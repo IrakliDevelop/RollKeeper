@@ -1,11 +1,20 @@
 import { 
-  CharacterState, 
+  CharacterAbilities, 
+  SkillName, 
   AbilityName, 
-  SkillName 
+  CharacterState,
+  SpellSlots,
+  PactMagic,
+  ClassInfo 
 } from '@/types/character';
 import { 
   SKILL_ABILITY_MAP, 
-  PROFICIENCY_BONUS_BY_LEVEL 
+  PROFICIENCY_BONUS_BY_LEVEL,
+  FULL_CASTER_SPELL_SLOTS,
+  HALF_CASTER_SPELL_SLOTS,
+  THIRD_CASTER_SPELL_SLOTS,
+  WARLOCK_PACT_SLOTS,
+  XP_THRESHOLDS
 } from './constants';
 
 /**
@@ -199,3 +208,146 @@ export const getCalculatedFields = (character: CharacterState) => {
     carryingCapacity: calculateCarryingCapacity(character),
   };
 }; 
+
+/**
+ * Calculate spell slots for a character based on class and level
+ */
+export function calculateSpellSlots(classInfo: ClassInfo, level: number): SpellSlots {
+  const emptySlots: SpellSlots = {
+    1: { max: 0, used: 0 },
+    2: { max: 0, used: 0 },
+    3: { max: 0, used: 0 },
+    4: { max: 0, used: 0 },
+    5: { max: 0, used: 0 },
+    6: { max: 0, used: 0 },
+    7: { max: 0, used: 0 },
+    8: { max: 0, used: 0 },
+    9: { max: 0, used: 0 },
+  };
+
+  if (classInfo.spellcaster === 'none' || classInfo.spellcaster === 'warlock') {
+    return emptySlots;
+  }
+
+  let slotsTable: Record<number, Record<number, number>>;
+  
+  switch (classInfo.spellcaster) {
+    case 'full':
+      slotsTable = FULL_CASTER_SPELL_SLOTS;
+      break;
+    case 'half':
+      slotsTable = HALF_CASTER_SPELL_SLOTS;
+      break;
+    case 'third':
+      slotsTable = THIRD_CASTER_SPELL_SLOTS;
+      break;
+    default:
+      return emptySlots;
+  }
+
+  const levelSlots = slotsTable[level] || {};
+  
+  const result = { ...emptySlots };
+  for (const [spellLevel, maxSlots] of Object.entries(levelSlots)) {
+    const level = parseInt(spellLevel) as keyof SpellSlots;
+    result[level] = { max: maxSlots, used: 0 };
+  }
+
+  return result;
+}
+
+/**
+ * Calculate warlock pact magic slots
+ */
+export function calculatePactMagic(level: number): PactMagic | undefined {
+  const pactData = WARLOCK_PACT_SLOTS[level];
+  if (!pactData) return undefined;
+
+  return {
+    slots: { max: pactData.slots, used: 0 },
+    level: pactData.level
+  };
+}
+
+/**
+ * Update spell slots when preserving used slots during level/class changes
+ */
+export function updateSpellSlotsPreservingUsed(
+  newSlots: SpellSlots, 
+  currentSlots: SpellSlots
+): SpellSlots {
+  const result = { ...newSlots };
+  
+  // Preserve used slots where possible, but don't exceed new max
+  for (let i = 1; i <= 9; i++) {
+    const level = i as keyof SpellSlots;
+    const currentUsed = currentSlots[level].used;
+    const newMax = newSlots[level].max;
+    
+    result[level].used = Math.min(currentUsed, newMax);
+  }
+  
+  return result;
+}
+
+/**
+ * Check if character has any spell slots
+ */
+export function hasSpellSlots(spellSlots: SpellSlots | undefined, pactMagic?: PactMagic): boolean {
+  const hasRegularSlots = spellSlots ? Object.values(spellSlots).some(slot => slot.max > 0) : false;
+  const hasPactSlots = pactMagic && pactMagic.slots.max > 0;
+  
+  return hasRegularSlots || !!hasPactSlots;
+} 
+
+/**
+ * Calculate level from experience points
+ */
+export function calculateLevelFromXP(xp: number): number {
+  // Find the highest level where XP threshold is met
+  for (let level = 20; level >= 1; level--) {
+    if (xp >= XP_THRESHOLDS[level]) {
+      return level;
+    }
+  }
+  return 1; // Fallback to level 1
+}
+
+/**
+ * Get XP required for a specific level
+ */
+export function getXPForLevel(level: number): number {
+  return XP_THRESHOLDS[Math.max(1, Math.min(20, level))] || 0;
+}
+
+/**
+ * Get XP needed to reach the next level
+ */
+export function getXPToNextLevel(currentXP: number, currentLevel: number): number {
+  if (currentLevel >= 20) return 0; // Max level reached
+  
+  const nextLevelXP = getXPForLevel(currentLevel + 1);
+  return Math.max(0, nextLevelXP - currentXP);
+}
+
+/**
+ * Get XP progress percentage for current level
+ */
+export function getXPProgress(currentXP: number, currentLevel: number): number {
+  if (currentLevel >= 20) return 100; // Max level reached
+  
+  const currentLevelXP = getXPForLevel(currentLevel);
+  const nextLevelXP = getXPForLevel(currentLevel + 1);
+  const xpInCurrentLevel = currentXP - currentLevelXP;
+  const xpNeededForLevel = nextLevelXP - currentLevelXP;
+  
+  return Math.min(100, Math.max(0, (xpInCurrentLevel / xpNeededForLevel) * 100));
+}
+
+/**
+ * Check if character should level up based on XP
+ */
+export function shouldLevelUp(currentXP: number, currentLevel: number): boolean {
+  const calculatedLevel = calculateLevelFromXP(currentXP);
+  return calculatedLevel > currentLevel;
+} 

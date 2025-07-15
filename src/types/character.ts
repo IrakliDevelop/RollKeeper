@@ -31,12 +31,50 @@ export interface HitPoints {
   temporary: number;
 }
 
+// Initiative tracking with override capability
+export interface InitiativeData {
+  value: number;
+  isOverridden: boolean; // If true, use custom value; if false, calculate from DEX
+}
+
+// Spell slot tracking for each level
+export interface SpellSlot {
+  max: number;
+  used: number;
+}
+
+// Spell slot data structure
+export interface SpellSlots {
+  1: SpellSlot;
+  2: SpellSlot;
+  3: SpellSlot;
+  4: SpellSlot;
+  5: SpellSlot;
+  6: SpellSlot;
+  7: SpellSlot;
+  8: SpellSlot;
+  9: SpellSlot;
+}
+
+// Warlock pact magic slots
+export interface PactMagic {
+  slots: SpellSlot;
+  level: number; // Pact slot level (1-5)
+}
+
+// Class information with custom support
+export interface ClassInfo {
+  name: string;
+  isCustom: boolean;
+  spellcaster?: 'full' | 'half' | 'third' | 'warlock' | 'none';
+}
+
 // Main character state interface
 export interface CharacterState {
   // Basic Information
   name: string;
   race: string;
-  class: string;
+  class: ClassInfo;
   level: number;
   experience: number;
   background: string;
@@ -71,7 +109,7 @@ export interface CharacterState {
   // Combat Stats
   hitPoints: HitPoints;
   armorClass: number;
-  initiative: number;
+  initiative: InitiativeData;
   speed: number;
   hitDice: string; // e.g., "1d8", "2d6"
   
@@ -84,6 +122,10 @@ export interface CharacterState {
     wisdom: SavingThrowProficiency;
     charisma: SavingThrowProficiency;
   };
+
+  // Spell Slots
+  spellSlots: SpellSlots;
+  pactMagic?: PactMagic; // Only for warlocks
 }
 
 // UI state for managing application state
