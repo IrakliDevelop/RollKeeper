@@ -4,6 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyle } from '@tiptap/extension-text-style';
+import { BulletList } from '@tiptap/extension-bullet-list';
+import { OrderedList } from '@tiptap/extension-ordered-list';
+import { ListItem } from '@tiptap/extension-list-item';
 import { 
   Bold, 
   Italic, 
@@ -41,13 +44,33 @@ export default function RichTextEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        bulletList: {
-          keepMarks: true,
-          keepAttributes: false,
+        // Disable built-in list extensions to use explicit ones
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
+        // Keep other extensions
+        heading: {
+          levels: [1, 2, 3],
         },
-        orderedList: {
-          keepMarks: true,
-          keepAttributes: false,
+      }),
+      // Explicitly add list extensions with proper configuration
+      BulletList.configure({
+        HTMLAttributes: {
+          class: 'list-disc list-inside space-y-1',
+        },
+        keepMarks: true,
+        keepAttributes: false,
+      }),
+      OrderedList.configure({
+        HTMLAttributes: {
+          class: 'list-decimal list-inside space-y-1',
+        },
+        keepMarks: true,
+        keepAttributes: false,
+      }),
+      ListItem.configure({
+        HTMLAttributes: {
+          class: 'leading-relaxed',
         },
       }),
       TextStyle,
@@ -59,7 +82,7 @@ export default function RichTextEditor({
     },
     editorProps: {
       attributes: {
-        class: `prose prose-sm max-w-none focus:outline-none px-3 py-2 text-gray-800`,
+        class: `focus:outline-none px-3 py-2 text-gray-800 leading-relaxed`,
         style: `min-height: ${minHeight}`,
       },
     },
@@ -216,7 +239,7 @@ export default function RichTextEditor({
       <div className="relative">
         <EditorContent 
           editor={editor} 
-          className="focus-within:ring-1 focus-within:ring-blue-500"
+          className="focus-within:ring-1 focus-within:ring-blue-500 prose-editor"
         />
         
         {/* Placeholder when empty */}
@@ -226,6 +249,46 @@ export default function RichTextEditor({
           </div>
         )}
       </div>
+      
+      {/* Custom styles for editor content */}
+      <style jsx>{`
+        .prose-editor :global(h1) {
+          font-size: 1.5rem;
+          font-weight: 700;
+          line-height: 1.3;
+          margin: 1rem 0 0.5rem 0;
+          color: #1f2937;
+        }
+        .prose-editor :global(h2) {
+          font-size: 1.25rem;
+          font-weight: 600;
+          line-height: 1.4;
+          margin: 0.75rem 0 0.5rem 0;
+          color: #374151;
+        }
+        .prose-editor :global(p) {
+          margin: 0.5rem 0;
+          line-height: 1.6;
+        }
+        .prose-editor :global(ul) {
+          margin: 0.5rem 0;
+          padding-left: 1.5rem;
+        }
+        .prose-editor :global(ol) {
+          margin: 0.5rem 0;
+          padding-left: 1.5rem;
+        }
+        .prose-editor :global(li) {
+          margin: 0.25rem 0;
+          line-height: 1.5;
+        }
+        .prose-editor :global(strong) {
+          font-weight: 600;
+        }
+        .prose-editor :global(em) {
+          font-style: italic;
+        }
+      `}</style>
     </div>
   );
 } 

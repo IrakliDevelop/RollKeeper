@@ -1,4 +1,4 @@
-import { AbilityName, SkillName, ClassInfo, RichTextContent, Weapon, Spell } from '@/types/character';
+import { AbilityName, SkillName, ClassInfo, RichTextContent, Weapon, Spell, TrackableTrait } from '@/types/character';
 
 // D&D 5e skill to ability mappings
 export const SKILL_ABILITY_MAP: Record<SkillName, AbilityName> = {
@@ -318,8 +318,11 @@ export const DEFAULT_CHARACTER_STATE = {
     9: { max: 0, used: 0 },
   },
 
+  trackableTraits: [] as TrackableTrait[],
+
   features: [] as RichTextContent[],
   traits: [] as RichTextContent[],
+  notes: [] as RichTextContent[],
   characterBackground: {
     backstory: '',
     personality: '',

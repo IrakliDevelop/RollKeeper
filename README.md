@@ -122,3 +122,9 @@ For detailed development plans and feature specifications, see `TODO.md`.
 - **Expanded spell filtering**: QuickSpells now includes utility spells with damage, not just attack/save spells
 - **Consistent UI patterns**: Damage roll buttons match the styling of weapon damage rolls for consistency
 - **Automatic damage calculation**: Uses the same `rollDamage` utility as weapons for accurate dice rolling
+
+### Notes Section & Rich Text Editor Improvements
+- **Added Notes section**: New dedicated notes area using the same interface as Features and Traits
+- **Fixed rich text editor**: Lists (bullet/numbered) and headers (H1/H2) now work properly
+- **Improved text rendering**: Consistent styling for rich text content across all editors
+- **Better extension configuration**: Explicit TipTap extension setup resolves formatting conflicts

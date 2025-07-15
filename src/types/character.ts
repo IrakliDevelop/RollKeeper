@@ -55,7 +55,7 @@ export interface RichTextContent {
   id: string;
   title: string;
   content: string; // HTML content from WYSIWYG editor
-  category: 'feature' | 'trait' | 'background';
+  category: 'feature' | 'trait' | 'background' | 'note' | 'spell';
   createdAt: string;
   updatedAt: string;
 }
@@ -86,6 +86,19 @@ export interface SpellSlots {
   7: SpellSlot;
   8: SpellSlot;
   9: SpellSlot;
+}
+
+// Trackable trait/feature with limited uses
+export interface TrackableTrait {
+  id: string;
+  name: string;
+  description?: string;
+  maxUses: number;
+  usedUses: number;
+  restType: 'short' | 'long'; // Recharges on short or long rest
+  source?: string; // e.g., "Racial", "Feat", "Class Feature", etc.
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Warlock pact magic slots
@@ -235,9 +248,13 @@ export interface CharacterState {
   spellSlots: SpellSlots;
   pactMagic?: PactMagic; // Only for warlocks
 
+  // Trackable Traits
+  trackableTraits: TrackableTrait[];
+
   // Rich Text Content
   features: RichTextContent[];
   traits: RichTextContent[];
+  notes: RichTextContent[];
   characterBackground: CharacterBackground;
 
   // Weapons and Equipment

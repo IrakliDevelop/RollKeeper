@@ -6,8 +6,10 @@ import { useAutoSave } from "@/hooks/useAutoSave";
 import { SaveIndicator } from "@/components/ui/SaveIndicator";
 import ClassSelector from "@/components/ui/ClassSelector";
 import SpellSlotTracker from "@/components/ui/SpellSlotTracker";
+import TraitTracker from "@/components/ui/TraitTracker";
 import XPTracker from "@/components/ui/XPTracker";
 import FeaturesTraitsManager from "@/components/ui/FeaturesTraitsManager";
+import NotesManager from "@/components/ui/NotesManager";
 import CharacterBackgroundEditor from "@/components/ui/CharacterBackgroundEditor";
 import HitPointManager from "@/components/ui/HitPointManager";
 import HitDiceManager from "@/components/ui/HitDiceManager";
@@ -79,6 +81,14 @@ export default function CharacterSheet() {
     addTrait,
     updateTrait,
     deleteTrait,
+    addNote,
+    updateNote,
+    deleteNote,
+    addTrackableTrait,
+    updateTrackableTrait,
+    deleteTrackableTrait,
+    useTrackableTrait,
+    resetTrackableTraits,
     updateCharacterBackground,
     exportCharacter,
     importCharacter,
@@ -719,6 +729,16 @@ export default function CharacterSheet() {
               />
             )}
 
+            {/* Special Abilities */}
+            <TraitTracker
+              traits={character.trackableTraits || []}
+              onAddTrait={addTrackableTrait}
+              onUpdateTrait={updateTrackableTrait}
+              onDeleteTrait={deleteTrackableTrait}
+              onUseTrait={useTrackableTrait}
+              onResetTraits={resetTrackableTraits}
+            />
+
             {/* Quick Stats */}
             <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
               <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
@@ -789,7 +809,7 @@ export default function CharacterSheet() {
           <h2 className="text-2xl font-bold text-emerald-800 mb-6 text-center border-b-2 border-emerald-400 pb-3">
             📜 Character Details
           </h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
             
             {/* Features */}
             <ErrorBoundary fallback={
@@ -824,7 +844,7 @@ export default function CharacterSheet() {
             </ErrorBoundary>
 
             {/* Character Background - Full Width */}
-            <div className="lg:col-span-2 xl:col-span-3">
+            <div className="lg:col-span-2">
               <ErrorBoundary fallback={
                 <div className="bg-white rounded-lg shadow-lg border border-emerald-200 p-6">
                   <h3 className="text-lg font-bold text-emerald-800 mb-4">Character Background</h3>
@@ -837,6 +857,35 @@ export default function CharacterSheet() {
                 />
               </ErrorBoundary>
             </div>
+          </div>
+        </section>
+
+        {/* Section Divider */}
+        <div className="flex items-center justify-center">
+          <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent w-full max-w-md"></div>
+          <span className="px-4 text-gray-500 font-medium">Session Notes</span>
+          <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent w-full max-w-md"></div>
+        </div>
+
+        {/* Notes Section */}
+        <section className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-300 shadow-lg backdrop-blur-sm">
+          <h2 className="text-2xl font-bold text-blue-800 mb-6 text-center border-b-2 border-blue-400 pb-3">
+            📝 Session Notes
+          </h2>
+          <div className="max-w-none">
+            <ErrorBoundary fallback={
+              <div className="bg-white rounded-lg shadow-lg border border-blue-200 p-6">
+                <h3 className="text-lg font-bold text-blue-800 mb-4">Notes</h3>
+                <p className="text-gray-500">Unable to load notes editor</p>
+              </div>
+            }>
+              <NotesManager
+                items={character.notes}
+                onAdd={addNote}
+                onUpdate={updateNote}
+                onDelete={deleteNote}
+              />
+            </ErrorBoundary>
           </div>
         </section>
 

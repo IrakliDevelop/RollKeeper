@@ -7,7 +7,7 @@ import RichTextEditor from './RichTextEditor';
 
 interface FeaturesTraitsManagerProps {
   items: RichTextContent[];
-  category: 'feature' | 'trait';
+  category: 'feature' | 'trait' | 'note';
   onAdd: (item: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onUpdate: (id: string, updates: Partial<RichTextContent>) => void;
   onDelete: (id: string) => void;
@@ -28,7 +28,7 @@ export default function FeaturesTraitsManager({
   const [isAdding, setIsAdding] = useState(false);
   const [newItem, setNewItem] = useState({ title: '', content: '' });
 
-  const categoryName = category === 'feature' ? 'Features' : 'Traits';
+  const categoryName = category === 'feature' ? 'Features' : category === 'trait' ? 'Traits' : 'Notes';
   
   // Define concrete styles to avoid Tailwind CSS purging issues
   const styles = category === 'feature' 
@@ -41,7 +41,8 @@ export default function FeaturesTraitsManager({
         itemBorder: 'border-amber-200',
         itemTitle: 'text-amber-900'
       }
-    : {
+    : category === 'trait'
+    ? {
         containerBorder: 'border-emerald-200',
         headerText: 'text-emerald-800', 
         addButton: 'bg-emerald-600 hover:bg-emerald-700',
@@ -49,6 +50,15 @@ export default function FeaturesTraitsManager({
         saveButton: 'bg-emerald-600 hover:bg-emerald-700',
         itemBorder: 'border-emerald-200',
         itemTitle: 'text-emerald-900'
+      }
+    : {
+        containerBorder: 'border-blue-200',
+        headerText: 'text-blue-800', 
+        addButton: 'bg-blue-600 hover:bg-blue-700',
+        formContainer: 'bg-blue-50 border-blue-200',
+        saveButton: 'bg-blue-600 hover:bg-blue-700',
+        itemBorder: 'border-blue-200',
+        itemTitle: 'text-blue-900'
       };
 
   const handleAdd = () => {
@@ -89,7 +99,7 @@ export default function FeaturesTraitsManager({
           className={`flex items-center space-x-1 px-3 py-1 ${styles.addButton} text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm`}
         >
           <Plus size={14} />
-          <span>Add {category === 'feature' ? 'Feature' : 'Trait'}</span>
+          <span>Add {category === 'feature' ? 'Feature' : category === 'trait' ? 'Trait' : 'Note'}</span>
         </button>
       </div>
 
@@ -99,7 +109,7 @@ export default function FeaturesTraitsManager({
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {category === 'feature' ? 'Feature' : 'Trait'} Name
+                {category === 'feature' ? 'Feature' : category === 'trait' ? 'Trait' : 'Note'} Name
               </label>
               <input
                 type="text"
@@ -146,8 +156,8 @@ export default function FeaturesTraitsManager({
       <div className="space-y-3">
         {safeItems.length === 0 && !isAdding && (
           <div className="text-center py-8 text-gray-500">
-            <p>No {category === 'feature' ? 'features' : 'traits'} added yet.</p>
-            <p className="text-sm mt-1">Click &quot;Add {category === 'feature' ? 'Feature' : 'Trait'}&quot; to get started.</p>
+            <p>No {category === 'feature' ? 'features' : category === 'trait' ? 'traits' : 'notes'} added yet.</p>
+            <p className="text-sm mt-1">Click &quot;Add {category === 'feature' ? 'Feature' : category === 'trait' ? 'Trait' : 'Note'}&quot; to get started.</p>
           </div>
         )}
 
@@ -188,7 +198,7 @@ interface CategoryStyles {
 
 interface EditItemFormProps {
   item: RichTextContent;
-  category: 'feature' | 'trait';
+  category: 'feature' | 'trait' | 'note';
   styles: CategoryStyles;
   onSave: (updates: { title: string; content: string }) => void;
   onCancel: () => void;
@@ -208,7 +218,7 @@ function EditItemForm({ item, category, styles, onSave, onCancel }: EditItemForm
     <div className="space-y-3">
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          {category === 'feature' ? 'Feature' : 'Trait'} Name
+          {category === 'feature' ? 'Feature' : category === 'trait' ? 'Trait' : 'Note'} Name
         </label>
         <input
           type="text"
@@ -278,9 +288,51 @@ function ViewItem({ item, styles, onEdit, onDelete }: ViewItemProps) {
         </div>
       </div>
       <div 
-        className="text-sm text-gray-700 prose prose-sm max-w-none"
+        className="text-sm text-gray-700 rich-content"
         dangerouslySetInnerHTML={{ __html: item.content || '<p class="text-gray-500 italic">No description provided.</p>' }}
       />
+      
+      {/* Inline styles for proper rendering of rich content */}
+      <style jsx>{`
+        .rich-content :global(h1) {
+          font-size: 1.125rem;
+          font-weight: 700;
+          line-height: 1.3;
+          margin: 0.75rem 0 0.5rem 0;
+          color: #1f2937;
+        }
+        .rich-content :global(h2) {
+          font-size: 1rem;
+          font-weight: 600;
+          line-height: 1.4;
+          margin: 0.5rem 0 0.25rem 0;
+          color: #374151;
+        }
+        .rich-content :global(p) {
+          margin: 0.25rem 0;
+          line-height: 1.5;
+        }
+        .rich-content :global(ul) {
+          margin: 0.25rem 0;
+          padding-left: 1.25rem;
+          list-style-type: disc;
+        }
+        .rich-content :global(ol) {
+          margin: 0.25rem 0;
+          padding-left: 1.25rem;
+          list-style-type: decimal;
+        }
+        .rich-content :global(li) {
+          margin: 0.125rem 0;
+          line-height: 1.4;
+        }
+        .rich-content :global(strong) {
+          font-weight: 600;
+        }
+        .rich-content :global(em) {
+          font-style: italic;
+        }
+      `}</style>
     </>
   );
 } 

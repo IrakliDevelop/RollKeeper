@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, HitPoints, DeathSavingThrows, Weapon } from '@/types/character';
+import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, HitPoints, DeathSavingThrows, Weapon, TrackableTrait } from '@/types/character';
 import { DEFAULT_CHARACTER_STATE, STORAGE_KEY, APP_VERSION, COMMON_CLASSES } from '@/utils/constants';
 import { 
   calculateSpellSlots, 
@@ -42,6 +42,9 @@ function migrateCharacterData(character: unknown): CharacterState {
     }
     if (!Array.isArray(result.traits)) {
       result.traits = DEFAULT_CHARACTER_STATE.traits;
+    }
+    if (!Array.isArray(result.notes)) {
+      result.notes = DEFAULT_CHARACTER_STATE.notes;
     }
     // Ensure characterBackground exists
     if (!result.characterBackground || typeof result.characterBackground !== 'object' || !('backstory' in result.characterBackground)) {
@@ -184,6 +187,16 @@ interface CharacterStore {
   addTrait: (trait: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateTrait: (id: string, updates: Partial<RichTextContent>) => void;
   deleteTrait: (id: string) => void;
+  addNote: (note: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateNote: (id: string, updates: Partial<RichTextContent>) => void;
+  deleteNote: (id: string) => void;
+
+  // Trackable trait management
+  addTrackableTrait: (trait: Omit<TrackableTrait, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateTrackableTrait: (id: string, updates: Partial<TrackableTrait>) => void;
+  deleteTrackableTrait: (id: string) => void;
+  useTrackableTrait: (id: string) => void;
+  resetTrackableTraits: (restType: 'short' | 'long') => void;
   updateCharacterBackground: (updates: Partial<CharacterBackground>) => void;
 
   // Weapon management
@@ -760,6 +773,133 @@ export const useCharacterStore = create<CharacterStore>()(
           character: {
             ...state.character,
             traits: state.character.traits.filter(trait => trait.id !== id)
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      addNote: (note: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => {
+        set((state) => {
+          const newNote: RichTextContent = {
+            ...note,
+            id: generateId(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          return {
+            character: {
+              ...state.character,
+              notes: [...state.character.notes, newNote]
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      updateNote: (id: string, updates: Partial<RichTextContent>) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            notes: state.character.notes.map(note =>
+              note.id === id
+                ? { ...note, ...updates, updatedAt: new Date().toISOString() }
+                : note
+            )
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      deleteNote: (id: string) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            notes: state.character.notes.filter(note => note.id !== id)
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      // Trackable trait management
+      addTrackableTrait: (trait) => {
+        set((state) => {
+          const newTrait: TrackableTrait = {
+            ...trait,
+            id: generateId(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          return {
+            character: {
+              ...state.character,
+              trackableTraits: [...(state.character.trackableTraits || []), newTrait]
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      updateTrackableTrait: (id, updates) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            trackableTraits: (state.character.trackableTraits || []).map(trait =>
+              trait.id === id
+                ? { ...trait, ...updates, updatedAt: new Date().toISOString() }
+                : trait
+            )
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      deleteTrackableTrait: (id) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            trackableTraits: (state.character.trackableTraits || []).filter(trait => trait.id !== id)
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      useTrackableTrait: (id) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            trackableTraits: (state.character.trackableTraits || []).map(trait =>
+              trait.id === id
+                ? { 
+                    ...trait, 
+                    usedUses: Math.min(trait.usedUses + 1, trait.maxUses), 
+                    updatedAt: new Date().toISOString() 
+                  }
+                : trait
+            )
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      resetTrackableTraits: (restType) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            trackableTraits: (state.character.trackableTraits || []).map(trait =>
+              trait.restType === restType || restType === 'long'
+                ? { ...trait, usedUses: 0, updatedAt: new Date().toISOString() }
+                : trait
+            )
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving'
