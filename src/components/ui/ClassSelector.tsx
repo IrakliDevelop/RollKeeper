@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ClassInfo } from '@/types/character';
 import { COMMON_CLASSES } from '@/utils/constants';
 import { CustomSwitcher } from './CustomSwitcher';
+import { FancySelect } from './FancySelect';
 
 interface ClassSelectorProps {
   value: ClassInfo;
@@ -94,24 +95,24 @@ export default function ClassSelector({ value, onChange, className = '' }: Class
         </div>
       ) : (
         <div className="space-y-2">
-          <select
+          <FancySelect
+            options={[
+              { value: '', label: 'Select a class...' },
+              ...COMMON_CLASSES.map((classData) => ({
+                value: classData.name,
+                label: classData.name,
+                description: classData.spellcaster !== 'none' ? 
+                  `${classData.spellcaster === 'full' ? 'Full' : 
+                     classData.spellcaster === 'half' ? 'Half' : 
+                     classData.spellcaster === 'third' ? '1/3' : 
+                     'Pact'} Caster` : 'Non-spellcaster'
+              }))
+            ]}
             value={value.isCustom ? '' : value.name}
-            onChange={(e) => handleStandardClassChange(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-800"
-          >
-            <option value="">Select a class...</option>
-            {COMMON_CLASSES.map((classData) => (
-              <option key={classData.name} value={classData.name}>
-                {classData.name}
-                {classData.spellcaster !== 'none' && (
-                  ` (${classData.spellcaster === 'full' ? 'Full' : 
-                       classData.spellcaster === 'half' ? 'Half' : 
-                       classData.spellcaster === 'third' ? '1/3' : 
-                       'Pact'} Caster)`
-                )}
-              </option>
-            ))}
-          </select>
+            onChange={(selectedValue) => handleStandardClassChange(selectedValue as string)}
+            placeholder="Select a class..."
+            color="blue"
+          />
           
           {/* Show spellcaster info for selected class */}
           {value.name && !value.isCustom && (

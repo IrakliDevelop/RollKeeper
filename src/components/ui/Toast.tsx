@@ -43,13 +43,13 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
   const getToastStyles = () => {
     switch (toast.type) {
       case 'attack':
-        return 'bg-gradient-to-r from-red-500 to-red-600 text-white border-red-400';
+        return 'bg-gradient-to-r from-slate-700 to-slate-800 text-white border-slate-600';
       case 'save':
-        return 'bg-gradient-to-r from-blue-500 to-blue-600 text-white border-blue-400';
+        return 'bg-gradient-to-r from-blue-600 to-blue-700 text-white border-blue-500';
       case 'damage':
-        return 'bg-gradient-to-r from-orange-500 to-orange-600 text-white border-orange-400';
+        return 'bg-gradient-to-r from-amber-600 to-orange-600 text-white border-amber-500';
       case 'success':
-        return 'bg-gradient-to-r from-green-500 to-green-600 text-white border-green-400';
+        return 'bg-gradient-to-r from-emerald-600 to-green-600 text-white border-emerald-500';
       case 'error':
         return 'bg-gradient-to-r from-red-600 to-red-700 text-white border-red-500';
       default:
@@ -221,11 +221,22 @@ export const useToast = () => {
     });
   }, [addToast]);
 
+  const showDamageRoll = useCallback((weaponName: string, damageRoll: string, damageType?: string, versatile = false) => {
+    addToast({
+      type: 'damage',
+      title: `💥 ${weaponName}${versatile ? ' (Versatile)' : ''}`,
+      message: `Damage: ${damageRoll}`,
+      details: damageType ? [`🗡️ ${damageType.charAt(0).toUpperCase() + damageType.slice(1)} damage`] : [],
+      duration: 4000
+    });
+  }, [addToast]);
+
   return {
     toasts,
     addToast,
     dismissToast,
     showAttackRoll,
-    showSavingThrow
+    showSavingThrow,
+    showDamageRoll
   };
 }; 

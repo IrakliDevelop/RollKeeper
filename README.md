@@ -108,3 +108,17 @@ The foundation is set! Next development stages include:
 - Character export format designed for future compatibility
 
 For detailed development plans and feature specifications, see `TODO.md`.
+
+## 🔧 Recent Improvements
+
+### Modal Portal System
+- **Fixed modal rendering issues**: Implemented React Portal system for all modals (weapon management, spell management, confirmation dialogs)
+- **Full-page backdrop blur**: Modals now properly blur the entire page instead of just their parent containers
+- **No more clipping**: Modals are rendered at the document body level, preventing parent container CSS from causing clipping issues
+- **Improved accessibility**: Added proper body scroll management when modals are open
+
+### Enhanced Quick Spells Action System
+- **Added damage roll functionality**: Spells with damage dice now have dedicated damage roll buttons
+- **Expanded spell filtering**: QuickSpells now includes utility spells with damage, not just attack/save spells
+- **Consistent UI patterns**: Damage roll buttons match the styling of weapon damage rolls for consistency
+- **Automatic damage calculation**: Uses the same `rollDamage` utility as weapons for accurate dice rolling

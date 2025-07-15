@@ -2,20 +2,23 @@
 
 import React from 'react';
 import { useCharacterStore } from '@/store/characterStore';
-import { Shield, Dice6 } from 'lucide-react';
+import { Shield, Dice6, Zap } from 'lucide-react';
 import { Weapon } from '@/types/character';
 import { 
   isWeaponProficient, 
   getWeaponAttackString, 
   getWeaponDamageString,
-  calculateWeaponAttackBonus
+  calculateWeaponAttackBonus,
+  calculateWeaponDamageBonus,
+  rollDamage
 } from '@/utils/calculations';
 
 interface EquippedWeaponsProps {
   showAttackRoll: (weaponName: string, roll: number, bonus: number, isCrit: boolean, damage?: string, damageType?: string) => void;
+  showDamageRoll: (weaponName: string, damageRoll: string, damageType?: string, versatile?: boolean) => void;
 }
 
-export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll }) => {
+export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll, showDamageRoll }) => {
   const { character, equipWeapon } = useCharacterStore();
   
   const rollWeaponAttack = (weapon: Weapon) => {
@@ -30,6 +33,19 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
       isCrit,
       weapon.damage.dice,
       weapon.damage.type
+    );
+  };
+
+  const rollWeaponDamage = (weapon: Weapon, versatile = false) => {
+    const damageBonus = calculateWeaponDamageBonus(character, weapon);
+    const dice = versatile && weapon.damage.versatiledice ? weapon.damage.versatiledice : weapon.damage.dice;
+    const damageResult = rollDamage(dice, damageBonus);
+    
+    showDamageRoll(
+      weapon.name,
+      damageResult,
+      weapon.damage.type,
+      versatile
     );
   };
   
@@ -130,18 +146,36 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
                   </div>
                 </div>
                 
-                <div className="flex flex-col items-center gap-1 ml-3">
+                <div className="flex flex-col items-center gap-2 ml-3">
                   <button
                     onClick={() => rollWeaponAttack(weapon)}
-                    className="flex items-center gap-1 px-2 py-1 text-xs bg-red-600 text-white hover:bg-red-700 rounded transition-colors"
+                    className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-lg shadow-md hover:from-slate-700 hover:to-slate-800 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
                     title="Roll attack"
                   >
-                    <Dice6 size={12} />
+                    <Dice6 size={14} className="group-hover:rotate-12 transition-transform" />
                     Attack
                   </button>
                   <button
+                    onClick={() => rollWeaponDamage(weapon)}
+                    className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg shadow-md hover:from-amber-600 hover:to-orange-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+                    title="Roll damage"
+                  >
+                    <Zap size={14} className="group-hover:animate-pulse" />
+                    Damage
+                  </button>
+                  {weapon.damage.versatiledice && (
+                    <button
+                      onClick={() => rollWeaponDamage(weapon, true)}
+                      className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-purple-600 to-violet-700 text-white rounded-lg shadow-md hover:from-purple-700 hover:to-violet-800 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+                      title="Roll versatile damage"
+                    >
+                      <Zap size={14} className="group-hover:animate-pulse" />
+                      Versatile
+                    </button>
+                  )}
+                  <button
                     onClick={() => equipWeapon(weapon.id, false)}
-                    className="px-2 py-1 text-xs bg-orange-200 text-orange-800 hover:bg-orange-300 rounded transition-colors"
+                    className="px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-orange-100 to-orange-200 text-orange-800 hover:from-orange-200 hover:to-orange-300 border border-orange-300 rounded-lg shadow-sm hover:shadow-md transform hover:scale-105 transition-all duration-200"
                     title="Unequip weapon"
                   >
                     Unequip

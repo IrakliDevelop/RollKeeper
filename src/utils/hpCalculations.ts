@@ -49,6 +49,7 @@ export function getClassHitDie(className: string, customHitDie?: number): number
  * 1. Damage hits temporary HP first
  * 2. Excess damage carries over to current HP
  * 3. If current HP reaches 0, trigger death saves
+ * 4. If excess damage after reaching 0 HP >= max HP, instant death (massive damage)
  */
 export function applyDamage(hitPoints: HitPoints, damage: number): HitPoints {
   if (damage <= 0) return hitPoints;
@@ -67,28 +68,33 @@ export function applyDamage(hitPoints: HitPoints, damage: number): HitPoints {
 
   // Then damage current HP
   if (remainingDamage > 0) {
-    newCurrentHP -= remainingDamage;
-  }
-
-  // If we hit 0 HP or below
-  if (newCurrentHP <= 0) {
-    newCurrentHP = 0;
+    // Calculate how much damage it takes to reach 0 HP
+    const damageToZero = Math.min(remainingDamage, newCurrentHP);
+    newCurrentHP -= damageToZero;
     
-    // Check for massive damage (damage >= max HP)
-    if (remainingDamage >= hitPoints.max) {
-      // Instant death from massive damage
-      deathSaves = {
-        successes: 0,
-        failures: 3,
-        isStabilized: false
-      };
-    } else if (!deathSaves) {
-      // Start death saving throws
-      deathSaves = {
-        successes: 0,
-        failures: 0,
-        isStabilized: false
-      };
+    // If we hit 0 HP or below
+    if (newCurrentHP <= 0) {
+      newCurrentHP = 0;
+      
+      // Calculate excess damage after reaching 0 HP (massive damage calculation)
+      const excessDamage = remainingDamage - damageToZero;
+      
+      // Check for massive damage (excess damage >= max HP)
+      if (excessDamage >= hitPoints.max) {
+        // Instant death from massive damage
+        deathSaves = {
+          successes: 0,
+          failures: 3,
+          isStabilized: false
+        };
+      } else if (!deathSaves) {
+        // Start death saving throws (unconscious but not dead)
+        deathSaves = {
+          successes: 0,
+          failures: 0,
+          isStabilized: false
+        };
+      }
     }
   }
 

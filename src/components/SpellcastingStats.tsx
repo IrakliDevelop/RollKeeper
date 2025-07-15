@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useCharacterStore } from '@/store/characterStore';
 import { SpellcastingAbility } from '@/types/character';
 import { CustomSwitcher } from './ui/CustomSwitcher';
+import { FancySelect } from './ui/FancySelect';
 import { Edit3, Calculator, Zap, Shield } from 'lucide-react';
 import { 
   getClassSpellcastingAbility, 
@@ -120,15 +121,17 @@ export const SpellcastingStats: React.FC = () => {
           
           <div className="flex items-center gap-4">
             {character.spellcastingStats.isAbilityOverridden ? (
-              <select
+              <FancySelect
+                options={[
+                  { value: 'intelligence', label: 'Intelligence', description: 'Logic, reasoning, memory' },
+                  { value: 'wisdom', label: 'Wisdom', description: 'Awareness, insight, intuition' },
+                  { value: 'charisma', label: 'Charisma', description: 'Force of personality, leadership' }
+                ]}
                 value={character.spellcastingStats.spellcastingAbility || 'intelligence'}
-                onChange={(e) => handleAbilityChange(e.target.value as SpellcastingAbility)}
-                className="px-3 py-2 border border-purple-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-800"
-              >
-                <option value="intelligence">Intelligence</option>
-                <option value="wisdom">Wisdom</option>
-                <option value="charisma">Charisma</option>
-              </select>
+                onChange={(value) => handleAbilityChange(value as SpellcastingAbility)}
+                color="purple"
+                className="w-48"
+              />
             ) : (
               <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-gray-800 capitalize">
                 {classDefaultAbility || 'Unknown'}

@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { Spell, SpellActionType } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Edit2, Trash2, Eye, BookOpen } from 'lucide-react';
+import { FancySelect } from '@/components/ui/FancySelect';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 // Constants for spell schools and common casting times
 const SPELL_SCHOOLS = [
@@ -222,17 +224,21 @@ export const SpellManagement: React.FC = () => {
           </h3>
           
           {/* Level Filter */}
-          <select
+          <FancySelect
+            options={[
+              { value: 'all', label: 'All Levels' },
+              { value: 0, label: 'Cantrips', description: 'Unlimited use spells' },
+              ...Array.from({ length: 9 }, (_, i) => ({
+                value: i + 1,
+                label: `Level ${i + 1}`,
+                description: i === 0 ? 'First level spells' : i === 8 ? 'Ninth level spells' : `${['Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth'][i-1]} level spells`
+              }))
+            ]}
             value={filterLevel}
-            onChange={(e) => setFilterLevel(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-            className="px-3 py-1 border border-purple-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500"
-          >
-            <option value="all">All Levels</option>
-            <option value={0}>Cantrips</option>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => (
-              <option key={level} value={level}>Level {level}</option>
-            ))}
-          </select>
+            onChange={(value) => setFilterLevel(value === 'all' ? 'all' : value as number)}
+            color="purple"
+            className="w-40"
+          />
         </div>
         
         <button
@@ -362,12 +368,13 @@ export const SpellManagement: React.FC = () => {
       </div>
 
       {/* Spell Form Modal */}
-      {isFormOpen && (
+      <ModalPortal isOpen={isFormOpen}>
         <div 
-          className="fixed inset-0 flex items-center justify-center z-50 p-4 backdrop-blur-md"
+          className="fixed inset-0 flex items-center justify-center z-[9999] p-4 bg-black/50 backdrop-blur-sm"
           onClick={(e) => e.target === e.currentTarget && resetForm()}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
         >
-          <div className="bg-gradient-to-br from-white to-purple-50 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-purple-200">
+          <div className="bg-gradient-to-br from-white to-purple-50 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-purple-200 transform animate-in zoom-in-95 fade-in-0 duration-200">
             <div className="p-6">
               <h3 className="text-xl font-bold text-purple-800 mb-6 flex items-center gap-2">
                 <span className="text-purple-600">✨</span>
@@ -396,16 +403,19 @@ export const SpellManagement: React.FC = () => {
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-800 mb-1">Level</label>
-                      <select
+                      <FancySelect
+                        options={[
+                          { value: 0, label: 'Cantrip', description: 'Unlimited use spell' },
+                          ...Array.from({ length: 9 }, (_, i) => ({
+                            value: i + 1,
+                            label: `Level ${i + 1}`,
+                            description: `${i + 1}${i === 0 ? 'st' : i === 1 ? 'nd' : i === 2 ? 'rd' : 'th'} level spell slot required`
+                          }))
+                        ]}
                         value={formData.level}
-                        onChange={(e) => setFormData(prev => ({ ...prev, level: parseInt(e.target.value) }))}
-                        className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-800"
-                      >
-                        <option value={0}>Cantrip</option>
-                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => (
-                          <option key={level} value={level}>Level {level}</option>
-                        ))}
-                      </select>
+                        onChange={(value) => setFormData(prev => ({ ...prev, level: value as number }))}
+                        color="purple"
+                      />
                     </div>
                     
                     <div>
@@ -714,22 +724,24 @@ export const SpellManagement: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
 
       {/* Spell Detail Modal */}
-      {viewingSpell && (
+      <ModalPortal isOpen={!!viewingSpell}>
         <div 
-          className="fixed inset-0 flex items-center justify-center z-50 p-4 backdrop-blur-md"
+          className="fixed inset-0 flex items-center justify-center z-[9999] p-4 bg-black/50 backdrop-blur-sm"
           onClick={(e) => e.target === e.currentTarget && setViewingSpell(null)}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
         >
-          <div className="bg-gradient-to-br from-white to-purple-50 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-purple-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-2xl font-bold text-purple-800">{viewingSpell.name}</h3>
-                  <p className="text-sm text-purple-600">
-                    {viewingSpell.level === 0 ? 'Cantrip' : `Level ${viewingSpell.level}`} {viewingSpell.school}
-                  </p>
+          {viewingSpell && (
+            <div className="bg-gradient-to-br from-white to-purple-50 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-purple-200 transform animate-in zoom-in-95 fade-in-0 duration-200">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-2xl font-bold text-purple-800">{viewingSpell.name}</h3>
+                    <p className="text-sm text-purple-600">
+                      {viewingSpell.level === 0 ? 'Cantrip' : `Level ${viewingSpell.level}`} {viewingSpell.school}
+                    </p>
                 </div>
                 <button
                   onClick={() => setViewingSpell(null)}
@@ -819,8 +831,9 @@ export const SpellManagement: React.FC = () => {
               </div>
             </div>
           </div>
+          )}
         </div>
-      )}
+      </ModalPortal>
     </div>
   );
 }; 

@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { Weapon, WeaponCategory, WeaponType, DamageType } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Edit2, Trash2, Shield, Zap, Eye, Sword, Target } from 'lucide-react';
+import { FancySelect } from '@/components/ui/FancySelect';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 import { 
   isWeaponProficient, 
   getWeaponAttackString, 
@@ -295,12 +297,13 @@ export const WeaponInventory: React.FC = () => {
       </div>
 
       {/* Add/Edit Form Modal */}
-      {isFormOpen && (
+      <ModalPortal isOpen={isFormOpen}>
         <div 
-          className="fixed inset-0 flex items-center justify-center z-50 p-4 backdrop-blur-md"
+          className="fixed inset-0 flex items-center justify-center z-[9999] p-4 bg-black/50 backdrop-blur-sm"
           onClick={(e) => e.target === e.currentTarget && resetForm()}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
         >
-          <div className="bg-gradient-to-br from-white to-blue-50 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-blue-200">
+          <div className="bg-gradient-to-br from-white to-blue-50 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-blue-200 transform animate-in zoom-in-95 fade-in-0 duration-200">
             <div className="p-6">
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 bg-blue-100 rounded-lg">
@@ -336,15 +339,19 @@ export const WeaponInventory: React.FC = () => {
                       <label className="block text-sm font-semibold text-gray-800 mb-2">
                         Category
                       </label>
-                      <select
+                      <FancySelect
+                        options={WEAPON_CATEGORIES.map(cat => ({
+                          value: cat,
+                          label: cat.charAt(0).toUpperCase() + cat.slice(1),
+                          description: cat === 'simple' ? 'Basic weapons (clubs, daggers, etc.)' :
+                                     cat === 'martial' ? 'Advanced weapons (swords, bows, etc.)' :
+                                     cat === 'magic' ? 'Magical weapons with special properties' :
+                                     'Legendary artifacts with unique powers'
+                        }))}
                         value={formData.category}
-                        onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value as WeaponCategory }))}
-                        className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-gray-900"
-                      >
-                        {WEAPON_CATEGORIES.map(cat => (
-                          <option key={cat} value={cat} className="capitalize text-gray-900">{cat}</option>
-                        ))}
-                      </select>
+                        onChange={(value) => setFormData(prev => ({ ...prev, category: value as WeaponCategory }))}
+                        color="blue"
+                      />
                     </div>
                   </div>
                 </div>
@@ -396,18 +403,31 @@ export const WeaponInventory: React.FC = () => {
                       <label className="block text-sm font-semibold text-gray-800 mb-2">
                         Damage Type
                       </label>
-                      <select
-                        value={formData.damage.type}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          damage: { ...prev.damage, type: e.target.value as DamageType }
+                      <FancySelect
+                        options={DAMAGE_TYPES.map(type => ({
+                          value: type,
+                          label: type.charAt(0).toUpperCase() + type.slice(1),
+                          description: type === 'bludgeoning' ? 'Clubs, hammers, falling' :
+                                     type === 'piercing' ? 'Arrows, spears, fangs' :
+                                     type === 'slashing' ? 'Swords, axes, claws' :
+                                     type === 'fire' ? 'Flames, lava, dragons' :
+                                     type === 'cold' ? 'Ice, frost, winter' :
+                                     type === 'lightning' ? 'Electricity, storms' :
+                                     type === 'poison' ? 'Venom, toxins' :
+                                     type === 'acid' ? 'Corrosive substances' :
+                                     type === 'psychic' ? 'Mental attacks' :
+                                     type === 'necrotic' ? 'Death energy' :
+                                     type === 'radiant' ? 'Divine, holy light' :
+                                     type === 'force' ? 'Pure magical energy' :
+                                     'Sound, sonic attacks'
                         }))}
-                        className="w-full p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-gray-900"
-                      >
-                        {DAMAGE_TYPES.map(type => (
-                          <option key={type} value={type} className="capitalize text-gray-900">{type}</option>
-                        ))}
-                      </select>
+                        value={formData.damage.type}
+                        onChange={(value) => setFormData(prev => ({
+                          ...prev,
+                          damage: { ...prev.damage, type: value as DamageType }
+                        }))}
+                        color="blue"
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-800 mb-2">
@@ -653,15 +673,17 @@ export const WeaponInventory: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
 
       {/* Weapon Detail Modal */}
-      {viewingWeapon && (
+      <ModalPortal isOpen={!!viewingWeapon}>
         <div 
-          className="fixed inset-0 flex items-center justify-center z-50 p-4 backdrop-blur-md"
+          className="fixed inset-0 flex items-center justify-center z-[9999] p-4 bg-black/50 backdrop-blur-sm"
           onClick={(e) => e.target === e.currentTarget && setViewingWeapon(null)}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, margin: 0 }}
         >
-          <div className="bg-gradient-to-br from-white to-blue-50 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-blue-200">
+          {viewingWeapon && (
+          <div className="bg-gradient-to-br from-white to-blue-50 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-blue-200 transform animate-in zoom-in-95 fade-in-0 duration-200">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -810,8 +832,9 @@ export const WeaponInventory: React.FC = () => {
               </div>
             </div>
           </div>
+          )}
         </div>
-      )}
+      </ModalPortal>
     </div>
   );
 }; 

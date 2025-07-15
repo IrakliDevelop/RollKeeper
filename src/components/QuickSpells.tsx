@@ -1,16 +1,17 @@
 'use client';
 
-import { Shield, Sparkles, Dice6 } from "lucide-react";
+import { Shield, Sparkles, Dice6, Zap } from "lucide-react";
 import { useCharacterStore } from "@/store/characterStore";
 import { Spell } from "@/types/character";
-import { calculateSpellAttackBonus, calculateSpellSaveDC, getCharacterSpellcastingAbility } from "@/utils/calculations";
+import { calculateSpellAttackBonus, calculateSpellSaveDC, getCharacterSpellcastingAbility, rollDamage } from "@/utils/calculations";
 
 interface QuickSpellsProps {
   showAttackRoll: (weaponName: string, roll: number, bonus: number, isCrit: boolean, damage?: string, damageType?: string) => void;
   showSavingThrow: (spellName: string, saveDC: number, saveType?: string, damage?: string, damageType?: string) => void;
+  showDamageRoll: (weaponName: string, damageRoll: string, damageType?: string, versatile?: boolean) => void;
 }
 
-export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: showSaveToast }: QuickSpellsProps) {
+export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: showSaveToast, showDamageRoll }: QuickSpellsProps) {
   const { character } = useCharacterStore();
   
   // Get all available spells for quick access (cantrips + prepared spells)
@@ -20,9 +21,11 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
     spell.isAlwaysPrepared // Always prepared spells
   );
 
-  // Filter spells that have actions (attack or save)
+  // Filter spells that have actions (attack, save, or damage)
   const actionSpells = quickAccessSpells.filter(spell => 
-    spell.actionType === 'attack' || spell.actionType === 'save'
+    spell.actionType === 'attack' || 
+    spell.actionType === 'save' || 
+    spell.damage // Include any spell with damage dice
   );
 
   // Get spellcasting ability and modifiers
@@ -64,13 +67,27 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
     );
   };
 
+  const rollSpellDamage = (spell: Spell) => {
+    if (!spell.damage) {
+      alert('This spell does not have damage dice specified');
+      return;
+    }
+    
+    const damageResult = rollDamage(spell.damage);
+    showDamageRoll(
+      spell.name,
+      damageResult,
+      spell.damageType
+    );
+  };
+
   if (actionSpells.length === 0) {
     return (
       <div className="text-center py-6 text-gray-500">
         <div className="text-4xl mb-2">🔮</div>
         <p className="font-medium">No action spells ready</p>
         <p className="text-sm mt-1">
-          Add spells with attack rolls or saving throws to see them here.
+          Add spells with attack rolls, saving throws, or damage dice to see them here.
         </p>
       </div>
     );
@@ -119,13 +136,13 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
             )}
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {spell.actionType === 'attack' && (
               <button
                 onClick={() => rollSpellAttack(spell)}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-lg shadow-md hover:from-slate-700 hover:to-slate-800 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
               >
-                <Dice6 size={14} />
+                <Dice6 size={16} className="group-hover:rotate-12 transition-transform" />
                 Attack Roll
               </button>
             )}
@@ -133,20 +150,31 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
             {spell.actionType === 'save' && (
               <button
                 onClick={() => showSavingThrow(spell)}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg shadow-md hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
               >
-                <Shield size={14} />
+                <Shield size={16} className="group-hover:scale-110 transition-transform" />
                 {spell.savingThrow ? `${spell.savingThrow} Save` : 'Saving Throw'}
               </button>
             )}
             
-            <div className="flex items-center gap-1 text-xs text-gray-600">
-              {spell.damage && (
-                <span className="bg-gray-100 px-2 py-1 rounded">
+            {spell.damage && (
+              <button
+                onClick={() => rollSpellDamage(spell)}
+                className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg shadow-md hover:from-amber-600 hover:to-orange-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+                title="Roll spell damage"
+              >
+                <Zap size={16} className="group-hover:animate-pulse" />
+                Damage
+              </button>
+            )}
+            
+            {spell.damage && (
+              <div className="flex items-center gap-1 text-xs text-gray-600">
+                <span className="bg-gradient-to-r from-gray-100 to-gray-200 px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm font-medium">
                   {spell.damage} {spell.damageType && `${spell.damageType}`}
                 </span>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       ))}

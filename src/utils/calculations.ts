@@ -296,6 +296,42 @@ export const getWeaponDamageString = (character: CharacterState, weapon: Weapon,
 }; 
 
 /**
+ * Roll damage dice and return result string
+ */
+export const rollDamage = (dice: string, bonus = 0): string => {
+  // Parse dice string (e.g., "1d8", "2d6", "3d4+2")
+  const diceMatch = dice.match(/(\d+)d(\d+)(?:\+(\d+))?(?:-(\d+))?/i);
+  if (!diceMatch) {
+    // If not a valid dice string, return as-is
+    return dice;
+  }
+
+  const numDice = parseInt(diceMatch[1]);
+  const dieSize = parseInt(diceMatch[2]);
+  const diceBonus = diceMatch[3] ? parseInt(diceMatch[3]) : (diceMatch[4] ? -parseInt(diceMatch[4]) : 0);
+
+  let total = 0;
+  const rolls: number[] = [];
+  
+  // Roll each die
+  for (let i = 0; i < numDice; i++) {
+    const roll = Math.floor(Math.random() * dieSize) + 1;
+    rolls.push(roll);
+    total += roll;
+  }
+  
+  // Add bonuses
+  total += diceBonus + bonus;
+  
+  // Format result
+  if (numDice === 1) {
+    return `${total}${diceBonus + bonus !== 0 ? ` (${rolls[0]}${diceBonus + bonus > 0 ? `+${diceBonus + bonus}` : diceBonus + bonus})` : ''}`;
+  } else {
+    return `${total} (${rolls.join('+')}${diceBonus + bonus !== 0 ? `${diceBonus + bonus > 0 ? `+${diceBonus + bonus}` : diceBonus + bonus}` : ''})`;
+  }
+};
+
+/**
  * Calculate spell slots for a character based on class and level
  */
 export function calculateSpellSlots(classInfo: ClassInfo, level: number): SpellSlots {

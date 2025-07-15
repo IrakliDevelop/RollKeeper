@@ -19,6 +19,7 @@ import { SpellcastingStats } from "@/components/SpellcastingStats";
 import { SpellManagement } from "@/components/SpellManagement";
 import { QuickSpells } from "@/components/QuickSpells";
 import { ToastContainer, useToast } from "@/components/ui/Toast";
+import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import { 
   ABILITY_ABBREVIATIONS, 
   ABILITY_NAMES, 
@@ -37,11 +38,11 @@ import {
   importCharacterFromFile 
 } from "@/utils/fileOperations";
 import { AbilityName, SkillName } from "@/types/character";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export default function CharacterSheet() {
   // Toast system
-  const { toasts, dismissToast, showAttackRoll, showSavingThrow } = useToast();
+  const { toasts, dismissToast, showAttackRoll, showSavingThrow, showDamageRoll } = useToast();
   
   // Zustand store
   const {
@@ -80,8 +81,12 @@ export default function CharacterSheet() {
     deleteTrait,
     updateCharacterBackground,
     exportCharacter,
-    importCharacter
+    importCharacter,
+    resetCharacter
   } = useCharacterStore();
+
+  // Modal state for character reset
+  const [showResetModal, setShowResetModal] = useState(false);
 
   // Auto-save functionality
   const { manualSave } = useAutoSave();
@@ -125,6 +130,35 @@ export default function CharacterSheet() {
       return character.initiative.value;
     }
     return getAbilityModifier('dexterity');
+  };
+
+  // Roll saving throw
+  const rollSavingThrow = (ability: AbilityName) => {
+    const roll = Math.floor(Math.random() * 20) + 1;
+    const modifier = getSavingThrowModifier(ability);
+    const isCrit = roll === 20;
+    
+    // Use showAttackRoll since it's more appropriate for displaying dice rolls
+    showAttackRoll(
+      `${ABILITY_NAMES[ability]} Save`,
+      roll,
+      modifier,
+      isCrit
+    );
+  };
+
+  // Roll skill check
+  const rollSkillCheck = (skillName: SkillName) => {
+    const roll = Math.floor(Math.random() * 20) + 1;
+    const modifier = getSkillModifier(skillName);
+    const isCrit = roll === 20;
+    
+    showAttackRoll(
+      SKILL_NAMES[skillName],
+      roll,
+      modifier,
+      isCrit
+    );
   };
 
   // Auto-update initiative when dexterity changes (if not overridden)
@@ -180,10 +214,10 @@ export default function CharacterSheet() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 to-yellow-50 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4">
       {/* Header with Character Name and Actions */}
       <header className="max-w-7xl mx-auto mb-8">
-        <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
+        <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl border border-slate-200 p-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex-1">
               <input
@@ -204,24 +238,32 @@ export default function CharacterSheet() {
               <button 
                 onClick={manualSave}
                 disabled={!hasUnsavedChanges}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg hover:from-emerald-700 hover:to-emerald-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all shadow-md"
               >
                 <Save size={16} />
                 Save
               </button>
               <button 
                 onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-lg hover:from-slate-700 hover:to-slate-800 transition-all shadow-md"
               >
                 <Download size={16} />
                 Export
               </button>
               <button 
                 onClick={handleImport}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-lg hover:from-slate-700 hover:to-slate-800 transition-all shadow-md"
               >
                 <Upload size={16} />
                 Import
+              </button>
+              <button 
+                onClick={() => setShowResetModal(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all shadow-md"
+                title="Reset character - this will clear all data!"
+              >
+                <RotateCcw size={16} />
+                Reset
               </button>
             </div>
           </div>
@@ -232,8 +274,8 @@ export default function CharacterSheet() {
       <main className="max-w-7xl mx-auto space-y-8">
         
         {/* Actions Section */}
-        <section className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200 shadow-lg">
-          <h2 className="text-2xl font-bold text-blue-800 mb-6 text-center border-b-2 border-blue-300 pb-3">
+        <section className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-6 border-2 border-slate-300 shadow-lg backdrop-blur-sm">
+          <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center border-b-2 border-slate-400 pb-3">
             ⚔️ Actions & Combat
           </h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -248,7 +290,7 @@ export default function CharacterSheet() {
                 <p className="text-gray-500">Unable to load equipped weapons</p>
               </div>
             }>
-              <EquippedWeapons showAttackRoll={showAttackRoll} />
+              <EquippedWeapons showAttackRoll={showAttackRoll} showDamageRoll={showDamageRoll} />
             </ErrorBoundary>
 
             {/* Cantrips & Spells */}
@@ -266,7 +308,7 @@ export default function CharacterSheet() {
                   <span className="text-purple-600">✨</span>
                   Quick Spells
                 </h3>
-                <QuickSpells showAttackRoll={showAttackRoll} showSavingThrow={showSavingThrow} />
+                <QuickSpells showAttackRoll={showAttackRoll} showSavingThrow={showSavingThrow} showDamageRoll={showDamageRoll} />
                 <div className="mt-4 pt-3 border-t border-gray-200">
                   <p className="text-xs text-gray-500 text-center">
                     Manage spells in the{' '}
@@ -299,8 +341,8 @@ export default function CharacterSheet() {
         </div>
         
         {/* Core D&D Stats Section */}
-        <section className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl p-6 border-2 border-amber-200 shadow-lg">
-          <h2 className="text-2xl font-bold text-amber-800 mb-6 text-center border-b-2 border-amber-300 pb-3">
+        <section className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-300 shadow-lg backdrop-blur-sm">
+          <h2 className="text-2xl font-bold text-blue-900 mb-6 text-center border-b-2 border-blue-400 pb-3">
             📊 Character Statistics
           </h2>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -459,7 +501,13 @@ export default function CharacterSheet() {
                     <span className="font-mono text-sm font-semibold w-8 text-right text-purple-800">
                       {formatModifier(getSavingThrowModifier(ability))}
                     </span>
-                    <span className="text-sm text-gray-800">{ABILITY_NAMES[ability]}</span>
+                    <button
+                      onClick={() => rollSavingThrow(ability)}
+                      className="text-sm text-gray-800 hover:text-purple-700 hover:bg-purple-100 px-2 py-1 rounded transition-colors cursor-pointer font-medium"
+                      title={`Roll ${ABILITY_NAMES[ability]} saving throw (d20 + ${formatModifier(getSavingThrowModifier(ability))})`}
+                    >
+                      {ABILITY_NAMES[ability]}
+                    </button>
                   </div>
                 ))}
               </div>
@@ -537,7 +585,13 @@ export default function CharacterSheet() {
                       </span>
                       
                       {/* Skill Name */}
-                      <span className="flex-1 text-gray-800">{SKILL_NAMES[skillName]}</span>
+                      <button
+                        onClick={() => rollSkillCheck(skillName)}
+                        className="flex-1 text-left text-gray-800 hover:text-green-700 hover:bg-green-100 px-2 py-1 rounded transition-colors cursor-pointer font-medium"
+                        title={`Roll ${SKILL_NAMES[skillName]} check (d20 + ${formatModifier(getSkillModifier(skillName))})`}
+                      >
+                        {SKILL_NAMES[skillName]}
+                      </button>
                       
                       {/* Ability Abbreviation */}
                       <span className="text-xs text-gray-500 w-8">
@@ -695,8 +749,8 @@ export default function CharacterSheet() {
         </div>
 
         {/* Spellcasting Section */}
-        <section id="spellcasting-section" className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-6 border-2 border-purple-200 shadow-lg">
-          <h2 className="text-2xl font-bold text-purple-800 mb-6 text-center border-b-2 border-purple-300 pb-3">
+        <section id="spellcasting-section" className="bg-gradient-to-r from-navy-50 to-indigo-100 rounded-xl p-6 border-2 border-navy-300 shadow-lg backdrop-blur-sm" style={{background: 'linear-gradient(to right, rgb(241 245 249), rgb(224 231 255))'}}>
+          <h2 className="text-2xl font-bold text-navy-900 mb-6 text-center border-b-2 border-navy-400 pb-3" style={{color: 'rgb(15 23 42)', borderColor: 'rgb(71 85 105)'}}>
             ✨ Spellcasting
           </h2>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -731,8 +785,8 @@ export default function CharacterSheet() {
         </div>
 
         {/* Character Details Section */}
-        <section className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-6 border-2 border-emerald-200 shadow-lg">
-          <h2 className="text-2xl font-bold text-emerald-800 mb-6 text-center border-b-2 border-emerald-300 pb-3">
+        <section className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-6 border-2 border-emerald-300 shadow-lg backdrop-blur-sm">
+          <h2 className="text-2xl font-bold text-emerald-800 mb-6 text-center border-b-2 border-emerald-400 pb-3">
             📜 Character Details
           </h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -794,8 +848,8 @@ export default function CharacterSheet() {
         </div>
 
         {/* Equipment Section */}
-        <section id="equipment-section" className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-6 border-2 border-purple-200 shadow-lg">
-          <h2 className="text-2xl font-bold text-purple-800 mb-6 text-center border-b-2 border-purple-300 pb-3">
+        <section id="equipment-section" className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl p-6 border-2 border-violet-300 shadow-lg backdrop-blur-sm">
+          <h2 className="text-2xl font-bold text-violet-800 mb-6 text-center border-b-2 border-violet-400 pb-3">
             🎒 Equipment & Inventory
           </h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -842,6 +896,18 @@ export default function CharacterSheet() {
       
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      
+      {/* Character Reset Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showResetModal}
+        onClose={() => setShowResetModal(false)}
+        onConfirm={resetCharacter}
+        title="Reset Character"
+        message="Are you sure you want to reset this character? This will permanently delete all character data, including abilities, equipment, spells, and progress. This action cannot be undone."
+        confirmText="Reset Character"
+        cancelText="Keep Character"
+        type="danger"
+      />
     </div>
   );
 }

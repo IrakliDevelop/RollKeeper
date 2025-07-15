@@ -4,6 +4,7 @@ import React from 'react';
 import { Dice6, Info } from 'lucide-react';
 import { ClassInfo } from '@/types/character';
 import { CLASS_HIT_DICE } from '@/utils/constants';
+import { FancySelect } from './FancySelect';
 
 interface HitDiceManagerProps {
   classInfo: ClassInfo;
@@ -97,20 +98,19 @@ export default function HitDiceManager({
           <label className="block text-sm font-medium text-gray-700">
             Select Hit Die for Custom Class
           </label>
-          <select
+          <FancySelect
+            options={HIT_DIE_OPTIONS.map((option) => ({
+              value: option.value,
+              label: option.label,
+              description: option.value === 6 ? 'Wizard, Sorcerer' : 
+                         option.value === 8 ? 'Most classes' : 
+                         option.value === 10 ? 'Fighter, Paladin, Ranger' : 
+                         'Barbarian'
+            }))}
             value={getCurrentHitDie()}
-            onChange={(e) => handleCustomHitDieChange(parseInt(e.target.value))}
-            className="w-full px-3 py-2 border border-purple-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800"
-          >
-            {HIT_DIE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label} ({option.value === 6 ? 'Wizard, Sorcerer' : 
-                       option.value === 8 ? 'Most classes' : 
-                       option.value === 10 ? 'Fighter, Paladin, Ranger' : 
-                       'Barbarian'})
-              </option>
-            ))}
-          </select>
+            onChange={(value) => handleCustomHitDieChange(value as number)}
+            color="purple"
+          />
         </div>
       )}
 
