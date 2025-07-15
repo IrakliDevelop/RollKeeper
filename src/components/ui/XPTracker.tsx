@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Edit3, TrendingUp } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
+import { CustomSwitcher } from './CustomSwitcher';
 import { 
   getXPForLevel, 
   getXPToNextLevel, 
@@ -112,34 +113,17 @@ export default function XPTracker({
 
       {/* XP Management Form */}
       <div className="space-y-3 border-t border-gray-100 pt-3">
-        <div className="flex items-center space-x-4">
-          <label className="flex items-center">
-            <input
-              type="radio"
-              name="xpMode"
-              checked={mode === 'add'}
-              onChange={() => setMode('add')}
-              className="mr-2"
-            />
-            <span className="text-sm flex items-center space-x-1">
-              <Plus size={14} />
-              <span>Add XP</span>
-            </span>
-          </label>
-          <label className="flex items-center">
-            <input
-              type="radio"
-              name="xpMode"
-              checked={mode === 'set'}
-              onChange={() => setMode('set')}
-              className="mr-2"
-            />
-            <span className="text-sm flex items-center space-x-1">
-              <Edit3 size={14} />
-              <span>Set XP</span>
-            </span>
-          </label>
-        </div>
+        <CustomSwitcher
+          leftLabel="➕ Add XP"
+          rightLabel="✏️ Set XP"
+          leftValue="add"
+          rightValue="set"
+          currentValue={mode}
+          onChange={(value) => setMode(value as 'add' | 'set')}
+          color="blue"
+          size="md"
+          className="w-full max-w-xs"
+        />
 
         <form onSubmit={handleSubmit} className="flex space-x-2">
           <input

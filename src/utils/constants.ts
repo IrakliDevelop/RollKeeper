@@ -1,4 +1,4 @@
-import { AbilityName, SkillName, ClassInfo, RichTextContent } from '@/types/character';
+import { AbilityName, SkillName, ClassInfo, RichTextContent, Weapon } from '@/types/character';
 
 // D&D 5e skill to ability mappings
 export const SKILL_ABILITY_MAP: Record<SkillName, AbilityName> = {
@@ -106,22 +106,40 @@ export const COMMON_RACES = [
   'Orc', 'Satyr', 'Tabaxi', 'Triton', 'Warforged', 'Yuan-Ti'
 ];
 
-// Common D&D classes with spellcaster information
-export const COMMON_CLASSES: Array<{ name: string; spellcaster: 'full' | 'half' | 'third' | 'warlock' | 'none' }> = [
-  { name: 'Barbarian', spellcaster: 'none' },
-  { name: 'Bard', spellcaster: 'full' },
-  { name: 'Cleric', spellcaster: 'full' },
-  { name: 'Druid', spellcaster: 'full' },
-  { name: 'Fighter', spellcaster: 'third' }, // Eldritch Knight
-  { name: 'Monk', spellcaster: 'none' },
-  { name: 'Paladin', spellcaster: 'half' },
-  { name: 'Ranger', spellcaster: 'half' },
-  { name: 'Rogue', spellcaster: 'third' }, // Arcane Trickster
-  { name: 'Sorcerer', spellcaster: 'full' },
-  { name: 'Warlock', spellcaster: 'warlock' },
-  { name: 'Wizard', spellcaster: 'full' },
-  { name: 'Artificer', spellcaster: 'half' },
-  { name: 'Blood Hunter', spellcaster: 'none' }
+// Hit dice for each D&D 5e class
+export const CLASS_HIT_DICE: Record<string, number> = {
+  'Barbarian': 12,
+  'Fighter': 10,
+  'Paladin': 10,
+  'Ranger': 10,
+  'Artificer': 8,
+  'Bard': 8,
+  'Cleric': 8,
+  'Druid': 8,
+  'Monk': 8,
+  'Rogue': 8,
+  'Warlock': 8,
+  'Sorcerer': 6,
+  'Wizard': 6,
+  'Blood Hunter': 10, // Critical Role homebrew class
+};
+
+// Common D&D classes with spellcaster and hit die information
+export const COMMON_CLASSES: Array<{ name: string; spellcaster: 'full' | 'half' | 'third' | 'warlock' | 'none'; hitDie: number }> = [
+  { name: 'Barbarian', spellcaster: 'none', hitDie: 12 },
+  { name: 'Bard', spellcaster: 'full', hitDie: 8 },
+  { name: 'Cleric', spellcaster: 'full', hitDie: 8 },
+  { name: 'Druid', spellcaster: 'full', hitDie: 8 },
+  { name: 'Fighter', spellcaster: 'third', hitDie: 10 }, // Eldritch Knight
+  { name: 'Monk', spellcaster: 'none', hitDie: 8 },
+  { name: 'Paladin', spellcaster: 'half', hitDie: 10 },
+  { name: 'Ranger', spellcaster: 'half', hitDie: 10 },
+  { name: 'Rogue', spellcaster: 'third', hitDie: 8 }, // Arcane Trickster
+  { name: 'Sorcerer', spellcaster: 'full', hitDie: 6 },
+  { name: 'Warlock', spellcaster: 'warlock', hitDie: 8 },
+  { name: 'Wizard', spellcaster: 'full', hitDie: 6 },
+  { name: 'Artificer', spellcaster: 'half', hitDie: 8 },
+  { name: 'Blood Hunter', spellcaster: 'none', hitDie: 10 }
 ];
 
 // Spell slots by level for full casters
@@ -224,6 +242,7 @@ export const DEFAULT_CHARACTER_STATE = {
     name: '',
     isCustom: false,
     spellcaster: 'none' as const,
+    hitDie: 8, // Default to d8 for unknown/empty classes
   },
   level: 1,
   experience: 0,
@@ -265,6 +284,9 @@ export const DEFAULT_CHARACTER_STATE = {
     current: 8,
     max: 8,
     temporary: 0,
+    calculationMode: 'auto' as const,
+    manualMaxOverride: undefined,
+    deathSaves: undefined,
   },
   
   armorClass: 10,
@@ -304,6 +326,13 @@ export const DEFAULT_CHARACTER_STATE = {
     ideals: '',
     bonds: '',
     flaws: '',
+  },
+
+  weapons: [] as Weapon[],
+  weaponProficiencies: {
+    simpleWeapons: false,
+    martialWeapons: false,
+    specificWeapons: [],
   },
 };
 

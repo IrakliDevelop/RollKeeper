@@ -75,7 +75,6 @@ export default function CharacterBackgroundEditor({
   const activeTabConfig = BACKGROUND_TABS.find(tab => tab.id === activeTab)!;
 
   const handleContentChange = (field: BackgroundTab, content: string) => {
-    console.log('Character background changing:', field, content.substring(0, 50) + '...');
     onChange({ [field]: content });
   };
 

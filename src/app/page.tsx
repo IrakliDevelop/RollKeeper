@@ -9,7 +9,12 @@ import SpellSlotTracker from "@/components/ui/SpellSlotTracker";
 import XPTracker from "@/components/ui/XPTracker";
 import FeaturesTraitsManager from "@/components/ui/FeaturesTraitsManager";
 import CharacterBackgroundEditor from "@/components/ui/CharacterBackgroundEditor";
+import HitPointManager from "@/components/ui/HitPointManager";
+import HitDiceManager from "@/components/ui/HitDiceManager";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
+import { WeaponInventory } from "@/components/WeaponInventory";
+import { EquippedWeapons } from "@/components/EquippedWeapons";
+import { WeaponProficiencies } from "@/components/WeaponProficiencies";
 import { 
   ABILITY_ABBREVIATIONS, 
   ABILITY_NAMES, 
@@ -28,7 +33,7 @@ import {
   importCharacterFromFile 
 } from "@/utils/fileOperations";
 import { AbilityName, SkillName } from "@/types/character";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 
 export default function CharacterSheet() {
   // Zustand store
@@ -40,10 +45,18 @@ export default function CharacterSheet() {
     updateCharacter,
     updateAbilityScore,
     updateSkillProficiency,
+    updateSkillExpertise,
     updateSavingThrowProficiency,
     updateHitPoints,
     updateInitiative,
     resetInitiativeToDefault,
+    applyDamageToCharacter,
+    applyHealingToCharacter,
+    addTemporaryHPToCharacter,
+    makeDeathSavingThrow,
+    resetDeathSavingThrows,
+    toggleHPCalculationMode,
+    recalculateMaxHP,
     updateClass,
     updateLevel,
     updateSpellSlot,
@@ -70,9 +83,9 @@ export default function CharacterSheet() {
   const proficiencyBonus = getProficiencyBonus(character.level);
   
   // Helper function to get ability modifier
-  const getAbilityModifier = (ability: AbilityName) => {
+  const getAbilityModifier = useCallback((ability: AbilityName) => {
     return calculateModifier(character.abilities[ability]);
-  };
+  }, [character.abilities]);
 
   // Helper function to get skill modifier
   const getSkillModifier = (skillName: SkillName) => {
@@ -115,7 +128,14 @@ export default function CharacterSheet() {
         updateInitiative(dexModifier, false);
       }
     }
-  }, [character.abilities.dexterity, character.initiative.isOverridden, character.initiative.value, updateInitiative]);
+  }, [character.abilities.dexterity, character.initiative.isOverridden, character.initiative.value, getAbilityModifier, updateInitiative]);
+
+  // Auto-recalculate max HP when level or constitution changes (if in auto mode)
+  useEffect(() => {
+    if (character.hitPoints.calculationMode === 'auto') {
+      recalculateMaxHP();
+    }
+  }, [character.level, character.abilities.constitution, character.class.name, character.hitPoints.calculationMode, recalculateMaxHP]);
 
   // Check if character has spell capabilities
   const characterHasSpells = hasSpellSlots(character.spellSlots, character.pactMagic);
@@ -212,16 +232,17 @@ export default function CharacterSheet() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
             {/* Attack Actions */}
-            <div className="bg-white rounded-lg shadow border border-blue-200 p-4">
-              <h3 className="text-lg font-bold text-blue-800 mb-4 flex items-center gap-2">
-                <span className="text-red-600">⚔️</span>
-                Attacks
-              </h3>
-              <div className="text-center py-6 text-gray-500">
-                <p>Coming soon: Weapon attacks and spell attacks</p>
-                <p className="text-sm mt-1">Add your weapons, calculate attack bonuses and damage.</p>
+            <ErrorBoundary fallback={
+              <div className="bg-white rounded-lg shadow border border-blue-200 p-4">
+                <h3 className="text-lg font-bold text-blue-800 mb-4 flex items-center gap-2">
+                  <span className="text-red-600">⚔️</span>
+                  Ready Weapons
+                </h3>
+                <p className="text-gray-500">Unable to load equipped weapons</p>
               </div>
-            </div>
+            }>
+              <EquippedWeapons />
+            </ErrorBoundary>
 
             {/* Cantrips & Spells */}
             <div className="bg-white rounded-lg shadow border border-blue-200 p-4">
@@ -356,6 +377,45 @@ export default function CharacterSheet() {
                 </div>
               </div>
             </div>
+
+            {/* Hit Dice */}
+            <ErrorBoundary fallback={
+              <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Hit Dice</h3>
+                <p className="text-gray-500">Unable to load hit dice manager</p>
+              </div>
+            }>
+              <HitDiceManager
+                classInfo={character.class}
+                level={character.level}
+                hitDice={character.hitDice}
+                onUpdateClass={updateClass}
+                onUpdateHitDice={(hitDice) => updateCharacter({ hitDice })}
+              />
+            </ErrorBoundary>
+
+            {/* Weapon Proficiencies */}
+            <ErrorBoundary fallback={
+              <div className="bg-white rounded-lg shadow border border-amber-200 p-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Weapon Proficiencies</h3>
+                <p className="text-gray-500">Unable to load weapon proficiencies</p>
+              </div>
+            }>
+              <WeaponProficiencies />
+            </ErrorBoundary>
+
+            {/* Experience Points */}
+            <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
+              <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
+                Experience Points
+              </h2>
+              <XPTracker
+                currentXP={character.experience}
+                currentLevel={character.level}
+                onAddXP={addExperience}
+                onSetXP={setExperience}
+              />
+            </div>
           </div>
 
           {/* Middle Column - Skills & Saving Throws */}
@@ -389,24 +449,82 @@ export default function CharacterSheet() {
               <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
                 Skills
               </h2>
+              
+              {/* Skills Legend */}
+              <div className="flex items-center gap-4 mb-3 text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-green-600 rounded"></div>
+                  <span>P = Proficient (+{formatModifier(proficiencyBonus)})</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-yellow-600 rounded"></div>
+                  <span>E = Expertise (+{formatModifier(proficiencyBonus * 2)})</span>
+                </div>
+              </div>
+              
               <div className="space-y-1 max-h-96 overflow-y-auto">
-                {(Object.keys(SKILL_NAMES) as SkillName[]).map((skillName) => (
-                  <div key={skillName} className="flex items-center gap-3 p-1 hover:bg-green-50 rounded text-sm transition-colors">
-                    <input 
-                      type="checkbox" 
-                      checked={character.skills[skillName].proficient}
-                      onChange={(e) => updateSkillProficiency(skillName, e.target.checked)}
-                      className="w-4 h-4 text-green-600 rounded" 
-                    />
-                    <span className="font-mono font-semibold w-8 text-right text-green-800">
-                      {formatModifier(getSkillModifier(skillName))}
-                    </span>
-                    <span className="flex-1 text-gray-800">{SKILL_NAMES[skillName]}</span>
-                    <span className="text-xs text-gray-500 w-8">
-                      {ABILITY_ABBREVIATIONS[SKILL_ABILITY_MAP[skillName]]}
-                    </span>
-                  </div>
-                ))}
+                {(Object.keys(SKILL_NAMES) as SkillName[]).map((skillName) => {
+                  const skill = character.skills[skillName];
+                  const isProficient = skill.proficient;
+                  const hasExpertise = skill.expertise;
+                  
+                  return (
+                    <div key={skillName} className="flex items-center gap-2 p-1 hover:bg-green-50 rounded text-sm transition-colors">
+                      {/* Proficiency Checkbox */}
+                      <div className="flex flex-col items-center">
+                        <input 
+                          type="checkbox" 
+                          checked={isProficient}
+                          onChange={(e) => {
+                            updateSkillProficiency(skillName, e.target.checked);
+                            // Remove expertise if proficiency is removed
+                            if (!e.target.checked && hasExpertise) {
+                              updateSkillExpertise(skillName, false);
+                            }
+                          }}
+                          className="w-4 h-4 text-green-600 rounded" 
+                          title="Proficient"
+                        />
+                        <span className="text-xs text-gray-500 mt-0.5">P</span>
+                      </div>
+                      
+                      {/* Expertise Checkbox */}
+                      <div className="flex flex-col items-center">
+                        <input 
+                          type="checkbox" 
+                          checked={hasExpertise && isProficient}
+                          onChange={(e) => updateSkillExpertise(skillName, e.target.checked)}
+                          disabled={!isProficient}
+                          className={`w-4 h-4 rounded ${
+                            isProficient 
+                              ? 'text-yellow-600 focus:ring-yellow-500' 
+                              : 'text-gray-300 cursor-not-allowed'
+                          }`}
+                          title="Expertise (Double Proficiency)"
+                        />
+                        <span className={`text-xs mt-0.5 ${
+                          isProficient ? 'text-yellow-600' : 'text-gray-300'
+                        }`}>E</span>
+                      </div>
+                      
+                      {/* Skill Modifier */}
+                      <span className={`font-mono font-semibold w-10 text-right ${
+                        hasExpertise && isProficient ? 'text-yellow-700' : 
+                        isProficient ? 'text-green-800' : 'text-gray-600'
+                      }`}>
+                        {formatModifier(getSkillModifier(skillName))}
+                      </span>
+                      
+                      {/* Skill Name */}
+                      <span className="flex-1 text-gray-800">{SKILL_NAMES[skillName]}</span>
+                      
+                      {/* Ability Abbreviation */}
+                      <span className="text-xs text-gray-500 w-8">
+                        {ABILITY_ABBREVIATIONS[SKILL_ABILITY_MAP[skillName]]}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -475,49 +593,29 @@ export default function CharacterSheet() {
                 </div>
               </div>
 
-              {/* Hit Points */}
+              {/* Hit Points - Now using comprehensive HP Manager */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Hit Points</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Current</label>
-                    <input 
-                      type="number" 
-                      value={character.hitPoints.current}
-                      onChange={(e) => updateHitPoints({ current: parseInt(e.target.value) || 0 })}
-                      className="w-full p-2 text-center border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-transparent text-gray-800"
-                    />
+                <ErrorBoundary fallback={
+                  <div className="bg-white rounded-lg shadow-lg border border-red-200 p-6">
+                    <h3 className="text-lg font-bold text-red-800 mb-4">Hit Points</h3>
+                    <p className="text-gray-500">Unable to load HP manager</p>
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Max</label>
-                    <input 
-                      type="number" 
-                      value={character.hitPoints.max}
-                      onChange={(e) => updateHitPoints({ max: parseInt(e.target.value) || 0 })}
-                      className="w-full p-2 text-center border border-gray-300 rounded-md focus:ring-2 focus:ring-red-500 focus:border-transparent text-gray-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Temp</label>
-                    <input 
-                      type="number" 
-                      value={character.hitPoints.temporary}
-                      onChange={(e) => updateHitPoints({ temporary: parseInt(e.target.value) || 0 })}
-                      className="w-full p-2 text-center border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Hit Dice */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Hit Dice</label>
-                <input 
-                  type="text" 
-                  value={character.hitDice}
-                  onChange={(e) => updateCharacter({ hitDice: e.target.value })}
-                  className="w-full p-2 text-center border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-800"
-                />
+                }>
+                  <HitPointManager
+                    hitPoints={character.hitPoints}
+                    classInfo={character.class}
+                    level={character.level}
+                    constitutionScore={character.abilities.constitution}
+                    onApplyDamage={applyDamageToCharacter}
+                    onApplyHealing={applyHealingToCharacter}
+                    onAddTemporaryHP={addTemporaryHPToCharacter}
+                    onMakeDeathSave={makeDeathSavingThrow}
+                    onResetDeathSaves={resetDeathSavingThrows}
+                    onToggleCalculationMode={toggleHPCalculationMode}
+                    onRecalculateMaxHP={recalculateMaxHP}
+                    onUpdateHitPoints={updateHitPoints}
+                  />
+                </ErrorBoundary>
               </div>
             </div>
 
@@ -538,12 +636,6 @@ export default function CharacterSheet() {
               <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
                 Quick Stats
               </h2>
-              <XPTracker
-                currentXP={character.experience}
-                currentLevel={character.level}
-                onAddXP={addExperience}
-                onSetXP={setExperience}
-              />
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Passive Perception</span>
@@ -632,23 +724,24 @@ export default function CharacterSheet() {
         </div>
 
         {/* Equipment Section */}
-        <section className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-6 border-2 border-purple-200 shadow-lg">
+        <section id="equipment-section" className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-6 border-2 border-purple-200 shadow-lg">
           <h2 className="text-2xl font-bold text-purple-800 mb-6 text-center border-b-2 border-purple-300 pb-3">
             🎒 Equipment & Inventory
           </h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             
             {/* Weapons */}
-            <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
-              <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
-                <span className="text-red-600">⚔️</span>
-                Weapons
-              </h3>
-              <div className="text-center py-6 text-gray-500">
-                <p>Coming soon: Weapon inventory</p>
-                <p className="text-sm mt-1">Track your weapons, damage, and properties.</p>
+            <ErrorBoundary fallback={
+              <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
+                <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
+                  <span className="text-red-600">⚔️</span>
+                  Weapons
+                </h3>
+                <p className="text-gray-500">Unable to load weapon inventory</p>
               </div>
-            </div>
+            }>
+              <WeaponInventory />
+            </ErrorBoundary>
 
             {/* Armor & Defense */}
             <div className="bg-white rounded-lg shadow border border-purple-200 p-4">

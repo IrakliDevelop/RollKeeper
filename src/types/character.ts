@@ -24,11 +24,24 @@ export interface SavingThrowProficiency {
   customModifier?: number;
 }
 
+// Hit Points calculation mode
+export type HPCalculationMode = 'auto' | 'manual';
+
+// Death Saving Throws
+export interface DeathSavingThrows {
+  successes: number; // 0-3
+  failures: number;  // 0-3
+  isStabilized: boolean;
+}
+
 // Hit points tracking
 export interface HitPoints {
   current: number;
   max: number;
   temporary: number;
+  calculationMode: HPCalculationMode;
+  manualMaxOverride?: number; // Used when calculationMode is 'manual'
+  deathSaves?: DeathSavingThrows; // Only present when at 0 HP
 }
 
 // Initiative tracking with override capability
@@ -86,6 +99,38 @@ export interface ClassInfo {
   name: string;
   isCustom: boolean;
   spellcaster?: 'full' | 'half' | 'third' | 'warlock' | 'none';
+  hitDie: number; // d6, d8, d10, d12 - the size of the hit die for this class
+}
+
+// Weapon and magic item types
+export type WeaponCategory = 'simple' | 'martial' | 'magic' | 'artifact';
+export type WeaponType = 'melee' | 'ranged' | 'finesse' | 'versatile' | 'light' | 'heavy' | 'reach' | 'thrown' | 'ammunition' | 'loading' | 'special';
+export type DamageType = 'acid' | 'bludgeoning' | 'cold' | 'fire' | 'force' | 'lightning' | 'necrotic' | 'piercing' | 'poison' | 'psychic' | 'radiant' | 'slashing' | 'thunder';
+
+// Individual weapon/magic item
+export interface Weapon {
+  id: string;
+  name: string;
+  category: WeaponCategory;
+  weaponType: WeaponType[];
+  damage: {
+    dice: string; // e.g., "1d8", "2d6"
+    type: DamageType;
+    versatiledice?: string; // For versatile weapons (e.g., "1d10")
+  };
+  enhancementBonus: number; // +0, +1, +2, +3 (enhancement bonus)
+  attackBonus?: number; // Additional custom attack bonus beyond enhancement
+  damageBonus?: number; // Additional custom damage bonus beyond enhancement
+  properties: string[]; // Custom properties like "magical", "silvered", etc.
+  description?: string; // Optional description for magic items
+  range?: {
+    normal: number;
+    long?: number;
+  };
+  isEquipped: boolean; // Whether this weapon is currently equipped/ready
+  manualProficiency?: boolean; // Manual override for proficiency (undefined = use auto calculation)
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Main character state interface
@@ -150,6 +195,14 @@ export interface CharacterState {
   features: RichTextContent[];
   traits: RichTextContent[];
   characterBackground: CharacterBackground;
+
+  // Weapons and Equipment
+  weapons: Weapon[];
+  weaponProficiencies: {
+    simpleWeapons: boolean;
+    martialWeapons: boolean;
+    specificWeapons: string[]; // Array of specific weapon names
+  };
 }
 
 // UI state for managing application state

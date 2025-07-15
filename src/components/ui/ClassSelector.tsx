@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ClassInfo } from '@/types/character';
 import { COMMON_CLASSES } from '@/utils/constants';
+import { CustomSwitcher } from './CustomSwitcher';
 
 interface ClassSelectorProps {
   value: ClassInfo;
@@ -21,7 +22,8 @@ export default function ClassSelector({ value, onChange, className = '' }: Class
       onChange({
         name: classData.name,
         isCustom: false,
-        spellcaster: classData.spellcaster
+        spellcaster: classData.spellcaster,
+        hitDie: classData.hitDie
       });
     }
   };
@@ -31,7 +33,8 @@ export default function ClassSelector({ value, onChange, className = '' }: Class
     onChange({
       name: customName,
       isCustom: true,
-      spellcaster: 'none' // Default for custom classes
+      spellcaster: 'none', // Default for custom classes
+      hitDie: 8 // Default hit die for custom classes
     });
   };
 
@@ -41,7 +44,8 @@ export default function ClassSelector({ value, onChange, className = '' }: Class
       onChange({
         name: customName,
         isCustom: true,
-        spellcaster: 'none'
+        spellcaster: 'none',
+        hitDie: 8 // Default hit die for custom classes
       });
     } else {
       // Reset to first standard class if switching from custom
@@ -49,7 +53,8 @@ export default function ClassSelector({ value, onChange, className = '' }: Class
       onChange({
         name: firstClass.name,
         isCustom: false,
-        spellcaster: firstClass.spellcaster
+        spellcaster: firstClass.spellcaster,
+        hitDie: firstClass.hitDie
       });
     }
   };
@@ -60,28 +65,17 @@ export default function ClassSelector({ value, onChange, className = '' }: Class
         <label className="text-sm font-medium text-gray-700">Class</label>
         
         {/* Toggle between standard and custom */}
-        <div className="flex items-center space-x-4">
-          <label className="flex items-center">
-            <input
-              type="radio"
-              name="classType"
-              checked={!isCustom}
-              onChange={() => handleCustomToggle(false)}
-              className="mr-2"
-            />
-            <span className="text-sm">Standard Class</span>
-          </label>
-          <label className="flex items-center">
-            <input
-              type="radio"
-              name="classType"
-              checked={isCustom}
-              onChange={() => handleCustomToggle(true)}
-              className="mr-2"
-            />
-            <span className="text-sm">Custom Class</span>
-          </label>
-        </div>
+        <CustomSwitcher
+          leftLabel="Standard"
+          rightLabel="Custom"
+          leftValue={false}
+          rightValue={true}
+          currentValue={isCustom}
+          onChange={(value) => handleCustomToggle(value as boolean)}
+          color="amber"
+          size="sm"
+          className="w-fit"
+        />
       </div>
 
       {/* Class selection */}

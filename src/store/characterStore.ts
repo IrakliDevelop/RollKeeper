@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground } from '@/types/character';
+import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, HitPoints, DeathSavingThrows, Weapon } from '@/types/character';
 import { DEFAULT_CHARACTER_STATE, STORAGE_KEY, APP_VERSION, COMMON_CLASSES } from '@/utils/constants';
 import { 
   calculateSpellSlots, 
@@ -10,6 +10,15 @@ import {
   calculateLevelFromXP,
   shouldLevelUp 
 } from '@/utils/calculations';
+import { 
+  applyDamage, 
+  applyHealing, 
+  addTemporaryHP, 
+  makeDeathSave, 
+  resetDeathSaves, 
+  calculateMaxHP, 
+  getClassHitDie 
+} from '@/utils/hpCalculations';
 
 // Migration function to handle old character data
 function migrateCharacterData(character: unknown): CharacterState {
@@ -38,6 +47,24 @@ function migrateCharacterData(character: unknown): CharacterState {
     if (!result.characterBackground || typeof result.characterBackground !== 'object' || !('backstory' in result.characterBackground)) {
       result.characterBackground = DEFAULT_CHARACTER_STATE.characterBackground;
     }
+    // Ensure weapons array exists
+    if (!Array.isArray(result.weapons)) {
+      result.weapons = DEFAULT_CHARACTER_STATE.weapons;
+    }
+    // Ensure weapon proficiencies exist
+    if (!result.weaponProficiencies || typeof result.weaponProficiencies !== 'object') {
+      result.weaponProficiencies = DEFAULT_CHARACTER_STATE.weaponProficiencies;
+    }
+    // Ensure class has hitDie
+    if (result.class && typeof result.class === 'object' && !('hitDie' in result.class)) {
+      (result.class as Record<string, unknown>).hitDie = 8; // Default to d8
+    }
+    // Ensure hitPoints has new properties
+    if (result.hitPoints && typeof result.hitPoints === 'object') {
+      if (!('calculationMode' in result.hitPoints)) {
+        (result.hitPoints as Record<string, unknown>).calculationMode = 'auto';
+      }
+    }
     return result;
   }
 
@@ -48,7 +75,8 @@ function migrateCharacterData(character: unknown): CharacterState {
     class: {
       name: (characterObj.class && typeof characterObj.class === 'string') ? characterObj.class : '',
       isCustom: false,
-      spellcaster: 'none' as const
+      spellcaster: 'none' as const,
+      hitDie: 8 // Default to d8
     },
     spellSlots: DEFAULT_CHARACTER_STATE.spellSlots,
     pactMagic: undefined,
@@ -58,7 +86,11 @@ function migrateCharacterData(character: unknown): CharacterState {
       typeof characterObj.characterBackground === 'object' &&
       'backstory' in characterObj.characterBackground) 
       ? characterObj.characterBackground as CharacterState['characterBackground']
-      : DEFAULT_CHARACTER_STATE.characterBackground
+      : DEFAULT_CHARACTER_STATE.characterBackground,
+    weapons: Array.isArray(characterObj.weapons) ? characterObj.weapons as Weapon[] : DEFAULT_CHARACTER_STATE.weapons,
+    weaponProficiencies: (characterObj.weaponProficiencies && typeof characterObj.weaponProficiencies === 'object') 
+      ? characterObj.weaponProficiencies as CharacterState['weaponProficiencies']
+      : DEFAULT_CHARACTER_STATE.weaponProficiencies
   };
 
   // Try to detect spellcaster type from class name
@@ -71,7 +103,8 @@ function migrateCharacterData(character: unknown): CharacterState {
       migratedCharacter.class = {
         name: matchingClass.name,
         isCustom: false,
-        spellcaster: matchingClass.spellcaster
+        spellcaster: matchingClass.spellcaster,
+        hitDie: matchingClass.hitDie
       };
       
       // Calculate initial spell slots
@@ -87,7 +120,8 @@ function migrateCharacterData(character: unknown): CharacterState {
         migratedCharacter.class = {
           name: typeof characterObj.class === 'string' ? characterObj.class : '',
           isCustom: true,
-          spellcaster: 'none'
+          spellcaster: 'none',
+          hitDie: 8 // Default to d8 for custom classes
         };
       }
   }
@@ -114,6 +148,15 @@ interface CharacterStore {
   updateInitiative: (value: number, isOverride: boolean) => void;
   resetInitiativeToDefault: () => void;
   
+  // HP management actions
+  applyDamageToCharacter: (damage: number) => void;
+  applyHealingToCharacter: (healing: number) => void;
+  addTemporaryHPToCharacter: (tempHP: number) => void;
+  makeDeathSavingThrow: (isSuccess: boolean, isCritical?: boolean) => void;
+  resetDeathSavingThrows: () => void;
+  toggleHPCalculationMode: () => void;
+  recalculateMaxHP: () => void;
+  
   // Class and spell management
   updateClass: (classInfo: ClassInfo) => void;
   updateLevel: (level: number) => void;
@@ -134,6 +177,12 @@ interface CharacterStore {
   updateTrait: (id: string, updates: Partial<RichTextContent>) => void;
   deleteTrait: (id: string) => void;
   updateCharacterBackground: (updates: Partial<CharacterBackground>) => void;
+
+  // Weapon management
+  addWeapon: (weapon: Omit<Weapon, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateWeapon: (id: string, updates: Partial<Weapon>) => void;
+  deleteWeapon: (id: string) => void;
+  equipWeapon: (id: string, equipped: boolean) => void;
   
   // Persistence actions
   saveCharacter: () => void;
@@ -288,6 +337,120 @@ export const useCharacterStore = create<CharacterStore>()(
           hasUnsavedChanges: true,
           saveStatus: 'saving'
         }));
+      },
+
+      // HP management actions
+      applyDamageToCharacter: (damage) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            hitPoints: applyDamage(state.character.hitPoints, damage)
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      applyHealingToCharacter: (healing) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            hitPoints: applyHealing(state.character.hitPoints, healing)
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      addTemporaryHPToCharacter: (tempHP) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            hitPoints: addTemporaryHP(state.character.hitPoints, tempHP)
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      makeDeathSavingThrow: (isSuccess, isCritical = false) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            hitPoints: makeDeathSave(state.character.hitPoints, isSuccess, isCritical)
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      resetDeathSavingThrows: () => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            hitPoints: resetDeathSaves(state.character.hitPoints)
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      toggleHPCalculationMode: () => {
+        set((state) => {
+          const newMode = state.character.hitPoints.calculationMode === 'auto' ? 'manual' : 'auto';
+          let newMaxHP = state.character.hitPoints.max;
+          
+          // If switching to auto mode, recalculate max HP
+          if (newMode === 'auto') {
+            const hitDie = getClassHitDie(state.character.class.name, state.character.class.hitDie);
+            newMaxHP = calculateMaxHP(
+              { ...state.character.class, hitDie },
+              state.character.level,
+              state.character.abilities.constitution
+            );
+          }
+          
+          return {
+            character: {
+              ...state.character,
+              hitPoints: {
+                ...state.character.hitPoints,
+                calculationMode: newMode,
+                max: newMaxHP,
+                manualMaxOverride: newMode === 'manual' ? state.character.hitPoints.max : undefined
+              }
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      recalculateMaxHP: () => {
+        set((state) => {
+          if (state.character.hitPoints.calculationMode === 'manual') {
+            return state; // Don't recalculate in manual mode
+          }
+          
+          const hitDie = getClassHitDie(state.character.class.name, state.character.class.hitDie);
+          const newMaxHP = calculateMaxHP(
+            { ...state.character.class, hitDie },
+            state.character.level,
+            state.character.abilities.constitution
+          );
+          
+          return {
+            character: {
+              ...state.character,
+              hitPoints: {
+                ...state.character.hitPoints,
+                max: newMaxHP
+              }
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
       },
 
       // Class and spell management
@@ -596,22 +759,79 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       updateCharacterBackground: (updates) => {
-        console.log('Store: updateCharacterBackground called with:', updates);
+        set((state) => ({
+          character: {
+            ...state.character,
+            characterBackground: {
+              ...state.character.characterBackground,
+              ...updates
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving' as SaveStatus
+        }));
+      },
+
+      // Weapon management actions
+      addWeapon: (weapon) => {
         set((state) => {
-          const newState = {
+          const newWeapon: Weapon = {
+            ...weapon,
+            id: generateId(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          return {
             character: {
               ...state.character,
-              characterBackground: {
-                ...state.character.characterBackground,
-                ...updates
-              }
+              weapons: [...state.character.weapons, newWeapon]
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving' as SaveStatus
+            saveStatus: 'saving'
           };
-          console.log('Store: new character background:', newState.character.characterBackground);
-          return newState;
         });
+      },
+
+      updateWeapon: (id, updates) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            weapons: state.character.weapons.map(weapon =>
+              weapon.id === id
+                ? { ...weapon, ...updates, updatedAt: new Date().toISOString() }
+                : weapon
+            )
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      deleteWeapon: (id) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            weapons: state.character.weapons.filter(weapon => weapon.id !== id)
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      equipWeapon: (id, equipped) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            weapons: state.character.weapons.map(weapon =>
+              weapon.id === id
+                ? { ...weapon, isEquipped: equipped, updatedAt: new Date().toISOString() }
+                : weapon
+            )
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
       },
 
       // Persistence actions

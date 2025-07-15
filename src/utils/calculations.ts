@@ -5,7 +5,8 @@ import {
   CharacterState,
   SpellSlots,
   PactMagic,
-  ClassInfo 
+  ClassInfo,
+  Weapon 
 } from '@/types/character';
 import { 
   SKILL_ABILITY_MAP, 
@@ -207,6 +208,116 @@ export const getCalculatedFields = (character: CharacterState) => {
     passivePerception: calculatePassivePerception(character),
     carryingCapacity: calculateCarryingCapacity(character),
   };
+};
+
+/**
+ * Check if character is proficient with a weapon
+ */
+export const isWeaponProficient = (character: CharacterState, weapon: Weapon): boolean => {
+  // Check manual proficiency override first
+  if (weapon.manualProficiency !== undefined) {
+    return weapon.manualProficiency;
+  }
+  
+  // Check category proficiency
+  if (weapon.category === 'simple' && character.weaponProficiencies.simpleWeapons) {
+    return true;
+  }
+  if (weapon.category === 'martial' && character.weaponProficiencies.martialWeapons) {
+    return true;
+  }
+  
+  // Check specific weapon proficiency
+  return character.weaponProficiencies.specificWeapons.includes(weapon.name.toLowerCase());
+};
+
+/**
+ * Get the appropriate ability modifier for a weapon attack
+ */
+export const getWeaponAbilityModifier = (character: CharacterState, weapon: Weapon): number => {
+  // Finesse weapons can use DEX or STR (we'll use the higher one)
+  if (weapon.weaponType.includes('finesse')) {
+    return Math.max(
+      calculateModifier(character.abilities.strength),
+      calculateModifier(character.abilities.dexterity)
+    );
+  }
+  
+  // Ranged weapons use DEX
+  if (weapon.weaponType.includes('ranged')) {
+    return calculateModifier(character.abilities.dexterity);
+  }
+  
+  // Melee weapons use STR by default
+  return calculateModifier(character.abilities.strength);
+};
+
+/**
+ * Calculate weapon attack bonus
+ */
+export const calculateWeaponAttackBonus = (character: CharacterState, weapon: Weapon): number => {
+  let attackBonus = 0;
+  
+  // Add ability modifier
+  attackBonus += getWeaponAbilityModifier(character, weapon);
+  
+  // Add proficiency bonus if proficient
+  if (isWeaponProficient(character, weapon)) {
+    attackBonus += getProficiencyBonus(character.level);
+  }
+  
+  // Add enhancement bonus
+  attackBonus += weapon.enhancementBonus;
+  
+  // Add custom attack bonus
+  if (weapon.attackBonus) {
+    attackBonus += weapon.attackBonus;
+  }
+  
+  return attackBonus;
+};
+
+/**
+ * Calculate weapon damage bonus (not including dice)
+ */
+export const calculateWeaponDamageBonus = (character: CharacterState, weapon: Weapon): number => {
+  let damageBonus = 0;
+  
+  // Add ability modifier
+  damageBonus += getWeaponAbilityModifier(character, weapon);
+  
+  // Add enhancement bonus
+  damageBonus += weapon.enhancementBonus;
+  
+  // Add custom damage bonus
+  if (weapon.damageBonus) {
+    damageBonus += weapon.damageBonus;
+  }
+  
+  return damageBonus;
+};
+
+/**
+ * Get weapon attack string for display (e.g., "+7 to hit")
+ */
+export const getWeaponAttackString = (character: CharacterState, weapon: Weapon): string => {
+  const attackBonus = calculateWeaponAttackBonus(character, weapon);
+  return `${formatModifier(attackBonus)} to hit`;
+};
+
+/**
+ * Get weapon damage string for display (e.g., "1d8+3 slashing")
+ */
+export const getWeaponDamageString = (character: CharacterState, weapon: Weapon, versatile = false): string => {
+  const damageBonus = calculateWeaponDamageBonus(character, weapon);
+  const dice = versatile && weapon.damage.versatiledice ? weapon.damage.versatiledice : weapon.damage.dice;
+  const damageType = weapon.damage.type;
+  
+  if (damageBonus === 0) {
+    return `${dice} ${damageType}`;
+  }
+  
+  return `${dice}${formatModifier(damageBonus)} ${damageType}`;
 }; 
 
 /**
