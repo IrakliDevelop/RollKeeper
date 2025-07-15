@@ -94,6 +94,50 @@ export interface PactMagic {
   level: number; // Pact slot level (1-5)
 }
 
+// Spellcasting ability types
+export type SpellcastingAbility = 'intelligence' | 'wisdom' | 'charisma';
+
+// Spell action types
+export type SpellActionType = 'attack' | 'save' | 'utility';
+
+// Spell information
+export interface Spell {
+  id: string;
+  name: string;
+  level: number; // 0 for cantrips, 1-9 for spells
+  school: string; // Divination, Evocation, etc.
+  castingTime: string; // "1 action", "1 bonus action", "1 minute", etc.
+  range: string; // "Touch", "30 feet", "Self", etc.
+  components: {
+    verbal: boolean;
+    somatic: boolean;
+    material: boolean;
+    materialDescription?: string; // e.g., "a handful of clay"
+  };
+  duration: string; // "Instantaneous", "1 minute", "Concentration, up to 1 hour", etc.
+  description: string;
+  higherLevel?: string; // Description of what happens when cast at higher levels
+  ritual?: boolean; // Can be cast as a ritual
+  concentration?: boolean; // Requires concentration
+  isPrepared?: boolean; // For classes that prepare spells
+  isAlwaysPrepared?: boolean; // For domain spells, patron spells, etc.
+  actionType?: SpellActionType; // Whether spell requires attack roll, saving throw, or is utility
+  savingThrow?: string; // Which saving throw (if actionType is 'save'): "Dexterity", "Constitution", etc.
+  damage?: string; // Damage dice (if applicable): "1d10", "3d6", etc.
+  damageType?: string; // Type of damage: "fire", "cold", "psychic", etc.
+  source?: string; // PHB, XGE, etc.
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Spellcasting statistics with override capability
+export interface SpellcastingStats {
+  spellcastingAbility: SpellcastingAbility | null; // null for non-spellcasters
+  isAbilityOverridden: boolean; // If true, use manual override instead of class-based
+  spellAttackBonus?: number; // Manual override for spell attack bonus
+  spellSaveDC?: number; // Manual override for spell save DC
+}
+
 // Class information with custom support
 export interface ClassInfo {
   name: string;
@@ -203,6 +247,10 @@ export interface CharacterState {
     martialWeapons: boolean;
     specificWeapons: string[]; // Array of specific weapon names
   };
+
+  // Spellcasting
+  spells: Spell[]; // All spells and cantrips known/prepared
+  spellcastingStats: SpellcastingStats;
 }
 
 // UI state for managing application state

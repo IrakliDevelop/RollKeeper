@@ -15,6 +15,10 @@ import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import { WeaponInventory } from "@/components/WeaponInventory";
 import { EquippedWeapons } from "@/components/EquippedWeapons";
 import { WeaponProficiencies } from "@/components/WeaponProficiencies";
+import { SpellcastingStats } from "@/components/SpellcastingStats";
+import { SpellManagement } from "@/components/SpellManagement";
+import { QuickSpells } from "@/components/QuickSpells";
+import { ToastContainer, useToast } from "@/components/ui/Toast";
 import { 
   ABILITY_ABBREVIATIONS, 
   ABILITY_NAMES, 
@@ -36,6 +40,9 @@ import { AbilityName, SkillName } from "@/types/character";
 import { useCallback, useEffect } from "react";
 
 export default function CharacterSheet() {
+  // Toast system
+  const { toasts, dismissToast, showAttackRoll, showSavingThrow } = useToast();
+  
   // Zustand store
   const {
     character,
@@ -241,20 +248,46 @@ export default function CharacterSheet() {
                 <p className="text-gray-500">Unable to load equipped weapons</p>
               </div>
             }>
-              <EquippedWeapons />
+              <EquippedWeapons showAttackRoll={showAttackRoll} />
             </ErrorBoundary>
 
             {/* Cantrips & Spells */}
-            <div className="bg-white rounded-lg shadow border border-blue-200 p-4">
-              <h3 className="text-lg font-bold text-blue-800 mb-4 flex items-center gap-2">
-                <span className="text-purple-600">✨</span>
-                Cantrips & Spells
-              </h3>
-              <div className="text-center py-6 text-gray-500">
-                <p>Coming soon: Quick-cast spells and cantrips</p>
-                <p className="text-sm mt-1">Manage your most-used spells for combat.</p>
+            <ErrorBoundary fallback={
+              <div className="bg-white rounded-lg shadow border border-blue-200 p-4">
+                <h3 className="text-lg font-bold text-blue-800 mb-4 flex items-center gap-2">
+                  <span className="text-purple-600">✨</span>
+                  Quick Spells
+                </h3>
+                <p className="text-gray-500">Unable to load quick spells</p>
               </div>
-            </div>
+            }>
+              <div className="bg-white rounded-lg shadow border border-blue-200 p-4">
+                <h3 className="text-lg font-bold text-blue-800 mb-4 flex items-center gap-2">
+                  <span className="text-purple-600">✨</span>
+                  Quick Spells
+                </h3>
+                <QuickSpells showAttackRoll={showAttackRoll} showSavingThrow={showSavingThrow} />
+                <div className="mt-4 pt-3 border-t border-gray-200">
+                  <p className="text-xs text-gray-500 text-center">
+                    Manage spells in the{' '}
+                    <button
+                      onClick={() => {
+                        const spellcastingSection = document.getElementById('spellcasting-section');
+                        if (spellcastingSection) {
+                          spellcastingSection.scrollIntoView({ 
+                            behavior: 'smooth',
+                            block: 'start'
+                          });
+                        }
+                      }}
+                      className="text-purple-600 hover:text-purple-800 underline hover:no-underline transition-colors font-semibold"
+                    >
+                      Spellcasting section
+                    </button>.
+                  </p>
+                </div>
+              </div>
+            </ErrorBoundary>
           </div>
         </section>
 
@@ -280,7 +313,7 @@ export default function CharacterSheet() {
               <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
                 Character Information
               </h2>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Race</label>
                   <input 
@@ -348,7 +381,7 @@ export default function CharacterSheet() {
               <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
                 Ability Scores
               </h2>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4">
                 {(Object.keys(ABILITY_ABBREVIATIONS) as AbilityName[]).map((ability) => (
                   <div key={ability} className="text-center">
                     <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 hover:border-blue-400 transition-colors">
@@ -404,18 +437,6 @@ export default function CharacterSheet() {
               <WeaponProficiencies />
             </ErrorBoundary>
 
-            {/* Experience Points */}
-            <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
-              <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
-                Experience Points
-              </h2>
-              <XPTracker
-                currentXP={character.experience}
-                currentLevel={character.level}
-                onAddXP={addExperience}
-                onSetXP={setExperience}
-              />
-            </div>
           </div>
 
           {/* Middle Column - Skills & Saving Throws */}
@@ -445,7 +466,7 @@ export default function CharacterSheet() {
             </div>
 
             {/* Skills */}
-            <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
+            <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6 flex flex-col">
               <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
                 Skills
               </h2>
@@ -454,15 +475,15 @@ export default function CharacterSheet() {
               <div className="flex items-center gap-4 mb-3 text-xs text-gray-600 bg-gray-50 p-2 rounded">
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 bg-green-600 rounded"></div>
-                  <span>P = Proficient (+{formatModifier(proficiencyBonus)})</span>
+                  <span>P = Proficient ({formatModifier(proficiencyBonus)})</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 bg-yellow-600 rounded"></div>
-                  <span>E = Expertise (+{formatModifier(proficiencyBonus * 2)})</span>
+                  <span>E = Expertise ({formatModifier(proficiencyBonus * 2)})</span>
                 </div>
               </div>
               
-              <div className="space-y-1 max-h-96 overflow-y-auto">
+              <div className="space-y-1 flex-1 min-h-0 max-h-[40vh] lg:max-h-[60vh] xl:max-h-none overflow-y-auto border border-gray-100 rounded-lg p-2 bg-gradient-to-b from-white to-gray-50">
                 {(Object.keys(SKILL_NAMES) as SkillName[]).map((skillName) => {
                   const skill = character.skills[skillName];
                   const isProficient = skill.proficient;
@@ -526,6 +547,19 @@ export default function CharacterSheet() {
                   );
                 })}
               </div>
+            </div>
+
+            {/* Experience Points */}
+            <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
+              <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
+                Experience Points
+              </h2>
+              <XPTracker
+                currentXP={character.experience}
+                currentLevel={character.level}
+                onAddXP={addExperience}
+                onSetXP={setExperience}
+              />
             </div>
           </div>
 
@@ -656,6 +690,42 @@ export default function CharacterSheet() {
         {/* Section Divider */}
         <div className="flex items-center justify-center">
           <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent w-full max-w-md"></div>
+          <span className="px-4 text-gray-500 font-medium">Spellcasting</span>
+          <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent w-full max-w-md"></div>
+        </div>
+
+        {/* Spellcasting Section */}
+        <section id="spellcasting-section" className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-6 border-2 border-purple-200 shadow-lg">
+          <h2 className="text-2xl font-bold text-purple-800 mb-6 text-center border-b-2 border-purple-300 pb-3">
+            ✨ Spellcasting
+          </h2>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            
+            {/* Spellcasting Statistics */}
+            <ErrorBoundary fallback={
+              <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
+                <h3 className="text-lg font-bold text-purple-800 mb-4">Spellcasting Stats</h3>
+                <p className="text-gray-500">Unable to load spellcasting statistics</p>
+              </div>
+            }>
+              <SpellcastingStats />
+            </ErrorBoundary>
+
+            {/* Spell Management */}
+            <ErrorBoundary fallback={
+              <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
+                <h3 className="text-lg font-bold text-purple-800 mb-4">Spells & Cantrips</h3>
+                <p className="text-gray-500">Unable to load spell management</p>
+              </div>
+            }>
+              <SpellManagement />
+            </ErrorBoundary>
+          </div>
+        </section>
+
+        {/* Section Divider */}
+        <div className="flex items-center justify-center">
+          <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent w-full max-w-md"></div>
           <span className="px-4 text-gray-500 font-medium">Character Details</span>
           <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent w-full max-w-md"></div>
         </div>
@@ -769,6 +839,9 @@ export default function CharacterSheet() {
           </div>
         </section>
       </main>
+      
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

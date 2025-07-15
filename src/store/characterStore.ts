@@ -55,6 +55,14 @@ function migrateCharacterData(character: unknown): CharacterState {
     if (!result.weaponProficiencies || typeof result.weaponProficiencies !== 'object') {
       result.weaponProficiencies = DEFAULT_CHARACTER_STATE.weaponProficiencies;
     }
+    // Ensure spells array exists
+    if (!Array.isArray(result.spells)) {
+      result.spells = DEFAULT_CHARACTER_STATE.spells;
+    }
+    // Ensure spellcasting stats exist
+    if (!result.spellcastingStats || typeof result.spellcastingStats !== 'object') {
+      result.spellcastingStats = DEFAULT_CHARACTER_STATE.spellcastingStats;
+    }
     // Ensure class has hitDie
     if (result.class && typeof result.class === 'object' && !('hitDie' in result.class)) {
       (result.class as Record<string, unknown>).hitDie = 8; // Default to d8

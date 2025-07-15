@@ -2,15 +2,36 @@
 
 import React from 'react';
 import { useCharacterStore } from '@/store/characterStore';
-import { Shield } from 'lucide-react';
+import { Shield, Dice6 } from 'lucide-react';
+import { Weapon } from '@/types/character';
 import { 
   isWeaponProficient, 
   getWeaponAttackString, 
-  getWeaponDamageString 
+  getWeaponDamageString,
+  calculateWeaponAttackBonus
 } from '@/utils/calculations';
 
-export const EquippedWeapons: React.FC = () => {
+interface EquippedWeaponsProps {
+  showAttackRoll: (weaponName: string, roll: number, bonus: number, isCrit: boolean, damage?: string, damageType?: string) => void;
+}
+
+export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll }) => {
   const { character, equipWeapon } = useCharacterStore();
+  
+  const rollWeaponAttack = (weapon: Weapon) => {
+    const roll = Math.floor(Math.random() * 20) + 1;
+    const attackBonus = calculateWeaponAttackBonus(character, weapon);
+    const isCrit = roll === 20;
+    
+    showAttackRoll(
+      weapon.name,
+      roll,
+      attackBonus,
+      isCrit,
+      weapon.damage.dice,
+      weapon.damage.type
+    );
+  };
   
   // Filter to only equipped weapons
   const equippedWeapons = character.weapons.filter(weapon => weapon.isEquipped);
@@ -110,6 +131,14 @@ export const EquippedWeapons: React.FC = () => {
                 </div>
                 
                 <div className="flex flex-col items-center gap-1 ml-3">
+                  <button
+                    onClick={() => rollWeaponAttack(weapon)}
+                    className="flex items-center gap-1 px-2 py-1 text-xs bg-red-600 text-white hover:bg-red-700 rounded transition-colors"
+                    title="Roll attack"
+                  >
+                    <Dice6 size={12} />
+                    Attack
+                  </button>
                   <button
                     onClick={() => equipWeapon(weapon.id, false)}
                     className="px-2 py-1 text-xs bg-orange-200 text-orange-800 hover:bg-orange-300 rounded transition-colors"

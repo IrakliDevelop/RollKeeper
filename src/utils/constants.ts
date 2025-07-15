@@ -1,4 +1,4 @@
-import { AbilityName, SkillName, ClassInfo, RichTextContent, Weapon } from '@/types/character';
+import { AbilityName, SkillName, ClassInfo, RichTextContent, Weapon, Spell } from '@/types/character';
 
 // D&D 5e skill to ability mappings
 export const SKILL_ABILITY_MAP: Record<SkillName, AbilityName> = {
@@ -333,6 +333,14 @@ export const DEFAULT_CHARACTER_STATE = {
     simpleWeapons: false,
     martialWeapons: false,
     specificWeapons: [],
+  },
+
+  spells: [] as Spell[],
+  spellcastingStats: {
+    spellcastingAbility: null,
+    isAbilityOverridden: false,
+    spellAttackBonus: undefined,
+    spellSaveDC: undefined,
   },
 };
 

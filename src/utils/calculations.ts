@@ -6,7 +6,8 @@ import {
   SpellSlots,
   PactMagic,
   ClassInfo,
-  Weapon 
+  Weapon,
+  SpellcastingAbility 
 } from '@/types/character';
 import { 
   SKILL_ABILITY_MAP, 
@@ -102,33 +103,7 @@ export const calculateInitiativeModifier = (character: CharacterState): number =
   return calculateModifier(character.abilities.dexterity);
 };
 
-/**
- * Calculate spell save DC
- * DC = 8 + proficiency bonus + spellcasting ability modifier
- */
-export const calculateSpellSaveDC = (
-  character: CharacterState,
-  spellcastingAbility: AbilityName
-): number => {
-  const abilityModifier = calculateModifier(character.abilities[spellcastingAbility]);
-  const proficiencyBonus = getProficiencyBonus(character.level);
-  
-  return 8 + proficiencyBonus + abilityModifier;
-};
 
-/**
- * Calculate spell attack bonus
- * Attack bonus = proficiency bonus + spellcasting ability modifier
- */
-export const calculateSpellAttackBonus = (
-  character: CharacterState,
-  spellcastingAbility: AbilityName
-): number => {
-  const abilityModifier = calculateModifier(character.abilities[spellcastingAbility]);
-  const proficiencyBonus = getProficiencyBonus(character.level);
-  
-  return proficiencyBonus + abilityModifier;
-};
 
 /**
  * Calculate passive perception
@@ -461,4 +436,138 @@ export function getXPProgress(currentXP: number, currentLevel: number): number {
 export function shouldLevelUp(currentXP: number, currentLevel: number): boolean {
   const calculatedLevel = calculateLevelFromXP(currentXP);
   return calculatedLevel > currentLevel;
+}
+
+// ========================================
+// SPELLCASTING CALCULATIONS
+// ========================================
+
+/**
+ * Get the default spellcasting ability for a class
+ */
+export function getClassSpellcastingAbility(className: string): SpellcastingAbility | null {
+  const normalizedClass = className.toLowerCase();
+  
+  // Intelligence-based spellcasters
+  if (normalizedClass.includes('wizard') || 
+      normalizedClass.includes('artificer') ||
+      normalizedClass.includes('eldritch knight') ||
+      normalizedClass.includes('arcane trickster')) {
+    return 'intelligence';
+  }
+  
+  // Wisdom-based spellcasters
+  if (normalizedClass.includes('cleric') || 
+      normalizedClass.includes('druid') ||
+      normalizedClass.includes('ranger')) {
+    return 'wisdom';
+  }
+  
+  // Charisma-based spellcasters
+  if (normalizedClass.includes('sorcerer') || 
+      normalizedClass.includes('warlock') ||
+      normalizedClass.includes('bard') ||
+      normalizedClass.includes('paladin')) {
+    return 'charisma';
+  }
+  
+  // Non-spellcaster or unknown class
+  return null;
+}
+
+/**
+ * Get the spellcasting ability for a character (with override support)
+ */
+export function getCharacterSpellcastingAbility(character: CharacterState): SpellcastingAbility | null {
+  if (character.spellcastingStats.isAbilityOverridden) {
+    return character.spellcastingStats.spellcastingAbility;
+  }
+  
+  return getClassSpellcastingAbility(character.class.name);
+}
+
+/**
+ * Calculate spell attack bonus with override support
+ * Formula: ability modifier + proficiency bonus
+ */
+export function calculateSpellAttackBonus(character: CharacterState): number | null {
+  // Check for manual override first
+  if (character.spellcastingStats.spellAttackBonus !== undefined) {
+    return character.spellcastingStats.spellAttackBonus;
+  }
+  
+  const spellcastingAbility = getCharacterSpellcastingAbility(character);
+  if (!spellcastingAbility) {
+    return null; // Not a spellcaster
+  }
+  
+  const abilityModifier = calculateModifier(character.abilities[spellcastingAbility]);
+  const proficiencyBonus = getProficiencyBonus(character.level);
+  
+  return abilityModifier + proficiencyBonus;
+}
+
+/**
+ * Calculate spell save DC with override support
+ * Formula: 8 + ability modifier + proficiency bonus
+ */
+export function calculateSpellSaveDC(character: CharacterState): number | null {
+  // Check for manual override first
+  if (character.spellcastingStats.spellSaveDC !== undefined) {
+    return character.spellcastingStats.spellSaveDC;
+  }
+  
+  const spellcastingAbility = getCharacterSpellcastingAbility(character);
+  if (!spellcastingAbility) {
+    return null; // Not a spellcaster
+  }
+  
+  const abilityModifier = calculateModifier(character.abilities[spellcastingAbility]);
+  const proficiencyBonus = getProficiencyBonus(character.level);
+  
+  return 8 + abilityModifier + proficiencyBonus;
+}
+
+/**
+ * Check if a character is a spellcaster
+ */
+export function isSpellcaster(character: CharacterState): boolean {
+  return getCharacterSpellcastingAbility(character) !== null || 
+         character.class.spellcaster !== 'none';
+}
+
+/**
+ * Get spellcasting ability modifier
+ */
+export function getSpellcastingAbilityModifier(character: CharacterState): number | null {
+  const spellcastingAbility = getCharacterSpellcastingAbility(character);
+  if (!spellcastingAbility) {
+    return null;
+  }
+  
+  return calculateModifier(character.abilities[spellcastingAbility]);
+}
+
+/**
+ * Format spell attack bonus for display
+ */
+export function getSpellAttackString(character: CharacterState): string {
+  const attackBonus = calculateSpellAttackBonus(character);
+  if (attackBonus === null) {
+    return "—";
+  }
+  
+  return attackBonus >= 0 ? `+${attackBonus}` : `${attackBonus}`;
+}
+
+/**
+ * Format spell save DC for display
+ */
+export function getSpellSaveDCString(character: CharacterState): string {
+  const saveDC = calculateSpellSaveDC(character);
+  if (saveDC === null) {
+    return "—";
+  }
+  
+  return `${saveDC}`;
 } 
