@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic } from '@/types/character';
+import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground } from '@/types/character';
 import { DEFAULT_CHARACTER_STATE, STORAGE_KEY, APP_VERSION, COMMON_CLASSES } from '@/utils/constants';
 import { 
   calculateSpellSlots, 
@@ -27,6 +27,17 @@ function migrateCharacterData(character: unknown): CharacterState {
     if (!result.spellSlots) {
       result.spellSlots = DEFAULT_CHARACTER_STATE.spellSlots;
     }
+    // Ensure features and traits are arrays
+    if (!Array.isArray(result.features)) {
+      result.features = DEFAULT_CHARACTER_STATE.features;
+    }
+    if (!Array.isArray(result.traits)) {
+      result.traits = DEFAULT_CHARACTER_STATE.traits;
+    }
+    // Ensure characterBackground exists
+    if (!result.characterBackground || typeof result.characterBackground !== 'object' || !('backstory' in result.characterBackground)) {
+      result.characterBackground = DEFAULT_CHARACTER_STATE.characterBackground;
+    }
     return result;
   }
 
@@ -40,7 +51,14 @@ function migrateCharacterData(character: unknown): CharacterState {
       spellcaster: 'none' as const
     },
     spellSlots: DEFAULT_CHARACTER_STATE.spellSlots,
-    pactMagic: undefined
+    pactMagic: undefined,
+    features: Array.isArray(characterObj.features) ? characterObj.features : DEFAULT_CHARACTER_STATE.features,
+    traits: Array.isArray(characterObj.traits) ? characterObj.traits : DEFAULT_CHARACTER_STATE.traits,
+    characterBackground: (characterObj.characterBackground && 
+      typeof characterObj.characterBackground === 'object' &&
+      'backstory' in characterObj.characterBackground) 
+      ? characterObj.characterBackground as CharacterState['characterBackground']
+      : DEFAULT_CHARACTER_STATE.characterBackground
   };
 
   // Try to detect spellcaster type from class name
@@ -107,6 +125,15 @@ interface CharacterStore {
   // XP management
   addExperience: (xpToAdd: number) => void;
   setExperience: (newXP: number) => void;
+
+  // Rich text content management
+  addFeature: (feature: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateFeature: (id: string, updates: Partial<RichTextContent>) => void;
+  deleteFeature: (id: string) => void;
+  addTrait: (trait: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateTrait: (id: string, updates: Partial<RichTextContent>) => void;
+  deleteTrait: (id: string) => void;
+  updateCharacterBackground: (updates: Partial<CharacterBackground>) => void;
   
   // Persistence actions
   saveCharacter: () => void;
@@ -120,6 +147,9 @@ interface CharacterStore {
   markSaved: () => void;
   markUnsaved: () => void;
 }
+
+// Utility function to generate unique IDs
+const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 
 export const useCharacterStore = create<CharacterStore>()(
   persist(
@@ -470,6 +500,113 @@ export const useCharacterStore = create<CharacterStore>()(
             saveStatus: 'saving'
           };
         });
+      },
+
+      // Rich text content management
+      addFeature: (feature) => {
+        set((state) => {
+          const newFeature: RichTextContent = {
+            ...feature,
+            id: generateId(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          return {
+            character: {
+              ...state.character,
+              features: [...state.character.features, newFeature]
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      updateFeature: (id, updates) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            features: state.character.features.map(feature =>
+              feature.id === id
+                ? { ...feature, ...updates, updatedAt: new Date().toISOString() }
+                : feature
+            )
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      deleteFeature: (id) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            features: state.character.features.filter(feature => feature.id !== id)
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      addTrait: (trait) => {
+        set((state) => {
+          const newTrait: RichTextContent = {
+            ...trait,
+            id: generateId(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          return {
+            character: {
+              ...state.character,
+              traits: [...state.character.traits, newTrait]
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      updateTrait: (id, updates) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            traits: state.character.traits.map(trait =>
+              trait.id === id
+                ? { ...trait, ...updates, updatedAt: new Date().toISOString() }
+                : trait
+            )
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      deleteTrait: (id) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            traits: state.character.traits.filter(trait => trait.id !== id)
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      updateCharacterBackground: (updates) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            characterBackground: {
+              ...state.character.characterBackground,
+              ...updates
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
       },
 
       // Persistence actions

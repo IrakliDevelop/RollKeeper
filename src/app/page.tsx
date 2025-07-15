@@ -7,6 +7,9 @@ import { SaveIndicator } from "@/components/ui/SaveIndicator";
 import ClassSelector from "@/components/ui/ClassSelector";
 import SpellSlotTracker from "@/components/ui/SpellSlotTracker";
 import XPTracker from "@/components/ui/XPTracker";
+import FeaturesTraitsManager from "@/components/ui/FeaturesTraitsManager";
+import CharacterBackgroundEditor from "@/components/ui/CharacterBackgroundEditor";
+import ErrorBoundary from "@/components/ui/ErrorBoundary";
 import { 
   ABILITY_ABBREVIATIONS, 
   ABILITY_NAMES, 
@@ -49,6 +52,13 @@ export default function CharacterSheet() {
     resetPactMagicSlots,
     addExperience,
     setExperience,
+    addFeature,
+    updateFeature,
+    deleteFeature,
+    addTrait,
+    updateTrait,
+    deleteTrait,
+    updateCharacterBackground,
     exportCharacter,
     importCharacter
   } = useCharacterStore();
@@ -192,8 +202,54 @@ export default function CharacterSheet() {
       </header>
 
       {/* Main Character Sheet */}
-      <main className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <main className="max-w-7xl mx-auto space-y-8">
+        
+        {/* Actions Section */}
+        <section className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border-2 border-blue-200 shadow-lg">
+          <h2 className="text-2xl font-bold text-blue-800 mb-6 text-center border-b-2 border-blue-300 pb-3">
+            ⚔️ Actions & Combat
+          </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Attack Actions */}
+            <div className="bg-white rounded-lg shadow border border-blue-200 p-4">
+              <h3 className="text-lg font-bold text-blue-800 mb-4 flex items-center gap-2">
+                <span className="text-red-600">⚔️</span>
+                Attacks
+              </h3>
+              <div className="text-center py-6 text-gray-500">
+                <p>Coming soon: Weapon attacks and spell attacks</p>
+                <p className="text-sm mt-1">Add your weapons, calculate attack bonuses and damage.</p>
+              </div>
+            </div>
+
+            {/* Cantrips & Spells */}
+            <div className="bg-white rounded-lg shadow border border-blue-200 p-4">
+              <h3 className="text-lg font-bold text-blue-800 mb-4 flex items-center gap-2">
+                <span className="text-purple-600">✨</span>
+                Cantrips & Spells
+              </h3>
+              <div className="text-center py-6 text-gray-500">
+                <p>Coming soon: Quick-cast spells and cantrips</p>
+                <p className="text-sm mt-1">Manage your most-used spells for combat.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Section Divider */}
+        <div className="flex items-center justify-center">
+          <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent w-full max-w-md"></div>
+          <span className="px-4 text-gray-500 font-medium">Core Stats</span>
+          <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent w-full max-w-md"></div>
+        </div>
+        
+        {/* Core D&D Stats Section */}
+        <section className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl p-6 border-2 border-amber-200 shadow-lg">
+          <h2 className="text-2xl font-bold text-amber-800 mb-6 text-center border-b-2 border-amber-300 pb-3">
+            📊 Character Statistics
+          </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* Left Column - Basic Info & Ability Scores */}
           <div className="lg:col-span-4 space-y-6">
@@ -477,23 +533,6 @@ export default function CharacterSheet() {
               />
             )}
 
-            {/* Features & Traits */}
-            <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
-              <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
-                Features & Traits
-              </h2>
-              <div className="space-y-3">
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-                  <div className="font-medium text-sm text-amber-900">Fighting Style</div>
-                  <div className="text-xs text-amber-700 mt-1">Choose a fighting style that suits your combat approach.</div>
-                </div>
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-                  <div className="font-medium text-sm text-amber-900">Second Wind</div>
-                  <div className="text-xs text-amber-700 mt-1">Regain hit points as a bonus action.</div>
-                </div>
-              </div>
-            </div>
-
             {/* Quick Stats */}
             <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
               <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
@@ -520,6 +559,122 @@ export default function CharacterSheet() {
             </div>
           </div>
         </div>
+        </section>
+
+        {/* Section Divider */}
+        <div className="flex items-center justify-center">
+          <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent w-full max-w-md"></div>
+          <span className="px-4 text-gray-500 font-medium">Character Details</span>
+          <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent w-full max-w-md"></div>
+        </div>
+
+        {/* Character Details Section */}
+        <section className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-6 border-2 border-emerald-200 shadow-lg">
+          <h2 className="text-2xl font-bold text-emerald-800 mb-6 text-center border-b-2 border-emerald-300 pb-3">
+            📜 Character Details
+          </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            
+            {/* Features */}
+            <ErrorBoundary fallback={
+              <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
+                <h3 className="text-lg font-bold text-amber-800 mb-4">Features</h3>
+                <p className="text-gray-500">Unable to load features editor</p>
+              </div>
+            }>
+              <FeaturesTraitsManager
+                items={character.features}
+                category="feature"
+                onAdd={addFeature}
+                onUpdate={updateFeature}
+                onDelete={deleteFeature}
+              />
+            </ErrorBoundary>
+
+            {/* Traits */}
+            <ErrorBoundary fallback={
+              <div className="bg-white rounded-lg shadow-lg border border-emerald-200 p-6">
+                <h3 className="text-lg font-bold text-emerald-800 mb-4">Traits</h3>
+                <p className="text-gray-500">Unable to load traits editor</p>
+              </div>
+            }>
+              <FeaturesTraitsManager
+                items={character.traits}
+                category="trait"
+                onAdd={addTrait}
+                onUpdate={updateTrait}
+                onDelete={deleteTrait}
+              />
+            </ErrorBoundary>
+
+            {/* Character Background - Full Width */}
+            <div className="lg:col-span-2 xl:col-span-3">
+              <ErrorBoundary fallback={
+                <div className="bg-white rounded-lg shadow-lg border border-emerald-200 p-6">
+                  <h3 className="text-lg font-bold text-emerald-800 mb-4">Character Background</h3>
+                  <p className="text-gray-500">Unable to load background editor</p>
+                </div>
+              }>
+                <CharacterBackgroundEditor
+                  background={character.characterBackground}
+                  onChange={updateCharacterBackground}
+                />
+              </ErrorBoundary>
+            </div>
+          </div>
+        </section>
+
+        {/* Section Divider */}
+        <div className="flex items-center justify-center">
+          <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent w-full max-w-md"></div>
+          <span className="px-4 text-gray-500 font-medium">Equipment & Inventory</span>
+          <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent w-full max-w-md"></div>
+        </div>
+
+        {/* Equipment Section */}
+        <section className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-6 border-2 border-purple-200 shadow-lg">
+          <h2 className="text-2xl font-bold text-purple-800 mb-6 text-center border-b-2 border-purple-300 pb-3">
+            🎒 Equipment & Inventory
+          </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            
+            {/* Weapons */}
+            <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
+              <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
+                <span className="text-red-600">⚔️</span>
+                Weapons
+              </h3>
+              <div className="text-center py-6 text-gray-500">
+                <p>Coming soon: Weapon inventory</p>
+                <p className="text-sm mt-1">Track your weapons, damage, and properties.</p>
+              </div>
+            </div>
+
+            {/* Armor & Defense */}
+            <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
+              <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
+                <span className="text-blue-600">🛡️</span>
+                Armor & Defense
+              </h3>
+              <div className="text-center py-6 text-gray-500">
+                <p>Coming soon: Armor and shields</p>
+                <p className="text-sm mt-1">Manage armor, AC calculations, and defenses.</p>
+              </div>
+            </div>
+
+            {/* General Items */}
+            <div className="bg-white rounded-lg shadow border border-purple-200 p-4 lg:col-span-2 xl:col-span-1">
+              <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
+                <span className="text-yellow-600">💰</span>
+                Items & Currency
+              </h3>
+              <div className="text-center py-6 text-gray-500">
+                <p>Coming soon: General inventory</p>
+                <p className="text-sm mt-1">Track items, currency, and supplies.</p>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   );

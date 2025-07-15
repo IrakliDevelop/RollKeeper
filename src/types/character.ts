@@ -37,6 +37,25 @@ export interface InitiativeData {
   isOverridden: boolean; // If true, use custom value; if false, calculate from DEX
 }
 
+// Rich text content for character information
+export interface RichTextContent {
+  id: string;
+  title: string;
+  content: string; // HTML content from WYSIWYG editor
+  category: 'feature' | 'trait' | 'background';
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Character background and history
+export interface CharacterBackground {
+  backstory: string; // Rich text HTML content
+  personality: string; // Rich text HTML content
+  ideals: string; // Rich text HTML content
+  bonds: string; // Rich text HTML content
+  flaws: string; // Rich text HTML content
+}
+
 // Spell slot tracking for each level
 export interface SpellSlot {
   max: number;
@@ -126,6 +145,11 @@ export interface CharacterState {
   // Spell Slots
   spellSlots: SpellSlots;
   pactMagic?: PactMagic; // Only for warlocks
+
+  // Rich Text Content
+  features: RichTextContent[];
+  traits: RichTextContent[];
+  characterBackground: CharacterBackground;
 }
 
 // UI state for managing application state

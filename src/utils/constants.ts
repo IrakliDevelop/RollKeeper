@@ -1,4 +1,4 @@
-import { AbilityName, SkillName, ClassInfo } from '@/types/character';
+import { AbilityName, SkillName, ClassInfo, RichTextContent } from '@/types/character';
 
 // D&D 5e skill to ability mappings
 export const SKILL_ABILITY_MAP: Record<SkillName, AbilityName> = {
@@ -295,7 +295,17 @@ export const DEFAULT_CHARACTER_STATE = {
     8: { max: 0, used: 0 },
     9: { max: 0, used: 0 },
   },
-} as const;
+
+  features: [] as RichTextContent[],
+  traits: [] as RichTextContent[],
+  characterBackground: {
+    backstory: '',
+    personality: '',
+    ideals: '',
+    bonds: '',
+    flaws: '',
+  },
+};
 
 // Auto-save settings
 export const AUTOSAVE_DELAY = 500; // ms
