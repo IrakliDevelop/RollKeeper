@@ -75,7 +75,9 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
       return;
     }
 
+    console.log('Auto-save: hasUnsavedChanges =', hasUnsavedChanges, 'enabled =', enabled);
     if (hasUnsavedChanges && enabled) {
+      console.log('Auto-save: triggering debouncedSave');
       debouncedSave();
     }
 

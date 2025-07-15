@@ -29,7 +29,27 @@ export default function FeaturesTraitsManager({
   const [newItem, setNewItem] = useState({ title: '', content: '' });
 
   const categoryName = category === 'feature' ? 'Features' : 'Traits';
-  const categoryColor = category === 'feature' ? 'amber' : 'emerald';
+  
+  // Define concrete styles to avoid Tailwind CSS purging issues
+  const styles = category === 'feature' 
+    ? {
+        containerBorder: 'border-amber-200',
+        headerText: 'text-amber-800',
+        addButton: 'bg-amber-600 hover:bg-amber-700',
+        formContainer: 'bg-amber-50 border-amber-200',
+        saveButton: 'bg-amber-600 hover:bg-amber-700',
+        itemBorder: 'border-amber-200',
+        itemTitle: 'text-amber-900'
+      }
+    : {
+        containerBorder: 'border-emerald-200',
+        headerText: 'text-emerald-800', 
+        addButton: 'bg-emerald-600 hover:bg-emerald-700',
+        formContainer: 'bg-emerald-50 border-emerald-200',
+        saveButton: 'bg-emerald-600 hover:bg-emerald-700',
+        itemBorder: 'border-emerald-200',
+        itemTitle: 'text-emerald-900'
+      };
 
   const handleAdd = () => {
     if (newItem.title.trim()) {
@@ -58,15 +78,15 @@ export default function FeaturesTraitsManager({
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-lg border border-${categoryColor}-200 p-6 ${className}`}>
+    <div className={`bg-white rounded-lg shadow-lg border ${styles.containerBorder} p-6 ${className}`}>
       <div className="flex items-center justify-between mb-4">
-        <h2 className={`text-lg font-bold text-${categoryColor}-800 border-b border-gray-200 pb-2`}>
+        <h2 className={`text-lg font-bold ${styles.headerText} border-b border-gray-200 pb-2`}>
           {categoryName}
         </h2>
         <button
           onClick={() => setIsAdding(true)}
           disabled={isAdding}
-          className={`flex items-center space-x-1 px-3 py-1 bg-${categoryColor}-600 text-white rounded-md hover:bg-${categoryColor}-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm`}
+          className={`flex items-center space-x-1 px-3 py-1 ${styles.addButton} text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm`}
         >
           <Plus size={14} />
           <span>Add {category === 'feature' ? 'Feature' : 'Trait'}</span>
@@ -75,7 +95,7 @@ export default function FeaturesTraitsManager({
 
       {/* Add New Item Form */}
       {isAdding && (
-        <div className={`mb-4 p-4 border-2 border-${categoryColor}-200 rounded-lg bg-${categoryColor}-50`}>
+        <div className={`mb-4 p-4 border-2 ${styles.formContainer} rounded-lg`}>
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -105,7 +125,7 @@ export default function FeaturesTraitsManager({
               <button
                 onClick={handleAdd}
                 disabled={!newItem.title.trim()}
-                className={`flex items-center space-x-1 px-3 py-2 bg-${categoryColor}-600 text-white rounded-md hover:bg-${categoryColor}-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm`}
+                className={`flex items-center space-x-1 px-3 py-2 ${styles.saveButton} text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm`}
               >
                 <Save size={14} />
                 <span>Save</span>
@@ -132,19 +152,19 @@ export default function FeaturesTraitsManager({
         )}
 
         {safeItems.map((item) => (
-          <div key={item.id} className={`border border-${categoryColor}-200 rounded-lg p-4 hover:shadow-sm transition-shadow`}>
+          <div key={item.id} className={`border ${styles.itemBorder} rounded-lg p-4 hover:shadow-sm transition-shadow`}>
             {editingId === item.id ? (
               <EditItemForm
                 item={item}
                 category={category}
-                categoryColor={categoryColor}
+                styles={styles}
                 onSave={(updates) => handleUpdate(item.id, updates)}
                 onCancel={handleCancelEdit}
               />
             ) : (
               <ViewItem
                 item={item}
-                categoryColor={categoryColor}
+                styles={styles}
                 onEdit={() => setEditingId(item.id)}
                 onDelete={() => onDelete(item.id)}
               />
@@ -156,15 +176,25 @@ export default function FeaturesTraitsManager({
   );
 }
 
+interface CategoryStyles {
+  containerBorder: string;
+  headerText: string;
+  addButton: string;
+  formContainer: string;
+  saveButton: string;
+  itemBorder: string;
+  itemTitle: string;
+}
+
 interface EditItemFormProps {
   item: RichTextContent;
   category: 'feature' | 'trait';
-  categoryColor: string;
+  styles: CategoryStyles;
   onSave: (updates: { title: string; content: string }) => void;
   onCancel: () => void;
 }
 
-function EditItemForm({ item, category, categoryColor, onSave, onCancel }: EditItemFormProps) {
+function EditItemForm({ item, category, styles, onSave, onCancel }: EditItemFormProps) {
   const [title, setTitle] = useState(item.title);
   const [content, setContent] = useState(item.content);
 
@@ -201,7 +231,7 @@ function EditItemForm({ item, category, categoryColor, onSave, onCancel }: EditI
         <button
           onClick={handleSave}
           disabled={!title.trim()}
-          className={`flex items-center space-x-1 px-3 py-2 bg-${categoryColor}-600 text-white rounded-md hover:bg-${categoryColor}-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm`}
+          className={`flex items-center space-x-1 px-3 py-2 ${styles.saveButton} text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm`}
         >
           <Save size={14} />
           <span>Save</span>
@@ -220,16 +250,16 @@ function EditItemForm({ item, category, categoryColor, onSave, onCancel }: EditI
 
 interface ViewItemProps {
   item: RichTextContent;
-  categoryColor: string;
+  styles: CategoryStyles;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-function ViewItem({ item, categoryColor, onEdit, onDelete }: ViewItemProps) {
+function ViewItem({ item, styles, onEdit, onDelete }: ViewItemProps) {
   return (
     <>
       <div className="flex items-start justify-between mb-2">
-        <h3 className={`font-semibold text-${categoryColor}-900`}>{item.title}</h3>
+        <h3 className={`font-semibold ${styles.itemTitle}`}>{item.title}</h3>
         <div className="flex items-center space-x-1">
           <button
             onClick={onEdit}

@@ -65,6 +65,21 @@ export default function RichTextEditor({
     },
   }, []);
 
+  // Update editor content when prop changes (e.g., from localStorage rehydration)
+  // Skip during initial mount to prevent hydration mismatches
+  useEffect(() => {
+    if (editor && isMounted && content !== editor.getHTML()) {
+      // Add a small delay to ensure hydration is complete
+      const timeoutId = setTimeout(() => {
+        if (editor && content !== editor.getHTML()) {
+          editor.commands.setContent(content);
+        }
+      }, 100);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [editor, content, isMounted]);
+
   // Don't render anything on server side
   if (!isMounted || !editor) {
     return (
@@ -197,18 +212,20 @@ export default function RichTextEditor({
         </button>
       </div>
 
-      {/* Editor */}
-      <EditorContent 
-        editor={editor} 
-        className="focus-within:ring-1 focus-within:ring-blue-500"
-      />
-      
-      {/* Placeholder when empty */}
-      {editor.isEmpty && (
-        <div className="absolute top-16 left-3 text-gray-400 pointer-events-none">
-          {placeholder}
-        </div>
-      )}
+      {/* Editor Container */}
+      <div className="relative">
+        <EditorContent 
+          editor={editor} 
+          className="focus-within:ring-1 focus-within:ring-blue-500"
+        />
+        
+        {/* Placeholder when empty */}
+        {editor.isEmpty && (
+          <div className="absolute top-3 left-3 text-gray-400 pointer-events-none">
+            {placeholder}
+          </div>
+        )}
+      </div>
     </div>
   );
 } 

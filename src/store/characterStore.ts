@@ -596,17 +596,22 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       updateCharacterBackground: (updates) => {
-        set((state) => ({
-          character: {
-            ...state.character,
-            characterBackground: {
-              ...state.character.characterBackground,
-              ...updates
-            }
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving'
-        }));
+        console.log('Store: updateCharacterBackground called with:', updates);
+        set((state) => {
+          const newState = {
+            character: {
+              ...state.character,
+              characterBackground: {
+                ...state.character.characterBackground,
+                ...updates
+              }
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as SaveStatus
+          };
+          console.log('Store: new character background:', newState.character.characterBackground);
+          return newState;
+        });
       },
 
       // Persistence actions
