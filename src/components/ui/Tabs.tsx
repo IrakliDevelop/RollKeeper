@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, ReactNode } from 'react';
+import React, { useState, ReactNode, useEffect, forwardRef, useImperativeHandle } from 'react';
 
 export interface TabItem {
   id: string;
@@ -17,18 +17,50 @@ interface TabsProps {
   onTabChange?: (tabId: string) => void;
 }
 
-export default function Tabs({ tabs, defaultTab, className = '', onTabChange }: TabsProps) {
+export interface TabsRef {
+  switchToTab: (tabId: string) => void;
+  getCurrentTab: () => string;
+}
+
+const Tabs = forwardRef<TabsRef, TabsProps>(({ tabs, defaultTab, className = '', onTabChange }, ref) => {
   const [activeTab, setActiveTab] = useState(defaultTab || tabs[0]?.id);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Ensure we're mounted on the client to prevent hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []); // Only run once on mount
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
     onTabChange?.(tabId);
   };
 
-  const activeTabContent = tabs.find(tab => tab.id === activeTab)?.content;
+  // Expose tab switching functionality via ref
+  useImperativeHandle(ref, () => ({
+    switchToTab: (tabId: string) => {
+      if (tabs.find(tab => tab.id === tabId && !tab.disabled)) {
+        handleTabChange(tabId);
+        // Scroll to tabs after switching
+        setTimeout(() => {
+          const tabsElement = document.getElementById('character-tabs');
+          if (tabsElement) {
+            tabsElement.scrollIntoView({ 
+              behavior: 'smooth',
+              block: 'start'
+            });
+          }
+        }, 100);
+      }
+    },
+    getCurrentTab: () => activeTab
+  }), [activeTab, tabs]);
+
+  // Don't render tab content until mounted to prevent hydration mismatch
+  const activeTabContent = isMounted ? tabs.find(tab => tab.id === activeTab)?.content : null;
 
   return (
-    <div className={`w-full ${className}`}>
+    <div id="character-tabs" className={`w-full ${className}`}>
       {/* Tab Navigation */}
       <div className="border-b border-gray-200 bg-white rounded-t-lg shadow-sm">
         <nav className="flex space-x-0 overflow-x-auto scrollbar-hide">
@@ -70,13 +102,24 @@ export default function Tabs({ tabs, defaultTab, className = '', onTabChange }: 
       <div className="bg-white rounded-b-lg shadow-lg border border-gray-200 border-t-0">
         <div className="min-h-[400px] max-h-[80vh] overflow-y-auto">
           <div className="p-6">
-            {activeTabContent}
+            {/* Show loading state until mounted, then show content */}
+            {!isMounted ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-gray-500">Loading...</div>
+              </div>
+            ) : (
+              activeTabContent
+            )}
           </div>
         </div>
       </div>
     </div>
   );
-}
+});
+
+Tabs.displayName = 'Tabs';
+
+export default Tabs;
 
 // Utility component for tab content with consistent styling
 export function TabContent({ children, className = '' }: { children: ReactNode; className?: string }) {

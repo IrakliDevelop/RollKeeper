@@ -42,8 +42,23 @@ import {
   importCharacterFromFile 
 } from "@/utils/fileOperations";
 import { AbilityName, SkillName } from "@/types/character";
-import { useCallback, useEffect, useState } from "react";
-import Tabs, { TabContent } from "@/components/ui/Tabs";
+import { useCallback, useEffect, useState, useRef, createContext, useContext } from "react";
+import Tabs, { TabContent, TabsRef } from "@/components/ui/Tabs";
+
+// Navigation context for tab switching
+interface NavigationContextType {
+  switchToTab: (tabId: string) => void;
+}
+
+const NavigationContext = createContext<NavigationContextType | null>(null);
+
+export const useNavigation = () => {
+  const context = useContext(NavigationContext);
+  if (!context) {
+    throw new Error('useNavigation must be used within NavigationContext');
+  }
+  return context;
+};
 
 export default function CharacterSheet() {
   // Toast system
@@ -236,8 +251,17 @@ export default function CharacterSheet() {
     }
   };
 
+  // Navigation ref for tab switching
+  const tabsRef = useRef<TabsRef>(null);
+
+  // Navigation function for components to switch tabs
+  const switchToTab = useCallback((tabId: string) => {
+    tabsRef.current?.switchToTab(tabId);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4">
+    <NavigationContext.Provider value={{ switchToTab }}>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4">
       {/* Header with Character Name and Actions */}
       <header className="max-w-7xl mx-auto mb-8">
         <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl border border-slate-200 p-6">
@@ -336,18 +360,10 @@ export default function CharacterSheet() {
                   <p className="text-xs text-gray-500 text-center">
                     Manage spells in the{' '}
                     <button
-                      onClick={() => {
-                        const spellcastingSection = document.getElementById('spellcasting-section');
-                        if (spellcastingSection) {
-                          spellcastingSection.scrollIntoView({ 
-                            behavior: 'smooth',
-                            block: 'start'
-                          });
-                        }
-                      }}
+                      onClick={() => switchToTab('spellcasting')}
                       className="text-purple-600 hover:text-purple-800 underline hover:no-underline transition-colors font-semibold"
                     >
-                      Spellcasting section
+                      Spellcasting tab
                     </button>.
                   </p>
                 </div>
@@ -1111,6 +1127,7 @@ export default function CharacterSheet() {
                 )
               }
             ]}
+            ref={tabsRef}
           />
         </section>
       </main>
@@ -1130,5 +1147,6 @@ export default function CharacterSheet() {
         type="danger"
       />
     </div>
+    </NavigationContext.Provider>
   );
 }

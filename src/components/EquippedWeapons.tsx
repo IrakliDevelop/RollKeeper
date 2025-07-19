@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useCharacterStore } from '@/store/characterStore';
+import { useNavigation } from '@/app/page';
 import { Shield, Dice6, Zap } from 'lucide-react';
 import { Weapon } from '@/types/character';
 import { 
@@ -20,6 +21,7 @@ interface EquippedWeaponsProps {
 
 export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll, showDamageRoll }) => {
   const { character, equipWeapon } = useCharacterStore();
+  const { switchToTab } = useNavigation();
   
   const rollWeaponAttack = (weapon: Weapon) => {
     const roll = Math.floor(Math.random() * 20) + 1;
@@ -191,18 +193,10 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
         <p className="text-sm text-blue-800 text-center">
           <strong>💡 Quick Reference:</strong> Manage your full weapon inventory in the{' '}
           <button
-            onClick={() => {
-              const equipmentSection = document.getElementById('equipment-section');
-              if (equipmentSection) {
-                equipmentSection.scrollIntoView({ 
-                  behavior: 'smooth',
-                  block: 'start'
-                });
-              }
-            }}
+            onClick={() => switchToTab('equipment')}
             className="text-blue-600 hover:text-blue-800 underline hover:no-underline transition-colors font-semibold"
           >
-            Equipment section below
+            Equipment tab
           </button>.
         </p>
       </div>
