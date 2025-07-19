@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useCharacterStore } from '@/store/characterStore';
-import { useNavigation } from '@/app/page';
+import { useNavigation } from '@/contexts/NavigationContext';
 import { Shield, Dice6, Zap } from 'lucide-react';
 import { Weapon } from '@/types/character';
 import { 

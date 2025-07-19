@@ -42,23 +42,9 @@ import {
   importCharacterFromFile 
 } from "@/utils/fileOperations";
 import { AbilityName, SkillName } from "@/types/character";
-import { useCallback, useEffect, useState, useRef, createContext, useContext } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import Tabs, { TabContent, TabsRef } from "@/components/ui/Tabs";
-
-// Navigation context for tab switching
-interface NavigationContextType {
-  switchToTab: (tabId: string) => void;
-}
-
-const NavigationContext = createContext<NavigationContextType | null>(null);
-
-export const useNavigation = () => {
-  const context = useContext(NavigationContext);
-  if (!context) {
-    throw new Error('useNavigation must be used within NavigationContext');
-  }
-  return context;
-};
+import { NavigationContext } from "@/contexts/NavigationContext";
 
 export default function CharacterSheet() {
   // Toast system

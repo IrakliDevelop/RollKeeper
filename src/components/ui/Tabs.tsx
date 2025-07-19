@@ -54,7 +54,9 @@ const Tabs = forwardRef<TabsRef, TabsProps>(({ tabs, defaultTab, className = '',
       }
     },
     getCurrentTab: () => activeTab
-  }), [activeTab, tabs]);
+  }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [activeTab, tabs]);
 
   // Don't render tab content until mounted to prevent hydration mismatch
   const activeTabContent = isMounted ? tabs.find(tab => tab.id === activeTab)?.content : null;
