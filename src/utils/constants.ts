@@ -290,9 +290,15 @@ export const DEFAULT_CHARACTER_STATE = {
   },
   
   armorClass: 10,
+  tempArmorClass: 0,
+  isWearingShield: false,
+  shieldBonus: 2,
   initiative: {
     value: 0,
     isOverridden: false
+  },
+  reaction: {
+    hasUsedReaction: false
   },
   speed: 30,
   hitDice: '1d8',
@@ -316,6 +322,11 @@ export const DEFAULT_CHARACTER_STATE = {
     7: { max: 0, used: 0 },
     8: { max: 0, used: 0 },
     9: { max: 0, used: 0 },
+  },
+
+  heroicInspiration: {
+    count: 0,
+    maxCount: undefined
   },
 
   trackableTraits: [] as TrackableTrait[],

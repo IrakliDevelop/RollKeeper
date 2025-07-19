@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, HitPoints, DeathSavingThrows, Weapon, TrackableTrait } from '@/types/character';
+import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, HitPoints, DeathSavingThrows, Weapon, TrackableTrait, HeroicInspiration } from '@/types/character';
 import { DEFAULT_CHARACTER_STATE, STORAGE_KEY, APP_VERSION, COMMON_CLASSES } from '@/utils/constants';
 import { 
   calculateSpellSlots, 
@@ -75,6 +75,26 @@ function migrateCharacterData(character: unknown): CharacterState {
       if (!('calculationMode' in result.hitPoints)) {
         (result.hitPoints as Record<string, unknown>).calculationMode = 'auto';
       }
+    }
+    // Ensure reaction tracking exists
+    if (!result.reaction || typeof result.reaction !== 'object') {
+      result.reaction = DEFAULT_CHARACTER_STATE.reaction;
+    }
+    // Ensure heroic inspiration exists
+    if (!result.heroicInspiration || typeof result.heroicInspiration !== 'object') {
+      result.heroicInspiration = DEFAULT_CHARACTER_STATE.heroicInspiration;
+    }
+    // Ensure temporary AC field exists
+    if (typeof result.tempArmorClass !== 'number') {
+      result.tempArmorClass = DEFAULT_CHARACTER_STATE.tempArmorClass;
+    }
+    // Ensure shield status exists
+    if (typeof result.isWearingShield !== 'boolean') {
+      result.isWearingShield = DEFAULT_CHARACTER_STATE.isWearingShield;
+    }
+    // Ensure shield bonus exists
+    if (typeof result.shieldBonus !== 'number') {
+      result.shieldBonus = DEFAULT_CHARACTER_STATE.shieldBonus;
     }
     return result;
   }
@@ -158,6 +178,22 @@ interface CharacterStore {
   updateHitPoints: (updates: Partial<CharacterState['hitPoints']>) => void;
   updateInitiative: (value: number, isOverride: boolean) => void;
   resetInitiativeToDefault: () => void;
+  
+  // Reaction management
+  toggleReaction: () => void;
+  resetReaction: () => void;
+  
+  // Heroic inspiration management
+  updateHeroicInspiration: (updates: Partial<HeroicInspiration>) => void;
+  addHeroicInspiration: (amount?: number) => void;
+  useHeroicInspiration: () => void;
+  resetHeroicInspiration: () => void;
+  
+  // Armor Class management
+  updateTempArmorClass: (tempAC: number) => void;
+  toggleShield: () => void;
+  resetTempArmorClass: () => void;
+  updateShieldBonus: (bonus: number) => void;
   
   // HP management actions
   applyDamageToCharacter: (damage: number) => void;
@@ -354,6 +390,141 @@ export const useCharacterStore = create<CharacterStore>()(
               value: calculateModifier(state.character.abilities.dexterity),
               isOverridden: false
             }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      // Reaction management actions
+      toggleReaction: () => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            reaction: {
+              hasUsedReaction: !state.character.reaction.hasUsedReaction
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      resetReaction: () => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            reaction: {
+              hasUsedReaction: false
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      // Heroic inspiration management actions
+      updateHeroicInspiration: (updates) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            heroicInspiration: {
+              ...state.character.heroicInspiration,
+              ...updates
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      addHeroicInspiration: (amount = 1) => {
+        set((state) => {
+          const current = state.character.heroicInspiration.count;
+          const max = state.character.heroicInspiration.maxCount;
+          const newCount = max ? Math.min(current + amount, max) : current + amount;
+          
+          return {
+            character: {
+              ...state.character,
+              heroicInspiration: {
+                ...state.character.heroicInspiration,
+                count: Math.max(0, newCount)
+              }
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      useHeroicInspiration: () => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            heroicInspiration: {
+              ...state.character.heroicInspiration,
+              count: Math.max(0, state.character.heroicInspiration.count - 1)
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      resetHeroicInspiration: () => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            heroicInspiration: {
+              ...state.character.heroicInspiration,
+              count: 0
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      // Armor Class management
+      updateTempArmorClass: (tempAC) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            tempArmorClass: tempAC
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      toggleShield: () => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            isWearingShield: !state.character.isWearingShield
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      resetTempArmorClass: () => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            tempArmorClass: 0
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      updateShieldBonus: (bonus) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            shieldBonus: bonus
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving'

@@ -103,7 +103,33 @@ export const calculateInitiativeModifier = (character: CharacterState): number =
   return calculateModifier(character.abilities.dexterity);
 };
 
+/**
+ * Calculate total armor class including all bonuses
+ * @param baseAC - Base armor class
+ * @param tempAC - Temporary AC bonuses from spells/effects
+ * @param isWearingShield - Whether character is wearing a shield
+ * @param shieldBonus - AC bonus from shield (default +2 for standard shield)
+ */
+export const calculateTotalArmorClass = (
+  baseAC: number, 
+  tempAC: number, 
+  isWearingShield: boolean, 
+  shieldBonus: number = 2
+): number => {
+  return baseAC + tempAC + (isWearingShield ? shieldBonus : 0);
+};
 
+/**
+ * Calculate total armor class from character state
+ */
+export const calculateCharacterArmorClass = (character: CharacterState): number => {
+  return calculateTotalArmorClass(
+    character.armorClass,
+    character.tempArmorClass,
+    character.isWearingShield,
+    character.shieldBonus
+  );
+};
 
 /**
  * Calculate passive perception

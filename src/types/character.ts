@@ -50,6 +50,17 @@ export interface InitiativeData {
   isOverridden: boolean; // If true, use custom value; if false, calculate from DEX
 }
 
+// Reaction tracking for combat
+export interface ReactionData {
+  hasUsedReaction: boolean; // Whether reaction has been used this turn/round
+}
+
+// Heroic Inspiration tracking (stackable)
+export interface HeroicInspiration {
+  count: number; // Number of inspiration dice available
+  maxCount?: number; // Optional maximum (some DMs set limits)
+}
+
 // Rich text content for character information
 export interface RichTextContent {
   id: string;
@@ -230,7 +241,11 @@ export interface CharacterState {
   // Combat Stats
   hitPoints: HitPoints;
   armorClass: number;
+  tempArmorClass: number; // Temporary AC bonuses from spells, effects, etc.
+  isWearingShield: boolean; // Whether character is currently wearing/using a shield
+  shieldBonus: number; // AC bonus from shield (default +2, but can be +1, +3, etc.)
   initiative: InitiativeData;
+  reaction: ReactionData;
   speed: number;
   hitDice: string; // e.g., "1d8", "2d6"
   
@@ -247,6 +262,9 @@ export interface CharacterState {
   // Spell Slots
   spellSlots: SpellSlots;
   pactMagic?: PactMagic; // Only for warlocks
+
+  // Heroic Inspiration
+  heroicInspiration: HeroicInspiration;
 
   // Trackable Traits
   trackableTraits: TrackableTrait[];

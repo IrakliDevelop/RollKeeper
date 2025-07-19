@@ -7,6 +7,7 @@ import { SaveIndicator } from "@/components/ui/SaveIndicator";
 import ClassSelector from "@/components/ui/ClassSelector";
 import SpellSlotTracker from "@/components/ui/SpellSlotTracker";
 import TraitTracker from "@/components/ui/TraitTracker";
+import HeroicInspirationTracker from "@/components/ui/HeroicInspirationTracker";
 import XPTracker from "@/components/ui/XPTracker";
 import FeaturesTraitsManager from "@/components/ui/FeaturesTraitsManager";
 import NotesManager from "@/components/ui/NotesManager";
@@ -33,7 +34,8 @@ import {
   calculateModifier, 
   getProficiencyBonus, 
   formatModifier,
-  hasSpellSlots
+  hasSpellSlots,
+  calculateCharacterArmorClass
 } from "@/utils/calculations";
 import { 
   exportCharacterToFile, 
@@ -92,7 +94,17 @@ export default function CharacterSheet() {
     updateCharacterBackground,
     exportCharacter,
     importCharacter,
-    resetCharacter
+    resetCharacter,
+    addHeroicInspiration,
+    updateHeroicInspiration,
+    useHeroicInspiration,
+    resetHeroicInspiration,
+    toggleReaction,
+    resetReaction,
+    updateTempArmorClass,
+    toggleShield,
+    resetTempArmorClass,
+    updateShieldBonus
   } = useCharacterStore();
 
   // Modal state for character reset
@@ -636,57 +648,219 @@ export default function CharacterSheet() {
                 Combat Stats
               </h2>
               
-              {/* AC, Initiative, Speed */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="text-center">
-                  <div className="bg-red-50 border-2 border-red-200 rounded-lg p-3 h-20 flex flex-col justify-center">
-                    <div className="text-xs font-medium text-red-700 mb-1">ARMOR CLASS</div>
-                    <input
-                      type="number"
-                      value={character.armorClass}
-                      onChange={(e) => updateCharacter({ armorClass: parseInt(e.target.value) || 10 })}
-                      className="text-xl font-bold text-red-800 bg-transparent border-none outline-none text-center w-full"
-                    />
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className={`rounded-lg p-3 h-20 flex flex-col justify-center border-2 transition-colors ${
-                    character.initiative.isOverridden 
-                      ? 'bg-orange-50 border-orange-300' 
-                      : 'bg-yellow-50 border-yellow-200'
-                  }`}>
-                    <div className="text-xs font-medium text-yellow-700 mb-1 flex items-center justify-center gap-1">
-                      INITIATIVE
-                      {character.initiative.isOverridden && (
-                        <button
-                          onClick={resetInitiativeToDefault}
-                          className="text-orange-600 hover:text-orange-800 transition-colors"
-                          title="Reset to DEX modifier"
-                        >
-                          <RotateCcw size={10} />
-                        </button>
-                      )}
+              {/* Armor Class - Full Width Row */}
+              <div className="mb-6">
+                <div className="bg-gradient-to-r from-red-50 to-red-100 border-2 border-red-200 rounded-xl p-6">
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold text-red-800 mb-3 flex items-center justify-center gap-2">
+                      🛡️ ARMOR CLASS
+                    </h3>
+                    <div className="text-5xl font-bold text-red-900 mb-2">
+                      {calculateCharacterArmorClass(character)}
                     </div>
-                    <input
-                      type="number"
-                      value={getInitiativeModifier()}
-                      onChange={(e) => updateInitiative(parseInt(e.target.value) || 0, true)}
-                      className={`text-xl font-bold bg-transparent border-none outline-none text-center w-full ${
-                        character.initiative.isOverridden ? 'text-orange-800' : 'text-yellow-800'
-                      }`}
-                      title={character.initiative.isOverridden ? 'Custom initiative (overridden)' : 'DEX modifier (auto-calculated)'}
-                    />
+                    <div className="text-base text-red-700 font-medium">Total AC</div>
+                  </div>
+                  
+                  {/* AC Components - Row Layout */}
+                  <div className="space-y-4 mb-6">
+                    {/* Base AC Row */}
+                    <div className="bg-white rounded-lg border-2 border-red-300 p-4 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="text-lg font-bold text-red-800">Base AC</div>
+                          <div className="text-sm text-red-600">From armor & dexterity</div>
+                        </div>
+                        <input
+                          type="number"
+                          value={character.armorClass}
+                          onChange={(e) => updateCharacter({ armorClass: parseInt(e.target.value) || 10 })}
+                          className="w-20 h-12 text-2xl font-bold text-center bg-red-50 border-2 border-red-300 rounded-lg text-red-900 focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                          min="0"
+                          max="30"
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Temporary AC Row */}
+                    <div className="bg-white rounded-lg border-2 border-orange-300 p-4 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="text-lg font-bold text-orange-800">Temporary AC</div>
+                          <div className="text-sm text-orange-600">From spells & effects</div>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl font-bold text-orange-700">+</span>
+                            <input
+                              type="number"
+                              value={character.tempArmorClass}
+                              onChange={(e) => updateTempArmorClass(parseInt(e.target.value) || 0)}
+                              className="w-20 h-12 text-2xl font-bold text-center bg-orange-50 border-2 border-orange-300 rounded-lg text-orange-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                              min="0"
+                              max="20"
+                            />
+                          </div>
+                          {character.tempArmorClass > 0 && (
+                            <button
+                              onClick={resetTempArmorClass}
+                              className="px-3 py-1 text-xs text-orange-600 hover:text-orange-800 hover:bg-orange-50 border border-orange-300 rounded-md transition-colors"
+                            >
+                              Reset
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Shield Row */}
+                    <div className="bg-white rounded-lg border-2 border-blue-300 p-4 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="text-lg font-bold text-blue-800">Shield</div>
+                          <div className="text-sm text-blue-600">
+                            {character.isWearingShield ? `+${character.shieldBonus} AC bonus` : 'Click to equip'}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={toggleShield}
+                            className={`w-12 h-12 rounded-lg text-2xl transition-all duration-200 flex items-center justify-center ${
+                              character.isWearingShield
+                                ? 'bg-blue-600 text-white shadow-lg transform scale-105 border-2 border-blue-700'
+                                : 'bg-blue-50 border-2 border-blue-300 text-blue-600 hover:bg-blue-100'
+                            }`}
+                            title={`${character.isWearingShield ? 'Unequip' : 'Equip'} shield`}
+                          >
+                            🛡️
+                          </button>
+                          
+                          {character.isWearingShield && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl font-bold text-blue-700">+</span>
+                              <input
+                                type="number"
+                                value={character.shieldBonus}
+                                onChange={(e) => updateShieldBonus(parseInt(e.target.value) || 2)}
+                                className="w-16 h-10 text-lg font-bold text-center bg-blue-50 border-2 border-blue-300 rounded-lg text-blue-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                min="0"
+                                max="5"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* AC Formula Display */}
+                  <div className="text-center">
+                    <div className="inline-flex items-center gap-3 px-6 py-3 bg-white rounded-lg border-2 border-red-300 text-lg font-medium text-red-800 shadow-sm">
+                      <span className="text-xl font-bold">{character.armorClass}</span>
+                      <span className="text-red-600 text-lg">+</span>
+                      <span className="text-xl font-bold">{character.tempArmorClass}</span>
+                      {character.isWearingShield && (
+                        <>
+                          <span className="text-red-600 text-lg">+</span>
+                          <span className="text-xl font-bold">{character.shieldBonus}</span>
+                        </>
+                      )}
+                      <span className="text-red-600 text-lg">=</span>
+                      <span className="font-bold text-2xl text-red-900">{calculateCharacterArmorClass(character)}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="text-center">
-                  <div className="bg-green-50 border-2 border-green-200 rounded-lg p-3 h-20 flex flex-col justify-center">
-                    <div className="text-xs font-medium text-green-700 mb-1">SPEED</div>
-                    <input
-                      type="number"
-                      value={character.speed}
-                      onChange={(e) => updateCharacter({ speed: parseInt(e.target.value) || 30 })}
-                      className="text-xl font-bold text-green-800 bg-transparent border-none outline-none text-center w-full"
-                    />
+              </div>
+
+              {/* Initiative and Speed Row */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  {/* Initiative */}
+                  <div className="text-center">
+                    <div className={`rounded-lg p-3 h-20 flex flex-col justify-center border-2 transition-colors ${
+                      character.initiative.isOverridden 
+                        ? 'bg-orange-50 border-orange-300' 
+                        : 'bg-yellow-50 border-yellow-200'
+                    }`}>
+                      <div className="text-xs font-medium text-yellow-700 mb-1 flex items-center justify-center gap-1">
+                        INITIATIVE
+                        {character.initiative.isOverridden && (
+                          <button
+                            onClick={resetInitiativeToDefault}
+                            className="text-orange-600 hover:text-orange-800 transition-colors"
+                            title="Reset to DEX modifier"
+                          >
+                            <RotateCcw size={10} />
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="number"
+                        value={getInitiativeModifier()}
+                        onChange={(e) => updateInitiative(parseInt(e.target.value) || 0, true)}
+                        className={`text-xl font-bold bg-transparent border-none outline-none text-center w-full ${
+                          character.initiative.isOverridden ? 'text-orange-800' : 'text-yellow-800'
+                        }`}
+                        title={character.initiative.isOverridden ? 'Custom initiative (overridden)' : 'DEX modifier (auto-calculated)'}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Speed */}
+                  <div className="text-center">
+                    <div className="bg-green-50 border-2 border-green-200 rounded-lg p-3 h-20 flex flex-col justify-center">
+                      <div className="text-xs font-medium text-green-700 mb-1">SPEED</div>
+                      <input
+                        type="number"
+                        value={character.speed}
+                        onChange={(e) => updateCharacter({ speed: parseInt(e.target.value) || 30 })}
+                        className="text-xl font-bold text-green-800 bg-transparent border-none outline-none text-center w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+              {/* Reaction Tracking */}
+              <div className="mb-6">
+                <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="text-sm font-bold text-purple-800">REACTION</div>
+                      <div className="text-xs text-purple-600">
+                        {character.reaction.hasUsedReaction ? 'Used this turn' : 'Available'}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={toggleReaction}
+                        className={`
+                          relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                          ${character.reaction.hasUsedReaction 
+                            ? 'bg-red-600' 
+                            : 'bg-green-600'
+                          }
+                        `}
+                        title={character.reaction.hasUsedReaction ? 'Mark reaction as available' : 'Mark reaction as used'}
+                      >
+                        <span
+                          className={`
+                            inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                            ${character.reaction.hasUsedReaction ? 'translate-x-6' : 'translate-x-1'}
+                          `}
+                        />
+                      </button>
+                      
+                      <button
+                        onClick={resetReaction}
+                        className="p-1 text-purple-600 hover:bg-purple-100 rounded transition-colors"
+                        title="Reset reaction to available"
+                      >
+                        <RotateCcw size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-2 text-xs text-purple-700 bg-purple-100 rounded p-2">
+                    <strong>Reaction:</strong> One reaction per turn - used for opportunity attacks, spells like Shield, or other triggered abilities.
                   </div>
                 </div>
               </div>
@@ -737,6 +911,15 @@ export default function CharacterSheet() {
               onDeleteTrait={deleteTrackableTrait}
               onUseTrait={useTrackableTrait}
               onResetTraits={resetTrackableTraits}
+            />
+
+            {/* Heroic Inspiration */}
+            <HeroicInspirationTracker
+              inspiration={character.heroicInspiration}
+              onAddInspiration={addHeroicInspiration}
+              onUpdateInspiration={updateHeroicInspiration}
+              onUseInspiration={useHeroicInspiration}
+              onResetInspiration={resetHeroicInspiration}
             />
 
             {/* Quick Stats */}
