@@ -473,6 +473,65 @@ function getSpellClasses(spellName: string): SpellClass[] {
   if (warlockSpells.includes(name)) classes.push('warlock');
   if (wizardSpells.includes(name)) classes.push('wizard');
 
+  // ELDRITCH KNIGHT SPELLS (Fighter subclass)
+  // Limited wizard spells - primarily abjuration and evocation, plus some exceptions
+  const eldritchKnightSpells = [
+    // Cantrips (any wizard cantrip)
+    'acid splash', 'blade ward', 'booming blade', 'chill touch', 'control flames', 'create bonfire',
+    'dancing lights', 'fire bolt', 'friends', 'frostbite', 'green-flame blade', 'gust',
+    'light', 'lightning lure', 'mage hand', 'mending', 'message', 'minor illusion',
+    'poison spray', 'prestidigitation', 'ray of frost', 'shocking grasp', 'sword burst',
+    'thunderclap', 'true strike',
+    // 1st Level (abjuration/evocation + exceptions)
+    'absorb elements', 'alarm', 'burning hands', 'chromatic orb', 'expeditious retreat',
+    'false life', 'find familiar', 'fog cloud', 'jump', 'longstrider', 'mage armor',
+    'magic missile', 'protection from evil and good', 'shield', 'thunderwave',
+    // 2nd Level (abjuration/evocation + exceptions)  
+    'aganazzar\'s scorcher', 'arcane lock', 'blur', 'continual flame', 'darkness',
+    'darkvision', 'enlarge/reduce', 'flaming sphere', 'gust of wind', 'invisibility',
+    'levitate', 'magic weapon', 'misty step', 'scorching ray', 'see invisibility',
+    'shatter', 'spider climb', 'web',
+    // 3rd Level (abjuration/evocation + exceptions)
+    'counterspell', 'daylight', 'dispel magic', 'fear', 'fireball', 'fly',
+    'gaseous form', 'haste', 'lightning bolt', 'magic circle', 'nondetection',
+    'protection from energy', 'sleet storm', 'slow', 'stinking cloud', 'tongues',
+    'vampiric touch', 'wall of water', 'water breathing',
+    // 4th Level (abjuration/evocation + exceptions)
+    'arcane eye', 'banishment', 'confusion', 'dimension door', 'evard\'s black tentacles',
+    'fire shield', 'greater invisibility', 'ice storm', 'locate creature',
+    'otiluke\'s resilient sphere', 'stoneskin', 'wall of fire'
+  ];
+
+  // ARCANE TRICKSTER SPELLS (Rogue subclass)  
+  // Limited wizard spells - primarily illusion and enchantment, plus some exceptions
+  const arcaneTricksterSpells = [
+    // Cantrips (any wizard cantrip)
+    'acid splash', 'blade ward', 'booming blade', 'chill touch', 'control flames', 'create bonfire',
+    'dancing lights', 'encode thoughts', 'fire bolt', 'friends', 'frostbite', 'green-flame blade',
+    'gust', 'infestation', 'light', 'lightning lure', 'mage hand', 'mending', 'message',
+    'minor illusion', 'mold earth', 'poison spray', 'prestidigitation', 'ray of frost',
+    'shape water', 'shocking grasp', 'sword burst', 'thunderclap', 'toll the dead', 'true strike',
+    // 1st Level (illusion/enchantment + exceptions)
+    'charm person', 'color spray', 'comprehend languages', 'detect magic', 'disguise self',
+    'expeditious retreat', 'false life', 'feather fall', 'find familiar', 'fog cloud',
+    'illusory script', 'jump', 'longstrider', 'silent image', 'silvery barbs', 'sleep',
+    'tasha\'s hideous laughter', 'unseen servant',
+    // 2nd Level (illusion/enchantment + exceptions)
+    'blindness/deafness', 'blur', 'cloud of daggers', 'crown of madness', 'darkness',
+    'detect thoughts', 'hold person', 'invisibility', 'knock', 'levitate', 'magic mouth',
+    'mirror image', 'misty step', 'rope trick', 'see invisibility', 'spider climb', 'suggestion', 'web',
+    // 3rd Level (illusion/enchantment + exceptions)
+    'catnap', 'clairvoyance', 'counterspell', 'fear', 'fly', 'gaseous form', 'hypnotic pattern',
+    'major image', 'nondetection', 'sending', 'slow', 'tongues',
+    // 4th Level (illusion/enchantment + exceptions)
+    'charm monster', 'confusion', 'dimension door', 'greater invisibility', 'hallucinatory terrain',
+    'locate creature', 'phantasmal killer', 'polymorph'
+  ];
+
+  // Check subclass spell lists
+  if (eldritchKnightSpells.includes(name)) classes.push('eldritch knight');
+  if (arcaneTricksterSpells.includes(name)) classes.push('arcane trickster');
+
   return classes;
 }
 
