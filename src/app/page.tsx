@@ -45,6 +45,8 @@ import { AbilityName, SkillName } from "@/types/character";
 import { useCallback, useEffect, useState, useRef } from "react";
 import Tabs, { TabContent, TabsRef } from "@/components/ui/Tabs";
 import { NavigationContext } from "@/contexts/NavigationContext";
+import ArmorDefenseManager from "@/components/ArmorDefenseManager";
+import InventoryCurrencyManager from "@/components/InventoryCurrencyManager";
 
 export default function CharacterSheet() {
   // Toast system
@@ -1005,28 +1007,30 @@ export default function CharacterSheet() {
                       </ErrorBoundary>
 
                       {/* Armor & Defense */}
-                      <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
-                        <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
-                          <span className="text-blue-600">🛡️</span>
-                          Armor & Defense
-                        </h3>
-                        <div className="text-center py-6 text-gray-500">
-                          <p>Coming soon: Armor and shields</p>
-                          <p className="text-sm mt-1">Manage armor, AC calculations, and defenses.</p>
+                      <ErrorBoundary fallback={
+                        <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
+                          <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
+                            <span className="text-blue-600">🛡️</span>
+                            Armor & Defense
+                          </h3>
+                          <p className="text-gray-500">Unable to load armor management</p>
                         </div>
-                      </div>
+                      }>
+                        <ArmorDefenseManager />
+                      </ErrorBoundary>
 
                       {/* General Items */}
-                      <div className="bg-white rounded-lg shadow border border-purple-200 p-4 lg:col-span-2 xl:col-span-1">
-                        <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
-                          <span className="text-yellow-600">💰</span>
-                          Items & Currency
-                        </h3>
-                        <div className="text-center py-6 text-gray-500">
-                          <p>Coming soon: General inventory</p>
-                          <p className="text-sm mt-1">Track items, currency, and supplies.</p>
+                      <ErrorBoundary fallback={
+                        <div className="bg-white rounded-lg shadow border border-purple-200 p-4 lg:col-span-2 xl:col-span-1">
+                          <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
+                            <span className="text-yellow-600">💰</span>
+                            Items & Currency
+                          </h3>
+                          <p className="text-gray-500">Unable to load inventory management</p>
                         </div>
-                      </div>
+                      }>
+                        <InventoryCurrencyManager />
+                      </ErrorBoundary>
                     </div>
                   </TabContent>
                 )

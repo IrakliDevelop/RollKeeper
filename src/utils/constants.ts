@@ -1,4 +1,4 @@
-import { AbilityName, SkillName, ClassInfo, RichTextContent, Weapon, Spell, TrackableTrait, MagicItem } from '@/types/character';
+import { AbilityName, SkillName, ClassInfo, RichTextContent, Weapon, Spell, TrackableTrait, MagicItem, ArmorItem, InventoryItem } from '@/types/character';
 
 // D&D 5e skill to ability mappings
 export const SKILL_ABILITY_MAP: Record<SkillName, AbilityName> = {
@@ -344,6 +344,15 @@ export const DEFAULT_CHARACTER_STATE = {
 
   weapons: [] as Weapon[],
   magicItems: [] as MagicItem[],
+  armorItems: [] as ArmorItem[],
+  inventoryItems: [] as InventoryItem[],
+  currency: {
+    copper: 0,
+    silver: 0,
+    electrum: 0,
+    gold: 0,
+    platinum: 0,
+  },
   attunementSlots: {
     used: 0,
     max: 3

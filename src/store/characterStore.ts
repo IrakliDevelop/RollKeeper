@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, HitPoints, DeathSavingThrows, Weapon, TrackableTrait, HeroicInspiration, MagicItem } from '@/types/character';
+import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, HitPoints, DeathSavingThrows, Weapon, TrackableTrait, HeroicInspiration, MagicItem, ArmorItem, InventoryItem } from '@/types/character';
 import { DEFAULT_CHARACTER_STATE, STORAGE_KEY, APP_VERSION, COMMON_CLASSES } from '@/utils/constants';
 import { 
   calculateSpellSlots, 
@@ -103,6 +103,18 @@ function migrateCharacterData(character: unknown): CharacterState {
     // Ensure attunement slots exist
     if (!result.attunementSlots || typeof result.attunementSlots !== 'object') {
       result.attunementSlots = DEFAULT_CHARACTER_STATE.attunementSlots;
+    }
+    // Ensure armor items exist
+    if (!Array.isArray(result.armorItems)) {
+      result.armorItems = DEFAULT_CHARACTER_STATE.armorItems;
+    }
+    // Ensure inventory items exist
+    if (!Array.isArray(result.inventoryItems)) {
+      result.inventoryItems = DEFAULT_CHARACTER_STATE.inventoryItems;
+    }
+    // Ensure currency exists
+    if (!result.currency || typeof result.currency !== 'object') {
+      result.currency = DEFAULT_CHARACTER_STATE.currency;
     }
     return result;
   }
@@ -255,6 +267,23 @@ interface CharacterStore {
   deleteMagicItem: (id: string) => void;
   attuneMagicItem: (id: string, attuned: boolean) => void;
   updateAttunementSlots: (max: number) => void;
+
+  // Armor management
+  addArmorItem: (item: Omit<ArmorItem, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateArmorItem: (id: string, updates: Partial<ArmorItem>) => void;
+  deleteArmorItem: (id: string) => void;
+  equipArmorItem: (id: string, equipped: boolean) => void;
+
+  // Inventory management
+  addInventoryItem: (item: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateInventoryItem: (id: string, updates: Partial<InventoryItem>) => void;
+  deleteInventoryItem: (id: string) => void;
+  updateItemQuantity: (id: string, quantity: number) => void;
+
+  // Currency management
+  updateCurrency: (updates: Partial<typeof DEFAULT_CHARACTER_STATE.currency>) => void;
+  addCurrency: (type: keyof typeof DEFAULT_CHARACTER_STATE.currency, amount: number) => void;
+  subtractCurrency: (type: keyof typeof DEFAULT_CHARACTER_STATE.currency, amount: number) => void;
   
   // Persistence actions
   saveCharacter: () => void;
@@ -1237,6 +1266,173 @@ export const useCharacterStore = create<CharacterStore>()(
             attunementSlots: {
               ...state.character.attunementSlots,
               max
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      // Armor management
+      addArmorItem: (item) => {
+        set((state) => {
+          const newItem: ArmorItem = {
+            ...item,
+            id: generateId(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          return {
+            character: {
+              ...state.character,
+              armorItems: [...(state.character.armorItems || []), newItem]
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      updateArmorItem: (id, updates) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            armorItems: state.character.armorItems.map(item =>
+              item.id === id
+                ? { ...item, ...updates, updatedAt: new Date().toISOString() }
+                : item
+            )
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      deleteArmorItem: (id) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            armorItems: state.character.armorItems.filter(item => item.id !== id)
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      equipArmorItem: (id, equipped) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            armorItems: state.character.armorItems.map(item =>
+              item.id === id
+                ? { ...item, isEquipped: equipped, updatedAt: new Date().toISOString() }
+                : item
+            )
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      // Inventory management
+      addInventoryItem: (item) => {
+        set((state) => {
+          const newItem: InventoryItem = {
+            ...item,
+            id: generateId(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          return {
+            character: {
+              ...state.character,
+              inventoryItems: [...(state.character.inventoryItems || []), newItem]
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      updateInventoryItem: (id, updates) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            inventoryItems: state.character.inventoryItems.map(item =>
+              item.id === id
+                ? { ...item, ...updates, updatedAt: new Date().toISOString() }
+                : item
+            )
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      deleteInventoryItem: (id) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            inventoryItems: state.character.inventoryItems.filter(item => item.id !== id)
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      updateItemQuantity: (id, quantity) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            inventoryItems: state.character.inventoryItems.map(item =>
+              item.id === id
+                ? { ...item, quantity }
+                : item
+            )
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      // Currency management
+      updateCurrency: (updates) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            currency: {
+              ...state.character.currency,
+              ...updates
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      addCurrency: (type, amount) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            currency: {
+              ...state.character.currency,
+              [type]: (state.character.currency[type] || 0) + amount
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      subtractCurrency: (type, amount) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            currency: {
+              ...state.character.currency,
+              [type]: Math.max(0, (state.character.currency[type] || 0) - amount)
             }
           },
           hasUnsavedChanges: true,

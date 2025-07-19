@@ -233,6 +233,53 @@ export interface AttunementSlots {
   max: number; // Usually 3, but can be modified by features
 }
 
+// Armor types and interfaces
+export type ArmorCategory = 'light' | 'medium' | 'heavy' | 'shield';
+export type ArmorType = 'padded' | 'leather' | 'studded-leather' | 'hide' | 'chain-shirt' | 'scale-mail' | 'breastplate' | 'half-plate' | 'ring-mail' | 'chain-mail' | 'splint' | 'plate' | 'shield' | 'custom';
+
+export interface ArmorItem {
+  id: string;
+  name: string;
+  category: ArmorCategory;
+  type: ArmorType;
+  baseAC: number; // Base AC provided by armor
+  maxDexBonus?: number; // Max dex bonus (null = unlimited)
+  stealthDisadvantage: boolean;
+  strengthRequirement?: number;
+  enhancementBonus: number; // +0, +1, +2, +3
+  isEquipped: boolean;
+  requiresAttunement?: boolean;
+  isAttuned?: boolean;
+  description?: string;
+  weight?: number;
+  value?: number; // In copper pieces
+  createdAt: string;
+  updatedAt: string;
+}
+
+// General inventory item
+export interface InventoryItem {
+  id: string;
+  name: string;
+  category: string; // "weapon", "armor", "tool", "consumable", "treasure", "misc"
+  quantity: number;
+  weight?: number; // Per item
+  value?: number; // Per item, in copper pieces
+  description?: string;
+  tags: string[]; // For filtering/organization
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Currency tracking
+export interface Currency {
+  copper: number;
+  silver: number;
+  electrum: number;
+  gold: number;
+  platinum: number;
+}
+
 // Main character state interface
 export interface CharacterState {
   // Basic Information
@@ -310,6 +357,9 @@ export interface CharacterState {
   // Weapons and Equipment
   weapons: Weapon[];
   magicItems: MagicItem[];
+  armorItems: ArmorItem[];
+  inventoryItems: InventoryItem[];
+  currency: Currency;
   attunementSlots: AttunementSlots;
   weaponProficiencies: {
     simpleWeapons: boolean;
