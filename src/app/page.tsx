@@ -501,6 +501,34 @@ export default function CharacterSheet() {
               <WeaponProficiencies />
             </ErrorBoundary>
 
+            {/* Heroic Inspiration */}
+            <HeroicInspirationTracker
+              inspiration={character.heroicInspiration}
+              onAddInspiration={addHeroicInspiration}
+              onUpdateInspiration={updateHeroicInspiration}
+              onUseInspiration={useHeroicInspiration}
+              onResetInspiration={resetHeroicInspiration}
+            />
+
+            {/* Quick Stats */}
+            <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
+              <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
+                Quick Stats
+              </h2>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Passive Perception</span>
+                  <span className="font-semibold text-gray-800">
+                    {10 + getSkillModifier('perception')}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Proficiency Bonus</span>
+                  <span className="font-semibold text-gray-800">{formatModifier(proficiencyBonus)}</span>
+                </div>
+              </div>
+            </div>
+
           </div>
 
           {/* Middle Column - Skills & Saving Throws */}
@@ -913,33 +941,6 @@ export default function CharacterSheet() {
               onResetTraits={resetTrackableTraits}
             />
 
-            {/* Heroic Inspiration */}
-            <HeroicInspirationTracker
-              inspiration={character.heroicInspiration}
-              onAddInspiration={addHeroicInspiration}
-              onUpdateInspiration={updateHeroicInspiration}
-              onUseInspiration={useHeroicInspiration}
-              onResetInspiration={resetHeroicInspiration}
-            />
-
-            {/* Quick Stats */}
-            <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
-              <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
-                Quick Stats
-              </h2>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Passive Perception</span>
-                  <span className="font-semibold text-gray-800">
-                    {10 + getSkillModifier('perception')}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Proficiency Bonus</span>
-                  <span className="font-semibold text-gray-800">{formatModifier(proficiencyBonus)}</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
         </section>

@@ -197,8 +197,40 @@ export interface Weapon {
   };
   isEquipped: boolean; // Whether this weapon is currently equipped/ready
   manualProficiency?: boolean; // Manual override for proficiency (undefined = use auto calculation)
+  requiresAttunement?: boolean; // Whether this weapon requires attunement
+  isAttuned?: boolean; // Whether character is attuned to this item
   createdAt: string;
   updatedAt: string;
+}
+
+// Magic item categories and types
+export type MagicItemCategory = 'wondrous' | 'armor' | 'shield' | 'ring' | 'staff' | 'wand' | 'rod' | 'scroll' | 'potion' | 'artifact' | 'other';
+export type MagicItemRarity = 'common' | 'uncommon' | 'rare' | 'very rare' | 'legendary' | 'artifact';
+
+// Magic item interface
+export interface MagicItem {
+  id: string;
+  name: string;
+  category: MagicItemCategory;
+  rarity: MagicItemRarity;
+  description: string;
+  properties: string[]; // Special properties or abilities
+  requiresAttunement: boolean;
+  isAttuned: boolean;
+  isEquipped?: boolean; // For wearable items
+  charges?: {
+    current: number;
+    max: number;
+    rechargeRule?: string; // e.g., "1d6+1 at dawn", "all at dawn"
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Attunement tracking
+export interface AttunementSlots {
+  used: number;
+  max: number; // Usually 3, but can be modified by features
 }
 
 // Main character state interface
@@ -277,6 +309,8 @@ export interface CharacterState {
 
   // Weapons and Equipment
   weapons: Weapon[];
+  magicItems: MagicItem[];
+  attunementSlots: AttunementSlots;
   weaponProficiencies: {
     simpleWeapons: boolean;
     martialWeapons: boolean;

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, HitPoints, DeathSavingThrows, Weapon, TrackableTrait, HeroicInspiration } from '@/types/character';
+import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, HitPoints, DeathSavingThrows, Weapon, TrackableTrait, HeroicInspiration, MagicItem } from '@/types/character';
 import { DEFAULT_CHARACTER_STATE, STORAGE_KEY, APP_VERSION, COMMON_CLASSES } from '@/utils/constants';
 import { 
   calculateSpellSlots, 
@@ -95,6 +95,14 @@ function migrateCharacterData(character: unknown): CharacterState {
     // Ensure shield bonus exists
     if (typeof result.shieldBonus !== 'number') {
       result.shieldBonus = DEFAULT_CHARACTER_STATE.shieldBonus;
+    }
+    // Ensure magic items exist
+    if (!Array.isArray(result.magicItems)) {
+      result.magicItems = DEFAULT_CHARACTER_STATE.magicItems;
+    }
+    // Ensure attunement slots exist
+    if (!result.attunementSlots || typeof result.attunementSlots !== 'object') {
+      result.attunementSlots = DEFAULT_CHARACTER_STATE.attunementSlots;
     }
     return result;
   }
@@ -240,6 +248,13 @@ interface CharacterStore {
   updateWeapon: (id: string, updates: Partial<Weapon>) => void;
   deleteWeapon: (id: string) => void;
   equipWeapon: (id: string, equipped: boolean) => void;
+  
+  // Magic item management
+  addMagicItem: (item: Omit<MagicItem, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateMagicItem: (id: string, updates: Partial<MagicItem>) => void;
+  deleteMagicItem: (id: string) => void;
+  attuneMagicItem: (id: string, attuned: boolean) => void;
+  updateAttunementSlots: (max: number) => void;
   
   // Persistence actions
   saveCharacter: () => void;
@@ -1147,6 +1162,82 @@ export const useCharacterStore = create<CharacterStore>()(
                 ? { ...weapon, isEquipped: equipped, updatedAt: new Date().toISOString() }
                 : weapon
             )
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      // Magic item management actions
+      addMagicItem: (item) => {
+        set((state) => {
+          const newItem: MagicItem = {
+            ...item,
+            id: generateId(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          return {
+            character: {
+              ...state.character,
+              magicItems: [...(state.character.magicItems || []), newItem]
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      updateMagicItem: (id, updates) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            magicItems: (state.character.magicItems || []).map(item =>
+              item.id === id
+                ? { ...item, ...updates, updatedAt: new Date().toISOString() }
+                : item
+            )
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      deleteMagicItem: (id) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            magicItems: (state.character.magicItems || []).filter(item => item.id !== id)
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      attuneMagicItem: (id, attuned) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            magicItems: (state.character.magicItems || []).map(item =>
+              item.id === id
+                ? { ...item, isAttuned: attuned, updatedAt: new Date().toISOString() }
+                : item
+            )
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      updateAttunementSlots: (max) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            attunementSlots: {
+              ...state.character.attunementSlots,
+              max
+            }
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving'
