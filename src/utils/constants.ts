@@ -289,6 +289,12 @@ export const DEFAULT_CHARACTER_STATE = {
     deathSaves: undefined,
   },
   
+  deathSavingThrows: {
+    successes: 0,
+    failures: 0,
+    isStabilized: false,
+  },
+
   armorClass: 10,
   tempArmorClass: 0,
   isWearingShield: false,
@@ -367,8 +373,24 @@ export const DEFAULT_CHARACTER_STATE = {
   spellcastingStats: {
     spellcastingAbility: null,
     isAbilityOverridden: false,
+    customSpellcastingAbility: null,
     spellAttackBonus: undefined,
     spellSaveDC: undefined,
+  },
+
+  // Spellbook system
+  spellbook: {
+    knownSpells: [],
+    preparedSpells: [],
+    favoriteSpells: [],
+    customSpells: [],
+    spellbookSettings: {
+      showOnlyClassSpells: true,
+      showOnlyKnownSpells: false,
+      preferredSources: ['PHB', 'XGE', 'TCE'],
+      spellbookName: 'My Spellbook',
+      theme: 'classic' as const,
+    },
   },
 };
 

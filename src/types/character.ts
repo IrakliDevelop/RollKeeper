@@ -1,5 +1,8 @@
-// Core ability scores
+// Basic character types for D&D 5e character sheet
 export type AbilityName = 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'charisma';
+export type SkillName = 'acrobatics' | 'animalHandling' | 'arcana' | 'athletics' | 'deception' | 'history' | 'insight' | 'intimidation' | 'investigation' | 'medicine' | 'nature' | 'perception' | 'performance' | 'persuasion' | 'religion' | 'sleightOfHand' | 'stealth' | 'survival';
+
+import type { SpellbookState } from './spells';
 
 // Character abilities with scores
 export interface CharacterAbilities {
@@ -370,6 +373,14 @@ export interface CharacterState {
   // Spellcasting
   spells: Spell[]; // All spells and cantrips known/prepared
   spellcastingStats: SpellcastingStats;
+
+  // Death saving throws
+  deathSavingThrows: DeathSavingThrows;
+
+  // Spellbook and grimoire system
+  spellbook: SpellbookState;
+
+  // Miscellaneous
 }
 
 // UI state for managing application state
@@ -385,9 +396,6 @@ export interface CharacterExport {
   exportDate: string;
   character: CharacterState;
 }
-
-// Skill name type for type safety
-export type SkillName = keyof CharacterState['skills'];
 
 // Save state type
 export type SaveStatus = 'saving' | 'saved' | 'error'; 

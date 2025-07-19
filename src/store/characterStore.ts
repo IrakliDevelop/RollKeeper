@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, HitPoints, DeathSavingThrows, Weapon, TrackableTrait, HeroicInspiration, MagicItem, ArmorItem, InventoryItem } from '@/types/character';
+import { ProcessedSpell } from '@/types/spells';
 import { DEFAULT_CHARACTER_STATE, STORAGE_KEY, APP_VERSION, COMMON_CLASSES } from '@/utils/constants';
 import { 
   calculateSpellSlots, 
@@ -115,6 +116,10 @@ function migrateCharacterData(character: unknown): CharacterState {
     // Ensure currency exists
     if (!result.currency || typeof result.currency !== 'object') {
       result.currency = DEFAULT_CHARACTER_STATE.currency;
+    }
+    // Ensure spellbook exists
+    if (!result.spellbook || typeof result.spellbook !== 'object') {
+      result.spellbook = DEFAULT_CHARACTER_STATE.spellbook;
     }
     return result;
   }
@@ -284,6 +289,16 @@ interface CharacterStore {
   updateCurrency: (updates: Partial<typeof DEFAULT_CHARACTER_STATE.currency>) => void;
   addCurrency: (type: keyof typeof DEFAULT_CHARACTER_STATE.currency, amount: number) => void;
   subtractCurrency: (type: keyof typeof DEFAULT_CHARACTER_STATE.currency, amount: number) => void;
+
+  // Spellbook management
+  addSpellToSpellbook: (spellId: string) => void;
+  removeSpellFromSpellbook: (spellId: string) => void;
+  toggleSpellFavorite: (spellId: string) => void;
+  prepareSpell: (spellId: string) => void;
+  unprepareSpell: (spellId: string) => void;
+  updateSpellbookSettings: (settings: Partial<typeof DEFAULT_CHARACTER_STATE.spellbook.spellbookSettings>) => void;
+  addCustomSpell: (spell: ProcessedSpell) => void; // We'll type this properly later
+  removeCustomSpell: (spellId: string) => void;
   
   // Persistence actions
   saveCharacter: () => void;
@@ -1433,6 +1448,141 @@ export const useCharacterStore = create<CharacterStore>()(
             currency: {
               ...state.character.currency,
               [type]: Math.max(0, (state.character.currency[type] || 0) - amount)
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      // Spellbook management
+      addSpellToSpellbook: (spellId) => {
+        set((state) => {
+          const isAlreadyKnown = state.character.spellbook.knownSpells.includes(spellId);
+          if (!isAlreadyKnown) {
+            return {
+              character: {
+                ...state.character,
+                spellbook: {
+                  ...state.character.spellbook,
+                  knownSpells: [...state.character.spellbook.knownSpells, spellId]
+                }
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving'
+            };
+          }
+          return state;
+        });
+      },
+
+      removeSpellFromSpellbook: (spellId) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            spellbook: {
+              ...state.character.spellbook,
+              knownSpells: state.character.spellbook.knownSpells.filter(id => id !== spellId),
+              preparedSpells: state.character.spellbook.preparedSpells.filter(id => id !== spellId),
+              favoriteSpells: state.character.spellbook.favoriteSpells.filter(id => id !== spellId)
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      toggleSpellFavorite: (spellId) => {
+        set((state) => {
+          const isFavorite = state.character.spellbook.favoriteSpells.includes(spellId);
+          return {
+            character: {
+              ...state.character,
+              spellbook: {
+                ...state.character.spellbook,
+                favoriteSpells: isFavorite
+                  ? state.character.spellbook.favoriteSpells.filter(id => id !== spellId)
+                  : [...state.character.spellbook.favoriteSpells, spellId]
+              }
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      prepareSpell: (spellId) => {
+        set((state) => {
+          const isAlreadyPrepared = state.character.spellbook.preparedSpells.includes(spellId);
+          if (!isAlreadyPrepared) {
+            return {
+              character: {
+                ...state.character,
+                spellbook: {
+                  ...state.character.spellbook,
+                  preparedSpells: [...state.character.spellbook.preparedSpells, spellId]
+                }
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving'
+            };
+          }
+          return state;
+        });
+      },
+
+      unprepareSpell: (spellId) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            spellbook: {
+              ...state.character.spellbook,
+              preparedSpells: state.character.spellbook.preparedSpells.filter(id => id !== spellId)
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      updateSpellbookSettings: (settings) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            spellbook: {
+              ...state.character.spellbook,
+              spellbookSettings: {
+                ...state.character.spellbook.spellbookSettings,
+                ...settings
+              }
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      addCustomSpell: (spell: ProcessedSpell) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            spellbook: {
+              ...state.character.spellbook,
+              customSpells: [...(state.character.spellbook.customSpells || []), spell]
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      removeCustomSpell: (spellId) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            spellbook: {
+              ...state.character.spellbook,
+              customSpells: (state.character.spellbook.customSpells || []).filter(s => s.id !== spellId)
             }
           },
           hasUnsavedChanges: true,
