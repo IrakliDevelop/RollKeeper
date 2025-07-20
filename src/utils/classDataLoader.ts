@@ -8,6 +8,7 @@ import {
   ProcessedClass, 
   ProcessedSubclass,
   ClassFeature,
+  SubclassSpellList,
   SpellcastingType
 } from '@/types/classes';
 
@@ -232,53 +233,36 @@ function processSubclassFeatures(
   source: string,
   subclassShortName: string
 ): ClassFeature[] {
-  if (!subclassFeatures || !Array.isArray(subclassFeatures)) return [];
+  if (!subclassFeatureDescriptions || !Array.isArray(subclassFeatureDescriptions)) return [];
 
-  return subclassFeatures.map((feature) => {
-    let featureName: string;
-    let level: number = 3; // Default to 3 for subclass features
-    let original: string;
+  // Instead of processing subclassFeatures references, directly process all individual subclass features
+  // that belong to this specific subclass
+  const relevantFeatures = subclassFeatureDescriptions.filter((desc) => {
+    const feature = desc as Record<string, unknown>;
+    return feature.className === className && 
+           feature.subclassShortName === subclassShortName &&
+           feature.name && 
+           feature.level;
+  });
 
-    if (typeof feature === 'string') {
-      const parts = feature.split('|');
-      featureName = parts[0] || feature;
-      original = feature;
-      
-      // Subclass format: "Feature Name|Class||Subclass||Level"
-      if (parts.length >= 6 && parts[2] === '' && parts[4] === '') {
-        level = parseInt(parts[5]) || 3;
-      } else if (parts.length >= 4) {
-        // Fallback format
-        level = parseInt(parts[3]) || 3;
-      }
-    } else {
-      featureName = String(feature);
-      original = String(feature);
-    }
-
-    // Find the feature description in subclassFeatureDescriptions
-    const featureDesc = subclassFeatureDescriptions?.find((desc) => 
-      desc.name === featureName && 
-      desc.className === className && 
-      desc.level === level
-    );
-
+  return relevantFeatures.map((featureDesc) => {
+    const feature = featureDesc as Record<string, unknown>;
     let entries: string[] = [];
-    if (featureDesc?.entries && Array.isArray(featureDesc.entries)) {
-      entries = processFeatureEntries(featureDesc.entries);
+    if (feature.entries && Array.isArray(feature.entries)) {
+      entries = processFeatureEntries(feature.entries);
     }
 
     return {
-      name: featureName,
-      level,
-      source: (featureDesc?.source as string) || source,
+      name: String(feature.name || ''),
+      level: Number(feature.level) || 3,
+      source: String(feature.source || source),
       className,
       entries,
       isSubclassFeature: true,
       subclassShortName,
-      original
+      original: `${feature.name}|${className}||${subclassShortName}||${feature.level}`
     };
-  });
+  }).sort((a, b) => a.level - b.level); // Sort by level
 }
 
 /**
@@ -414,6 +398,53 @@ function processClass(rawClass: RawClassData, subclasses: RawSubclassData[], fil
 }
 
 /**
+ * Process additional spells for subclasses
+ */
+function processSubclassSpells(additionalSpells?: Array<{
+  prepared?: Record<string, string[]>;
+  known?: Record<string, string[]>;
+  expanded?: Record<string, string[]>;
+}>): SubclassSpellList[] {
+  if (!additionalSpells || additionalSpells.length === 0) return [];
+
+  const spellList: SubclassSpellList[] = [];
+  
+  additionalSpells.forEach(spellGroup => {
+    // Process prepared spells (most common for Domain, Oath, etc.)
+    if (spellGroup.prepared) {
+      Object.entries(spellGroup.prepared).forEach(([level, spells]) => {
+        spellList.push({
+          level: parseInt(level),
+          spells: spells
+        });
+      });
+    }
+    
+    // Process known spells (some subclasses like Aberrant Mind Sorcerer)
+    if (spellGroup.known) {
+      Object.entries(spellGroup.known).forEach(([level, spells]) => {
+        spellList.push({
+          level: parseInt(level),
+          spells: spells
+        });
+      });
+    }
+    
+    // Process expanded spells (Warlocks)
+    if (spellGroup.expanded) {
+      Object.entries(spellGroup.expanded).forEach(([level, spells]) => {
+        spellList.push({
+          level: parseInt(level),
+          spells: spells
+        });
+      });
+    }
+  });
+
+  return spellList.sort((a, b) => a.level - b.level);
+}
+
+/**
  * Process raw subclass data into our application format
  */
 function processSubclass(rawSubclass: RawSubclassData, fileData: ClassDataFile): ProcessedSubclass {
@@ -434,6 +465,7 @@ function processSubclass(rawSubclass: RawSubclassData, fileData: ClassDataFile):
       rawSubclass.source,
       rawSubclass.shortName || rawSubclass.name
     ),
+    spellList: processSubclassSpells(rawSubclass.additionalSpells),
     tags: [
       rawSubclass.source,
       rawSubclass.className.toLowerCase(),
