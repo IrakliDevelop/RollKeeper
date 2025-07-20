@@ -566,7 +566,7 @@ function processSpell(rawSpell: RawSpellData): ProcessedSpell {
     level: rawSpell.level,
     school: rawSpell.school,
     schoolName: SPELL_SCHOOLS[rawSpell.school] || 'Unknown',
-    source: rawSpell.source,
+    source: rawSpell.source === 'XPHB' ? 'PHB2024' : rawSpell.source,
     page: rawSpell.page,
     isRitual: rawSpell.meta?.ritual || false,
     concentration: hasConcentration(rawSpell.duration),
@@ -582,7 +582,7 @@ function processSpell(rawSpell: RawSpellData): ProcessedSpell {
       ...(rawSpell.areaTags || []),
       ...(rawSpell.damageInflict || []),
       rawSpell.school,
-      rawSpell.source
+      rawSpell.source === 'XPHB' ? 'PHB2024' : rawSpell.source
     ],
     damage: rawSpell.damageInflict,
     saves: rawSpell.savingThrow,
@@ -605,13 +605,26 @@ export async function loadAllSpells(): Promise<ProcessedSpell[]> {
     const processedSpells = rawSpells.map(processSpell);
     
     // Remove duplicates (same spell from different sources)
+    // Priority: PHB2024 (XPHB) > SRD > PHB > others
     const uniqueSpells = new Map<string, ProcessedSpell>();
     
     for (const spell of processedSpells) {
       const key = spell.name.toLowerCase();
-      if (!uniqueSpells.has(key) || spell.isSrd) {
-        // Prefer SRD versions when available
+      const existingSpell = uniqueSpells.get(key);
+      
+      if (!existingSpell) {
+        // No existing spell, add this one
         uniqueSpells.set(key, spell);
+      } else {
+        // Check if we should replace the existing spell
+        const shouldReplace = 
+          spell.source === 'PHB2024' || // Always prefer 2024 version
+          (existingSpell.source !== 'PHB2024' && spell.isSrd) || // Prefer SRD if no 2024 version
+          (existingSpell.source !== 'PHB2024' && !existingSpell.isSrd && spell.source === 'PHB'); // Prefer PHB over others if no 2024/SRD
+        
+        if (shouldReplace) {
+          uniqueSpells.set(key, spell);
+        }
       }
     }
     

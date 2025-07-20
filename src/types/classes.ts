@@ -69,6 +69,11 @@ export interface RawSubclassData {
   reprintedAs?: string[];
   edition?: string;
   subclassFeatures: string[];
+  additionalSpells?: Array<{
+    prepared?: Record<string, string[]>;
+    known?: Record<string, string[]>;
+    expanded?: Record<string, string[]>;
+  }>;
   _copy?: {
     name: string;
     source: string;
@@ -133,6 +138,12 @@ export interface ProcessedClass {
   tags: string[];
 }
 
+// Subclass spell list
+export interface SubclassSpellList {
+  level: number;
+  spells: string[];
+}
+
 // Processed subclass data
 export interface ProcessedSubclass {
   id: string;
@@ -143,6 +154,7 @@ export interface ProcessedSubclass {
   parentClassName: string;
   parentClassSource: string;
   features: ClassFeature[];
+  spellList?: SubclassSpellList[]; // Additional spells from subclass (Domain, Oath, Patron, etc.)
   description?: string;
   tags: string[];
 }

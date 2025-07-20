@@ -1,7 +1,7 @@
 
 
 export interface ParsedReference {
-  type: 'item' | 'spell' | 'filter' | 'dice' | 'creature' | 'condition' | 'action' | 'skill' | 'sense' | 'damage' | 'unknown';
+  type: 'item' | 'spell' | 'filter' | 'dice' | 'creature' | 'condition' | 'action' | 'skill' | 'sense' | 'damage' | 'scaledamage' | 'unknown';
   name: string;
   source?: string;
   displayText: string;
@@ -82,10 +82,51 @@ function normalizeReferenceType(type: string): ParsedReference['type'] {
     'skill': 'skill',
     'sense': 'sense',
     'damage': 'damage',
+    'scaledamage': 'scaledamage',
     // Add more mappings as needed
   };
   
   return typeMap[type.toLowerCase()] || 'unknown';
+}
+
+/**
+ * Parse scaled damage format: {@scaledamage baseDamage|levelRange|additionalPerLevel}
+ * Example: {@scaledamage 8d6|3-9|1d6} -> "8d6 (+ 1d6 per level above 3rd)"
+ */
+function parseScaledDamage(baseDamage: string, levelRange?: string, extra?: string[]): string {
+  if (!levelRange || !extra || extra.length === 0) {
+    return baseDamage; // Fallback to base damage if parsing fails
+  }
+  
+  const additionalPerLevel = extra[0];
+  const levelParts = levelRange.split('-');
+  const startLevel = levelParts[0];
+  
+  if (!startLevel || !additionalPerLevel) {
+    return baseDamage;
+  }
+  
+  // Format the level suffix (1st, 2nd, 3rd, 4th, etc.)
+  const levelSuffix = getLevelSuffix(parseInt(startLevel));
+  
+  return `${baseDamage} (+ ${additionalPerLevel} per level above ${levelSuffix})`;
+}
+
+/**
+ * Get the ordinal suffix for a level number
+ */
+function getLevelSuffix(level: number): string {
+  if (level >= 11 && level <= 13) {
+    return `${level}th`;
+  }
+  
+  const lastDigit = level % 10;
+  switch (lastDigit) {
+    case 1: return `${level}st`;
+    case 2: return `${level}nd`;
+    case 3: return `${level}rd`;
+    default: return `${level}th`;
+  }
 }
 
 /**
@@ -122,6 +163,9 @@ function formatDisplayText(type: string, name: string, source?: string, extra?: 
     
     case 'damage':
       return name;
+    
+    case 'scaledamage':
+      return parseScaledDamage(name, source, extra);
     
     default:
       return name;
@@ -204,6 +248,11 @@ function formatReferenceHtml(reference: ParsedReference): string {
     case 'damage':
       typeClasses = "bg-red-600/10 text-red-400 border border-red-600/20 hover:bg-red-600/20";
       icon = "💥";
+      break;
+    
+    case 'scaledamage':
+      typeClasses = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20";
+      icon = "📈";
       break;
     
     default:

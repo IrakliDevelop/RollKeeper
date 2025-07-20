@@ -1,5 +1,6 @@
 import React from 'react';
 import { ProcessedSpell } from '@/types/spells';
+import { getFormattedHtml } from '@/utils/referenceParser';
 import { 
   X, 
   Clock, 
@@ -85,12 +86,12 @@ export default function SpellDetailModal({
   };
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={handleBackdropClick}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Blurred Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
+      <div 
+        className="absolute inset-0 bg-black/60 backdrop-blur-md" 
+        onClick={handleBackdropClick}
+      />
       
       {/* Modal Container */}
       <div className="relative bg-slate-900/95 backdrop-blur-xl border border-slate-600/50 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
@@ -238,9 +239,12 @@ export default function SpellDetailModal({
             <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-600/30">
               <h3 className="text-lg font-semibold text-white mb-3">Description</h3>
               <div className="prose prose-slate prose-invert max-w-none">
-                <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">
-                  {spell.description}
-                </p>
+                <div 
+                  className="text-slate-300 leading-relaxed whitespace-pre-wrap"
+                  dangerouslySetInnerHTML={{ 
+                    __html: getFormattedHtml(spell.description) 
+                  }}
+                />
               </div>
             </div>
             
@@ -248,9 +252,12 @@ export default function SpellDetailModal({
             {spell.higherLevelDescription && (
               <div className="bg-amber-600/10 rounded-lg p-4 border border-amber-500/30">
                 <h3 className="text-lg font-semibold text-amber-400 mb-3">At Higher Levels</h3>
-                <p className="text-slate-300 leading-relaxed">
-                  {spell.higherLevelDescription}
-                </p>
+                <div 
+                  className="text-slate-300 leading-relaxed"
+                  dangerouslySetInnerHTML={{ 
+                    __html: getFormattedHtml(spell.higherLevelDescription) 
+                  }}
+                />
               </div>
             )}
             

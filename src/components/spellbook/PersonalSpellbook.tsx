@@ -9,9 +9,11 @@ import SpellCard from '@/components/spellbook/SpellCard';
 interface PersonalSpellbookProps {
   allSpells: ProcessedSpell[];
   displayMode: 'grid' | 'list';
+  sortBy?: 'name' | 'level';
+  sortOrder?: 'asc' | 'desc';
 }
 
-export default function PersonalSpellbook({ allSpells, displayMode }: PersonalSpellbookProps) {
+export default function PersonalSpellbook({ allSpells, displayMode, sortBy = 'name', sortOrder = 'asc' }: PersonalSpellbookProps) {
   const { 
     character, 
     removeSpellFromSpellbook,
@@ -39,6 +41,24 @@ export default function PersonalSpellbook({ allSpells, displayMode }: PersonalSp
       .filter((spell): spell is ProcessedSpell => spell !== undefined);
   }, [character.spellbook?.favoriteSpells, allSpells]);
 
+  // Sort spells function
+  const sortSpells = (spells: ProcessedSpell[]) => {
+    return [...spells].sort((a, b) => {
+      if (sortBy === 'name') {
+        const comparison = a.name.localeCompare(b.name);
+        return sortOrder === 'asc' ? comparison : -comparison;
+      } else if (sortBy === 'level') {
+        const levelComparison = a.level - b.level;
+        if (levelComparison === 0) {
+          // If levels are equal, sort by name as secondary
+          return a.name.localeCompare(b.name);
+        }
+        return sortOrder === 'asc' ? levelComparison : -levelComparison;
+      }
+      return 0;
+    });
+  };
+
   // Organize spells by level
   const organizeSpellsByLevel = (spells: ProcessedSpell[]) => {
     const byLevel: { [level: number]: ProcessedSpell[] } = {};
@@ -50,6 +70,13 @@ export default function PersonalSpellbook({ allSpells, displayMode }: PersonalSp
       const level = spell.isCantrip ? 0 : spell.level;
       byLevel[level].push(spell);
     });
+    
+    // Sort spells within each level
+    for (let level = 0; level <= 9; level++) {
+      if (byLevel[level].length > 0) {
+        byLevel[level] = sortSpells(byLevel[level]);
+      }
+    }
     
     return byLevel;
   };

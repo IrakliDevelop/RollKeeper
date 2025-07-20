@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { ProcessedSpell, SpellFilters, SPELL_SCHOOLS } from '@/types/spells';
 import { filterSpells } from '@/utils/spellFilters';
 import { useCharacterStore } from '@/store/characterStore';
-import { Search, Filter, BookOpen, Star, Settings, Grid, List, Loader2, ChevronDown } from 'lucide-react';
+import { Search, Filter, BookOpen, Star, Settings, Grid, List, Loader2, ChevronDown, ArrowUp, ArrowDown } from 'lucide-react';
 import SpellCard from '@/components/spellbook/SpellCard';
 import SpellFiltersPanel from '@/components/spellbook/SpellFiltersPanel';
 import PersonalSpellbook from '@/components/spellbook/PersonalSpellbook';
@@ -46,6 +46,8 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
   const [displayMode, setDisplayMode] = useState<DisplayMode>('grid');
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'level'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   
   // Infinite scroll state
   const [displayedCount, setDisplayedCount] = useState(30); // Initial load
@@ -77,27 +79,47 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
     duration: []
   });
 
-  // Filter spells based on current filters and search
-  const filteredSpells = useMemo(() => {
+  // Sort spells function
+  const sortSpells = useCallback((spells: ProcessedSpell[]) => {
+    const sorted = [...spells].sort((a, b) => {
+      if (sortBy === 'name') {
+        const comparison = a.name.localeCompare(b.name);
+        return sortOrder === 'asc' ? comparison : -comparison;
+      } else if (sortBy === 'level') {
+        const levelComparison = a.level - b.level;
+        if (levelComparison === 0) {
+          // If levels are equal, sort by name as secondary
+          return a.name.localeCompare(b.name);
+        }
+        return sortOrder === 'asc' ? levelComparison : -levelComparison;
+      }
+      return 0;
+    });
+    return sorted;
+  }, [sortBy, sortOrder]);
+
+  // Filter and sort spells based on current filters and search
+  const filteredAndSortedSpells = useMemo(() => {
     const currentFilters = {
       ...filters,
       query: searchQuery
     };
     
-    return filterSpells(spells, currentFilters);
-  }, [spells, filters, searchQuery]);
+    const filtered = filterSpells(spells, currentFilters);
+    return sortSpells(filtered);
+  }, [spells, filters, searchQuery, sortSpells]);
 
   // Smart loading strategy: show all for small results, progressive for large
-  const shouldUseInfiniteScroll = filteredSpells.length > SMALL_RESULT_THRESHOLD;
+  const shouldUseInfiniteScroll = filteredAndSortedSpells.length > SMALL_RESULT_THRESHOLD;
   const visibleSpells = shouldUseInfiniteScroll 
-    ? filteredSpells.slice(0, displayedCount)
-    : filteredSpells;
-  const hasMoreSpells = shouldUseInfiniteScroll && displayedCount < filteredSpells.length;
+    ? filteredAndSortedSpells.slice(0, displayedCount)
+    : filteredAndSortedSpells;
+  const hasMoreSpells = shouldUseInfiniteScroll && displayedCount < filteredAndSortedSpells.length;
 
   // Reset displayed count when filters change
   useEffect(() => {
     setDisplayedCount(30);
-  }, [filteredSpells.length]);
+  }, [filteredAndSortedSpells.length]);
 
   // Load more spells function
   const loadMoreSpells = useCallback(async () => {
@@ -108,9 +130,9 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
     // Simulate loading delay for smooth UX
     await new Promise(resolve => setTimeout(resolve, 300));
     
-    setDisplayedCount(prev => Math.min(prev + ITEMS_PER_LOAD, filteredSpells.length));
+    setDisplayedCount(prev => Math.min(prev + ITEMS_PER_LOAD, filteredAndSortedSpells.length));
     setIsLoadingMore(false);
-  }, [isLoadingMore, hasMoreSpells, filteredSpells.length]);
+  }, [isLoadingMore, hasMoreSpells, filteredAndSortedSpells.length]);
 
   // Intersection Observer for automatic loading
   useEffect(() => {
@@ -286,16 +308,42 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
           {/* Filters Toggle */}
           <div className="mb-6">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              {/* Search Bar */}
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
-                <input
-                  type="text"
-                  placeholder="Search spells..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50"
-                />
+              <div className="flex flex-1 gap-4 items-center">
+                {/* Search Bar */}
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                  <input
+                    type="text"
+                    placeholder="Search spells..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50"
+                  />
+                </div>
+
+                {/* Sort Controls */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-400 whitespace-nowrap">Sort by:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'name' | 'level')}
+                    className="px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50"
+                  >
+                    <option value="name">Name</option>
+                    <option value="level">Level</option>
+                  </select>
+                  <button
+                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                    className="p-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
+                    title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+                  >
+                    {sortOrder === 'asc' ? (
+                      <ArrowUp className="h-4 w-4" />
+                    ) : (
+                      <ArrowDown className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Filter Toggle Button */}
@@ -321,15 +369,15 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
             <p className="text-slate-400 text-sm mt-3">
               {shouldUseInfiniteScroll ? (
                 <>
-                  Showing {visibleSpells.length} of {filteredSpells.length} spells
-                  {filteredSpells.length !== spells.length && (
+                  Showing {visibleSpells.length} of {filteredAndSortedSpells.length} spells
+                  {filteredAndSortedSpells.length !== spells.length && (
                     <span> (filtered from {spells.length} total)</span>
                   )}
                 </>
               ) : (
                 <>
-                  Found {filteredSpells.length} spell{filteredSpells.length !== 1 ? 's' : ''}
-                  {filteredSpells.length !== spells.length && (
+                  Found {filteredAndSortedSpells.length} spell{filteredAndSortedSpells.length !== 1 ? 's' : ''}
+                  {filteredAndSortedSpells.length !== spells.length && (
                     <span> (filtered from {spells.length} total)</span>
                   )}
                 </>
@@ -347,7 +395,7 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
                   availableSources={availableSources}
                   onFilterChange={handleFilterChange}
                   onClearFilters={clearFilters}
-                  spellCount={filteredSpells.length}
+                  spellCount={filteredAndSortedSpells.length}
                   totalSpells={spells.length}
                 />
               </div>
@@ -392,7 +440,7 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
                           ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full mb-6'
                           : 'space-y-3 w-full mb-6'
                         }>
-                          {Array.from({ length: Math.min(ITEMS_PER_LOAD, filteredSpells.length - displayedCount) }).map((_, i) => (
+                          {Array.from({ length: Math.min(ITEMS_PER_LOAD, filteredAndSortedSpells.length - displayedCount) }).map((_, i) => (
                             <SpellCardSkeleton key={i} displayMode={displayMode} />
                           ))}
                         </div>
@@ -406,7 +454,7 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
                           <ChevronDown className="h-4 w-4" />
                           Load More Spells
                           <span className="text-xs opacity-80">
-                            ({filteredSpells.length - displayedCount} remaining)
+                            ({filteredAndSortedSpells.length - displayedCount} remaining)
                           </span>
                         </button>
                       )}
@@ -435,7 +483,12 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
           </div>
         </div>
       ) : (
-        <PersonalSpellbook allSpells={spells} displayMode={displayMode} />
+        <PersonalSpellbook 
+          allSpells={spells} 
+          displayMode={displayMode}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+        />
       )}
     </div>
   );

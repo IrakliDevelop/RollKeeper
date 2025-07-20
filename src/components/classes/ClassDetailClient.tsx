@@ -9,6 +9,7 @@ import {
   Star, 
   Users, 
   Book, 
+  BookOpen,
   Sword,
   Brain,
   Zap,
@@ -570,6 +571,63 @@ export default function ClassDetailClient({ classData }: ClassDetailClientProps)
 
                  {activeTab === 'features' && (
            <div className="space-y-6">
+             {/* Subclass Spell Lists */}
+             {selectedSubclassData.length > 0 && selectedSubclassData.some(sub => sub.spellList && sub.spellList.length > 0) && (
+               <div className="bg-gradient-to-br from-purple-900/20 to-purple-800/20 backdrop-blur-sm border border-purple-500/30 rounded-xl p-6 shadow-xl">
+                 <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                   <BookOpen className="h-6 w-6 text-purple-400" />
+                   {classData.name === 'Paladin' ? 'Oath Spells' : 
+                    classData.name === 'Cleric' ? 'Domain Spells' :
+                    classData.name === 'Warlock' ? 'Expanded Spell List' :
+                    'Additional Spells'}
+                 </h3>
+                 
+                 {selectedSubclassData
+                   .filter(sub => sub.spellList && sub.spellList.length > 0)
+                   .map((subclass) => (
+                   <div key={subclass.id} className="mb-6 last:mb-0">
+                     <h4 className="text-lg font-semibold text-purple-300 mb-3 flex items-center gap-2">
+                       <Star size={16} className="text-purple-400" />
+                       {subclass.name}
+                     </h4>
+                     <div className="bg-slate-800/40 rounded-lg border border-slate-600/30 overflow-hidden">
+                       <table className="w-full">
+                         <thead>
+                           <tr className="bg-slate-700/50">
+                             <th className="text-left p-3 text-slate-300 font-medium">
+                               {classData.name} Level
+                             </th>
+                             <th className="text-left p-3 text-slate-300 font-medium">Spells</th>
+                           </tr>
+                         </thead>
+                         <tbody>
+                           {subclass.spellList!.map((spellLevel, index) => (
+                             <tr key={index} className="border-t border-slate-600/20 hover:bg-slate-700/20 transition-colors">
+                               <td className="p-3 text-purple-300 font-semibold">
+                                 {spellLevel.level}{spellLevel.level === 1 ? 'st' : spellLevel.level === 2 ? 'nd' : spellLevel.level === 3 ? 'rd' : 'th'}
+                               </td>
+                               <td className="p-3 text-slate-300">
+                                 <div className="flex flex-wrap gap-1">
+                                   {spellLevel.spells.map((spell, spellIndex) => (
+                                     <span 
+                                       key={spellIndex}
+                                       className="bg-purple-500/20 text-purple-300 px-2 py-1 rounded text-sm border border-purple-500/30"
+                                     >
+                                       {spell}
+                                     </span>
+                                   ))}
+                                 </div>
+                               </td>
+                             </tr>
+                           ))}
+                         </tbody>
+                       </table>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+             )}
+             
              {/* Features organized by level */}
              {renderFeaturesByLevel()}
            </div>
@@ -616,8 +674,14 @@ export default function ClassDetailClient({ classData }: ClassDetailClientProps)
                           {subclass.source}
                           {subclass.page && ` • p. ${subclass.page}`}
                         </div>
-                        <div className="text-xs text-slate-500">
-                          {subclass.features.length} features
+                        <div className="text-xs text-slate-500 flex items-center gap-2">
+                          <span>{subclass.features.length} features</span>
+                          {subclass.spellList && subclass.spellList.length > 0 && (
+                            <span className="bg-purple-500/20 text-purple-300 px-2 py-1 rounded border border-purple-500/30 flex items-center gap-1">
+                              <BookOpen size={12} />
+                              {subclass.spellList.length} spell levels
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -641,13 +705,53 @@ export default function ClassDetailClient({ classData }: ClassDetailClientProps)
                         {subclass.source}
                         {subclass.page && ` • Page ${subclass.page}`}
                       </div>
-                      <div className="text-sm text-slate-300">
-                        <div className="font-medium text-slate-200 mb-2">Features:</div>
-                        <ul className="space-y-1">
-                          {subclass.features.map((feature, index) => (
-                            <li key={index} className="text-slate-400">• {feature.name}</li>
-                          ))}
-                        </ul>
+                      <div className="text-sm text-slate-300 space-y-4">
+                        {/* Spell List */}
+                        {subclass.spellList && subclass.spellList.length > 0 && (
+                          <div>
+                            <div className="font-medium text-slate-200 mb-2 flex items-center gap-2">
+                              <BookOpen size={16} className="text-purple-400" />
+                              {classData.name === 'Paladin' ? 'Oath Spells' : 
+                               classData.name === 'Cleric' ? 'Domain Spells' :
+                               classData.name === 'Warlock' ? 'Expanded Spell List' :
+                               'Additional Spells'}:
+                            </div>
+                            <div className="bg-slate-700/20 rounded-lg border border-slate-600/20 overflow-hidden">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="bg-slate-600/20">
+                                    <th className="text-left p-2 text-slate-300 font-medium">
+                                      {classData.name} Level
+                                    </th>
+                                    <th className="text-left p-2 text-slate-300 font-medium">Spells</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {subclass.spellList.map((spellLevel, index) => (
+                                    <tr key={index} className="border-t border-slate-600/20">
+                                      <td className="p-2 text-slate-300 font-medium">
+                                        {spellLevel.level}{spellLevel.level === 1 ? 'st' : spellLevel.level === 2 ? 'nd' : spellLevel.level === 3 ? 'rd' : 'th'}
+                                      </td>
+                                      <td className="p-2 text-slate-400">
+                                        {spellLevel.spells.join(', ')}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Features */}
+                        <div>
+                          <div className="font-medium text-slate-200 mb-2">Features:</div>
+                          <ul className="space-y-1">
+                            {subclass.features.map((feature, index) => (
+                              <li key={index} className="text-slate-400">• {feature.name}</li>
+                            ))}
+                          </ul>
+                        </div>
                       </div>
                     </div>
                   ))}
