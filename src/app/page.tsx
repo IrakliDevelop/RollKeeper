@@ -1,6 +1,6 @@
 'use client';
 
-import { Save, Download, Upload, RotateCcw, Edit2, Book, Zap, FileText } from "lucide-react";
+import { Save, Download, Upload, RotateCcw, Edit2, Book, Zap, FileText, Shield } from "lucide-react";
 import { useCharacterStore } from "@/store/characterStore";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { SaveIndicator } from "@/components/ui/SaveIndicator";
@@ -274,6 +274,19 @@ export default function CharacterSheet() {
               />
             </div>
             <div className="flex gap-2">
+              {/* Class Compendium Link */}
+              <Link 
+                href="/classes"
+                className="relative flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white rounded-lg hover:from-emerald-700 hover:via-teal-700 hover:to-cyan-700 transition-all shadow-md hover:shadow-lg transform hover:scale-105 border border-emerald-400/30"
+                title="Class Compendium - Explore D&D classes and subclasses with detailed information"
+              >
+                <Shield size={16} />
+                <span className="font-medium">Classes</span>
+                <div className="absolute -top-1 -right-1 bg-amber-400 text-amber-900 text-xs px-1.5 py-0.5 rounded-full font-bold animate-pulse border border-amber-300">
+                  NEW
+                </div>
+              </Link>
+              
               {/* Experimental Spellbook Link */}
               <Link 
                 href="/spellbook"
