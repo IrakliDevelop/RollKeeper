@@ -108,6 +108,32 @@ function extractSkillChoices(skills?: Array<{ choose?: { from: string[]; count: 
 }
 
 /**
+ * Process multiclassing requirements to handle complex OR logic
+ */
+function processMulticlassingRequirements(requirements?: Record<string, unknown>): Record<string, number> {
+  if (!requirements) return {};
+  
+  // Handle OR requirements (e.g., Fighter needs STR 13 OR DEX 13)
+  if (requirements.or && Array.isArray(requirements.or)) {
+    // For now, take the first option in OR requirements
+    const firstOption = requirements.or[0] as Record<string, number>;
+    if (firstOption && typeof firstOption === 'object') {
+      return firstOption;
+    }
+  }
+  
+  // Handle direct requirements (e.g., Paladin needs STR 13 AND CHA 13)
+  const result: Record<string, number> = {};
+  for (const [key, value] of Object.entries(requirements)) {
+    if (key !== 'or' && typeof value === 'number') {
+      result[key] = value;
+    }
+  }
+  
+  return result;
+}
+
+/**
  * Clean and format equipment strings
  */
 function formatEquipment(equipment?: string[]): string[] {
@@ -361,7 +387,7 @@ function processClass(rawClass: RawClassData, subclasses: RawSubclassData[], fil
     },
     startingEquipment: formatEquipment(rawClass.startingEquipment?.default),
     multiclassing: rawClass.multiclassing ? {
-      requirements: rawClass.multiclassing.requirements || {},
+      requirements: processMulticlassingRequirements(rawClass.multiclassing.requirements),
       proficienciesGained: {
         armor: formatEquipment(rawClass.multiclassing.proficienciesGained?.armor),
         weapons: formatEquipment(rawClass.multiclassing.proficienciesGained?.weapons),
