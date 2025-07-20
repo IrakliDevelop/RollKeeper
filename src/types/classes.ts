@@ -94,6 +94,7 @@ export interface ClassFeature {
   isSubclassFeature: boolean;
   subclassShortName?: string;
   original: string; // Original feature reference
+  is2024Rules?: boolean;
 }
 
 // Processed class data for our application

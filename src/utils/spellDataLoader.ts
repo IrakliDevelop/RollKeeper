@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { RawSpellData, ProcessedSpell, SpellClass, SPELL_SCHOOLS, CLASS_SPELL_LISTS } from '@/types/spells';
+import { RawSpellData, ProcessedSpell, SpellClass, SPELL_SCHOOLS } from '@/types/spells';
+import { formatSourceForDisplay } from './sourceUtils';
 
 // Cache for loaded spells to avoid reprocessing
 let cachedSpells: ProcessedSpell[] | null = null;
@@ -566,7 +567,7 @@ function processSpell(rawSpell: RawSpellData): ProcessedSpell {
     level: rawSpell.level,
     school: rawSpell.school,
     schoolName: SPELL_SCHOOLS[rawSpell.school] || 'Unknown',
-    source: rawSpell.source === 'XPHB' ? 'PHB2024' : rawSpell.source,
+    source: formatSourceForDisplay(rawSpell.source),
     page: rawSpell.page,
     isRitual: rawSpell.meta?.ritual || false,
     concentration: hasConcentration(rawSpell.duration),
@@ -582,7 +583,7 @@ function processSpell(rawSpell: RawSpellData): ProcessedSpell {
       ...(rawSpell.areaTags || []),
       ...(rawSpell.damageInflict || []),
       rawSpell.school,
-      rawSpell.source === 'XPHB' ? 'PHB2024' : rawSpell.source
+      formatSourceForDisplay(rawSpell.source)
     ],
     damage: rawSpell.damageInflict,
     saves: rawSpell.savingThrow,

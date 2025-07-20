@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { parseReferences } from './referenceParser';
+import { formatSourceForDisplay, compareSourcePriority } from './sourceUtils';
 import { 
   ClassDataFile, 
   RawClassData, 
@@ -159,7 +160,7 @@ function processClassFeatures(
 ): ClassFeature[] {
   if (!classFeatures || !Array.isArray(classFeatures)) return [];
 
-  return classFeatures.map((feature) => {
+  const features = classFeatures.map((feature) => {
     let featureName: string;
     let level: number = 1;
     let isSubclassFeature = false;
@@ -218,9 +219,13 @@ function processClassFeatures(
       className,
       entries,
       isSubclassFeature,
-      original
+      original,
+      is2024Rules: Boolean(featureDesc?.basicRules2024)
     };
   });
+
+  // Prioritize 2024 features over 2014 features for the same level and name
+  return prioritize2024Features(features);
 }
 
 /**
@@ -245,24 +250,32 @@ function processSubclassFeatures(
            feature.level;
   });
 
-  return relevantFeatures.map((featureDesc) => {
+  const features = relevantFeatures.map((featureDesc) => {
     const feature = featureDesc as Record<string, unknown>;
     let entries: string[] = [];
     if (feature.entries && Array.isArray(feature.entries)) {
       entries = processFeatureEntries(feature.entries);
     }
 
+    // Force 2024 D&D compliance: all subclass features start at level 3 minimum
+    const originalLevel = Number(feature.level) || 3;
+    const adjustedLevel = originalLevel < 3 ? 3 : originalLevel;
+
     return {
       name: String(feature.name || ''),
-      level: Number(feature.level) || 3,
+      level: adjustedLevel,
       source: String(feature.source || source),
       className,
       entries,
       isSubclassFeature: true,
       subclassShortName,
-      original: `${feature.name}|${className}||${subclassShortName}||${feature.level}`
+      original: `${feature.name}|${className}||${subclassShortName}||${feature.level}`,
+      is2024Rules: Boolean(feature.basicRules2024)
     };
-  }).sort((a, b) => a.level - b.level); // Sort by level
+  });
+
+  // Prioritize 2024 features over 2014 features for the same level and name
+  return prioritize2024Features(features);
 }
 
 /**
@@ -346,12 +359,21 @@ function processClass(rawClass: RawClassData, subclasses: RawSubclassData[], fil
   // Process subclasses for this class  
   const processedSubclasses = subclasses
     .filter(sub => sub.className === rawClass.name && sub.classSource === rawClass.source)
-    .map(sub => processSubclass(sub, fileData));
+    .filter(sub => sub.source !== 'PHB')
+    .filter(sub => !(sub.source !== 'XPHB' && sub.classSource === 'XPHB')) // avoid copies
+    .map(sub => processSubclass(sub, fileData))
+    .sort((a, b) => {
+      // First sort by source priority (PHB2024 > SRD > PHB > others)
+      const sourcePriority = compareSourcePriority(a.source, b.source);
+      if (sourcePriority !== 0) return sourcePriority;
+      // Then sort alphabetically by name
+      return a.name.localeCompare(b.name);
+    })
   
   return {
     id,
     name: rawClass.name,
-    source: rawClass.source,
+    source: formatSourceForDisplay(rawClass.source),
     page: rawClass.page,
     hitDie: formatHitDie(rawClass.hd),
     primaryAbilities: rawClass.proficiency || [],
@@ -398,12 +420,98 @@ function processClass(rawClass: RawClassData, subclasses: RawSubclassData[], fil
 }
 
 /**
+ * Prioritize 2024 features over 2014 features when both exist for the same level and name
+ */
+function prioritize2024Features(features: ClassFeature[]): ClassFeature[] {
+  const featureMap = new Map<string, ClassFeature[]>();
+  
+  // Group features by level and name
+  for (const feature of features) {
+    const key = `${feature.level}-${feature.name}`;
+    if (!featureMap.has(key)) {
+      featureMap.set(key, []);
+    }
+    featureMap.get(key)!.push(feature);
+  }
+  
+  const prioritizedFeatures: ClassFeature[] = [];
+  
+  // For each group, prioritize 2024 version if available
+  for (const [key, featureGroup] of featureMap.entries()) {
+    if (featureGroup.length === 1) {
+      // Only one version, use it
+      prioritizedFeatures.push(featureGroup[0]);
+    } else {
+      // Multiple versions - find 2024 version
+      const rules2024Feature = featureGroup.find(f => f.is2024Rules);
+      if (rules2024Feature) {
+        prioritizedFeatures.push(rules2024Feature);
+      } else {
+        // No 2024 version found, use the first one (should be prioritized by source already)
+        prioritizedFeatures.push(featureGroup[0]);
+      }
+    }
+  }
+  
+  return prioritizedFeatures.sort((a, b) => a.level - b.level);
+}
+
+/**
+ * Clean spell name by removing source suffix (e.g., "fireball|xphb" -> "fireball")
+ */
+function cleanSpellName(spellName: unknown): string {
+  try {
+    // Handle null/undefined
+    if (spellName == null) {
+      return '';
+    }
+    
+    // Handle various input types
+    if (typeof spellName === 'string') {
+      // Remove source suffixes like "|xphb", "|phb", etc.
+      const cleaned = spellName.split('|')[0] || spellName;
+      return cleaned.trim();
+    } else if (typeof spellName === 'object') {
+      // Handle object format like { "name": "fireball", "source": "xphb" }
+      const spellObj = spellName as Record<string, unknown>;
+      
+      // Try different object properties
+      if (spellObj.name && typeof spellObj.name === 'string') {
+        const cleaned = spellObj.name.split('|')[0] || spellObj.name;
+        return cleaned.trim();
+      }
+      if (spellObj.spell && typeof spellObj.spell === 'string') {
+        const cleaned = spellObj.spell.split('|')[0] || spellObj.spell;
+        return cleaned.trim();
+      }
+      
+      // Skip logging for known spell selection rules (these are intentional)
+      if (spellObj.all || spellObj.choose || spellObj.daily || spellObj._) {
+        return ''; // These are spell selection rules, not actual spells
+      }
+      
+      // Log truly unexpected objects for debugging
+      console.warn('Unexpected spell object format:', JSON.stringify(spellObj));
+      return '';
+    }
+    
+    // Fallback for other types (numbers, etc.)
+    const fallbackStr = String(spellName);
+    const cleaned = fallbackStr.includes('|') ? fallbackStr.split('|')[0] : fallbackStr;
+    return cleaned.trim();
+  } catch (error) {
+    console.error('Error in cleanSpellName with input:', spellName, 'Error:', error);
+    return '';
+  }
+}
+
+/**
  * Process additional spells for subclasses
  */
 function processSubclassSpells(additionalSpells?: Array<{
-  prepared?: Record<string, string[]>;
-  known?: Record<string, string[]>;
-  expanded?: Record<string, string[]>;
+  prepared?: Record<string, unknown>;
+  known?: Record<string, unknown>;
+  expanded?: Record<string, unknown>;
 }>): SubclassSpellList[] {
   if (!additionalSpells || additionalSpells.length === 0) return [];
 
@@ -413,30 +521,129 @@ function processSubclassSpells(additionalSpells?: Array<{
     // Process prepared spells (most common for Domain, Oath, etc.)
     if (spellGroup.prepared) {
       Object.entries(spellGroup.prepared).forEach(([level, spells]) => {
-        spellList.push({
-          level: parseInt(level),
-          spells: spells
-        });
+        // Handle various spell list formats
+        let cleanedSpells: string[] = [];
+        
+        try {
+          if (Array.isArray(spells) && typeof spells.map === 'function') {
+            cleanedSpells = spells
+              .map(cleanSpellName)
+              .filter(name => typeof name === 'string' && name.trim().length > 0);
+          } else if (typeof spells === 'string') {
+            const cleaned = cleanSpellName(spells);
+            if (cleaned && cleaned.trim().length > 0) {
+              cleanedSpells = [cleaned];
+            }
+          } else if (spells && typeof spells === 'object') {
+            // Handle object format - might be a single spell object
+            const cleaned = cleanSpellName(spells);
+            if (cleaned && cleaned.trim().length > 0) {
+              cleanedSpells = [cleaned];
+            }
+          }
+          
+          // Additional validation - ensure all entries are valid strings
+          cleanedSpells = cleanedSpells.filter(spell => 
+            typeof spell === 'string' && 
+            spell.trim().length > 0 && 
+            !spell.includes('[object Object]')
+          );
+        } catch (error) {
+          console.error(`Error processing prepared spells at level ${level}:`, spells, 'Error:', error);
+        }
+            
+        if (cleanedSpells.length > 0) {
+          spellList.push({
+            level: parseInt(level),
+            spells: cleanedSpells
+          });
+        }
       });
     }
     
     // Process known spells (some subclasses like Aberrant Mind Sorcerer)
     if (spellGroup.known) {
       Object.entries(spellGroup.known).forEach(([level, spells]) => {
-        spellList.push({
-          level: parseInt(level),
-          spells: spells
-        });
+        // Handle various spell list formats
+        let cleanedSpells: string[] = [];
+        
+        try {
+          if (Array.isArray(spells) && typeof spells.map === 'function') {
+            cleanedSpells = spells
+              .map(cleanSpellName)
+              .filter(name => typeof name === 'string' && name.trim().length > 0);
+          } else if (typeof spells === 'string') {
+            const cleaned = cleanSpellName(spells);
+            if (cleaned && cleaned.trim().length > 0) {
+              cleanedSpells = [cleaned];
+            }
+          } else if (spells && typeof spells === 'object') {
+            // Handle object format - might be a single spell object
+            const cleaned = cleanSpellName(spells);
+            if (cleaned && cleaned.trim().length > 0) {
+              cleanedSpells = [cleaned];
+            }
+          }
+          
+          // Additional validation - ensure all entries are valid strings
+          cleanedSpells = cleanedSpells.filter(spell => 
+            typeof spell === 'string' && 
+            spell.trim().length > 0 && 
+            !spell.includes('[object Object]')
+          );
+        } catch (error) {
+          console.error(`Error processing known spells at level ${level}:`, spells, 'Error:', error);
+        }
+            
+        if (cleanedSpells.length > 0) {
+          spellList.push({
+            level: parseInt(level),
+            spells: cleanedSpells
+          });
+        }
       });
     }
     
     // Process expanded spells (Warlocks)
     if (spellGroup.expanded) {
       Object.entries(spellGroup.expanded).forEach(([level, spells]) => {
-        spellList.push({
-          level: parseInt(level),
-          spells: spells
-        });
+        // Handle various spell list formats
+        let cleanedSpells: string[] = [];
+        
+        try {
+          if (Array.isArray(spells) && typeof spells.map === 'function') {
+            cleanedSpells = spells
+              .map(cleanSpellName)
+              .filter(name => typeof name === 'string' && name.trim().length > 0);
+          } else if (typeof spells === 'string') {
+            const cleaned = cleanSpellName(spells);
+            if (cleaned && cleaned.trim().length > 0) {
+              cleanedSpells = [cleaned];
+            }
+          } else if (spells && typeof spells === 'object') {
+            // Handle object format - might be a single spell object
+            const cleaned = cleanSpellName(spells);
+            if (cleaned && cleaned.trim().length > 0) {
+              cleanedSpells = [cleaned];
+            }
+          }
+          
+          // Additional validation - ensure all entries are valid strings
+          cleanedSpells = cleanedSpells.filter(spell => 
+            typeof spell === 'string' && 
+            spell.trim().length > 0 && 
+            !spell.includes('[object Object]')
+          );
+        } catch (error) {
+          console.error(`Error processing expanded spells at level ${level}:`, spells, 'Error:', error);
+        }
+            
+        if (cleanedSpells.length > 0) {
+          spellList.push({
+            level: parseInt(level),
+            spells: cleanedSpells
+          });
+        }
       });
     }
   });
@@ -454,7 +661,7 @@ function processSubclass(rawSubclass: RawSubclassData, fileData: ClassDataFile):
     id,
     name: rawSubclass.name,
     shortName: rawSubclass.shortName,
-    source: rawSubclass.source,
+    source: formatSourceForDisplay(rawSubclass.source),
     page: rawSubclass.page,
     parentClassName: rawSubclass.className,
     parentClassSource: rawSubclass.classSource,
@@ -465,7 +672,19 @@ function processSubclass(rawSubclass: RawSubclassData, fileData: ClassDataFile):
       rawSubclass.source,
       rawSubclass.shortName || rawSubclass.name
     ),
-    spellList: processSubclassSpells(rawSubclass.additionalSpells),
+    spellList: (() => {
+      try {
+        // Only process spell lists for classes that should have them
+        const classesWithSubclassSpells = ['Cleric', 'Paladin', 'Warlock', 'Sorcerer', 'Ranger'];
+        if (!classesWithSubclassSpells.includes(rawSubclass.className)) {
+          return [];
+        }
+        return processSubclassSpells(rawSubclass.additionalSpells);
+      } catch (error) {
+        console.error(`Error processing spell list for ${rawSubclass.name}:`, error);
+        return [];
+      }
+    })(),
     tags: [
       rawSubclass.source,
       rawSubclass.className.toLowerCase(),
@@ -495,18 +714,38 @@ export async function loadAllClasses(): Promise<ProcessedClass[]> {
           processedClasses.push(processedClass);
         } catch (error) {
           console.error(`Error processing class ${rawClass.name}:`, error);
+          // Log more details about the error for debugging
+          if (error instanceof Error) {
+            console.error(`Stack trace:`, error.stack);
+          }
           // Continue with other classes instead of failing completely
         }
       }
     }
     
-    // Remove duplicates (prefer SRD versions when available)
+    // Remove duplicates (same class from different sources)
+    // Priority: PHB2024 (XPHB) > SRD > PHB > others
     const uniqueClasses = new Map<string, ProcessedClass>();
     
     for (const processedClass of processedClasses) {
       const key = processedClass.name.toLowerCase();
-      if (!uniqueClasses.has(key) || processedClass.isSrd) {
+      const existingClass = uniqueClasses.get(key);
+      
+      if (!existingClass) {
+        // No existing class, add this one
         uniqueClasses.set(key, processedClass);
+      } else {
+        // Check if we should replace the existing class
+        const shouldReplace = 
+          processedClass.source === 'PHB2024' || // Always prefer 2024 version
+          (existingClass.source !== 'PHB2024' && processedClass.isSrd) || // Prefer SRD if no 2024 version
+          (existingClass.source !== 'PHB2024' && !existingClass.isSrd && processedClass.source === 'PHB'); // Prefer PHB over others if no 2024/SRD
+        
+        if (shouldReplace) {
+          processedClass.subclasses = [...existingClass.subclasses, ...processedClass.subclasses]
+          .sort((a, b) => a.name.localeCompare(b.name));
+          uniqueClasses.set(key, processedClass);
+        }
       }
     }
     
