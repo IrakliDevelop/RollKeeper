@@ -79,6 +79,18 @@ export interface RawSubclassData {
   };
 }
 
+// Class feature with description
+export interface ClassFeature {
+  name: string;
+  level: number;
+  source: string;
+  className?: string;
+  entries?: string[]; // Parsed description entries
+  isSubclassFeature: boolean;
+  subclassShortName?: string;
+  original: string; // Original feature reference
+}
+
 // Processed class data for our application
 export interface ProcessedClass {
   id: string;
@@ -113,7 +125,7 @@ export interface ProcessedClass {
       tools?: string[];
     };
   };
-  features: string[];
+  features: ClassFeature[];
   spellSlotProgression?: Record<number, Record<number, number>>; // level -> spell level -> slots
   subclasses: ProcessedSubclass[];
   description?: string;
@@ -130,7 +142,7 @@ export interface ProcessedSubclass {
   page?: number;
   parentClassName: string;
   parentClassSource: string;
-  features: string[];
+  features: ClassFeature[];
   description?: string;
   tags: string[];
 }

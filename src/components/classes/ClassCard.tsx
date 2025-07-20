@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { ProcessedClass } from '@/types/classes';
 import { formatSpellcastingType, formatSpellcastingAbility, formatProficiencyType } from '@/utils/classFilters';
 import { 
@@ -46,7 +47,8 @@ export default function ClassCard({ classData, displayMode }: ClassCardProps) {
 
   if (displayMode === 'list') {
     return (
-      <div className="bg-slate-800/40 backdrop-blur-sm border border-slate-600/50 rounded-lg hover:border-emerald-500/50 transition-all shadow-lg hover:shadow-xl">
+      <Link href={`/classes/${classData.id}`} className="block">
+        <div className="bg-slate-800/40 backdrop-blur-sm border border-slate-600/50 rounded-lg hover:border-emerald-500/50 transition-all shadow-lg hover:shadow-xl cursor-pointer">
         <div className="p-6">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
@@ -121,7 +123,11 @@ export default function ClassCard({ classData, displayMode }: ClassCardProps) {
             <div className="flex items-center gap-2 ml-4">
               {classData.subclasses.length > 0 && (
                 <button
-                  onClick={() => setShowSubclasses(!showSubclasses)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowSubclasses(!showSubclasses);
+                  }}
                   className="p-2 text-slate-400 hover:text-emerald-400 transition-colors"
                   title="Show subclasses"
                 >
@@ -160,14 +166,16 @@ export default function ClassCard({ classData, displayMode }: ClassCardProps) {
           )}
         </div>
       </div>
+    </Link>
     );
   }
 
   // Grid mode
   return (
-    <div className="group bg-slate-800/40 backdrop-blur-sm border border-slate-600/50 rounded-lg hover:border-emerald-500/50 transition-all shadow-lg hover:shadow-xl overflow-hidden">
-      {/* Header */}
-      <div className="p-6 pb-4">
+    <Link href={`/classes/${classData.id}`} className="block">
+      <div className="group bg-slate-800/40 backdrop-blur-sm border border-slate-600/50 rounded-lg hover:border-emerald-500/50 transition-all shadow-lg hover:shadow-xl overflow-hidden cursor-pointer">
+        {/* Header */}
+        <div className="p-6 pb-4">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className="flex-shrink-0">
@@ -253,7 +261,11 @@ export default function ClassCard({ classData, displayMode }: ClassCardProps) {
                 Subclasses ({classData.subclasses.length})
               </div>
               <button
-                onClick={() => setShowSubclasses(!showSubclasses)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowSubclasses(!showSubclasses);
+                }}
                 className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1"
               >
                 {showSubclasses ? 'Hide' : 'Show'}
@@ -286,5 +298,6 @@ export default function ClassCard({ classData, displayMode }: ClassCardProps) {
         )}
       </div>
     </div>
+  </Link>
   );
 } 
