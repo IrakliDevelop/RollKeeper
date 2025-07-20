@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, HitPoints, DeathSavingThrows, Weapon, TrackableTrait, HeroicInspiration, MagicItem, ArmorItem, InventoryItem } from '@/types/character';
+import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, Weapon, TrackableTrait, HeroicInspiration, MagicItem, ArmorItem, InventoryItem } from '@/types/character';
 import { ProcessedSpell } from '@/types/spells';
 import { DEFAULT_CHARACTER_STATE, STORAGE_KEY, APP_VERSION, COMMON_CLASSES } from '@/utils/constants';
 import { 
@@ -9,7 +9,6 @@ import {
   updateSpellSlotsPreservingUsed,
   calculateModifier,
   calculateLevelFromXP,
-  shouldLevelUp 
 } from '@/utils/calculations';
 import { 
   applyDamage, 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ProcessedClass, ClassFeature } from '@/types/classes';
 import { formatSpellcastingType, formatSpellcastingAbility, formatProficiencyType } from '@/utils/classFilters';
 import { 
@@ -42,6 +42,7 @@ const HIT_DIE_COLORS = {
 export default function ClassDetailClient({ classData }: ClassDetailClientProps) {
   const [selectedSubclasses, setSelectedSubclasses] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'features' | 'subclasses' | 'progression'>('overview');
+  const [collapsedTenets, setCollapsedTenets] = useState<Set<string>>(new Set());
 
   const spellcastingColorClass = SPELLCASTING_TYPE_COLORS[classData.spellcasting.type] || SPELLCASTING_TYPE_COLORS.none;
   const hitDieColorClass = HIT_DIE_COLORS[classData.hitDie as keyof typeof HIT_DIE_COLORS] || HIT_DIE_COLORS.d8;
@@ -55,6 +56,50 @@ export default function ClassDetailClient({ classData }: ClassDetailClientProps)
   };
 
   const selectedSubclassData = classData.subclasses.filter(sub => selectedSubclasses.includes(sub.id));
+
+  // Function to detect if a feature contains tenets/oaths (flavor text)
+  const isFlavorText = (feature: ClassFeature): boolean => {
+    if (classData.name !== 'Paladin' || !feature.isSubclassFeature) return false;
+    
+    const featureName = feature.name.toLowerCase();
+    const contentText = feature.entries?.join(' ').toLowerCase() || '';
+    
+    // Be very specific about what constitutes flavor text
+    // Only tenet/oath descriptions, not mechanical features
+    const isExplicitTenet = featureName.includes('tenet') || 
+                           featureName.includes('oath') && !featureName.includes('spell');
+    
+    // Check for tenet-specific content patterns (multiple indicators required)
+    const tenetIndicators = ['tenet', 'sworn to', 'guide you', 'follow these'];
+    const principleIndicators = ['principle', 'ideal', 'creed', 'belief'];
+    
+    const hasTenetContent = tenetIndicators.some(indicator => contentText.includes(indicator));
+    const hasPrincipleContent = principleIndicators.some(indicator => contentText.includes(indicator));
+    
+    // Only consider it flavor text if:
+    // 1. Name explicitly mentions tenets/oath, OR
+    // 2. Content has multiple flavor indicators AND is quite long (>600 chars) AND no mechanical keywords
+    const mechanicalKeywords = ['damage', 'spell', 'attack', 'bonus', 'action', 'reaction', 'channel divinity', 'hit points', 'saving throw'];
+    const hasMechanicalContent = mechanicalKeywords.some(keyword => contentText.includes(keyword));
+    
+    const isLongFlavorText = (hasTenetContent || hasPrincipleContent) && 
+                           contentText.length > 600 && 
+                           !hasMechanicalContent;
+    
+    return isExplicitTenet || isLongFlavorText;
+  };
+
+  const toggleTenetCollapse = (featureId: string) => {
+    setCollapsedTenets(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(featureId)) {
+        newSet.delete(featureId);
+      } else {
+        newSet.add(featureId);
+      }
+      return newSet;
+    });
+  };
 
   // Group features by level (now using ClassFeature objects)
   const groupedFeatures = classData.features.reduce((acc, feature) => {
@@ -97,13 +142,20 @@ export default function ClassDetailClient({ classData }: ClassDetailClientProps)
         </div>
 
         <div className="grid gap-4">
-          {groupedFeaturesWithSubclasses[level].map((feature, index) => (
+          {groupedFeaturesWithSubclasses[level].map((feature, index) => {
+            const isFlavorFeature = isFlavorText(feature);
+            const featureId = `${feature.name}-${feature.level}-${index}`;
+            const isCollapsed = collapsedTenets.has(featureId);
+            
+            return (
             <div 
               key={index}
               className={`p-6 rounded-lg border transition-colors ${
-                feature.isSubclassFeature 
-                  ? 'bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/15'
-                  : 'bg-slate-700/30 border-slate-600/30 hover:bg-slate-700/40'
+                isFlavorFeature
+                  ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/15'
+                  : feature.isSubclassFeature 
+                    ? 'bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/15'
+                    : 'bg-slate-700/30 border-slate-600/30 hover:bg-slate-700/40'
               }`}
             >
               <div className="flex items-start justify-between mb-4">
@@ -111,8 +163,17 @@ export default function ClassDetailClient({ classData }: ClassDetailClientProps)
                   <div className="flex items-center gap-2 mb-2">
                     <h4 className="text-lg font-semibold text-white">{feature.name}</h4>
                     {feature.isSubclassFeature && (
-                      <span className="bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded text-xs border border-emerald-500/30">
+                      <span className={`px-2 py-1 rounded text-xs border ${
+                        isFlavorFeature
+                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                          : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                      }`}>
                         {feature.subclassShortName || 'Subclass'}
+                      </span>
+                    )}
+                    {isFlavorFeature && (
+                      <span className="bg-amber-500/20 text-amber-400 px-2 py-1 rounded text-xs border border-amber-500/30">
+                        Flavor
                       </span>
                     )}
                   </div>
@@ -134,19 +195,55 @@ export default function ClassDetailClient({ classData }: ClassDetailClientProps)
               {/* Feature Description */}
               {feature.entries && feature.entries.length > 0 && (
                 <div className="border-t border-slate-600/30 pt-4">
-                  <div className="prose prose-invert prose-sm max-w-none">
-                    {feature.entries.map((entry, entryIndex) => (
-                      <div 
-                        key={entryIndex}
-                        className="mb-3 text-slate-300 leading-relaxed"
-                        dangerouslySetInnerHTML={{ __html: entry }}
-                      />
-                    ))}
-                  </div>
+                  {isFlavorFeature ? (
+                    <div>
+                      <button
+                        onClick={() => toggleTenetCollapse(featureId)}
+                        className="flex items-center gap-2 w-full text-left mb-3 p-2 rounded hover:bg-amber-500/10 transition-colors"
+                      >
+                        <div className={`transform transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`}>
+                          <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                        <span className="text-amber-400 font-medium">
+                          {isCollapsed ? 'Show' : 'Hide'} Oath Details
+                        </span>
+                        <span className="text-amber-300/60 text-xs ml-auto">
+                          (Flavor Text - Not Mechanically Required)
+                        </span>
+                      </button>
+                      
+                      {!isCollapsed && (
+                        <div className="bg-amber-500/5 rounded-lg p-4 border border-amber-500/20">
+                          <div className="prose prose-invert prose-sm max-w-none">
+                            {feature.entries.map((entry, entryIndex) => (
+                              <div 
+                                key={entryIndex}
+                                className="mb-3 text-amber-200/80 leading-relaxed"
+                                dangerouslySetInnerHTML={{ __html: entry }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="prose prose-invert prose-sm max-w-none">
+                      {feature.entries.map((entry, entryIndex) => (
+                        <div 
+                          key={entryIndex}
+                          className="mb-3 text-slate-300 leading-relaxed"
+                          dangerouslySetInnerHTML={{ __html: entry }}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     ));
@@ -571,8 +668,9 @@ export default function ClassDetailClient({ classData }: ClassDetailClientProps)
 
                  {activeTab === 'features' && (
            <div className="space-y-6">
-             {/* Subclass Spell Lists */}
-             {selectedSubclassData.length > 0 && selectedSubclassData.some(sub => sub.spellList && sub.spellList.length > 0) && (
+             {/* Subclass Spell Lists - Only show for selected subclasses */}
+             {selectedSubclassData.length > 0 && 
+              selectedSubclassData.some(sub => sub.spellList && sub.spellList.length > 0) && (
                <div className="bg-gradient-to-br from-purple-900/20 to-purple-800/20 backdrop-blur-sm border border-purple-500/30 rounded-xl p-6 shadow-xl">
                  <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                    <BookOpen className="h-6 w-6 text-purple-400" />
@@ -625,6 +723,35 @@ export default function ClassDetailClient({ classData }: ClassDetailClientProps)
                      </div>
                    </div>
                  ))}
+               </div>
+             )}
+             
+             {/* Help message for classes with spell lists when no subclasses selected */}
+             {selectedSubclassData.length === 0 && 
+              ['Cleric', 'Paladin', 'Warlock', 'Sorcerer', 'Ranger'].includes(classData.name) && 
+              classData.subclasses.some(sub => sub.spellList && sub.spellList.length > 0) && (
+               <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                 <div className="flex items-start gap-3">
+                   <div className="flex-shrink-0 mt-0.5">
+                     <Info className="h-4 w-4 text-blue-400" />
+                   </div>
+                   <div>
+                     <h4 className="text-blue-400 font-medium mb-1">
+                       {classData.name === 'Paladin' ? 'Oath Spells Available' : 
+                        classData.name === 'Cleric' ? 'Domain Spells Available' :
+                        classData.name === 'Warlock' ? 'Expanded Spell Lists Available' :
+                        'Additional Spells Available'}
+                     </h4>
+                     <p className="text-blue-300 text-sm">
+                       Select subclasses from the &quot;Subclasses&quot; tab to view their {
+                         classData.name === 'Paladin' ? 'oath spells' : 
+                         classData.name === 'Cleric' ? 'domain spells' :
+                         classData.name === 'Warlock' ? 'expanded spell lists' :
+                         'additional spells'
+                       }.
+                     </p>
+                   </div>
+                 </div>
                </div>
              )}
              

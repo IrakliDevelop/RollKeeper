@@ -51,7 +51,6 @@ export default function InventoryCurrencyManager() {
     updateInventoryItem, 
     deleteInventoryItem, 
     updateItemQuantity,
-    updateCurrency,
     addCurrency,
     subtractCurrency
   } = useCharacterStore();
