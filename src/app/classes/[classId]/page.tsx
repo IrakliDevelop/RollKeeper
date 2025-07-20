@@ -6,9 +6,9 @@ import { ArrowLeft, Shield } from 'lucide-react';
 import Link from 'next/link';
 
 interface ClassDetailPageProps {
-  params: {
+  params: Promise<{
     classId: string;
-  };
+  }>;
 }
 
 export default async function ClassDetailPage({ params }: ClassDetailPageProps) {

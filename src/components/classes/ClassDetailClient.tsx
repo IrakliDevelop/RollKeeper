@@ -317,7 +317,7 @@ export default function ClassDetailClient({ classData }: ClassDetailClientProps)
             <h3 className="text-lg font-semibold text-white">Saving Throws</h3>
           </div>
           <div className="flex gap-2 flex-wrap">
-            {classData.primaryAbilities?.map((ability) => (
+            {classData.proficiencies.savingThrows?.map((ability) => (
               <span
                 key={ability}
                 className="text-sm bg-blue-500/20 text-blue-400 px-3 py-1 rounded-lg border border-blue-500/30"
