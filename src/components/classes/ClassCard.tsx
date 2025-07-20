@@ -95,15 +95,15 @@ export default function ClassCard({ classData, displayMode }: ClassCardProps) {
                 </div>
 
                 {/* Primary Abilities */}
-                <div className="flex items-center gap-2">
-                  <Brain className="h-4 w-4 text-blue-400" />
-                  <div>
-                    <div className="text-xs text-slate-400">Saves</div>
-                    <div className="text-sm text-white">
-                      {classData.primaryAbilities.map(formatProficiencyType).join(', ')}
-                    </div>
-                  </div>
-                </div>
+                                 <div className="flex items-center gap-2">
+                   <Brain className="h-4 w-4 text-blue-400" />
+                   <div>
+                     <div className="text-xs text-slate-400">Saves</div>
+                     <div className="text-sm text-white">
+                       {classData.primaryAbilities?.map(formatProficiencyType).join(', ') || 'None'}
+                     </div>
+                   </div>
+                 </div>
 
                 {/* Subclasses Count */}
                 <div className="flex items-center gap-2">
@@ -219,19 +219,21 @@ export default function ClassCard({ classData, displayMode }: ClassCardProps) {
         </div>
 
         {/* Saving Throws */}
-        <div className="mb-4">
-          <div className="text-xs text-slate-400 mb-1">Saving Throw Proficiencies</div>
-          <div className="flex gap-1 flex-wrap">
-            {classData.primaryAbilities.map((ability) => (
-              <span
-                key={ability}
-                className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded border border-blue-500/30"
-              >
-                {formatProficiencyType(ability)}
-              </span>
-            ))}
+        {classData.primaryAbilities && classData.primaryAbilities.length > 0 && (
+          <div className="mb-4">
+            <div className="text-xs text-slate-400 mb-1">Saving Throw Proficiencies</div>
+            <div className="flex gap-1 flex-wrap">
+              {classData.primaryAbilities.map((ability) => (
+                <span
+                  key={ability}
+                  className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded border border-blue-500/30"
+                >
+                  {formatProficiencyType(ability)}
+                </span>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Spellcasting ability if applicable */}
         {classData.spellcasting.ability && (

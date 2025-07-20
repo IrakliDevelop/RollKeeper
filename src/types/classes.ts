@@ -17,14 +17,14 @@ export interface RawClassData {
     number: number;
     faces: number;
   };
-  proficiency: ProficiencyType[];
+  proficiency?: ProficiencyType[];
   spellcastingAbility?: SpellcastingAbility;
   casterProgression?: SpellcastingType;
   preparedSpells?: string;
   cantripProgression?: number[];
   spellsKnownProgressionFixed?: number[];
   spellsKnownProgressionFixedAllowLowerLevel?: boolean;
-  startingProficiencies: {
+  startingProficiencies?: {
     armor?: string[];
     weapons?: string[];
     tools?: string[];

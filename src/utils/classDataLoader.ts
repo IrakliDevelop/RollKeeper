@@ -19,11 +19,8 @@ let cachedClasses: ProcessedClass[] | null = null;
  */
 async function loadClassFiles(): Promise<ClassDataFile[]> {
   const classDir = path.join(process.cwd(), 'json', 'class');
-  console.log(`Looking for class files in: ${classDir}`);
-  
   const files = await fs.readdir(classDir);
   const classFiles = files.filter(file => file.endsWith('.json'));
-  console.log(`Found ${classFiles.length} JSON files: ${classFiles.join(', ')}`);
   
   const allClassData: ClassDataFile[] = [];
   
@@ -33,12 +30,8 @@ async function loadClassFiles(): Promise<ClassDataFile[]> {
       const fileContent = await fs.readFile(filePath, 'utf-8');
       const data: ClassDataFile = JSON.parse(fileContent);
       
-      console.log(`File ${file}: ${data.class?.length || 0} classes, ${data.subclass?.length || 0} subclasses`);
-      
       if (data.class && Array.isArray(data.class)) {
         allClassData.push(data);
-      } else {
-        console.warn(`File ${file} does not contain valid class array`);
       }
     } catch (error) {
       console.error(`Error loading class file ${file}:`, error);
@@ -175,7 +168,7 @@ function processClass(rawClass: RawClassData, subclasses: RawSubclassData[]): Pr
     source: rawClass.source,
     page: rawClass.page,
     hitDie: formatHitDie(rawClass.hd),
-    primaryAbilities: rawClass.proficiency,
+    primaryAbilities: rawClass.proficiency || [],
     spellcasting: {
       type: spellcastingType,
       ability: rawClass.spellcastingAbility,
@@ -184,11 +177,11 @@ function processClass(rawClass: RawClassData, subclasses: RawSubclassData[]): Pr
       spellsKnownProgression: rawClass.spellsKnownProgressionFixed,
     },
     proficiencies: {
-      armor: formatEquipment(rawClass.startingProficiencies.armor),
-      weapons: formatEquipment(rawClass.startingProficiencies.weapons),
-      tools: formatEquipment(rawClass.startingProficiencies.tools),
-      savingThrows: rawClass.proficiency,
-      skillChoices: extractSkillChoices(rawClass.startingProficiencies.skills),
+      armor: formatEquipment(rawClass.startingProficiencies?.armor),
+      weapons: formatEquipment(rawClass.startingProficiencies?.weapons),
+      tools: formatEquipment(rawClass.startingProficiencies?.tools),
+      savingThrows: rawClass.proficiency || [],
+      skillChoices: extractSkillChoices(rawClass.startingProficiencies?.skills),
     },
     startingEquipment: formatEquipment(rawClass.startingEquipment?.default),
     multiclassing: rawClass.multiclassing ? {
@@ -204,7 +197,7 @@ function processClass(rawClass: RawClassData, subclasses: RawSubclassData[]): Pr
     subclasses: processedSubclasses,
     isSrd: rawClass.srd || false,
     tags: [
-      rawClass.source,
+      rawClass.source || 'unknown',
       spellcastingType,
       rawClass.spellcastingAbility || 'none',
       formatHitDie(rawClass.hd),
@@ -247,13 +240,9 @@ export async function loadAllClasses(): Promise<ProcessedClass[]> {
   
   try {
     const classDataFiles = await loadClassFiles();
-    console.log(`Loaded ${classDataFiles.length} class data files`);
-    
     const processedClasses: ProcessedClass[] = [];
     
     for (const classFile of classDataFiles) {
-      console.log(`Processing file with ${classFile.class?.length || 0} classes`);
-      
       // Process each class in the file
       for (const rawClass of classFile.class || []) {
         try {
