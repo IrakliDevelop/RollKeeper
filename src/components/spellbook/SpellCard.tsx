@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ProcessedSpell } from '@/types/spells';
+import { getFormattedHtml } from '@/utils/referenceParser';
 import { 
   Plus, 
   Check, 
@@ -75,10 +76,13 @@ export default function SpellCard({
   const levelColor = LEVEL_COLORS[spell.level as keyof typeof LEVEL_COLORS] || 'text-gray-400 border-gray-400';
 
   const formatDescription = (text: string, maxLength: number = 150) => {
+    const formattedHtml = getFormattedHtml(text);
     if (showFullDescription || text.length <= maxLength) {
-      return text;
+      return formattedHtml;
     }
-    return text.substring(0, maxLength) + '...';
+    // For truncated text, we need to work with plain text first, then format
+    const truncated = text.substring(0, maxLength) + '...';
+    return getFormattedHtml(truncated);
   };
 
   const handleToggleSpellbook = () => {
@@ -181,8 +185,12 @@ export default function SpellCard({
               </div>
 
               {/* Description */}
-              <p className="text-sm text-slate-300 leading-relaxed">
-                {formatDescription(spell.description)}
+              <div className="text-sm text-slate-300 leading-relaxed">
+                <div 
+                  dangerouslySetInnerHTML={{ 
+                    __html: formatDescription(spell.description) 
+                  }}
+                />
                 {spell.description.length > 150 && (
                   <div className="flex items-center gap-2 mt-2">
                     <button
@@ -210,7 +218,7 @@ export default function SpellCard({
                     View Details
                   </button>
                 )}
-              </p>
+              </div>
             </div>
 
             {/* Action Buttons */}
@@ -370,9 +378,12 @@ export default function SpellCard({
 
         {/* Description */}
         <div className="mb-4">
-          <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">
-            {formatDescription(spell.description)}
-          </p>
+          <div 
+            className="text-sm text-slate-300 leading-relaxed line-clamp-3"
+            dangerouslySetInnerHTML={{ 
+              __html: formatDescription(spell.description) 
+            }}
+          />
           <div className="flex items-center gap-2 mt-2">
             {spell.description.length > 150 && (
               <>
@@ -399,13 +410,21 @@ export default function SpellCard({
         {/* Expanded Description */}
         {isExpanded && (
           <div className="mb-4 p-3 bg-slate-700/30 rounded border border-slate-600/30">
-            <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
-              {spell.description}
-            </p>
+            <div 
+              className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap"
+              dangerouslySetInnerHTML={{ 
+                __html: getFormattedHtml(spell.description) 
+              }}
+            />
             {spell.higherLevelDescription && (
               <div className="mt-3 pt-3 border-t border-slate-600/30">
                 <h4 className="text-sm font-semibold text-amber-400 mb-1">At Higher Levels:</h4>
-                <p className="text-sm text-slate-300">{spell.higherLevelDescription}</p>
+                <div 
+                  className="text-sm text-slate-300"
+                  dangerouslySetInnerHTML={{ 
+                    __html: getFormattedHtml(spell.higherLevelDescription) 
+                  }}
+                />
               </div>
             )}
           </div>
