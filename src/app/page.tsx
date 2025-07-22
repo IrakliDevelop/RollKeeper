@@ -23,6 +23,7 @@ import { WeaponProficiencies } from "@/components/WeaponProficiencies";
 import { SpellcastingStats } from "@/components/SpellcastingStats";
 import { SpellManagement } from "@/components/SpellManagement";
 import { QuickSpells } from "@/components/QuickSpells";
+import { ConcentrationTracker } from "@/components/ui/ConcentrationTracker";
 import { ToastContainer, useToast } from "@/components/ui/Toast";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import { 
@@ -111,7 +112,8 @@ export default function CharacterSheet() {
     updateTempArmorClass,
     toggleShield,
     resetTempArmorClass,
-    updateShieldBonus
+    updateShieldBonus,
+    stopConcentration
   } = useCharacterStore();
 
   // Modal state for character reset
@@ -372,6 +374,14 @@ export default function CharacterSheet() {
                 </div>
               </div>
             </ErrorBoundary>
+
+            {/* Concentration Tracker */}
+            {character.concentration.isConcentrating && (
+              <ConcentrationTracker
+                concentration={character.concentration}
+                onStopConcentration={stopConcentration}
+              />
+            )}
           </div>
         </section>
 

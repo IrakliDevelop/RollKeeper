@@ -605,33 +605,9 @@ export async function loadAllSpells(): Promise<ProcessedSpell[]> {
     const rawSpells = await loadSpellFiles();
     const processedSpells = rawSpells.map(processSpell);
     
-    // Remove duplicates (same spell from different sources)
-    // Priority: PHB2024 (XPHB) > SRD > PHB > others
-    const uniqueSpells = new Map<string, ProcessedSpell>();
+    cachedSpells = processedSpells;
     
-    for (const spell of processedSpells) {
-      const key = spell.name.toLowerCase();
-      const existingSpell = uniqueSpells.get(key);
-      
-      if (!existingSpell) {
-        // No existing spell, add this one
-        uniqueSpells.set(key, spell);
-      } else {
-        // Check if we should replace the existing spell
-        const shouldReplace = 
-          spell.source === 'PHB2024' || // Always prefer 2024 version
-          (existingSpell.source !== 'PHB2024' && spell.isSrd) || // Prefer SRD if no 2024 version
-          (existingSpell.source !== 'PHB2024' && !existingSpell.isSrd && spell.source === 'PHB'); // Prefer PHB over others if no 2024/SRD
-        
-        if (shouldReplace) {
-          uniqueSpells.set(key, spell);
-        }
-      }
-    }
-    
-    cachedSpells = Array.from(uniqueSpells.values());
-    
-    console.log(`Loaded ${cachedSpells.length} unique spells from ${rawSpells.length} total spell entries`);
+    console.log(`Loaded ${cachedSpells.length} processed spells from ${rawSpells.length} total spell entries`);
     
     return cachedSpells;
   } catch (error) {

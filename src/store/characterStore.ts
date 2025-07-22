@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, Weapon, TrackableTrait, HeroicInspiration, MagicItem, ArmorItem, InventoryItem } from '@/types/character';
+import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, Weapon, TrackableTrait, HeroicInspiration, MagicItem, ArmorItem, InventoryItem, ConcentrationState } from '@/types/character';
 import { ProcessedSpell } from '@/types/spells';
 import { DEFAULT_CHARACTER_STATE, STORAGE_KEY, APP_VERSION, COMMON_CLASSES } from '@/utils/constants';
 import { 
@@ -120,6 +120,10 @@ function migrateCharacterData(character: unknown): CharacterState {
     if (!result.spellbook || typeof result.spellbook !== 'object') {
       result.spellbook = DEFAULT_CHARACTER_STATE.spellbook;
     }
+    // Ensure concentration tracking exists
+    if (!result.concentration || typeof result.concentration !== 'object') {
+      result.concentration = DEFAULT_CHARACTER_STATE.concentration;
+    }
     return result;
   }
 
@@ -235,6 +239,11 @@ interface CharacterStore {
   updatePactMagicSlot: (used: number) => void;
   resetSpellSlots: () => void;
   resetPactMagicSlots: () => void;
+  
+  // Concentration management
+  startConcentration: (spellName: string, spellId?: string, castAt?: number) => void;
+  stopConcentration: () => void;
+  isConcentratingOn: (spellName: string) => boolean;
   
   // XP management
   addExperience: (xpToAdd: number) => void;
@@ -847,6 +856,47 @@ export const useCharacterStore = create<CharacterStore>()(
             saveStatus: 'saving'
           };
         });
+      },
+
+      // Concentration management
+      startConcentration: (spellName, spellId, castAt) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            concentration: {
+              isConcentrating: true,
+              spellName,
+              spellId,
+              castAt,
+              startedAt: new Date().toISOString(),
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      stopConcentration: () => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            concentration: {
+              isConcentrating: false,
+              spellName: undefined,
+              spellId: undefined,
+              castAt: undefined,
+              startedAt: undefined,
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      isConcentratingOn: (spellName) => {
+        const state = get();
+        return state.character.concentration.isConcentrating && 
+               state.character.concentration.spellName === spellName;
       },
 
       // XP management

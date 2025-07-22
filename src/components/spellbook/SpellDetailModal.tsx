@@ -14,6 +14,7 @@ import {
   CheckCircle,
   Plus
 } from 'lucide-react';
+import { SPELL_SOURCE_BOOKS } from '@/utils/constants';
 
 interface SpellDetailModalProps {
   spell: ProcessedSpell;
@@ -265,7 +266,7 @@ export default function SpellDetailModal({
             <div className="bg-slate-800/30 rounded-lg p-4 border border-slate-600/30">
               <h3 className="text-lg font-semibold text-white mb-2">Source</h3>
               <p className="text-slate-300">
-                {spell.source}
+                {SPELL_SOURCE_BOOKS[spell.source] || spell.source}
                 {spell.page && ` (page ${spell.page})`}
               </p>
             </div>

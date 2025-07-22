@@ -127,6 +127,15 @@ export type SpellcastingAbility = 'intelligence' | 'wisdom' | 'charisma';
 // Spell action types
 export type SpellActionType = 'attack' | 'save' | 'utility';
 
+// Concentration tracking state
+export interface ConcentrationState {
+  isConcentrating: boolean;
+  spellName?: string; // Name of the spell being concentrated on
+  spellId?: string; // ID of the spell being concentrated on (for user spells)
+  castAt?: number; // What level the concentration spell was cast at
+  startedAt?: string; // ISO timestamp when concentration started
+}
+
 // Spell information
 export interface Spell {
   id: string;
@@ -373,6 +382,7 @@ export interface CharacterState {
   // Spellcasting
   spells: Spell[]; // All spells and cantrips known/prepared
   spellcastingStats: SpellcastingStats;
+  concentration: ConcentrationState; // Active concentration tracking
 
   // Death saving throws
   deathSavingThrows: DeathSavingThrows;

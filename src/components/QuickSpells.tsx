@@ -1,9 +1,11 @@
 'use client';
 
-import { Shield, Sparkles, Dice6, Zap } from "lucide-react";
+import React, { useState } from "react";
+import { Shield, Sparkles, Dice6, Zap, Wand2 } from "lucide-react";
 import { useCharacterStore } from "@/store/characterStore";
 import { Spell } from "@/types/character";
 import { calculateSpellAttackBonus, calculateSpellSaveDC, getCharacterSpellcastingAbility, rollDamage } from "@/utils/calculations";
+import { SpellCastModal } from "@/components/ui/SpellCastModal";
 
 interface QuickSpellsProps {
   showAttackRoll: (weaponName: string, roll: number, bonus: number, isCrit: boolean, damage?: string, damageType?: string) => void;
@@ -12,7 +14,16 @@ interface QuickSpellsProps {
 }
 
 export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: showSaveToast, showDamageRoll }: QuickSpellsProps) {
-  const { character } = useCharacterStore();
+  const { 
+    character, 
+    updateSpellSlot, 
+    startConcentration, 
+    stopConcentration 
+  } = useCharacterStore();
+  
+  // Modal state
+  const [castModalOpen, setCastModalOpen] = useState(false);
+  const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null);
   
   // Get all available spells for quick access (cantrips + prepared spells)
   const quickAccessSpells = character.spells.filter(spell => 
@@ -81,6 +92,36 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
     );
   };
 
+  const openCastModal = (spell: Spell) => {
+    setSelectedSpell(spell);
+    setCastModalOpen(true);
+  };
+
+  const handleCastSpell = (spellLevel: number) => {
+    if (!selectedSpell) return;
+
+    // If it's a concentration spell, stop current concentration
+    if (selectedSpell.concentration) {
+      if (character.concentration.isConcentrating) {
+        stopConcentration();
+      }
+      startConcentration(selectedSpell.name, selectedSpell.id, spellLevel);
+    }
+
+    // Use spell slot if it's not a cantrip
+    if (selectedSpell.level > 0) {
+      updateSpellSlot(spellLevel as keyof typeof character.spellSlots, 
+        character.spellSlots[spellLevel as keyof typeof character.spellSlots].used + 1);
+    }
+
+    // Close modal
+    setCastModalOpen(false);
+    setSelectedSpell(null);
+    
+    // Show a toast or notification that the spell was cast
+    // You could add a toast system here if desired
+  };
+
   if (actionSpells.length === 0) {
     return (
       <div className="text-center py-6 text-gray-500">
@@ -94,6 +135,7 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
   }
 
   return (
+    <>
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-sm text-purple-700 mb-3">
         <Sparkles size={16} />
@@ -137,6 +179,15 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
           </div>
           
           <div className="flex flex-wrap gap-2">
+            {/* Cast Button - Always show for all spells */}
+            <button
+              onClick={() => openCastModal(spell)}
+              className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-lg shadow-md hover:from-purple-700 hover:to-violet-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+            >
+              <Wand2 size={16} className="group-hover:rotate-12 transition-transform" />
+              Cast
+            </button>
+
             {spell.actionType === 'attack' && (
               <button
                 onClick={() => rollSpellAttack(spell)}
@@ -179,5 +230,21 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
         </div>
       ))}
     </div>
+    
+    {/* Spell Cast Modal */}
+    {selectedSpell && (
+      <SpellCastModal
+        isOpen={castModalOpen}
+        onClose={() => {
+          setCastModalOpen(false);
+          setSelectedSpell(null);
+        }}
+        spell={selectedSpell}
+        spellSlots={character.spellSlots}
+        concentration={character.concentration}
+        onCastSpell={handleCastSpell}
+      />
+    )}
+    </>
   );
 } 

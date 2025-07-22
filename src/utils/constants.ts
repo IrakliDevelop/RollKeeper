@@ -1,4 +1,4 @@
-import { AbilityName, SkillName, ClassInfo, RichTextContent, Weapon, Spell, TrackableTrait, MagicItem, ArmorItem, InventoryItem } from '@/types/character';
+import { AbilityName, SkillName, ClassInfo, RichTextContent, Weapon, Spell, TrackableTrait, MagicItem, ArmorItem, InventoryItem, ConcentrationState } from '@/types/character';
 
 // D&D 5e skill to ability mappings
 export const SKILL_ABILITY_MAP: Record<SkillName, AbilityName> = {
@@ -378,6 +378,14 @@ export const DEFAULT_CHARACTER_STATE = {
     spellSaveDC: undefined,
   },
 
+  concentration: {
+    isConcentrating: false,
+    spellName: undefined,
+    spellId: undefined,
+    castAt: undefined,
+    startedAt: undefined,
+  },
+
   // Spellbook system
   spellbook: {
     knownSpells: [],
@@ -392,6 +400,67 @@ export const DEFAULT_CHARACTER_STATE = {
       theme: 'classic' as const,
     },
   },
+};
+
+// spell source books and colors mapping, key should be SPELL_SOURCE_BOOKS keys
+export const SPELL_SOURCE_COLORS: Record<string, string> = {
+  'PHB': 'bg-blue-500',
+  'PHB2024': 'bg-indigo-500',
+  'XPHB': 'bg-violet-500', 
+  'XGE': 'bg-green-500',
+  'TCE': 'bg-red-500',
+  'ERLW': 'bg-amber-500',
+  'AI': 'bg-cyan-500',
+  'AAG': 'bg-teal-500',
+  'EEPC': 'bg-emerald-500',
+  'EGW': 'bg-sky-500',
+  'RMR': 'bg-purple-500',
+  'FTD': 'bg-fuchsia-500',
+  'GGR': 'bg-rose-500',
+  'IDRotF': 'bg-orange-500',
+  'MOTF': 'bg-yellow-500',
+  'MTG': 'bg-lime-500',
+  'SatO': 'bg-pink-500',
+  'SCC': 'bg-slate-500',
+  'SCAG': 'bg-zinc-500',
+  'TDCSR': 'bg-emerald-600',
+  'BMT': 'bg-violet-600',
+  'BoET': 'bg-indigo-600',
+  'DoDk': 'bg-blue-600',
+  'GHLoE': 'bg-cyan-600',
+  'VG': 'bg-teal-600',
+  'AitFR-AVT': 'bg-green-600',
+};
+
+export const SPELL_SOURCE_BOOKS: Record<string, string> = {
+  'PHB': 'Player\'s Handbook',
+  'PHB2024': 'Player\'s Handbook 2024',
+  'XPHB': 'Player\'s Handbook 2024',
+  'XGE': 'Xanathar\'s Guide to Everything',
+  'TCE': 'Tasha\'s Cauldron of Everything',
+  'ERLW': 'Eberron: Rising from the Last War',
+  'AI': 'Acquisitions Incorporated',
+  'AAG': `Astral Adventurers Guild`,
+  'EEPC': `Elemental Evil Player's Companion`,
+  'EGW': `Explorer's Guide to Wildemount`,
+  'RMR':  `Dungeons & Dragons vs Rick & Morty`,
+  'FTD': `Fizban's Treasury of Dragons`,
+  'GGR': `Guildmasters' Guide to Ravnica`,
+  'IDRotF': `Icewind Dale: Rime of the Frostmaiden`,
+  'MOTF': `Mythic Odysseys of Theros`,
+  'MTG': `Magic: The Gathering`,
+  'SatO': 'Sigil and the Outlands',
+  'SCC': 'Strixhaven: A Curriculum of Chaos',
+  'SCAG': 'Sword Coast Adventurer\'s Guide',
+  'TDCSR': `Tal'Dorei Campaign Setting Reborn`,
+  'BMT': 'The Book of Many Things',
+  'BoET': 'Book of Ebon Tides',
+  'DoDk': 'Dungeons of Drakkenheim',
+  'GHLoE': 'Grim Hollow: Lairs of Etharis',
+  'VG': 'Volo\'s Guide to Monsters',
+  'AitFR-AVT': `Adventures in the Forgotten Realms: A Verdant Tomb`,
+  'AitFR-FCD': `Adventures in the Forgotten Realms: From Cyan Depths`,
+  'LLK': 'Lost Laboratory of Kwalish',
 };
 
 // Auto-save settings
