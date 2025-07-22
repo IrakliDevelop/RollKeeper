@@ -70,7 +70,7 @@ export interface RawSpellData {
   components: SpellComponents;
   duration: SpellDuration[];
   meta?: SpellMeta;
-  entries: string[];
+  entries: (string | SpellEntry)[];
   entriesHigherLevel?: SpellEntryHigherLevel[];
   scalingLevelDice?: SpellScalingLevelDice;
   damageInflict?: string[];
@@ -81,6 +81,21 @@ export interface RawSpellData {
   miscTags?: string[];
   areaTags?: string[];
   hasFluffImages?: boolean;
+}
+
+// Spell entry objects that can appear in entries array
+export interface SpellEntry {
+  type: string;
+  name?: string;
+  entries?: string[];
+  style?: string;
+  items?: SpellEntryItem[];
+}
+
+export interface SpellEntryItem {
+  type: string;
+  name: string;
+  entries: string[];
 }
 
 // Processed spell data for our application

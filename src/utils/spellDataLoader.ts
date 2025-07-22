@@ -1,6 +1,13 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { RawSpellData, ProcessedSpell, SpellClass, SPELL_SCHOOLS } from '@/types/spells';
+import { 
+  RawSpellData, 
+  ProcessedSpell, 
+  SpellClass,
+  SpellEntry,
+  SpellEntryItem,
+  SPELL_SCHOOLS
+} from '@/types/spells';
 import { formatSourceForDisplay } from './sourceUtils';
 
 // Cache for loaded spells to avoid reprocessing
@@ -114,7 +121,7 @@ function hasConcentration(duration: RawSpellData['duration']): boolean {
 }
 
 /**
- * Map spell names to their available classes based on D&D 5e rules
+ * Get the classes that can cast a specific spell
  * This includes the 11 main spellcasting classes and their spell access
  */
 function getSpellClasses(spellName: string): SpellClass[] {
@@ -537,13 +544,53 @@ function getSpellClasses(spellName: string): SpellClass[] {
 }
 
 /**
+ * Parse spell entries that can contain both strings and complex objects
+ */
+function parseSpellEntries(entries: (string | SpellEntry)[]): string {
+  return entries.map(entry => {
+    if (typeof entry === 'string') {
+      return entry;
+    }
+    
+    // Handle object entries
+    if (entry.type === 'list' && entry.items) {
+      // Handle list items like "Audible Alarm" and "Mental Alarm"
+      return entry.items.map(item => {
+        if (item.type === 'item' && item.name && item.entries) {
+          return `**${item.name}.** ${item.entries.join(' ')}`;
+        }
+        return '';
+      }).filter(Boolean).join('\n\n');
+    }
+    
+    if (entry.type === 'entries' && entry.entries) {
+      // Handle nested entries
+      let result = '';
+      if (entry.name) {
+        result += `**${entry.name}**\n\n`;
+      }
+      result += entry.entries.join('\n\n');
+      return result;
+    }
+    
+    // For any other object types, try to extract meaningful text
+    if (entry.entries) {
+      return entry.entries.join('\n\n');
+    }
+    
+    // Fallback for unknown object types
+    return '';
+  }).filter(Boolean).join('\n\n');
+}
+
+/**
  * Process raw spell data into our application format
  */
 function processSpell(rawSpell: RawSpellData): ProcessedSpell {
   const id = generateSpellId(rawSpell.name, rawSpell.source);
   
-  // Process description
-  const description = rawSpell.entries.join('\n\n');
+  // Process description using the new parser
+  const description = parseSpellEntries(rawSpell.entries);
   
   // Process higher level description
   let higherLevelDescription: string | undefined;
