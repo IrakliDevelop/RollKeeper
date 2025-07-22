@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ProcessedSpell } from '@/types/spells';
 import { getFormattedHtml } from '@/utils/referenceParser';
 import { 
@@ -18,6 +18,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import SpellDetailModal from './SpellDetailModal';
+import { SPELL_SOURCE_BOOKS, SPELL_SOURCE_COLORS } from '@/utils/constants';
 
 interface SpellCardProps {
   spell: ProcessedSpell;
@@ -84,6 +85,12 @@ export default function SpellCard({
     const truncated = text.substring(0, maxLength) + '...';
     return getFormattedHtml(truncated);
   };
+
+  //functiion to give spell source in a badge unique color based on the source
+  // should we memoize this?
+  const getSourceColor = useCallback((source: string) => {
+    return SPELL_SOURCE_COLORS[source] || 'bg-slate-500';
+  }, []);
 
   const handleToggleSpellbook = () => {
     if (isInSpellbook && onRemoveFromSpellbook) {
@@ -314,6 +321,9 @@ export default function SpellCard({
 
         {/* Spell Name */}
         <h3 className="text-lg font-bold text-white mb-2 leading-tight">{spell.name}</h3>
+        <div className="flex items-center gap-2 mb-2">
+          <span className={`text-xs text-white px-2 py-1 rounded-full ${getSourceColor(spell.source)} drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]`}>{SPELL_SOURCE_BOOKS[spell.source] || spell.source}</span>
+        </div>
         
         {/* Status Tags */}
         <div className="flex flex-wrap gap-1 mb-3">
