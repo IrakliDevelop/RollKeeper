@@ -607,7 +607,7 @@ export async function loadAllSpells(): Promise<ProcessedSpell[]> {
     
     cachedSpells = processedSpells;
     
-    console.log(`Loaded ${cachedSpells.length} unique spells from ${rawSpells.length} total spell entries`);
+    console.log(`Loaded ${cachedSpells.length} processed spells from ${rawSpells.length} total spell entries`);
     
     return cachedSpells;
   } catch (error) {
