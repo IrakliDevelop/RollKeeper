@@ -86,7 +86,7 @@ export default function SpellCard({
     return getFormattedHtml(truncated);
   };
 
-  //functiion to give spell source in a badge unique color based on the source
+  // Function to give the spell source a unique badge color based on the source.
   // should we memoize this?
   const getSourceColor = useCallback((source: string) => {
     return SPELL_SOURCE_COLORS[source] || 'bg-slate-500';
