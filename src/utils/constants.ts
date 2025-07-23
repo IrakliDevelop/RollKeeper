@@ -400,6 +400,13 @@ export const DEFAULT_CHARACTER_STATE = {
       theme: 'classic' as const,
     },
   },
+
+  // Conditions and diseases
+  conditionsAndDiseases: {
+    activeConditions: [],
+    activeDiseases: [],
+    exhaustionVariant: '2024' as const, // Default to 2024 rules
+  },
 };
 
 // spell source books and colors mapping, key should be SPELL_SOURCE_BOOKS keys
@@ -461,6 +468,9 @@ export const SPELL_SOURCE_BOOKS: Record<string, string> = {
   'AitFR-AVT': `Adventures in the Forgotten Realms: A Verdant Tomb`,
   'AitFR-FCD': `Adventures in the Forgotten Realms: From Cyan Depths`,
   'LLK': 'Lost Laboratory of Kwalish',
+  'DMG': 'Dungeon Master\'s Guide',
+  'DMG2024': 'Dungeon Master\'s Guide 2024',
+  'XDMG': 'Dungeon Master\'s Guide 2024',
 };
 
 // Auto-save settings
