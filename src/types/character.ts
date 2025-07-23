@@ -390,6 +390,9 @@ export interface CharacterState {
   // Spellbook and grimoire system
   spellbook: SpellbookState;
 
+  // Conditions and diseases
+  conditionsAndDiseases: ConditionsDiseasesState;
+
   // Miscellaneous
 }
 
@@ -409,3 +412,110 @@ export interface CharacterExport {
 
 // Save state type
 export type SaveStatus = 'saving' | 'saved' | 'error'; 
+
+// Exhaustion variants (2014 vs 2024)
+export type ExhaustionVariant = '2014' | '2024';
+
+// Active condition tracking
+export interface ActiveCondition {
+  id: string;
+  name: string;
+  source: string; // PHB, XPHB, etc.
+  description: string;
+  stackable: boolean;
+  count: number; // For stackable conditions like exhaustion
+  appliedAt: string; // ISO date string
+  notes?: string; // Optional player notes
+}
+
+// Active disease tracking  
+export interface ActiveDisease {
+  id: string;
+  name: string;
+  source: string;
+  description: string;
+  onsetTime?: string; // When symptoms started
+  appliedAt: string; // ISO date string
+  notes?: string;
+}
+
+// Conditions and diseases state
+export interface ConditionsDiseasesState {
+  activeConditions: ActiveCondition[];
+  activeDiseases: ActiveDisease[];
+  exhaustionVariant: ExhaustionVariant; // Player's preference for exhaustion rules
+} 
+
+// Raw JSON data types for conditions/diseases
+export interface RawConditionEntry {
+  type?: string;
+  name?: string;
+  entries?: (string | RawConditionEntry)[];
+  items?: (string | RawConditionEntry)[];
+  entry?: string; // Single entry field (used in item objects)
+}
+
+export interface RawCondition {
+  name: string;
+  source: string;
+  page?: number;
+  srd?: boolean;
+  basicRules?: boolean;
+  srd52?: boolean;
+  basicRules2024?: boolean;
+  reprintedAs?: string[];
+  entries: (string | RawConditionEntry)[];
+  hasFluffImages?: boolean;
+}
+
+export interface RawDisease {
+  name: string;
+  source: string;
+  page?: number;
+  type?: string;
+  entries: string[];
+}
+
+export interface RawStatus {
+  name: string;
+  source: string;
+  page?: number;
+  srd?: boolean;
+  basicRules?: boolean;
+  srd52?: boolean;
+  basicRules2024?: boolean;
+  reprintedAs?: string[];
+  entries: (string | RawConditionEntry)[];
+}
+
+export interface RawConditionsDiseasesData {
+  condition: RawCondition[];
+  disease: RawDisease[];
+  status: RawStatus[];
+}
+
+// Processed condition/disease data
+export interface ProcessedCondition {
+  id: string;
+  name: string;
+  source: string;
+  description: string;
+  isExhaustion: boolean;
+  stackable: boolean;
+  variant?: '2014' | '2024'; // For conditions that have multiple versions
+}
+
+export interface ProcessedDisease {
+  id: string;
+  name: string;
+  source: string;
+  description: string;
+  type?: string;
+}
+
+export interface ProcessedStatus {
+  id: string;
+  name: string;
+  source: string;
+  description: string;
+} 

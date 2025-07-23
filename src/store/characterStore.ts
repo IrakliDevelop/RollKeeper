@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, Weapon, TrackableTrait, HeroicInspiration, MagicItem, ArmorItem, InventoryItem, ConcentrationState } from '@/types/character';
+import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, Weapon, TrackableTrait, HeroicInspiration, MagicItem, ArmorItem, InventoryItem, ConcentrationState, ActiveCondition, ActiveDisease, ExhaustionVariant } from '@/types/character';
 import { ProcessedSpell } from '@/types/spells';
 import { DEFAULT_CHARACTER_STATE, STORAGE_KEY, APP_VERSION, COMMON_CLASSES } from '@/utils/constants';
 import { 
@@ -124,6 +124,10 @@ function migrateCharacterData(character: unknown): CharacterState {
     if (!result.concentration || typeof result.concentration !== 'object') {
       result.concentration = DEFAULT_CHARACTER_STATE.concentration;
     }
+    // Ensure conditions and diseases tracking exists
+    if (!result.conditionsAndDiseases || typeof result.conditionsAndDiseases !== 'object') {
+      result.conditionsAndDiseases = DEFAULT_CHARACTER_STATE.conditionsAndDiseases;
+    }
     return result;
   }
 
@@ -196,6 +200,7 @@ interface CharacterStore {
   saveStatus: SaveStatus;
   lastSaved: Date | string | null; // Can be string when rehydrated from localStorage
   hasUnsavedChanges: boolean;
+  hasHydrated: boolean;
   
   // Actions
   updateCharacter: (updates: Partial<CharacterState>) => void;
@@ -244,6 +249,17 @@ interface CharacterStore {
   startConcentration: (spellName: string, spellId?: string, castAt?: number) => void;
   stopConcentration: () => void;
   isConcentratingOn: (spellName: string) => boolean;
+
+  // Conditions and diseases management
+  addCondition: (conditionName: string, source: string, description: string, count?: number, notes?: string) => void;
+  updateCondition: (conditionId: string, updates: Partial<Pick<ActiveCondition, 'count' | 'notes'>>) => void;
+  removeCondition: (conditionId: string) => void;
+  addDisease: (diseaseName: string, source: string, description: string, onsetTime?: string, notes?: string) => void;
+  updateDisease: (diseaseId: string, updates: Partial<Pick<ActiveDisease, 'onsetTime' | 'notes'>>) => void;
+  removeDisease: (diseaseId: string) => void;
+  setExhaustionVariant: (variant: ExhaustionVariant) => void;
+  clearAllConditions: () => void;
+  clearAllDiseases: () => void;
   
   // XP management
   addExperience: (xpToAdd: number) => void;
@@ -332,6 +348,7 @@ export const useCharacterStore = create<CharacterStore>()(
       saveStatus: 'saved',
       lastSaved: null,
       hasUnsavedChanges: false,
+      hasHydrated: false,
 
       // Character update actions
       updateCharacter: (updates) => {
@@ -897,6 +914,182 @@ export const useCharacterStore = create<CharacterStore>()(
         const state = get();
         return state.character.concentration.isConcentrating && 
                state.character.concentration.spellName === spellName;
+      },
+
+      // Conditions and diseases management
+      addCondition: (conditionName, source, description, count = 1, notes) => {
+        set((state) => {
+          const newCondition: ActiveCondition = {
+            id: `${conditionName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
+            name: conditionName,
+            source,
+            description,
+            stackable: conditionName.toLowerCase() === 'exhaustion',
+            count,
+            appliedAt: new Date().toISOString(),
+            notes
+          };
+
+          return {
+            character: {
+              ...state.character,
+              conditionsAndDiseases: {
+                ...state.character.conditionsAndDiseases,
+                activeConditions: [...state.character.conditionsAndDiseases.activeConditions, newCondition]
+              }
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      updateCondition: (conditionId, updates) => {
+        set((state) => {
+          const updatedConditions = state.character.conditionsAndDiseases.activeConditions.map(condition =>
+            condition.id === conditionId ? { ...condition, ...updates } : condition
+          );
+
+          return {
+            character: {
+              ...state.character,
+              conditionsAndDiseases: {
+                ...state.character.conditionsAndDiseases,
+                activeConditions: updatedConditions
+              }
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      removeCondition: (conditionId) => {
+        set((state) => {
+          const filteredConditions = state.character.conditionsAndDiseases.activeConditions.filter(
+            condition => condition.id !== conditionId
+          );
+
+          return {
+            character: {
+              ...state.character,
+              conditionsAndDiseases: {
+                ...state.character.conditionsAndDiseases,
+                activeConditions: filteredConditions
+              }
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      addDisease: (diseaseName, source, description, onsetTime, notes) => {
+        set((state) => {
+          const newDisease: ActiveDisease = {
+            id: `${diseaseName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
+            name: diseaseName,
+            source,
+            description,
+            onsetTime,
+            appliedAt: new Date().toISOString(),
+            notes
+          };
+
+          return {
+            character: {
+              ...state.character,
+              conditionsAndDiseases: {
+                ...state.character.conditionsAndDiseases,
+                activeDiseases: [...state.character.conditionsAndDiseases.activeDiseases, newDisease]
+              }
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      updateDisease: (diseaseId, updates) => {
+        set((state) => {
+          const updatedDiseases = state.character.conditionsAndDiseases.activeDiseases.map(disease =>
+            disease.id === diseaseId ? { ...disease, ...updates } : disease
+          );
+
+          return {
+            character: {
+              ...state.character,
+              conditionsAndDiseases: {
+                ...state.character.conditionsAndDiseases,
+                activeDiseases: updatedDiseases
+              }
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      removeDisease: (diseaseId) => {
+        set((state) => {
+          const filteredDiseases = state.character.conditionsAndDiseases.activeDiseases.filter(
+            disease => disease.id !== diseaseId
+          );
+
+          return {
+            character: {
+              ...state.character,
+              conditionsAndDiseases: {
+                ...state.character.conditionsAndDiseases,
+                activeDiseases: filteredDiseases
+              }
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      setExhaustionVariant: (variant) => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            conditionsAndDiseases: {
+              ...state.character.conditionsAndDiseases,
+              exhaustionVariant: variant
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      clearAllConditions: () => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            conditionsAndDiseases: {
+              ...state.character.conditionsAndDiseases,
+              activeConditions: []
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      clearAllDiseases: () => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            conditionsAndDiseases: {
+              ...state.character.conditionsAndDiseases,
+              activeDiseases: []
+            }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
       },
 
       // XP management
@@ -1744,6 +1937,7 @@ export const useCharacterStore = create<CharacterStore>()(
           state.character = migrateCharacterData(state.character);
           state.saveStatus = 'saved';
           state.hasUnsavedChanges = false;
+          state.hasHydrated = true;
         }
       }
     }

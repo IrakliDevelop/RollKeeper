@@ -26,6 +26,8 @@ import { QuickSpells } from "@/components/QuickSpells";
 import { ConcentrationTracker } from "@/components/ui/ConcentrationTracker";
 import { ToastContainer, useToast } from "@/components/ui/Toast";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
+import ConditionsDiseasesManager from "@/components/ui/ConditionsDiseasesManager";
+import { useHydration } from "@/hooks/useHydration";
 import { 
   ABILITY_ABBREVIATIONS, 
   ABILITY_NAMES, 
@@ -53,6 +55,9 @@ import InventoryCurrencyManager from "@/components/InventoryCurrencyManager";
 
 
 export default function CharacterSheet() {
+  // Hydration check to prevent SSR/client mismatches
+  const hasHydrated = useHydration();
+  
   // Toast system
   const { toasts, dismissToast, showAttackRoll, showSavingThrow, showDamageRoll } = useToast();
   
@@ -539,6 +544,39 @@ export default function CharacterSheet() {
               onUseInspiration={useHeroicInspiration}
               onResetInspiration={resetHeroicInspiration}
             />
+
+            {/* Conditions & Diseases Quick View */}
+            {hasHydrated && (character.conditionsAndDiseases?.activeConditions?.length > 0 || character.conditionsAndDiseases?.activeDiseases?.length > 0) && (
+              <div className="bg-white rounded-lg shadow border border-red-200 p-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <span className="text-red-600">🤒</span>
+                  Active Conditions & Diseases
+                  <button
+                    onClick={() => tabsRef.current?.switchToTab('conditions')}
+                    className="ml-auto text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    Manage →
+                  </button>
+                </h3>
+                <div className="space-y-1">
+                  {character.conditionsAndDiseases?.activeConditions?.map?.(condition => (
+                    <div key={condition.id} className="text-xs text-red-700 flex items-center justify-between">
+                      <span>
+                        {condition.name}
+                        {condition.stackable && condition.count > 1 && ` (Level ${condition.count})`}
+                      </span>
+                      <span className="text-gray-500">{condition.source}</span>
+                    </div>
+                  ))}
+                  {character.conditionsAndDiseases?.activeDiseases?.map?.(disease => (
+                    <div key={disease.id} className="text-xs text-purple-700 flex items-center justify-between">
+                      <span>{disease.name}</span>
+                      <span className="text-gray-500">{disease.source}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Quick Stats */}
             <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
@@ -1138,6 +1176,32 @@ export default function CharacterSheet() {
                         />
                       </ErrorBoundary>
                     </div>
+                  </TabContent>
+                )
+              },
+              {
+                id: 'conditions',
+                label: 'Conditions & Diseases',
+                icon: '🤒',
+                content: (
+                  <TabContent>
+                    <ErrorBoundary fallback={
+                      <div className="bg-white rounded-lg shadow-lg border border-red-200 p-6">
+                        <h3 className="text-lg font-bold text-red-800 mb-4">Conditions & Diseases</h3>
+                        <p className="text-gray-500">Unable to load conditions and diseases manager</p>
+                      </div>
+                    }>
+                      {hasHydrated ? (
+                        <ConditionsDiseasesManager />
+                      ) : (
+                        <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
+                          <div className="text-center py-4">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                            <p className="mt-2 text-gray-600">Loading conditions and diseases...</p>
+                          </div>
+                        </div>
+                      )}
+                    </ErrorBoundary>
                   </TabContent>
                 )
               }
