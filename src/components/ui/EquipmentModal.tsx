@@ -697,17 +697,28 @@ export default function EquipmentModal({ isOpen, onClose }: EquipmentModalProps)
                               )}
                             </div>
                             <div className="text-sm text-gray-600 mb-2">
-                              {weapon.damage.length > 0 ? (
-                                weapon.damage.map((dmg, idx) => (
-                                  <span key={idx}>
-                                    {dmg.dice} {dmg.type}
-                                    {dmg.label && dmg.label !== 'Weapon Damage' && ` (${dmg.label})`}
-                                    {idx < weapon.damage.length - 1 && ', '}
-                                  </span>
-                                ))
-                              ) : (
-                                'No damage defined'
-                              )} • {weapon.category}
+                              {(() => {
+                                if (Array.isArray(weapon.damage)) {
+                                  // New format: array of damage entries
+                                  return weapon.damage.length > 0 ? (
+                                    weapon.damage.map((dmg, idx) => (
+                                      <span key={idx}>
+                                        {dmg.dice} {dmg.type}
+                                        {dmg.label && dmg.label !== 'Weapon Damage' && ` (${dmg.label})`}
+                                        {idx < weapon.damage.length - 1 && ', '}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    'No damage defined'
+                                  );
+                                } else {
+                                  // Old format: single damage object
+                                  const legacyDamage = weapon.damage as { dice: string; type: string; versatiledice?: string };
+                                  return legacyDamage && legacyDamage.dice && legacyDamage.type
+                                    ? `${legacyDamage.dice} ${legacyDamage.type}`
+                                    : 'No damage defined';
+                                }
+                              })()} • {weapon.category}
                             </div>
                             {weapon.description && (
                               <p className="text-sm text-gray-700">{weapon.description}</p>

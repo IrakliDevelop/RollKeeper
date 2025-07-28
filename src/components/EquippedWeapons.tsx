@@ -28,34 +28,65 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
     const attackBonus = calculateWeaponAttackBonus(character, weapon);
     const isCrit = roll === 20;
     
-    // Get primary damage (first damage entry)
-    const primaryDamage = weapon.damage.length > 0 ? weapon.damage[0] : null;
+    // Handle backward compatibility for damage
+    let primaryDice = '1d6';
+    let primaryType = 'bludgeoning';
+    
+    if (Array.isArray(weapon.damage)) {
+      // New format: array of damage entries
+      const primaryDamage = weapon.damage.length > 0 ? weapon.damage[0] : null;
+      primaryDice = primaryDamage?.dice || '1d6';
+      primaryType = primaryDamage?.type || 'bludgeoning';
+    } else {
+      // Old format: single damage object
+      const legacyDamage = weapon.damage as { dice: string; type: string; versatiledice?: string };
+      if (legacyDamage && legacyDamage.dice && legacyDamage.type) {
+        primaryDice = legacyDamage.dice;
+        primaryType = legacyDamage.type;
+      }
+    }
     
     showAttackRoll(
       weapon.name,
       roll,
       attackBonus,
       isCrit,
-      primaryDamage?.dice || '1d6',
-      primaryDamage?.type || 'bludgeoning'
+      primaryDice,
+      primaryType
     );
   };
 
   const rollWeaponDamage = (weapon: Weapon, versatile = false) => {
     const damageBonus = calculateWeaponDamageBonus(character, weapon);
     
-    // Roll all damage types
-    weapon.damage.forEach((damage, index) => {
-      const dice = versatile && damage.versatiledice ? damage.versatiledice : damage.dice;
-      const damageResult = rollDamage(dice, index === 0 ? damageBonus : 0); // Only add weapon damage bonus to first damage
-      
-      showDamageRoll(
-        `${weapon.name}${damage.label && damage.label !== 'Weapon Damage' ? ` (${damage.label})` : ''}`,
-        damageResult,
-        damage.type,
-        versatile && index === 0 // Only show versatile for first damage
-      );
-    });
+    if (Array.isArray(weapon.damage)) {
+      // New format: array of damage entries
+      weapon.damage.forEach((damage, index) => {
+        const dice = versatile && damage.versatiledice ? damage.versatiledice : damage.dice;
+        const damageResult = rollDamage(dice, index === 0 ? damageBonus : 0); // Only add weapon damage bonus to first damage
+        
+        showDamageRoll(
+          `${weapon.name}${damage.label && damage.label !== 'Weapon Damage' ? ` (${damage.label})` : ''}`,
+          damageResult,
+          damage.type,
+          versatile && index === 0 // Only show versatile for first damage
+        );
+      });
+    } else {
+      // Old format: single damage object
+      const legacyDamage = weapon.damage as { dice: string; type: string; versatiledice?: string };
+      if (legacyDamage && legacyDamage.dice && legacyDamage.type) {
+        const dice = versatile && legacyDamage.versatiledice ? legacyDamage.versatiledice : legacyDamage.dice;
+        const damageResult = rollDamage(dice, damageBonus);
+        
+        showDamageRoll(
+          weapon.name,
+          damageResult,
+          legacyDamage.type,
+          versatile
+        );
+      }
+    }
   };
   
   // Filter to only equipped weapons
@@ -92,9 +123,19 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
           const isProficient = isWeaponProficient(character, weapon);
           const attackString = getWeaponAttackString(character, weapon);
           const damageString = getWeaponDamageString(character, weapon);
-          const versatileDamageString = weapon.damage.some(dmg => dmg.versatiledice)
-            ? getWeaponDamageString(character, weapon, true)
-            : null;
+          const versatileDamageString = (() => {
+            if (Array.isArray(weapon.damage)) {
+              return weapon.damage.some(dmg => dmg.versatiledice)
+                ? getWeaponDamageString(character, weapon, true)
+                : null;
+            } else {
+              // Old format
+              const legacyDamage = weapon.damage as { dice: string; type: string; versatiledice?: string };
+              return legacyDamage && legacyDamage.versatiledice
+                ? getWeaponDamageString(character, weapon, true)
+                : null;
+            }
+          })();
 
           return (
             <div
@@ -172,7 +213,14 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
                     <Zap size={14} className="group-hover:animate-pulse" />
                     Damage
                   </button>
-                  {weapon.damage.some(dmg => dmg.versatiledice) && (
+                  {(() => {
+                    if (Array.isArray(weapon.damage)) {
+                      return weapon.damage.some(dmg => dmg.versatiledice);
+                    } else {
+                      const legacyDamage = weapon.damage as { dice: string; type: string; versatiledice?: string };
+                      return legacyDamage && legacyDamage.versatiledice;
+                    }
+                  })() && (
                     <button
                       onClick={() => rollWeaponDamage(weapon, true)}
                       className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-purple-600 to-violet-700 text-white rounded-lg shadow-md hover:from-purple-700 hover:to-violet-800 hover:shadow-lg transform hover:scale-105 transition-all duration-200"

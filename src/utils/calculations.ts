@@ -311,6 +311,23 @@ export const getWeaponAttackString = (character: CharacterState, weapon: Weapon)
 export const getWeaponDamageString = (character: CharacterState, weapon: Weapon, versatile = false): string => {
   const damageBonus = calculateWeaponDamageBonus(character, weapon);
   
+  // Handle backward compatibility - check if damage is old format (object) or new format (array)
+  if (!Array.isArray(weapon.damage)) {
+    // Old format: weapon.damage is an object with dice, type, versatiledice
+    const legacyDamage = weapon.damage as { dice: string; type: string; versatiledice?: string };
+    if (legacyDamage && legacyDamage.dice && legacyDamage.type) {
+      const dice = versatile && legacyDamage.versatiledice ? legacyDamage.versatiledice : legacyDamage.dice;
+      
+      if (damageBonus === 0) {
+        return `${dice} ${legacyDamage.type}`;
+      }
+      
+      return `${dice}${formatModifier(damageBonus)} ${legacyDamage.type}`;
+    }
+    return "No damage";
+  }
+  
+  // New format: weapon.damage is an array
   if (weapon.damage.length === 0) {
     return "No damage";
   }
