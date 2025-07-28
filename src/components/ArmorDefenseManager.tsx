@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ArmorItem, ArmorCategory, ArmorType } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Edit2, Trash2, Shield, CheckCircle } from 'lucide-react';
+import DragDropList from '@/components/ui/DragDropList';
 
 const ARMOR_CATEGORIES: ArmorCategory[] = ['light', 'medium', 'heavy', 'shield'];
 const ARMOR_TYPES: { [key in ArmorCategory]: ArmorType[] } = {
@@ -70,7 +71,8 @@ export default function ArmorDefenseManager() {
     addArmorItem, 
     updateArmorItem, 
     deleteArmorItem, 
-    equipArmorItem 
+    equipArmorItem,
+    reorderArmorItems
   } = useCharacterStore();
   
   const [showForm, setShowForm] = useState(false);
@@ -139,6 +141,31 @@ export default function ArmorDefenseManager() {
   const equippedArmor = character.armorItems.filter(item => item.isEquipped);
   const unequippedArmor = character.armorItems.filter(item => !item.isEquipped);
 
+  // Custom reorder handlers for equipped and unequipped armor
+  const handleReorderEquippedArmor = (sourceIndex: number, destinationIndex: number) => {
+    const sourceArmorId = equippedArmor[sourceIndex].id;
+    const destinationArmorId = equippedArmor[destinationIndex].id;
+    
+    const sourceGlobalIndex = character.armorItems.findIndex(item => item.id === sourceArmorId);
+    const destinationGlobalIndex = character.armorItems.findIndex(item => item.id === destinationArmorId);
+    
+    if (sourceGlobalIndex !== -1 && destinationGlobalIndex !== -1) {
+      reorderArmorItems(sourceGlobalIndex, destinationGlobalIndex);
+    }
+  };
+
+  const handleReorderUnequippedArmor = (sourceIndex: number, destinationIndex: number) => {
+    const sourceArmorId = unequippedArmor[sourceIndex].id;
+    const destinationArmorId = unequippedArmor[destinationIndex].id;
+    
+    const sourceGlobalIndex = character.armorItems.findIndex(item => item.id === sourceArmorId);
+    const destinationGlobalIndex = character.armorItems.findIndex(item => item.id === destinationArmorId);
+    
+    if (sourceGlobalIndex !== -1 && destinationGlobalIndex !== -1) {
+      reorderArmorItems(sourceGlobalIndex, destinationGlobalIndex);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header with Add Button */}
@@ -163,18 +190,23 @@ export default function ArmorDefenseManager() {
             <CheckCircle size={16} className="text-green-600" />
             Equipped Armor
           </h4>
-          <div className="space-y-3">
-            {equippedArmor.map((armor) => (
+          <DragDropList
+            items={equippedArmor}
+            onReorder={handleReorderEquippedArmor}
+            keyExtractor={(armor) => armor.id}
+            className="space-y-3"
+            showDragHandle={true}
+            dragHandlePosition="left"
+            renderItem={(armor, index, isDragging) => (
               <ArmorCard 
-                key={armor.id}
                 armor={armor}
                 onEdit={handleEdit}
                 onDelete={() => deleteArmorItem(armor.id)}
                 onToggleEquip={() => equipArmorItem(armor.id, !armor.isEquipped)}
                 equipped={true}
               />
-            ))}
-          </div>
+            )}
+          />
         </div>
       )}
 
@@ -184,18 +216,23 @@ export default function ArmorDefenseManager() {
           <h4 className="text-md font-semibold text-gray-700 mb-3">
             Available Armor ({unequippedArmor.length})
           </h4>
-          <div className="space-y-3">
-            {unequippedArmor.map((armor) => (
+          <DragDropList
+            items={unequippedArmor}
+            onReorder={handleReorderUnequippedArmor}
+            keyExtractor={(armor) => armor.id}
+            className="space-y-3"
+            showDragHandle={true}
+            dragHandlePosition="left"
+            renderItem={(armor, index, isDragging) => (
               <ArmorCard 
-                key={armor.id}
                 armor={armor}
                 onEdit={handleEdit}
                 onDelete={() => deleteArmorItem(armor.id)}
                 onToggleEquip={() => equipArmorItem(armor.id, !armor.isEquipped)}
                 equipped={false}
               />
-            ))}
-          </div>
+            )}
+          />
         </div>
       )}
 

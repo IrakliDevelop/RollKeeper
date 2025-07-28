@@ -7,6 +7,7 @@ import { Plus, Edit2, Trash2, Package, Minus, MapPin, Filter, X } from 'lucide-r
 import { formatCurrencyFromCopper } from '@/utils/currency';
 import { inputStyles, selectStyles, labelStyles } from '@/styles/inputs';
 import CustomDropdown from './CustomDropdown';
+import DragDropList from './DragDropList';
 
 const ITEM_CATEGORIES = ['weapon', 'armor', 'tool', 'consumable', 'treasure', 'misc'];
 
@@ -76,7 +77,8 @@ export default function InventoryManager() {
     addInventoryItem, 
     updateInventoryItem, 
     deleteInventoryItem, 
-    updateItemQuantity
+    updateItemQuantity,
+    reorderInventoryItems
   } = useCharacterStore();
   
   const [showItemForm, setShowItemForm] = useState(false);
@@ -183,8 +185,8 @@ export default function InventoryManager() {
       tags: item.tags,
     });
     
-    // Check if location is custom
-    if (item.location && !DEFAULT_LOCATIONS.includes(item.location)) {
+    // Check if location is custom (not in any existing locations)
+    if (item.location && !allLocations.includes(item.location)) {
       setCustomLocation(item.location);
       setShowCustomLocation(true);
     }
@@ -220,6 +222,21 @@ export default function InventoryManager() {
     return items.reduce((total, item) => {
       return total + (item.value ? item.value * item.quantity : 0);
     }, 0);
+  };
+
+  // Custom reorder handler for items within the same location
+  const handleReorderItemsInLocation = (location: string) => (sourceIndex: number, destinationIndex: number) => {
+    const itemsInLocation = itemsByLocation[location];
+    const sourceItemId = itemsInLocation[sourceIndex].id;
+    const destinationItemId = itemsInLocation[destinationIndex].id;
+    
+    // Find the indices in the main inventory array
+    const sourceGlobalIndex = character.inventoryItems.findIndex(item => item.id === sourceItemId);
+    const destinationGlobalIndex = character.inventoryItems.findIndex(item => item.id === destinationItemId);
+    
+    if (sourceGlobalIndex !== -1 && destinationGlobalIndex !== -1) {
+      reorderInventoryItems(sourceGlobalIndex, destinationGlobalIndex);
+    }
   };
 
   return (
@@ -294,17 +311,22 @@ export default function InventoryManager() {
                     <span>Value: {formatCurrencyFromCopper(getTotalValue(items))}</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {items.map((item) => (
+                <DragDropList
+                  items={items}
+                  onReorder={handleReorderItemsInLocation(location)}
+                  keyExtractor={(item) => item.id}
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
+                  showDragHandle={true}
+                  dragHandlePosition="left"
+                  renderItem={(item, index, isDragging) => (
                     <ItemCard
-                      key={item.id}
                       item={item}
                       onEdit={handleEditItem}
                       onDelete={() => deleteInventoryItem(item.id)}
                       onQuantityChange={(quantity) => updateItemQuantity(item.id, quantity)}
                     />
-                  ))}
-                </div>
+                  )}
+                />
               </div>
             ))}
           </div>
@@ -437,7 +459,7 @@ export default function InventoryManager() {
                         }}
                         className={selectStyles.purple.replace('w-full', 'flex-1')}
                       >
-                        {DEFAULT_LOCATIONS.map(location => (
+                        {allLocations.filter((location): location is string => Boolean(location)).map(location => (
                           <option key={location} value={location}>{location}</option>
                         ))}
                         <option value="custom">Custom Location...</option>

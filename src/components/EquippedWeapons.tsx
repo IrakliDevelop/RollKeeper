@@ -13,6 +13,7 @@ import {
   calculateWeaponDamageBonus,
   rollDamage
 } from '@/utils/calculations';
+import DragDropList from '@/components/ui/DragDropList';
 
 interface EquippedWeaponsProps {
   showAttackRoll: (weaponName: string, roll: number, bonus: number, isCrit: boolean, damage?: string, damageType?: string) => void;
@@ -20,7 +21,7 @@ interface EquippedWeaponsProps {
 }
 
 export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll, showDamageRoll }) => {
-  const { character, equipWeapon } = useCharacterStore();
+  const { character, equipWeapon, reorderWeapons } = useCharacterStore();
   const { switchToTab } = useNavigation();
   
   const rollWeaponAttack = (weapon: Weapon) => {
@@ -91,6 +92,21 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
   
   // Filter to only equipped weapons
   const equippedWeapons = character.weapons.filter(weapon => weapon.isEquipped);
+
+  // Custom reorder handler for equipped weapons only
+  const handleReorderEquippedWeapons = (sourceIndex: number, destinationIndex: number) => {
+    // Get the weapon IDs being reordered
+    const sourceWeaponId = equippedWeapons[sourceIndex].id;
+    const destinationWeaponId = equippedWeapons[destinationIndex].id;
+    
+    // Find the indices in the main weapons array
+    const sourceGlobalIndex = character.weapons.findIndex(weapon => weapon.id === sourceWeaponId);
+    const destinationGlobalIndex = character.weapons.findIndex(weapon => weapon.id === destinationWeaponId);
+    
+    if (sourceGlobalIndex !== -1 && destinationGlobalIndex !== -1) {
+      reorderWeapons(sourceGlobalIndex, destinationGlobalIndex);
+    }
+  };
   
   if (equippedWeapons.length === 0) {
     return (
@@ -118,8 +134,15 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
         </span>
       </h3>
       
-      <div className="space-y-3">
-        {equippedWeapons.map((weapon) => {
+      <DragDropList
+        items={equippedWeapons}
+        onReorder={handleReorderEquippedWeapons}
+        keyExtractor={(weapon) => weapon.id}
+        className="space-y-3"
+        itemClassName="p-3 rounded-lg border-2 border-green-300 bg-green-50 transition-all hover:shadow-md hover:border-green-400"
+        showDragHandle={true}
+        dragHandlePosition="left"
+        renderItem={(weapon, index, isDragging) => {
           const isProficient = isWeaponProficient(character, weapon);
           const attackString = getWeaponAttackString(character, weapon);
           const damageString = getWeaponDamageString(character, weapon);
@@ -137,11 +160,8 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
             }
           })();
 
-          return (
-            <div
-              key={weapon.id}
-              className="p-3 rounded-lg border-2 border-green-300 bg-green-50 transition-all hover:shadow-md hover:border-green-400"
-            >
+                    return (
+            <>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
@@ -239,10 +259,10 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
                   </button>
                 </div>
               </div>
-            </div>
+            </>
           );
-        })}
-      </div>
+        }}
+      />
       
       <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-blue-800 text-center">

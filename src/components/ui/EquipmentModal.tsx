@@ -5,6 +5,7 @@ import { Weapon, MagicItem, MagicItemCategory, MagicItemRarity, WeaponCategory, 
 import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Edit2, Trash2, Sword, Wand2, X } from 'lucide-react';
 import { ModalPortal } from '@/components/ui/ModalPortal';
+import DragDropList from './DragDropList';
 
 interface EquipmentModalProps {
   isOpen: boolean;
@@ -112,10 +113,12 @@ export default function EquipmentModal({ isOpen, onClose }: EquipmentModalProps)
     updateMagicItem, 
     deleteMagicItem, 
     attuneMagicItem,
+    reorderMagicItems,
     addWeapon,
     updateWeapon,
     deleteWeapon,
-    equipWeapon 
+    equipWeapon,
+    reorderWeapons
   } = useCharacterStore();
   
   const [showMagicItemForm, setShowMagicItemForm] = useState(false);
@@ -670,91 +673,96 @@ export default function EquipmentModal({ isOpen, onClose }: EquipmentModalProps)
                       <p>No weapons added yet</p>
                     </div>
                   ) : (
-                    character.weapons.map((weapon) => (
-                      <div
-                        key={weapon.id}
-                        className={`p-4 border rounded-lg transition-all ${
+                    <DragDropList
+                      items={character.weapons}
+                      onReorder={reorderWeapons}
+                      keyExtractor={(weapon) => weapon.id}
+                      className="space-y-3"
+                      showDragHandle={true}
+                      dragHandlePosition="left"
+                      renderItem={(weapon, index, isDragging) => (
+                        <div className={`p-4 border rounded-lg transition-all ${
                           weapon.isEquipped 
                             ? 'border-blue-300 bg-blue-50' 
                             : 'border-gray-200 bg-white hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-semibold text-gray-800">{weapon.name}</h4>
-                              {weapon.enhancementBonus > 0 && (
-                                <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded">
-                                  +{weapon.enhancementBonus}
-                                </span>
+                        }`}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-semibold text-gray-800">{weapon.name}</h4>
+                                {weapon.enhancementBonus > 0 && (
+                                  <span className="text-xs px-2 py-1 bg-yellow-100 text-yellow-800 rounded">
+                                    +{weapon.enhancementBonus}
+                                  </span>
+                                )}
+                                {weapon.requiresAttunement && (
+                                  <span className={`text-xs px-2 py-1 rounded ${
+                                    weapon.isAttuned ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {weapon.isAttuned ? 'Attuned' : 'Requires Attunement'}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-sm text-gray-600 mb-2">
+                                {(() => {
+                                  if (Array.isArray(weapon.damage)) {
+                                    // New format: array of damage entries
+                                    return weapon.damage.length > 0 ? (
+                                      weapon.damage.map((dmg, idx) => (
+                                        <span key={idx}>
+                                          {dmg.dice} {dmg.type}
+                                          {dmg.label && dmg.label !== 'Weapon Damage' && ` (${dmg.label})`}
+                                          {idx < weapon.damage.length - 1 && ', '}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      'No damage defined'
+                                    );
+                                  } else {
+                                    // Old format: single damage object
+                                    const legacyDamage = weapon.damage as { dice: string; type: string; versatiledice?: string };
+                                    return legacyDamage && legacyDamage.dice && legacyDamage.type
+                                      ? `${legacyDamage.dice} ${legacyDamage.type}`
+                                      : 'No damage defined';
+                                  }
+                                })()} • {weapon.category}
+                              </div>
+                              {weapon.description && (
+                                <p className="text-sm text-gray-700">{weapon.description}</p>
                               )}
-                              {weapon.requiresAttunement && (
-                                <span className={`text-xs px-2 py-1 rounded ${
-                                  weapon.isAttuned ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                  {weapon.isAttuned ? 'Attuned' : 'Requires Attunement'}
-                                </span>
-                              )}
                             </div>
-                            <div className="text-sm text-gray-600 mb-2">
-                              {(() => {
-                                if (Array.isArray(weapon.damage)) {
-                                  // New format: array of damage entries
-                                  return weapon.damage.length > 0 ? (
-                                    weapon.damage.map((dmg, idx) => (
-                                      <span key={idx}>
-                                        {dmg.dice} {dmg.type}
-                                        {dmg.label && dmg.label !== 'Weapon Damage' && ` (${dmg.label})`}
-                                        {idx < weapon.damage.length - 1 && ', '}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    'No damage defined'
-                                  );
-                                } else {
-                                  // Old format: single damage object
-                                  const legacyDamage = weapon.damage as { dice: string; type: string; versatiledice?: string };
-                                  return legacyDamage && legacyDamage.dice && legacyDamage.type
-                                    ? `${legacyDamage.dice} ${legacyDamage.type}`
-                                    : 'No damage defined';
-                                }
-                              })()} • {weapon.category}
-                            </div>
-                            {weapon.description && (
-                              <p className="text-sm text-gray-700">{weapon.description}</p>
-                            )}
-                          </div>
-                          <div className="flex flex-col gap-2 ml-4">
-                            <div className="flex gap-2">
+                            <div className="flex flex-col gap-2 ml-4">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleEditWeapon(weapon)}
+                                  className="p-1 text-gray-600 hover:text-blue-600 transition-colors"
+                                  title="Edit weapon"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                                <button
+                                  onClick={() => deleteWeapon(weapon.id)}
+                                  className="p-1 text-gray-600 hover:text-red-600 transition-colors"
+                                  title="Delete weapon"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
                               <button
-                                onClick={() => handleEditWeapon(weapon)}
-                                className="p-1 text-gray-600 hover:text-blue-600 transition-colors"
-                                title="Edit weapon"
+                                onClick={() => equipWeapon(weapon.id, !weapon.isEquipped)}
+                                className={`px-2 py-1 text-xs rounded transition-colors ${
+                                  weapon.isEquipped
+                                    ? 'bg-green-600 text-white hover:bg-green-700'
+                                    : 'bg-gray-200 text-gray-700 hover:bg-blue-100'
+                                }`}
                               >
-                                <Edit2 size={16} />
-                              </button>
-                              <button
-                                onClick={() => deleteWeapon(weapon.id)}
-                                className="p-1 text-gray-600 hover:text-red-600 transition-colors"
-                                title="Delete weapon"
-                              >
-                                <Trash2 size={16} />
+                                {weapon.isEquipped ? 'Equipped' : 'Equip'}
                               </button>
                             </div>
-                            <button
-                              onClick={() => equipWeapon(weapon.id, !weapon.isEquipped)}
-                              className={`px-2 py-1 text-xs rounded transition-colors ${
-                                weapon.isEquipped
-                                  ? 'bg-green-600 text-white hover:bg-green-700'
-                                  : 'bg-gray-200 text-gray-700 hover:bg-blue-100'
-                              }`}
-                            >
-                              {weapon.isEquipped ? 'Equipped' : 'Equip'}
-                            </button>
                           </div>
                         </div>
-                      </div>
-                    ))
+                      )}
+                    />
                   )}
                 </div>
               </div>
@@ -782,73 +790,78 @@ export default function EquipmentModal({ isOpen, onClose }: EquipmentModalProps)
                       <p>No magic items added yet</p>
                     </div>
                   ) : (
-                    character.magicItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className={`p-4 border rounded-lg transition-all ${
+                    <DragDropList
+                      items={character.magicItems}
+                      onReorder={reorderMagicItems}
+                      keyExtractor={(item) => item.id}
+                      className="space-y-3"
+                      showDragHandle={true}
+                      dragHandlePosition="left"
+                      renderItem={(item, index, isDragging) => (
+                        <div className={`p-4 border rounded-lg transition-all ${
                           item.isEquipped 
                             ? 'border-purple-300 bg-purple-50' 
                             : 'border-gray-200 bg-white hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h4 className="font-semibold text-gray-800">{item.name}</h4>
-                              <span className={`text-xs px-2 py-1 rounded ${getRarityColor(item.rarity)}`}>
-                                {item.rarity}
-                              </span>
-                              {item.requiresAttunement && (
-                                <span className={`text-xs px-2 py-1 rounded ${
-                                  item.isAttuned ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                  {item.isAttuned ? 'Attuned' : 'Requires Attunement'}
+                        }`}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-semibold text-gray-800">{item.name}</h4>
+                                <span className={`text-xs px-2 py-1 rounded ${getRarityColor(item.rarity)}`}>
+                                  {item.rarity}
                                 </span>
+                                {item.requiresAttunement && (
+                                  <span className={`text-xs px-2 py-1 rounded ${
+                                    item.isAttuned ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {item.isAttuned ? 'Attuned' : 'Requires Attunement'}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-sm text-gray-600 mb-2">
+                                {item.category} • {item.rarity}
+                              </div>
+                              <p className="text-sm text-gray-700 mb-2">{item.description}</p>
+                              {item.charges && (
+                                <div className="text-sm text-blue-600">
+                                  Charges: {item.charges.current}/{item.charges.max}
+                                </div>
                               )}
                             </div>
-                            <div className="text-sm text-gray-600 mb-2">
-                              {item.category} • {item.rarity}
-                            </div>
-                            <p className="text-sm text-gray-700 mb-2">{item.description}</p>
-                            {item.charges && (
-                              <div className="text-sm text-blue-600">
-                                Charges: {item.charges.current}/{item.charges.max}
+                            <div className="flex flex-col gap-2 ml-4">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleEditMagicItem(item)}
+                                  className="p-1 text-gray-600 hover:text-blue-600 transition-colors"
+                                  title="Edit item"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                                <button
+                                  onClick={() => deleteMagicItem(item.id)}
+                                  className="p-1 text-gray-600 hover:text-red-600 transition-colors"
+                                  title="Delete item"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
                               </div>
-                            )}
-                          </div>
-                          <div className="flex flex-col gap-2 ml-4">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleEditMagicItem(item)}
-                                className="p-1 text-gray-600 hover:text-blue-600 transition-colors"
-                                title="Edit item"
-                              >
-                                <Edit2 size={16} />
-                              </button>
-                              <button
-                                onClick={() => deleteMagicItem(item.id)}
-                                className="p-1 text-gray-600 hover:text-red-600 transition-colors"
-                                title="Delete item"
-                              >
-                                <Trash2 size={16} />
-                              </button>
+                              {item.requiresAttunement && (
+                                <button
+                                  onClick={() => handleAttunement(item, !item.isAttuned)}
+                                  className={`px-2 py-1 text-xs rounded transition-colors ${
+                                    item.isAttuned
+                                      ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                      : 'bg-gray-200 text-gray-700 hover:bg-purple-100'
+                                  }`}
+                                >
+                                  {item.isAttuned ? 'Unattune' : 'Attune'}
+                                </button>
+                              )}
                             </div>
-                            {item.requiresAttunement && (
-                              <button
-                                onClick={() => handleAttunement(item, !item.isAttuned)}
-                                className={`px-2 py-1 text-xs rounded transition-colors ${
-                                  item.isAttuned
-                                    ? 'bg-purple-600 text-white hover:bg-purple-700'
-                                    : 'bg-gray-200 text-gray-700 hover:bg-purple-100'
-                                }`}
-                              >
-                                {item.isAttuned ? 'Unattune' : 'Attune'}
-                              </button>
-                            )}
                           </div>
                         </div>
-                      </div>
-                    ))
+                      )}
+                    />
                   )}
                 </div>
               </div>
