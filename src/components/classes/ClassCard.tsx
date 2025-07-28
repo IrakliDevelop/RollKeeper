@@ -8,14 +8,10 @@ import {
   Shield, 
   Heart, 
   Star, 
-  Users, 
-  Book, 
+  Users,
   ChevronDown, 
   ChevronUp,
-  Sword,
-  Brain,
-  Eye,
-  Zap
+  Brain
 } from 'lucide-react';
 
 interface ClassCardProps {
@@ -39,7 +35,6 @@ const HIT_DIE_COLORS = {
 };
 
 export default function ClassCard({ classData, displayMode }: ClassCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [showSubclasses, setShowSubclasses] = useState(false);
 
   const spellcastingColorClass = SPELLCASTING_TYPE_COLORS[classData.spellcasting.type] || SPELLCASTING_TYPE_COLORS.none;

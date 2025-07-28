@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Edit3, Trash2, Save, X, BookOpen, PenTool } from 'lucide-react';
+import { Plus, Edit3, Trash2, Save, X, BookOpen, PenTool, GripVertical } from 'lucide-react';
 import { RichTextContent } from '@/types/character';
 import RichTextEditor from './RichTextEditor';
 import NoteModal from './NoteModal';
@@ -11,6 +11,7 @@ interface NotesManagerProps {
   onAdd: (item: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onUpdate: (id: string, updates: Partial<RichTextContent>) => void;
   onDelete: (id: string) => void;
+  onReorder?: (sourceIndex: number, destinationIndex: number) => void;
   className?: string;
 }
 
@@ -19,16 +20,28 @@ export default function NotesManager({
   onAdd,
   onUpdate,
   onDelete,
+  onReorder,
   className = ''
 }: NotesManagerProps) {
   // Safety guard to ensure items is always an array
   const safeItems = Array.isArray(items) ? items : [];
+  
+  // Sort items by order field if it exists, otherwise maintain current order
+  const sortedItems = [...safeItems].sort((a, b) => {
+    if (a.order !== undefined && b.order !== undefined) {
+      return a.order - b.order;
+    }
+    return 0;
+  });
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [newItem, setNewItem] = useState({ title: '', content: '' });
   const [viewMode, setViewMode] = useState<'read' | 'edit'>('read');
   const [selectedNote, setSelectedNote] = useState<RichTextContent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const handleAdd = () => {
     if (newItem.title.trim()) {
@@ -64,6 +77,40 @@ export default function NotesManager({
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedNote(null);
+  };
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.currentTarget.outerHTML);
+    (e.currentTarget as HTMLElement).style.opacity = '0.5';
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    (e.currentTarget as HTMLElement).style.opacity = '1';
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (draggedIndex !== null && draggedIndex !== dropIndex && onReorder) {
+      onReorder(draggedIndex, dropIndex);
+    }
+    
+    setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   const renderContent = (content: string) => {
@@ -188,7 +235,7 @@ export default function NotesManager({
 
       {/* Notes List */}
       <div className="space-y-6">
-        {safeItems.length === 0 ? (
+        {sortedItems.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <BookOpen className="mx-auto h-12 w-12 text-gray-400 mb-4" />
             <p className="text-lg font-medium mb-2">No notes yet</p>
@@ -200,8 +247,21 @@ export default function NotesManager({
             </p>
           </div>
         ) : (
-          safeItems.map((item) => (
-            <div key={item.id} className="border border-blue-100 rounded-lg p-6 bg-gradient-to-r from-blue-25 to-indigo-25 hover:shadow-md transition-all cursor-pointer hover:shadow-lg hover:border-blue-200">
+          sortedItems.map((item, index) => (
+            <div 
+              key={item.id} 
+              className={`border border-blue-100 rounded-lg p-6 bg-gradient-to-r from-blue-25 to-indigo-25 hover:shadow-md transition-all cursor-pointer hover:shadow-lg hover:border-blue-200 ${
+                dragOverIndex === index ? 'border-blue-400 border-2 bg-blue-100' : ''
+              } ${
+                draggedIndex === index ? 'opacity-50' : ''
+              }`}
+              draggable={viewMode === 'edit'}
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragEnd={handleDragEnd}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, index)}
+            >
               {editingId === item.id && viewMode === 'edit' ? (
                 // Edit mode for individual note
                 <div className="space-y-4">
@@ -264,9 +324,19 @@ export default function NotesManager({
                 // Display mode
                 <div data-editing={item.id} onClick={() => handleNoteClick(item)}>
                   <div className="flex items-start justify-between mb-4">
-                    <h3 className="text-xl font-semibold text-blue-900 flex-1">
-                      {item.title}
-                    </h3>
+                    <div className="flex items-center gap-3 flex-1">
+                      {viewMode === 'edit' && onReorder && (
+                        <div 
+                          className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 transition-colors"
+                          onMouseDown={(e) => e.stopPropagation()}
+                        >
+                          <GripVertical size={20} />
+                        </div>
+                      )}
+                      <h3 className="text-xl font-semibold text-blue-900 flex-1">
+                        {item.title}
+                      </h3>
+                    </div>
                     {viewMode === 'edit' && (
                       <div className="flex items-center space-x-2 ml-4">
                         <button

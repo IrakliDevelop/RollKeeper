@@ -1,6 +1,6 @@
 'use client';
 
-import { Save, Download, Upload, RotateCcw, Edit2, Zap, FileText, Shield } from "lucide-react";
+import { Save, Download, Upload, RotateCcw } from "lucide-react";
 import { useCharacterStore } from "@/store/characterStore";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { SaveIndicator } from "@/components/ui/SaveIndicator";
@@ -48,10 +48,11 @@ import {
 } from "@/utils/fileOperations";
 import { AbilityName, SkillName } from "@/types/character";
 import { useCallback, useEffect, useState, useRef } from "react";
-import Tabs, { TabContent, TabsRef } from "@/components/ui/Tabs";
+import GroupedTabs, { TabContent, GroupedTabsRef } from "@/components/ui/GroupedTabs";
 import { NavigationContext } from "@/contexts/NavigationContext";
 import ArmorDefenseManager from "@/components/ArmorDefenseManager";
-import InventoryCurrencyManager from "@/components/InventoryCurrencyManager";
+import InventoryManager from "@/components/ui/InventoryManager";
+import CurrencyManager from "@/components/ui/CurrencyManager";
 
 
 export default function CharacterSheet() {
@@ -99,6 +100,7 @@ export default function CharacterSheet() {
     addNote,
     updateNote,
     deleteNote,
+    reorderNotes,
     addTrackableTrait,
     updateTrackableTrait,
     deleteTrackableTrait,
@@ -250,7 +252,7 @@ export default function CharacterSheet() {
   };
 
   // Navigation ref for tab switching
-  const tabsRef = useRef<TabsRef>(null);
+  const tabsRef = useRef<GroupedTabsRef>(null);
 
   // Navigation function for components to switch tabs
   const switchToTab = useCallback((tabId: string) => {
@@ -1013,197 +1015,247 @@ export default function CharacterSheet() {
         </div>
         </section>
 
-        {/* Tabbed Interface for Additional Sections */}
+        {/* Grouped Tabbed Interface for Additional Sections */}
         <section className="mt-8">
-          <Tabs
+          <GroupedTabs
             defaultTab="spellcasting"
             className="w-full"
-            tabs={[
+            groups={[
               {
-                id: 'spellcasting',
-                label: 'Spellcasting',
-                icon: '✨',
-                content: (
-                  <TabContent>
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                      {/* Spellcasting Statistics */}
-                      <ErrorBoundary fallback={
-                        <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
-                          <h3 className="text-lg font-bold text-purple-800 mb-4">Spellcasting Stats</h3>
-                          <p className="text-gray-500">Unable to load spellcasting statistics</p>
-                        </div>
-                      }>
-                        <SpellcastingStats />
-                      </ErrorBoundary>
-
-                      {/* Spell Management */}
-                      <ErrorBoundary fallback={
-                        <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
-                          <h3 className="text-lg font-bold text-purple-800 mb-4">Spells & Cantrips</h3>
-                          <p className="text-gray-500">Unable to load spell management</p>
-                        </div>
-                      }>
-                        <SpellManagement />
-                      </ErrorBoundary>
-                    </div>
-                  </TabContent>
-                )
-              },
-              {
-                id: 'equipment',
-                label: 'Equipment',
+                id: 'combat-magic',
+                label: 'Combat & Magic',
                 icon: '⚔️',
-                content: (
-                  <TabContent>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                      {/* Weapons */}
-                      <ErrorBoundary fallback={
-                        <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
-                          <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
-                            <span className="text-red-600">⚔️</span>
-                            Weapons
-                          </h3>
-                          <p className="text-gray-500">Unable to load weapon inventory</p>
-                        </div>
-                      }>
-                        <WeaponInventory />
-                      </ErrorBoundary>
+                defaultOpen: true,
+                tabs: [
+                  {
+                    id: 'spellcasting',
+                    label: 'Spellcasting',
+                    icon: '✨',
+                    content: (
+                      <TabContent>
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                          {/* Spellcasting Statistics */}
+                          <ErrorBoundary fallback={
+                            <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
+                              <h3 className="text-lg font-bold text-purple-800 mb-4">Spellcasting Stats</h3>
+                              <p className="text-gray-500">Unable to load spellcasting statistics</p>
+                            </div>
+                          }>
+                            <SpellcastingStats />
+                          </ErrorBoundary>
 
-                      {/* Armor & Defense */}
-                      <ErrorBoundary fallback={
-                        <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
-                          <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
-                            <span className="text-blue-600">🛡️</span>
-                            Armor & Defense
-                          </h3>
-                          <p className="text-gray-500">Unable to load armor management</p>
+                          {/* Spell Management */}
+                          <ErrorBoundary fallback={
+                            <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
+                              <h3 className="text-lg font-bold text-purple-800 mb-4">Spells & Cantrips</h3>
+                              <p className="text-gray-500">Unable to load spell management</p>
+                            </div>
+                          }>
+                            <SpellManagement />
+                          </ErrorBoundary>
                         </div>
-                      }>
-                        <ArmorDefenseManager />
-                      </ErrorBoundary>
+                      </TabContent>
+                    )
+                  },
+                  {
+                    id: 'equipment',
+                    label: 'Equipment',
+                    icon: '🛡️',
+                    content: (
+                      <TabContent>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          {/* Weapons */}
+                          <ErrorBoundary fallback={
+                            <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
+                              <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
+                                <span className="text-red-600">⚔️</span>
+                                Weapons
+                              </h3>
+                              <p className="text-gray-500">Unable to load weapon inventory</p>
+                            </div>
+                          }>
+                            <WeaponInventory />
+                          </ErrorBoundary>
 
-                      {/* General Items */}
-                      <ErrorBoundary fallback={
-                        <div className="bg-white rounded-lg shadow border border-purple-200 p-4 lg:col-span-2 xl:col-span-1">
-                          <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
-                            <span className="text-yellow-600">💰</span>
-                            Items & Currency
-                          </h3>
-                          <p className="text-gray-500">Unable to load inventory management</p>
+                          {/* Armor & Defense */}
+                          <ErrorBoundary fallback={
+                            <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
+                              <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
+                                <span className="text-blue-600">🛡️</span>
+                                Armor & Defense
+                              </h3>
+                              <p className="text-gray-500">Unable to load armor management</p>
+                            </div>
+                          }>
+                            <ArmorDefenseManager />
+                          </ErrorBoundary>
                         </div>
-                      }>
-                        <InventoryCurrencyManager />
-                      </ErrorBoundary>
-                    </div>
-                  </TabContent>
-                )
-              },
-              {
-                id: 'character-details',
-                label: 'Character Details',
-                icon: '📜',
-                content: (
-                  <TabContent>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
-                      {/* Features */}
-                      <ErrorBoundary fallback={
-                        <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
-                          <h3 className="text-lg font-bold text-amber-800 mb-4">Features</h3>
-                          <p className="text-gray-500">Unable to load features editor</p>
-                        </div>
-                      }>
-                        <FeaturesTraitsManager
-                          items={character.features}
-                          category="feature"
-                          onAdd={addFeature}
-                          onUpdate={updateFeature}
-                          onDelete={deleteFeature}
-                        />
-                      </ErrorBoundary>
-
-                      {/* Traits */}
-                      <ErrorBoundary fallback={
-                        <div className="bg-white rounded-lg shadow-lg border border-emerald-200 p-6">
-                          <h3 className="text-lg font-bold text-emerald-800 mb-4">Traits</h3>
-                          <p className="text-gray-500">Unable to load traits editor</p>
-                        </div>
-                      }>
-                        <FeaturesTraitsManager
-                          items={character.traits}
-                          category="trait"
-                          onAdd={addTrait}
-                          onUpdate={updateTrait}
-                          onDelete={deleteTrait}
-                        />
-                      </ErrorBoundary>
-
-                      {/* Character Background - Full Width */}
-                      <div className="lg:col-span-2">
+                      </TabContent>
+                    )
+                  },
+                  {
+                    id: 'conditions',
+                    label: 'Conditions & Diseases',
+                    icon: '🤒',
+                    content: (
+                      <TabContent>
                         <ErrorBoundary fallback={
-                          <div className="bg-white rounded-lg shadow-lg border border-emerald-200 p-6">
-                            <h3 className="text-lg font-bold text-emerald-800 mb-4">Character Background</h3>
-                            <p className="text-gray-500">Unable to load background editor</p>
+                          <div className="bg-white rounded-lg shadow-lg border border-red-200 p-6">
+                            <h3 className="text-lg font-bold text-red-800 mb-4">Conditions & Diseases</h3>
+                            <p className="text-gray-500">Unable to load conditions and diseases manager</p>
                           </div>
                         }>
-                          <CharacterBackgroundEditor
-                            background={character.characterBackground}
-                            onChange={updateCharacterBackground}
-                          />
+                          {hasHydrated ? (
+                            <ConditionsDiseasesManager />
+                          ) : (
+                            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
+                              <div className="text-center py-4">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                                <p className="mt-2 text-gray-600">Loading conditions and diseases...</p>
+                              </div>
+                            </div>
+                          )}
                         </ErrorBoundary>
-                      </div>
-                    </div>
-                  </TabContent>
-                )
+                      </TabContent>
+                    )
+                  }
+                ]
               },
               {
-                id: 'notes',
-                label: 'Session Notes',
-                icon: '📝',
-                content: (
-                  <TabContent>
-                    <div className="max-w-none">
-                      <ErrorBoundary fallback={
-                        <div className="bg-white rounded-lg shadow-lg border border-blue-200 p-6">
-                          <h3 className="text-lg font-bold text-blue-800 mb-4">Notes</h3>
-                          <p className="text-gray-500">Unable to load notes editor</p>
+                id: 'items-wealth',
+                label: 'Items & Wealth',
+                icon: '💰',
+                defaultOpen: false,
+                tabs: [
+                  {
+                    id: 'inventory',
+                    label: 'Inventory',
+                    icon: '🎒',
+                    content: (
+                      <TabContent>
+                        <div className="max-w-none">
+                          <ErrorBoundary fallback={
+                            <div className="bg-white rounded-lg shadow-lg border border-purple-200 p-6">
+                              <h3 className="text-lg font-bold text-purple-800 mb-4">Inventory</h3>
+                              <p className="text-gray-500">Unable to load inventory management</p>
+                            </div>
+                          }>
+                            <InventoryManager />
+                          </ErrorBoundary>
                         </div>
-                      }>
-                        <NotesManager
-                          items={character.notes}
-                          onAdd={addNote}
-                          onUpdate={updateNote}
-                          onDelete={deleteNote}
-                        />
-                      </ErrorBoundary>
-                    </div>
-                  </TabContent>
-                )
+                      </TabContent>
+                    )
+                  },
+                  {
+                    id: 'currency',
+                    label: 'Currency',
+                    icon: '💰',
+                    content: (
+                      <TabContent>
+                        <div className="max-w-4xl mx-auto">
+                          <ErrorBoundary fallback={
+                            <div className="bg-white rounded-lg shadow-lg border border-yellow-200 p-6">
+                              <h3 className="text-lg font-bold text-amber-800 mb-4">Currency</h3>
+                              <p className="text-gray-500">Unable to load currency management</p>
+                            </div>
+                          }>
+                            <CurrencyManager />
+                          </ErrorBoundary>
+                        </div>
+                      </TabContent>
+                    )
+                  }
+                ]
               },
               {
-                id: 'conditions',
-                label: 'Conditions & Diseases',
-                icon: '🤒',
-                content: (
-                  <TabContent>
-                    <ErrorBoundary fallback={
-                      <div className="bg-white rounded-lg shadow-lg border border-red-200 p-6">
-                        <h3 className="text-lg font-bold text-red-800 mb-4">Conditions & Diseases</h3>
-                        <p className="text-gray-500">Unable to load conditions and diseases manager</p>
-                      </div>
-                    }>
-                      {hasHydrated ? (
-                        <ConditionsDiseasesManager />
-                      ) : (
-                        <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
-                          <div className="text-center py-4">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                            <p className="mt-2 text-gray-600">Loading conditions and diseases...</p>
+                id: 'character-story',
+                label: 'Character & Story',
+                icon: '📖',
+                defaultOpen: false,
+                tabs: [
+                  {
+                    id: 'character-details',
+                    label: 'Character Details',
+                    icon: '📜',
+                    content: (
+                      <TabContent>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
+                          {/* Features */}
+                          <ErrorBoundary fallback={
+                            <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
+                              <h3 className="text-lg font-bold text-amber-800 mb-4">Features</h3>
+                              <p className="text-gray-500">Unable to load features editor</p>
+                            </div>
+                          }>
+                            <FeaturesTraitsManager
+                              items={character.features}
+                              category="feature"
+                              onAdd={addFeature}
+                              onUpdate={updateFeature}
+                              onDelete={deleteFeature}
+                            />
+                          </ErrorBoundary>
+
+                          {/* Traits */}
+                          <ErrorBoundary fallback={
+                            <div className="bg-white rounded-lg shadow-lg border border-emerald-200 p-6">
+                              <h3 className="text-lg font-bold text-emerald-800 mb-4">Traits</h3>
+                              <p className="text-gray-500">Unable to load traits editor</p>
+                            </div>
+                          }>
+                            <FeaturesTraitsManager
+                              items={character.traits}
+                              category="trait"
+                              onAdd={addTrait}
+                              onUpdate={updateTrait}
+                              onDelete={deleteTrait}
+                            />
+                          </ErrorBoundary>
+
+                          {/* Character Background - Full Width */}
+                          <div className="lg:col-span-2">
+                            <ErrorBoundary fallback={
+                              <div className="bg-white rounded-lg shadow-lg border border-emerald-200 p-6">
+                                <h3 className="text-lg font-bold text-emerald-800 mb-4">Character Background</h3>
+                                <p className="text-gray-500">Unable to load background editor</p>
+                              </div>
+                            }>
+                              <CharacterBackgroundEditor
+                                background={character.characterBackground}
+                                onChange={updateCharacterBackground}
+                              />
+                            </ErrorBoundary>
                           </div>
                         </div>
-                      )}
-                    </ErrorBoundary>
-                  </TabContent>
-                )
+                      </TabContent>
+                    )
+                  },
+                  {
+                    id: 'notes',
+                    label: 'Session Notes',
+                    icon: '📝',
+                    content: (
+                      <TabContent>
+                        <div className="max-w-none">
+                          <ErrorBoundary fallback={
+                            <div className="bg-white rounded-lg shadow-lg border border-blue-200 p-6">
+                              <h3 className="text-lg font-bold text-blue-800 mb-4">Notes</h3>
+                              <p className="text-gray-500">Unable to load notes editor</p>
+                            </div>
+                          }>
+                            <NotesManager
+                              items={character.notes}
+                              onAdd={addNote}
+                              onUpdate={updateNote}
+                              onDelete={deleteNote}
+                              onReorder={reorderNotes}
+                            />
+                          </ErrorBoundary>
+                        </div>
+                      </TabContent>
+                    )
+                  }
+                ]
               }
             ]}
             ref={tabsRef}

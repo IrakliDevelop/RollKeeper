@@ -1,4 +1,4 @@
-import { AbilityName, SkillName, ClassInfo, RichTextContent, Weapon, Spell, TrackableTrait, MagicItem, ArmorItem, InventoryItem, ConcentrationState } from '@/types/character';
+import { AbilityName, SkillName, RichTextContent, Weapon, Spell, TrackableTrait, MagicItem, ArmorItem, InventoryItem } from '@/types/character';
 
 // D&D 5e skill to ability mappings
 export const SKILL_ABILITY_MAP: Record<SkillName, AbilityName> = {

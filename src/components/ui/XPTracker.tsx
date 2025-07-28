@@ -37,20 +37,16 @@ export default function XPTracker({
     e.preventDefault();
     const value = parseInt(inputValue);
     
-    if (isNaN(value) || value < 0) return;
-
-    const oldLevel = currentLevel;
+  if (isNaN(value) || value < 0) return;
     
     if (mode === 'add') {
       onAddXP(value);
-      // Check if this will cause a level up
       if (shouldLevelUp(currentXP + value, currentLevel)) {
         setShowLevelUp(true);
         setTimeout(() => setShowLevelUp(false), 3000);
       }
     } else {
       onSetXP(value);
-      // Check if this will cause a level up
       if (shouldLevelUp(value, currentLevel)) {
         setShowLevelUp(true);
         setTimeout(() => setShowLevelUp(false), 3000);

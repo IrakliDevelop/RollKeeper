@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, Weapon, TrackableTrait, HeroicInspiration, MagicItem, ArmorItem, InventoryItem, ConcentrationState, ActiveCondition, ActiveDisease, ExhaustionVariant } from '@/types/character';
+import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, Weapon, TrackableTrait, HeroicInspiration, MagicItem, ArmorItem, InventoryItem, ActiveCondition, ActiveDisease, ExhaustionVariant, WeaponDamage, DamageType } from '@/types/character';
 import { ProcessedSpell } from '@/types/spells';
 import { DEFAULT_CHARACTER_STATE, STORAGE_KEY, APP_VERSION, COMMON_CLASSES } from '@/utils/constants';
 import { 
@@ -19,6 +19,40 @@ import {
   calculateMaxHP, 
   getClassHitDie 
 } from '@/utils/hpCalculations';
+
+// Function to migrate weapon damage from old format to new array format
+function migrateWeaponDamage(weapon: Record<string, unknown>): Weapon {
+  // If the weapon already has the new damage array format, return as-is
+  if (Array.isArray(weapon.damage)) {
+    return weapon as unknown as Weapon;
+  }
+
+  // If the weapon has the old damage object format, convert it
+  const damage = weapon.damage as Record<string, unknown>;
+  if (damage && typeof damage === 'object' && 
+      typeof damage.dice === 'string' && 
+      typeof damage.type === 'string') {
+    
+    const newDamage: WeaponDamage = {
+      dice: damage.dice,
+      type: damage.type as DamageType,
+      versatiledice: damage.versatiledice as string | undefined,
+      label: 'Weapon Damage' // Default label for migrated weapons
+    };
+
+    return {
+      ...weapon,
+      damage: [newDamage],
+      legacyDamage: damage // Keep the old format for reference
+    } as unknown as Weapon;
+  }
+
+  // If no damage is defined, create a default empty array
+  return {
+    ...weapon,
+    damage: []
+  } as unknown as Weapon;
+}
 
 // Migration function to handle old character data
 function migrateCharacterData(character: unknown): CharacterState {
@@ -150,7 +184,9 @@ function migrateCharacterData(character: unknown): CharacterState {
       'backstory' in characterObj.characterBackground) 
       ? characterObj.characterBackground as CharacterState['characterBackground']
       : DEFAULT_CHARACTER_STATE.characterBackground,
-    weapons: Array.isArray(characterObj.weapons) ? characterObj.weapons as Weapon[] : DEFAULT_CHARACTER_STATE.weapons,
+    weapons: Array.isArray(characterObj.weapons) 
+      ? (characterObj.weapons as Record<string, unknown>[]).map(migrateWeaponDamage)
+      : DEFAULT_CHARACTER_STATE.weapons,
     weaponProficiencies: (characterObj.weaponProficiencies && typeof characterObj.weaponProficiencies === 'object') 
       ? characterObj.weaponProficiencies as CharacterState['weaponProficiencies']
       : DEFAULT_CHARACTER_STATE.weaponProficiencies
@@ -275,6 +311,7 @@ interface CharacterStore {
   addNote: (note: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateNote: (id: string, updates: Partial<RichTextContent>) => void;
   deleteNote: (id: string) => void;
+  reorderNotes: (sourceIndex: number, destinationIndex: number) => void;
 
   // Trackable trait management
   addTrackableTrait: (trait: Omit<TrackableTrait, 'id' | 'createdAt' | 'updatedAt'>) => void;
@@ -1256,6 +1293,7 @@ export const useCharacterStore = create<CharacterStore>()(
           const newNote: RichTextContent = {
             ...note,
             id: generateId(),
+            order: state.character.notes.length, // Set order to the end
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
@@ -1295,6 +1333,30 @@ export const useCharacterStore = create<CharacterStore>()(
           hasUnsavedChanges: true,
           saveStatus: 'saving'
         }));
+      },
+
+      reorderNotes: (sourceIndex: number, destinationIndex: number) => {
+        set((state) => {
+          const notes = [...state.character.notes];
+          const [removed] = notes.splice(sourceIndex, 1);
+          notes.splice(destinationIndex, 0, removed);
+
+          // Update order property
+          const updatedNotes = notes.map((note, index) => ({
+            ...note,
+            order: index,
+            updatedAt: new Date().toISOString()
+          }));
+
+          return {
+            character: {
+              ...state.character,
+              notes: updatedNotes
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
       },
 
       // Trackable trait management
@@ -1834,7 +1896,6 @@ export const useCharacterStore = create<CharacterStore>()(
 
       // Persistence actions
       saveCharacter: () => {
-        const state = get();
         try {
           // Save to localStorage (handled by persist middleware)
           set({

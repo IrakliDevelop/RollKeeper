@@ -70,6 +70,7 @@ export interface RichTextContent {
   title: string;
   content: string; // HTML content from WYSIWYG editor
   category: 'feature' | 'trait' | 'background' | 'note' | 'spell';
+  order?: number; // For ordering notes
   createdAt: string;
   updatedAt: string;
 }
@@ -187,16 +188,27 @@ export type WeaponCategory = 'simple' | 'martial' | 'magic' | 'artifact';
 export type WeaponType = 'melee' | 'ranged' | 'finesse' | 'versatile' | 'light' | 'heavy' | 'reach' | 'thrown' | 'ammunition' | 'loading' | 'special';
 export type DamageType = 'acid' | 'bludgeoning' | 'cold' | 'fire' | 'force' | 'lightning' | 'necrotic' | 'piercing' | 'poison' | 'psychic' | 'radiant' | 'slashing' | 'thunder';
 
+// Weapon damage entry for multiple damage types
+export interface WeaponDamage {
+  dice: string; // e.g., "1d8", "2d6"
+  type: DamageType;
+  versatiledice?: string; // For versatile weapons (e.g., "1d10")
+  label?: string; // Optional label like "Cold Damage", "Fire Damage", etc.
+}
+
 // Individual weapon/magic item
 export interface Weapon {
   id: string;
   name: string;
   category: WeaponCategory;
   weaponType: WeaponType[];
-  damage: {
-    dice: string; // e.g., "1d8", "2d6"
+  // Updated to support multiple damage types
+  damage: WeaponDamage[]; // Array of damage entries
+  // Legacy single damage support for backward compatibility
+  legacyDamage?: {
+    dice: string;
     type: DamageType;
-    versatiledice?: string; // For versatile weapons (e.g., "1d10")
+    versatiledice?: string;
   };
   enhancementBonus: number; // +0, +1, +2, +3 (enhancement bonus)
   attackBonus?: number; // Additional custom attack bonus beyond enhancement
@@ -274,6 +286,9 @@ export interface InventoryItem {
   id: string;
   name: string;
   category: string; // "weapon", "armor", "tool", "consumable", "treasure", "misc"
+  location?: string; // Custom location like "backpack", "bag of holding", "pocket", etc.
+  rarity?: MagicItemRarity; // Item rarity (common, uncommon, rare, etc.)
+  type?: MagicItemCategory; // Item type (wondrous, ring, potion, etc.)
   quantity: number;
   weight?: number; // Per item
   value?: number; // Per item, in copper pieces

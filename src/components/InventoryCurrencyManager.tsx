@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { InventoryItem, Currency } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Edit2, Trash2, Package, Coins, Minus } from 'lucide-react';
+import { formatCurrencyFromCopper } from '@/utils/currency';
 
 const ITEM_CATEGORIES = ['weapon', 'armor', 'tool', 'consumable', 'treasure', 'misc'];
 
@@ -526,7 +527,7 @@ function ItemCard({ item, onEdit, onDelete, onQuantityChange }: ItemCardProps) {
         {totalValue !== undefined && (
           <div className="flex justify-between">
             <span>Value:</span>
-            <span>{Math.floor(totalValue / 100)} gp, {totalValue % 100} cp</span>
+            <span>{formatCurrencyFromCopper(totalValue)}</span>
           </div>
         )}
 

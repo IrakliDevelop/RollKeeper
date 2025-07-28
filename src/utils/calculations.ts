@@ -1,5 +1,4 @@
 import { 
-  CharacterAbilities, 
   SkillName, 
   AbilityName, 
   CharacterState,
@@ -307,18 +306,44 @@ export const getWeaponAttackString = (character: CharacterState, weapon: Weapon)
 };
 
 /**
- * Get weapon damage string for display (e.g., "1d8+3 slashing")
+ * Get weapon damage string for display (e.g., "1d8+3 slashing, 1d6 fire")
  */
 export const getWeaponDamageString = (character: CharacterState, weapon: Weapon, versatile = false): string => {
   const damageBonus = calculateWeaponDamageBonus(character, weapon);
-  const dice = versatile && weapon.damage.versatiledice ? weapon.damage.versatiledice : weapon.damage.dice;
-  const damageType = weapon.damage.type;
   
-  if (damageBonus === 0) {
-    return `${dice} ${damageType}`;
+  // Handle backward compatibility - check if damage is old format (object) or new format (array)
+  if (!Array.isArray(weapon.damage)) {
+    // Old format: weapon.damage is an object with dice, type, versatiledice
+    const legacyDamage = weapon.damage as { dice: string; type: string; versatiledice?: string };
+    if (legacyDamage && legacyDamage.dice && legacyDamage.type) {
+      const dice = versatile && legacyDamage.versatiledice ? legacyDamage.versatiledice : legacyDamage.dice;
+      
+      if (damageBonus === 0) {
+        return `${dice} ${legacyDamage.type}`;
+      }
+      
+      return `${dice}${formatModifier(damageBonus)} ${legacyDamage.type}`;
+    }
+    return "No damage";
   }
   
-  return `${dice}${formatModifier(damageBonus)} ${damageType}`;
+  // New format: weapon.damage is an array
+  if (weapon.damage.length === 0) {
+    return "No damage";
+  }
+  
+  const damageStrings = weapon.damage.map((damage, index) => {
+    const dice = versatile && damage.versatiledice ? damage.versatiledice : damage.dice;
+    const bonus = index === 0 ? damageBonus : 0; // Only add weapon damage bonus to first damage
+    
+    if (bonus === 0) {
+      return `${dice} ${damage.type}`;
+    }
+    
+    return `${dice}${formatModifier(bonus)} ${damage.type}`;
+  });
+  
+  return damageStrings.join(', ');
 }; 
 
 /**

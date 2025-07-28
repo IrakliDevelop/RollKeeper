@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, X, AlertTriangle, Shield, Eye, EyeOff, Settings, Search, Trash2 } from 'lucide-react';
+import { Plus, Minus, X, AlertTriangle, Shield, Eye, Settings, Search, Trash2 } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
 import { 
   loadAllConditions, 
@@ -36,8 +36,6 @@ export default function ConditionsDiseasesManager() {
   const [availableDiseases, setAvailableDiseases] = useState<ProcessedDisease[]>([]);
   const [conditionSearch, setConditionSearch] = useState('');
   const [diseaseSearch, setDiseaseSearch] = useState('');
-  const [showConditionDetails, setShowConditionDetails] = useState<string | null>(null);
-  const [showDiseaseDetails, setShowDiseaseDetails] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCondition, setSelectedCondition] = useState<ActiveCondition | null>(null);
   const [selectedDisease, setSelectedDisease] = useState<ActiveDisease | null>(null);

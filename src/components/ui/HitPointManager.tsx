@@ -36,14 +36,12 @@ export default function HitPointManager({
   hitPoints,
   classInfo,
   level,
-  constitutionScore,
   onApplyDamage,
   onApplyHealing,
   onAddTemporaryHP,
   onMakeDeathSave,
   onResetDeathSaves,
   onToggleCalculationMode,
-  onRecalculateMaxHP,
   onUpdateHitPoints,
   className = ''
 }: HitPointManagerProps) {

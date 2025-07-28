@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { ProcessedSpell, SpellFilters, SPELL_SCHOOLS } from '@/types/spells';
+import { ProcessedSpell, SpellFilters } from '@/types/spells';
 import { filterSpells } from '@/utils/spellFilters';
 import { useCharacterStore } from '@/store/characterStore';
-import { Search, Filter, BookOpen, Star, Settings, Grid, List, Loader2, ChevronDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Filter, BookOpen, Grid, List, Loader2, ChevronDown, ArrowUp, ArrowDown } from 'lucide-react';
 import SpellCard from '@/components/spellbook/SpellCard';
 import SpellFiltersPanel from '@/components/spellbook/SpellFiltersPanel';
 import PersonalSpellbook from '@/components/spellbook/PersonalSpellbook';

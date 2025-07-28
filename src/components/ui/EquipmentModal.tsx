@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Weapon, MagicItem, MagicItemCategory, MagicItemRarity, WeaponCategory, WeaponType, DamageType } from '@/types/character';
+import { Weapon, MagicItem, MagicItemCategory, MagicItemRarity, WeaponCategory, WeaponType, DamageType, WeaponDamage } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
-import { Plus, Edit2, Trash2, Shield, Zap, Eye, Sword, Target, Star, Wand2, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Sword, Wand2, X } from 'lucide-react';
 import { ModalPortal } from '@/components/ui/ModalPortal';
-import { FancySelect } from '@/components/ui/FancySelect';
 
 interface EquipmentModalProps {
   isOpen: boolean;
@@ -32,11 +31,7 @@ interface WeaponFormData {
   name: string;
   category: WeaponCategory;
   weaponType: WeaponType[];
-  damage: {
-    dice: string;
-    type: DamageType;
-    versatiledice?: string;
-  };
+  damage: WeaponDamage[]; // Updated to array of damage entries
   enhancementBonus: number;
   attackBonus?: number;
   damageBonus?: number;
@@ -67,10 +62,11 @@ const initialWeaponData: WeaponFormData = {
   name: '',
   category: 'simple',
   weaponType: ['melee'],
-  damage: {
+  damage: [{
     dice: '1d6',
     type: 'bludgeoning',
-  },
+    label: 'Weapon Damage'
+  }],
   enhancementBonus: 0,
   attackBonus: 0,
   damageBonus: 0,
@@ -128,7 +124,7 @@ export default function EquipmentModal({ isOpen, onClose }: EquipmentModalProps)
   const [editingWeapon, setEditingWeapon] = useState<Weapon | null>(null);
   const [magicItemForm, setMagicItemForm] = useState<MagicItemFormData>(initialMagicItemData);
   const [weaponForm, setWeaponForm] = useState<WeaponFormData>(initialWeaponData);
-  const [propertyInput, setPropertyInput] = useState('');
+  const [, setPropertyInput] = useState('');
 
   // Calculate attunement usage
   const attunedItems = character.magicItems.filter(item => item.isAttuned).length;
@@ -190,11 +186,32 @@ export default function EquipmentModal({ isOpen, onClose }: EquipmentModalProps)
   };
 
   const handleEditWeapon = (weapon: Weapon) => {
+    // Migrate old damage format to new array format if needed
+    let damageArray: WeaponDamage[];
+    if (Array.isArray(weapon.damage)) {
+      damageArray = weapon.damage;
+    } else if (weapon.legacyDamage && weapon.legacyDamage.dice) {
+      // Use legacy damage if available
+      damageArray = [{
+        dice: weapon.legacyDamage.dice,
+        type: weapon.legacyDamage.type as DamageType,
+        versatiledice: weapon.legacyDamage.versatiledice,
+        label: 'Weapon Damage'
+      }];
+    } else {
+      // Fallback: create default damage entry
+      damageArray = [{
+        dice: '1d6',
+        type: 'bludgeoning',
+        label: 'Weapon Damage'
+      }];
+    }
+
     setWeaponForm({
       name: weapon.name,
       category: weapon.category,
       weaponType: weapon.weaponType,
-      damage: weapon.damage,
+      damage: damageArray,
       enhancementBonus: weapon.enhancementBonus,
       attackBonus: weapon.attackBonus || 0,
       damageBonus: weapon.damageBonus || 0,
@@ -216,23 +233,6 @@ export default function EquipmentModal({ isOpen, onClose }: EquipmentModalProps)
       return;
     }
     attuneMagicItem(item.id, shouldAttune);
-  };
-
-  const addProperty = () => {
-    if (propertyInput.trim() && !weaponForm.properties.includes(propertyInput.trim())) {
-      setWeaponForm(prev => ({
-        ...prev,
-        properties: [...prev.properties, propertyInput.trim()]
-      }));
-      setPropertyInput('');
-    }
-  };
-
-  const removeProperty = (index: number) => {
-    setWeaponForm(prev => ({
-      ...prev,
-      properties: prev.properties.filter((_, i) => i !== index)
-    }));
   };
 
   const toggleWeaponType = (type: WeaponType) => {
@@ -331,52 +331,117 @@ export default function EquipmentModal({ isOpen, onClose }: EquipmentModalProps)
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Damage Dice</label>
-                      <input
-                        type="text"
-                        value={weaponForm.damage.dice}
-                        onChange={(e) => setWeaponForm({ 
-                          ...weaponForm, 
-                          damage: { ...weaponForm.damage, dice: e.target.value }
-                        })}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                        placeholder="1d8"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Damage Type</label>
-                      <select
-                        value={weaponForm.damage.type}
-                        onChange={(e) => setWeaponForm({ 
-                          ...weaponForm, 
-                          damage: { ...weaponForm.damage, type: e.target.value as DamageType }
-                        })}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
+                  {/* Multiple Damage Entries */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-medium text-gray-700">Damage Entries</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newDamage: WeaponDamage = {
+                            dice: '1d6',
+                            type: 'fire',
+                            label: 'Additional Damage'
+                          };
+                          setWeaponForm({
+                            ...weaponForm,
+                            damage: [...weaponForm.damage, newDamage]
+                          });
+                        }}
+                        className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
                       >
-                        {DAMAGE_TYPES.map(type => (
-                          <option key={type} value={type} className="text-gray-900">
-                            {type.charAt(0).toUpperCase() + type.slice(1)}
-                          </option>
-                        ))}
-                      </select>
+                        <Plus size={14} className="inline mr-1" />
+                        Add Damage Type
+                      </button>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Versatile Dice</label>
-                      <input
-                        type="text"
-                        value={weaponForm.damage.versatiledice || ''}
-                        onChange={(e) => setWeaponForm({ 
-                          ...weaponForm, 
-                          damage: { ...weaponForm.damage, versatiledice: e.target.value || undefined }
-                        })}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-                        placeholder="1d10"
-                      />
-                    </div>
+                    {weaponForm.damage.map((damage, index) => (
+                      <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-medium text-gray-700">
+                            {damage.label || `Damage ${index + 1}`}
+                          </h4>
+                          {weaponForm.damage.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newDamage = weaponForm.damage.filter((_, i) => i !== index);
+                                setWeaponForm({ ...weaponForm, damage: newDamage });
+                              }}
+                              className="text-red-600 hover:text-red-800 transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Label</label>
+                            <input
+                              type="text"
+                              value={damage.label || ''}
+                              onChange={(e) => {
+                                const newDamage = [...weaponForm.damage];
+                                newDamage[index] = { ...damage, label: e.target.value };
+                                setWeaponForm({ ...weaponForm, damage: newDamage });
+                              }}
+                              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white text-sm"
+                              placeholder="e.g., Fire Damage"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Dice</label>
+                            <input
+                              type="text"
+                              value={damage.dice}
+                              onChange={(e) => {
+                                const newDamage = [...weaponForm.damage];
+                                newDamage[index] = { ...damage, dice: e.target.value };
+                                setWeaponForm({ ...weaponForm, damage: newDamage });
+                              }}
+                              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white text-sm"
+                              placeholder="1d8"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+                            <select
+                              value={damage.type}
+                              onChange={(e) => {
+                                const newDamage = [...weaponForm.damage];
+                                newDamage[index] = { ...damage, type: e.target.value as DamageType };
+                                setWeaponForm({ ...weaponForm, damage: newDamage });
+                              }}
+                              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white text-sm"
+                            >
+                              {DAMAGE_TYPES.map(type => (
+                                <option key={type} value={type} className="text-gray-900">
+                                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Versatile</label>
+                            <input
+                              type="text"
+                              value={damage.versatiledice || ''}
+                              onChange={(e) => {
+                                const newDamage = [...weaponForm.damage];
+                                newDamage[index] = { ...damage, versatiledice: e.target.value || undefined };
+                                setWeaponForm({ ...weaponForm, damage: newDamage });
+                              }}
+                              className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white text-sm"
+                              placeholder="1d10"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
                   <div>
@@ -632,7 +697,28 @@ export default function EquipmentModal({ isOpen, onClose }: EquipmentModalProps)
                               )}
                             </div>
                             <div className="text-sm text-gray-600 mb-2">
-                              {weapon.damage.dice} {weapon.damage.type} • {weapon.category}
+                              {(() => {
+                                if (Array.isArray(weapon.damage)) {
+                                  // New format: array of damage entries
+                                  return weapon.damage.length > 0 ? (
+                                    weapon.damage.map((dmg, idx) => (
+                                      <span key={idx}>
+                                        {dmg.dice} {dmg.type}
+                                        {dmg.label && dmg.label !== 'Weapon Damage' && ` (${dmg.label})`}
+                                        {idx < weapon.damage.length - 1 && ', '}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    'No damage defined'
+                                  );
+                                } else {
+                                  // Old format: single damage object
+                                  const legacyDamage = weapon.damage as { dice: string; type: string; versatiledice?: string };
+                                  return legacyDamage && legacyDamage.dice && legacyDamage.type
+                                    ? `${legacyDamage.dice} ${legacyDamage.type}`
+                                    : 'No damage defined';
+                                }
+                              })()} • {weapon.category}
                             </div>
                             {weapon.description && (
                               <p className="text-sm text-gray-700">{weapon.description}</p>

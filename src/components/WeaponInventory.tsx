@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useCharacterStore } from '@/store/characterStore';
-import { Plus, Eye, Sword, Wand2 } from 'lucide-react';
+import { Eye, Sword, Wand2 } from 'lucide-react';
 import EquipmentModal from '@/components/ui/EquipmentModal';
 
 export const WeaponInventory: React.FC = () => {
@@ -11,7 +11,6 @@ export const WeaponInventory: React.FC = () => {
 
   // Calculate equipped items
   const equippedWeapons = character.weapons.filter(weapon => weapon.isEquipped);
-  const equippedMagicItems = character.magicItems.filter(item => item.isEquipped);
   const attunedItems = character.magicItems.filter(item => item.isAttuned).length + 
                       character.weapons.filter(weapon => weapon.isAttuned).length;
 
