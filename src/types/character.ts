@@ -70,6 +70,7 @@ export interface RichTextContent {
   title: string;
   content: string; // HTML content from WYSIWYG editor
   category: 'feature' | 'trait' | 'background' | 'note' | 'spell';
+  order?: number; // For ordering notes
   createdAt: string;
   updatedAt: string;
 }
@@ -274,6 +275,9 @@ export interface InventoryItem {
   id: string;
   name: string;
   category: string; // "weapon", "armor", "tool", "consumable", "treasure", "misc"
+  location?: string; // Custom location like "backpack", "bag of holding", "pocket", etc.
+  rarity?: MagicItemRarity; // Item rarity (common, uncommon, rare, etc.)
+  type?: MagicItemCategory; // Item type (wondrous, ring, potion, etc.)
   quantity: number;
   weight?: number; // Per item
   value?: number; // Per item, in copper pieces

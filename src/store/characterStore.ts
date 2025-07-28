@@ -275,6 +275,7 @@ interface CharacterStore {
   addNote: (note: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateNote: (id: string, updates: Partial<RichTextContent>) => void;
   deleteNote: (id: string) => void;
+  reorderNotes: (sourceIndex: number, destinationIndex: number) => void;
 
   // Trackable trait management
   addTrackableTrait: (trait: Omit<TrackableTrait, 'id' | 'createdAt' | 'updatedAt'>) => void;
@@ -1256,6 +1257,7 @@ export const useCharacterStore = create<CharacterStore>()(
           const newNote: RichTextContent = {
             ...note,
             id: generateId(),
+            order: state.character.notes.length, // Set order to the end
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
@@ -1295,6 +1297,30 @@ export const useCharacterStore = create<CharacterStore>()(
           hasUnsavedChanges: true,
           saveStatus: 'saving'
         }));
+      },
+
+      reorderNotes: (sourceIndex: number, destinationIndex: number) => {
+        set((state) => {
+          const notes = [...state.character.notes];
+          const [removed] = notes.splice(sourceIndex, 1);
+          notes.splice(destinationIndex, 0, removed);
+
+          // Update order property
+          const updatedNotes = notes.map((note, index) => ({
+            ...note,
+            order: index,
+            updatedAt: new Date().toISOString()
+          }));
+
+          return {
+            character: {
+              ...state.character,
+              notes: updatedNotes
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
       },
 
       // Trackable trait management
