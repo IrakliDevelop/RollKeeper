@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { loadAllClasses } from '@/utils/classDataLoader';
 import ClassCompendiumClient from '@/components/classes/ClassCompendiumClient';
-import { Shield, Loader2, ArrowLeft, Users } from 'lucide-react';
+import { Shield, Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 // Loading fallback component

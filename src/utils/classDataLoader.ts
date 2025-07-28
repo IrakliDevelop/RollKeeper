@@ -447,7 +447,7 @@ function prioritize2024Features(features: ClassFeature[]): ClassFeature[] {
       if (rules2024Feature) {
         prioritizedFeatures.push(rules2024Feature);
       } else {
-        // No 2024 version found, use the first one (should be prioritized by source already)
+      // No 2024 version found, use the first one (should be prioritized by source already)
         prioritizedFeatures.push(featureGroup[0]);
       }
     }

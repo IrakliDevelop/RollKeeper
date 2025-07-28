@@ -8,9 +8,7 @@ import {
   Zap, 
   Book, 
   Sparkles,
-  Shield,
   Star,
-  Circle,
   CheckCircle,
   Plus
 } from 'lucide-react';

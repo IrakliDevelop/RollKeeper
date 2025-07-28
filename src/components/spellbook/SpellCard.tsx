@@ -11,10 +11,7 @@ import {
   Zap, 
   ChevronDown, 
   ChevronUp,
-  Eye,
   Star,
-  BookOpen,
-  Circle,
   ExternalLink
 } from 'lucide-react';
 import SpellDetailModal from './SpellDetailModal';

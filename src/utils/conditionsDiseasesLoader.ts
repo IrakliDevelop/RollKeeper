@@ -141,6 +141,7 @@ function parseEntries(entries: (string | RawConditionEntry)[]): string {
       }
       
       return '';
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
       // Safety fallback for any parsing errors
       return '';

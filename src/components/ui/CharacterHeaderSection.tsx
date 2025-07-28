@@ -4,7 +4,7 @@ import React from 'react';
 import { useCharacterStore } from '@/store/characterStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { SaveIndicator } from '@/components/ui/SaveIndicator';
-import { Save, Download, Upload, RotateCcw, Edit2 } from 'lucide-react';
+import { Save, Download, Upload, RotateCcw } from 'lucide-react';
 
 export default function CharacterHeaderSection() {
   const { 

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Currency } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import { Coins } from 'lucide-react';
-import { inputStyles, labelStyles } from '@/styles/inputs';
+import { inputStyles } from '@/styles/inputs';
 
 const CURRENCY_TYPES: { [key in keyof Currency]: { name: string; abbr: string; color: string } } = {
   platinum: { name: 'Platinum', abbr: 'pp', color: 'text-slate-600' },

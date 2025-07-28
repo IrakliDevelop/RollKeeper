@@ -5,7 +5,6 @@ import {
   ProcessedSpell, 
   SpellClass,
   SpellEntry,
-  SpellEntryItem,
   SPELL_SCHOOLS
 } from '@/types/spells';
 import { formatSourceForDisplay } from './sourceUtils';

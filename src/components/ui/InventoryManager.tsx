@@ -113,7 +113,9 @@ export default function InventoryManager() {
 
   // Filter items based on selected filters
   const filteredItems = character.inventoryItems.filter(item => {
-    const locationMatch = filterLocation === 'all' || item.location === filterLocation;
+    const locationMatch = filterLocation === 'all' || 
+    (filterLocation === 'Unassigned' && (item.location === undefined || item.location === null))
+    || item.location === filterLocation;
     const categoryMatch = filterCategory === 'all' || item.category === filterCategory;
     return locationMatch && categoryMatch;
   });

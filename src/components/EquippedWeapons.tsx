@@ -28,27 +28,34 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
     const attackBonus = calculateWeaponAttackBonus(character, weapon);
     const isCrit = roll === 20;
     
+    // Get primary damage (first damage entry)
+    const primaryDamage = weapon.damage.length > 0 ? weapon.damage[0] : null;
+    
     showAttackRoll(
       weapon.name,
       roll,
       attackBonus,
       isCrit,
-      weapon.damage.dice,
-      weapon.damage.type
+      primaryDamage?.dice || '1d6',
+      primaryDamage?.type || 'bludgeoning'
     );
   };
 
   const rollWeaponDamage = (weapon: Weapon, versatile = false) => {
     const damageBonus = calculateWeaponDamageBonus(character, weapon);
-    const dice = versatile && weapon.damage.versatiledice ? weapon.damage.versatiledice : weapon.damage.dice;
-    const damageResult = rollDamage(dice, damageBonus);
     
-    showDamageRoll(
-      weapon.name,
-      damageResult,
-      weapon.damage.type,
-      versatile
-    );
+    // Roll all damage types
+    weapon.damage.forEach((damage, index) => {
+      const dice = versatile && damage.versatiledice ? damage.versatiledice : damage.dice;
+      const damageResult = rollDamage(dice, index === 0 ? damageBonus : 0); // Only add weapon damage bonus to first damage
+      
+      showDamageRoll(
+        `${weapon.name}${damage.label && damage.label !== 'Weapon Damage' ? ` (${damage.label})` : ''}`,
+        damageResult,
+        damage.type,
+        versatile && index === 0 // Only show versatile for first damage
+      );
+    });
   };
   
   // Filter to only equipped weapons
@@ -85,7 +92,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
           const isProficient = isWeaponProficient(character, weapon);
           const attackString = getWeaponAttackString(character, weapon);
           const damageString = getWeaponDamageString(character, weapon);
-          const versatileDamageString = weapon.damage.versatiledice 
+          const versatileDamageString = weapon.damage.some(dmg => dmg.versatiledice)
             ? getWeaponDamageString(character, weapon, true)
             : null;
 
@@ -165,7 +172,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
                     <Zap size={14} className="group-hover:animate-pulse" />
                     Damage
                   </button>
-                  {weapon.damage.versatiledice && (
+                  {weapon.damage.some(dmg => dmg.versatiledice) && (
                     <button
                       onClick={() => rollWeaponDamage(weapon, true)}
                       className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-purple-600 to-violet-700 text-white rounded-lg shadow-md hover:from-purple-700 hover:to-violet-800 hover:shadow-lg transform hover:scale-105 transition-all duration-200"

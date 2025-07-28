@@ -93,7 +93,7 @@ export default function PersonalSpellbook({ allSpells, displayMode, sortBy = 'na
   // Tab state
   const [activeTab, setActiveTab] = React.useState<'known' | 'prepared' | 'favorites'>('known');
 
-  const renderSpellLevel = (level: number, spells: ProcessedSpell[], showPreparedStatus: boolean = true) => {
+  const renderSpellLevel = (level: number, spells: ProcessedSpell[]) => {
     if (spells.length === 0) return null;
 
     const levelName = level === 0 ? 'Cantrips' : `Level ${level}`;
@@ -295,6 +295,7 @@ export default function PersonalSpellbook({ allSpells, displayMode, sortBy = 'na
         {totalSpellsInTab > 0 ? (
           <div>
             {Object.entries(tabData.spells)
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               .filter(([_, spells]) => spells.length > 0)
               .map(([level, spells]) => renderSpellLevel(parseInt(level), spells))
             }

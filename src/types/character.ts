@@ -188,16 +188,27 @@ export type WeaponCategory = 'simple' | 'martial' | 'magic' | 'artifact';
 export type WeaponType = 'melee' | 'ranged' | 'finesse' | 'versatile' | 'light' | 'heavy' | 'reach' | 'thrown' | 'ammunition' | 'loading' | 'special';
 export type DamageType = 'acid' | 'bludgeoning' | 'cold' | 'fire' | 'force' | 'lightning' | 'necrotic' | 'piercing' | 'poison' | 'psychic' | 'radiant' | 'slashing' | 'thunder';
 
+// Weapon damage entry for multiple damage types
+export interface WeaponDamage {
+  dice: string; // e.g., "1d8", "2d6"
+  type: DamageType;
+  versatiledice?: string; // For versatile weapons (e.g., "1d10")
+  label?: string; // Optional label like "Cold Damage", "Fire Damage", etc.
+}
+
 // Individual weapon/magic item
 export interface Weapon {
   id: string;
   name: string;
   category: WeaponCategory;
   weaponType: WeaponType[];
-  damage: {
-    dice: string; // e.g., "1d8", "2d6"
+  // Updated to support multiple damage types
+  damage: WeaponDamage[]; // Array of damage entries
+  // Legacy single damage support for backward compatibility
+  legacyDamage?: {
+    dice: string;
     type: DamageType;
-    versatiledice?: string; // For versatile weapons (e.g., "1d10")
+    versatiledice?: string;
   };
   enhancementBonus: number; // +0, +1, +2, +3 (enhancement bonus)
   attackBonus?: number; // Additional custom attack bonus beyond enhancement
