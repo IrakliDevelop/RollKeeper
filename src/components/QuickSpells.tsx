@@ -6,6 +6,7 @@ import { useCharacterStore } from "@/store/characterStore";
 import { Spell } from "@/types/character";
 import { calculateSpellAttackBonus, calculateSpellSaveDC, getCharacterSpellcastingAbility, rollDamage } from "@/utils/calculations";
 import { SpellCastModal } from "@/components/ui/SpellCastModal";
+import DragDropList from "@/components/ui/DragDropList";
 
 interface QuickSpellsProps {
   showAttackRoll: (weaponName: string, roll: number, bonus: number, isCrit: boolean, damage?: string, damageType?: string) => void;
@@ -18,7 +19,8 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
     character, 
     updateSpellSlot, 
     startConcentration, 
-    stopConcentration 
+    stopConcentration,
+    reorderSpells
   } = useCharacterStore();
   
   // Modal state
@@ -43,6 +45,21 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
   const spellcastingAbility = getCharacterSpellcastingAbility(character);
   const spellAttackBonus = calculateSpellAttackBonus(character);
   const spellSaveDC = calculateSpellSaveDC(character);
+
+  // Custom reorder handler for action spells
+  const handleReorderActionSpells = (sourceIndex: number, destinationIndex: number) => {
+    // Get the spell IDs being reordered
+    const sourceSpellId = actionSpells[sourceIndex].id;
+    const destinationSpellId = actionSpells[destinationIndex].id;
+    
+    // Find the indices in the main spells array
+    const sourceGlobalIndex = character.spells.findIndex(spell => spell.id === sourceSpellId);
+    const destinationGlobalIndex = character.spells.findIndex(spell => spell.id === destinationSpellId);
+    
+    if (sourceGlobalIndex !== -1 && destinationGlobalIndex !== -1) {
+      reorderSpells(sourceGlobalIndex, destinationGlobalIndex);
+    }
+  };
 
   const rollSpellAttack = (spell: Spell) => {
     if (spellAttackBonus === null) {
@@ -149,86 +166,92 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
         )}
       </div>
       
-      {actionSpells.map((spell) => (
-        <div
-          key={spell.id}
-          className="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-lg p-3 hover:shadow-md transition-all duration-200"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${
-                spell.level === 0 ? 'bg-yellow-400' : 'bg-purple-400'
-              }`}></div>
-              <span className="font-semibold text-purple-900">{spell.name}</span>
-              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
-                {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
-              </span>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2 text-xs text-purple-600 mb-2">
-            <span>{spell.castingTime}</span>
-            <span>•</span>
-            <span>{spell.range}</span>
-            {spell.concentration && (
-              <>
-                <span>•</span>
-                <span className="text-orange-600">Concentration</span>
-              </>
-            )}
-          </div>
-          
-          <div className="flex flex-wrap gap-2">
-            {/* Cast Button - Always show for all spells */}
-            <button
-              onClick={() => openCastModal(spell)}
-              className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-lg shadow-md hover:from-purple-700 hover:to-violet-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
-            >
-              <Wand2 size={16} className="group-hover:rotate-12 transition-transform" />
-              Cast
-            </button>
-
-            {spell.actionType === 'attack' && (
-              <button
-                onClick={() => rollSpellAttack(spell)}
-                className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-lg shadow-md hover:from-slate-700 hover:to-slate-800 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
-              >
-                <Dice6 size={16} className="group-hover:rotate-12 transition-transform" />
-                Attack Roll
-              </button>
-            )}
-            
-            {spell.actionType === 'save' && (
-              <button
-                onClick={() => showSavingThrow(spell)}
-                className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg shadow-md hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
-              >
-                <Shield size={16} className="group-hover:scale-110 transition-transform" />
-                {spell.savingThrow ? `${spell.savingThrow} Save` : 'Saving Throw'}
-              </button>
-            )}
-            
-            {spell.damage && (
-              <button
-                onClick={() => rollSpellDamage(spell)}
-                className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg shadow-md hover:from-amber-600 hover:to-orange-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
-                title="Roll spell damage"
-              >
-                <Zap size={16} className="group-hover:animate-pulse" />
-                Damage
-              </button>
-            )}
-            
-            {spell.damage && (
-              <div className="flex items-center gap-1 text-xs text-gray-600">
-                <span className="bg-gradient-to-r from-gray-100 to-gray-200 px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm font-medium">
-                  {spell.damage} {spell.damageType && `${spell.damageType}`}
+      <DragDropList
+        items={actionSpells}
+        onReorder={handleReorderActionSpells}
+        keyExtractor={(spell) => spell.id}
+        className="space-y-3"
+        itemClassName="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-lg p-3 hover:shadow-md transition-all duration-200"
+        showDragHandle={true}
+        dragHandlePosition="left"
+        renderItem={(spell, index, isDragging) => (
+          <>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  spell.level === 0 ? 'bg-yellow-400' : 'bg-purple-400'
+                }`}></div>
+                <span className="font-semibold text-purple-900">{spell.name}</span>
+                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
+                  {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
                 </span>
               </div>
-            )}
-          </div>
-        </div>
-      ))}
+            </div>
+            
+            <div className="flex items-center gap-2 text-xs text-purple-600 mb-2">
+              <span>{spell.castingTime}</span>
+              <span>•</span>
+              <span>{spell.range}</span>
+              {spell.concentration && (
+                <>
+                  <span>•</span>
+                  <span className="text-orange-600">Concentration</span>
+                </>
+              )}
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              {/* Cast Button - Always show for all spells */}
+              <button
+                onClick={() => openCastModal(spell)}
+                className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-purple-600 to-violet-600 text-white rounded-lg shadow-md hover:from-purple-700 hover:to-violet-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+              >
+                <Wand2 size={16} className="group-hover:rotate-12 transition-transform" />
+                Cast
+              </button>
+
+              {spell.actionType === 'attack' && (
+                <button
+                  onClick={() => rollSpellAttack(spell)}
+                  className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-lg shadow-md hover:from-slate-700 hover:to-slate-800 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+                >
+                  <Dice6 size={16} className="group-hover:rotate-12 transition-transform" />
+                  Attack Roll
+                </button>
+              )}
+              
+              {spell.actionType === 'save' && (
+                <button
+                  onClick={() => showSavingThrow(spell)}
+                  className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg shadow-md hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+                >
+                  <Shield size={16} className="group-hover:scale-110 transition-transform" />
+                  {spell.savingThrow ? `${spell.savingThrow} Save` : 'Saving Throw'}
+                </button>
+              )}
+              
+              {spell.damage && (
+                <button
+                  onClick={() => rollSpellDamage(spell)}
+                  className="group flex items-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg shadow-md hover:from-amber-600 hover:to-orange-700 hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+                  title="Roll spell damage"
+                >
+                  <Zap size={16} className="group-hover:animate-pulse" />
+                  Damage
+                </button>
+              )}
+              
+              {spell.damage && (
+                <div className="flex items-center gap-1 text-xs text-gray-600">
+                  <span className="bg-gradient-to-r from-gray-100 to-gray-200 px-3 py-1.5 rounded-lg border border-gray-300 shadow-sm font-medium">
+                    {spell.damage} {spell.damageType && `${spell.damageType}`}
+                  </span>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      />
     </div>
     
     {/* Spell Cast Modal */}

@@ -326,6 +326,7 @@ interface CharacterStore {
   updateWeapon: (id: string, updates: Partial<Weapon>) => void;
   deleteWeapon: (id: string) => void;
   equipWeapon: (id: string, equipped: boolean) => void;
+  reorderWeapons: (sourceIndex: number, destinationIndex: number) => void;
   
   // Magic item management
   addMagicItem: (item: Omit<MagicItem, 'id' | 'createdAt' | 'updatedAt'>) => void;
@@ -333,18 +334,21 @@ interface CharacterStore {
   deleteMagicItem: (id: string) => void;
   attuneMagicItem: (id: string, attuned: boolean) => void;
   updateAttunementSlots: (max: number) => void;
+  reorderMagicItems: (sourceIndex: number, destinationIndex: number) => void;
 
   // Armor management
   addArmorItem: (item: Omit<ArmorItem, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateArmorItem: (id: string, updates: Partial<ArmorItem>) => void;
   deleteArmorItem: (id: string) => void;
   equipArmorItem: (id: string, equipped: boolean) => void;
+  reorderArmorItems: (sourceIndex: number, destinationIndex: number) => void;
 
   // Inventory management
   addInventoryItem: (item: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateInventoryItem: (id: string, updates: Partial<InventoryItem>) => void;
   deleteInventoryItem: (id: string) => void;
   updateItemQuantity: (id: string, quantity: number) => void;
+  reorderInventoryItems: (sourceIndex: number, destinationIndex: number) => void;
 
   // Currency management
   updateCurrency: (updates: Partial<typeof DEFAULT_CHARACTER_STATE.currency>) => void;
@@ -360,6 +364,8 @@ interface CharacterStore {
   updateSpellbookSettings: (settings: Partial<typeof DEFAULT_CHARACTER_STATE.spellbook.spellbookSettings>) => void;
   addCustomSpell: (spell: ProcessedSpell) => void; // We'll type this properly later
   removeCustomSpell: (spellId: string) => void;
+  reorderPreparedSpells: (sourceIndex: number, destinationIndex: number) => void;
+  reorderSpells: (sourceIndex: number, destinationIndex: number) => void;
   
   // Persistence actions
   saveCharacter: () => void;
@@ -1516,6 +1522,29 @@ export const useCharacterStore = create<CharacterStore>()(
         }));
       },
 
+      reorderWeapons: (sourceIndex: number, destinationIndex: number) => {
+        set((state) => {
+          const weapons = [...state.character.weapons];
+          const [removed] = weapons.splice(sourceIndex, 1);
+          weapons.splice(destinationIndex, 0, removed);
+
+          // Update all weapons with new timestamps
+          const updatedWeapons = weapons.map((weapon) => ({
+            ...weapon,
+            updatedAt: new Date().toISOString()
+          }));
+
+          return {
+            character: {
+              ...state.character,
+              weapons: updatedWeapons
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
       // Magic item management actions
       addMagicItem: (item) => {
         set((state) => {
@@ -1592,6 +1621,29 @@ export const useCharacterStore = create<CharacterStore>()(
         }));
       },
 
+      reorderMagicItems: (sourceIndex: number, destinationIndex: number) => {
+        set((state) => {
+          const magicItems = [...(state.character.magicItems || [])];
+          const [removed] = magicItems.splice(sourceIndex, 1);
+          magicItems.splice(destinationIndex, 0, removed);
+
+          // Update all magic items with new timestamps
+          const updatedMagicItems = magicItems.map((item) => ({
+            ...item,
+            updatedAt: new Date().toISOString()
+          }));
+
+          return {
+            character: {
+              ...state.character,
+              magicItems: updatedMagicItems
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
       // Armor management
       addArmorItem: (item) => {
         set((state) => {
@@ -1654,6 +1706,29 @@ export const useCharacterStore = create<CharacterStore>()(
         }));
       },
 
+      reorderArmorItems: (sourceIndex: number, destinationIndex: number) => {
+        set((state) => {
+          const armorItems = [...state.character.armorItems];
+          const [removed] = armorItems.splice(sourceIndex, 1);
+          armorItems.splice(destinationIndex, 0, removed);
+
+          // Update all armor items with new timestamps
+          const updatedArmorItems = armorItems.map((item) => ({
+            ...item,
+            updatedAt: new Date().toISOString()
+          }));
+
+          return {
+            character: {
+              ...state.character,
+              armorItems: updatedArmorItems
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
       // Inventory management
       addInventoryItem: (item) => {
         set((state) => {
@@ -1714,6 +1789,29 @@ export const useCharacterStore = create<CharacterStore>()(
           hasUnsavedChanges: true,
           saveStatus: 'saving'
         }));
+      },
+
+      reorderInventoryItems: (sourceIndex: number, destinationIndex: number) => {
+        set((state) => {
+          const inventoryItems = [...state.character.inventoryItems];
+          const [removed] = inventoryItems.splice(sourceIndex, 1);
+          inventoryItems.splice(destinationIndex, 0, removed);
+
+          // Update all inventory items with new timestamps
+          const updatedInventoryItems = inventoryItems.map((item) => ({
+            ...item,
+            updatedAt: new Date().toISOString()
+          }));
+
+          return {
+            character: {
+              ...state.character,
+              inventoryItems: updatedInventoryItems
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
       },
 
       // Currency management
@@ -1892,6 +1990,43 @@ export const useCharacterStore = create<CharacterStore>()(
           hasUnsavedChanges: true,
           saveStatus: 'saving'
         }));
+      },
+
+      reorderPreparedSpells: (sourceIndex: number, destinationIndex: number) => {
+        set((state) => {
+          const preparedSpells = [...state.character.spellbook.preparedSpells];
+          const [removed] = preparedSpells.splice(sourceIndex, 1);
+          preparedSpells.splice(destinationIndex, 0, removed);
+
+          return {
+            character: {
+              ...state.character,
+              spellbook: {
+                ...state.character.spellbook,
+                preparedSpells
+              }
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
+      },
+
+      reorderSpells: (sourceIndex: number, destinationIndex: number) => {
+        set((state) => {
+          const spells = [...state.character.spells];
+          const [removed] = spells.splice(sourceIndex, 1);
+          spells.splice(destinationIndex, 0, removed);
+
+          return {
+            character: {
+              ...state.character,
+              spells
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving'
+          };
+        });
       },
 
       // Persistence actions

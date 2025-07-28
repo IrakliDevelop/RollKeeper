@@ -6,6 +6,7 @@ import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Edit2, Trash2, Eye, BookOpen } from 'lucide-react';
 import { FancySelect } from '@/components/ui/FancySelect';
 import { ModalPortal } from '@/components/ui/ModalPortal';
+import DragDropList from '@/components/ui/DragDropList';
 
 // Constants for spell schools and common casting times
 const SPELL_SCHOOLS = [
@@ -101,7 +102,7 @@ const initialFormData: SpellFormData = {
 };
 
 export const SpellManagement: React.FC = () => {
-  const { character, updateCharacter } = useCharacterStore();
+  const { character, updateCharacter, reorderPreparedSpells, reorderSpells } = useCharacterStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<SpellFormData>(initialFormData);
@@ -214,6 +215,21 @@ export const SpellManagement: React.FC = () => {
     return level === 0 ? 'Cantrips' : `Level ${level}`;
   };
 
+  // Custom reorder handler for spells within the same level
+  const handleReorderSpellsInLevel = (level: number) => (sourceIndex: number, destinationIndex: number) => {
+    const spellsInLevel = spellsByLevel[level];
+    const sourceSpellId = spellsInLevel[sourceIndex].id;
+    const destinationSpellId = spellsInLevel[destinationIndex].id;
+    
+    // Find the indices in the main spells array
+    const sourceGlobalIndex = character.spells.findIndex(spell => spell.id === sourceSpellId);
+    const destinationGlobalIndex = character.spells.findIndex(spell => spell.id === destinationSpellId);
+    
+    if (sourceGlobalIndex !== -1 && destinationGlobalIndex !== -1) {
+      reorderSpells(sourceGlobalIndex, destinationGlobalIndex);
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow border border-purple-200 p-6">
       <div className="flex justify-between items-center mb-4">
@@ -267,16 +283,20 @@ export const SpellManagement: React.FC = () => {
               <h4 className="font-semibold text-purple-800 border-b border-purple-200 pb-1">
                 {getLevelName(level)} ({spells.length})
               </h4>
-              <div className="grid grid-cols-1 gap-2">
-                {spells.map((spell) => (
-                  <div
-                    key={spell.id}
-                    className={`p-3 rounded-lg border transition-all hover:shadow-md ${
-                      spell.isPrepared
-                        ? 'border-green-400 bg-green-50'
-                        : 'border-gray-200 bg-gray-50 hover:border-purple-300'
-                    }`}
-                  >
+              <DragDropList
+                items={spells}
+                onReorder={handleReorderSpellsInLevel(level)}
+                keyExtractor={(spell) => spell.id}
+                className="grid grid-cols-1 gap-2"
+                itemClassName={`p-3 rounded-lg border transition-all hover:shadow-md`}
+                showDragHandle={true}
+                dragHandlePosition="left"
+                renderItem={(spell, index, isDragging) => (
+                  <div className={`${
+                    spell.isPrepared
+                      ? 'border-green-400 bg-green-50'
+                      : 'border-gray-200 bg-gray-50 hover:border-purple-300'
+                  }`}>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
@@ -360,8 +380,8 @@ export const SpellManagement: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                )}
+              />
             </div>
           );
         })}

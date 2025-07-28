@@ -5,6 +5,7 @@ import { Plus, Edit3, Trash2, Save, X, BookOpen, PenTool, GripVertical } from 'l
 import { RichTextContent } from '@/types/character';
 import RichTextEditor from './RichTextEditor';
 import NoteModal from './NoteModal';
+import DragDropList from './DragDropList';
 
 interface NotesManagerProps {
   items: RichTextContent[];
@@ -40,9 +41,6 @@ export default function NotesManager({
   const [viewMode, setViewMode] = useState<'read' | 'edit'>('read');
   const [selectedNote, setSelectedNote] = useState<RichTextContent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-
   const handleAdd = () => {
     if (newItem.title.trim()) {
       onAdd({
@@ -79,38 +77,10 @@ export default function NotesManager({
     setSelectedNote(null);
   };
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', e.currentTarget.outerHTML);
-    (e.currentTarget as HTMLElement).style.opacity = '0.5';
-  };
-
-  const handleDragEnd = (e: React.DragEvent) => {
-    (e.currentTarget as HTMLElement).style.opacity = '1';
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverIndex(index);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverIndex(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
-    e.preventDefault();
-    
-    if (draggedIndex !== null && draggedIndex !== dropIndex && onReorder) {
-      onReorder(draggedIndex, dropIndex);
+  const handleReorder = (sourceIndex: number, destinationIndex: number) => {
+    if (onReorder) {
+      onReorder(sourceIndex, destinationIndex);
     }
-    
-    setDraggedIndex(null);
-    setDragOverIndex(null);
   };
 
   const renderContent = (content: string) => {
@@ -247,156 +217,145 @@ export default function NotesManager({
             </p>
           </div>
         ) : (
-          sortedItems.map((item, index) => (
-            <div 
-              key={item.id} 
-              className={`border border-blue-100 rounded-lg p-6 bg-gradient-to-r from-blue-25 to-indigo-25 hover:shadow-md transition-all cursor-pointer hover:shadow-lg hover:border-blue-200 ${
-                dragOverIndex === index ? 'border-blue-400 border-2 bg-blue-100' : ''
-              } ${
-                draggedIndex === index ? 'opacity-50' : ''
-              }`}
-              draggable={viewMode === 'edit'}
-              onDragStart={(e) => handleDragStart(e, index)}
-              onDragEnd={handleDragEnd}
-              onDragOver={(e) => handleDragOver(e, index)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, index)}
-            >
-              {editingId === item.id && viewMode === 'edit' ? (
-                // Edit mode for individual note
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-blue-800 mb-2">
-                      Note Title
-                    </label>
-                    <input
-                      type="text"
-                      defaultValue={item.title}
-                      onChange={(e) => {
-                        const newTitle = e.target.value;
-                        // We'll save on blur or when save is clicked
-                        e.target.setAttribute('data-title', newTitle);
-                      }}
-                      className="w-full px-4 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800"
-                    />
+          <DragDropList
+            items={sortedItems}
+            onReorder={handleReorder}
+            keyExtractor={(item) => item.id}
+            disabled={viewMode !== 'edit' || !onReorder}
+            className="space-y-6"
+            itemClassName="border border-blue-100 rounded-lg p-6 bg-gradient-to-r from-blue-25 to-indigo-25 hover:shadow-md transition-all cursor-pointer hover:shadow-lg hover:border-blue-200"
+            showDragHandle={viewMode === 'edit' && Boolean(onReorder)}
+            dragHandlePosition="left"
+            renderItem={(item, index, isDragging) => (
+              <>
+                {editingId === item.id && viewMode === 'edit' ? (
+                  // Edit mode for individual note
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-blue-800 mb-2">
+                        Note Title
+                      </label>
+                      <input
+                        type="text"
+                        defaultValue={item.title}
+                        onChange={(e) => {
+                          const newTitle = e.target.value;
+                          // We'll save on blur or when save is clicked
+                          e.target.setAttribute('data-title', newTitle);
+                        }}
+                        className="w-full px-4 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-blue-800 mb-2">
+                        Note Content
+                      </label>
+                      <RichTextEditor
+                        content={item.content}
+                        onChange={(content) => {
+                          // Store the content for saving later
+                          document.querySelector(`[data-editing="${item.id}"]`)?.setAttribute('data-content', content);
+                        }}
+                        className="min-h-40"
+                      />
+                    </div>
+                    <div className="flex justify-end space-x-3">
+                      <button
+                        onClick={handleCancelEdit}
+                        className="flex items-center space-x-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                      >
+                        <X size={16} />
+                        <span>Cancel</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          const container = document.querySelector(`[data-editing="${item.id}"]`);
+                          const titleInput = container?.querySelector('input[data-title]') as HTMLInputElement;
+                          const newTitle = titleInput?.getAttribute('data-title') || titleInput?.value || item.title;
+                          const newContent = container?.getAttribute('data-content') || item.content;
+                          
+                          handleUpdate(item.id, {
+                            title: newTitle,
+                            content: newContent
+                          });
+                        }}
+                        className="flex items-center space-x-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+                      >
+                        <Save size={16} />
+                        <span>Save</span>
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-blue-800 mb-2">
-                      Note Content
-                    </label>
-                    <RichTextEditor
-                      content={item.content}
-                      onChange={(content) => {
-                        // Store the content for saving later
-                        document.querySelector(`[data-editing="${item.id}"]`)?.setAttribute('data-content', content);
-                      }}
-                      className="min-h-40"
-                    />
-                  </div>
-                  <div className="flex justify-end space-x-3">
-                    <button
-                      onClick={handleCancelEdit}
-                      className="flex items-center space-x-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                    >
-                      <X size={16} />
-                      <span>Cancel</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        const container = document.querySelector(`[data-editing="${item.id}"]`);
-                        const titleInput = container?.querySelector('input[data-title]') as HTMLInputElement;
-                        const newTitle = titleInput?.getAttribute('data-title') || titleInput?.value || item.title;
-                        const newContent = container?.getAttribute('data-content') || item.content;
-                        
-                        handleUpdate(item.id, {
-                          title: newTitle,
-                          content: newContent
-                        });
-                      }}
-                      className="flex items-center space-x-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
-                    >
-                      <Save size={16} />
-                      <span>Save</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                // Display mode
-                <div data-editing={item.id} onClick={() => handleNoteClick(item)}>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3 flex-1">
-                      {viewMode === 'edit' && onReorder && (
-                        <div 
-                          className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 transition-colors"
-                          onMouseDown={(e) => e.stopPropagation()}
-                        >
-                          <GripVertical size={20} />
+                ) : (
+                  // Display mode
+                  <div data-editing={item.id} onClick={() => handleNoteClick(item)}>
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3 flex-1">
+                        <h3 className="text-xl font-semibold text-blue-900 flex-1">
+                          {item.title}
+                        </h3>
+                      </div>
+                      {viewMode === 'edit' && (
+                        <div className="flex items-center space-x-2 ml-4">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingId(item.id);
+                            }}
+                            className="p-2 text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
+                            title="Edit note"
+                          >
+                            <Edit3 size={16} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDelete(item.id);
+                            }}
+                            className="p-2 text-red-600 hover:bg-red-100 rounded-md transition-colors"
+                            title="Delete note"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       )}
-                      <h3 className="text-xl font-semibold text-blue-900 flex-1">
-                        {item.title}
-                      </h3>
                     </div>
-                    {viewMode === 'edit' && (
-                      <div className="flex items-center space-x-2 ml-4">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingId(item.id);
-                          }}
-                          className="p-2 text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
-                          title="Edit note"
-                        >
-                          <Edit3 size={16} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDelete(item.id);
-                          }}
-                          className="p-2 text-red-600 hover:bg-red-100 rounded-md transition-colors"
-                          title="Delete note"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="mt-4">
-                    {item.content ? (
-                      <div className="relative">
-                        <div className="max-h-32 overflow-hidden">
-                          {renderContent(item.content)}
-                        </div>
-                        {item.content.length > 200 && (
-                          <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-blue-25 to-transparent"></div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-gray-500 italic">No content yet...</p>
-                    )}
                     
-                    {viewMode === 'read' && (
-                      <div className="mt-4 pt-3 border-t border-blue-100">
-                        <p className="text-sm text-blue-600 font-medium">
-                          {item.content && item.content.length > 200 ? 'Click to read full note →' : 'Click to view or edit in detail →'}
+                    <div className="mt-4">
+                      {item.content ? (
+                        <div className="relative">
+                          <div className="max-h-32 overflow-hidden">
+                            {renderContent(item.content)}
+                          </div>
+                          {item.content.length > 200 && (
+                            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-blue-25 to-transparent"></div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 italic">No content yet...</p>
+                      )}
+                      
+                      {viewMode === 'read' && (
+                        <div className="mt-4 pt-3 border-t border-blue-100">
+                          <p className="text-sm text-blue-600 font-medium">
+                            {item.content && item.content.length > 200 ? 'Click to read full note →' : 'Click to view or edit in detail →'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {item.updatedAt && (
+                      <div className="mt-6 pt-4 border-t border-blue-200">
+                        <p className="text-sm text-blue-600">
+                          Last updated: {new Date(item.updatedAt).toLocaleDateString()} at {new Date(item.updatedAt).toLocaleTimeString()}
                         </p>
                       </div>
                     )}
                   </div>
-                  
-                  {item.updatedAt && (
-                    <div className="mt-6 pt-4 border-t border-blue-200">
-                      <p className="text-sm text-blue-600">
-                        Last updated: {new Date(item.updatedAt).toLocaleDateString()} at {new Date(item.updatedAt).toLocaleTimeString()}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))
+                )}
+              </>
+            )}
+          />
         )}
       </div>
 
