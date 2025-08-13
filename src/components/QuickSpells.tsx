@@ -7,14 +7,16 @@ import { Spell } from "@/types/character";
 import { calculateSpellAttackBonus, calculateSpellSaveDC, getCharacterSpellcastingAbility, rollDamage } from "@/utils/calculations";
 import { SpellCastModal } from "@/components/ui/SpellCastModal";
 import DragDropList from "@/components/ui/DragDropList";
+import { RollSummary } from "@/types/dice";
 
 interface QuickSpellsProps {
   showAttackRoll: (weaponName: string, roll: number, bonus: number, isCrit: boolean, damage?: string, damageType?: string) => void;
   showSavingThrow: (spellName: string, saveDC: number, saveType?: string, damage?: string, damageType?: string) => void;
   showDamageRoll: (weaponName: string, damageRoll: string, damageType?: string, versatile?: boolean) => void;
+  animateRoll?: (notation: string) => Promise<unknown> | void;
 }
 
-export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: showSaveToast, showDamageRoll }: QuickSpellsProps) {
+export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: showSaveToast, showDamageRoll, animateRoll }: QuickSpellsProps) {
   const { 
     character, 
     updateSpellSlot, 
@@ -61,12 +63,37 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
     }
   };
 
-  const rollSpellAttack = (spell: Spell) => {
+  const rollSpellAttack = async (spell: Spell) => {
     if (spellAttackBonus === null) {
       alert('Cannot cast spells - no spellcasting ability detected');
       return;
     }
     
+    // Animate d20 for spell attack and use actual result
+    if (animateRoll) {
+      try {
+        const rollResult = await animateRoll('1d20');
+        if (rollResult && typeof rollResult === 'object' && 'individualValues' in rollResult) {
+          const summary = rollResult as RollSummary;
+          const roll = summary.individualValues[0] || 1; // Get the d20 result
+          const isCrit = roll === 20;
+          
+          showAttackToast(
+            spell.name,
+            roll,
+            spellAttackBonus,
+            isCrit,
+            spell.damage,
+            spell.damageType
+          );
+          return;
+        }
+      } catch (error) {
+        console.warn('Dice animation failed, falling back to random roll:', error);
+      }
+    }
+    
+    // Fallback to random roll if animation fails or isn't available
     const roll = Math.floor(Math.random() * 20) + 1;
     const isCrit = roll === 20;
     
@@ -80,11 +107,20 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
     );
   };
 
-  const showSavingThrow = (spell: Spell) => {
+  const showSavingThrow = async (spell: Spell) => {
     if (spellSaveDC === null) {
       alert('Cannot cast spells - no spellcasting ability detected');
       return;
     }
+    
+    // Animate damage dice if the spell has damage
+    // if (spell.damage && animateRoll) {
+    //   try {
+    //     await animateRoll(`1`);
+    //   } catch (error) {
+    //     console.warn('Damage dice animation failed for saving throw:', error);
+    //   }
+    // }
     
     showSaveToast(
       spell.name,
@@ -95,12 +131,33 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
     );
   };
 
-  const rollSpellDamage = (spell: Spell) => {
+  const rollSpellDamage = async (spell: Spell) => {
     if (!spell.damage) {
       alert('This spell does not have damage dice specified');
       return;
     }
     
+    // Animate damage dice and use actual result
+    if (animateRoll) {
+      try {
+        const rollResult = await animateRoll(spell.damage);
+        if (rollResult && typeof rollResult === 'object' && 'finalTotal' in rollResult) {
+          const summary = rollResult as RollSummary;
+          const damageResult = `${summary.finalTotal}`;
+          
+          showDamageRoll(
+            spell.name,
+            damageResult,
+            spell.damageType
+          );
+          return;
+        }
+      } catch (error) {
+        console.warn('Dice animation failed, falling back to calculated roll:', error);
+      }
+    }
+    
+    // Fallback to calculated damage if animation fails
     const damageResult = rollDamage(spell.damage);
     showDamageRoll(
       spell.name,

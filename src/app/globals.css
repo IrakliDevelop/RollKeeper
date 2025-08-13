@@ -29,3 +29,95 @@ body {
 button {
   cursor: pointer;
 }
+
+/* Dice Box Styling */
+#dice-box {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  pointer-events: none !important;
+  z-index: 9999 !important;
+  overflow: hidden;
+}
+
+#dice-box canvas {
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none !important;
+  display: block;
+  z-index: 9999 !important;
+}
+
+
+.dot1 {
+  animation: pulse 1s infinite;
+  animation-delay: 0s;
+  opacity: 0.3;
+}
+
+.dot2 {
+  animation: pulse 1s infinite;
+  animation-delay: 0.2s;
+  opacity: 0.3;
+}
+
+.dot3 {
+  animation: pulse 1s infinite;
+  animation-delay: 0.4s;
+  opacity: 0.3;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.3;
+  }
+}
+
+/* Error page animations */
+@keyframes float {
+  0%, 100% { 
+    transform: translateY(0px) rotate(0deg); 
+  }
+  50% { 
+    transform: translateY(-20px) rotate(180deg); 
+  }
+}
+
+@keyframes float-delayed {
+  0%, 100% { 
+    transform: translateY(0px) rotate(0deg); 
+  }
+  50% { 
+    transform: translateY(-15px) rotate(-180deg); 
+  }
+}
+
+@keyframes float-slow {
+  0%, 100% { 
+    transform: translateY(0px) rotate(45deg); 
+  }
+  50% { 
+    transform: translateY(-10px) rotate(225deg); 
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float-delayed 4s ease-in-out infinite 2s;
+}
+
+.animate-float-slow {
+  animation: float-slow 8s ease-in-out infinite 1s;
+}
+

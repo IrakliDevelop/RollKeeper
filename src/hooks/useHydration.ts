@@ -12,6 +12,7 @@ export function useHydration() {
     // Set hasHydrated to true after initial render to prevent hydration mismatches
     // The onRehydrateStorage callback will have already run if there was stored data
     if (!hasHydrated) {
+      console.log('[useHydration] Setting hasHydrated to true');
       const timer = setTimeout(() => {
         useCharacterStore.setState({ hasHydrated: true });
       }, 0);

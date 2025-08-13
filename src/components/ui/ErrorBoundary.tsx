@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import ErrorPage from './ErrorPage';
 
 interface Props {
   children: ReactNode;
@@ -33,18 +34,13 @@ export default class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="p-4 border border-red-200 rounded-lg bg-red-50">
-          <h3 className="text-red-800 font-semibold mb-2">Something went wrong</h3>
-          <p className="text-red-600 text-sm">
-            {this.state.error?.message || 'An unexpected error occurred'}
-          </p>
-          <button
-            onClick={() => this.setState({ hasError: false, error: undefined })}
-            className="mt-2 px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 transition-colors"
-          >
-            Try again
-          </button>
-        </div>
+        <ErrorPage
+          error={this.state.error}
+          reset={() => this.setState({ hasError: false, error: undefined })}
+          title="Component Spell Failed!"
+          description={this.state.error?.message}
+          showHome={false}
+        />
       );
     }
 
