@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Rollkeeper",
   description: "Rollkeeper is a character sheet for the game of D&D 5e.",
+  icons: {
+    icon: "/rollkeeper_favicon.svg",
+    shortcut: "/rollkeeper_favicon.svg",
+    apple: "/rollkeeper_favicon.svg",
+  },
 };
 
 export default function RootLayout({
