@@ -5,6 +5,7 @@ import { useCharacterStore } from '@/store/characterStore';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { Shield, Dice6, Zap } from 'lucide-react';
 import { Weapon } from '@/types/character';
+import { RollSummary } from '@/types/dice';
 import { 
   isWeaponProficient, 
   getWeaponAttackString, 
@@ -18,16 +19,15 @@ import DragDropList from '@/components/ui/DragDropList';
 interface EquippedWeaponsProps {
   showAttackRoll: (weaponName: string, roll: number, bonus: number, isCrit: boolean, damage?: string, damageType?: string) => void;
   showDamageRoll: (weaponName: string, damageRoll: string, damageType?: string, versatile?: boolean) => void;
+  animateRoll?: (notation: string) => Promise<unknown> | void;
 }
 
-export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll, showDamageRoll }) => {
+export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll, showDamageRoll, animateRoll }) => {
   const { character, equipWeapon, reorderWeapons } = useCharacterStore();
   const { switchToTab } = useNavigation();
   
-  const rollWeaponAttack = (weapon: Weapon) => {
-    const roll = Math.floor(Math.random() * 20) + 1;
+  const rollWeaponAttack = async (weapon: Weapon) => {
     const attackBonus = calculateWeaponAttackBonus(character, weapon);
-    const isCrit = roll === 20;
     
     // Handle backward compatibility for damage
     let primaryDice = '1d6';
@@ -47,6 +47,34 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
       }
     }
     
+    // Animate d20 attack roll and use actual result
+    if (animateRoll) {
+      try {
+        const rollResult = await animateRoll(`1d20${attackBonus > 0 ? `+${attackBonus}` : attackBonus}`);
+        if (rollResult && typeof rollResult === 'object' && 'individualValues' in rollResult) {
+          const summary = rollResult as RollSummary;
+          const roll = summary.individualValues[0] || 1; // Get the d20 result
+          const isCrit = roll === 20;
+          
+          showAttackRoll(
+            weapon.name,
+            roll,
+            attackBonus,
+            isCrit,
+            primaryDice,
+            primaryType
+          );
+          return;
+        }
+      } catch (error) {
+        console.warn('Dice animation failed, falling back to random roll:', error);
+      }
+    }
+    
+    // Fallback to random roll if animation fails or isn't available
+    const roll = Math.floor(Math.random() * 20) + 1;
+    const isCrit = roll === 20;
+    
     showAttackRoll(
       weapon.name,
       roll,
@@ -57,29 +85,81 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
     );
   };
 
-  const rollWeaponDamage = (weapon: Weapon, versatile = false) => {
+  const rollWeaponDamage = async (weapon: Weapon, versatile = false) => {
     const damageBonus = calculateWeaponDamageBonus(character, weapon);
     
     if (Array.isArray(weapon.damage)) {
       // New format: array of damage entries
-      weapon.damage.forEach((damage, index) => {
+      for (let index = 0; index < weapon.damage.length; index++) {
+        const damage = weapon.damage[index];
         const dice = versatile && damage.versatiledice ? damage.versatiledice : damage.dice;
-        const damageResult = rollDamage(dice, index === 0 ? damageBonus : 0); // Only add weapon damage bonus to first damage
+        const weaponBonus = index === 0 ? damageBonus : 0; // Only add weapon damage bonus to first damage
         
+        // Animate damage dice and use actual result
+        if (animateRoll) {
+          try {
+            const notationWithBonus = weaponBonus !== 0
+              ? `${dice}${weaponBonus > 0 ? `+${weaponBonus}` : `${weaponBonus}`}`
+              : dice;
+            const rollResult = await animateRoll(notationWithBonus);
+            if (rollResult && typeof rollResult === 'object' && 'finalTotal' in rollResult) {
+              const summary = rollResult as RollSummary;
+              const damageResult = `${summary.total} + ${weaponBonus} = ${summary.finalTotal}`;
+              
+              showDamageRoll(
+                `${weapon.name}${damage.label && damage.label !== 'Weapon Damage' ? ` (${damage.label})` : ''}`,
+                damageResult,
+                damage.type,
+                versatile && index === 0 // Only show versatile for first damage
+              );
+              continue;
+            }
+          } catch (error) {
+            console.warn('Dice animation failed, falling back to calculated roll:', error);
+          }
+        }
+        
+        // Fallback to calculated damage if animation fails
+        const damageResult = rollDamage(dice, weaponBonus);
         showDamageRoll(
           `${weapon.name}${damage.label && damage.label !== 'Weapon Damage' ? ` (${damage.label})` : ''}`,
           damageResult,
           damage.type,
           versatile && index === 0 // Only show versatile for first damage
         );
-      });
+      }
     } else {
       // Old format: single damage object
       const legacyDamage = weapon.damage as { dice: string; type: string; versatiledice?: string };
       if (legacyDamage && legacyDamage.dice && legacyDamage.type) {
         const dice = versatile && legacyDamage.versatiledice ? legacyDamage.versatiledice : legacyDamage.dice;
-        const damageResult = rollDamage(dice, damageBonus);
         
+        // Animate damage dice and use actual result
+        if (animateRoll) {
+          try {
+            const notationWithBonus = damageBonus !== 0
+              ? `${dice}${damageBonus > 0 ? `+${damageBonus}` : `${damageBonus}`}`
+              : dice;
+            const rollResult = await animateRoll(notationWithBonus);
+            if (rollResult && typeof rollResult === 'object' && 'finalTotal' in rollResult) {
+              const summary = rollResult as RollSummary;
+              const damageResult = `${summary.total} + ${damageBonus} = ${summary.finalTotal}`;
+              
+              showDamageRoll(
+                weapon.name,
+                damageResult,
+                legacyDamage.type,
+                versatile
+              );
+              return;
+            }
+          } catch (error) {
+            console.warn('Dice animation failed, falling back to calculated roll:', error);
+          }
+        }
+        
+        // Fallback to calculated damage if animation fails
+        const damageResult = rollDamage(dice, damageBonus);
         showDamageRoll(
           weapon.name,
           damageResult,

@@ -48,16 +48,34 @@ import {
 } from "@/utils/fileOperations";
 import { AbilityName, SkillName } from "@/types/character";
 import { useCallback, useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import GroupedTabs, { TabContent, GroupedTabsRef } from "@/components/ui/GroupedTabs";
 import { NavigationContext } from "@/contexts/NavigationContext";
 import ArmorDefenseManager from "@/components/ArmorDefenseManager";
 import InventoryManager from "@/components/ui/InventoryManager";
 import CurrencyManager from "@/components/ui/CurrencyManager";
+import { useSimpleDiceRoll } from "@/hooks/useSimpleDiceRoll";
+import { DiceButton } from "@/components/ui/DiceButton";
+import { RollSummary } from "@/types/dice";
+import NotHydrated from "@/components/ui/NotHydrated";
 
 
 export default function CharacterSheet() {
   // Hydration check to prevent SSR/client mismatches
   const hasHydrated = useHydration();
+
+
+  
+  // Dice rolling with new modular system
+  const { isReady: diceBoxInitialized, roll: rollDice, clearDice } = useSimpleDiceRoll({
+    containerId: 'main-dice-container',
+    onRollComplete: (summary: RollSummary) => {
+      console.log('Dice roll completed:', summary);
+    },
+    onError: (error: string) => {
+      console.error('Dice roll error:', error);
+    }
+  });
   
   // Toast system
   const { toasts, dismissToast, showAttackRoll, showSavingThrow, showDamageRoll } = useToast();
@@ -171,30 +189,155 @@ export default function CharacterSheet() {
   };
 
   // Roll saving throw
-  const rollSavingThrow = (ability: AbilityName) => {
+  const rollSavingThrow = async (ability: AbilityName) => {
+    const saveModifier = getSavingThrowModifier(ability);
+
+    // Roll 3D dice and use actual result
+    if (diceBoxInitialized) {
+      try {
+        const rollResult = await rollDice(`1d20${saveModifier > 0 ? `+${saveModifier}` : saveModifier}`);
+        if (rollResult && typeof rollResult === 'object' && 'individualValues' in rollResult) {
+          const summary = rollResult as RollSummary;
+          const roll = summary.individualValues[0] || 1; // Get the d20 result
+          const isCrit = roll === 20;
+
+          // Use showAttackRoll since it's more appropriate for displaying dice rolls
+          showAttackRoll(
+            `${ABILITY_NAMES[ability]} Save`,
+            roll,
+            saveModifier,
+            isCrit
+          );
+          return;
+        }
+      } catch (error) {
+        console.warn('Dice animation failed, falling back to random roll:', error);
+      }
+    }
+
+    // Fallback to random roll if animation fails or isn't available
     const roll = Math.floor(Math.random() * 20) + 1;
-    const modifier = getSavingThrowModifier(ability);
     const isCrit = roll === 20;
-    
+
     // Use showAttackRoll since it's more appropriate for displaying dice rolls
     showAttackRoll(
       `${ABILITY_NAMES[ability]} Save`,
       roll,
-      modifier,
+      saveModifier,
       isCrit
     );
   };
 
   // Roll skill check
-  const rollSkillCheck = (skillName: SkillName) => {
+  const rollSkillCheck = async (skillName: SkillName) => {
+    const skillModifier = getSkillModifier(skillName);
+    
+    // Roll 3D dice and use actual result
+    if (diceBoxInitialized) {
+      try {
+        const rollResult = await rollDice(`1d20${skillModifier > 0 ? `+${skillModifier}` : skillModifier}`);
+        if (rollResult && typeof rollResult === 'object' && 'individualValues' in rollResult) {
+          const summary = rollResult as RollSummary;
+          const roll = summary.individualValues[0] || 1; // Get the d20 result
+          const isCrit = roll === 20;
+          
+          showAttackRoll(
+            SKILL_NAMES[skillName],
+            roll,
+            skillModifier,
+            isCrit
+          );
+          return;
+        }
+      } catch (error) {
+        console.warn('Dice animation failed, falling back to random roll:', error);
+      }
+    }
+    
+    // Fallback to random roll if animation fails or isn't available
     const roll = Math.floor(Math.random() * 20) + 1;
-    const modifier = getSkillModifier(skillName);
     const isCrit = roll === 20;
     
     showAttackRoll(
       SKILL_NAMES[skillName],
       roll,
-      modifier,
+      skillModifier,
+      isCrit
+    );
+  };
+
+  // Roll ability check
+  const rollAbilityCheck = async (ability: AbilityName) => {
+    const abilityModifier = getAbilityModifier(ability);
+    
+    // Roll 3D dice and use actual result
+    if (diceBoxInitialized) {
+      try {
+        const rollResult = await rollDice(`1d20${abilityModifier > 0 ? `+${abilityModifier}` : abilityModifier}`);
+        if (rollResult && typeof rollResult === 'object' && 'individualValues' in rollResult) {
+          const summary = rollResult as RollSummary;
+          const roll = summary.individualValues[0] || 1; // Get the d20 result
+          const isCrit = roll === 20;
+          
+          showAttackRoll(
+            `${ABILITY_NAMES[ability]} Check`,
+            roll,
+            abilityModifier,
+            isCrit
+          );
+          return;
+        }
+      } catch (error) {
+        console.warn('Dice animation failed, falling back to random roll:', error);
+      }
+    }
+    
+    // Fallback to random roll if animation fails or isn't available
+    const roll = Math.floor(Math.random() * 20) + 1;
+    const isCrit = roll === 20;
+    
+    showAttackRoll(
+      `${ABILITY_NAMES[ability]} Check`,
+      roll,
+      abilityModifier,
+      isCrit
+    );
+  };
+
+  // Roll initiative
+  const rollInitiative = async () => {
+    const initiativeModifier = getInitiativeModifier();
+    
+    // Roll 3D dice and use actual result
+    if (diceBoxInitialized) {
+      try {
+        const rollResult = await rollDice(`1d20${initiativeModifier > 0 ? `+${initiativeModifier}` : initiativeModifier}`);
+        if (rollResult && typeof rollResult === 'object' && 'individualValues' in rollResult) {
+          const summary = rollResult as RollSummary;
+          const roll = summary.individualValues[0] || 1; // Get the d20 result
+          const isCrit = roll === 20;
+          
+          showAttackRoll(
+            'Initiative',
+            roll,
+            initiativeModifier,
+            isCrit
+          );
+          return;
+        }
+      } catch (error) {
+        console.warn('Dice animation failed, falling back to random roll:', error);
+      }
+    }
+    
+    // Fallback to random roll if animation fails or isn't available
+    const roll = Math.floor(Math.random() * 20) + 1;
+    const isCrit = roll === 20;
+    
+    showAttackRoll(
+      'Initiative',
+      roll,
+      initiativeModifier,
       isCrit
     );
   };
@@ -259,13 +402,49 @@ export default function CharacterSheet() {
     tabsRef.current?.switchToTab(tabId);
   }, []);
 
-
+  if (!hasHydrated) {
+    console.log('[CharacterSheet] Waiting for hydration');
+    return <NotHydrated />;
+  }
 
   return (
+    <ErrorBoundary fallback={<div>Error</div>}>
     <NavigationContext.Provider value={{ switchToTab }}>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-4 relative">
+      {/* Main Dice Container */}
+      <div 
+        id="main-dice-container" 
+        className="fixed inset-0 pointer-events-none z-[9999]"
+        style={{ 
+          width: '100vw', 
+          height: '100vh',
+          top: 0,
+          left: 0
+        }}
+      ></div>
+      <style jsx global>{`
+        #main-dice-container {
+          position: fixed;
+          inset: 0;
+          width: 100vw;
+          height: 100vh;
+        }
+        #main-dice-container canvas,
+        #main-dice-container > div,
+        #main-dice-container > canvas {
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          max-width: 100% !important;
+          max-height: 100% !important;
+          display: block !important;
+        }
+      `}</style>
+      
       {/* Header with Character Name and Actions */}
-      <header className="max-w-7xl mx-auto mb-8">
+      <header className="max-w-7xl mx-auto mb-8 relative z-20">{/* Increased z-index to be above dice */}
         <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl border border-slate-200 p-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex-1">
@@ -318,6 +497,30 @@ export default function CharacterSheet() {
                 <RotateCcw size={16} />
                 Reset
               </button>
+              {/* Test Dice Button */}
+              <DiceButton
+                notation="1d20"
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all shadow-md"
+                onRollComplete={(summary) => console.log('Test roll:', summary)}
+              >
+                Test Dice
+              </DiceButton>
+              {/* Clear Dice Button */}
+              <button 
+                onClick={clearDice}
+                disabled={!diceBoxInitialized}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-lg hover:from-orange-700 hover:to-orange-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all shadow-md"
+                title={diceBoxInitialized ? "Clear dice from screen" : "Dice box is initializing..."}
+              >
+                🧹 Clear Dice
+              </button>
+              <Link 
+                href="/dice-components-demo"
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg hover:from-teal-700 hover:to-teal-800 transition-all shadow-md"
+                title="See modular dice components"
+              >
+                🎲 Dice Lab
+              </Link>
             </div>
           </div>
         </div>
@@ -330,7 +533,7 @@ export default function CharacterSheet() {
       <ExperimentalFeaturesSection />
 
       {/* Main Character Sheet */}
-      <main className="max-w-7xl mx-auto space-y-8">
+      <main className="max-w-7xl mx-auto space-y-8 relative z-20">
         
         {/* Actions Section */}
         <section className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-6 border-2 border-slate-300 shadow-lg backdrop-blur-sm">
@@ -349,7 +552,11 @@ export default function CharacterSheet() {
                 <p className="text-gray-500">Unable to load equipped weapons</p>
               </div>
             }>
-              <EquippedWeapons showAttackRoll={showAttackRoll} showDamageRoll={showDamageRoll} />
+              <EquippedWeapons 
+                showAttackRoll={showAttackRoll} 
+                showDamageRoll={showDamageRoll}
+                animateRoll={diceBoxInitialized ? rollDice : undefined}
+              />
             </ErrorBoundary>
 
             {/* Cantrips & Spells */}
@@ -367,7 +574,12 @@ export default function CharacterSheet() {
                   <span className="text-purple-600">✨</span>
                   Quick Spells
                 </h3>
-                <QuickSpells showAttackRoll={showAttackRoll} showSavingThrow={showSavingThrow} showDamageRoll={showDamageRoll} />
+                <QuickSpells 
+                  showAttackRoll={showAttackRoll} 
+                  showSavingThrow={showSavingThrow} 
+                  showDamageRoll={showDamageRoll}
+                  animateRoll={diceBoxInitialized ? rollDice : undefined}
+                />
                 <div className="mt-4 pt-3 border-t border-gray-200">
                   <p className="text-xs text-gray-500 text-center">
                     Manage spells in the{' '}
@@ -497,9 +709,13 @@ export default function CharacterSheet() {
                         max="30"
                         className="w-full text-2xl font-bold text-center bg-transparent border-none outline-none text-blue-900"
                       />
-                      <div className="text-lg font-semibold text-blue-700 mt-1">
+                      <button
+                        onClick={() => rollAbilityCheck(ability)}
+                        className="text-lg font-semibold text-blue-700 mt-1 hover:text-blue-900 hover:bg-blue-100 px-2 py-1 rounded transition-colors cursor-pointer"
+                        title={`Roll ${ABILITY_NAMES[ability]} check (d20 + ${formatModifier(getAbilityModifier(ability))})`}
+                      >
                         {formatModifier(getAbilityModifier(ability))}
-                      </div>
+                      </button>
                       <div className="text-xs text-blue-600">modifier</div>
                     </div>
                   </div>
@@ -889,6 +1105,13 @@ export default function CharacterSheet() {
                             <RotateCcw size={10} />
                           </button>
                         )}
+                        <button
+                          onClick={rollInitiative}
+                          className="text-yellow-600 hover:text-yellow-800 transition-colors ml-1"
+                          title={`Roll initiative (d20 + ${formatModifier(getInitiativeModifier())})`}
+                        >
+                          🎲
+                        </button>
                       </div>
                       <input
                         type="number"
@@ -1279,5 +1502,6 @@ export default function CharacterSheet() {
       />
     </div>
     </NavigationContext.Provider>
+    </ErrorBoundary>
   );
 }
