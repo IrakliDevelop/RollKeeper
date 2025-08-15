@@ -1,7 +1,7 @@
 
 
 export interface ParsedReference {
-  type: 'item' | 'spell' | 'filter' | 'dice' | 'creature' | 'condition' | 'action' | 'skill' | 'sense' | 'damage' | 'scaledamage' | 'unknown';
+  type: 'item' | 'spell' | 'filter' | 'dice' | 'creature' | 'condition' | 'action' | 'skill' | 'sense' | 'damage' | 'scaledamage' | 'atk' | 'atkr' | 'hit' | 'h' | 'dc' | 'actSave' | 'actSaveFail' | 'actSaveSuccess' | 'actTrigger' | 'actResponse' | 'hitYourSpellAttack' | 'unknown';
   name: string;
   source?: string;
   displayText: string;
@@ -83,6 +83,17 @@ function normalizeReferenceType(type: string): ParsedReference['type'] {
     'sense': 'sense',
     'damage': 'damage',
     'scaledamage': 'scaledamage',
+    'atk': 'atk',
+    'atkr': 'atkr',
+    'hit': 'hit',
+    'h': 'h',
+    'dc': 'dc',
+    'actsave': 'actSave',
+    'actsavefail': 'actSaveFail',
+    'actsavesuccess': 'actSaveSuccess',
+    'acttrigger': 'actTrigger',
+    'actresponse': 'actResponse',
+    'hityourspellattack': 'hitYourSpellAttack',
     // Add more mappings as needed
   };
   
@@ -166,6 +177,53 @@ function formatDisplayText(type: string, name: string, source?: string, extra?: 
     
     case 'scaledamage':
       return parseScaledDamage(name, source, extra);
+    
+    case 'atk':
+      // Handle attack types like "mw" (melee weapon), "rw" (ranged weapon)
+      switch (name.toLowerCase()) {
+        case 'm':
+        case 'mw': return 'Melee Weapon Attack:';
+        case 'r':
+        case 'rw': return 'Ranged Weapon Attack:';
+        case 'ms': return 'Melee Spell Attack:';
+        case 'rs': return 'Ranged Spell Attack:';
+        default: return `${name} Attack:`;
+      }
+    
+    case 'atkr':
+      // Handle ranged attack types
+      switch (name.toLowerCase()) {
+        case 'm': return 'Melee Attack:';
+        case 'r': return 'Ranged Attack:';
+        default: return `${name} Attack:`;
+      }
+    
+    case 'hit':
+      return `+${name}`;
+    
+    case 'h':
+      return `Hit: ${name}`;
+    
+    case 'dc':
+      return `DC ${name}`;
+    
+    case 'actsave':
+      return `${name.toUpperCase()} save`;
+    
+    case 'actsavefail':
+      return 'On a failed save:';
+    
+    case 'actsavesuccess':
+      return 'On a successful save:';
+    
+    case 'acttrigger':
+      return `Trigger: ${name}`;
+    
+    case 'actresponse':
+      return `Response: ${name}`;
+    
+    case 'hityourspellattack':
+      return name; // This typically contains the full text like "Bonus equals your spell attack modifier"
     
     default:
       return name;
@@ -253,6 +311,61 @@ function formatReferenceHtml(reference: ParsedReference): string {
     case 'scaledamage':
       typeClasses = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20";
       icon = "📈";
+      break;
+    
+    case 'atk':
+      typeClasses = "bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20";
+      icon = "⚔️";
+      break;
+    
+    case 'atkr':
+      typeClasses = "bg-violet-600/10 text-violet-400 border border-violet-600/20 hover:bg-violet-600/20";
+      icon = "🏹";
+      break;
+    
+    case 'hit':
+      typeClasses = "bg-emerald-600/10 text-emerald-400 border border-emerald-600/20 hover:bg-emerald-600/20";
+      icon = "🎯";
+      break;
+    
+    case 'h':
+      typeClasses = "bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20";
+      icon = "💥";
+      break;
+    
+    case 'dc':
+      typeClasses = "bg-blue-600/10 text-blue-400 border border-blue-600/20 hover:bg-blue-600/20";
+      icon = "🔢";
+      break;
+    
+    case 'actSave':
+      typeClasses = "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/20";
+      icon = "🛡️";
+      break;
+    
+    case 'actSaveFail':
+      typeClasses = "bg-red-700/10 text-red-400 border border-red-700/20 hover:bg-red-700/20";
+      icon = "❌";
+      break;
+    
+    case 'actSaveSuccess':
+      typeClasses = "bg-green-600/10 text-green-400 border border-green-600/20 hover:bg-green-600/20";
+      icon = "✅";
+      break;
+    
+    case 'actTrigger':
+      typeClasses = "bg-orange-600/10 text-orange-400 border border-orange-600/20 hover:bg-orange-600/20";
+      icon = "⚡";
+      break;
+    
+    case 'actResponse':
+      typeClasses = "bg-indigo-600/10 text-indigo-400 border border-indigo-600/20 hover:bg-indigo-600/20";
+      icon = "↩️";
+      break;
+    
+    case 'hitYourSpellAttack':
+      typeClasses = "bg-purple-600/10 text-purple-400 border border-purple-600/20 hover:bg-purple-600/20";
+      icon = "✨";
       break;
     
     default:
