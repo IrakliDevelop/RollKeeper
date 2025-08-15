@@ -2,11 +2,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 
-interface DropdownOption {
+export interface DropdownOption {
   value: string;
   label: string;
-  disabled?: boolean;
+  icon?: React.ReactNode;
+  description?: string;
 }
 
 interface CustomDropdownProps {
@@ -16,20 +18,20 @@ interface CustomDropdownProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  width?: 'auto' | 'full' | string;
 }
 
 export default function CustomDropdown({
   options,
   value,
   onChange,
-  placeholder = "Select an option",
-  className = "",
-  disabled = false
+  placeholder = 'Select an option',
+  className = '',
+  disabled = false,
+  width = 'auto'
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [focusedIndex, setFocusedIndex] = useState(-1);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
 
   const selectedOption = options.find(option => option.value === value);
 
@@ -37,157 +39,113 @@ export default function CustomDropdown({
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
-        setFocusedIndex(-1);
       }
     };
 
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsOpen(false);
-        setFocusedIndex(-1);
-        buttonRef.current?.focus();
-      }
-    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleEscape);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isOpen]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (disabled) return;
-
-    switch (e.key) {
-      case 'Enter':
-      case ' ':
-        e.preventDefault();
-        if (!isOpen) {
-          setIsOpen(true);
-          setFocusedIndex(0);
-        } else if (focusedIndex >= 0) {
-          const selectedOption = options[focusedIndex];
-          if (!selectedOption.disabled) {
-            onChange(selectedOption.value);
-            setIsOpen(false);
-            setFocusedIndex(-1);
-          }
-        }
-        break;
-      case 'ArrowDown':
-        e.preventDefault();
-        if (!isOpen) {
-          setIsOpen(true);
-          setFocusedIndex(0);
-        } else {
-          setFocusedIndex(prev => {
-            const nextIndex = prev < options.length - 1 ? prev + 1 : 0;
-            return options[nextIndex].disabled ? (nextIndex + 1) % options.length : nextIndex;
-          });
-        }
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        if (!isOpen) {
-          setIsOpen(true);
-          setFocusedIndex(options.length - 1);
-        } else {
-          setFocusedIndex(prev => {
-            const nextIndex = prev > 0 ? prev - 1 : options.length - 1;
-            return options[nextIndex].disabled ? (nextIndex - 1 + options.length) % options.length : nextIndex;
-          });
-        }
-        break;
-      case 'Tab':
-        setIsOpen(false);
-        setFocusedIndex(-1);
-        break;
+  const handleToggle = () => {
+    if (!disabled) {
+      setIsOpen(!isOpen);
     }
   };
 
-  const handleOptionClick = (option: DropdownOption) => {
-    if (option.disabled) return;
-    onChange(option.value);
+  const handleSelect = (optionValue: string) => {
+    onChange(optionValue);
     setIsOpen(false);
-    setFocusedIndex(-1);
-    buttonRef.current?.focus();
   };
 
-  const toggleDropdown = () => {
-    if (disabled) return;
-    setIsOpen(!isOpen);
-    if (!isOpen) {
-      setFocusedIndex(0);
-    }
-  };
+  const widthClass = width === 'full' ? 'w-full' : width === 'auto' ? 'w-auto' : width;
 
   return (
-    <div ref={dropdownRef} className={`relative ${className}`}>
+    <div className={`relative ${widthClass} ${className}`} ref={dropdownRef}>
+      {/* Trigger Button */}
       <button
-        ref={buttonRef}
         type="button"
-        onClick={toggleDropdown}
-        onKeyDown={handleKeyDown}
+        onClick={handleToggle}
         disabled={disabled}
         className={`
-          w-full px-4 py-3 text-left border-2 border-gray-300 rounded-lg bg-white text-gray-900 
-          transition-all duration-200 focus:ring-2 focus:ring-purple-500 focus:border-purple-500
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-400 cursor-pointer'}
-          ${isOpen ? 'border-purple-500 ring-2 ring-purple-500' : ''}
-          flex items-center justify-between
+          flex items-center justify-between w-full px-4 py-3 text-left
+          bg-slate-800/50 border border-slate-600/50 rounded-lg
+          text-white text-sm font-medium
+          hover:bg-slate-700/50 hover:border-slate-500/50
+          focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50
+          transition-all duration-200
+          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+          ${isOpen ? 'ring-2 ring-emerald-500/50 border-emerald-500/50' : ''}
         `}
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        aria-labelledby="dropdown-label"
       >
-        <span className={selectedOption ? 'text-gray-900' : 'text-gray-500'}>
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          {selectedOption?.icon && (
+            <span className="flex-shrink-0 text-slate-400">
+              {selectedOption.icon}
+            </span>
+          )}
+          <span className="truncate">
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+        </div>
+        
         <ChevronDown 
-          size={16} 
-          className={`text-gray-400 transition-transform duration-200 ${
+          className={`flex-shrink-0 h-4 w-4 text-slate-400 transition-transform duration-200 ${
             isOpen ? 'rotate-180' : ''
-          }`}
+          }`} 
         />
       </button>
 
-      {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border-2 border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
-          <ul role="listbox" className="py-1">
-            {options.map((option, index) => (
-              <li
-                key={option.value}
-                role="option"
-                aria-selected={option.value === value}
-                className={`
-                  px-4 py-3 cursor-pointer transition-colors duration-150 flex items-center justify-between
-                  ${option.disabled 
-                    ? 'text-gray-400 cursor-not-allowed' 
-                    : focusedIndex === index
-                      ? 'bg-purple-50 text-purple-900'
-                      : option.value === value
-                        ? 'bg-purple-100 text-purple-900'
-                        : 'text-gray-900 hover:bg-gray-50'
-                  }
-                  ${index !== options.length - 1 ? 'border-b border-gray-100' : ''}
-                `}
-                onClick={() => handleOptionClick(option)}
-                onMouseEnter={() => !option.disabled && setFocusedIndex(index)}
-              >
-                <span className="flex-1">{option.label}</span>
-                {option.value === value && (
-                  <Check size={16} className="text-purple-600 ml-2" />
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* Dropdown Menu */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className="absolute top-full left-0 right-0 mt-2 z-50"
+          >
+            <div className="bg-slate-800/95 backdrop-blur-sm border border-slate-600/50 rounded-lg shadow-xl shadow-black/30 overflow-hidden">
+              <div className="py-2 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+                {options.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => handleSelect(option.value)}
+                    className={`
+                      w-full px-4 py-3 text-left flex items-center gap-3
+                      hover:bg-slate-700/50 transition-colors duration-150
+                      ${value === option.value ? 'bg-emerald-600/20 text-emerald-300' : 'text-slate-200'}
+                    `}
+                  >
+                    {option.icon && (
+                      <span className={`flex-shrink-0 ${
+                        value === option.value ? 'text-emerald-400' : 'text-slate-400'
+                      }`}>
+                        {option.icon}
+                      </span>
+                    )}
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium truncate">{option.label}</span>
+                        {value === option.value && (
+                          <Check className="h-4 w-4 text-emerald-400 flex-shrink-0 ml-2" />
+                        )}
+                      </div>
+                      {option.description && (
+                        <p className="text-xs text-slate-400 mt-1 truncate">
+                          {option.description}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
-} 
+}

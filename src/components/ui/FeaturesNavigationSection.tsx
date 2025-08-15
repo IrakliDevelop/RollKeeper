@@ -51,8 +51,8 @@ const navigationItems: NavigationItem[] = [
     icon: Skull,
     gradient: 'from-red-600 via-rose-600 to-pink-600',
     hoverGradient: 'from-red-700 via-rose-700 to-pink-700',
-    available: false,
-    comingSoon: true,
+    available: true,
+    comingSoon: false,
   },
 ];
 

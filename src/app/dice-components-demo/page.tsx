@@ -27,7 +27,7 @@ export default function DiceComponentsDemo() {
             🎲 Modular Dice Components Demo
           </h1>
           <p className="text-gray-600 mb-6">
-            Showcase of reusable dice rolling components that can be plugged into any part of your app
+            Showcase of reusable dice rolling components that can be plugged into any part of the app
           </p>
           <Link 
             href="/"
