@@ -23,7 +23,7 @@ Create a comprehensive, dedicated note-taking module for D&D sessions with advan
 
 ## 🏗️ Implementation Roadmap
 
-### Phase 1: Research & Planning (Days 1-3)
+### Phase 1: Research & Planning
 - [ ] **Editor Research**
   - [ ] Evaluate TipTap v2 upgrade path
   - [ ] Research Lexical editor capabilities
@@ -40,7 +40,7 @@ Create a comprehensive, dedicated note-taking module for D&D sessions with advan
   - [ ] Define API contracts
   - [ ] Local storage strategy
 
-### Phase 2: Foundation Setup (Days 4-7)
+### Phase 2: Foundation Setup
 - [ ] **Core Infrastructure**
   - [ ] Create `src/store/notesStore.ts`
   - [ ] Define note data models in `src/types/notes.ts`
@@ -57,7 +57,7 @@ Create a comprehensive, dedicated note-taking module for D&D sessions with advan
   - [ ] Add note deletion with confirmation
   - [ ] Build note listing and filtering
 
-### Phase 3: Enhanced Editor (Days 8-12)
+### Phase 3: Enhanced Editor
 - [ ] **Editor Implementation**
   - [ ] Install and configure chosen editor
   - [ ] Create `NoteEditor` component
@@ -74,7 +74,7 @@ Create a comprehensive, dedicated note-taking module for D&D sessions with advan
   - [ ] Image/attachment support
   - [ ] Code blocks and syntax highlighting
 
-### Phase 4: Organization System (Days 13-17)
+### Phase 4: Organization System
 - [ ] **Categories & Tags**
   - [ ] Create category management system
   - [ ] Implement tagging functionality
@@ -91,7 +91,7 @@ Create a comprehensive, dedicated note-taking module for D&D sessions with advan
   - [ ] Bulk operations (delete, tag, move)
   - [ ] Note templates
 
-### Phase 5: Note Relationships (Days 18-22)
+### Phase 5: Note Relationships 
 - [ ] **Linking System**
   - [ ] Bidirectional note linking
   - [ ] Link type definitions
@@ -108,7 +108,7 @@ Create a comprehensive, dedicated note-taking module for D&D sessions with advan
   - [ ] Link strength indicators
   - [ ] Broken link detection
 
-### Phase 6: Canvas View (Days 23-28)
+### Phase 6: Canvas View
 - [ ] **Canvas Implementation**
   - [ ] Install and configure React Flow
   - [ ] Create `NotesCanvas` component
@@ -125,7 +125,7 @@ Create a comprehensive, dedicated note-taking module for D&D sessions with advan
   - [ ] Quick note creation on canvas
   - [ ] Canvas search and filtering
 
-### Phase 7: Advanced Features (Days 29-33)
+### Phase 7: Advanced Features
 - [ ] **Session Integration**
   - [ ] Session-specific note categories
   - [ ] Timeline view for session notes
@@ -142,7 +142,7 @@ Create a comprehensive, dedicated note-taking module for D&D sessions with advan
   - [ ] Search index optimization
   - [ ] Canvas rendering performance
 
-### Phase 8: Migration & Polish (Days 34-38)
+### Phase 8: Migration & Polish
 - [ ] **Data Migration**
   - [ ] Migration script for existing notes
   - [ ] Data validation and cleanup
@@ -159,7 +159,7 @@ Create a comprehensive, dedicated note-taking module for D&D sessions with advan
   - [ ] Cross-browser compatibility
   - [ ] Mobile device testing
 
-### Phase 9: Documentation & Launch (Days 39-42)
+### Phase 9: Documentation & Launch
 - [ ] **Documentation**
   - [ ] User guide creation
   - [ ] Feature documentation
