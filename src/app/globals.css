@@ -30,6 +30,94 @@ button {
   cursor: pointer;
 }
 
+/* Fix text readability - make text darker without changing backgrounds */
+input, 
+textarea, 
+select {
+  color: #1f2937; /* Dark gray text instead of light gray */
+}
+
+/* Placeholder text should be medium gray, not too light */
+input::placeholder,
+textarea::placeholder {
+  color: #6b7280; /* Medium gray for good readability */
+  opacity: 1;
+}
+
+
+/* TipTap Editor content - make text darker and more specific */
+.ProseMirror {
+  color: #1f2937 !important; /* Dark text for readability */
+}
+
+.ProseMirror p,
+.ProseMirror h1,
+.ProseMirror h2, 
+.ProseMirror h3,
+.ProseMirror h4,
+.ProseMirror h5,
+.ProseMirror h6,
+.ProseMirror li,
+.ProseMirror ul,
+.ProseMirror ol,
+.ProseMirror div {
+  color: #1f2937 !important; /* Ensure all editor content is dark */
+}
+
+/* Fix text inputs in editor mode */
+.prose input[type="text"] {
+  color: #1f2937 !important;
+}
+/* but for placeholder text */
+.prose input[type="text"]::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Fix light gray text on white buttons */
+
+
+/* Make sure all text in forms is readable */
+form input,
+form textarea,
+form select {
+  color: #1f2937;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  
+  select {
+    color: #9ca3af;
+  }
+
+  input, 
+  textarea {
+    color: #1f2937 ;
+  }
+  
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af;
+  }
+  
+  .ProseMirror {
+    color: #f9fafb;
+  }
+  
+  .ProseMirror p,
+  .ProseMirror h1,
+  .ProseMirror h2, 
+  .ProseMirror h3,
+  .ProseMirror h4,
+  .ProseMirror h5,
+  .ProseMirror h6,
+  .ProseMirror li,
+  .ProseMirror ul,
+  .ProseMirror ol {
+    color: #f9fafb;
+  }
+}
+
 /* Dice Box Styling */
 #dice-box {
   position: fixed !important;

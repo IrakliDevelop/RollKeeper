@@ -1,6 +1,7 @@
 'use client';
 
-import { Save, Download, Upload, RotateCcw } from "lucide-react";
+import { Save, Download, Upload, RotateCcw, FileText } from "lucide-react";
+import Link from "next/link";
 import { useCharacterStore } from "@/store/characterStore";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { SaveIndicator } from "@/components/ui/SaveIndicator";
@@ -48,7 +49,6 @@ import {
 } from "@/utils/fileOperations";
 import { AbilityName, SkillName } from "@/types/character";
 import { useCallback, useEffect, useState, useRef } from "react";
-import Link from "next/link";
 import GroupedTabs, { TabContent, GroupedTabsRef } from "@/components/ui/GroupedTabs";
 import { NavigationContext } from "@/contexts/NavigationContext";
 import ArmorDefenseManager from "@/components/ArmorDefenseManager";
@@ -489,6 +489,14 @@ export default function CharacterSheet() {
                 <Upload size={16} />
                 Import
               </button>
+              <Link 
+                href="/prototype"
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md"
+                title="Try the new Notes module prototype"
+              >
+                <FileText size={16} />
+                Notes Prototype
+              </Link>
               <button 
                 onClick={() => setShowResetModal(true)}
                 className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all shadow-md"

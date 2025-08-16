@@ -3,10 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { TextStyle } from '@tiptap/extension-text-style';
-import { BulletList } from '@tiptap/extension-bullet-list';
-import { OrderedList } from '@tiptap/extension-ordered-list';
-import { ListItem } from '@tiptap/extension-list-item';
 import { 
   Bold, 
   Italic, 
@@ -20,7 +16,7 @@ import {
   Code
 } from 'lucide-react';
 
-interface ImprovedRichTextEditorProps {
+interface FixedRichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
   placeholder?: string;
@@ -28,58 +24,27 @@ interface ImprovedRichTextEditorProps {
   minHeight?: string;
 }
 
-export default function ImprovedRichTextEditor({
+export default function FixedRichTextEditor({
   content,
   onChange,
   placeholder = 'Start typing...',
   className = '',
   minHeight = '200px'
-}: ImprovedRichTextEditorProps) {
+}: FixedRichTextEditorProps) {
   const [isMounted, setIsMounted] = useState(false);
 
-  // Ensure component only renders on client side
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
   const editor = useEditor({
     extensions: [
+      // Use StarterKit with minimal configuration to avoid conflicts
       StarterKit.configure({
-        // Disable built-in extensions that we want to configure explicitly
-        bulletList: false,
-        orderedList: false,
-        listItem: false,
         heading: {
           levels: [1, 2, 3, 4, 5, 6],
         },
-        // Make sure code blocks work
-        codeBlock: {
-          HTMLAttributes: {
-            class: 'bg-gray-100 rounded p-2 text-sm font-mono',
-          },
-        },
       }),
-      // Explicitly configured list extensions to fix conflicts
-      BulletList.configure({
-        HTMLAttributes: {
-          class: 'prose-bullet-list',
-        },
-        keepMarks: true,
-        keepAttributes: false,
-      }),
-      OrderedList.configure({
-        HTMLAttributes: {
-          class: 'prose-ordered-list',
-        },
-        keepMarks: true,
-        keepAttributes: false,
-      }),
-      ListItem.configure({
-        HTMLAttributes: {
-          class: 'prose-list-item',
-        },
-      }),
-      TextStyle,
     ],
     content,
     immediatelyRender: false,
@@ -94,7 +59,6 @@ export default function ImprovedRichTextEditor({
     },
   }, []);
 
-  // Update editor content when prop changes
   useEffect(() => {
     if (editor && isMounted && content !== editor.getHTML()) {
       const timeoutId = setTimeout(() => {
@@ -106,7 +70,6 @@ export default function ImprovedRichTextEditor({
     }
   }, [editor, content, isMounted]);
 
-  // Don't render on server side
   if (!isMounted || !editor) {
     return (
       <div 
@@ -114,34 +77,64 @@ export default function ImprovedRichTextEditor({
         style={{ minHeight }}
       >
         <div className="flex items-center justify-center h-full text-gray-500">
-          Loading enhanced editor...
+          Loading fixed editor...
         </div>
       </div>
     );
   }
 
-  // Editor commands
-  const toggleBold = () => editor.chain().focus().toggleBold().run();
-  const toggleItalic = () => editor.chain().focus().toggleItalic().run();
-  const toggleCode = () => editor.chain().focus().toggleCode().run();
-  const toggleBulletList = () => editor.chain().focus().toggleBulletList().run();
-  const toggleOrderedList = () => editor.chain().focus().toggleOrderedList().run();
-  const toggleHeading1 = () => editor.chain().focus().toggleHeading({ level: 1 }).run();
-  const toggleHeading2 = () => editor.chain().focus().toggleHeading({ level: 2 }).run();
-  const undo = () => editor.chain().focus().undo().run();
-  const redo = () => editor.chain().focus().redo().run();
-  const clearFormatting = () => editor.chain().focus().clearNodes().unsetAllMarks().run();
+  // Editor commands - using chain() for better reliability
+  const toggleBold = () => {
+    editor.chain().focus().toggleBold().run();
+  };
+  
+  const toggleItalic = () => {
+    editor.chain().focus().toggleItalic().run();
+  };
+  
+  const toggleCode = () => {
+    editor.chain().focus().toggleCode().run();
+  };
+  
+  const toggleBulletList = () => {
+    editor.chain().focus().toggleBulletList().run();
+  };
+  
+  const toggleOrderedList = () => {
+    editor.chain().focus().toggleOrderedList().run();
+  };
+  
+  const toggleHeading1 = () => {
+    editor.chain().focus().toggleHeading({ level: 1 }).run();
+  };
+  
+  const toggleHeading2 = () => {
+    editor.chain().focus().toggleHeading({ level: 2 }).run();
+  };
+  
+  const undo = () => {
+    editor.chain().focus().undo().run();
+  };
+  
+  const redo = () => {
+    editor.chain().focus().redo().run();
+  };
+  
+  const clearFormatting = () => {
+    editor.chain().focus().clearNodes().unsetAllMarks().run();
+  };
 
   return (
     <div className={`border border-gray-300 rounded-lg overflow-hidden bg-white shadow-sm ${className}`}>
-      {/* Enhanced Toolbar */}
+      {/* Toolbar */}
       <div className="flex items-center gap-1 p-3 border-b border-gray-200 bg-gray-50">
         {/* Text Formatting */}
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={toggleBold}
-            className={`p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors ${
+            disabled={!editor.can().chain().focus().toggleBold().run()}
+            className={`p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               editor.isActive('bold') ? 'bg-blue-200 text-blue-900' : ''
             }`}
             title="Bold (Ctrl+B)"
@@ -152,7 +145,8 @@ export default function ImprovedRichTextEditor({
           <button
             type="button"
             onClick={toggleItalic}
-            className={`p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors ${
+            disabled={!editor.can().chain().focus().toggleItalic().run()}
+            className={`p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               editor.isActive('italic') ? 'bg-blue-200 text-blue-900' : ''
             }`}
             title="Italic (Ctrl+I)"
@@ -163,7 +157,8 @@ export default function ImprovedRichTextEditor({
           <button
             type="button"
             onClick={toggleCode}
-            className={`p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors ${
+            disabled={!editor.can().chain().focus().toggleCode().run()}
+            className={`p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               editor.isActive('code') ? 'bg-blue-200 text-blue-900' : ''
             }`}
             title="Inline Code"
@@ -179,7 +174,8 @@ export default function ImprovedRichTextEditor({
           <button
             type="button"
             onClick={toggleHeading1}
-            className={`p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors ${
+            disabled={!editor.can().chain().focus().toggleHeading({ level: 1 }).run()}
+            className={`p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               editor.isActive('heading', { level: 1 }) ? 'bg-blue-200 text-blue-900' : ''
             }`}
             title="Heading 1"
@@ -190,7 +186,8 @@ export default function ImprovedRichTextEditor({
           <button
             type="button"
             onClick={toggleHeading2}
-            className={`p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors ${
+            disabled={!editor.can().chain().focus().toggleHeading({ level: 2 }).run()}
+            className={`p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               editor.isActive('heading', { level: 2 }) ? 'bg-blue-200 text-blue-900' : ''
             }`}
             title="Heading 2"
@@ -206,7 +203,8 @@ export default function ImprovedRichTextEditor({
           <button
             type="button"
             onClick={toggleBulletList}
-            className={`p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors ${
+            disabled={!editor.can().chain().focus().toggleBulletList().run()}
+            className={`p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               editor.isActive('bulletList') ? 'bg-blue-200 text-blue-900' : ''
             }`}
             title="Bullet List"
@@ -217,7 +215,8 @@ export default function ImprovedRichTextEditor({
           <button
             type="button"
             onClick={toggleOrderedList}
-            className={`p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors ${
+            disabled={!editor.can().chain().focus().toggleOrderedList().run()}
+            className={`p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               editor.isActive('orderedList') ? 'bg-blue-200 text-blue-900' : ''
             }`}
             title="Numbered List"
@@ -247,7 +246,7 @@ export default function ImprovedRichTextEditor({
           <button
             type="button"
             onClick={undo}
-            disabled={!editor.can().undo()}
+            disabled={!editor.can().chain().focus().undo().run()}
             className="p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Undo (Ctrl+Z)"
           >
@@ -257,7 +256,7 @@ export default function ImprovedRichTextEditor({
           <button
             type="button"
             onClick={redo}
-            disabled={!editor.can().redo()}
+            disabled={!editor.can().chain().focus().redo().run()}
             className="p-2 rounded text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Redo (Ctrl+Y)"
           >
@@ -270,7 +269,7 @@ export default function ImprovedRichTextEditor({
       <div className="relative">
         <EditorContent 
           editor={editor} 
-          className="notes-editor-content"
+          className="fixed-editor-content"
         />
         
         {/* Placeholder when empty */}
@@ -281,90 +280,65 @@ export default function ImprovedRichTextEditor({
         )}
       </div>
       
-      {/* Basic styles for editor content - let global CSS handle colors */}
+      {/* Simplified styles for debugging */}
       <style jsx>{`
-        .notes-editor-content :global(.ProseMirror) {
+        .fixed-editor-content :global(.ProseMirror) {
           outline: none;
           padding: 1rem;
+          min-height: ${minHeight};
         }
         
-        .notes-editor-content :global(h1) {
-          font-size: 1.875rem;
+        .fixed-editor-content :global(h1) {
+          font-size: 2rem;
           font-weight: 700;
-          line-height: 1.2;
           margin: 1.5rem 0 1rem 0;
-          border-bottom: 2px solid #e5e7eb;
-          padding-bottom: 0.5rem;
+          line-height: 1.2;
         }
         
-        .notes-editor-content :global(h2) {
+        .fixed-editor-content :global(h2) {
           font-size: 1.5rem;
           font-weight: 600;
-          line-height: 1.3;
           margin: 1.25rem 0 0.75rem 0;
+          line-height: 1.3;
         }
         
-        .notes-editor-content :global(h3) {
-          font-size: 1.25rem;
-          font-weight: 600;
-          line-height: 1.4;
-          margin: 1rem 0 0.5rem 0;
-        }
-        
-        .notes-editor-content :global(p) {
+        .fixed-editor-content :global(p) {
           margin: 0.75rem 0;
           line-height: 1.6;
         }
         
-        .notes-editor-content :global(.prose-bullet-list) {
+        .fixed-editor-content :global(ul) {
           list-style-type: disc;
           margin: 1rem 0;
           padding-left: 1.5rem;
         }
         
-        .notes-editor-content :global(.prose-ordered-list) {
+        .fixed-editor-content :global(ol) {
           list-style-type: decimal;
           margin: 1rem 0;
           padding-left: 1.5rem;
         }
         
-        .notes-editor-content :global(.prose-list-item) {
-          margin: 0.5rem 0;
+        .fixed-editor-content :global(li) {
+          margin: 0.25rem 0;
           line-height: 1.5;
         }
         
-        .notes-editor-content :global(strong) {
+        .fixed-editor-content :global(strong) {
           font-weight: 600;
         }
         
-        .notes-editor-content :global(em) {
+        .fixed-editor-content :global(em) {
           font-style: italic;
         }
         
-        .notes-editor-content :global(code) {
+        .fixed-editor-content :global(code) {
           background-color: #f3f4f6;
           color: #dc2626;
           padding: 0.125rem 0.25rem;
           border-radius: 0.25rem;
           font-size: 0.875em;
-          font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        }
-        
-        .notes-editor-content :global(pre) {
-          background-color: #1f2937;
-          color: #f9fafb;
-          padding: 1rem;
-          border-radius: 0.5rem;
-          margin: 1rem 0;
-          overflow-x: auto;
-          font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        }
-        
-        .notes-editor-content :global(blockquote) {
-          border-left: 4px solid #3b82f6;
-          padding-left: 1rem;
-          margin: 1rem 0;
-          font-style: italic;
+          font-family: monospace;
         }
       `}</style>
     </div>

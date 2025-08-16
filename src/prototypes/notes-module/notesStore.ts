@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 // Simple note interface for prototype
 export interface ProtoNote {
@@ -17,9 +17,21 @@ export interface ProtoNote {
   size?: { width: number; height: number };
 }
 
+export interface NoteConnection {
+  id: string;
+  sourceId: string;
+  targetId: string;
+  label?: string;
+  type: 'reference' | 'related' | 'conflict' | 'child' | 'parent';
+  createdAt: string;
+}
+
 export interface ProtoNotesStore {
   // Data
   notes: ProtoNote[];
+  connections: NoteConnection[];
+  hasInitialized: boolean; // Track if we've initialized with data
+  hasHydrated: boolean; // Track if store has been rehydrated from localStorage
   
   // Actions
   createNote: (note: Omit<ProtoNote, 'id' | 'createdAt' | 'updatedAt' | 'excerpt'>) => string;
@@ -27,12 +39,23 @@ export interface ProtoNotesStore {
   deleteNote: (id: string) => void;
   getNoteById: (id: string) => ProtoNote | undefined;
   
+  // Connection actions
+  createConnection: (sourceId: string, targetId: string, type?: NoteConnection['type'], label?: string) => string;
+  deleteConnection: (connectionId: string) => void;
+  getConnectionsForNote: (noteId: string) => NoteConnection[];
+  getConnectedNotes: (noteId: string) => ProtoNote[];
+  
   // Canvas actions
   updateNotePosition: (id: string, position: { x: number; y: number }) => void;
   updateNoteSize: (id: string, size: { width: number; height: number }) => void;
   
+  // Tag utilities
+  getAllTags: () => string[];
+  getPopularTags: () => string[];
+  
   // Utility
   clearAllNotes: () => void;
+  initializeStore: () => void;
 }
 
 // Helper to generate excerpt from HTML content
@@ -54,6 +77,9 @@ export const useProtoNotesStore = create<ProtoNotesStore>()(
   persist(
     (set, get) => ({
       notes: [],
+      connections: [],
+      hasInitialized: false,
+      hasHydrated: false,
 
       createNote: (noteData) => {
         const id = generateId();
@@ -116,16 +142,110 @@ export const useProtoNotesStore = create<ProtoNotesStore>()(
         }));
       },
 
+      // Connection actions
+      createConnection: (sourceId, targetId, type = 'related', label) => {
+        const connectionId = generateId();
+        const now = new Date().toISOString();
+        
+        set((state) => ({
+          connections: [...state.connections, {
+            id: connectionId,
+            sourceId,
+            targetId,
+            type,
+            label,
+            createdAt: now,
+          }],
+        }));
+        
+        return connectionId;
+      },
+
+      deleteConnection: (connectionId) => {
+        set((state) => ({
+          connections: state.connections.filter(conn => conn.id !== connectionId),
+        }));
+      },
+
+      getConnectionsForNote: (noteId) => {
+        const { connections } = get();
+        return connections.filter(conn => 
+          conn.sourceId === noteId || conn.targetId === noteId
+        );
+      },
+
+      getConnectedNotes: (noteId) => {
+        const { connections, notes } = get();
+        const connectedIds = new Set<string>();
+        
+        connections.forEach(conn => {
+          if (conn.sourceId === noteId) {
+            connectedIds.add(conn.targetId);
+          } else if (conn.targetId === noteId) {
+            connectedIds.add(conn.sourceId);
+          }
+        });
+        
+        return notes.filter(note => connectedIds.has(note.id));
+      },
+
+      getAllTags: () => {
+        const allTags = get().notes.flatMap(note => note.tags);
+        return Array.from(new Set(allTags)).sort();
+      },
+
+      getPopularTags: () => {
+        const tagCounts = get().notes
+          .flatMap(note => note.tags)
+          .reduce((counts, tag) => {
+            counts[tag] = (counts[tag] || 0) + 1;
+            return counts;
+          }, {} as Record<string, number>);
+
+        return Object.entries(tagCounts)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 12)
+          .map(([tag]) => tag);
+      },
+
       clearAllNotes: () => {
-        set({ notes: [] });
+        set({ notes: [], connections: [] });
+      },
+
+      initializeStore: () => {
+        set({ hasInitialized: true });
       },
     }),
     {
       name: 'proto-notes-storage',
+      storage: createJSONStorage(() => localStorage),
       version: 1,
+      // Handle rehydration
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.hasHydrated = true;
+          // Initialize with sample data only if no notes exist after rehydration
+          if (state.notes.length === 0 && !state.hasInitialized) {
+            // This will be handled by the component after hydration
+            state.hasInitialized = false;
+          } else {
+            state.hasInitialized = true;
+          }
+        }
+      }
     }
   )
 );
+
+// Initialize sample notes only if empty (for first-time users)
+export const initializeSampleNotesIfEmpty = () => {
+  const store = useProtoNotesStore.getState();
+  
+  // Only create samples if no notes exist
+  if (store.notes.length === 0) {
+    createSampleNotes();
+  }
+};
 
 // Sample data for testing
 export const createSampleNotes = () => {
@@ -133,6 +253,9 @@ export const createSampleNotes = () => {
   
   // Clear existing notes
   store.clearAllNotes();
+  
+  // Mark store as initialized
+  store.initializeStore();
   
   // Create sample notes
   const sampleNotes = [
