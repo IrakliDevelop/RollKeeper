@@ -10,13 +10,6 @@ interface DiceBoxInstance {
   init?: () => Promise<void>;
 }
 
-type DiceBoxUpdateConfig = {
-  bounds?: { width: number; height: number };
-  theme?: string;
-  themeColor?: string;
-  scale?: number;
-};
-
 export interface UseDiceRollerOptions {
   containerId: string;
   theme?: string;

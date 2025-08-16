@@ -102,7 +102,7 @@ const initialFormData: SpellFormData = {
 };
 
 export const SpellManagement: React.FC = () => {
-  const { character, updateCharacter, reorderPreparedSpells, reorderSpells } = useCharacterStore();
+  const { character, updateCharacter, reorderSpells } = useCharacterStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<SpellFormData>(initialFormData);
@@ -291,7 +291,7 @@ export const SpellManagement: React.FC = () => {
                 itemClassName={`p-3 rounded-lg border transition-all hover:shadow-md`}
                 showDragHandle={true}
                 dragHandlePosition="left"
-                renderItem={(spell, index, isDragging) => (
+                renderItem={(spell) => (
                   <div className={`${
                     spell.isPrepared
                       ? 'border-green-400 bg-green-50'

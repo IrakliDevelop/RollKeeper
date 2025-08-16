@@ -55,7 +55,7 @@ import ArmorDefenseManager from "@/components/ArmorDefenseManager";
 import InventoryManager from "@/components/ui/InventoryManager";
 import CurrencyManager from "@/components/ui/CurrencyManager";
 import { useSimpleDiceRoll } from "@/hooks/useSimpleDiceRoll";
-import { DiceButton } from "@/components/ui/DiceButton";
+
 import { RollSummary } from "@/types/dice";
 import NotHydrated from "@/components/ui/NotHydrated";
 
@@ -63,11 +63,9 @@ import NotHydrated from "@/components/ui/NotHydrated";
 export default function CharacterSheet() {
   // Hydration check to prevent SSR/client mismatches
   const hasHydrated = useHydration();
-
-
   
   // Dice rolling with new modular system
-  const { isReady: diceBoxInitialized, roll: rollDice, clearDice } = useSimpleDiceRoll({
+  const { isReady: diceBoxInitialized, roll: rollDice } = useSimpleDiceRoll({
     containerId: 'main-dice-container',
     onRollComplete: (summary: RollSummary) => {
       console.log('Dice roll completed:', summary);

@@ -31,7 +31,7 @@ export function DraggableWeaponsList({
       itemClassName="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
       showDragHandle={!disabled}
       dragHandlePosition="left"
-      renderItem={(weapon, index, isDragging) => (
+      renderItem={(weapon) => (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Sword size={20} className="text-gray-500" />
@@ -103,7 +103,7 @@ export function DraggableInventoryList({
       itemClassName="bg-purple-25 border border-purple-200 rounded-md p-3 hover:shadow-sm transition-all"
       showDragHandle={!disabled}
       dragHandlePosition="right"
-      renderItem={(item, index, isDragging) => (
+      renderItem={(item) => (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Package size={18} className="text-purple-500" />
@@ -174,7 +174,7 @@ export function DraggableMagicItemsList({
       itemClassName="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4 hover:shadow-md transition-all"
       showDragHandle={!disabled}
       dragHandlePosition="left"
-      renderItem={(item, index, isDragging) => (
+      renderItem={(item) => (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Sparkles size={20} className="text-indigo-500" />

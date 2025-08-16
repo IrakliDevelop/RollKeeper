@@ -3,7 +3,6 @@
 import React from 'react';
 import { useProtoNotesStore } from './notesStore';
 import { 
-  Plus, 
   FileText,
   Download
 } from 'lucide-react';
@@ -13,24 +12,7 @@ interface NotesCanvasFallbackProps {
 }
 
 export default function NotesCanvasFallback({ }: NotesCanvasFallbackProps) {
-  const { notes, createNote, updateNotePosition } = useProtoNotesStore();
-
-  // Add new note to canvas
-  const handleAddNote = () => {
-    const id = createNote({
-      title: 'New Canvas Note',
-      content: '<p>Created on canvas...</p>',
-      category: 'session',
-      tags: [],
-      isPinned: false,
-    });
-
-    // Position new note randomly
-    updateNotePosition(id, { 
-      x: Math.random() * 300 + 100, 
-      y: Math.random() * 200 + 100 
-    });
-  };
+  const { notes } = useProtoNotesStore();
 
   const handleInstallReactFlow = () => {
     alert('To enable the canvas view, please run: npm install reactflow');

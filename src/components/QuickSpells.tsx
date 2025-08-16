@@ -231,7 +231,7 @@ export function QuickSpells({ showAttackRoll: showAttackToast, showSavingThrow: 
         itemClassName="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-lg p-3 hover:shadow-md transition-all duration-200"
         showDragHandle={true}
         dragHandlePosition="left"
-        renderItem={(spell, index, isDragging) => (
+        renderItem={(spell) => (
           <>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
