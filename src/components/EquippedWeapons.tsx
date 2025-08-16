@@ -222,7 +222,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({ showAttackRoll
         itemClassName="p-3 rounded-lg border-2 border-green-300 bg-green-50 transition-all hover:shadow-md hover:border-green-400"
         showDragHandle={true}
         dragHandlePosition="left"
-        renderItem={(weapon, index, isDragging) => {
+        renderItem={(weapon) => {
           const isProficient = isWeaponProficient(character, weapon);
           const attackString = getWeaponAttackString(character, weapon);
           const damageString = getWeaponDamageString(character, weapon);

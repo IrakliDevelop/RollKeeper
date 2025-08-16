@@ -680,7 +680,7 @@ export default function EquipmentModal({ isOpen, onClose }: EquipmentModalProps)
                       className="space-y-3"
                       showDragHandle={true}
                       dragHandlePosition="left"
-                      renderItem={(weapon, index, isDragging) => (
+                      renderItem={(weapon) => (
                         <div className={`p-4 border rounded-lg transition-all ${
                           weapon.isEquipped 
                             ? 'border-blue-300 bg-blue-50' 
@@ -797,7 +797,7 @@ export default function EquipmentModal({ isOpen, onClose }: EquipmentModalProps)
                       className="space-y-3"
                       showDragHandle={true}
                       dragHandlePosition="left"
-                      renderItem={(item, index, isDragging) => (
+                      renderItem={(item) => (
                         <div className={`p-4 border rounded-lg transition-all ${
                           item.isEquipped 
                             ? 'border-purple-300 bg-purple-50' 

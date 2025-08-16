@@ -197,7 +197,7 @@ export default function ArmorDefenseManager() {
             className="space-y-3"
             showDragHandle={true}
             dragHandlePosition="left"
-            renderItem={(armor, index, isDragging) => (
+            renderItem={(armor) => (
               <ArmorCard 
                 armor={armor}
                 onEdit={handleEdit}
@@ -223,7 +223,7 @@ export default function ArmorDefenseManager() {
             className="space-y-3"
             showDragHandle={true}
             dragHandlePosition="left"
-            renderItem={(armor, index, isDragging) => (
+            renderItem={(armor) => (
               <ArmorCard 
                 armor={armor}
                 onEdit={handleEdit}

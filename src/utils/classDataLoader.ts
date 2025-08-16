@@ -437,7 +437,7 @@ function prioritize2024Features(features: ClassFeature[]): ClassFeature[] {
   const prioritizedFeatures: ClassFeature[] = [];
   
   // For each group, prioritize 2024 version if available
-  for (const [key, featureGroup] of featureMap.entries()) {
+  for (const [, featureGroup] of featureMap.entries()) {
     if (featureGroup.length === 1) {
       // Only one version, use it
       prioritizedFeatures.push(featureGroup[0]);
