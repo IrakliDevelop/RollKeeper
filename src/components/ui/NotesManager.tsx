@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Edit3, Trash2, Save, X, BookOpen, PenTool, GripVertical } from 'lucide-react';
+import { Plus, Edit3, Trash2, Save, X, BookOpen, PenTool } from 'lucide-react';
 import { RichTextContent } from '@/types/character';
 import RichTextEditor from './RichTextEditor';
+import RichTextRenderer from './RichTextRenderer';
 import NoteModal from './NoteModal';
 import DragDropList from './DragDropList';
 
@@ -83,31 +84,7 @@ export default function NotesManager({
     }
   };
 
-  const renderContent = (content: string) => {
-    return (
-      <div 
-        className="prose prose-lg max-w-none text-gray-700 leading-relaxed"
-        style={{
-          fontSize: '16px',
-          lineHeight: '1.7',
-          // Custom styling for better readability
-          '--tw-prose-headings': '#1f2937',
-          '--tw-prose-body': '#374151',
-          '--tw-prose-bold': '#111827',
-          '--tw-prose-links': '#2563eb',
-          '--tw-prose-quotes': '#6b7280',
-          '--tw-prose-quote-borders': '#d1d5db',
-          '--tw-prose-captions': '#6b7280',
-          '--tw-prose-code': '#111827',
-          '--tw-prose-pre-code': '#e5e7eb',
-          '--tw-prose-pre-bg': '#1f2937',
-          '--tw-prose-th-borders': '#d1d5db',
-          '--tw-prose-td-borders': '#e5e7eb',
-        } as React.CSSProperties}
-        dangerouslySetInnerHTML={{ __html: content }}
-      />
-    );
-  };
+
 
   return (
     <div className={`bg-white rounded-lg shadow-lg border border-blue-200 p-6 ${className}`}>
@@ -226,7 +203,7 @@ export default function NotesManager({
             itemClassName="border border-blue-100 rounded-lg p-6 bg-gradient-to-r from-blue-25 to-indigo-25 hover:shadow-md transition-all cursor-pointer hover:shadow-lg hover:border-blue-200"
             showDragHandle={viewMode === 'edit' && Boolean(onReorder)}
             dragHandlePosition="left"
-            renderItem={(item, index, isDragging) => (
+            renderItem={(item) => (
               <>
                 {editingId === item.id && viewMode === 'edit' ? (
                   // Edit mode for individual note
@@ -325,7 +302,7 @@ export default function NotesManager({
                       {item.content ? (
                         <div className="relative">
                           <div className="max-h-32 overflow-hidden">
-                            {renderContent(item.content)}
+                            <RichTextRenderer content={item.content} />
                           </div>
                           {item.content.length > 200 && (
                             <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-blue-25 to-transparent"></div>
