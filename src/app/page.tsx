@@ -497,30 +497,6 @@ export default function CharacterSheet() {
                 <RotateCcw size={16} />
                 Reset
               </button>
-              {/* Test Dice Button */}
-              <DiceButton
-                notation="1d20"
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all shadow-md"
-                onRollComplete={(summary) => console.log('Test roll:', summary)}
-              >
-                Test Dice
-              </DiceButton>
-              {/* Clear Dice Button */}
-              <button 
-                onClick={clearDice}
-                disabled={!diceBoxInitialized}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-lg hover:from-orange-700 hover:to-orange-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all shadow-md"
-                title={diceBoxInitialized ? "Clear dice from screen" : "Dice box is initializing..."}
-              >
-                🧹 Clear Dice
-              </button>
-              <Link 
-                href="/dice-components-demo"
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg hover:from-teal-700 hover:to-teal-800 transition-all shadow-md"
-                title="See modular dice components"
-              >
-                🎲 Dice Lab
-              </Link>
             </div>
           </div>
         </div>
