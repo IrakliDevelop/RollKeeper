@@ -15,9 +15,13 @@ import {
   Position,
   NodeProps,
   NodeChange,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
+  EdgeProps,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { useProtoNotesStore, type ProtoNote } from './notesStore';
+import { useProtoNotesStore, type ProtoNote, type NoteConnection } from './notesStore';
 import NoteModal from './NoteModal';
 import { 
   Pin, 
@@ -27,7 +31,8 @@ import {
   Users,
   Package,
   Map,
-  Plus
+  Plus,
+  X
 } from 'lucide-react';
 
 // Helper function for connection colors
@@ -41,6 +46,123 @@ const getConnectionColor = (type: string) => {
     default: return '#6b7280'; // gray
   }
 };
+
+
+// Custom Edge Component with Delete Button
+interface CustomEdgeData {
+  connection: NoteConnection;
+  onDelete: (id: string) => void;
+}
+
+function CustomEdge({ id, sourceX, sourceY, targetX, targetY, data, style, markerEnd }: EdgeProps<CustomEdgeData>) {
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+  });
+  
+  const [longPressTimer, setLongPressTimer] = React.useState<NodeJS.Timeout | null>(null);
+  const [showDeleteButton, setShowDeleteButton] = React.useState(false);
+
+  const handleDelete = (event: React.MouseEvent | React.TouchEvent) => {
+    event.stopPropagation();
+    if (data?.onDelete) {
+      data.onDelete(id);
+    }
+  };
+
+  const handleLongPressStart = (event: React.TouchEvent | React.MouseEvent) => {
+    event.preventDefault();
+    const timer = setTimeout(() => {
+      // Show confirmation for long press
+      if (window.confirm('Delete this connection?')) {
+        handleDelete(event);
+      }
+    }, 800); // 800ms long press
+    setLongPressTimer(timer);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+  };
+
+  const handleEdgeClick = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    setShowDeleteButton(!showDeleteButton);
+  };
+
+  return (
+    <>
+      <BaseEdge 
+        path={edgePath} 
+        markerEnd={markerEnd} 
+        style={{
+          ...style,
+          cursor: 'pointer',
+        }}
+      />
+      
+      {/* Invisible click area over the edge for long press */}
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: 'all',
+          }}
+          className="nodrag nopan"
+        >
+          {/* Invisible large click area for edge interaction */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '-20px',
+              left: '-40px',
+              width: '80px',
+              height: '40px',
+              cursor: 'pointer',
+              zIndex: 999
+            }}
+            onTouchStart={handleLongPressStart}
+            onTouchEnd={handleLongPressEnd}
+            onTouchCancel={handleLongPressEnd}
+            onMouseDown={handleLongPressStart}
+            onMouseUp={handleLongPressEnd}
+            onMouseLeave={handleLongPressEnd}
+            onClick={handleEdgeClick}
+          />
+          
+          {/* Always visible delete button for touch devices */}
+          <button
+            onClick={handleDelete}
+            className="w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-200 hover:scale-110 relative"
+            title="Delete connection"
+            style={{ 
+              opacity: 1, // Always visible
+              zIndex: 1000 
+            }}
+          >
+            <X size={14} />
+          </button>
+          
+          {/* Long press instruction tooltip */}
+          <div 
+            className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded pointer-events-none transition-opacity duration-200 whitespace-nowrap"
+            style={{
+              opacity: showDeleteButton ? 1 : 0
+            }}
+          >
+            Long press edge to delete
+          </div>
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
 
 // Custom Note Node Component
 function NoteNode({ data, selected }: NodeProps<ProtoNote & { onEditNote?: (id: string) => void }>) {
@@ -78,9 +200,17 @@ function NoteNode({ data, selected }: NodeProps<ProtoNote & { onEditNote?: (id: 
       ${selected ? 'border-blue-500' : data.isPinned ? 'border-yellow-400' : 'border-gray-200'}
       hover:shadow-xl transition-shadow
     `}>
-      {/* Connection Handles */}
-      <Handle type="target" position={Position.Left} className="w-3 h-3" />
-      <Handle type="source" position={Position.Right} className="w-3 h-3" />
+      {/* Connection Handles - Larger for touch devices */}
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        className="w-6 h-6 sm:w-5 sm:h-5 md:w-4 md:h-4 lg:w-3 lg:h-3 !bg-blue-500 !border-2 !border-white hover:!bg-blue-600 transition-all duration-200 hover:scale-110" 
+      />
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        className="w-6 h-6 sm:w-5 sm:h-5 md:w-4 md:h-4 lg:w-3 lg:h-3 !bg-blue-500 !border-2 !border-white hover:!bg-blue-600 transition-all duration-200 hover:scale-110" 
+      />    
       
       {/* Note Header */}
       <div className="flex items-start justify-between mb-3">
@@ -150,9 +280,12 @@ function NoteNode({ data, selected }: NodeProps<ProtoNote & { onEditNote?: (id: 
   );
 }
 
-// Custom node types
 const nodeTypes = {
   noteCard: NoteNode,
+};
+
+const edgeTypes = {
+  deletableEdge: CustomEdge,
 };
 
 export default function NotesCanvas() {
@@ -176,6 +309,8 @@ export default function NotesCanvas() {
     isNewNote: false,
   });
 
+
+
   // Modal handlers
   const openNoteModal = useCallback((noteId: string, isNewNote = false) => {
     setModalState({
@@ -192,6 +327,8 @@ export default function NotesCanvas() {
       isNewNote: false,
     });
   }, []);
+
+
   
   // Auto-position notes that don't have canvas positions
   React.useEffect(() => {
@@ -226,16 +363,29 @@ export default function NotesCanvas() {
       id: conn.id,
       source: conn.sourceId,
       target: conn.targetId,
-      type: 'smoothstep',
+      type: 'deletableEdge',
       animated: true,
       label: conn.label,
       style: { 
         stroke: getConnectionColor(conn.type),
-        strokeWidth: 2 
+        strokeWidth: 3
       },
-      data: { connection: conn },
+      labelStyle: {
+        fill: getConnectionColor(conn.type),
+        fontWeight: 600,
+        fontSize: 12
+      },
+      labelBgStyle: {
+        fill: '#ffffff',
+        fillOpacity: 0.9
+      },
+      markerEnd: 'arrowclosed',
+      data: { 
+        connection: conn,
+        onDelete: deleteConnection
+      },
     }))
-  , [connections]);
+  , [connections, deleteConnection]);
   
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
@@ -295,17 +445,30 @@ export default function NotesCanvas() {
       id: conn.id,
       source: conn.sourceId,
       target: conn.targetId,
-      type: 'smoothstep',
+      type: 'deletableEdge',
       animated: true,
       label: conn.label,
       style: { 
         stroke: getConnectionColor(conn.type),
-        strokeWidth: 2 
+        strokeWidth: 3
       },
-      data: { connection: conn },
+      labelStyle: {
+        fill: getConnectionColor(conn.type),
+        fontWeight: 600,
+        fontSize: 12
+      },
+      labelBgStyle: {
+        fill: '#ffffff',
+        fillOpacity: 0.9
+      },
+      markerEnd: 'arrowclosed',
+      data: { 
+        connection: conn,
+        onDelete: deleteConnection
+      },
     }));
     setEdges(newEdges);
-  }, [connections, setEdges]);
+  }, [connections, setEdges, deleteConnection]);
 
   return (
     <div className="h-screen w-full bg-gray-50">
@@ -323,8 +486,13 @@ export default function NotesCanvas() {
           });
         }}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
-        className="react-flow-canvas"
+        className="react-flow-canvas touch-flow"
+        deleteKeyCode={["Backspace", "Delete", "del"]}
+        multiSelectionKeyCode={["Meta", "Ctrl"]}
+        selectNodesOnDrag={false}
+        connectOnClick={true}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <Controls />
@@ -355,14 +523,18 @@ export default function NotesCanvas() {
         </div>
         
         {/* Canvas Info */}
-        <div className="absolute bottom-4 left-4 z-10 bg-white rounded-lg shadow-lg p-3 text-sm text-gray-600">
+        <div className="absolute bottom-4 left-4 z-10 bg-white rounded-lg shadow-lg p-3 text-sm text-gray-600 max-w-64">
           <div className="font-medium mb-1">Canvas Notes: {nodes.length}</div>
           <div className="font-medium mb-1">Connections: {connections.length}</div>
-          <div className="text-xs">
-            Drag notes • Connect with handles • Select & delete edges
+          <div className="text-xs space-y-1">
+            <div>• Drag notes to reposition</div>
+            <div>• Drag between large blue handles to connect</div>
+            <div>• Or tap two handles in sequence</div>
           </div>
         </div>
       </ReactFlow>
+      
+
       
       {/* Note Modal */}
       <NoteModal

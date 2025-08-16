@@ -29,7 +29,9 @@ import {
   Grid3X3,
   List,
   ArrowLeft,
-  AlertTriangle
+  AlertTriangle,
+  Group,
+  Ungroup
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -61,6 +63,7 @@ export default function NotesPrototype() {
     sortBy: 'updated',
     sortOrder: 'desc'
   });
+  const [isGrouped, setIsGrouped] = useState(false);
 
   // Initialize with sample data only on first visit
   useEffect(() => {
@@ -406,7 +409,7 @@ export default function NotesPrototype() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className={`${isGrouped ? 'min-h-screen' : 'h-screen'} flex flex-col bg-gray-50`}>
       {/* Prototype Banner */}
       <div className="bg-amber-50 border-b border-amber-200 px-6 py-3">
         <div className="flex items-center justify-between">
@@ -471,6 +474,20 @@ export default function NotesPrototype() {
                 />
               </div>
             </div>
+            
+            <button
+              onClick={() => setIsGrouped(!isGrouped)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                isGrouped 
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+              title={isGrouped ? "Show all notes together" : "Group notes by category"}
+            >
+              {isGrouped ? <Ungroup size={16} /> : <Group size={16} />}
+              {isGrouped ? 'Ungroup' : 'Group'}
+            </button>
+            
             <button
               onClick={handleCreateNote}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -518,7 +535,100 @@ export default function NotesPrototype() {
               </button>
             )}
           </div>
+        ) : isGrouped ? (
+          // Grouped view by category
+          <div className="space-y-8">
+            {['session', 'npc', 'item', 'plot'].map((category) => {
+              const categoryNotes = filteredAndSortedNotes.filter(note => note.category === category);
+              if (categoryNotes.length === 0) return null;
+
+              return (
+                <div key={category} className="bg-gray-50 rounded-lg p-6">
+                  {/* Category Header */}
+                  <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200">
+                    {getCategoryIcon(category)}
+                    <h2 className="text-lg font-bold text-gray-800 capitalize">
+                      {category === 'npc' ? 'Characters' : category === 'session' ? 'Sessions' : category}
+                    </h2>
+                    <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-sm font-medium">
+                      {categoryNotes.length}
+                    </span>
+                  </div>
+                  
+                  {/* Category Notes Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {categoryNotes.map((note) => (
+                      <div
+                        key={note.id}
+                        className={`bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow ${
+                          note.isPinned ? 'ring-2 ring-yellow-200' : ''
+                        }`}
+                      >
+                        {/* Note Header */}
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2 flex-1">
+                            <h3 className="font-semibold text-gray-900 truncate">{note.title}</h3>
+                            {note.isPinned && (
+                              <Pin size={14} className="text-yellow-600 flex-shrink-0" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleTogglePin(note)}
+                              className="p-1 text-gray-400 hover:text-yellow-600"
+                              title={note.isPinned ? 'Unpin' : 'Pin'}
+                            >
+                              {note.isPinned ? <Pin size={14} /> : <PinOff size={14} />}
+                            </button>
+                            <button
+                              onClick={() => handleEditNote(note)}
+                              className="p-1 text-gray-400 hover:text-blue-600"
+                              title="Edit"
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteNote(note.id)}
+                              className="p-1 text-gray-400 hover:text-red-600"
+                              title="Delete"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Note Content */}
+                        <div className="text-sm text-gray-600 mb-3 line-clamp-3">
+                          {note.excerpt}
+                        </div>
+
+                        {/* Note Tags */}
+                        {note.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            {note.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Note Metadata */}
+                        <div className="text-xs text-gray-500 border-t border-gray-100 pt-2">
+                          Updated {new Date(note.updatedAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         ) : (
+          // Regular grid view
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredAndSortedNotes.map((note) => (
               <div
