@@ -5,6 +5,7 @@ import { X, Edit3, Save, Eye, Trash2 } from 'lucide-react';
 import { RichTextContent } from '@/types/character';
 import { ModalPortal } from './ModalPortal';
 import RichTextEditor from './RichTextEditor';
+import RichTextRenderer from './RichTextRenderer';
 
 interface NoteModalProps {
   note: RichTextContent | null;
@@ -61,31 +62,7 @@ export default function NoteModal({
     }
   };
 
-  const renderContent = (content: string) => {
-    return (
-      <div 
-        className="prose prose-lg max-w-none text-gray-700 leading-relaxed"
-        style={{
-          fontSize: '16px',
-          lineHeight: '1.7',
-          // Custom styling for better readability
-          '--tw-prose-headings': '#1f2937',
-          '--tw-prose-body': '#374151',
-          '--tw-prose-bold': '#111827',
-          '--tw-prose-links': '#2563eb',
-          '--tw-prose-quotes': '#6b7280',
-          '--tw-prose-quote-borders': '#d1d5db',
-          '--tw-prose-captions': '#6b7280',
-          '--tw-prose-code': '#111827',
-          '--tw-prose-pre-code': '#e5e7eb',
-          '--tw-prose-pre-bg': '#1f2937',
-          '--tw-prose-th-borders': '#d1d5db',
-          '--tw-prose-td-borders': '#e5e7eb',
-        } as React.CSSProperties}
-        dangerouslySetInnerHTML={{ __html: content }}
-      />
-    );
-  };
+
 
   if (!note) return null;
 
@@ -178,7 +155,7 @@ export default function NoteModal({
             ) : (
               <div className="space-y-6">
                 {note.content ? (
-                  renderContent(note.content)
+                  <RichTextRenderer content={note.content} />
                 ) : (
                   <div className="text-center py-12 text-gray-500">
                     <Eye className="mx-auto h-12 w-12 text-gray-400 mb-4" />

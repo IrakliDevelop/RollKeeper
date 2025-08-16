@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useProtoNotesStore, createSampleNotes, initializeSampleNotesIfEmpty, type ProtoNote } from './notesStore';
-import FixedRichTextEditor from './FixedRichTextEditor';
+import RichTextEditor from '@/components/ui/RichTextEditor';
 import TagManager from './TagManager';
 import FilterPanel, { type FilterOptions } from './FilterPanel';
 import { FancySelect } from '@/components/ui/FancySelect';
@@ -382,7 +382,7 @@ export default function NotesPrototype() {
         </div>
 
         {/* Editor Content */}
-        <div className="flex-1 p-6 space-y-6">
+        <div className="flex-1 p-6 space-y-6 bg-white">
           {/* Tags Section */}
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <h3 className="text-sm font-medium text-gray-700 mb-3">Tags</h3>
@@ -394,8 +394,8 @@ export default function NotesPrototype() {
           </div>
 
           {/* Editor */}
-          <div className="flex-1">
-            <FixedRichTextEditor
+          <div className="flex-1 bg-white">
+            <RichTextEditor
               content={editingNote.content}
               onChange={(content) => setEditingNote({ ...editingNote, content })}
               placeholder="Write your note here..."

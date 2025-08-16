@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useProtoNotesStore, type ProtoNote } from './notesStore';
-import FixedRichTextEditor from './FixedRichTextEditor';
+import RichTextEditor from '@/components/ui/RichTextEditor';
 import TagManager from './TagManager';
 import { FancySelect } from '@/components/ui/FancySelect';
 import { 
@@ -194,8 +194,8 @@ export default function NoteModal({ isOpen, noteId, onClose, isNewNote = false }
           </div>
 
           {/* Editor */}
-          <div className="flex-1 min-h-0">
-            <FixedRichTextEditor
+          <div className="flex-1 min-h-0 bg-white">
+            <RichTextEditor
               content={editingNote.content}
               onChange={(content) => updateEditingNote({ content })}
               placeholder="Write your note here..."
