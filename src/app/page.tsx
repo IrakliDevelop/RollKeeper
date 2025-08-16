@@ -1,6 +1,7 @@
 'use client';
 
-import { Save, Download, Upload, RotateCcw } from "lucide-react";
+import { Save, Download, Upload, RotateCcw, FileText } from "lucide-react";
+import Link from "next/link";
 import { useCharacterStore } from "@/store/characterStore";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { SaveIndicator } from "@/components/ui/SaveIndicator";
@@ -48,7 +49,6 @@ import {
 } from "@/utils/fileOperations";
 import { AbilityName, SkillName } from "@/types/character";
 import { useCallback, useEffect, useState, useRef } from "react";
-import Link from "next/link";
 import GroupedTabs, { TabContent, GroupedTabsRef } from "@/components/ui/GroupedTabs";
 import { NavigationContext } from "@/contexts/NavigationContext";
 import ArmorDefenseManager from "@/components/ArmorDefenseManager";
@@ -489,6 +489,14 @@ export default function CharacterSheet() {
                 <Upload size={16} />
                 Import
               </button>
+              <Link 
+                href="/prototype"
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md"
+                title="Try the new Notes module prototype"
+              >
+                <FileText size={16} />
+                Notes Prototype
+              </Link>
               <button 
                 onClick={() => setShowResetModal(true)}
                 className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all shadow-md"
@@ -497,30 +505,6 @@ export default function CharacterSheet() {
                 <RotateCcw size={16} />
                 Reset
               </button>
-              {/* Test Dice Button */}
-              <DiceButton
-                notation="1d20"
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all shadow-md"
-                onRollComplete={(summary) => console.log('Test roll:', summary)}
-              >
-                Test Dice
-              </DiceButton>
-              {/* Clear Dice Button */}
-              <button 
-                onClick={clearDice}
-                disabled={!diceBoxInitialized}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-orange-600 to-orange-700 text-white rounded-lg hover:from-orange-700 hover:to-orange-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all shadow-md"
-                title={diceBoxInitialized ? "Clear dice from screen" : "Dice box is initializing..."}
-              >
-                🧹 Clear Dice
-              </button>
-              <Link 
-                href="/dice-components-demo"
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-lg hover:from-teal-700 hover:to-teal-800 transition-all shadow-md"
-                title="See modular dice components"
-              >
-                🎲 Dice Lab
-              </Link>
             </div>
           </div>
         </div>
