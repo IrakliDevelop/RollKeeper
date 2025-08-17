@@ -72,7 +72,7 @@ const initialFormData: InventoryFormData = {
 
 interface InventoryManagerProps {
   items: InventoryItem[];
-  onAddItem?: (item: Omit<InventoryItem, 'id'>) => void;
+  onAddItem?: (item: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onUpdateItem?: (id: string, updates: Partial<InventoryItem>) => void;
   onDeleteItem?: (id: string) => void;
   onQuantityChange?: (id: string, quantity: number) => void;
@@ -81,7 +81,6 @@ interface InventoryManagerProps {
   // Display options
   readonly?: boolean;
   compact?: boolean;
-  hideControls?: boolean;
   hideAddButton?: boolean;
   hideFilters?: boolean;
   hideLocations?: boolean;
@@ -100,7 +99,6 @@ export function InventoryManager({
   onReorderItems,
   readonly = false,
   compact = false,
-  hideControls = false,
   hideAddButton = false,
   hideFilters = false,
   hideLocations = false,
@@ -191,11 +189,7 @@ export function InventoryManager({
       onUpdateItem(editingId, itemData);
       setEditingId(null);
     } else {
-      onAddItem({
-        ...itemData,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
+      onAddItem(itemData);
     }
 
     resetItemForm();
@@ -369,23 +363,38 @@ export function InventoryManager({
                   )}
                 </div>
               )}
-              <DragDropList
-                items={locationItems}
-                onReorder={!readonly && handleReorderItemsInLocation(location)}
-                keyExtractor={(item) => item.id}
-                className={`grid ${compact ? 'grid-cols-1 gap-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3'}`}
-                showDragHandle={!readonly && Boolean(onReorderItems)}
-                dragHandlePosition="left"
-                renderItem={(item) => (
-                  <ItemCard
-                    item={item}
-                    onEdit={readonly ? undefined : handleEditItem}
-                    onDelete={readonly || !onDeleteItem ? undefined : () => onDeleteItem(item.id)}
-                    onQuantityChange={readonly || !onQuantityChange ? undefined : (quantity) => onQuantityChange(item.id, quantity)}
-                    compact={compact}
-                  />
-                )}
-              />
+              {readonly || !onReorderItems ? (
+                <div className={`grid ${compact ? 'grid-cols-1 gap-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3'}`}>
+                  {locationItems.map((item) => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      onEdit={readonly ? undefined : handleEditItem}
+                      onDelete={readonly || !onDeleteItem ? undefined : () => onDeleteItem(item.id)}
+                      onQuantityChange={readonly || !onQuantityChange ? undefined : (quantity) => onQuantityChange(item.id, quantity)}
+                      compact={compact}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <DragDropList
+                  items={locationItems}
+                  onReorder={handleReorderItemsInLocation(location)}
+                  keyExtractor={(item) => item.id}
+                  className={`grid ${compact ? 'grid-cols-1 gap-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3'}`}
+                  showDragHandle={true}
+                  dragHandlePosition="left"
+                  renderItem={(item) => (
+                    <ItemCard
+                      item={item}
+                      onEdit={readonly ? undefined : handleEditItem}
+                      onDelete={readonly || !onDeleteItem ? undefined : () => onDeleteItem(item.id)}
+                      onQuantityChange={readonly || !onQuantityChange ? undefined : (quantity) => onQuantityChange(item.id, quantity)}
+                      compact={compact}
+                    />
+                  )}
+                />
+              )}
             </div>
           ))}
         </div>

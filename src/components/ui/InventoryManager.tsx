@@ -13,8 +13,6 @@ export default function InventoryManager() {
     updateItemQuantity,
     reorderInventoryItems
   } = useCharacterStore();
-
-  // Use the shared InventoryManager component with full functionality
   return (
     <div className="space-y-6">
       <SharedInventoryManager
@@ -26,7 +24,6 @@ export default function InventoryManager() {
         onReorderItems={reorderInventoryItems}
         readonly={false}
         compact={false}
-        hideControls={false}
         hideAddButton={false}
         hideFilters={false}
         hideLocations={false}
