@@ -1,1 +1,1 @@
-// Spell components will be added here
+export { SpellSlotTracker } from './SpellSlotTracker';
