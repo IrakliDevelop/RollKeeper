@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'DM Toolset - RollKeeper',
@@ -21,18 +22,18 @@ export default function DMLayout({
               <span className="ml-2 text-purple-200 text-sm">RollKeeper</span>
             </div>
             <nav className="hidden md:flex space-x-6">
-              <a href="/dm" className="hover:text-purple-200 transition-colors">
+              <Link href="/dm" className="hover:text-purple-200 transition-colors">
                 Dashboard
-              </a>
-              <a href="/dm/campaigns" className="hover:text-purple-200 transition-colors">
+              </Link>
+              <Link href="/dm/campaigns" className="hover:text-purple-200 transition-colors">
                 Campaigns
-              </a>
-              <a href="/dm/settings" className="hover:text-purple-200 transition-colors">
+              </Link>
+              <Link href="/dm/settings" className="hover:text-purple-200 transition-colors">
                 Settings
-              </a>
-              <a href="/" className="hover:text-purple-200 transition-colors">
+              </Link>
+              <Link href="/" className="hover:text-purple-200 transition-colors">
                 Character Sheet
-              </a>
+              </Link>
             </nav>
           </div>
         </div>
