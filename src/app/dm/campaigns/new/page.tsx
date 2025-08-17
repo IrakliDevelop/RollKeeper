@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
+import { useDMStore } from '@/store/dmStore';
 
 export default function NewCampaignPage() {
   const router = useRouter();
+  const { createCampaign } = useDMStore();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -34,17 +36,30 @@ export default function NewCampaignPage() {
     setIsLoading(true);
 
     try {
-      // TODO: Implement campaign creation with store
-      console.log('Creating campaign:', formData);
+      if (!formData.name.trim()) {
+        alert('Please enter a campaign name');
+        setIsLoading(false);
+        return;
+      }
+
+      const campaignId = createCampaign({
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        dmId: 'default-dm', // TODO: Get from user context
+        tags: formData.tags.filter(tag => tag.trim()),
+        settings: formData.settings,
+        playerCharacters: [],
+        sessions: [],
+        encounters: [],
+        notes: [],
+        isArchived: false
+      });
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Navigate to campaigns list or new campaign page
-      router.push('/dm/campaigns');
+      // Navigate to the new campaign page
+      router.push(`/dm/campaigns/${campaignId}`);
     } catch (error) {
       console.error('Failed to create campaign:', error);
-      // TODO: Show error toast
+      alert('Failed to create campaign. Please try again.');
     } finally {
       setIsLoading(false);
     }
