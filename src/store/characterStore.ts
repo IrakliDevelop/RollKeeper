@@ -58,7 +58,10 @@ function migrateWeaponDamage(weapon: Record<string, unknown>): Weapon {
 function migrateCharacterData(character: unknown): CharacterState {
   // Type guard to check if character is an object
   if (!character || typeof character !== 'object') {
-    return DEFAULT_CHARACTER_STATE;
+    return {
+      ...DEFAULT_CHARACTER_STATE,
+      id: generateId()
+    };
   }
 
   const characterObj = character as Record<string, unknown>;
@@ -167,6 +170,7 @@ function migrateCharacterData(character: unknown): CharacterState {
 
   // Migrate old character with string class to new format
   const migratedCharacter: CharacterState = {
+    id: generateId(),
     ...DEFAULT_CHARACTER_STATE,
     ...(characterObj as Partial<CharacterState>),
     class: {
@@ -240,6 +244,7 @@ interface CharacterStore {
   
   // Actions
   updateCharacter: (updates: Partial<CharacterState>) => void;
+  loadCharacterState: (characterState: CharacterState) => void;
   updateAbilityScore: (ability: keyof CharacterState['abilities'], value: number) => void;
   updateSkillProficiency: (skill: keyof CharacterState['skills'], proficient: boolean) => void;
   updateSkillExpertise: (skill: keyof CharacterState['skills'], expertise: boolean) => void;
@@ -387,7 +392,10 @@ export const useCharacterStore = create<CharacterStore>()(
   persist(
     (set, get) => ({
       // Initial state
-      character: DEFAULT_CHARACTER_STATE,
+      character: {
+        ...DEFAULT_CHARACTER_STATE,
+        id: generateId()
+      },
       saveStatus: 'saved',
       lastSaved: null,
       hasUnsavedChanges: false,
@@ -400,6 +408,16 @@ export const useCharacterStore = create<CharacterStore>()(
           hasUnsavedChanges: true,
           saveStatus: 'saving'
         }));
+      },
+      
+      loadCharacterState: (characterState) => {
+        const migratedCharacter = migrateCharacterData(characterState);
+        set({
+          character: migratedCharacter,
+          hasUnsavedChanges: false,
+          saveStatus: 'saved',
+          lastSaved: new Date()
+        });
       },
 
       updateAbilityScore: (ability, value) => {
@@ -2055,7 +2073,10 @@ export const useCharacterStore = create<CharacterStore>()(
 
       resetCharacter: () => {
         set({
-          character: DEFAULT_CHARACTER_STATE,
+          character: {
+            ...DEFAULT_CHARACTER_STATE,
+            id: generateId()
+          },
           saveStatus: 'saved',
           lastSaved: new Date(),
           hasUnsavedChanges: false

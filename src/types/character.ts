@@ -309,6 +309,7 @@ export interface Currency {
 
 // Main character state interface
 export interface CharacterState {
+  id: string;
   // Basic Information
   name: string;
   race: string;
