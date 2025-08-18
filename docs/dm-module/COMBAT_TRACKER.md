@@ -2,213 +2,169 @@
 
 ## 🎯 Overview
 
-The Combat Tracker is the centerpiece of the DM Toolset, providing a visual, interactive canvas for managing D&D combat encounters. It builds upon the existing React Flow notes canvas while adding combat-specific functionality like initiative tracking, resource management, and tactical positioning.
+The Combat Tracker is a card-based combat management system for DMs, designed to provide quick access to essential combat information without the complexity of a full virtual tabletop. The system focuses on initiative tracking, health management, and combat flow rather than tactical positioning.
 
-## 🗺️ Canvas Architecture
+## 🃏 Card-Based Architecture
 
-### Building on Existing Foundation
-The combat tracker extends the proven notes canvas system:
-
-```typescript
-// Existing notes canvas components
-- NotesCanvas.tsx          → CombatCanvas.tsx
-- NoteNode.tsx            → CombatParticipant.tsx  
-- NotesCanvasFallback.tsx → CombatCanvasFallback.tsx
-```
-
-### Canvas Layout Structure
-```mermaid
-graph TB
-    subgraph "Combat Canvas Layout"
-        CC[CombatCanvas]
-        CC --> CT[Combat Toolbar]
-        CC --> CM[Canvas Main]
-        CC --> CS[Combat Sidebar]
-        
-        CM --> RF[React Flow Canvas]
-        CM --> GR[Grid Overlay]
-        CM --> AO[AoE Templates]
-        
-        CS --> IL[Initiative List]
-        CS --> RC[Resource Controls]
-        CS --> QA[Quick Actions]
-        
-        RF --> CP[Combat Participants]
-        RF --> SE[Static Elements]
-        RF --> MT[Measurement Tools]
-    end
-```
-
-## 🎭 Combat Participants
-
-### Participant Token Design
-Each participant is represented as a draggable token on the canvas:
+### Combat Participant Cards
+Each participant (player or monster) is represented by an interactive card containing their most critical combat information:
 
 ```typescript
-interface CombatParticipantNode {
+interface CombatParticipantCard {
   id: string;
-  type: 'combatParticipant';
-  position: Position;
-  data: CombatParticipantData;
-}
-
-interface CombatParticipantData {
-  participant: CombatParticipant;
+  type: 'player' | 'monster';
+  name: string;
+  
+  // Core Combat Stats
+  armorClass: number;
+  tempArmorClass?: number;
+  hitPoints: {
+    current: number;
+    max: number;
+    temporary: number;
+  };
+  
+  // Action Economy
+  hasReaction: boolean;
+  hasBonusAction: boolean;
+  hasLegendaryActions?: number; // For monsters
+  
+  // Character Info
+  class?: string; // For players
+  level?: number; // For players
+  challengeRating?: string; // For monsters
+  
+  // Initiative
+  initiative: number;
+  dexterityModifier: number;
+  
+  // Visual State
+  position: { x: number; y: number }; // For card arrangement
   isCurrentTurn: boolean;
-  isSelected: boolean;
-  onUpdateStats: (stats: Partial<CombatStats>) => void;
-  onAddCondition: (condition: ActiveCondition) => void;
-  onContextMenu: (action: string) => void;
+  isDead: boolean;
+  conditions: ActiveCondition[];
 }
 ```
 
-### Token Visual States
+### Card Layout Design
+
+#### Player Character Card
 ```typescript
-// Token appearance based on status
-const getTokenStyle = (participant: CombatParticipant) => {
-  const baseStyle = "combat-token";
-  const statusStyles = [];
+// Player card layout with essential combat info
+<PlayerCombatCard>
+  <CardHeader>
+    <CharacterName>{name}</CharacterName>
+    <ClassLevel>{class} {level}</ClassLevel>
+    <InitiativeBadge>{initiative}</InitiativeBadge>
+  </CardHeader>
   
-  // Health status
-  const hpPercent = participant.combatStats.currentHP / participant.combatStats.maxHP;
-  if (hpPercent <= 0) statusStyles.push("unconscious");
-  else if (hpPercent <= 0.25) statusStyles.push("critical");
-  else if (hpPercent <= 0.5) statusStyles.push("wounded");
+  <CombatStats>
+    <ArmorClassDisplay>
+      <BaseAC>{armorClass}</BaseAC>
+      {tempArmorClass && <TempAC>+{tempArmorClass}</TempAC>}
+    </ArmorClassDisplay>
+    
+    <HitPointsDisplay>
+      <CurrentHP editable>{hitPoints.current}</CurrentHP>
+      <MaxHP>/{hitPoints.max}</MaxHP>
+      {hitPoints.temporary > 0 && <TempHP>+{hitPoints.temporary}</TempHP>}
+      <HPBar percentage={(hitPoints.current / hitPoints.max) * 100} />
+    </HitPointsDisplay>
+  </CombatStats>
   
-  // Turn status
-  if (participant.isCurrentTurn) statusStyles.push("current-turn");
-  else if (participant.hasActed) statusStyles.push("has-acted");
+  <ActionEconomy>
+    <ReactionIndicator used={!hasReaction} />
+    <BonusActionIndicator used={!hasBonusAction} />
+  </ActionEconomy>
   
-  // Conditions
-  if (participant.conditions.length > 0) statusStyles.push("has-conditions");
+  <QuickStats>
+    <AbilityModifiers />
+    <SavingThrows />
+  </QuickStats>
   
-  return cn(baseStyle, ...statusStyles);
-};
+  {spellSlots && <SpellSlotIndicators slots={spellSlots} />}
+  
+  <ConditionIndicators conditions={conditions} />
+</PlayerCombatCard>
 ```
 
-### Participant Token Component
+#### Monster Combat Card
 ```typescript
-// src/components/dm/CombatTracker/CombatParticipantToken.tsx
-import { Handle, Position } from 'reactflow';
-
-interface CombatParticipantTokenProps {
-  data: CombatParticipantData;
-  selected: boolean;
-}
-
-export function CombatParticipantToken({
-  data,
-  selected
-}: CombatParticipantTokenProps) {
-  const { participant, isCurrentTurn } = data;
+// Monster card with condensed stats
+<MonsterCombatCard>
+  <CardHeader>
+    <MonsterName>{name}</MonsterName>
+    <ChallengeRating>CR {challengeRating}</ChallengeRating>
+    <InitiativeBadge>{initiative}</InitiativeBadge>
+  </CardHeader>
   
-  return (
-    <div className={getTokenStyle(participant, isCurrentTurn, selected)}>
-      {/* Token Avatar */}
-      <div className="token-avatar">
-        <img 
-          src={participant.tokenImage || getDefaultAvatar(participant.type)}
-          alt={participant.name}
-        />
-      </div>
-      
-      {/* Health Bar */}
-      <HealthBar
-        current={participant.combatStats.currentHP}
-        max={participant.combatStats.maxHP}
-        temp={participant.combatStats.tempHP}
-        compact={true}
-      />
-      
-      {/* Initiative Badge */}
-      <div className="initiative-badge">
-        {participant.initiative}
-      </div>
-      
-      {/* Condition Indicators */}
-      {participant.conditions.length > 0 && (
-        <div className="condition-indicators">
-          {participant.conditions.slice(0, 3).map(condition => (
-            <ConditionIcon key={condition.id} condition={condition} />
-          ))}
-          {participant.conditions.length > 3 && (
-            <span className="condition-overflow">+{participant.conditions.length - 3}</span>
-          )}
-        </div>
-      )}
-      
-      {/* Turn Status Indicator */}
-      {isCurrentTurn && (
-        <div className="turn-indicator">
-          <span className="turn-arrow">→</span>
-        </div>
-      )}
-      
-      {/* Context Menu Handle */}
-      <Handle
-        type="source"
-        position={Position.Top}
-        className="context-handle"
-      />
-    </div>
-  );
-}
+  <CombatStats>
+    <ArmorClassDisplay>{armorClass}</ArmorClassDisplay>
+    <HitPointsDisplay>
+      <CurrentHP editable>{hitPoints.current}</CurrentHP>
+      <MaxHP>/{hitPoints.max}</MaxHP>
+      <HPBar percentage={(hitPoints.current / hitPoints.max) * 100} />
+    </HitPointsDisplay>
+  </CombatStats>
+  
+  <MonsterAbilities>
+    <AbilityScores />
+    <LegendaryActions count={hasLegendaryActions} />
+  </MonsterAbilities>
+  
+  <ConditionIndicators conditions={conditions} />
+</MonsterCombatCard>
 ```
 
-## 🎲 Initiative System
+## 🎲 Initiative & Turn Management
 
-### Initiative Tracking
+### Initiative Tracker Component
 ```typescript
-// src/components/dm/InitiativeTracker/InitiativeTracker.tsx
 interface InitiativeTrackerProps {
-  encounter: Encounter;
+  participants: CombatParticipant[];
+  currentTurn: number;
+  currentRound: number;
   onAdvanceTurn: () => void;
-  onRollInitiative: (participantId: string) => void;
-  onReorderInitiative: (newOrder: InitiativeOrder[]) => void;
+  onRollInitiative: (participantId?: string) => void;
+  onReorderInitiative: (newOrder: string[]) => void;
 }
 
 export function InitiativeTracker({
-  encounter,
+  participants,
+  currentTurn,
+  currentRound,
   onAdvanceTurn,
   onRollInitiative,
   onReorderInitiative
 }: InitiativeTrackerProps) {
-  const sortedInitiative = [...encounter.initiative].sort(
+  const sortedParticipants = [...participants].sort(
     (a, b) => b.initiative - a.initiative
   );
-  
+
   return (
     <div className="initiative-tracker">
-      <div className="tracker-header">
-        <h3>Initiative Order</h3>
-        <div className="round-counter">
-          Round {encounter.currentRound}
-        </div>
-      </div>
-      
-      <div className="initiative-list">
-        {sortedInitiative.map((init, index) => {
-          const participant = encounter.participants.find(p => p.id === init.participantId);
-          const isCurrentTurn = index === encounter.currentTurn;
-          
-          return (
-            <InitiativeItem
-              key={init.participantId}
-              participant={participant!}
-              initiative={init}
-              isCurrentTurn={isCurrentTurn}
-              onRollInitiative={() => onRollInitiative(init.participantId)}
-            />
-          );
-        })}
-      </div>
-      
-      <div className="tracker-controls">
-        <Button onClick={onAdvanceTurn} className="next-turn-btn">
+      <div className="round-counter">
+        <h3>Round {currentRound}</h3>
+        <Button onClick={onAdvanceTurn} size="lg">
           Next Turn
         </Button>
-        <Button variant="outline" onClick={() => onRollInitiative('all')}>
-          Reroll All
+      </div>
+      
+      <div className="initiative-order">
+        {sortedParticipants.map((participant, index) => (
+          <InitiativeItem
+            key={participant.id}
+            participant={participant}
+            isCurrentTurn={index === currentTurn}
+            position={index + 1}
+            onRollInitiative={() => onRollInitiative(participant.id)}
+          />
+        ))}
+      </div>
+      
+      <div className="initiative-controls">
+        <Button onClick={() => onRollInitiative()} variant="outline">
+          Reroll All Initiative
         </Button>
       </div>
     </div>
@@ -216,561 +172,647 @@ export function InitiativeTracker({
 }
 ```
 
-### Turn Management
+### Turn Management System
 ```typescript
-// src/utils/dm/initiativeUtils.ts
-export class InitiativeManager {
-  static rollInitiative(participant: CombatParticipant): number {
-    const dexMod = calculateModifier(participant.characterReference?.characterData.abilities.dexterity || 10);
-    const roll = rollDice('1d20');
-    return roll.total + dexMod;
-  }
-  
-  static sortInitiativeOrder(participants: CombatParticipant[]): InitiativeOrder[] {
-    return participants
-      .map(p => ({
-        participantId: p.id,
-        initiative: p.initiative,
-        tiebreaker: calculateModifier(
-          p.characterReference?.characterData.abilities.dexterity || 
-          p.monsterData?.dex || 10
-        ),
-        isPlayer: p.type === 'player',
-        isDelayed: false
-      }))
-      .sort((a, b) => {
-        // Higher initiative first
-        if (a.initiative !== b.initiative) {
-          return b.initiative - a.initiative;
-        }
-        // Tie-breaker: higher dexterity modifier first
-        if (a.tiebreaker !== b.tiebreaker) {
-          return b.tiebreaker - a.tiebreaker;
-        }
-        // Final tie-breaker: players go before monsters
-        return a.isPlayer === b.isPlayer ? 0 : a.isPlayer ? -1 : 1;
-      });
-  }
-  
-  static advanceTurn(encounter: Encounter): Partial<Encounter> {
-    const currentParticipant = encounter.participants[encounter.currentTurn];
+// src/utils/dm/turnManager.ts
+export class TurnManager {
+  static advanceTurn(
+    participants: CombatParticipant[], 
+    currentTurn: number, 
+    currentRound: number
+  ): { newTurn: number; newRound: number; updatedParticipants: CombatParticipant[] } {
     
-    // Mark current participant as having acted
-    const updatedParticipants = encounter.participants.map(p =>
-      p.id === currentParticipant.id 
-        ? { ...p, hasActed: true, hasReaction: false, hasBonusAction: false }
-        : p
-    );
+    let nextTurn = currentTurn + 1;
+    let nextRound = currentRound;
     
-    let nextTurn = encounter.currentTurn + 1;
-    let nextRound = encounter.currentRound;
+    // Reset current participant's turn-based resources
+    const updatedParticipants = participants.map((p, index) => {
+      if (index === currentTurn) {
+        return {
+          ...p,
+          hasReaction: false,
+          hasBonusAction: false
+        };
+      }
+      return p;
+    });
     
-    // Check if we've reached the end of the round
-    if (nextTurn >= encounter.participants.length) {
+    // Check if we've completed the round
+    if (nextTurn >= participants.length) {
       nextTurn = 0;
       nextRound++;
       
-      // Reset turn-based resources
+      // Reset all participants for new round
       updatedParticipants.forEach(p => {
-        p.hasActed = false;
         p.hasReaction = true;
         p.hasBonusAction = true;
+        // Process ongoing effects, concentration checks, etc.
+        p.conditions = p.conditions.map(condition => ({
+          ...condition,
+          duration: condition.duration ? condition.duration - 1 : condition.duration
+        })).filter(condition => !condition.duration || condition.duration > 0);
       });
     }
     
     return {
-      participants: updatedParticipants,
-      currentTurn: nextTurn,
-      currentRound: nextRound
+      newTurn: nextTurn,
+      newRound: nextRound,
+      updatedParticipants
     };
+  }
+  
+  static rollInitiative(participant: CombatParticipant): number {
+    const roll = Math.floor(Math.random() * 20) + 1;
+    return roll + participant.dexterityModifier;
   }
 }
 ```
 
-## 🎯 Canvas Interactions
+## 🃏 Combat Canvas Layout
 
-### Drag and Drop System
+### Card Grid System
 ```typescript
 // src/components/dm/CombatTracker/CombatCanvas.tsx
 export function CombatCanvas({
   encounter,
   onUpdateParticipant,
-  onAddParticipant
+  onAddParticipant,
+  onRemoveParticipant
 }: CombatCanvasProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  
-  // Handle participant position updates
-  const handleNodeDragStop = useCallback((event: MouseEvent, node: Node) => {
-    const participant = encounter.participants.find(p => p.id === node.id);
-    if (participant) {
-      onUpdateParticipant(participant.id, {
-        position: node.position
-      });
-    }
-  }, [encounter.participants, onUpdateParticipant]);
-  
-  // Handle drag from external sources (bestiary, character pool)
-  const onDrop = useCallback((event: DragEvent) => {
-    event.preventDefault();
-    
-    const reactFlowBounds = event.currentTarget.getBoundingClientRect();
-    const type = event.dataTransfer.getData('application/reactflow-type');
-    const data = JSON.parse(event.dataTransfer.getData('application/reactflow-data'));
-    
-    const position = {
-      x: event.clientX - reactFlowBounds.left,
-      y: event.clientY - reactFlowBounds.top,
-    };
-    
-    if (type === 'character') {
-      addCharacterToEncounter(data, position);
-    } else if (type === 'monster') {
-      addMonsterToEncounter(data, position);
-    }
-  }, []);
+  const [cardLayout, setCardLayout] = useState<'grid' | 'initiative'>('initiative');
   
   return (
-    <div className="combat-canvas" onDrop={onDrop} onDragOver={onDragOver}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeDragStop={handleNodeDragStop}
-        nodeTypes={combatNodeTypes}
-        edgeTypes={combatEdgeTypes}
-        fitView
-        attributionPosition="bottom-left"
-      >
-        <Background variant={BackgroundVariant.Dots} gap={gridSize} size={1} />
-        <Controls />
-        <MiniMap 
-          nodeColor={getNodeColor}
-          nodeStrokeWidth={3}
-          nodeBorderRadius={8}
-        />
+    <div className="combat-canvas">
+      <div className="canvas-toolbar">
+        <div className="layout-controls">
+          <Button 
+            variant={cardLayout === 'initiative' ? 'default' : 'outline'}
+            onClick={() => setCardLayout('initiative')}
+          >
+            Initiative Order
+          </Button>
+          <Button 
+            variant={cardLayout === 'grid' ? 'default' : 'outline'}
+            onClick={() => setCardLayout('grid')}
+          >
+            Free Arrangement
+          </Button>
+        </div>
         
-        {/* Combat-specific overlays */}
-        <CombatOverlays 
-          encounter={encounter}
-          showGrid={showGrid}
-          gridSize={gridSize}
-        />
-      </ReactFlow>
+        <div className="combat-controls">
+          <AddParticipantDropdown 
+            onAddPlayer={onAddParticipant}
+            onAddMonster={onAddParticipant}
+          />
+          <Button onClick={endCombat} variant="destructive">
+            End Combat
+          </Button>
+        </div>
+      </div>
+      
+      <div className={`participant-cards ${cardLayout}`}>
+        {encounter.participants.map((participant, index) => (
+          <DraggableCard
+            key={participant.id}
+            participant={participant}
+            isCurrentTurn={index === encounter.currentTurn}
+            layout={cardLayout}
+            onUpdate={(updates) => onUpdateParticipant(participant.id, updates)}
+            onRemove={() => onRemoveParticipant(participant.id)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 ```
 
-### Grid System
+## 🐉 Monster Integration
+
+### Bestiary Integration
 ```typescript
-// src/components/dm/CombatTracker/GridOverlay.tsx
-interface GridOverlayProps {
-  gridSize: number; // feet per square
-  showGrid: boolean;
-  gridType: 'square' | 'hex';
-}
-
-export function GridOverlay({ gridSize, showGrid, gridType }: GridOverlayProps) {
-  if (!showGrid) return null;
+// src/components/dm/CombatTracker/MonsterSelector.tsx
+export function MonsterSelector({
+  onAddMonster,
+  isOpen,
+  onClose
+}: MonsterSelectorProps) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredMonsters, setFilteredMonsters] = useState<Monster[]>([]);
   
-  return (
-    <div className="grid-overlay">
-      <svg className="grid-svg">
-        {gridType === 'square' ? (
-          <SquareGrid size={gridSize} />
-        ) : (
-          <HexGrid size={gridSize} />
-        )}
-      </svg>
-    </div>
-  );
-}
-
-function SquareGrid({ size }: { size: number }) {
-  const pixelsPerFoot = 20; // 20 pixels = 1 foot
-  const pixelSize = size * pixelsPerFoot;
+  // Load monsters from JSON files or bestiary
+  const { monsters, loading } = useMonsterDatabase();
   
-  return (
-    <defs>
-      <pattern
-        id="grid"
-        width={pixelSize}
-        height={pixelSize}
-        patternUnits="userSpaceOnUse"
-      >
-        <path
-          d={`M ${pixelSize} 0 L 0 0 0 ${pixelSize}`}
-          fill="none"
-          stroke="#ccc"
-          strokeWidth="1"
-        />
-      </pattern>
-      <rect width="100%" height="100%" fill="url(#grid)" />
-    </defs>
-  );
-}
-```
-
-## 🎯 Area of Effect Templates
-
-### AoE Template System
-```typescript
-// src/components/dm/CombatTracker/AoETemplate.tsx
-interface AoETemplateProps {
-  shape: 'circle' | 'cone' | 'line' | 'square' | 'sphere';
-  size: number; // radius in feet
-  origin: Position;
-  direction?: number; // for cones and lines (degrees)
-  onConfirm?: (affectedParticipants: string[]) => void;
-  onCancel?: () => void;
-}
-
-export function AoETemplate({
-  shape,
-  size,
-  origin,
-  direction = 0,
-  onConfirm,
-  onCancel
-}: AoETemplateProps) {
-  const [affectedParticipants, setAffectedParticipants] = useState<string[]>([]);
-  
-  // Calculate which participants are within the AoE
   useEffect(() => {
-    const affected = calculateAoEAffectedParticipants(
-      shape,
-      size,
-      origin,
-      direction,
-      encounter.participants
-    );
-    setAffectedParticipants(affected);
-  }, [shape, size, origin, direction]);
-  
-  return (
-    <div className="aoe-template">
-      <svg className="aoe-overlay">
-        {shape === 'circle' && (
-          <circle
-            cx={origin.x}
-            cy={origin.y}
-            r={size * PIXELS_PER_FOOT}
-            className="aoe-shape aoe-circle"
-          />
-        )}
-        
-        {shape === 'cone' && (
-          <ConeTemplate
-            origin={origin}
-            size={size}
-            direction={direction}
-          />
-        )}
-        
-        {shape === 'line' && (
-          <LineTemplate
-            origin={origin}
-            size={size}
-            direction={direction}
-          />
-        )}
-        
-        {shape === 'square' && (
-          <rect
-            x={origin.x - (size * PIXELS_PER_FOOT) / 2}
-            y={origin.y - (size * PIXELS_PER_FOOT) / 2}
-            width={size * PIXELS_PER_FOOT}
-            height={size * PIXELS_PER_FOOT}
-            className="aoe-shape aoe-square"
-          />
-        )}
-      </svg>
-      
-      {/* Affected participant indicators */}
-      {affectedParticipants.map(participantId => (
-        <ParticipantHighlight
-          key={participantId}
-          participantId={participantId}
-          type="aoe-affected"
-        />
-      ))}
-      
-      {/* Template controls */}
-      <div className="aoe-controls">
-        <Button onClick={() => onConfirm?.(affectedParticipants)}>
-          Apply Effect
-        </Button>
-        <Button variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </div>
-  );
-}
-```
-
-### AoE Calculation Utilities
-```typescript
-// src/utils/dm/aoeCalculations.ts
-export function calculateAoEAffectedParticipants(
-  shape: AoEShape,
-  size: number,
-  origin: Position,
-  direction: number,
-  participants: CombatParticipant[]
-): string[] {
-  const affected: string[] = [];
-  
-  for (const participant of participants) {
-    if (!participant.position) continue;
-    
-    const distance = calculateDistance(origin, participant.position);
-    const isAffected = isParticipantInAoE(
-      shape,
-      size,
-      origin,
-      direction,
-      participant.position,
-      distance
-    );
-    
-    if (isAffected) {
-      affected.push(participant.id);
+    if (!searchTerm) {
+      setFilteredMonsters(monsters.slice(0, 20)); // Show first 20
+      return;
     }
-  }
+    
+    const filtered = monsters.filter(monster =>
+      monster.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      monster.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      monster.challenge_rating.toString().includes(searchTerm)
+    );
+    
+    setFilteredMonsters(filtered.slice(0, 20));
+  }, [searchTerm, monsters]);
   
-  return affected;
-}
-
-function isParticipantInAoE(
-  shape: AoEShape,
-  size: number,
-  origin: Position,
-  direction: number,
-  target: Position,
-  distance: number
-): boolean {
-  switch (shape) {
-    case 'circle':
-    case 'sphere':
-      return distance <= size;
-      
-    case 'cone':
-      if (distance > size) return false;
-      const angle = calculateAngle(origin, target);
-      const angleDiff = Math.abs(normalizeAngle(angle - direction));
-      return angleDiff <= 30; // 60-degree cone (30 degrees each side)
-      
-    case 'line':
-      const lineAngle = calculateAngle(origin, target);
-      const lineAngleDiff = Math.abs(normalizeAngle(lineAngle - direction));
-      return lineAngleDiff <= 2.5 && distance <= size; // 5-foot wide line
-      
-    case 'square':
-      const dx = Math.abs(target.x - origin.x);
-      const dy = Math.abs(target.y - origin.y);
-      return dx <= size / 2 && dy <= size / 2;
-      
-    default:
-      return false;
-  }
-}
-```
-
-## 📊 Resource Tracking Panel
-
-### Combat Sidebar
-```typescript
-// src/components/dm/CombatTracker/CombatSidebar.tsx
-export function CombatSidebar({
-  encounter,
-  selectedParticipant,
-  onUpdateParticipant
-}: CombatSidebarProps) {
   return (
-    <aside className="combat-sidebar">
-      {/* Initiative Tracker */}
-      <section className="sidebar-section">
-        <InitiativeTracker encounter={encounter} />
-      </section>
-      
-      {/* Selected Participant Details */}
-      {selectedParticipant && (
-        <section className="sidebar-section">
-          <ParticipantDetails
-            participant={selectedParticipant}
-            onUpdate={onUpdateParticipant}
-          />
-        </section>
-      )}
-      
-      {/* Quick Actions */}
-      <section className="sidebar-section">
-        <CombatQuickActions encounter={encounter} />
-      </section>
-      
-      {/* Environmental Effects */}
-      <section className="sidebar-section">
-        <EnvironmentalEffects encounter={encounter} />
-      </section>
-    </aside>
-  );
-}
-```
-
-### Participant Detail Panel
-```typescript
-// src/components/dm/CombatTracker/ParticipantDetails.tsx
-export function ParticipantDetails({
-  participant,
-  onUpdate
-}: ParticipantDetailsProps) {
-  return (
-    <div className="participant-details">
-      <h4 className="participant-name">{participant.name}</h4>
-      
-      {/* Health Management */}
-      <div className="health-section">
-        <HitPointTracker
-          hitPoints={{
-            current: participant.combatStats.currentHP,
-            max: participant.combatStats.maxHP,
-            temporary: participant.combatStats.tempHP
-          }}
-          onUpdate={(updates) => onUpdate(participant.id, {
-            combatStats: {
-              ...participant.combatStats,
-              currentHP: updates.current ?? participant.combatStats.currentHP,
-              maxHP: updates.max ?? participant.combatStats.maxHP,
-              tempHP: updates.temporary ?? participant.combatStats.tempHP
-            }
-          })}
-          showControls={true}
-        />
-      </div>
-      
-      {/* Armor Class */}
-      <div className="ac-section">
-        <ArmorClassTracker
-          baseAC={participant.combatStats.baseAC}
-          currentAC={participant.combatStats.currentAC}
-          tempAC={participant.combatStats.tempAC}
-          onUpdate={(ac) => onUpdate(participant.id, {
-            combatStats: { ...participant.combatStats, currentAC: ac }
-          })}
-        />
-      </div>
-      
-      {/* Conditions */}
-      <div className="conditions-section">
-        <ConditionTracker
-          conditions={participant.conditions}
-          onAdd={(condition) => onUpdate(participant.id, {
-            conditions: [...participant.conditions, condition]
-          })}
-          onRemove={(conditionId) => onUpdate(participant.id, {
-            conditions: participant.conditions.filter(c => c.id !== conditionId)
-          })}
-        />
-      </div>
-      
-      {/* Spell Slots (if applicable) */}
-      {participant.combatStats.spellSlots && (
-        <div className="spells-section">
-          <SpellSlotTracker
-            spellSlots={participant.combatStats.spellSlots}
-            onUseSlot={(level) => useSpellSlot(participant.id, level)}
-            compact={true}
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Add Monster to Combat</DialogTitle>
+        </DialogHeader>
+        
+        <div className="monster-search">
+          <Input
+            placeholder="Search monsters by name, type, or CR..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-      )}
-      
-      {/* Used Abilities */}
-      <div className="abilities-section">
-        <UsedAbilitiesTracker
-          usedAbilities={participant.combatStats.usedAbilities}
-          availableAbilities={getAvailableAbilities(participant)}
-          onUseAbility={(abilityId) => useAbility(participant.id, abilityId)}
-          onResetAbility={(abilityId) => resetAbility(participant.id, abilityId)}
-        />
+        
+        <div className="monster-grid">
+          {filteredMonsters.map(monster => (
+            <MonsterCard
+              key={monster.slug}
+              monster={monster}
+              onAdd={() => {
+                onAddMonster(monster);
+                onClose();
+              }}
+            />
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+### Monster Card Preview
+```typescript
+// Quick monster info for selection
+function MonsterCard({ monster, onAdd }: { monster: Monster; onAdd: () => void }) {
+  return (
+    <div className="monster-preview-card">
+      <div className="monster-header">
+        <h4>{monster.name}</h4>
+        <span className="cr-badge">CR {monster.challenge_rating}</span>
       </div>
+      
+      <div className="monster-stats">
+        <div>AC: {monster.armor_class}</div>
+        <div>HP: {monster.hit_points}</div>
+        <div>Speed: {monster.speed.walk || 30}ft</div>
+      </div>
+      
+      <div className="monster-type">
+        {monster.type} • {monster.size}
+      </div>
+      
+      <Button onClick={onAdd} className="add-monster-btn">
+        Add to Combat
+      </Button>
     </div>
   );
 }
 ```
 
-## 💾 Combat State Persistence
+## 📝 Combat Log System
 
-### Combat Store Integration
+### Combat Log Component
+```typescript
+interface CombatLogEntry {
+  id: string;
+  timestamp: Date;
+  round: number;
+  type: 'damage' | 'healing' | 'condition' | 'death' | 'action' | 'initiative';
+  actor: string; // participant name
+  target?: string; // target name if applicable
+  amount?: number; // damage/healing amount
+  description: string;
+}
+
+export function CombatLog({
+  entries,
+  isCollapsed,
+  onToggle
+}: CombatLogProps) {
+  const groupedEntries = groupBy(entries, 'round');
+  
+  return (
+    <div className={`combat-log ${isCollapsed ? 'collapsed' : 'expanded'}`}>
+      <div className="log-header" onClick={onToggle}>
+        <h3>Combat Log</h3>
+        <span className="toggle-icon">
+          {isCollapsed ? '▲' : '▼'}
+        </span>
+      </div>
+      
+      {!isCollapsed && (
+        <div className="log-entries">
+          {Object.entries(groupedEntries).reverse().map(([round, roundEntries]) => (
+            <div key={round} className="round-group">
+              <div className="round-header">Round {round}</div>
+              {roundEntries.map(entry => (
+                <CombatLogEntry key={entry.id} entry={entry} />
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CombatLogEntry({ entry }: { entry: CombatLogEntry }) {
+  const getEntryIcon = (type: string) => {
+    switch (type) {
+      case 'damage': return '⚔️';
+      case 'healing': return '💚';
+      case 'death': return '💀';
+      case 'condition': return '🎭';
+      case 'initiative': return '🎲';
+      default: return '📝';
+    }
+  };
+  
+  return (
+    <div className={`log-entry ${entry.type}`}>
+      <span className="entry-icon">{getEntryIcon(entry.type)}</span>
+      <span className="entry-time">
+        {entry.timestamp.toLocaleTimeString()}
+      </span>
+      <span className="entry-description">{entry.description}</span>
+    </div>
+  );
+}
+```
+
+### Combat Action Logging
+```typescript
+// src/utils/dm/combatLogger.ts
+export class CombatLogger {
+  static logDamage(
+    attacker: string,
+    target: string,
+    amount: number,
+    damageType: string,
+    round: number
+  ): CombatLogEntry {
+    return {
+      id: generateId(),
+      timestamp: new Date(),
+      round,
+      type: 'damage',
+      actor: attacker,
+      target,
+      amount,
+      description: `${attacker} deals ${amount} ${damageType} damage to ${target}`
+    };
+  }
+  
+  static logHealing(
+    healer: string,
+    target: string,
+    amount: number,
+    round: number
+  ): CombatLogEntry {
+    return {
+      id: generateId(),
+      timestamp: new Date(),
+      round,
+      type: 'healing',
+      actor: healer,
+      target,
+      amount,
+      description: `${healer} heals ${target} for ${amount} hit points`
+    };
+  }
+  
+  static logDeath(
+    participant: string,
+    round: number
+  ): CombatLogEntry {
+    return {
+      id: generateId(),
+      timestamp: new Date(),
+      round,
+      type: 'death',
+      actor: participant,
+      description: `${participant} has fallen unconscious`
+    };
+  }
+  
+  static logCondition(
+    participant: string,
+    condition: string,
+    added: boolean,
+    round: number
+  ): CombatLogEntry {
+    return {
+      id: generateId(),
+      timestamp: new Date(),
+      round,
+      type: 'condition',
+      actor: participant,
+      description: `${participant} is ${added ? 'now' : 'no longer'} ${condition}`
+    };
+  }
+}
+```
+
+## 💾 Combat State Management
+
+### Enhanced Combat Store
 ```typescript
 // src/store/combatStore.ts
 interface CombatState {
   activeEncounter: Encounter | null;
+  combatLog: CombatLogEntry[];
   encounterHistory: Encounter[];
-  canvasState: CombatCanvasState;
-  autoSave: boolean;
+  
+  // Actions
+  startEncounter: (participants: CombatParticipant[]) => void;
+  endEncounter: () => void;
+  updateParticipant: (participantId: string, updates: Partial<CombatParticipant>) => void;
+  addParticipant: (participant: CombatParticipant) => void;
+  removeParticipant: (participantId: string) => void;
+  advanceTurn: () => void;
+  logAction: (entry: CombatLogEntry) => void;
+  
+  // Character sync
+  syncCharacterChanges: (characterId: string, characterData: CharacterState) => void;
 }
 
 export const useCombatStore = create<CombatState>()(
   persist(
     (set, get) => ({
       activeEncounter: null,
+      combatLog: [],
       encounterHistory: [],
-      canvasState: {
-        zoom: 1,
-        position: { x: 0, y: 0 },
-        selectedParticipants: [],
-        showGrid: true,
-        gridSize: 5
-      },
-      autoSave: true,
       
-      // Actions
-      startEncounter: (encounter: Encounter) => {
-        set({ activeEncounter: encounter });
+      startEncounter: (participants) => {
+        const encounter: Encounter = {
+          id: generateId(),
+          participants: participants.map(p => ({
+            ...p,
+            initiative: TurnManager.rollInitiative(p)
+          })).sort((a, b) => b.initiative - a.initiative),
+          currentTurn: 0,
+          currentRound: 1,
+          startedAt: new Date(),
+          isActive: true
+        };
+        
+        set({ 
+          activeEncounter: encounter,
+          combatLog: [{
+            id: generateId(),
+            timestamp: new Date(),
+            round: 1,
+            type: 'initiative',
+            actor: 'DM',
+            description: 'Combat has begun! Initiative order set.'
+          }]
+        });
       },
       
-      updateParticipant: (participantId: string, updates: Partial<CombatParticipant>) => {
+      endEncounter: () => {
         const state = get();
         if (!state.activeEncounter) return;
         
+        // Sync final HP values back to character store
+        state.activeEncounter.participants
+          .filter(p => p.type === 'player')
+          .forEach(participant => {
+            // Update character HP in DM store
+            state.syncCharacterChanges(participant.id, {
+              hitPoints: participant.hitPoints
+            });
+          });
+        
+        set({
+          encounterHistory: [...state.encounterHistory, {
+            ...state.activeEncounter,
+            endedAt: new Date(),
+            isActive: false,
+            finalLog: state.combatLog
+          }],
+          activeEncounter: null,
+          combatLog: []
+        });
+      },
+      
+      updateParticipant: (participantId, updates) => {
+        const state = get();
+        if (!state.activeEncounter) return;
+        
+        const oldParticipant = state.activeEncounter.participants.find(p => p.id === participantId);
+        if (!oldParticipant) return;
+        
         const updatedParticipants = state.activeEncounter.participants.map(p =>
           p.id === participantId ? { ...p, ...updates } : p
+        );
+        
+        // Log changes
+        const newLog = [...state.combatLog];
+        if (updates.hitPoints && oldParticipant.hitPoints.current !== updates.hitPoints.current) {
+          const hpChange = updates.hitPoints.current - oldParticipant.hitPoints.current;
+          if (hpChange < 0) {
+            newLog.push(CombatLogger.logDamage(
+              'Unknown', 
+              oldParticipant.name, 
+              Math.abs(hpChange), 
+              'untyped',
+              state.activeEncounter.currentRound
+            ));
+          } else if (hpChange > 0) {
+            newLog.push(CombatLogger.logHealing(
+              'Unknown',
+              oldParticipant.name,
+              hpChange,
+              state.activeEncounter.currentRound
+            ));
+          }
+          
+          // Check for death
+          if (updates.hitPoints.current <= 0 && oldParticipant.hitPoints.current > 0) {
+            newLog.push(CombatLogger.logDeath(
+              oldParticipant.name,
+              state.activeEncounter.currentRound
+            ));
+          }
+        }
+        
+        set({
+          activeEncounter: {
+            ...state.activeEncounter,
+            participants: updatedParticipants
+          },
+          combatLog: newLog
+        });
+      },
+      
+      advanceTurn: () => {
+        const state = get();
+        if (!state.activeEncounter) return;
+        
+        const { newTurn, newRound, updatedParticipants } = TurnManager.advanceTurn(
+          state.activeEncounter.participants,
+          state.activeEncounter.currentTurn,
+          state.activeEncounter.currentRound
         );
         
         set({
           activeEncounter: {
             ...state.activeEncounter,
             participants: updatedParticipants,
-            updatedAt: new Date()
+            currentTurn: newTurn,
+            currentRound: newRound
           }
         });
       },
       
-      endEncounter: () => {
-        const state = get();
-        if (state.activeEncounter) {
-          set({
-            encounterHistory: [...state.encounterHistory, state.activeEncounter],
-            activeEncounter: null
-          });
-        }
+      syncCharacterChanges: (characterId, characterData) => {
+        // This will be called by websockets in the future
+        // For now, update local character data
+        const { updatePlayerCharacter } = useDMStore.getState();
+        updatePlayerCharacter(characterId, { characterData });
       }
     }),
     {
       name: 'combat-store',
       partialize: (state) => ({
-        encounterHistory: state.encounterHistory,
-        canvasState: state.canvasState,
-        autoSave: state.autoSave
+        encounterHistory: state.encounterHistory
       })
     }
   )
 );
 ```
 
+## 🎨 Visual Design Patterns
+
+### Card Styling System
+```css
+/* Combat participant cards */
+.combat-participant-card {
+  @apply bg-white rounded-xl shadow-lg border-2 border-gray-200;
+  @apply p-4 min-w-[280px] max-w-[320px];
+  @apply transition-all duration-200;
+}
+
+.combat-participant-card.current-turn {
+  @apply border-blue-500 shadow-blue-200 shadow-xl;
+  @apply ring-2 ring-blue-300;
+}
+
+.combat-participant-card.player {
+  @apply border-l-4 border-l-blue-500;
+}
+
+.combat-participant-card.monster {
+  @apply border-l-4 border-l-red-500;
+}
+
+.combat-participant-card.unconscious {
+  @apply opacity-60 border-red-300;
+}
+
+/* HP Bar styling */
+.hp-bar {
+  @apply w-full h-2 bg-gray-200 rounded-full overflow-hidden;
+}
+
+.hp-bar-fill {
+  @apply h-full transition-all duration-300;
+}
+
+.hp-bar-fill.healthy { @apply bg-green-500; }
+.hp-bar-fill.wounded { @apply bg-yellow-500; }
+.hp-bar-fill.critical { @apply bg-red-500; }
+
+/* Initiative badges */
+.initiative-badge {
+  @apply absolute -top-2 -right-2 w-8 h-8;
+  @apply bg-purple-600 text-white rounded-full;
+  @apply flex items-center justify-center text-sm font-bold;
+  @apply shadow-lg;
+}
+```
+
+## 🚀 Implementation Progress
+
+### ✅ Phase 1: Core Combat System (COMPLETED)
+- ✅ Combat store with persistence (Zustand)
+- ✅ Combat participant cards with HP/AC editing
+- ✅ Initiative tracking and turn management  
+- ✅ Start/End combat functionality
+- ✅ Basic layout modes (Initiative Order, Grid)
+- ✅ Death saves integration (reusing HitPointTracker)
+- ✅ Action economy tracking (reaction/bonus action)
+
+### ✅ Phase 2: Enhanced Combat Features (COMPLETED)
+- ✅ Combat log system with round grouping and filtering
+- ✅ Add participant modal (players and monsters)
+- ✅ Basic monster integration (sample monsters)
+- ✅ Combat history preservation
+- ✅ Character HP sync on combat end
+- ✅ Turn indicators and current turn highlighting
+
+### ⏳ Phase 3: UI & UX Improvements (IN PROGRESS)
+- ❌ **Replace basic layout with React Flow canvas** - Current grid layout is functional but limited
+- ❌ **Optimize card sizing** - Cards currently take too much vertical space
+- ❌ **Full bestiary integration** - Currently using only 3 sample monsters (Goblin, Orc, Owlbear)
+- ❌ **Advanced monster search and filtering** - Need proper search through full monster database
+- ⏳ Condition tracking system
+- ⏳ Spell slot management
+- ⏳ Drag & drop positioning for free layout mode
+
+### ⏳ Phase 4: Advanced Features (PLANNED)
+- ⏳ Combat settings and configuration options
+- ⏳ Encounter templates and presets
+- ⏳ Export encounter summaries
+- ⏳ Combat statistics and analytics
+- ⏳ Advanced turn management (delay actions, ready actions)
+- ⏳ Environmental effects tracking
+
+### 🔮 Phase 5: Future Backend Integration (PLANNED)
+- ⏳ Websocket integration for real-time updates
+- ⏳ Player connection for live HP sync
+- ⏳ Advanced combat automation
+- ⏳ Integration with virtual dice roller
+- ⏳ Multi-DM campaign support
+
 ---
 
-This combat tracker design provides a comprehensive, visual interface for managing D&D combat while building on your existing canvas infrastructure and maintaining the familiar patterns your users already know.
+## 🎯 Current Status & Next Steps
+
+### ✅ What's Working Now
+The combat tracker is **fully functional** for basic D&D combat management:
+- **Start Combat**: Creates new encounters with empty participant list
+- **Add Participants**: Both campaign players and sample monsters
+- **Combat Flow**: Full initiative order, turn advancement, round tracking
+- **HP Management**: Direct editing with death save integration
+- **Combat Log**: Comprehensive action tracking with filtering
+- **End Combat**: Syncs final HP back to character sheets
+
+### 🚧 Key Limitations to Address
+1. **Card Layout**: Cards are too large vertically, need more compact design
+2. **Monster Database**: Only 3 sample monsters vs. full bestiary (1000+ monsters)
+3. **Canvas System**: Basic CSS layout instead of React Flow for proper positioning
+4. **Search & Filtering**: Limited monster search capabilities
+5. **Mobile Responsiveness**: Cards may not work well on smaller screens
+
+### 🎯 Immediate Next Steps
+1. **Implement React Flow Canvas** - Replace basic layout with proper drag/drop positioning
+2. **Integrate Full Bestiary** - Connect to existing JSON monster files with search
+3. **Optimize Card Sizing** - More compact, efficient card design
+4. **Add Condition Tracking** - Status effects and conditions on participant cards
+5. **Enhance Monster Search** - Advanced filtering by CR, type, environment, etc.
+
+---
+
+This card-based combat tracker focuses on streamlined combat management while maintaining the flexibility needed for complex D&D encounters. The system prioritizes quick access to essential information over tactical positioning, making it perfect for theater-of-mind combat or hybrid approaches.

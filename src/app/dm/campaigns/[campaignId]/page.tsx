@@ -116,9 +116,9 @@ export default function CampaignDetailPage() {
                 <Users size={20} />
                 Player Characters ({activePlayers.length})
               </h2>
-              <Link href={`/dm/campaigns/${campaignId}/characters/import`} className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm">
-                <Plus size={16} />
-                Import Characters
+              <Link href={`/dm/campaigns/${campaignId}/characters`} className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm">
+                <Users size={16} />
+                Manage Characters
               </Link>
             </div>
             
@@ -226,9 +226,9 @@ export default function CampaignDetailPage() {
                 <span className="text-red-800 font-medium">Start Combat</span>
               </Link>
               
-              <Link href={`/dm/campaigns/${campaignId}/characters/import`} className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+              <Link href={`/dm/campaigns/${campaignId}/characters`} className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
                 <Users className="h-5 w-5 text-blue-600" />
-                <span className="text-blue-800 font-medium">Import Characters</span>
+                <span className="text-blue-800 font-medium">Manage Characters</span>
               </Link>
               
               <Link href={`/dm/campaigns/${campaignId}/sessions/new`} className="flex items-center gap-3 p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
