@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ClassInfo } from '@/types/character';
+import Image from 'next/image';
 
 interface CharacterHeaderProps {
   name: string;
@@ -66,10 +67,12 @@ export function CharacterHeader({
       <div className={containerClasses}>
         <div className="flex items-center gap-3">
           {avatar && (
-            <img 
-              src={avatar} 
-              alt={name || 'Character'} 
+            <Image 
+              src={avatar}
+              alt={name || 'Character'}
               className="w-12 h-12 rounded-full border-2 border-blue-200"
+              width={48}
+              height={48}
             />
           )}
           <div className="flex-1 min-w-0">

@@ -7,8 +7,15 @@ import {
   CombatCanvasState,
   CombatLayoutMode 
 } from '@/types/combat';
-import { CharacterState, HitPoints } from '@/types/character';
+
 import { useDMStore } from './dmStore';
+import { 
+  applyDamage as calculateDamage,
+  applyHealing as calculateHealing,
+  addTemporaryHP as calculateTemporaryHP,
+  makeDeathSave as calculateDeathSave,
+  resetDeathSaves as calculateResetDeathSaves
+} from '@/utils/hpCalculations';
 
 interface CombatState {
   // Current encounter
@@ -422,8 +429,7 @@ export const useCombatStore = create<CombatState>()(
         if (!participant) return;
 
         // Use existing damage calculation logic
-        const { applyDamage } = require('@/utils/hpCalculations');
-        const newHitPoints = applyDamage(participant.hitPoints, damage);
+        const newHitPoints = calculateDamage(participant.hitPoints, damage);
 
         get().updateParticipant(participantId, { hitPoints: newHitPoints });
         get().addLogEntry(createLogEntry(
@@ -456,8 +462,7 @@ export const useCombatStore = create<CombatState>()(
         const participant = state.activeEncounter.participants.find(p => p.id === participantId);
         if (!participant) return;
 
-        const { applyHealing } = require('@/utils/hpCalculations');
-        const newHitPoints = applyHealing(participant.hitPoints, healing);
+        const newHitPoints = calculateHealing(participant.hitPoints, healing);
 
         get().updateParticipant(participantId, { hitPoints: newHitPoints });
         get().addLogEntry(createLogEntry(
@@ -478,8 +483,7 @@ export const useCombatStore = create<CombatState>()(
         const participant = state.activeEncounter.participants.find(p => p.id === participantId);
         if (!participant) return;
 
-        const { addTemporaryHP } = require('@/utils/hpCalculations');
-        const newHitPoints = addTemporaryHP(participant.hitPoints, tempHP);
+        const newHitPoints = calculateTemporaryHP(participant.hitPoints, tempHP);
 
         get().updateParticipant(participantId, { hitPoints: newHitPoints });
         get().addLogEntry(createLogEntry(
@@ -500,10 +504,9 @@ export const useCombatStore = create<CombatState>()(
         const participant = state.activeEncounter.participants.find(p => p.id === participantId);
         if (!participant) return;
 
-        const { makeDeathSave } = require('@/utils/hpCalculations');
         const isSuccess = roll >= 10;
         const isCritical = roll === 20;
-        const newHitPoints = makeDeathSave(participant.hitPoints, isSuccess, isCritical);
+        const newHitPoints = calculateDeathSave(participant.hitPoints, isSuccess, isCritical);
 
         get().updateParticipant(participantId, { hitPoints: newHitPoints });
         
@@ -524,8 +527,7 @@ export const useCombatStore = create<CombatState>()(
         const participant = state.activeEncounter.participants.find(p => p.id === participantId);
         if (!participant) return;
 
-        const { resetDeathSaves } = require('@/utils/hpCalculations');
-        const newHitPoints = resetDeathSaves(participant.hitPoints);
+        const newHitPoints = calculateResetDeathSaves(participant.hitPoints);
 
         get().updateParticipant(participantId, { hitPoints: newHitPoints });
         get().addLogEntry(createLogEntry(

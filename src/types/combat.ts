@@ -41,7 +41,7 @@ export interface CombatParticipant {
   };
   monsterReference?: {
     slug: string;
-    monsterData: any; // Will be typed later when we integrate monster data
+    monsterData: unknown; // Will be typed later when we integrate monster data
   };
   
   // Combat tracking
@@ -81,7 +81,7 @@ export interface CombatLogEntry {
   target?: string; // target name if applicable
   amount?: number; // damage/healing amount
   description: string;
-  data?: any; // Additional structured data
+  data?: unknown; // Additional structured data
 }
 
 // Combat action types
@@ -91,7 +91,7 @@ export interface CombatAction {
   actor: string;
   targets: string[];
   description: string;
-  data?: any;
+  data?: unknown;
 }
 
 // Initiative order tracking

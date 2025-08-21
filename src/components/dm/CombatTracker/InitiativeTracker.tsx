@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { 
   ChevronRight, 
-  RotateCcw, 
   Play, 
   Pause, 
   SkipForward,
