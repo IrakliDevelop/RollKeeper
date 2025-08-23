@@ -253,60 +253,69 @@ export default function TraitTracker({
                  </label>
                </div>
                
-               {newTrait.scaleWithProficiency ? (
-                 <div className="grid grid-cols-2 gap-4">
-                   <div>
-                     <label className="block text-sm font-bold text-indigo-800 mb-2">Proficiency Multiplier</label>
-                     <input
-                       type="number"
-                       min="1"
-                       max="5"
-                       value={newTrait.proficiencyMultiplier}
-                       onChange={(e) => setNewTrait({ ...newTrait, proficiencyMultiplier: parseInt(e.target.value) || 1 })}
-                       className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all hover:border-gray-400 font-medium"
-                     />
-                     <p className="text-xs text-gray-600 mt-1">
-                       Current: {Math.max(1, getProficiencyBonus(characterLevel) * newTrait.proficiencyMultiplier)} uses
-                     </p>
+               <div className="space-y-4">
+                 {newTrait.scaleWithProficiency ? (
+                   <>
+                     <div className="grid grid-cols-2 gap-4">
+                       <div>
+                         <label className="block text-sm font-bold text-indigo-800 mb-2">Multiplier</label>
+                         <input
+                           type="number"
+                           min="1"
+                           max="5"
+                           value={newTrait.proficiencyMultiplier}
+                           onChange={(e) => setNewTrait({ ...newTrait, proficiencyMultiplier: parseInt(e.target.value) || 1 })}
+                           className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all hover:border-gray-400 font-medium"
+                         />
+                       </div>
+                       <div>
+                         <label className="block text-sm font-bold text-indigo-800 mb-2">Recharges On</label>
+                         <select
+                           value={newTrait.restType}
+                           onChange={(e) => setNewTrait({ ...newTrait, restType: e.target.value as 'short' | 'long' })}
+                           className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all cursor-pointer hover:border-gray-400 font-medium"
+                         >
+                           <option value="short">Short Rest</option>
+                           <option value="long">Long Rest</option>
+                         </select>
+                       </div>
+                     </div>
+                     <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                       <p className="text-sm text-indigo-700 font-medium">
+                         Current Uses: {Math.max(1, getProficiencyBonus(characterLevel) * newTrait.proficiencyMultiplier)}
+                       </p>
+                       <p className="text-xs text-indigo-600 mt-1">
+                         Proficiency Bonus ({getProficiencyBonus(characterLevel)}) × Multiplier ({newTrait.proficiencyMultiplier})
+                       </p>
+                     </div>
+                   </>
+                 ) : (
+                   <div className="grid grid-cols-2 gap-4">
+                     <div>
+                       <label className="block text-sm font-bold text-indigo-800 mb-2">Maximum Uses</label>
+                       <input
+                         type="number"
+                         min="1"
+                         max="10"
+                         value={newTrait.maxUses}
+                         onChange={(e) => setNewTrait({ ...newTrait, maxUses: parseInt(e.target.value) || 1 })}
+                         className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all hover:border-gray-400 font-medium"
+                       />
+                     </div>
+                     <div>
+                       <label className="block text-sm font-bold text-indigo-800 mb-2">Recharges On</label>
+                       <select
+                         value={newTrait.restType}
+                         onChange={(e) => setNewTrait({ ...newTrait, restType: e.target.value as 'short' | 'long' })}
+                         className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all cursor-pointer hover:border-gray-400 font-medium"
+                       >
+                         <option value="short">Short Rest</option>
+                         <option value="long">Long Rest</option>
+                       </select>
+                     </div>
                    </div>
-                   <div>
-                     <label className="block text-sm font-bold text-indigo-800 mb-2">Recharges On</label>
-                     <select
-                       value={newTrait.restType}
-                       onChange={(e) => setNewTrait({ ...newTrait, restType: e.target.value as 'short' | 'long' })}
-                       className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all cursor-pointer hover:border-gray-400 font-medium"
-                     >
-                       <option value="short">Short Rest</option>
-                       <option value="long">Long Rest</option>
-                     </select>
-                   </div>
-                 </div>
-               ) : (
-                 <div className="grid grid-cols-2 gap-4">
-                   <div>
-                     <label className="block text-sm font-bold text-indigo-800 mb-2">Maximum Uses</label>
-                     <input
-                       type="number"
-                       min="1"
-                       max="10"
-                       value={newTrait.maxUses}
-                       onChange={(e) => setNewTrait({ ...newTrait, maxUses: parseInt(e.target.value) || 1 })}
-                       className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all hover:border-gray-400 font-medium"
-                     />
-                   </div>
-                   <div>
-                     <label className="block text-sm font-bold text-indigo-800 mb-2">Recharges On</label>
-                     <select
-                       value={newTrait.restType}
-                       onChange={(e) => setNewTrait({ ...newTrait, restType: e.target.value as 'short' | 'long' })}
-                       className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all cursor-pointer hover:border-gray-400 font-medium"
-                     >
-                       <option value="short">Short Rest</option>
-                       <option value="long">Long Rest</option>
-                     </select>
-                   </div>
-                 </div>
-               )}
+                 )}
+               </div>
              </div>
             <div className="flex justify-end space-x-3 pt-2">
               <button
@@ -378,60 +387,69 @@ export default function TraitTracker({
                      </label>
                    </div>
                    
-                   {editTrait.scaleWithProficiency ? (
-                     <div className="grid grid-cols-2 gap-4">
-                       <div>
-                         <label className="block text-sm font-bold text-indigo-800 mb-2">Proficiency Multiplier</label>
-                         <input
-                           type="number"
-                           min="1"
-                           max="5"
-                           value={editTrait.proficiencyMultiplier || 1}
-                           onChange={(e) => setEditTrait({ ...editTrait, proficiencyMultiplier: parseInt(e.target.value) || 1 })}
-                           className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all hover:border-gray-400 font-medium"
-                         />
-                         <p className="text-xs text-gray-600 mt-1">
-                           Current: {Math.max(1, getProficiencyBonus(characterLevel) * (editTrait.proficiencyMultiplier || 1))} uses
-                         </p>
+                   <div className="space-y-4">
+                     {editTrait.scaleWithProficiency ? (
+                       <>
+                         <div className="grid grid-cols-2 gap-4">
+                           <div>
+                             <label className="block text-sm font-bold text-indigo-800 mb-2">Multiplier</label>
+                             <input
+                               type="number"
+                               min="1"
+                               max="5"
+                               value={editTrait.proficiencyMultiplier || 1}
+                               onChange={(e) => setEditTrait({ ...editTrait, proficiencyMultiplier: parseInt(e.target.value) || 1 })}
+                               className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all hover:border-gray-400 font-medium"
+                             />
+                           </div>
+                           <div>
+                             <label className="block text-sm font-bold text-indigo-800 mb-2">Recharges On</label>
+                             <select
+                               value={editTrait.restType || 'long'}
+                               onChange={(e) => setEditTrait({ ...editTrait, restType: e.target.value as 'short' | 'long' })}
+                               className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all cursor-pointer hover:border-gray-400 font-medium"
+                             >
+                               <option value="short">Short Rest</option>
+                               <option value="long">Long Rest</option>
+                             </select>
+                           </div>
+                         </div>
+                         <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                           <p className="text-sm text-indigo-700 font-medium">
+                             Current Uses: {Math.max(1, getProficiencyBonus(characterLevel) * (editTrait.proficiencyMultiplier || 1))}
+                           </p>
+                           <p className="text-xs text-indigo-600 mt-1">
+                             Proficiency Bonus ({getProficiencyBonus(characterLevel)}) × Multiplier ({editTrait.proficiencyMultiplier || 1})
+                           </p>
+                         </div>
+                       </>
+                     ) : (
+                       <div className="grid grid-cols-2 gap-4">
+                         <div>
+                           <label className="block text-sm font-bold text-indigo-800 mb-2">Max Uses</label>
+                           <input
+                             type="number"
+                             min="1"
+                             max="10"
+                             value={editTrait.maxUses || 1}
+                             onChange={(e) => setEditTrait({ ...editTrait, maxUses: parseInt(e.target.value) || 1 })}
+                             className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all hover:border-gray-400 font-medium"
+                           />
+                         </div>
+                         <div>
+                           <label className="block text-sm font-bold text-indigo-800 mb-2">Recharges On</label>
+                           <select
+                             value={editTrait.restType || 'long'}
+                             onChange={(e) => setEditTrait({ ...editTrait, restType: e.target.value as 'short' | 'long' })}
+                             className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all cursor-pointer hover:border-gray-400 font-medium"
+                           >
+                             <option value="short">Short Rest</option>
+                             <option value="long">Long Rest</option>
+                           </select>
+                         </div>
                        </div>
-                       <div>
-                         <label className="block text-sm font-bold text-indigo-800 mb-2">Recharges On</label>
-                         <select
-                           value={editTrait.restType || 'long'}
-                           onChange={(e) => setEditTrait({ ...editTrait, restType: e.target.value as 'short' | 'long' })}
-                           className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all cursor-pointer hover:border-gray-400 font-medium"
-                         >
-                           <option value="short">Short Rest</option>
-                           <option value="long">Long Rest</option>
-                         </select>
-                       </div>
-                     </div>
-                   ) : (
-                     <div className="grid grid-cols-2 gap-4">
-                       <div>
-                         <label className="block text-sm font-bold text-indigo-800 mb-2">Max Uses</label>
-                         <input
-                           type="number"
-                           min="1"
-                           max="10"
-                           value={editTrait.maxUses || 1}
-                           onChange={(e) => setEditTrait({ ...editTrait, maxUses: parseInt(e.target.value) || 1 })}
-                           className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all hover:border-gray-400 font-medium"
-                         />
-                       </div>
-                       <div>
-                         <label className="block text-sm font-bold text-indigo-800 mb-2">Recharges On</label>
-                         <select
-                           value={editTrait.restType || 'long'}
-                           onChange={(e) => setEditTrait({ ...editTrait, restType: e.target.value as 'short' | 'long' })}
-                           className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all cursor-pointer hover:border-gray-400 font-medium"
-                         >
-                           <option value="short">Short Rest</option>
-                           <option value="long">Long Rest</option>
-                         </select>
-                       </div>
-                     </div>
-                   )}
+                     )}
+                   </div>
                  </div>
                                  <div className="flex justify-end space-x-3 pt-2">
                    <button
