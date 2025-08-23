@@ -112,6 +112,8 @@ export interface TrackableTrait {
   usedUses: number;
   restType: 'short' | 'long'; // Recharges on short or long rest
   source?: string; // e.g., "Racial", "Feat", "Class Feature", etc.
+  scaleWithProficiency?: boolean; // If true, maxUses scales with proficiency bonus
+  proficiencyMultiplier?: number; // Multiplier for proficiency bonus (default 1)
   createdAt: string;
   updatedAt: string;
 }
@@ -407,6 +409,9 @@ export interface CharacterState {
 
   // Conditions and diseases
   conditionsAndDiseases: ConditionsDiseasesState;
+
+  // Class Features
+  jackOfAllTrades: boolean; // Bard feature: add half proficiency to non-proficient skills
 
   // Miscellaneous
 }

@@ -407,6 +407,9 @@ export const DEFAULT_CHARACTER_STATE = {
     activeDiseases: [],
     exhaustionVariant: '2024' as const, // Default to 2024 rules
   },
+
+  // Class Features
+  jackOfAllTrades: false, // Bard feature: add half proficiency to non-proficient skills
 };
 
 // spell source books and colors mapping, key should be SPELL_SOURCE_BOOKS keys
