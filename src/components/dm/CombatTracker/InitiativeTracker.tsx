@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { CombatParticipant } from '@/types/combat';
 import { useCombatStore } from '@/store/combatStore';
+import { Modal } from '@/components/ui/Modal';
 import { isDying, isDead, isStabilized } from '@/utils/hpCalculations';
 
 interface InitiativeTrackerProps {
@@ -248,49 +249,50 @@ export function InitiativeTracker({
       </div>
 
       {/* Reroll Initiative Dialog */}
-      {showRollDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Reroll Initiative</h3>
+      <Modal
+        isOpen={showRollDialog}
+        onClose={() => setShowRollDialog(false)}
+        title="Reroll Initiative"
+        size="sm"
+      >
+        <div className="p-6">
+          <div className="space-y-3 mb-6">
+            <button
+              onClick={() => handleRollInitiative()}
+              className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+            >
+              <Dice6 className="inline mr-2" size={16} />
+              Reroll All Participants
+            </button>
             
-            <div className="space-y-3 mb-6">
-              <button
-                onClick={() => handleRollInitiative()}
-                className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
-              >
-                <Dice6 className="inline mr-2" size={16} />
-                Reroll All Participants
-              </button>
-              
-              <div className="text-center text-sm text-gray-500">or</div>
-              
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-gray-700">Reroll Individual:</div>
-                <div className="max-h-32 overflow-y-auto space-y-1">
-                  {participants.map(participant => (
-                    <button
-                      key={participant.id}
-                      onClick={() => handleRollInitiative(participant.id)}
-                      className="w-full px-3 py-2 text-left text-sm bg-gray-50 hover:bg-gray-100 rounded transition-colors"
-                    >
-                      {participant.name} ({participant.initiative})
-                    </button>
-                  ))}
-                </div>
+            <div className="text-center text-sm text-gray-500">or</div>
+            
+            <div className="space-y-2">
+              <div className="text-sm font-medium text-gray-700">Reroll Individual:</div>
+              <div className="max-h-32 overflow-y-auto space-y-1">
+                {participants.map(participant => (
+                  <button
+                    key={participant.id}
+                    onClick={() => handleRollInitiative(participant.id)}
+                    className="w-full px-3 py-2 text-left text-sm bg-gray-50 hover:bg-blue-100 text-gray-900 rounded transition-colors"
+                  >
+                    {participant.name} ({participant.initiative})
+                  </button>
+                ))}
               </div>
             </div>
+          </div>
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowRollDialog(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowRollDialog(false)}
+              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

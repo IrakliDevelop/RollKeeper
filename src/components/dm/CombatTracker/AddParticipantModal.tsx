@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  X, 
   Skull, 
   Search, 
   Plus, 
@@ -13,7 +12,10 @@ import { CombatParticipant } from '@/types/combat';
 import { ProcessedMonster } from '@/types/bestiary';
 import { useDMStore } from '@/store/dmStore';
 import { useCombatStore } from '@/store/combatStore';
-import { monsterToCombatParticipant, formatMonsterType, parseChallengeRating } from '@/utils/dm/monsterUtils';
+import { monsterToCombatParticipant, parseChallengeRating, formatMonsterType } from '@/utils/dm/monsterUtils';
+import { useDebouncedSearch } from '@/hooks/useDebounce';
+import { VirtualizedMonsterGrid } from './VirtualizedMonsterGrid';
+import { Modal } from '@/components/ui/Modal';
 
 interface AddParticipantModalProps {
   campaignId: string;
@@ -46,94 +48,15 @@ export function AddParticipantModal({
     const loadMonsters = async () => {
       setLoading(true);
       try {
-        // TODO: Replace with actual bestiary data loading
-        // For now, create some sample monsters
-        const sampleMonsters: ProcessedMonster[] = [
-          {
-            id: 'goblin',
-            name: 'Goblin',
-            size: ['Small'],
-            type: 'humanoid',
-            alignment: 'Neutral Evil',
-            ac: '15 (Leather Armor, Shield)',
-            hp: '7 (2d6)',
-            speed: '30 ft.',
-            str: 8,
-            dex: 14,
-            con: 10,
-            int: 10,
-            wis: 8,
-            cha: 8,
-            saves: '',
-            skills: 'Stealth +6',
-            resistances: '',
-            immunities: '',
-            vulnerabilities: '',
-            senses: 'darkvision 60 ft.',
-            passivePerception: 9,
-            languages: 'Common, Goblin',
-            cr: '1/4',
-            source: 'MM',
-            page: 166
-          },
-          {
-            id: 'orc',
-            name: 'Orc',
-            size: ['Medium'],
-            type: 'humanoid',
-            alignment: 'Chaotic Evil',
-            ac: '13 (Hide Armor)',
-            hp: '15 (2d8 + 2)',
-            speed: '30 ft.',
-            str: 16,
-            dex: 12,
-            con: 13,
-            int: 7,
-            wis: 11,
-            cha: 10,
-            saves: '',
-            skills: '',
-            resistances: '',
-            immunities: '',
-            vulnerabilities: '',
-            senses: 'darkvision 60 ft.',
-            passivePerception: 10,
-            languages: 'Common, Orc',
-            cr: '1/2',
-            source: 'MM',
-            page: 246
-          },
-          {
-            id: 'owlbear',
-            name: 'Owlbear',
-            size: ['Large'],
-            type: 'monstrosity',
-            alignment: 'Unaligned',
-            ac: '13 (Natural Armor)',
-            hp: '59 (7d10 + 21)',
-            speed: '40 ft.',
-            str: 20,
-            dex: 12,
-            con: 17,
-            int: 3,
-            wis: 12,
-            cha: 7,
-            saves: '',
-            skills: 'Perception +3',
-            resistances: '',
-            immunities: '',
-            vulnerabilities: '',
-            senses: 'darkvision 60 ft.',
-            passivePerception: 13,
-            languages: '',
-            cr: '3',
-            source: 'MM',
-            page: 249
-          }
-        ];
-        setMonsters(sampleMonsters);
+        // Use lazy loading to avoid blocking initial page load
+        const { lazyLoadBestiary } = await import('@/utils/lazyDataLoader');
+        const allMonsters = await lazyLoadBestiary();
+        setMonsters(allMonsters);
+        console.log(`Combat tracker: Loaded ${allMonsters.length} monsters`);
       } catch (error) {
         console.error('Failed to load monsters:', error);
+        // Fallback to empty array if loading fails
+        setMonsters([]);
       } finally {
         setLoading(false);
       }
@@ -144,23 +67,54 @@ export function AddParticipantModal({
     }
   }, [activeTab]);
 
-  // Filter players based on search
-  const filteredPlayers = campaign?.playerCharacters.filter(pc => 
-    pc.characterData.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    pc.characterData.class?.name.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  // Use debounced search to reduce filtering operations
+  const { debouncedSearchTerm, isSearching } = useDebouncedSearch(searchTerm, 300);
 
-  // Filter monsters based on search and filters
-  const filteredMonsters = monsters.filter(monster => {
-    const matchesSearch = monster.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         monster.type.toString().toLowerCase().includes(searchTerm.toLowerCase());
+  // Memoized filtered players to avoid unnecessary re-computations
+  const filteredPlayers = useMemo(() => {
+    if (!campaign?.playerCharacters) return [];
     
-    const matchesCR = !crFilter || monster.cr === crFilter;
-    const matchesType = !typeFilter || 
-                       (typeof monster.type === 'string' ? monster.type : monster.type.type) === typeFilter;
+    return campaign.playerCharacters.filter(pc => 
+      pc.characterData.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      pc.characterData.class?.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+    );
+  }, [campaign?.playerCharacters, debouncedSearchTerm]);
 
-    return matchesSearch && matchesCR && matchesType;
-  });
+  // Memoized filtered monsters with optimized search and pagination
+  const filteredMonsters = useMemo(() => {
+    if (!monsters.length) return [];
+
+    const filtered = monsters.filter(monster => {
+      // Search optimization: only search if there's a search term
+      const matchesSearch = !debouncedSearchTerm || 
+        monster.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        (() => {
+          // Safe type checking for monster.type
+          if (typeof monster.type === 'string') {
+            return monster.type.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+          } else if (monster.type && typeof monster.type === 'object' && monster.type.type) {
+            return monster.type.type.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+          }
+          return false;
+        })() ||
+        monster.cr.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+      
+      const matchesCR = !crFilter || monster.cr === crFilter;
+      const matchesType = !typeFilter || (() => {
+        // Safe type extraction for comparison
+        if (typeof monster.type === 'string') {
+          return monster.type === typeFilter;
+        } else if (monster.type && typeof monster.type === 'object' && monster.type.type) {
+          return monster.type.type === typeFilter;
+        }
+        return false;
+      })();
+
+      return matchesSearch && matchesCR && matchesType;
+    });
+
+    return filtered.slice(0, 50);
+  }, [monsters, debouncedSearchTerm, crFilter, typeFilter]);
 
   const handlePlayerToggle = (playerId: string) => {
     setSelectedPlayers(prev => 
@@ -232,10 +186,17 @@ export function AddParticipantModal({
   const getUniqueValues = (field: 'cr' | 'type'): string[] => {
     const values = monsters.map(monster => {
       if (field === 'type') {
-        return typeof monster.type === 'string' ? monster.type : monster.type.type;
+        // Safe type extraction
+        if (typeof monster.type === 'string') {
+          return monster.type;
+        } else if (monster.type && typeof monster.type === 'object' && monster.type.type) {
+          return monster.type.type;
+        }
+        return 'Unknown'; // Fallback for undefined types
       }
       return monster[field];
-    });
+    }).filter(value => value != null && value !== ''); // Remove null/undefined/empty values
+    
     return [...new Set(values)].sort((a, b) => {
       if (field === 'cr') {
         return parseChallengeRating(a) - parseChallengeRating(b);
@@ -245,22 +206,16 @@ export function AddParticipantModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-bold text-gray-900">Add Participants to Combat</h3>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex mt-4 bg-gray-100 rounded-lg p-1">
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Add Participants to Combat"
+      size="xl"
+      className="flex flex-col max-h-[90vh]"
+    >
+      {/* Tabs */}
+      <div className="p-6 border-b border-gray-200">
+        <div className="flex bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setActiveTab('players')}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md transition-colors ${
@@ -283,21 +238,30 @@ export function AddParticipantModal({
               <Skull size={16} />
               Monsters ({filteredMonsters.length})
             </button>
-          </div>
         </div>
+      </div>
 
         {/* Search and Filters */}
         <div className="p-4 border-b border-gray-200 bg-gray-50">
           <div className="flex gap-4">
             <div className="flex-1 relative">
-              <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              {isSearching ? (
+                <Loader2 size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-500 animate-spin" />
+              ) : (
+                <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              )}
               <input
                 type="text"
-                placeholder={`Search ${activeTab}...`}
+                placeholder={`Search ${activeTab}... (${activeTab === 'monsters' ? `${monsters.length} available` : 'type to search'})`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
+              {activeTab === 'monsters' && filteredMonsters.length > 0 && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-500">
+                  {filteredMonsters.length} results
+                </div>
+              )}
             </div>
 
             {activeTab === 'monsters' && (
@@ -361,13 +325,21 @@ export function AddParticipantModal({
             </div>
           ) : (
             <>
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 size={32} className="animate-spin text-gray-400" />
-                  <span className="ml-3 text-gray-600">Loading monsters...</span>
-                </div>
+              {filteredMonsters.length > 100 ? (
+                // Use virtualized grid for large datasets
+                <VirtualizedMonsterGrid
+                  monsters={filteredMonsters}
+                  onAddMonster={handleMonsterToggle}
+                  selectedMonsters={selectedMonsters}
+                  monsterQuantities={monsterQuantities}
+                  onQuantityChange={handleQuantityChange}
+                  containerWidth={900} // Increased modal width
+                  containerHeight={500} // Increased height for better virtualization
+                  loading={loading}
+                />
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                // Use simple grid for smaller datasets (more reliable)
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
                   {filteredMonsters.map(monster => {
                     const isSelected = selectedMonsters.some(m => m.id === monster.id);
                     const quantity = monsterQuantities[monster.id] || 1;
@@ -380,22 +352,21 @@ export function AddParticipantModal({
                             ? 'border-red-500 bg-red-50'
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
+                        onClick={() => handleMonsterToggle(monster)}
                       >
-                        <div onClick={() => handleMonsterToggle(monster)}>
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <Skull size={16} className="text-red-600" />
-                              <h4 className="font-medium text-gray-900">{monster.name}</h4>
-                            </div>
-                            <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded">
-                              CR {monster.cr}
-                            </span>
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Skull size={16} className="text-red-600" />
+                            <h4 className="font-medium text-gray-900">{monster.name}</h4>
                           </div>
-                          
-                          <div className="text-sm text-gray-600 space-y-1">
-                            <p>{formatMonsterType(monster)}</p>
-                            <p>AC {monster.ac.match(/(\d+)/)?.[1] || '?'} • HP {monster.hp.match(/(\d+)/)?.[1] || '?'}</p>
-                          </div>
+                          <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded">
+                            CR {monster.cr}
+                          </span>
+                        </div>
+                        
+                        <div className="text-sm text-gray-600 space-y-1">
+                          <p>{formatMonsterType(monster)}</p>
+                          <p>AC {monster.ac.match(/(\d+)/)?.[1] || '?'} • HP {monster.hp.match(/(\d+)/)?.[1] || '?'}</p>
                         </div>
 
                         {isSelected && (
@@ -452,7 +423,6 @@ export function AddParticipantModal({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
