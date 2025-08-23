@@ -2,10 +2,12 @@
 
 import React, { useState } from 'react';
 import { TrackableTrait } from '@/types/character';
+import { calculateTraitMaxUses, getProficiencyBonus } from '@/utils/calculations';
 import { RotateCcw, Plus, Edit3, Trash2, Zap } from 'lucide-react';
 
 interface TraitTrackerProps {
   traits: TrackableTrait[];
+  characterLevel: number;
   onAddTrait: (trait: Omit<TrackableTrait, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onUpdateTrait: (id: string, updates: Partial<TrackableTrait>) => void;
   onDeleteTrait: (id: string) => void;
@@ -16,6 +18,7 @@ interface TraitTrackerProps {
 
 export default function TraitTracker({
   traits,
+  characterLevel,
   onAddTrait,
   onUpdateTrait,
   onDeleteTrait,
@@ -30,7 +33,9 @@ export default function TraitTracker({
     description: '',
     maxUses: 1,
     restType: 'long' as 'short' | 'long',
-    source: ''
+    source: '',
+    scaleWithProficiency: false,
+    proficiencyMultiplier: 1
   });
   const [editTrait, setEditTrait] = useState<Partial<TrackableTrait>>({});
 
@@ -42,14 +47,18 @@ export default function TraitTracker({
         maxUses: newTrait.maxUses,
         usedUses: 0,
         restType: newTrait.restType,
-        source: newTrait.source.trim() || undefined
+        source: newTrait.source.trim() || undefined,
+        scaleWithProficiency: newTrait.scaleWithProficiency,
+        proficiencyMultiplier: newTrait.scaleWithProficiency ? newTrait.proficiencyMultiplier : undefined
       });
       setNewTrait({
         name: '',
         description: '',
         maxUses: 1,
         restType: 'long',
-        source: ''
+        source: '',
+        scaleWithProficiency: false,
+        proficiencyMultiplier: 1
       });
       setIsAdding(false);
     }
@@ -62,7 +71,9 @@ export default function TraitTracker({
       description: trait.description || '',
       maxUses: trait.maxUses,
       restType: trait.restType,
-      source: trait.source || ''
+      source: trait.source || '',
+      scaleWithProficiency: trait.scaleWithProficiency || false,
+      proficiencyMultiplier: trait.proficiencyMultiplier || 1
     });
   };
 
@@ -73,7 +84,9 @@ export default function TraitTracker({
         description: editTrait.description?.trim() || undefined,
         maxUses: editTrait.maxUses,
         restType: editTrait.restType,
-        source: editTrait.source?.trim() || undefined
+        source: editTrait.source?.trim() || undefined,
+        scaleWithProficiency: editTrait.scaleWithProficiency,
+        proficiencyMultiplier: editTrait.scaleWithProficiency ? editTrait.proficiencyMultiplier : undefined
       });
       setEditingId(null);
       setEditTrait({});
@@ -89,7 +102,9 @@ export default function TraitTracker({
       description: '',
       maxUses: 1,
       restType: 'long',
-      source: ''
+      source: '',
+      scaleWithProficiency: false,
+      proficiencyMultiplier: 1
     });
   };
 
@@ -97,15 +112,16 @@ export default function TraitTracker({
   const safeTraits = Array.isArray(traits) ? traits : [];
 
   const renderUsageCheckboxes = (trait: TrackableTrait) => {
+    const effectiveMaxUses = calculateTraitMaxUses(trait, characterLevel);
     return (
       <div className="flex flex-wrap gap-1">
-        {Array.from({ length: trait.maxUses }, (_, index) => (
+        {Array.from({ length: effectiveMaxUses }, (_, index) => (
           <button
             key={index}
             onClick={() => {
               const newUsed = index < trait.usedUses ? trait.usedUses - 1 : index + 1;
               onUpdateTrait(trait.id, {
-                usedUses: Math.max(0, Math.min(newUsed, trait.maxUses))
+                usedUses: Math.max(0, Math.min(newUsed, effectiveMaxUses))
               });
             }}
             className={`w-4 h-4 border-2 rounded transition-colors ${
@@ -222,29 +238,75 @@ export default function TraitTracker({
                  className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 placeholder-gray-400 shadow-sm transition-all resize-none hover:border-gray-400"
                />
              </div>
-                         <div className="grid grid-cols-2 gap-4">
-               <div>
-                 <label className="block text-sm font-bold text-indigo-800 mb-2">Maximum Uses</label>
+                         {/* Proficiency Scaling Toggle */}
+             <div className="space-y-4">
+               <div className="flex items-center space-x-3">
                  <input
-                   type="number"
-                   min="1"
-                   max="10"
-                   value={newTrait.maxUses}
-                   onChange={(e) => setNewTrait({ ...newTrait, maxUses: parseInt(e.target.value) || 1 })}
-                   className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all hover:border-gray-400 font-medium"
+                   type="checkbox"
+                   id="scaleWithProficiency"
+                   checked={newTrait.scaleWithProficiency}
+                   onChange={(e) => setNewTrait({ ...newTrait, scaleWithProficiency: e.target.checked })}
+                   className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
                  />
+                 <label htmlFor="scaleWithProficiency" className="text-sm font-bold text-indigo-800">
+                   Scale with Proficiency Bonus
+                 </label>
                </div>
-               <div>
-                 <label className="block text-sm font-bold text-indigo-800 mb-2">Recharges On</label>
-                 <select
-                   value={newTrait.restType}
-                   onChange={(e) => setNewTrait({ ...newTrait, restType: e.target.value as 'short' | 'long' })}
-                   className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all cursor-pointer hover:border-gray-400 font-medium"
-                 >
-                   <option value="short">Short Rest</option>
-                   <option value="long">Long Rest</option>
-                 </select>
-               </div>
+               
+               {newTrait.scaleWithProficiency ? (
+                 <div className="grid grid-cols-2 gap-4">
+                   <div>
+                     <label className="block text-sm font-bold text-indigo-800 mb-2">Proficiency Multiplier</label>
+                     <input
+                       type="number"
+                       min="1"
+                       max="5"
+                       value={newTrait.proficiencyMultiplier}
+                       onChange={(e) => setNewTrait({ ...newTrait, proficiencyMultiplier: parseInt(e.target.value) || 1 })}
+                       className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all hover:border-gray-400 font-medium"
+                     />
+                     <p className="text-xs text-gray-600 mt-1">
+                       Current: {Math.max(1, getProficiencyBonus(characterLevel) * newTrait.proficiencyMultiplier)} uses
+                     </p>
+                   </div>
+                   <div>
+                     <label className="block text-sm font-bold text-indigo-800 mb-2">Recharges On</label>
+                     <select
+                       value={newTrait.restType}
+                       onChange={(e) => setNewTrait({ ...newTrait, restType: e.target.value as 'short' | 'long' })}
+                       className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all cursor-pointer hover:border-gray-400 font-medium"
+                     >
+                       <option value="short">Short Rest</option>
+                       <option value="long">Long Rest</option>
+                     </select>
+                   </div>
+                 </div>
+               ) : (
+                 <div className="grid grid-cols-2 gap-4">
+                   <div>
+                     <label className="block text-sm font-bold text-indigo-800 mb-2">Maximum Uses</label>
+                     <input
+                       type="number"
+                       min="1"
+                       max="10"
+                       value={newTrait.maxUses}
+                       onChange={(e) => setNewTrait({ ...newTrait, maxUses: parseInt(e.target.value) || 1 })}
+                       className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all hover:border-gray-400 font-medium"
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-sm font-bold text-indigo-800 mb-2">Recharges On</label>
+                     <select
+                       value={newTrait.restType}
+                       onChange={(e) => setNewTrait({ ...newTrait, restType: e.target.value as 'short' | 'long' })}
+                       className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all cursor-pointer hover:border-gray-400 font-medium"
+                     >
+                       <option value="short">Short Rest</option>
+                       <option value="long">Long Rest</option>
+                     </select>
+                   </div>
+                 </div>
+               )}
              </div>
             <div className="flex justify-end space-x-3 pt-2">
               <button
@@ -301,29 +363,75 @@ export default function TraitTracker({
                      className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all resize-none hover:border-gray-400"
                    />
                  </div>
-                 <div className="grid grid-cols-2 gap-4">
-                   <div>
-                     <label className="block text-sm font-bold text-indigo-800 mb-2">Max Uses</label>
+                 {/* Proficiency Scaling Toggle */}
+                 <div className="space-y-4">
+                   <div className="flex items-center space-x-3">
                      <input
-                       type="number"
-                       min="1"
-                       max="10"
-                       value={editTrait.maxUses || 1}
-                       onChange={(e) => setEditTrait({ ...editTrait, maxUses: parseInt(e.target.value) || 1 })}
-                       className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all hover:border-gray-400 font-medium"
+                       type="checkbox"
+                       id="editScaleWithProficiency"
+                       checked={editTrait.scaleWithProficiency || false}
+                       onChange={(e) => setEditTrait({ ...editTrait, scaleWithProficiency: e.target.checked })}
+                       className="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
                      />
+                     <label htmlFor="editScaleWithProficiency" className="text-sm font-bold text-indigo-800">
+                       Scale with Proficiency Bonus
+                     </label>
                    </div>
-                   <div>
-                     <label className="block text-sm font-bold text-indigo-800 mb-2">Recharges On</label>
-                     <select
-                       value={editTrait.restType || 'long'}
-                       onChange={(e) => setEditTrait({ ...editTrait, restType: e.target.value as 'short' | 'long' })}
-                       className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all cursor-pointer hover:border-gray-400 font-medium"
-                     >
-                       <option value="short">Short Rest</option>
-                       <option value="long">Long Rest</option>
-                     </select>
-                   </div>
+                   
+                   {editTrait.scaleWithProficiency ? (
+                     <div className="grid grid-cols-2 gap-4">
+                       <div>
+                         <label className="block text-sm font-bold text-indigo-800 mb-2">Proficiency Multiplier</label>
+                         <input
+                           type="number"
+                           min="1"
+                           max="5"
+                           value={editTrait.proficiencyMultiplier || 1}
+                           onChange={(e) => setEditTrait({ ...editTrait, proficiencyMultiplier: parseInt(e.target.value) || 1 })}
+                           className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all hover:border-gray-400 font-medium"
+                         />
+                         <p className="text-xs text-gray-600 mt-1">
+                           Current: {Math.max(1, getProficiencyBonus(characterLevel) * (editTrait.proficiencyMultiplier || 1))} uses
+                         </p>
+                       </div>
+                       <div>
+                         <label className="block text-sm font-bold text-indigo-800 mb-2">Recharges On</label>
+                         <select
+                           value={editTrait.restType || 'long'}
+                           onChange={(e) => setEditTrait({ ...editTrait, restType: e.target.value as 'short' | 'long' })}
+                           className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all cursor-pointer hover:border-gray-400 font-medium"
+                         >
+                           <option value="short">Short Rest</option>
+                           <option value="long">Long Rest</option>
+                         </select>
+                       </div>
+                     </div>
+                   ) : (
+                     <div className="grid grid-cols-2 gap-4">
+                       <div>
+                         <label className="block text-sm font-bold text-indigo-800 mb-2">Max Uses</label>
+                         <input
+                           type="number"
+                           min="1"
+                           max="10"
+                           value={editTrait.maxUses || 1}
+                           onChange={(e) => setEditTrait({ ...editTrait, maxUses: parseInt(e.target.value) || 1 })}
+                           className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all hover:border-gray-400 font-medium"
+                         />
+                       </div>
+                       <div>
+                         <label className="block text-sm font-bold text-indigo-800 mb-2">Recharges On</label>
+                         <select
+                           value={editTrait.restType || 'long'}
+                           onChange={(e) => setEditTrait({ ...editTrait, restType: e.target.value as 'short' | 'long' })}
+                           className="w-full text-base p-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-gray-900 shadow-sm transition-all cursor-pointer hover:border-gray-400 font-medium"
+                         >
+                           <option value="short">Short Rest</option>
+                           <option value="long">Long Rest</option>
+                         </select>
+                       </div>
+                     </div>
+                   )}
                  </div>
                                  <div className="flex justify-end space-x-3 pt-2">
                    <button
@@ -388,13 +496,16 @@ export default function TraitTracker({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <span className="text-sm font-medium text-gray-700">
-                      Uses: {trait.maxUses - trait.usedUses}/{trait.maxUses}
+                      Uses: {calculateTraitMaxUses(trait, characterLevel) - trait.usedUses}/{calculateTraitMaxUses(trait, characterLevel)}
+                      {trait.scaleWithProficiency && (
+                        <span className="text-xs text-indigo-600 ml-1">(Proficiency)</span>
+                      )}
                     </span>
                     {renderUsageCheckboxes(trait)}
                   </div>
                   <button
                     onClick={() => onUseTrait(trait.id)}
-                    disabled={trait.usedUses >= trait.maxUses}
+                    disabled={trait.usedUses >= calculateTraitMaxUses(trait, characterLevel)}
                     className="text-sm px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     title="Use ability"
                   >

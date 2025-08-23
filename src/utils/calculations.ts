@@ -6,7 +6,8 @@ import {
   PactMagic,
   ClassInfo,
   Weapon,
-  SpellcastingAbility 
+  SpellcastingAbility,
+  TrackableTrait
 } from '@/types/character';
 import { 
   SKILL_ABILITY_MAP, 
@@ -36,7 +37,7 @@ export const getProficiencyBonus = (level: number): number => {
 
 /**
  * Calculate skill modifier
- * Takes into account ability modifier, proficiency, and expertise
+ * Takes into account ability modifier, proficiency, expertise, and Jack of All Trades
  */
 export const calculateSkillModifier = (
   character: CharacterState,
@@ -53,6 +54,9 @@ export const calculateSkillModifier = (
   // Add proficiency bonus if proficient
   if (skill.proficient) {
     modifier += proficiencyBonus;
+  } else if (character.jackOfAllTrades) {
+    // Jack of All Trades: add half proficiency bonus (rounded down) to non-proficient skills
+    modifier += Math.floor(proficiencyBonus / 2);
   }
   
   // Double proficiency bonus for expertise
@@ -657,4 +661,19 @@ export function getSpellSaveDCString(character: CharacterState): string {
   }
   
   return `${saveDC}`;
+}
+
+/**
+ * Calculate effective max uses for a trackable trait
+ * Takes into account proficiency bonus scaling if enabled
+ */
+export function calculateTraitMaxUses(trait: TrackableTrait, characterLevel: number): number {
+  if (!trait.scaleWithProficiency) {
+    return trait.maxUses;
+  }
+  
+  const proficiencyBonus = getProficiencyBonus(characterLevel);
+  const multiplier = trait.proficiencyMultiplier || 1;
+  
+  return Math.max(1, Math.floor(proficiencyBonus * multiplier));
 } 
