@@ -9,6 +9,7 @@ import {
   updateSpellSlotsPreservingUsed,
   calculateModifier,
   calculateLevelFromXP,
+  calculateTraitMaxUses,
 } from '@/utils/calculations';
 import { 
   applyDamage, 
@@ -193,7 +194,10 @@ function migrateCharacterData(character: unknown): CharacterState {
       : DEFAULT_CHARACTER_STATE.weapons,
     weaponProficiencies: (characterObj.weaponProficiencies && typeof characterObj.weaponProficiencies === 'object') 
       ? characterObj.weaponProficiencies as CharacterState['weaponProficiencies']
-      : DEFAULT_CHARACTER_STATE.weaponProficiencies
+      : DEFAULT_CHARACTER_STATE.weaponProficiencies,
+    jackOfAllTrades: (characterObj.jackOfAllTrades && typeof characterObj.jackOfAllTrades === 'boolean')
+      ? characterObj.jackOfAllTrades
+      : DEFAULT_CHARACTER_STATE.jackOfAllTrades
   };
 
   // Try to detect spellcaster type from class name
@@ -256,6 +260,9 @@ interface CharacterStore {
   // Reaction management
   toggleReaction: () => void;
   resetReaction: () => void;
+  
+  // Class Features
+  toggleJackOfAllTrades: () => void;
   
   // Heroic inspiration management
   updateHeroicInspiration: (updates: Partial<HeroicInspiration>) => void;
@@ -562,6 +569,18 @@ export const useCharacterStore = create<CharacterStore>()(
             reaction: {
               hasUsedReaction: false
             }
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving'
+        }));
+      },
+
+      // Class Features actions
+      toggleJackOfAllTrades: () => {
+        set((state) => ({
+          character: {
+            ...state.character,
+            jackOfAllTrades: !state.character.jackOfAllTrades
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving'
@@ -1438,7 +1457,7 @@ export const useCharacterStore = create<CharacterStore>()(
               trait.id === id
                 ? { 
                     ...trait, 
-                    usedUses: Math.min(trait.usedUses + 1, trait.maxUses), 
+                    usedUses: Math.min(trait.usedUses + 1, calculateTraitMaxUses(trait, state.character.level)), 
                     updatedAt: new Date().toISOString() 
                   }
                 : trait

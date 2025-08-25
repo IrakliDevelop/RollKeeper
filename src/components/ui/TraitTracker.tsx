@@ -6,6 +6,7 @@ import { TraitTracker as SharedTraitTracker } from '@/components/shared/characte
 
 interface TraitTrackerProps {
   traits: TrackableTrait[];
+  characterLevel: number;
   onAddTrait: (trait: Omit<TrackableTrait, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onUpdateTrait: (id: string, updates: Partial<TrackableTrait>) => void;
   onDeleteTrait: (id: string) => void;
@@ -16,6 +17,7 @@ interface TraitTrackerProps {
 
 export default function TraitTracker({
   traits,
+  characterLevel,
   onAddTrait,
   onUpdateTrait,
   onDeleteTrait,
@@ -27,6 +29,7 @@ export default function TraitTracker({
   return (
     <SharedTraitTracker
       traits={traits}
+      characterLevel={characterLevel}
       onAddTrait={onAddTrait}
       onUpdateTrait={onUpdateTrait}
       onDeleteTrait={onDeleteTrait}
@@ -41,4 +44,4 @@ export default function TraitTracker({
       className={className}
     />
   );
-} 
+}

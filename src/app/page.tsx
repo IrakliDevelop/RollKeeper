@@ -70,6 +70,7 @@ export default function LandingPage() {
               <p className="text-slate-600">Comprehensive tools for organizing sessions, notes, and character progression</p>
             </div>
           </div>
+
         </div>
       </section>
 

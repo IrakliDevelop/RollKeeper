@@ -43,7 +43,8 @@ import {
   getProficiencyBonus, 
   formatModifier,
   hasSpellSlots,
-  calculateCharacterArmorClass
+  calculateCharacterArmorClass,
+  calculateSkillModifier,
 } from "@/utils/calculations";
 import { 
   exportCharacterToFile
@@ -139,6 +140,7 @@ export default function CharacterSheet() {
     toggleReaction,
     resetReaction,
     updateTempArmorClass,
+    toggleJackOfAllTrades,
     toggleShield,
     resetTempArmorClass,
     updateShieldBonus,
@@ -256,16 +258,7 @@ export default function CharacterSheet() {
 
   // Helper function to get skill modifier
   const getSkillModifier = (skillName: SkillName) => {
-    const skill = character.skills[skillName];
-    const relatedAbility = SKILL_ABILITY_MAP[skillName];
-    const abilityModifier = getAbilityModifier(relatedAbility);
-    
-    let modifier = abilityModifier;
-    if (skill.proficient) modifier += proficiencyBonus;
-    if (skill.expertise && skill.proficient) modifier += proficiencyBonus;
-    if (skill.customModifier) modifier += skill.customModifier;
-    
-    return modifier;
+    return calculateSkillModifier(character, skillName);
   };
 
   // Helper function to get saving throw modifier
@@ -990,9 +983,31 @@ export default function CharacterSheet() {
 
             {/* Skills */}
             <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6 flex flex-col">
-              <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
-                Skills
-              </h2>
+            <div className="flex items-center justify-between mb-4 border-b border-gray-200 pb-2">
+                <h2 className="text-lg font-bold text-gray-800">
+                  Skills
+                </h2>
+                
+                {/* Jack of All Trades Toggle */}
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="jackOfAllTrades"
+                    checked={character.jackOfAllTrades}
+                    onChange={toggleJackOfAllTrades}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                  />
+                  <label htmlFor="jackOfAllTrades" className="text-sm font-medium text-gray-700">
+                    Jack of All Trades
+                  </label>
+                  <div className="group relative">
+                    <span className="text-gray-400 cursor-help">ⓘ</span>
+                    <div className="absolute right-0 top-6 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                      Bard feature: Add half proficiency bonus (rounded down) to ability checks using skills you&apos;re not proficient in.
+                    </div>
+                  </div>
+                </div>
+              </div>
               
               {/* Skills Legend */}
               <div className="flex items-center gap-4 mb-3 text-xs text-gray-600 bg-gray-50 p-2 rounded">
@@ -1004,6 +1019,12 @@ export default function CharacterSheet() {
                   <div className="w-3 h-3 bg-yellow-600 rounded"></div>
                   <span>E = Expertise ({formatModifier(proficiencyBonus * 2)})</span>
                 </div>
+                {character.jackOfAllTrades && (
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 bg-blue-500 rounded"></div>
+                    <span>J = Jack of All Trades ({formatModifier(Math.floor(proficiencyBonus / 2))})</span>
+                  </div>
+                )}
               </div>
               
               <div className="space-y-1 flex-1 min-h-0 max-h-[40vh] lg:max-h-[60vh] xl:max-h-none overflow-y-auto border border-gray-100 rounded-lg p-2 bg-gradient-to-b from-white to-gray-50">
@@ -1054,7 +1075,8 @@ export default function CharacterSheet() {
                       {/* Skill Modifier */}
                       <span className={`font-mono font-semibold w-10 text-right ${
                         hasExpertise && isProficient ? 'text-yellow-700' : 
-                        isProficient ? 'text-green-800' : 'text-gray-600'
+                        isProficient ? 'text-green-800' : 
+                        character.jackOfAllTrades && !isProficient ? 'text-blue-600' : 'text-gray-600'
                       }`}>
                         {formatModifier(getSkillModifier(skillName))}
                       </span>
@@ -1366,6 +1388,7 @@ export default function CharacterSheet() {
             {/* Special Abilities */}
             <TraitTracker
               traits={character.trackableTraits || []}
+              characterLevel={character.level}
               onAddTrait={addTrackableTrait}
               onUpdateTrait={updateTrackableTrait}
               onDeleteTrait={deleteTrackableTrait}
