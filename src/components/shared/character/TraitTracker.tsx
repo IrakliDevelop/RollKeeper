@@ -698,7 +698,7 @@ export function TraitTracker({
                       </span>
                     </div>
                     {trait.description && !compact && (
-                      <p className="mt-1 text-sm text-gray-600">
+                      <p className="mt-1 text-sm text-gray-600 line-clamp-2">
                         {trait.description}
                       </p>
                     )}

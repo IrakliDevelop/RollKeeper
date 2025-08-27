@@ -38,6 +38,12 @@ export default function LandingPage() {
               >
                 DM Toolset
               </Link>
+              <Link
+                href="/resources"
+                className="font-medium text-slate-600 transition-colors hover:text-purple-600"
+              >
+                Resources
+              </Link>
             </div>
           </div>
         </div>

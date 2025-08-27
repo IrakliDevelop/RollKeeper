@@ -14,7 +14,6 @@ import XPTracker from '@/components/ui/character/XPTracker';
 
 import HitPointManager from '@/components/ui/character/HitPointManager';
 import ExperimentalFeaturesSection from '@/components/ui/layout/ExperimentalFeaturesSection';
-import FeaturesNavigationSection from '@/components/ui/layout/FeaturesNavigationSection';
 import HitDiceManager from '@/components/ui/character/HitDiceManager';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { WeaponProficiencies } from '@/components/WeaponProficiencies';
@@ -30,6 +29,7 @@ import Skills from '@/components/ui/character/Skills';
 import CombatStats from '@/components/ui/character/CombatStats';
 import ActionsSection from '@/components/ui/character/ActionsSection';
 import QuickStats from '@/components/ui/character/QuickStats';
+import { ExtendedFeaturesSection } from '@/components/ui/character/ExtendedFeatures';
 import { useHydration } from '@/hooks/useHydration';
 import { ABILITY_NAMES, SKILL_NAMES } from '@/utils/constants';
 import {
@@ -58,10 +58,8 @@ export default function CharacterSheet() {
   const { getCharacterById, updateCharacterData } = usePlayerStore();
   const playerCharacter = getCharacterById(characterId);
 
-  // Hydration check to prevent SSR/client mismatches
   const hasHydrated = useHydration();
 
-  // Dice rolling with new modular system
   const { isReady: diceBoxInitialized, roll: rollDice } = useSimpleDiceRoll({
     containerId: 'main-dice-container',
     onRollComplete: (summary: RollSummary) => {
@@ -72,7 +70,6 @@ export default function CharacterSheet() {
     },
   });
 
-  // Toast system
   const {
     toasts,
     dismissToast,
@@ -82,7 +79,6 @@ export default function CharacterSheet() {
     addToast,
   } = useToast();
 
-  // Zustand store
   const {
     character,
     saveStatus,
@@ -126,6 +122,13 @@ export default function CharacterSheet() {
     deleteTrackableTrait,
     useTrackableTrait,
     resetTrackableTraits,
+    addExtendedFeature,
+    updateExtendedFeature,
+    deleteExtendedFeature,
+    useExtendedFeature,
+    resetExtendedFeatures,
+    reorderExtendedFeatures,
+    migrateTraitsToExtendedFeatures,
     updateCharacterBackground,
     exportCharacter,
     resetCharacter,
@@ -144,13 +147,10 @@ export default function CharacterSheet() {
     loadCharacterState,
   } = useCharacterStore();
 
-  // Modal state for character reset
   const [showResetModal, setShowResetModal] = useState(false);
 
-  // Auto-save functionality
   const { manualSave } = useAutoSave();
 
-  // Track the last loaded character to prevent sync loops
   const lastLoadedCharacterRef = useRef<string | null>(null);
   const lastSyncedCharacterRef = useRef<CharacterState | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -167,6 +167,17 @@ export default function CharacterSheet() {
         lastLoadedCharacterRef.current = currentCharacterId;
         lastSyncedCharacterRef.current = playerCharacter.characterData;
 
+        // Auto-migrate existing traits to extended features if needed
+        const hasTraits = (playerCharacter.characterData.trackableTraits || []).length > 0;
+        const hasExtended = (playerCharacter.characterData.extendedFeatures || []).length > 0;
+        
+        if (hasTraits && !hasExtended) {
+          // Small delay to ensure character state is loaded first
+          setTimeout(() => {
+            migrateTraitsToExtendedFeatures();
+          }, 100);
+        }
+
         // Mark initial load as complete after state has been set
         const timer = setTimeout(() => {
           setIsInitialLoad(false);
@@ -175,7 +186,7 @@ export default function CharacterSheet() {
         return () => clearTimeout(timer);
       }
     }
-  }, [playerCharacter, hasHydrated, loadCharacterState]);
+  }, [playerCharacter, hasHydrated, loadCharacterState, migrateTraitsToExtendedFeatures]);
 
   // Sync character data back to player store when it changes (skip during initial load)
   useEffect(() => {
@@ -535,8 +546,6 @@ export default function CharacterSheet() {
               }
             `}</style>
 
-            <FeaturesNavigationSection />
-
             <ExperimentalFeaturesSection />
 
             {/* Main Character Sheet */}
@@ -840,6 +849,20 @@ export default function CharacterSheet() {
                     />
                   </div>
                 </div>
+              </section>
+
+              {/* Extended Character Features Section */}
+              <section className="mt-8">
+                <ExtendedFeaturesSection
+                  features={character.extendedFeatures || []}
+                  characterLevel={character.level}
+                  onAddFeature={addExtendedFeature}
+                  onUpdateFeature={updateExtendedFeature}
+                  onDeleteFeature={deleteExtendedFeature}
+                  onUseFeature={useExtendedFeature}
+                  onResetFeatures={resetExtendedFeatures}
+                  onReorderFeatures={reorderExtendedFeatures}
+                />
               </section>
 
               {/* Grouped Tabbed Interface for Additional Sections */}
