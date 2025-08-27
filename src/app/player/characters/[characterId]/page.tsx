@@ -494,17 +494,13 @@ export default function CharacterSheet() {
           display: block !important;
         }
       `}</style>
-      
 
-
-      {/* Features Navigation Section */}
       <FeaturesNavigationSection />
 
-      {/* Experimental Features Section */}
       <ExperimentalFeaturesSection />
 
       {/* Main Character Sheet */}
-      <main className="max-w-7xl mx-auto space-y-8 relative z-20">
+      <main className="max-w-7xl mx-auto space-y-8 relative z-10">
         
         {/* Actions Section */}
         <ActionsSection

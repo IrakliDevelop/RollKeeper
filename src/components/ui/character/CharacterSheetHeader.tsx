@@ -6,6 +6,7 @@ import { SaveIndicator } from "@/components/ui/feedback/SaveIndicator";
 import { usePlayerStore } from "@/store/playerStore";
 import { useCharacterStore } from "@/store/characterStore";
 import { exportCharacterToFile } from "@/utils/fileOperations";
+import { useState, useEffect } from "react";
 
 interface CharacterSheetHeaderProps {
   characterName: string;
@@ -37,11 +38,51 @@ export default function CharacterSheetHeader({
   onAddToast
 }: CharacterSheetHeaderProps) {
   const { exportCharacter } = useCharacterStore();
+  
+  // Header visibility state
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const [lastScrollY, setLastScrollY] = useState(0);
+  const [isHovering, setIsHovering] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      if (currentScrollY < 10) {
+        setIsHeaderVisible(true);
+      }
+      else if (!isHovering) {
+        if (currentScrollY > lastScrollY && currentScrollY > 100) {
+          setIsHeaderVisible(false);
+        } else if (currentScrollY < lastScrollY) {
+          setIsHeaderVisible(true);
+        }
+      }
+      
+      setLastScrollY(currentScrollY);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [lastScrollY, isHovering]);
 
   return (
     <>
-      {/* Top Header Bar */}
-      <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-10">
+      {!isHeaderVisible && (
+        <div 
+          className="fixed top-0 left-0 w-full h-3 z-[60] cursor-pointer"
+          onMouseEnter={() => setIsHovering(true)}
+          title="Hover to show header"
+        />
+      )}
+      
+      <header 
+        className={`bg-white shadow-lg border-b border-slate-200 sticky top-0 z-50 transition-transform duration-300 ease-in-out ${
+          isHeaderVisible ? 'translate-y-0' : '-translate-y-full'
+        }`}
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
@@ -148,7 +189,7 @@ export default function CharacterSheetHeader({
       </header>
 
       {/* Main Character Header */}
-      <header className="max-w-7xl mx-auto mb-8 relative z-20">
+      <header className="max-w-7xl mx-auto mb-8 relative z-30">
         <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl border border-slate-200 p-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex-1">
