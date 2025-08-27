@@ -5,6 +5,7 @@ import {
   Weapon,
   Spell,
   TrackableTrait,
+  ExtendedFeature,
   MagicItem,
   ArmorItem,
   InventoryItem,
@@ -430,6 +431,8 @@ export const DEFAULT_CHARACTER_STATE = {
   },
 
   trackableTraits: [] as TrackableTrait[],
+
+  extendedFeatures: [] as ExtendedFeature[],
 
   features: [] as RichTextContent[],
   traits: [] as RichTextContent[],
