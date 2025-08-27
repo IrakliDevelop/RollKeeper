@@ -13,7 +13,7 @@ import {
   AlertCircle,
   CheckCircle2
 } from 'lucide-react';
-import FeatureModal from './FeatureModal';
+import FeatureModal from '@/components/ui/character/ExtendedFeatures/FeatureModal';
 
 interface FeatureCardProps {
   feature: ExtendedFeature;

@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import { ExtendedFeature, FeatureCategory, groupFeaturesBySource } from '@/types/character';
 import { ChevronDown, ChevronRight, Plus, Settings } from 'lucide-react';
-import FeatureCategorySection from './FeatureCategorySection';
-import AddFeatureModal from './AddFeatureModal';
+import FeatureCategorySection from '@/components/ui/character/ExtendedFeatures/FeatureCategorySection';
+import AddFeatureModal from '@/components/ui/character/ExtendedFeatures/AddFeatureModal';
 
 interface ExtendedFeaturesSectionProps {
   features: ExtendedFeature[];
@@ -133,7 +133,7 @@ export default function ExtendedFeaturesSection({
                   onUpdateFeature={onUpdateFeature}
                   onDeleteFeature={onDeleteFeature}
                   onUseFeature={onUseFeature}
-                  onReorderFeatures={(sourceIndex, destinationIndex) => 
+                  onReorderFeatures={(sourceIndex: number, destinationIndex: number) => 
                     onReorderFeatures(sourceIndex, destinationIndex, category.sourceType)
                   }
                   readonly={readonly}

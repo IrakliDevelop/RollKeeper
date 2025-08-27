@@ -1635,12 +1635,25 @@ export const useCharacterStore = create<CharacterStore>()(
             updatedAt: new Date().toISOString(),
           };
 
+          // Also add as extended feature
+          const newExtendedFeature: ExtendedFeature = {
+            ...newTrait,
+            sourceType: 'other' as const,
+            sourceDetail: newTrait.source || undefined,
+            displayOrder: (state.character.extendedFeatures || []).length,
+            isPassive: newTrait.maxUses === 0,
+          };
+
           return {
             character: {
               ...state.character,
               trackableTraits: [
                 ...(state.character.trackableTraits || []),
                 newTrait,
+              ],
+              extendedFeatures: [
+                ...(state.character.extendedFeatures || []),
+                newExtendedFeature,
               ],
             },
             hasUnsavedChanges: true,
@@ -1650,23 +1663,42 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       updateTrackableTrait: (id, updates) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            trackableTraits: (state.character.trackableTraits || []).map(
-              trait =>
-                trait.id === id
-                  ? {
-                      ...trait,
-                      ...updates,
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : trait
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
+        set(state => {
+          const updatedTraits = (state.character.trackableTraits || []).map(
+            trait =>
+              trait.id === id
+                ? {
+                    ...trait,
+                    ...updates,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : trait
+          );
+
+          // Also update corresponding extended feature
+          const updatedExtendedFeatures = (state.character.extendedFeatures || []).map(
+            feature =>
+              feature.id === id
+                ? {
+                    ...feature,
+                    ...updates,
+                    sourceDetail: updates.source || feature.sourceDetail,
+                    isPassive: (updates.maxUses !== undefined ? updates.maxUses : feature.maxUses) === 0,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : feature
+          );
+
+          return {
+            character: {
+              ...state.character,
+              trackableTraits: updatedTraits,
+              extendedFeatures: updatedExtendedFeatures,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
       },
 
       deleteTrackableTrait: id => {
@@ -1676,6 +1708,9 @@ export const useCharacterStore = create<CharacterStore>()(
             trackableTraits: (state.character.trackableTraits || []).filter(
               trait => trait.id !== id
             ),
+            extendedFeatures: (state.character.extendedFeatures || []).filter(
+              feature => feature.id !== id
+            ),
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving',
@@ -1683,46 +1718,83 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       useTrackableTrait: id => {
-        set(state => ({
-          character: {
-            ...state.character,
-            trackableTraits: (state.character.trackableTraits || []).map(
-              trait =>
-                trait.id === id
-                  ? {
-                      ...trait,
-                      usedUses: Math.min(
-                        trait.usedUses + 1,
-                        calculateTraitMaxUses(trait, state.character.level)
-                      ),
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : trait
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
+        set(state => {
+          const updatedTraits = (state.character.trackableTraits || []).map(
+            trait =>
+              trait.id === id
+                ? {
+                    ...trait,
+                    usedUses: Math.min(
+                      trait.usedUses + 1,
+                      calculateTraitMaxUses(trait, state.character.level)
+                    ),
+                    updatedAt: new Date().toISOString(),
+                  }
+                : trait
+          );
+
+          // Also update corresponding extended feature
+          const updatedExtendedFeatures = (state.character.extendedFeatures || []).map(
+            feature =>
+              feature.id === id
+                ? {
+                    ...feature,
+                    usedUses: Math.min(
+                      feature.usedUses + 1,
+                      calculateTraitMaxUses(feature, state.character.level)
+                    ),
+                    updatedAt: new Date().toISOString(),
+                  }
+                : feature
+          );
+
+          return {
+            character: {
+              ...state.character,
+              trackableTraits: updatedTraits,
+              extendedFeatures: updatedExtendedFeatures,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
       },
 
       resetTrackableTraits: restType => {
-        set(state => ({
-          character: {
-            ...state.character,
-            trackableTraits: (state.character.trackableTraits || []).map(
-              trait =>
-                trait.restType === restType || restType === 'long'
-                  ? {
-                      ...trait,
-                      usedUses: 0,
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : trait
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
+        set(state => {
+          const updatedTraits = (state.character.trackableTraits || []).map(
+            trait =>
+              trait.restType === restType || restType === 'long'
+                ? {
+                    ...trait,
+                    usedUses: 0,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : trait
+          );
+
+          // Also update corresponding extended features
+          const updatedExtendedFeatures = (state.character.extendedFeatures || []).map(
+            feature =>
+              feature.restType === restType || restType === 'long'
+                ? {
+                    ...feature,
+                    usedUses: 0,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : feature
+          );
+
+          return {
+            character: {
+              ...state.character,
+              trackableTraits: updatedTraits,
+              extendedFeatures: updatedExtendedFeatures,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
       },
 
       // Extended feature management actions
@@ -1735,12 +1807,31 @@ export const useCharacterStore = create<CharacterStore>()(
             updatedAt: new Date().toISOString(),
           };
 
+          // Also add as trackable trait
+          const newTrackableTrait: TrackableTrait = {
+            id: newFeature.id,
+            name: newFeature.name,
+            description: newFeature.description,
+            maxUses: newFeature.maxUses,
+            usedUses: newFeature.usedUses,
+            restType: newFeature.restType,
+            source: newFeature.sourceDetail || newFeature.source,
+            scaleWithProficiency: newFeature.scaleWithProficiency,
+            proficiencyMultiplier: newFeature.proficiencyMultiplier,
+            createdAt: newFeature.createdAt,
+            updatedAt: newFeature.updatedAt,
+          };
+
           return {
             character: {
               ...state.character,
               extendedFeatures: [
                 ...(state.character.extendedFeatures || []),
                 newFeature,
+              ],
+              trackableTraits: [
+                ...(state.character.trackableTraits || []),
+                newTrackableTrait,
               ],
             },
             hasUnsavedChanges: true,
@@ -1750,23 +1841,41 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       updateExtendedFeature: (id, updates) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            extendedFeatures: (state.character.extendedFeatures || []).map(
-              feature =>
-                feature.id === id
-                  ? {
-                      ...feature,
-                      ...updates,
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : feature
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
+        set(state => {
+          const updatedFeatures = (state.character.extendedFeatures || []).map(
+            feature =>
+              feature.id === id
+                ? {
+                    ...feature,
+                    ...updates,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : feature
+          );
+
+          // Also update corresponding trackable trait
+          const updatedTraits = (state.character.trackableTraits || []).map(
+            trait =>
+              trait.id === id
+                ? {
+                    ...trait,
+                    ...updates,
+                    source: updates.sourceDetail || updates.source || trait.source,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : trait
+          );
+
+          return {
+            character: {
+              ...state.character,
+              extendedFeatures: updatedFeatures,
+              trackableTraits: updatedTraits,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
       },
 
       deleteExtendedFeature: id => {
@@ -1776,6 +1885,9 @@ export const useCharacterStore = create<CharacterStore>()(
             extendedFeatures: (state.character.extendedFeatures || []).filter(
               feature => feature.id !== id
             ),
+            trackableTraits: (state.character.trackableTraits || []).filter(
+              trait => trait.id !== id
+            ),
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving',
@@ -1783,46 +1895,83 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       useExtendedFeature: id => {
-        set(state => ({
-          character: {
-            ...state.character,
-            extendedFeatures: (state.character.extendedFeatures || []).map(
-              feature =>
-                feature.id === id
-                  ? {
-                      ...feature,
-                      usedUses: Math.min(
-                        feature.usedUses + 1,
-                        calculateTraitMaxUses(feature, state.character.level)
-                      ),
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : feature
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
+        set(state => {
+          const updatedFeatures = (state.character.extendedFeatures || []).map(
+            feature =>
+              feature.id === id
+                ? {
+                    ...feature,
+                    usedUses: Math.min(
+                      feature.usedUses + 1,
+                      calculateTraitMaxUses(feature, state.character.level)
+                    ),
+                    updatedAt: new Date().toISOString(),
+                  }
+                : feature
+          );
+
+          // Also update corresponding trackable trait
+          const updatedTraits = (state.character.trackableTraits || []).map(
+            trait =>
+              trait.id === id
+                ? {
+                    ...trait,
+                    usedUses: Math.min(
+                      trait.usedUses + 1,
+                      calculateTraitMaxUses(trait, state.character.level)
+                    ),
+                    updatedAt: new Date().toISOString(),
+                  }
+                : trait
+          );
+
+          return {
+            character: {
+              ...state.character,
+              extendedFeatures: updatedFeatures,
+              trackableTraits: updatedTraits,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
       },
 
       resetExtendedFeatures: restType => {
-        set(state => ({
-          character: {
-            ...state.character,
-            extendedFeatures: (state.character.extendedFeatures || []).map(
-              feature =>
-                feature.restType === restType || restType === 'long'
-                  ? {
-                      ...feature,
-                      usedUses: 0,
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : feature
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
+        set(state => {
+          const updatedFeatures = (state.character.extendedFeatures || []).map(
+            feature =>
+              feature.restType === restType || restType === 'long'
+                ? {
+                    ...feature,
+                    usedUses: 0,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : feature
+          );
+
+          // Also update corresponding trackable traits
+          const updatedTraits = (state.character.trackableTraits || []).map(
+            trait =>
+              trait.restType === restType || restType === 'long'
+                ? {
+                    ...trait,
+                    usedUses: 0,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : trait
+          );
+
+          return {
+            character: {
+              ...state.character,
+              extendedFeatures: updatedFeatures,
+              trackableTraits: updatedTraits,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
       },
 
       reorderExtendedFeatures: (sourceIndex, destinationIndex, sourceType) => {
