@@ -123,6 +123,7 @@ export type CharacterSyncStatus =
 
 // Combat and encounter types (basic for now)
 export interface SavedEncounter extends DMEntityBase {
+  roundNumber: number;
   campaignId: string;
   name: string;
   description: string;

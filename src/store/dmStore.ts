@@ -523,7 +523,7 @@ export const useDMStore = create<DMStoreState>()(
                     ...encounter,
                     // @ts-expect-error - TODO: fix this
                     participants: encounter.participants.filter(
-                      p => p.id !== participantId
+                      (                      p: { id: string; }) => p.id !== participantId
                     ),
                     updatedAt: new Date(),
                   }
@@ -605,7 +605,6 @@ export const useDMStore = create<DMStoreState>()(
                   ? {
                       ...e,
                       turnIndex: shouldAdvanceRound ? 0 : nextTurnIndex,
-                      // @ts-expect-error - TODO: fix this
                       roundNumber: shouldAdvanceRound
                         ? e.roundNumber + 1
                         : e.roundNumber,
