@@ -2,9 +2,18 @@
 
 export type SpellSchool = 'A' | 'C' | 'D' | 'E' | 'I' | 'N' | 'T' | 'V';
 
-export type SpellClass = 
-  | 'artificer' | 'bard' | 'cleric' | 'druid' | 'paladin' | 'ranger' 
-  | 'sorcerer' | 'warlock' | 'wizard' | 'eldritch knight' | 'arcane trickster';
+export type SpellClass =
+  | 'artificer'
+  | 'bard'
+  | 'cleric'
+  | 'druid'
+  | 'paladin'
+  | 'ranger'
+  | 'sorcerer'
+  | 'warlock'
+  | 'wizard'
+  | 'eldritch knight'
+  | 'arcane trickster';
 
 export interface SpellTime {
   number: number;
@@ -13,7 +22,19 @@ export interface SpellTime {
 }
 
 export interface SpellRange {
-  type: 'point' | 'line' | 'cone' | 'cube' | 'sphere' | 'hemisphere' | 'cylinder' | 'self' | 'sight' | 'unlimited' | 'touch' | 'special';
+  type:
+    | 'point'
+    | 'line'
+    | 'cone'
+    | 'cube'
+    | 'sphere'
+    | 'hemisphere'
+    | 'cylinder'
+    | 'self'
+    | 'sight'
+    | 'unlimited'
+    | 'touch'
+    | 'special';
   distance?: {
     type: 'feet' | 'miles' | 'self' | 'touch' | 'sight' | 'unlimited';
     amount?: number;
@@ -166,7 +187,7 @@ export const SPELL_SCHOOLS: Record<SpellSchool, string> = {
   I: 'Illusion',
   N: 'Necromancy',
   T: 'Transmutation',
-  V: 'Evocation'
+  V: 'Evocation',
 };
 
 // Class spell lists mapping (we'll populate this based on D&D 5e SRD data)
@@ -181,5 +202,5 @@ export const CLASS_SPELL_LISTS: Record<SpellClass, string[]> = {
   warlock: [],
   wizard: [],
   'eldritch knight': [],
-  'arcane trickster': []
-}; 
+  'arcane trickster': [],
+};

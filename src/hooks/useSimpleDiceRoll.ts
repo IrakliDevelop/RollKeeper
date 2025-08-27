@@ -24,29 +24,26 @@ export function useSimpleDiceRoll({
   containerId = 'main-dice-container',
   autoClearDelay = 1000,
   onRollComplete,
-  onError
+  onError,
 }: UseSimpleDiceRollOptions = {}): UseSimpleDiceRollReturn {
-  
-  const {
-    isInitialized,
-    isRolling,
-    roll,
-    clearDice
-  } = useDiceRoller({
+  const { isInitialized, isRolling, roll, clearDice } = useDiceRoller({
     containerId,
     autoClearDelay,
     onRollComplete,
-    onError
+    onError,
   });
 
-  const rollDice = useCallback(async (notation: string): Promise<RollSummary | null> => {
-    return await roll(notation);
-  }, [roll]);
+  const rollDice = useCallback(
+    async (notation: string): Promise<RollSummary | null> => {
+      return await roll(notation);
+    },
+    [roll]
+  );
 
   return {
     isReady: isInitialized,
     isRolling,
     roll: rollDice,
-    clearDice
+    clearDice,
   };
 }

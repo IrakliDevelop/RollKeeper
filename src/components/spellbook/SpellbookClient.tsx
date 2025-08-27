@@ -1,10 +1,26 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useCallback,
+} from 'react';
 import { ProcessedSpell, SpellFilters } from '@/types/spells';
 import { filterSpells } from '@/utils/spellFilters';
 import { useCharacterStore } from '@/store/characterStore';
-import { Search, Filter, BookOpen, Grid, List, Loader2, ChevronDown, ArrowUp, ArrowDown } from 'lucide-react';
+import {
+  Search,
+  Filter,
+  BookOpen,
+  Grid,
+  List,
+  Loader2,
+  ChevronDown,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react';
 import SpellCard from '@/components/spellbook/SpellCard';
 import SpellFiltersPanel from '@/components/spellbook/SpellFiltersPanel';
 import PersonalSpellbook from '@/components/spellbook/PersonalSpellbook';
@@ -19,28 +35,32 @@ type DisplayMode = 'grid' | 'list';
 // Skeleton loading component for spell cards
 function SpellCardSkeleton({ displayMode }: { displayMode: DisplayMode }) {
   return (
-    <div className={`animate-pulse ${
-      displayMode === 'grid' 
-        ? 'bg-slate-800/30 border border-slate-600/30 rounded-lg p-4 h-80'
-        : 'bg-slate-800/30 border border-slate-600/30 rounded-lg p-4 h-32'
-    }`}>
-      <div className="flex items-start justify-between mb-3">
+    <div
+      className={`animate-pulse ${
+        displayMode === 'grid'
+          ? 'h-80 rounded-lg border border-slate-600/30 bg-slate-800/30 p-4'
+          : 'h-32 rounded-lg border border-slate-600/30 bg-slate-800/30 p-4'
+      }`}
+    >
+      <div className="mb-3 flex items-start justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-slate-600/50 rounded-full"></div>
-          <div className="w-4 h-4 bg-slate-600/50 rounded"></div>
+          <div className="h-8 w-8 rounded-full bg-slate-600/50"></div>
+          <div className="h-4 w-4 rounded bg-slate-600/50"></div>
         </div>
-        <div className="w-16 h-6 bg-slate-600/50 rounded-full"></div>
+        <div className="h-6 w-16 rounded-full bg-slate-600/50"></div>
       </div>
-      <div className="w-3/4 h-6 bg-slate-600/50 rounded mb-3"></div>
+      <div className="mb-3 h-6 w-3/4 rounded bg-slate-600/50"></div>
       <div className="space-y-2">
-        <div className="w-full h-4 bg-slate-600/50 rounded"></div>
-        <div className="w-2/3 h-4 bg-slate-600/50 rounded"></div>
+        <div className="h-4 w-full rounded bg-slate-600/50"></div>
+        <div className="h-4 w-2/3 rounded bg-slate-600/50"></div>
       </div>
     </div>
   );
 }
 
-export default function SpellbookClient({ initialSpells }: SpellbookClientProps) {
+export default function SpellbookClient({
+  initialSpells,
+}: SpellbookClientProps) {
   const [spells] = useState<ProcessedSpell[]>(initialSpells);
   const [viewMode, setViewMode] = useState<ViewMode>('browse');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('grid');
@@ -48,22 +68,22 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'level'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  
+
   // Infinite scroll state
   const [displayedCount, setDisplayedCount] = useState(30); // Initial load
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const ITEMS_PER_LOAD = 20;
   const SMALL_RESULT_THRESHOLD = 50;
-  
+
   // Get character spellbook data and actions
-  const { 
-    character, 
-    addSpellToSpellbook, 
+  const {
+    character,
+    addSpellToSpellbook,
     removeSpellFromSpellbook,
     toggleSpellFavorite,
     prepareSpell,
-    unprepareSpell
+    unprepareSpell,
   } = useCharacterStore();
 
   const [filters, setFilters] = useState<SpellFilters>({
@@ -76,45 +96,50 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
     ritual: undefined,
     searchQuery: '',
     castingTime: [],
-    duration: []
+    duration: [],
   });
 
   // Sort spells function
-  const sortSpells = useCallback((spells: ProcessedSpell[]) => {
-    const sorted = [...spells].sort((a, b) => {
-      if (sortBy === 'name') {
-        const comparison = a.name.localeCompare(b.name);
-        return sortOrder === 'asc' ? comparison : -comparison;
-      } else if (sortBy === 'level') {
-        const levelComparison = a.level - b.level;
-        if (levelComparison === 0) {
-          // If levels are equal, sort by name as secondary
-          return a.name.localeCompare(b.name);
+  const sortSpells = useCallback(
+    (spells: ProcessedSpell[]) => {
+      const sorted = [...spells].sort((a, b) => {
+        if (sortBy === 'name') {
+          const comparison = a.name.localeCompare(b.name);
+          return sortOrder === 'asc' ? comparison : -comparison;
+        } else if (sortBy === 'level') {
+          const levelComparison = a.level - b.level;
+          if (levelComparison === 0) {
+            // If levels are equal, sort by name as secondary
+            return a.name.localeCompare(b.name);
+          }
+          return sortOrder === 'asc' ? levelComparison : -levelComparison;
         }
-        return sortOrder === 'asc' ? levelComparison : -levelComparison;
-      }
-      return 0;
-    });
-    return sorted;
-  }, [sortBy, sortOrder]);
+        return 0;
+      });
+      return sorted;
+    },
+    [sortBy, sortOrder]
+  );
 
   // Filter and sort spells based on current filters and search
   const filteredAndSortedSpells = useMemo(() => {
     const currentFilters = {
       ...filters,
-      query: searchQuery
+      query: searchQuery,
     };
-    
+
     const filtered = filterSpells(spells, currentFilters);
     return sortSpells(filtered);
   }, [spells, filters, searchQuery, sortSpells]);
 
   // Smart loading strategy: show all for small results, progressive for large
-  const shouldUseInfiniteScroll = filteredAndSortedSpells.length > SMALL_RESULT_THRESHOLD;
-  const visibleSpells = shouldUseInfiniteScroll 
+  const shouldUseInfiniteScroll =
+    filteredAndSortedSpells.length > SMALL_RESULT_THRESHOLD;
+  const visibleSpells = shouldUseInfiniteScroll
     ? filteredAndSortedSpells.slice(0, displayedCount)
     : filteredAndSortedSpells;
-  const hasMoreSpells = shouldUseInfiniteScroll && displayedCount < filteredAndSortedSpells.length;
+  const hasMoreSpells =
+    shouldUseInfiniteScroll && displayedCount < filteredAndSortedSpells.length;
 
   // Reset displayed count when filters change
   useEffect(() => {
@@ -124,20 +149,22 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
   // Load more spells function
   const loadMoreSpells = useCallback(async () => {
     if (isLoadingMore || !hasMoreSpells) return;
-    
+
     setIsLoadingMore(true);
-    
+
     // Simulate loading delay for smooth UX
     await new Promise(resolve => setTimeout(resolve, 300));
-    
-    setDisplayedCount(prev => Math.min(prev + ITEMS_PER_LOAD, filteredAndSortedSpells.length));
+
+    setDisplayedCount(prev =>
+      Math.min(prev + ITEMS_PER_LOAD, filteredAndSortedSpells.length)
+    );
     setIsLoadingMore(false);
   }, [isLoadingMore, hasMoreSpells, filteredAndSortedSpells.length]);
 
   // Intersection Observer for automatic loading
   useEffect(() => {
     const observer = new IntersectionObserver(
-      (entries) => {
+      entries => {
         const [entry] = entries;
         if (entry.isIntersecting && hasMoreSpells && !isLoadingMore) {
           loadMoreSpells();
@@ -145,7 +172,7 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
       },
       {
         threshold: 0.1,
-        rootMargin: '100px'
+        rootMargin: '100px',
       }
     );
 
@@ -182,7 +209,7 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
       ritual: undefined,
       searchQuery: '',
       castingTime: [],
-      duration: []
+      duration: [],
     });
     setSearchQuery('');
   };
@@ -218,22 +245,22 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
       {/* Header */}
       <div className="relative mb-8">
         {/* Background decorative elements */}
-        <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 via-transparent to-amber-500/5 rounded-lg" />
-        <div className="absolute top-0 left-1/4 right-1/4 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
-        
-        <div className="relative bg-slate-800/30 backdrop-blur-sm border border-slate-600/50 rounded-lg p-6">
+        <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-amber-500/5 via-transparent to-amber-500/5" />
+        <div className="absolute top-0 right-1/4 left-1/4 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+
+        <div className="relative rounded-lg border border-slate-600/50 bg-slate-800/30 p-6 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               {/* Grimoire icon */}
-              <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-600/20 to-amber-800/20 border-2 border-amber-500/30 rounded-lg shadow-lg">
+              <div className="flex h-16 w-16 items-center justify-center rounded-lg border-2 border-amber-500/30 bg-gradient-to-br from-amber-600/20 to-amber-800/20 shadow-lg">
                 <BookOpen className="h-8 w-8 text-amber-400" />
               </div>
-              
+
               <div>
-                <h1 className="text-4xl font-bold text-white mb-2 tracking-wide">
+                <h1 className="mb-2 text-4xl font-bold tracking-wide text-white">
                   Spell Grimoire
                 </h1>
-                <p className="text-slate-300 text-lg">
+                <p className="text-lg text-slate-300">
                   Discover and manage your magical repertoire
                 </p>
               </div>
@@ -241,13 +268,13 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
 
             {/* View Mode Toggle */}
             <div className="flex items-center gap-4">
-              <div className="flex items-center bg-slate-700/50 rounded-lg p-1 border border-slate-600/50">
+              <div className="flex items-center rounded-lg border border-slate-600/50 bg-slate-700/50 p-1">
                 <button
                   onClick={() => setDisplayMode('grid')}
-                  className={`p-3 rounded-md transition-all ${
+                  className={`rounded-md p-3 transition-all ${
                     displayMode === 'grid'
                       ? 'bg-amber-600 text-white shadow-lg'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-600/50'
+                      : 'text-slate-300 hover:bg-slate-600/50 hover:text-white'
                   }`}
                   title="Grid View"
                 >
@@ -255,10 +282,10 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
                 </button>
                 <button
                   onClick={() => setDisplayMode('list')}
-                  className={`p-3 rounded-md transition-all ${
+                  className={`rounded-md p-3 transition-all ${
                     displayMode === 'list'
                       ? 'bg-amber-600 text-white shadow-lg'
-                      : 'text-slate-300 hover:text-white hover:bg-slate-600/50'
+                      : 'text-slate-300 hover:bg-slate-600/50 hover:text-white'
                   }`}
                   title="List View"
                 >
@@ -267,39 +294,43 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
               </div>
             </div>
           </div>
-          
+
           {/* Bottom accent line */}
-          <div className="absolute bottom-0 left-1/3 right-1/3 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
+          <div className="absolute right-1/3 bottom-0 left-1/3 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
         </div>
       </div>
 
       {/* Tab Navigation */}
       <div className="relative mb-8">
-        <div className="flex space-x-1 bg-slate-800/50 backdrop-blur-sm p-1 rounded-lg border border-slate-600/50 shadow-lg">
+        <div className="flex space-x-1 rounded-lg border border-slate-600/50 bg-slate-800/50 p-1 shadow-lg backdrop-blur-sm">
           {[
             { key: 'browse' as const, label: 'Browse Spells', icon: BookOpen },
-            { key: 'spellbook' as const, label: 'Personal Spellbook', icon: BookOpen }
+            {
+              key: 'spellbook' as const,
+              label: 'Personal Spellbook',
+              icon: BookOpen,
+            },
           ].map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setViewMode(key)}
-              className={`flex items-center gap-3 px-6 py-4 rounded-md transition-all font-medium ${
+              className={`flex items-center gap-3 rounded-md px-6 py-4 font-medium transition-all ${
                 viewMode === key
-                  ? 'bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-lg transform scale-[1.02]'
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                  ? 'scale-[1.02] transform bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-lg'
+                  : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
               }`}
             >
               <Icon size={20} />
               <span>{label}</span>
               {viewMode === key && (
-                <div className="w-2 h-2 bg-amber-200 rounded-full animate-pulse" />
+                <div className="h-2 w-2 animate-pulse rounded-full bg-amber-200" />
               )}
             </button>
           ))}
         </div>
-        
+
         {/* Tab indicator line */}
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
+        <div className="absolute right-0 bottom-0 left-0 h-px bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
       </div>
 
       {/* Content based on view mode */}
@@ -307,34 +338,40 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
         <div>
           {/* Filters Toggle */}
           <div className="mb-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex flex-1 gap-4 items-center">
+            <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+              <div className="flex flex-1 items-center gap-4">
                 {/* Search Bar */}
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                <div className="relative max-w-md flex-1">
+                  <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-slate-400" />
                   <input
                     type="text"
                     placeholder="Search spells..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50"
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="w-full rounded-lg border border-slate-600/50 bg-slate-800/50 py-2 pr-4 pl-10 text-white placeholder-slate-400 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 focus:outline-none"
                   />
                 </div>
 
                 {/* Sort Controls */}
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-400 whitespace-nowrap">Sort by:</span>
+                  <span className="text-sm whitespace-nowrap text-slate-400">
+                    Sort by:
+                  </span>
                   <select
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as 'name' | 'level')}
-                    className="px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white text-sm focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50"
+                    onChange={e =>
+                      setSortBy(e.target.value as 'name' | 'level')
+                    }
+                    className="rounded-lg border border-slate-600/50 bg-slate-800/50 px-3 py-2 text-sm text-white focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 focus:outline-none"
                   >
                     <option value="name">Name</option>
                     <option value="level">Level</option>
                   </select>
                   <button
-                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="p-2 bg-slate-800/50 border border-slate-600/50 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
+                    onClick={() =>
+                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+                    }
+                    className="rounded-lg border border-slate-600/50 bg-slate-800/50 p-2 text-slate-400 transition-colors hover:bg-slate-700/50 hover:text-white"
                     title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
                   >
                     {sortOrder === 'asc' ? (
@@ -349,16 +386,16 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
               {/* Filter Toggle Button */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                className={`flex items-center gap-2 rounded-lg px-4 py-2 transition-all ${
                   showFilters
                     ? 'bg-amber-600 text-white shadow-lg'
-                    : 'bg-slate-700/50 text-slate-300 hover:text-white hover:bg-slate-600/50'
+                    : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 hover:text-white'
                 }`}
               >
                 <Filter size={16} />
                 <span>Filters</span>
                 {activeFilterCount > 0 && (
-                  <span className="px-2 py-0.5 bg-amber-500/30 text-amber-200 rounded-full text-xs">
+                  <span className="rounded-full bg-amber-500/30 px-2 py-0.5 text-xs text-amber-200">
                     {activeFilterCount}
                   </span>
                 )}
@@ -366,17 +403,19 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
             </div>
 
             {/* Results Summary */}
-            <p className="text-slate-400 text-sm mt-3">
+            <p className="mt-3 text-sm text-slate-400">
               {shouldUseInfiniteScroll ? (
                 <>
-                  Showing {visibleSpells.length} of {filteredAndSortedSpells.length} spells
+                  Showing {visibleSpells.length} of{' '}
+                  {filteredAndSortedSpells.length} spells
                   {filteredAndSortedSpells.length !== spells.length && (
                     <span> (filtered from {spells.length} total)</span>
                   )}
                 </>
               ) : (
                 <>
-                  Found {filteredAndSortedSpells.length} spell{filteredAndSortedSpells.length !== 1 ? 's' : ''}
+                  Found {filteredAndSortedSpells.length} spell
+                  {filteredAndSortedSpells.length !== 1 ? 's' : ''}
                   {filteredAndSortedSpells.length !== spells.length && (
                     <span> (filtered from {spells.length} total)</span>
                   )}
@@ -386,7 +425,7 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
           </div>
 
           {/* Search and Results */}
-          <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex flex-col gap-6 lg:flex-row">
             {/* Filters Sidebar */}
             {showFilters && (
               <div className="lg:w-80">
@@ -406,15 +445,20 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
               {visibleSpells.length > 0 ? (
                 <>
                   {/* Spells Grid */}
-                  <div className={displayMode === 'grid' 
-                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
-                    : 'space-y-3'
-                  }>
+                  <div
+                    className={
+                      displayMode === 'grid'
+                        ? 'grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                        : 'space-y-3'
+                    }
+                  >
                     {visibleSpells.map((spell, index) => (
                       <div
                         key={spell.id}
                         className="animate-in fade-in-0 duration-300"
-                        style={{ animationDelay: `${(index % ITEMS_PER_LOAD) * 50}ms` }}
+                        style={{
+                          animationDelay: `${(index % ITEMS_PER_LOAD) * 50}ms`,
+                        }}
                       >
                         <SpellCard
                           spell={spell}
@@ -423,7 +467,9 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
                           isFavorite={isSpellFavorite(spell.id)}
                           isPrepared={isSpellPrepared(spell.id)}
                           onAddToSpellbook={() => addSpellToSpellbook(spell.id)}
-                          onRemoveFromSpellbook={() => removeSpellFromSpellbook(spell.id)}
+                          onRemoveFromSpellbook={() =>
+                            removeSpellFromSpellbook(spell.id)
+                          }
                           onToggleFavorite={() => toggleSpellFavorite(spell.id)}
                           onPrepareSpell={() => prepareSpell(spell.id)}
                           onUnprepareSpell={() => unprepareSpell(spell.id)}
@@ -434,31 +480,46 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
 
                   {/* Loading More Indicator and Load More Button */}
                   {shouldUseInfiniteScroll && (
-                    <div ref={loadMoreRef} className="mt-8 flex flex-col items-center">
+                    <div
+                      ref={loadMoreRef}
+                      className="mt-8 flex flex-col items-center"
+                    >
                       {isLoadingMore && (
-                        <div className={displayMode === 'grid' 
-                          ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full mb-6'
-                          : 'space-y-3 w-full mb-6'
-                        }>
-                          {Array.from({ length: Math.min(ITEMS_PER_LOAD, filteredAndSortedSpells.length - displayedCount) }).map((_, i) => (
-                            <SpellCardSkeleton key={i} displayMode={displayMode} />
+                        <div
+                          className={
+                            displayMode === 'grid'
+                              ? 'mb-6 grid w-full grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                              : 'mb-6 w-full space-y-3'
+                          }
+                        >
+                          {Array.from({
+                            length: Math.min(
+                              ITEMS_PER_LOAD,
+                              filteredAndSortedSpells.length - displayedCount
+                            ),
+                          }).map((_, i) => (
+                            <SpellCardSkeleton
+                              key={i}
+                              displayMode={displayMode}
+                            />
                           ))}
                         </div>
                       )}
-                      
+
                       {hasMoreSpells && !isLoadingMore && (
                         <button
                           onClick={loadMoreSpells}
-                          className="flex items-center gap-2 px-6 py-3 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-300 rounded-lg transition-all hover:scale-105 backdrop-blur-sm"
+                          className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-600/20 px-6 py-3 text-amber-300 backdrop-blur-sm transition-all hover:scale-105 hover:bg-amber-600/30"
                         >
                           <ChevronDown className="h-4 w-4" />
                           Load More Spells
                           <span className="text-xs opacity-80">
-                            ({filteredAndSortedSpells.length - displayedCount} remaining)
+                            ({filteredAndSortedSpells.length - displayedCount}{' '}
+                            remaining)
                           </span>
                         </button>
                       )}
-                      
+
                       {isLoadingMore && (
                         <div className="flex items-center gap-2 text-amber-300">
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -469,11 +530,13 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
                   )}
                 </>
               ) : (
-                <div className="text-center py-12">
-                  <p className="text-slate-400 text-lg">No spells found matching your criteria.</p>
+                <div className="py-12 text-center">
+                  <p className="text-lg text-slate-400">
+                    No spells found matching your criteria.
+                  </p>
                   <button
                     onClick={clearFilters}
-                    className="mt-4 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
+                    className="mt-4 rounded-lg bg-amber-600 px-4 py-2 text-white transition-colors hover:bg-amber-700"
                   >
                     Clear Filters
                   </button>
@@ -483,8 +546,8 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
           </div>
         </div>
       ) : (
-        <PersonalSpellbook 
-          allSpells={spells} 
+        <PersonalSpellbook
+          allSpells={spells}
           displayMode={displayMode}
           sortBy={sortBy}
           sortOrder={sortOrder}
@@ -492,4 +555,4 @@ export default function SpellbookClient({ initialSpells }: SpellbookClientProps)
       )}
     </div>
   );
-} 
+}

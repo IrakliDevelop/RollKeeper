@@ -34,15 +34,14 @@ export interface UseDiceRollerReturn {
 
 export function useDiceRoller({
   containerId,
-  theme = "diceOfRolling",
-  themeColor = "#feea03",
+  theme = 'diceOfRolling',
+  themeColor = '#feea03',
   scale = 6,
   autoClearDelay: initialAutoClearDelay = 10000,
   onRollComplete,
   onError,
-  onLog
+  onLog,
 }: UseDiceRollerOptions): UseDiceRollerReturn {
-  
   const [diceBox, setDiceBox] = useState<DiceBoxInstance | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isRolling, setIsRolling] = useState(false);
@@ -53,7 +52,7 @@ export function useDiceRoller({
   // Use ref to avoid recreating log function on every render
   const onLogRef = useRef(onLog);
   const onErrorRef = useRef(onError);
-  
+
   // Update refs when props change
   useEffect(() => {
     onLogRef.current = onLog;
@@ -81,12 +80,16 @@ export function useDiceRoller({
         // Check if DOM element exists
         const containerElement = document.querySelector(`#${containerId}`);
         if (!containerElement) {
-          log(`Container element #${containerId} not found, waiting for DOM...`);
+          log(
+            `Container element #${containerId} not found, waiting for DOM...`
+          );
           return false;
         }
 
         const rect = (containerElement as HTMLElement).getBoundingClientRect();
-        log(`Container element #${containerId} found at ${Math.round(rect.left)},${Math.round(rect.top)} size ${Math.round(rect.width)}x${Math.round(rect.height)} - creating DiceBox...`);
+        log(
+          `Container element #${containerId} found at ${Math.round(rect.left)},${Math.round(rect.top)} size ${Math.round(rect.width)}x${Math.round(rect.height)} - creating DiceBox...`
+        );
 
         const selector = `#${containerId}`;
         const box = new DiceBox(selector, {
@@ -104,17 +107,21 @@ export function useDiceRoller({
         setDiceBox(box);
         log('DiceBox instance created');
 
-        box.init().then(() => {
-          log('DiceBox initialized successfully');
-          setIsInitialized(true);
-        }).catch((error: unknown) => {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-                  const message = `Failed to initialize DiceBox: ${errorMessage}`;
-        log(message);
-        if (onErrorRef.current) {
-          onErrorRef.current(message);
-        }
-        });
+        box
+          .init()
+          .then(() => {
+            log('DiceBox initialized successfully');
+            setIsInitialized(true);
+          })
+          .catch((error: unknown) => {
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            const message = `Failed to initialize DiceBox: ${errorMessage}`;
+            log(message);
+            if (onErrorRef.current) {
+              onErrorRef.current(message);
+            }
+          });
 
         return true;
       };
@@ -125,74 +132,79 @@ export function useDiceRoller({
         const timer = setTimeout(() => {
           initializeDiceBox();
         }, 100);
-        
+
         return () => clearTimeout(timer);
       }
     }
   }, [containerId, scale, theme, themeColor, isInitialized, isMounted, log]);
 
   // Roll dice function
-  const roll = useCallback(async (notation: string): Promise<RollSummary | null> => {
-    if (!diceBox || !isInitialized) {
-      const message = 'DiceBox not ready yet';
-      log(message);
-      if (onErrorRef.current) {
-        onErrorRef.current(message);
-      }
-      return null;
-    }
-
-    if (isRolling) {
-      const message = 'Already rolling dice, please wait';
-      log(message);
-      if (onErrorRef.current) {
-        onErrorRef.current(message);
-      }
-      return null;
-    }
-
-    setIsRolling(true);
-    log(`Rolling: ${notation}`);
-
-    try {
-      if (!diceBox.roll) {
-        throw new Error('DiceBox roll method not available');
-      }
-      const results: DiceRollResults = await diceBox.roll(notation);
-      log(`Roll completed: ${notation}`);
-      
-      // Calculate summary
-      const summary = calculateRollSummary(results, notation);
-      setRollHistory(prev => [...prev, summary]);
-      
-      log(`Total: ${summary.finalTotal} (dice: ${summary.total}, modifier: ${summary.modifier})`);
-      
-      // Call completion callback
-      if (onRollComplete) {
-        onRollComplete(summary);
+  const roll = useCallback(
+    async (notation: string): Promise<RollSummary | null> => {
+      if (!diceBox || !isInitialized) {
+        const message = 'DiceBox not ready yet';
+        log(message);
+        if (onErrorRef.current) {
+          onErrorRef.current(message);
+        }
+        return null;
       }
 
-      // Auto-clear if enabled
-      if (autoClearDelay > 0) {
-        autoClearDice(diceBox, autoClearDelay, () => {
-          log(`Dice auto-cleared after ${autoClearDelay}ms`);
-        });
+      if (isRolling) {
+        const message = 'Already rolling dice, please wait';
+        log(message);
+        if (onErrorRef.current) {
+          onErrorRef.current(message);
+        }
+        return null;
       }
 
-      setIsRolling(false);
-      return summary;
+      setIsRolling(true);
+      log(`Rolling: ${notation}`);
 
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const message = `Error rolling dice: ${errorMessage}`;
-      log(message);
-      if (onErrorRef.current) {
-        onErrorRef.current(message);
+      try {
+        if (!diceBox.roll) {
+          throw new Error('DiceBox roll method not available');
+        }
+        const results: DiceRollResults = await diceBox.roll(notation);
+        log(`Roll completed: ${notation}`);
+
+        // Calculate summary
+        const summary = calculateRollSummary(results, notation);
+        setRollHistory(prev => [...prev, summary]);
+
+        log(
+          `Total: ${summary.finalTotal} (dice: ${summary.total}, modifier: ${summary.modifier})`
+        );
+
+        // Call completion callback
+        if (onRollComplete) {
+          onRollComplete(summary);
+        }
+
+        // Auto-clear if enabled
+        if (autoClearDelay > 0) {
+          autoClearDice(diceBox, autoClearDelay, () => {
+            log(`Dice auto-cleared after ${autoClearDelay}ms`);
+          });
+        }
+
+        setIsRolling(false);
+        return summary;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        const message = `Error rolling dice: ${errorMessage}`;
+        log(message);
+        if (onErrorRef.current) {
+          onErrorRef.current(message);
+        }
+        setIsRolling(false);
+        return null;
       }
-      setIsRolling(false);
-      return null;
-    }
-  }, [diceBox, isInitialized, isRolling, autoClearDelay, onRollComplete, log]);
+    },
+    [diceBox, isInitialized, isRolling, autoClearDelay, onRollComplete, log]
+  );
 
   // Clear dice function
   const clearDice = useCallback(() => {
@@ -202,7 +214,8 @@ export function useDiceRoller({
         diceBox.clear();
         log('Dice cleared successfully');
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         const message = `Error clearing dice: ${errorMessage}`;
         log(message);
         if (onErrorRef.current) {
@@ -210,7 +223,8 @@ export function useDiceRoller({
         }
       }
     } else {
-      const message = 'Cannot clear dice - not initialized or clear method unavailable';
+      const message =
+        'Cannot clear dice - not initialized or clear method unavailable';
       log(message);
       if (onErrorRef.current) {
         onErrorRef.current(message);
@@ -246,6 +260,6 @@ export function useDiceRoller({
     clearDice,
     clearHistory,
     setAutoClearDelay,
-    autoClearDelay
+    autoClearDelay,
   };
 }

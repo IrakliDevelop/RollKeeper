@@ -1,8 +1,17 @@
 'use client';
 
 import React from 'react';
-import { Filter, X, Pin, Tag, Users, Package, Map, FileText } from 'lucide-react';
-import { FancySelect } from '@/components/ui/FancySelect';
+import {
+  Filter,
+  X,
+  Pin,
+  Tag,
+  Users,
+  Package,
+  Map,
+  FileText,
+} from 'lucide-react';
+import { FancySelect } from '@/components/ui/forms/FancySelect';
 
 interface FilterOptions {
   categories: string[];
@@ -29,16 +38,20 @@ export default function FilterPanel({
   availableTags,
   className = '',
   isOpen,
-  onToggle
+  onToggle,
 }: FilterPanelProps) {
-  
   const getCategoryIcon = (category: string) => {
     switch (category) {
-      case 'session': return <FileText size={14} className="text-blue-600" />;
-      case 'npc': return <Users size={14} className="text-green-600" />;
-      case 'item': return <Package size={14} className="text-purple-600" />;
-      case 'plot': return <Map size={14} className="text-orange-600" />;
-      default: return <FileText size={14} className="text-gray-600" />;
+      case 'session':
+        return <FileText size={14} className="text-blue-600" />;
+      case 'npc':
+        return <Users size={14} className="text-green-600" />;
+      case 'item':
+        return <Package size={14} className="text-purple-600" />;
+      case 'plot':
+        return <Map size={14} className="text-orange-600" />;
+      default:
+        return <FileText size={14} className="text-gray-600" />;
     }
   };
 
@@ -62,25 +75,28 @@ export default function FilterPanel({
       tags: [],
       pinned: null,
       sortBy: 'updated',
-      sortOrder: 'desc'
+      sortOrder: 'desc',
     });
   };
 
-  const hasActiveFilters = filters.categories.length > 0 || 
-                          filters.tags.length > 0 || 
-                          filters.pinned !== null;
+  const hasActiveFilters =
+    filters.categories.length > 0 ||
+    filters.tags.length > 0 ||
+    filters.pinned !== null;
 
   if (!isOpen) {
     return (
       <button
         onClick={onToggle}
-        className={`flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 ${className}`}
+        className={`flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-gray-700 hover:bg-gray-50 ${className}`}
       >
         <Filter size={16} />
         Filters
         {hasActiveFilters && (
-          <span className="bg-blue-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] h-5 flex items-center justify-center">
-            {filters.categories.length + filters.tags.length + (filters.pinned !== null ? 1 : 0)}
+          <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white">
+            {filters.categories.length +
+              filters.tags.length +
+              (filters.pinned !== null ? 1 : 0)}
           </span>
         )}
       </button>
@@ -88,15 +104,19 @@ export default function FilterPanel({
   }
 
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg shadow-lg p-4 space-y-4 ${className}`}>
+    <div
+      className={`space-y-4 rounded-lg border border-gray-200 bg-white p-4 shadow-lg ${className}`}
+    >
       {/* Filter Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Filter size={16} className="text-gray-600" />
           <h3 className="font-medium text-gray-900">Filters</h3>
           {hasActiveFilters && (
-            <span className="bg-blue-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] h-5 flex items-center justify-center">
-              {filters.categories.length + filters.tags.length + (filters.pinned !== null ? 1 : 0)}
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white">
+              {filters.categories.length +
+                filters.tags.length +
+                (filters.pinned !== null ? 1 : 0)}
             </span>
           )}
         </div>
@@ -122,13 +142,13 @@ export default function FilterPanel({
       <div className="space-y-2">
         <h4 className="text-sm font-medium text-gray-700">Categories</h4>
         <div className="flex flex-wrap gap-2">
-          {availableCategories.map((category) => (
+          {availableCategories.map(category => (
             <button
               key={category}
               onClick={() => handleCategoryToggle(category)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
                 filters.categories.includes(category)
-                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                  ? 'border border-blue-200 bg-blue-100 text-blue-800'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -143,14 +163,14 @@ export default function FilterPanel({
       {availableTags.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-gray-700">Tags</h4>
-          <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-            {availableTags.slice(0, 20).map((tag) => (
+          <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto">
+            {availableTags.slice(0, 20).map(tag => (
               <button
                 key={tag}
                 onClick={() => handleTagToggle(tag)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs transition-colors ${
+                className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs transition-colors ${
                   filters.tags.includes(tag)
-                    ? 'bg-green-100 text-green-800 border border-green-200'
+                    ? 'border border-green-200 bg-green-100 text-green-800'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
@@ -168,7 +188,7 @@ export default function FilterPanel({
         <div className="flex gap-2">
           <button
             onClick={() => onFiltersChange({ ...filters, pinned: null })}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
               filters.pinned === null
                 ? 'bg-gray-200 text-gray-800'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -178,9 +198,9 @@ export default function FilterPanel({
           </button>
           <button
             onClick={() => onFiltersChange({ ...filters, pinned: true })}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
+            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
               filters.pinned === true
-                ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                ? 'border border-yellow-200 bg-yellow-100 text-yellow-800'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
@@ -196,28 +216,56 @@ export default function FilterPanel({
         <div className="grid grid-cols-1 gap-3">
           <FancySelect
             value={filters.sortBy}
-            onChange={(value) => onFiltersChange({ 
-              ...filters, 
-              sortBy: value as FilterOptions['sortBy'] 
-            })}
+            onChange={value =>
+              onFiltersChange({
+                ...filters,
+                sortBy: value as FilterOptions['sortBy'],
+              })
+            }
             options={[
-              { value: 'updated', label: 'Last Updated', description: 'Most recently modified notes first' },
-              { value: 'created', label: 'Date Created', description: 'Newest notes first' },
-              { value: 'title', label: 'Title', description: 'Alphabetical order' },
-              { value: 'category', label: 'Category', description: 'Group by note type' }
+              {
+                value: 'updated',
+                label: 'Last Updated',
+                description: 'Most recently modified notes first',
+              },
+              {
+                value: 'created',
+                label: 'Date Created',
+                description: 'Newest notes first',
+              },
+              {
+                value: 'title',
+                label: 'Title',
+                description: 'Alphabetical order',
+              },
+              {
+                value: 'category',
+                label: 'Category',
+                description: 'Group by note type',
+              },
             ]}
             color="slate"
             className="text-sm"
           />
           <FancySelect
             value={filters.sortOrder}
-            onChange={(value) => onFiltersChange({ 
-              ...filters, 
-              sortOrder: value as FilterOptions['sortOrder'] 
-            })}
+            onChange={value =>
+              onFiltersChange({
+                ...filters,
+                sortOrder: value as FilterOptions['sortOrder'],
+              })
+            }
             options={[
-              { value: 'desc', label: 'Newest First', description: 'Recent items at the top' },
-              { value: 'asc', label: 'Oldest First', description: 'Older items at the top' }
+              {
+                value: 'desc',
+                label: 'Newest First',
+                description: 'Recent items at the top',
+              },
+              {
+                value: 'asc',
+                label: 'Oldest First',
+                description: 'Older items at the top',
+              },
             ]}
             color="slate"
             className="text-sm"

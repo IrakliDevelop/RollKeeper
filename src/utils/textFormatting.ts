@@ -14,19 +14,34 @@ export function processDndText(text: string): string {
   processedText = processedText.replace(/\{@dc\s+(\d+)\}/g, 'DC $1');
 
   // Handle {@variantrule Name|Source} notation - extract just the name
-  processedText = processedText.replace(/\{@variantrule\s+([^|}\s]+)(\|[^}]*)?\}/g, '$1');
+  processedText = processedText.replace(
+    /\{@variantrule\s+([^|}\s]+)(\|[^}]*)?\}/g,
+    '$1'
+  );
 
   // Handle {@action Name|Source} notation - extract just the name
-  processedText = processedText.replace(/\{@action\s+([^|}\s]+)(\|[^}]*)?\}/g, '$1');
+  processedText = processedText.replace(
+    /\{@action\s+([^|}\s]+)(\|[^}]*)?\}/g,
+    '$1'
+  );
 
   // Handle {@condition Name|Source} notation - extract just the name
-  processedText = processedText.replace(/\{@condition\s+([^|}\s]+)(\|[^}]*)?\}/g, '$1');
+  processedText = processedText.replace(
+    /\{@condition\s+([^|}\s]+)(\|[^}]*)?\}/g,
+    '$1'
+  );
 
   // Handle {@spell Name|Source} notation - extract just the name
-  processedText = processedText.replace(/\{@spell\s+([^|}\s]+)(\|[^}]*)?\}/g, '$1');
+  processedText = processedText.replace(
+    /\{@spell\s+([^|}\s]+)(\|[^}]*)?\}/g,
+    '$1'
+  );
 
   // Handle {@status Name|Source} notation - extract just the name
-  processedText = processedText.replace(/\{@status\s+([^|}\s]+)(\|[^}]*)?\}/g, '$1');
+  processedText = processedText.replace(
+    /\{@status\s+([^|}\s]+)(\|[^}]*)?\}/g,
+    '$1'
+  );
 
   // Handle {@damage XdY} notation - keep as is but remove braces
   processedText = processedText.replace(/\{@damage\s+([^}]+)\}/g, '$1');
@@ -35,7 +50,10 @@ export function processDndText(text: string): string {
   processedText = processedText.replace(/\{@dice\s+([^}]+)\}/g, '$1');
 
   // Handle any remaining {@...} notation by extracting the first word after @
-  processedText = processedText.replace(/\{@\w+\s+([^|}\s]+)(\|[^}]*)?\}/g, '$1');
+  processedText = processedText.replace(
+    /\{@\w+\s+([^|}\s]+)(\|[^}]*)?\}/g,
+    '$1'
+  );
 
   return processedText;
 }
@@ -62,4 +80,4 @@ export function processAndFormatDndText(text: string): string {
  */
 export function createSafeHtml(text: string) {
   return { __html: processAndFormatDndText(text) };
-} 
+}

@@ -6,7 +6,7 @@ import { useCharacterStore } from '@/store/characterStore';
  * This prevents hydration mismatches between server and client
  */
 export function useHydration() {
-  const hasHydrated = useCharacterStore((state) => state.hasHydrated);
+  const hasHydrated = useCharacterStore(state => state.hasHydrated);
 
   useEffect(() => {
     // Set hasHydrated to true after initial render to prevent hydration mismatches
@@ -16,10 +16,10 @@ export function useHydration() {
       const timer = setTimeout(() => {
         useCharacterStore.setState({ hasHydrated: true });
       }, 0);
-      
+
       return () => clearTimeout(timer);
     }
   }, [hasHydrated]);
 
   return hasHydrated;
-} 
+}

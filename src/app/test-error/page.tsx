@@ -11,25 +11,27 @@ export default function TestErrorPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-8">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-gray-800">Error Page Demo</h1>
-        <p className="text-gray-600 mb-6">
+      <div className="mx-auto max-w-2xl">
+        <h1 className="mb-6 text-3xl font-bold text-gray-800">
+          Error Page Demo
+        </h1>
+        <p className="mb-6 text-gray-600">
           This page lets you test theerror page
         </p>
-        
+
         <div className="space-y-4">
           <button
             onClick={() => setShouldThrow(true)}
-            className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-lg"
+            className="rounded-lg bg-red-600 px-6 py-3 text-white shadow-lg transition-colors hover:bg-red-700"
           >
             🎲 Roll for Catastrophic Failure
           </button>
 
-          <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+          <div className="mt-6 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
             <div className="space-y-2">
-              <a 
-                href="/non-existent-page" 
-                className="block text-blue-600 hover:text-blue-800 underline"
+              <a
+                href="/non-existent-page"
+                className="block text-blue-600 underline hover:text-blue-800"
                 target="_blank"
               >
                 🔗 Test 404 Not Found Page

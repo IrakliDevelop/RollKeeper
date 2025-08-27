@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import DragDropList from '@/components/ui/DragDropList';
+import DragDropList from '@/components/ui/layout/DragDropList';
 import { Weapon, InventoryItem, MagicItem } from '@/types/character';
 import { Sword, Package, Sparkles, Trash2, Edit2 } from 'lucide-react';
 
@@ -14,40 +14,38 @@ interface WeaponListProps {
   disabled?: boolean;
 }
 
-export function DraggableWeaponsList({ 
-  weapons, 
-  onReorder, 
-  onEdit, 
-  onDelete, 
-  disabled = false 
+export function DraggableWeaponsList({
+  weapons,
+  onReorder,
+  onEdit,
+  onDelete,
+  disabled = false,
 }: WeaponListProps) {
   return (
     <DragDropList
       items={weapons}
       onReorder={onReorder}
-      keyExtractor={(weapon) => weapon.id}
+      keyExtractor={weapon => weapon.id}
       disabled={disabled}
       className="space-y-3"
       itemClassName="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
       showDragHandle={!disabled}
       dragHandlePosition="left"
-      renderItem={(weapon) => (
+      renderItem={weapon => (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Sword size={20} className="text-gray-500" />
             <div>
               <h4 className="font-medium text-gray-900">{weapon.name}</h4>
               <p className="text-sm text-gray-500">
-                {weapon.damage.length > 0 ? (
-                  weapon.damage.map((dmg, idx) => (
-                    <span key={idx}>
-                      {dmg.dice} {dmg.type}
-                      {idx < weapon.damage.length - 1 && ', '}
-                    </span>
-                  ))
-                ) : (
-                  'No damage defined'
-                )}
+                {weapon.damage.length > 0
+                  ? weapon.damage.map((dmg, idx) => (
+                      <span key={idx}>
+                        {dmg.dice} {dmg.type}
+                        {idx < weapon.damage.length - 1 && ', '}
+                      </span>
+                    ))
+                  : 'No damage defined'}
               </p>
             </div>
           </div>
@@ -55,7 +53,7 @@ export function DraggableWeaponsList({
             {onEdit && (
               <button
                 onClick={() => onEdit(weapon)}
-                className="p-2 text-blue-600 hover:bg-blue-100 rounded-md"
+                className="rounded-md p-2 text-blue-600 hover:bg-blue-100"
                 title="Edit weapon"
               >
                 <Edit2 size={16} />
@@ -64,7 +62,7 @@ export function DraggableWeaponsList({
             {onDelete && (
               <button
                 onClick={() => onDelete(weapon.id)}
-                className="p-2 text-red-600 hover:bg-red-100 rounded-md"
+                className="rounded-md p-2 text-red-600 hover:bg-red-100"
                 title="Delete weapon"
               >
                 <Trash2 size={16} />
@@ -86,24 +84,24 @@ interface InventoryListProps {
   disabled?: boolean;
 }
 
-export function DraggableInventoryList({ 
-  items, 
-  onReorder, 
-  onEdit, 
-  onDelete, 
-  disabled = false 
+export function DraggableInventoryList({
+  items,
+  onReorder,
+  onEdit,
+  onDelete,
+  disabled = false,
 }: InventoryListProps) {
   return (
     <DragDropList
       items={items}
       onReorder={onReorder}
-      keyExtractor={(item) => item.id}
+      keyExtractor={item => item.id}
       disabled={disabled}
       className="space-y-2"
       itemClassName="bg-purple-25 border border-purple-200 rounded-md p-3 hover:shadow-sm transition-all"
       showDragHandle={!disabled}
       dragHandlePosition="right"
-      renderItem={(item) => (
+      renderItem={item => (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Package size={18} className="text-purple-500" />
@@ -126,7 +124,7 @@ export function DraggableInventoryList({
             {onEdit && (
               <button
                 onClick={() => onEdit(item)}
-                className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                className="rounded p-1 text-blue-600 hover:bg-blue-100"
                 title="Edit item"
               >
                 <Edit2 size={14} />
@@ -135,7 +133,7 @@ export function DraggableInventoryList({
             {onDelete && (
               <button
                 onClick={() => onDelete(item.id)}
-                className="p-1 text-red-600 hover:bg-red-100 rounded"
+                className="rounded p-1 text-red-600 hover:bg-red-100"
                 title="Delete item"
               >
                 <Trash2 size={14} />
@@ -157,41 +155,50 @@ interface MagicItemListProps {
   disabled?: boolean;
 }
 
-export function DraggableMagicItemsList({ 
-  items, 
-  onReorder, 
-  onEdit, 
-  onDelete, 
-  disabled = false 
+export function DraggableMagicItemsList({
+  items,
+  onReorder,
+  onEdit,
+  onDelete,
+  disabled = false,
 }: MagicItemListProps) {
   return (
     <DragDropList
       items={items}
       onReorder={onReorder}
-      keyExtractor={(item) => item.id}
+      keyExtractor={item => item.id}
       disabled={disabled}
       className="space-y-3"
       itemClassName="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4 hover:shadow-md transition-all"
       showDragHandle={!disabled}
       dragHandlePosition="left"
-      renderItem={(item) => (
+      renderItem={item => (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Sparkles size={20} className="text-indigo-500" />
             <div>
               <h4 className="font-medium text-gray-900">{item.name}</h4>
               <div className="flex items-center gap-2 text-sm">
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  item.rarity === 'common' ? 'bg-gray-100 text-gray-700' :
-                  item.rarity === 'uncommon' ? 'bg-green-100 text-green-700' :
-                  item.rarity === 'rare' ? 'bg-blue-100 text-blue-700' :
-                  item.rarity === 'very rare' ? 'bg-purple-100 text-purple-700' :
-                  item.rarity === 'legendary' ? 'bg-orange-100 text-orange-700' :
-                  'bg-red-100 text-red-700'
-                }`}>
+                <span
+                  className={`rounded px-2 py-1 text-xs font-medium ${
+                    item.rarity === 'common'
+                      ? 'bg-gray-100 text-gray-700'
+                      : item.rarity === 'uncommon'
+                        ? 'bg-green-100 text-green-700'
+                        : item.rarity === 'rare'
+                          ? 'bg-blue-100 text-blue-700'
+                          : item.rarity === 'very rare'
+                            ? 'bg-purple-100 text-purple-700'
+                            : item.rarity === 'legendary'
+                              ? 'bg-orange-100 text-orange-700'
+                              : 'bg-red-100 text-red-700'
+                  }`}
+                >
                   {item.rarity}
                 </span>
-                <span className="text-gray-500 capitalize">{item.category}</span>
+                <span className="text-gray-500 capitalize">
+                  {item.category}
+                </span>
               </div>
             </div>
           </div>
@@ -199,7 +206,7 @@ export function DraggableMagicItemsList({
             {onEdit && (
               <button
                 onClick={() => onEdit(item)}
-                className="p-2 text-blue-600 hover:bg-blue-100 rounded-md"
+                className="rounded-md p-2 text-blue-600 hover:bg-blue-100"
                 title="Edit magic item"
               >
                 <Edit2 size={16} />
@@ -208,7 +215,7 @@ export function DraggableMagicItemsList({
             {onDelete && (
               <button
                 onClick={() => onDelete(item.id)}
-                className="p-2 text-red-600 hover:bg-red-100 rounded-md"
+                className="rounded-md p-2 text-red-600 hover:bg-red-100"
                 title="Delete magic item"
               >
                 <Trash2 size={16} />
@@ -227,7 +234,10 @@ export function DragDropShowcase() {
     // Mock data - replace with real data
   ]);
 
-  const handleWeaponReorder = (sourceIndex: number, destinationIndex: number) => {
+  const handleWeaponReorder = (
+    sourceIndex: number,
+    destinationIndex: number
+  ) => {
     const newWeapons = [...weapons];
     const [moved] = newWeapons.splice(sourceIndex, 1);
     newWeapons.splice(destinationIndex, 0, moved);
@@ -235,18 +245,18 @@ export function DragDropShowcase() {
   };
 
   return (
-    <div className="p-6 space-y-8">
+    <div className="space-y-8 p-6">
       <div>
-        <h2 className="text-xl font-bold mb-4">Draggable Weapons List</h2>
+        <h2 className="mb-4 text-xl font-bold">Draggable Weapons List</h2>
         <DraggableWeaponsList
           weapons={weapons}
           onReorder={handleWeaponReorder}
-          onEdit={(weapon) => console.log('Edit weapon:', weapon)}
-          onDelete={(id) => console.log('Delete weapon:', id)}
+          onEdit={weapon => console.log('Edit weapon:', weapon)}
+          onDelete={id => console.log('Delete weapon:', id)}
         />
       </div>
-      
+
       {/* Add similar sections for inventory and magic items */}
     </div>
   );
-} 
+}

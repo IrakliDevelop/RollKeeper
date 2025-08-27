@@ -19,16 +19,16 @@ export function calculateMaxHP(
 
   const conModifier = calculateModifier(constitutionScore);
   const hitDie = classInfo.hitDie;
-  
+
   // Level 1: Full hit die + CON modifier
   let maxHP = hitDie + conModifier;
-  
+
   // Subsequent levels: Average hit die (rounded up) + CON modifier
   if (level > 1) {
     const averageHitDieRoll = Math.floor(hitDie / 2) + 1; // (hitDie + 1) / 2 rounded up
     maxHP += (level - 1) * (averageHitDieRoll + conModifier);
   }
-  
+
   // Minimum 1 HP per level
   return Math.max(maxHP, level);
 }
@@ -36,11 +36,14 @@ export function calculateMaxHP(
 /**
  * Get hit die for a class name, with fallback for custom classes
  */
-export function getClassHitDie(className: string, customHitDie?: number): number {
+export function getClassHitDie(
+  className: string,
+  customHitDie?: number
+): number {
   if (customHitDie) {
     return customHitDie;
   }
-  
+
   return CLASS_HIT_DICE[className] || 8; // Default to d8 for unknown classes
 }
 
@@ -71,28 +74,28 @@ export function applyDamage(hitPoints: HitPoints, damage: number): HitPoints {
     // Calculate how much damage it takes to reach 0 HP
     const damageToZero = Math.min(remainingDamage, newCurrentHP);
     newCurrentHP -= damageToZero;
-    
+
     // If we hit 0 HP or below
     if (newCurrentHP <= 0) {
       newCurrentHP = 0;
-      
+
       // Calculate excess damage after reaching 0 HP (massive damage calculation)
       const excessDamage = remainingDamage - damageToZero;
-      
+
       // Check for massive damage (excess damage >= max HP)
       if (excessDamage >= hitPoints.max) {
         // Instant death from massive damage
         deathSaves = {
           successes: 0,
           failures: 3,
-          isStabilized: false
+          isStabilized: false,
         };
       } else if (!deathSaves) {
         // Start death saving throws (unconscious but not dead)
         deathSaves = {
           successes: 0,
           failures: 0,
-          isStabilized: false
+          isStabilized: false,
         };
       }
     }
@@ -102,7 +105,7 @@ export function applyDamage(hitPoints: HitPoints, damage: number): HitPoints {
     ...hitPoints,
     current: newCurrentHP,
     temporary: newTempHP,
-    deathSaves
+    deathSaves,
   };
 }
 
@@ -126,7 +129,7 @@ export function applyHealing(hitPoints: HitPoints, healing: number): HitPoints {
   return {
     ...hitPoints,
     current: newCurrentHP,
-    deathSaves
+    deathSaves,
   };
 }
 
@@ -135,12 +138,15 @@ export function applyHealing(hitPoints: HitPoints, healing: number): HitPoints {
  * 1. Temporary HP doesn't stack - take the higher value
  * 2. Temporary HP doesn't affect current or max HP
  */
-export function addTemporaryHP(hitPoints: HitPoints, tempHP: number): HitPoints {
+export function addTemporaryHP(
+  hitPoints: HitPoints,
+  tempHP: number
+): HitPoints {
   if (tempHP <= 0) return hitPoints;
 
   return {
     ...hitPoints,
-    temporary: Math.max(hitPoints.temporary, tempHP)
+    temporary: Math.max(hitPoints.temporary, tempHP),
   };
 }
 
@@ -150,15 +156,17 @@ export function addTemporaryHP(hitPoints: HitPoints, tempHP: number): HitPoints 
  * @param isCritical - whether it was a critical success (natural 20)
  */
 export function makeDeathSave(
-  hitPoints: HitPoints, 
-  isSuccess: boolean, 
+  hitPoints: HitPoints,
+  isSuccess: boolean,
   isCritical: boolean = false
 ): HitPoints {
   if (!hitPoints.deathSaves) {
     return hitPoints;
   }
 
-  let newDeathSaves: DeathSavingThrows | undefined = { ...hitPoints.deathSaves };
+  let newDeathSaves: DeathSavingThrows | undefined = {
+    ...hitPoints.deathSaves,
+  };
   let newCurrentHP = hitPoints.current;
 
   if (isSuccess) {
@@ -169,7 +177,7 @@ export function makeDeathSave(
     } else {
       // Regular success
       newDeathSaves.successes = Math.min(newDeathSaves.successes + 1, 3);
-      
+
       // 3 successes = stabilized
       if (newDeathSaves.successes >= 3) {
         newDeathSaves.isStabilized = true;
@@ -183,7 +191,7 @@ export function makeDeathSave(
   return {
     ...hitPoints,
     current: newCurrentHP,
-    deathSaves: newDeathSaves
+    deathSaves: newDeathSaves,
   };
 }
 
@@ -193,7 +201,7 @@ export function makeDeathSave(
 export function resetDeathSaves(hitPoints: HitPoints): HitPoints {
   return {
     ...hitPoints,
-    deathSaves: undefined
+    deathSaves: undefined,
   };
 }
 
@@ -201,7 +209,11 @@ export function resetDeathSaves(hitPoints: HitPoints): HitPoints {
  * Check if character is dying (unconscious and making death saves)
  */
 export function isDying(hitPoints: HitPoints): boolean {
-  return hitPoints.current === 0 && !!hitPoints.deathSaves && !hitPoints.deathSaves.isStabilized;
+  return (
+    hitPoints.current === 0 &&
+    !!hitPoints.deathSaves &&
+    !hitPoints.deathSaves.isStabilized
+  );
 }
 
 /**
@@ -215,5 +227,9 @@ export function isDead(hitPoints: HitPoints): boolean {
  * Check if character is stabilized (0 HP but not dying)
  */
 export function isStabilized(hitPoints: HitPoints): boolean {
-  return hitPoints.current === 0 && !!hitPoints.deathSaves && hitPoints.deathSaves.isStabilized;
-} 
+  return (
+    hitPoints.current === 0 &&
+    !!hitPoints.deathSaves &&
+    hitPoints.deathSaves.isStabilized
+  );
+}

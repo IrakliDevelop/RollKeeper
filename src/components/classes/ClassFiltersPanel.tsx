@@ -1,8 +1,17 @@
 'use client';
 
 import React from 'react';
-import { ClassFilters, SpellcastingType, SpellcastingAbility, ProficiencyType } from '@/types/classes';
-import { formatSpellcastingType, formatSpellcastingAbility, formatProficiencyType } from '@/utils/classFilters';
+import {
+  ClassFilters,
+  SpellcastingType,
+  SpellcastingAbility,
+  ProficiencyType,
+} from '@/types/classes';
+import {
+  formatSpellcastingType,
+  formatSpellcastingAbility,
+  formatProficiencyType,
+} from '@/utils/classFilters';
 import { X, Filter } from 'lucide-react';
 
 interface ClassFiltersPanelProps {
@@ -17,15 +26,21 @@ interface ClassFiltersPanelProps {
 }
 
 const SPELLCASTING_ABILITIES: SpellcastingAbility[] = ['int', 'wis', 'cha'];
-const PRIMARY_ABILITIES: ProficiencyType[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+const PRIMARY_ABILITIES: ProficiencyType[] = [
+  'str',
+  'dex',
+  'con',
+  'int',
+  'wis',
+  'cha',
+];
 
-export default function ClassFiltersPanel({ 
-  filters, 
-  onFiltersChange, 
-  filterOptions, 
-  onClearFilters 
+export default function ClassFiltersPanel({
+  filters,
+  onFiltersChange,
+  filterOptions,
+  onClearFilters,
 }: ClassFiltersPanelProps) {
-  
   const updateFilter = <K extends keyof ClassFilters>(
     key: K,
     value: ClassFilters[K]
@@ -44,27 +59,27 @@ export default function ClassFiltersPanel({
     const newArray = currentArray.includes(value)
       ? currentArray.filter(item => item !== value)
       : [...currentArray, value];
-    
+
     updateFilter(key, newArray as ClassFilters[typeof key]);
   };
 
-  const hasActiveFilters = Object.values(filters).some(filter => 
+  const hasActiveFilters = Object.values(filters).some(filter =>
     Array.isArray(filter) ? filter.length > 0 : Boolean(filter)
   );
 
   return (
-    <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-600/50 rounded-lg p-6 space-y-6">
+    <div className="space-y-6 rounded-lg border border-slate-600/50 bg-slate-800/30 p-6 backdrop-blur-sm">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Filter className="h-5 w-5 text-emerald-400" />
           <h3 className="text-lg font-semibold text-white">Filter Classes</h3>
         </div>
-        
+
         {hasActiveFilters && (
           <button
             onClick={onClearFilters}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors border border-slate-600/50"
+            className="flex items-center gap-2 rounded-lg border border-slate-600/50 bg-slate-700/50 px-3 py-1.5 text-sm text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
           >
             <X size={16} />
             Clear All
@@ -72,22 +87,27 @@ export default function ClassFiltersPanel({
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Sources */}
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-3">
+          <label className="mb-3 block text-sm font-medium text-slate-300">
             Sources ({filters.sources?.length || 0} selected)
           </label>
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {filterOptions.sources.map((source) => (
-              <label key={source} className="flex items-center space-x-2 cursor-pointer group">
+          <div className="max-h-40 space-y-2 overflow-y-auto">
+            {filterOptions.sources.map(source => (
+              <label
+                key={source}
+                className="group flex cursor-pointer items-center space-x-2"
+              >
                 <input
                   type="checkbox"
                   checked={filters.sources?.includes(source) || false}
-                  onChange={() => toggleArrayFilter('sources', source, filters.sources)}
+                  onChange={() =>
+                    toggleArrayFilter('sources', source, filters.sources)
+                  }
                   className="rounded border-slate-600 bg-slate-700 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-800"
                 />
-                <span className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">
+                <span className="text-sm text-slate-400 transition-colors group-hover:text-slate-300">
                   {source}
                 </span>
               </label>
@@ -97,19 +117,28 @@ export default function ClassFiltersPanel({
 
         {/* Spellcasting Types */}
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-3">
+          <label className="mb-3 block text-sm font-medium text-slate-300">
             Spellcasting ({filters.spellcastingTypes?.length || 0} selected)
           </label>
           <div className="space-y-2">
-            {filterOptions.spellcastingTypes.map((type) => (
-              <label key={type} className="flex items-center space-x-2 cursor-pointer group">
+            {filterOptions.spellcastingTypes.map(type => (
+              <label
+                key={type}
+                className="group flex cursor-pointer items-center space-x-2"
+              >
                 <input
                   type="checkbox"
                   checked={filters.spellcastingTypes?.includes(type) || false}
-                  onChange={() => toggleArrayFilter('spellcastingTypes', type, filters.spellcastingTypes)}
+                  onChange={() =>
+                    toggleArrayFilter(
+                      'spellcastingTypes',
+                      type,
+                      filters.spellcastingTypes
+                    )
+                  }
                   className="rounded border-slate-600 bg-slate-700 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-800"
                 />
-                <span className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">
+                <span className="text-sm text-slate-400 transition-colors group-hover:text-slate-300">
                   {formatSpellcastingType(type)}
                 </span>
               </label>
@@ -119,19 +148,31 @@ export default function ClassFiltersPanel({
 
         {/* Spellcasting Abilities */}
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-3">
-            Spellcasting Ability ({filters.spellcastingAbilities?.length || 0} selected)
+          <label className="mb-3 block text-sm font-medium text-slate-300">
+            Spellcasting Ability ({filters.spellcastingAbilities?.length || 0}{' '}
+            selected)
           </label>
           <div className="space-y-2">
-            {SPELLCASTING_ABILITIES.map((ability) => (
-              <label key={ability} className="flex items-center space-x-2 cursor-pointer group">
+            {SPELLCASTING_ABILITIES.map(ability => (
+              <label
+                key={ability}
+                className="group flex cursor-pointer items-center space-x-2"
+              >
                 <input
                   type="checkbox"
-                  checked={filters.spellcastingAbilities?.includes(ability) || false}
-                  onChange={() => toggleArrayFilter('spellcastingAbilities', ability, filters.spellcastingAbilities)}
+                  checked={
+                    filters.spellcastingAbilities?.includes(ability) || false
+                  }
+                  onChange={() =>
+                    toggleArrayFilter(
+                      'spellcastingAbilities',
+                      ability,
+                      filters.spellcastingAbilities
+                    )
+                  }
                   className="rounded border-slate-600 bg-slate-700 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-800"
                 />
-                <span className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">
+                <span className="text-sm text-slate-400 transition-colors group-hover:text-slate-300">
                   {formatSpellcastingAbility(ability)}
                 </span>
               </label>
@@ -141,19 +182,28 @@ export default function ClassFiltersPanel({
 
         {/* Hit Dice Types */}
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-3">
+          <label className="mb-3 block text-sm font-medium text-slate-300">
             Hit Dice ({filters.hitDiceTypes?.length || 0} selected)
           </label>
           <div className="space-y-2">
-            {filterOptions.hitDiceTypes.map((hitDie) => (
-              <label key={hitDie} className="flex items-center space-x-2 cursor-pointer group">
+            {filterOptions.hitDiceTypes.map(hitDie => (
+              <label
+                key={hitDie}
+                className="group flex cursor-pointer items-center space-x-2"
+              >
                 <input
                   type="checkbox"
                   checked={filters.hitDiceTypes?.includes(hitDie) || false}
-                  onChange={() => toggleArrayFilter('hitDiceTypes', hitDie, filters.hitDiceTypes)}
+                  onChange={() =>
+                    toggleArrayFilter(
+                      'hitDiceTypes',
+                      hitDie,
+                      filters.hitDiceTypes
+                    )
+                  }
                   className="rounded border-slate-600 bg-slate-700 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-800"
                 />
-                <span className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">
+                <span className="text-sm text-slate-400 transition-colors group-hover:text-slate-300">
                   {hitDie}
                 </span>
               </label>
@@ -163,19 +213,28 @@ export default function ClassFiltersPanel({
 
         {/* Primary Abilities */}
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-3">
+          <label className="mb-3 block text-sm font-medium text-slate-300">
             Saving Throws ({filters.primaryAbilities?.length || 0} selected)
           </label>
           <div className="space-y-2">
-            {PRIMARY_ABILITIES.map((ability) => (
-              <label key={ability} className="flex items-center space-x-2 cursor-pointer group">
+            {PRIMARY_ABILITIES.map(ability => (
+              <label
+                key={ability}
+                className="group flex cursor-pointer items-center space-x-2"
+              >
                 <input
                   type="checkbox"
                   checked={filters.primaryAbilities?.includes(ability) || false}
-                  onChange={() => toggleArrayFilter('primaryAbilities', ability, filters.primaryAbilities)}
+                  onChange={() =>
+                    toggleArrayFilter(
+                      'primaryAbilities',
+                      ability,
+                      filters.primaryAbilities
+                    )
+                  }
                   className="rounded border-slate-600 bg-slate-700 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-800"
                 />
-                <span className="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">
+                <span className="text-sm text-slate-400 transition-colors group-hover:text-slate-300">
                   {formatProficiencyType(ability)}
                 </span>
               </label>
@@ -186,18 +245,20 @@ export default function ClassFiltersPanel({
 
       {/* Active filters summary */}
       {hasActiveFilters && (
-        <div className="pt-4 border-t border-slate-600/50">
-          <div className="text-sm text-slate-400 mb-2">Active filters:</div>
+        <div className="border-t border-slate-600/50 pt-4">
+          <div className="mb-2 text-sm text-slate-400">Active filters:</div>
           <div className="flex flex-wrap gap-2">
             {/* Sources */}
-            {filters.sources?.map((source) => (
+            {filters.sources?.map(source => (
               <span
                 key={`source-${source}`}
-                className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded border border-blue-500/30"
+                className="inline-flex items-center gap-1 rounded border border-blue-500/30 bg-blue-500/20 px-2 py-1 text-xs text-blue-400"
               >
                 {source}
                 <button
-                  onClick={() => toggleArrayFilter('sources', source, filters.sources)}
+                  onClick={() =>
+                    toggleArrayFilter('sources', source, filters.sources)
+                  }
                   className="hover:text-blue-300"
                 >
                   <X size={12} />
@@ -206,14 +267,20 @@ export default function ClassFiltersPanel({
             ))}
 
             {/* Spellcasting Types */}
-            {filters.spellcastingTypes?.map((type) => (
+            {filters.spellcastingTypes?.map(type => (
               <span
                 key={`casting-${type}`}
-                className="inline-flex items-center gap-1 px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded border border-purple-500/30"
+                className="inline-flex items-center gap-1 rounded border border-purple-500/30 bg-purple-500/20 px-2 py-1 text-xs text-purple-400"
               >
                 {formatSpellcastingType(type)}
                 <button
-                  onClick={() => toggleArrayFilter('spellcastingTypes', type, filters.spellcastingTypes)}
+                  onClick={() =>
+                    toggleArrayFilter(
+                      'spellcastingTypes',
+                      type,
+                      filters.spellcastingTypes
+                    )
+                  }
                   className="hover:text-purple-300"
                 >
                   <X size={12} />
@@ -222,14 +289,20 @@ export default function ClassFiltersPanel({
             ))}
 
             {/* Spellcasting Abilities */}
-            {filters.spellcastingAbilities?.map((ability) => (
+            {filters.spellcastingAbilities?.map(ability => (
               <span
                 key={`ability-${ability}`}
-                className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded border border-emerald-500/30"
+                className="inline-flex items-center gap-1 rounded border border-emerald-500/30 bg-emerald-500/20 px-2 py-1 text-xs text-emerald-400"
               >
                 {formatSpellcastingAbility(ability)}
                 <button
-                  onClick={() => toggleArrayFilter('spellcastingAbilities', ability, filters.spellcastingAbilities)}
+                  onClick={() =>
+                    toggleArrayFilter(
+                      'spellcastingAbilities',
+                      ability,
+                      filters.spellcastingAbilities
+                    )
+                  }
                   className="hover:text-emerald-300"
                 >
                   <X size={12} />
@@ -238,14 +311,20 @@ export default function ClassFiltersPanel({
             ))}
 
             {/* Hit Dice */}
-            {filters.hitDiceTypes?.map((hitDie) => (
+            {filters.hitDiceTypes?.map(hitDie => (
               <span
                 key={`hitdie-${hitDie}`}
-                className="inline-flex items-center gap-1 px-2 py-1 bg-orange-500/20 text-orange-400 text-xs rounded border border-orange-500/30"
+                className="inline-flex items-center gap-1 rounded border border-orange-500/30 bg-orange-500/20 px-2 py-1 text-xs text-orange-400"
               >
                 {hitDie}
                 <button
-                  onClick={() => toggleArrayFilter('hitDiceTypes', hitDie, filters.hitDiceTypes)}
+                  onClick={() =>
+                    toggleArrayFilter(
+                      'hitDiceTypes',
+                      hitDie,
+                      filters.hitDiceTypes
+                    )
+                  }
                   className="hover:text-orange-300"
                 >
                   <X size={12} />
@@ -254,14 +333,20 @@ export default function ClassFiltersPanel({
             ))}
 
             {/* Primary Abilities */}
-            {filters.primaryAbilities?.map((ability) => (
+            {filters.primaryAbilities?.map(ability => (
               <span
                 key={`primary-${ability}`}
-                className="inline-flex items-center gap-1 px-2 py-1 bg-cyan-500/20 text-cyan-400 text-xs rounded border border-cyan-500/30"
+                className="inline-flex items-center gap-1 rounded border border-cyan-500/30 bg-cyan-500/20 px-2 py-1 text-xs text-cyan-400"
               >
                 {formatProficiencyType(ability)}
                 <button
-                  onClick={() => toggleArrayFilter('primaryAbilities', ability, filters.primaryAbilities)}
+                  onClick={() =>
+                    toggleArrayFilter(
+                      'primaryAbilities',
+                      ability,
+                      filters.primaryAbilities
+                    )
+                  }
                   className="hover:text-cyan-300"
                 >
                   <X size={12} />
@@ -273,4 +358,4 @@ export default function ClassFiltersPanel({
       )}
     </div>
   );
-} 
+}

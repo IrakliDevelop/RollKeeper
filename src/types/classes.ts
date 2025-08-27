@@ -28,12 +28,15 @@ export interface RawClassData {
     armor?: string[];
     weapons?: string[];
     tools?: string[];
-    skills?: Array<{
-      choose?: {
-        from: string[];
-        count: number;
-      };
-    } | string>;
+    skills?: Array<
+      | {
+          choose?: {
+            from: string[];
+            count: number;
+          };
+        }
+      | string
+    >;
   };
   startingEquipment?: {
     additionalFromBackground?: boolean;
@@ -179,4 +182,4 @@ export interface ClassDataFile {
   subclass: RawSubclassData[];
   subclassFeature?: unknown[]; // Features data if needed later
   classFeature?: unknown[]; // Features data if needed later
-} 
+}
