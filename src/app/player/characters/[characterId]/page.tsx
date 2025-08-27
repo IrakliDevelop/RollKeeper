@@ -14,7 +14,6 @@ import XPTracker from '@/components/ui/character/XPTracker';
 
 import HitPointManager from '@/components/ui/character/HitPointManager';
 import ExperimentalFeaturesSection from '@/components/ui/layout/ExperimentalFeaturesSection';
-import FeaturesNavigationSection from '@/components/ui/layout/FeaturesNavigationSection';
 import HitDiceManager from '@/components/ui/character/HitDiceManager';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { WeaponProficiencies } from '@/components/WeaponProficiencies';
@@ -546,8 +545,6 @@ export default function CharacterSheet() {
                 display: block !important;
               }
             `}</style>
-
-            <FeaturesNavigationSection />
 
             <ExperimentalFeaturesSection />
 
