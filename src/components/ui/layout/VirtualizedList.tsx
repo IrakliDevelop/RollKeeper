@@ -21,7 +21,7 @@ export function VirtualizedList<T>({
   containerHeight,
   renderItem,
   overscan = 5,
-  className = ''
+  className = '',
 }: VirtualizedListProps<T>) {
   const [scrollTop, setScrollTop] = useState(0);
   const scrollElementRef = useRef<HTMLDivElement>(null);
@@ -122,10 +122,20 @@ export function useVirtualizedGrid<T>({
     );
 
     const start = visibleStartRow * columnsPerRow;
-    const end = Math.min((visibleEndRow + 1) * columnsPerRow - 1, items.length - 1);
+    const end = Math.min(
+      (visibleEndRow + 1) * columnsPerRow - 1,
+      items.length - 1
+    );
 
     return { start, end, startRow: visibleStartRow, endRow: visibleEndRow };
-  }, [scrollTop, rowHeight, containerHeight, totalRows, columnsPerRow, items.length]);
+  }, [
+    scrollTop,
+    rowHeight,
+    containerHeight,
+    totalRows,
+    columnsPerRow,
+    items.length,
+  ]);
 
   const visibleItems = useMemo(() => {
     return items.slice(visibleRange.start, visibleRange.end + 1);

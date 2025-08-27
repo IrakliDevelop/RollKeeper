@@ -3,7 +3,10 @@
 import React from 'react';
 import { ProcessedMonster } from '@/types/bestiary';
 import { useVirtualizedGrid } from '@/components/ui/layout/VirtualizedList';
-import { formatMonsterType, parseChallengeRating } from '@/utils/dm/monsterUtils';
+import {
+  formatMonsterType,
+  parseChallengeRating,
+} from '@/utils/dm/monsterUtils';
 import { Plus, Crown, Skull } from 'lucide-react';
 
 interface VirtualizedMonsterGridProps {
@@ -29,7 +32,7 @@ export function VirtualizedMonsterGrid({
   onQuantityChange,
   containerWidth,
   containerHeight,
-  loading = false
+  loading = false,
 }: VirtualizedMonsterGridProps) {
   const {
     visibleItems,
@@ -63,25 +66,25 @@ export function VirtualizedMonsterGrid({
           height: MONSTER_CARD_HEIGHT,
         }}
       >
-        <div className={`
-          h-full bg-white rounded-lg border-2 transition-all duration-200 cursor-pointer
-          ${isSelected 
-            ? 'border-blue-500 bg-blue-50 shadow-lg scale-105' 
-            : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
-          }
-        `}>
-          <div className="p-4 h-full flex flex-col">
+        <div
+          className={`h-full cursor-pointer rounded-lg border-2 bg-white transition-all duration-200 ${
+            isSelected
+              ? 'scale-105 border-blue-500 bg-blue-50 shadow-lg'
+              : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+          } `}
+        >
+          <div className="flex h-full flex-col p-4">
             {/* Header */}
-            <div className="flex justify-between items-start mb-2">
-              <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-gray-900 truncate text-sm">
+            <div className="mb-2 flex items-start justify-between">
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-sm font-bold text-gray-900">
                   {monster.name}
                 </h3>
-                <p className="text-xs text-gray-600 truncate">
+                <p className="truncate text-xs text-gray-600">
                   {formatMonsterType(monster)} • CR {monster.cr}
                 </p>
               </div>
-              <div className="flex items-center gap-1 ml-2">
+              <div className="ml-2 flex items-center gap-1">
                 {parseChallengeRating(monster.cr) >= 10 && (
                   <Crown size={14} className="text-yellow-500" />
                 )}
@@ -92,7 +95,7 @@ export function VirtualizedMonsterGrid({
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-2 text-xs mb-3 flex-1">
+            <div className="mb-3 grid flex-1 grid-cols-3 gap-2 text-xs">
               <div className="text-center">
                 <div className="font-medium text-gray-700">AC</div>
                 <div className="text-gray-600">{monster.ac}</div>
@@ -108,17 +111,17 @@ export function VirtualizedMonsterGrid({
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-between mt-auto">
+            <div className="mt-auto flex items-center justify-between">
               {isSelected ? (
-                <div className="flex items-center gap-2 flex-1">
+                <div className="flex flex-1 items-center gap-2">
                   <span className="text-xs text-gray-600">Qty:</span>
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={(e) => {
+                      onClick={e => {
                         e.stopPropagation();
                         onQuantityChange(monster.id, Math.max(1, quantity - 1));
                       }}
-                      className="w-6 h-6 bg-gray-200 hover:bg-gray-300 rounded text-xs font-bold"
+                      className="h-6 w-6 rounded bg-gray-200 text-xs font-bold hover:bg-gray-300"
                     >
                       -
                     </button>
@@ -126,11 +129,11 @@ export function VirtualizedMonsterGrid({
                       {quantity}
                     </span>
                     <button
-                      onClick={(e) => {
+                      onClick={e => {
                         e.stopPropagation();
                         onQuantityChange(monster.id, quantity + 1);
                       }}
-                      className="w-6 h-6 bg-gray-200 hover:bg-gray-300 rounded text-xs font-bold"
+                      className="h-6 w-6 rounded bg-gray-200 text-xs font-bold hover:bg-gray-300"
                     >
                       +
                     </button>
@@ -138,20 +141,18 @@ export function VirtualizedMonsterGrid({
                 </div>
               ) : (
                 <button
-                  onClick={(e) => {
+                  onClick={e => {
                     e.stopPropagation();
                     onAddMonster(monster);
                   }}
-                  className="flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-md transition-colors"
+                  className="flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1 text-xs text-white transition-colors hover:bg-blue-700"
                 >
                   <Plus size={12} />
                   Add
                 </button>
               )}
-              
-              <div className="text-xs text-gray-500 ml-2">
-                {monster.source}
-              </div>
+
+              <div className="ml-2 text-xs text-gray-500">{monster.source}</div>
             </div>
           </div>
         </div>
@@ -161,7 +162,7 @@ export function VirtualizedMonsterGrid({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <div className="text-gray-500">Loading monsters...</div>
       </div>
     );
@@ -169,7 +170,7 @@ export function VirtualizedMonsterGrid({
 
   if (monsters.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <div className="text-gray-500">No monsters found</div>
       </div>
     );
@@ -191,7 +192,7 @@ export function VirtualizedMonsterGrid({
             right: 0,
           }}
         >
-          {visibleItems.map((monster, index) => 
+          {visibleItems.map((monster, index) =>
             renderMonsterCard(monster, visibleRange.start + index)
           )}
         </div>

@@ -1,6 +1,30 @@
 // Basic character types for D&D 5e character sheet
-export type AbilityName = 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'charisma';
-export type SkillName = 'acrobatics' | 'animalHandling' | 'arcana' | 'athletics' | 'deception' | 'history' | 'insight' | 'intimidation' | 'investigation' | 'medicine' | 'nature' | 'perception' | 'performance' | 'persuasion' | 'religion' | 'sleightOfHand' | 'stealth' | 'survival';
+export type AbilityName =
+  | 'strength'
+  | 'dexterity'
+  | 'constitution'
+  | 'intelligence'
+  | 'wisdom'
+  | 'charisma';
+export type SkillName =
+  | 'acrobatics'
+  | 'animalHandling'
+  | 'arcana'
+  | 'athletics'
+  | 'deception'
+  | 'history'
+  | 'insight'
+  | 'intimidation'
+  | 'investigation'
+  | 'medicine'
+  | 'nature'
+  | 'perception'
+  | 'performance'
+  | 'persuasion'
+  | 'religion'
+  | 'sleightOfHand'
+  | 'stealth'
+  | 'survival';
 
 import type { SpellbookState } from './spells';
 
@@ -33,7 +57,7 @@ export type HPCalculationMode = 'auto' | 'manual';
 // Death Saving Throws
 export interface DeathSavingThrows {
   successes: number; // 0-3
-  failures: number;  // 0-3
+  failures: number; // 0-3
   isStabilized: boolean;
 }
 
@@ -187,8 +211,32 @@ export interface ClassInfo {
 
 // Weapon and magic item types
 export type WeaponCategory = 'simple' | 'martial' | 'magic' | 'artifact';
-export type WeaponType = 'melee' | 'ranged' | 'finesse' | 'versatile' | 'light' | 'heavy' | 'reach' | 'thrown' | 'ammunition' | 'loading' | 'special';
-export type DamageType = 'acid' | 'bludgeoning' | 'cold' | 'fire' | 'force' | 'lightning' | 'necrotic' | 'piercing' | 'poison' | 'psychic' | 'radiant' | 'slashing' | 'thunder';
+export type WeaponType =
+  | 'melee'
+  | 'ranged'
+  | 'finesse'
+  | 'versatile'
+  | 'light'
+  | 'heavy'
+  | 'reach'
+  | 'thrown'
+  | 'ammunition'
+  | 'loading'
+  | 'special';
+export type DamageType =
+  | 'acid'
+  | 'bludgeoning'
+  | 'cold'
+  | 'fire'
+  | 'force'
+  | 'lightning'
+  | 'necrotic'
+  | 'piercing'
+  | 'poison'
+  | 'psychic'
+  | 'radiant'
+  | 'slashing'
+  | 'thunder';
 
 // Weapon damage entry for multiple damage types
 export interface WeaponDamage {
@@ -230,8 +278,25 @@ export interface Weapon {
 }
 
 // Magic item categories and types
-export type MagicItemCategory = 'wondrous' | 'armor' | 'shield' | 'ring' | 'staff' | 'wand' | 'rod' | 'scroll' | 'potion' | 'artifact' | 'other';
-export type MagicItemRarity = 'common' | 'uncommon' | 'rare' | 'very rare' | 'legendary' | 'artifact';
+export type MagicItemCategory =
+  | 'wondrous'
+  | 'armor'
+  | 'shield'
+  | 'ring'
+  | 'staff'
+  | 'wand'
+  | 'rod'
+  | 'scroll'
+  | 'potion'
+  | 'artifact'
+  | 'other';
+export type MagicItemRarity =
+  | 'common'
+  | 'uncommon'
+  | 'rare'
+  | 'very rare'
+  | 'legendary'
+  | 'artifact';
 
 // Magic item interface
 export interface MagicItem {
@@ -261,7 +326,21 @@ export interface AttunementSlots {
 
 // Armor types and interfaces
 export type ArmorCategory = 'light' | 'medium' | 'heavy' | 'shield';
-export type ArmorType = 'padded' | 'leather' | 'studded-leather' | 'hide' | 'chain-shirt' | 'scale-mail' | 'breastplate' | 'half-plate' | 'ring-mail' | 'chain-mail' | 'splint' | 'plate' | 'shield' | 'custom';
+export type ArmorType =
+  | 'padded'
+  | 'leather'
+  | 'studded-leather'
+  | 'hide'
+  | 'chain-shirt'
+  | 'scale-mail'
+  | 'breastplate'
+  | 'half-plate'
+  | 'ring-mail'
+  | 'chain-mail'
+  | 'splint'
+  | 'plate'
+  | 'shield'
+  | 'custom';
 
 export interface ArmorItem {
   id: string;
@@ -321,10 +400,10 @@ export interface CharacterState {
   background: string;
   alignment: string;
   playerName: string;
-  
+
   // Ability Scores
   abilities: CharacterAbilities;
-  
+
   // Skills (all 18 D&D skills)
   skills: {
     acrobatics: SkillProficiency;
@@ -346,7 +425,7 @@ export interface CharacterState {
     stealth: SkillProficiency;
     survival: SkillProficiency;
   };
-  
+
   // Combat Stats
   hitPoints: HitPoints;
   armorClass: number;
@@ -357,7 +436,7 @@ export interface CharacterState {
   reaction: ReactionData;
   speed: number;
   hitDice: string; // e.g., "1d8", "2d6"
-  
+
   // Saving Throws
   savingThrows: {
     strength: SavingThrowProficiency;
@@ -432,7 +511,7 @@ export interface CharacterExport {
 }
 
 // Save state type
-export type SaveStatus = 'saving' | 'saved' | 'error'; 
+export type SaveStatus = 'saving' | 'saved' | 'error';
 
 // Exhaustion variants (2014 vs 2024)
 export type ExhaustionVariant = '2014' | '2024';
@@ -449,7 +528,7 @@ export interface ActiveCondition {
   notes?: string; // Optional player notes
 }
 
-// Active disease tracking  
+// Active disease tracking
 export interface ActiveDisease {
   id: string;
   name: string;
@@ -465,7 +544,7 @@ export interface ConditionsDiseasesState {
   activeConditions: ActiveCondition[];
   activeDiseases: ActiveDisease[];
   exhaustionVariant: ExhaustionVariant; // Player's preference for exhaustion rules
-} 
+}
 
 // Raw JSON data types for conditions/diseases
 export interface RawConditionEntry {
@@ -539,4 +618,4 @@ export interface ProcessedStatus {
   name: string;
   source: string;
   description: string;
-} 
+}

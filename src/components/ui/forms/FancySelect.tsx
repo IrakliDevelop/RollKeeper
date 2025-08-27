@@ -26,7 +26,7 @@ export const FancySelect: React.FC<FancySelectProps> = ({
   placeholder = 'Select an option...',
   className = '',
   disabled = false,
-  color = 'blue'
+  color = 'blue',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -40,23 +40,25 @@ export const FancySelect: React.FC<FancySelectProps> = ({
       dropdown: 'border-blue-200',
       option: 'hover:bg-blue-50',
       optionSelected: 'bg-blue-100 text-blue-900',
-      checkIcon: 'text-blue-600'
+      checkIcon: 'text-blue-600',
     },
     purple: {
-      trigger: 'border-purple-300 focus:ring-purple-500 focus:border-purple-500',
+      trigger:
+        'border-purple-300 focus:ring-purple-500 focus:border-purple-500',
       triggerOpen: 'border-purple-500 ring-2 ring-purple-500',
       dropdown: 'border-purple-200',
       option: 'hover:bg-purple-50',
       optionSelected: 'bg-purple-100 text-purple-900',
-      checkIcon: 'text-purple-600'
+      checkIcon: 'text-purple-600',
     },
     emerald: {
-      trigger: 'border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500',
+      trigger:
+        'border-emerald-300 focus:ring-emerald-500 focus:border-emerald-500',
       triggerOpen: 'border-emerald-500 ring-2 ring-emerald-500',
       dropdown: 'border-emerald-200',
       option: 'hover:bg-emerald-50',
       optionSelected: 'bg-emerald-100 text-emerald-900',
-      checkIcon: 'text-emerald-600'
+      checkIcon: 'text-emerald-600',
     },
     amber: {
       trigger: 'border-amber-300 focus:ring-amber-500 focus:border-amber-500',
@@ -64,7 +66,7 @@ export const FancySelect: React.FC<FancySelectProps> = ({
       dropdown: 'border-amber-200',
       option: 'hover:bg-amber-50',
       optionSelected: 'bg-amber-100 text-amber-900',
-      checkIcon: 'text-amber-600'
+      checkIcon: 'text-amber-600',
     },
     slate: {
       trigger: 'border-slate-300 focus:ring-slate-500 focus:border-slate-500',
@@ -72,8 +74,8 @@ export const FancySelect: React.FC<FancySelectProps> = ({
       dropdown: 'border-slate-200',
       option: 'hover:bg-slate-50',
       optionSelected: 'bg-slate-100 text-slate-900',
-      checkIcon: 'text-slate-600'
-    }
+      checkIcon: 'text-slate-600',
+    },
   };
 
   const styles = colorStyles[color];
@@ -81,7 +83,10 @@ export const FancySelect: React.FC<FancySelectProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
         setHighlightedIndex(-1);
       }
@@ -97,13 +102,13 @@ export const FancySelect: React.FC<FancySelectProps> = ({
           break;
         case 'ArrowDown':
           event.preventDefault();
-          setHighlightedIndex(prev => 
+          setHighlightedIndex(prev =>
             prev < options.length - 1 ? prev + 1 : 0
           );
           break;
         case 'ArrowUp':
           event.preventDefault();
-          setHighlightedIndex(prev => 
+          setHighlightedIndex(prev =>
             prev > 0 ? prev - 1 : options.length - 1
           );
           break;
@@ -132,7 +137,9 @@ export const FancySelect: React.FC<FancySelectProps> = ({
   // Scroll highlighted option into view
   useEffect(() => {
     if (isOpen && highlightedIndex >= 0 && optionsRef.current) {
-      const highlightedElement = optionsRef.current.children[highlightedIndex] as HTMLElement;
+      const highlightedElement = optionsRef.current.children[
+        highlightedIndex
+      ] as HTMLElement;
       if (highlightedElement) {
         highlightedElement.scrollIntoView({ block: 'nearest' });
       }
@@ -159,21 +166,19 @@ export const FancySelect: React.FC<FancySelectProps> = ({
         type="button"
         onClick={handleToggle}
         disabled={disabled}
-        className={`
-          w-full p-3 text-left bg-white border-2 rounded-lg transition-all duration-200
-          flex items-center justify-between
-          ${disabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 
-            isOpen ? styles.triggerOpen : styles.trigger}
-          ${disabled ? '' : 'hover:shadow-md'}
-          focus:outline-none
-          text-gray-900 font-medium
-        `}
+        className={`flex w-full items-center justify-between rounded-lg border-2 bg-white p-3 text-left transition-all duration-200 ${
+          disabled
+            ? 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400'
+            : isOpen
+              ? styles.triggerOpen
+              : styles.trigger
+        } ${disabled ? '' : 'hover:shadow-md'} font-medium text-gray-900 focus:outline-none`}
       >
         <span className={selectedOption ? 'text-gray-900' : 'text-gray-500'}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <ChevronDown 
-          size={20} 
+        <ChevronDown
+          size={20}
           className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${
             disabled ? 'text-gray-400' : 'text-gray-600'
           }`}
@@ -182,34 +187,26 @@ export const FancySelect: React.FC<FancySelectProps> = ({
 
       {/* Dropdown */}
       {isOpen && !disabled && (
-        <div className={`
-          absolute z-50 mt-2 w-full bg-white border-2 ${styles.dropdown} rounded-lg shadow-xl
-          max-h-60 overflow-y-auto
-          animate-in fade-in-0 zoom-in-95 duration-100
-        `}>
+        <div
+          className={`absolute z-50 mt-2 w-full border-2 bg-white ${styles.dropdown} animate-in fade-in-0 zoom-in-95 max-h-60 overflow-y-auto rounded-lg shadow-xl duration-100`}
+        >
           <div ref={optionsRef}>
             {options.map((option, index) => {
               const isSelected = option.value === value;
               const isHighlighted = index === highlightedIndex;
-              
+
               return (
                 <div
                   key={option.value}
                   onClick={() => handleOptionClick(option.value)}
-                  className={`
-                    px-4 py-3 cursor-pointer transition-colors duration-150
-                    flex items-center justify-between
-                    ${isHighlighted ? styles.option : ''}
-                    ${isSelected ? styles.optionSelected : 'text-gray-900'}
-                    ${index === 0 ? 'rounded-t-md' : ''}
-                    ${index === options.length - 1 ? 'rounded-b-md' : ''}
-                    hover:shadow-sm
-                  `}
+                  className={`flex cursor-pointer items-center justify-between px-4 py-3 transition-colors duration-150 ${isHighlighted ? styles.option : ''} ${isSelected ? styles.optionSelected : 'text-gray-900'} ${index === 0 ? 'rounded-t-md' : ''} ${index === options.length - 1 ? 'rounded-b-md' : ''} hover:shadow-sm`}
                 >
                   <div className="flex-1">
                     <div className="font-medium">{option.label}</div>
                     {option.description && (
-                      <div className="text-sm text-gray-500 mt-1">{option.description}</div>
+                      <div className="mt-1 text-sm text-gray-500">
+                        {option.description}
+                      </div>
                     )}
                   </div>
                   {isSelected && (
@@ -223,4 +220,4 @@ export const FancySelect: React.FC<FancySelectProps> = ({
       )}
     </div>
   );
-}; 
+};

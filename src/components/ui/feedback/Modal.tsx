@@ -19,7 +19,7 @@ const sizeClasses = {
   md: 'max-w-2xl',
   lg: 'max-w-4xl',
   xl: 'max-w-6xl',
-  full: 'max-w-[95vw]'
+  full: 'max-w-[95vw]',
 };
 
 export function Modal({
@@ -30,7 +30,7 @@ export function Modal({
   size = 'lg',
   showCloseButton = true,
   closeOnBackdropClick = true,
-  className = ''
+  className = '',
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -67,37 +67,29 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop with blur effect */}
-      <div 
+      <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300"
         onClick={handleBackdropClick}
         aria-hidden="true"
       />
-      
+
       {/* Modal container */}
       <div className="flex min-h-full items-center justify-center p-4">
         <div
           ref={modalRef}
-          className={`
-            relative w-full ${sizeClasses[size]} 
-            bg-white rounded-xl shadow-2xl 
-            transform transition-all duration-300 
-            max-h-[90vh] overflow-hidden
-            ${className}
-          `}
-          onClick={(e) => e.stopPropagation()}
+          className={`relative w-full ${sizeClasses[size]} max-h-[90vh] transform overflow-hidden rounded-xl bg-white shadow-2xl transition-all duration-300 ${className} `}
+          onClick={e => e.stopPropagation()}
         >
           {/* Header */}
           {(title || showCloseButton) && (
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between border-b border-gray-200 p-6">
               {title && (
-                <h2 className="text-xl font-semibold text-gray-900">
-                  {title}
-                </h2>
+                <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
               )}
               {showCloseButton && (
                 <button
                   onClick={onClose}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  className="rounded-lg p-2 transition-colors hover:bg-gray-100"
                   aria-label="Close modal"
                 >
                   <X size={20} className="text-gray-500" />
@@ -105,11 +97,9 @@ export function Modal({
               )}
             </div>
           )}
-          
+
           {/* Content */}
-          <div className="flex-1 overflow-y-auto">
-            {children}
-          </div>
+          <div className="flex-1 overflow-y-auto">{children}</div>
         </div>
       </div>
     </div>
@@ -121,11 +111,11 @@ export function ConfirmationModal({
   isOpen,
   onClose,
   onConfirm,
-  title = "Confirm Action",
+  title = 'Confirm Action',
   message,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
-  variant = "default"
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
+  variant = 'default',
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -136,18 +126,19 @@ export function ConfirmationModal({
   cancelText?: string;
   variant?: 'default' | 'danger';
 }) {
-  const buttonClasses = variant === 'danger' 
-    ? 'bg-red-600 hover:bg-red-700 text-white'
-    : 'bg-blue-600 hover:bg-blue-700 text-white';
+  const buttonClasses =
+    variant === 'danger'
+      ? 'bg-red-600 hover:bg-red-700 text-white'
+      : 'bg-blue-600 hover:bg-blue-700 text-white';
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
       <div className="p-6">
-        <p className="text-gray-700 mb-6">{message}</p>
-        <div className="flex gap-3 justify-end">
+        <p className="mb-6 text-gray-700">{message}</p>
+        <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            className="rounded-lg bg-gray-100 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-200"
           >
             {cancelText}
           </button>
@@ -156,7 +147,7 @@ export function ConfirmationModal({
               onConfirm();
               onClose();
             }}
-            className={`px-4 py-2 rounded-lg transition-colors ${buttonClasses}`}
+            className={`rounded-lg px-4 py-2 transition-colors ${buttonClasses}`}
           >
             {confirmText}
           </button>
@@ -169,24 +160,24 @@ export function ConfirmationModal({
 // Loading modal for async operations
 export function LoadingModal({
   isOpen,
-  title = "Loading...",
-  message = "Please wait while we process your request."
+  title = 'Loading...',
+  message = 'Please wait while we process your request.',
 }: {
   isOpen: boolean;
   title?: string;
   message?: string;
 }) {
   return (
-    <Modal 
-      isOpen={isOpen} 
-      onClose={() => {}} 
-      title={title} 
+    <Modal
+      isOpen={isOpen}
+      onClose={() => {}}
+      title={title}
       size="sm"
       showCloseButton={false}
       closeOnBackdropClick={false}
     >
       <div className="p-6 text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"></div>
         <p className="text-gray-700">{message}</p>
       </div>
     </Modal>

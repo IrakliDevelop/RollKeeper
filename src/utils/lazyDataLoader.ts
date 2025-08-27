@@ -6,7 +6,12 @@
 import { ProcessedMonster } from '@/types/bestiary';
 import { ProcessedSpell } from '@/types/spells';
 import { ProcessedClass } from '@/types/classes';
-import { fetchBestiary, fetchSpells, fetchClasses, fetchPopularMonsters } from '@/utils/apiClient';
+import {
+  fetchBestiary,
+  fetchSpells,
+  fetchClasses,
+  fetchPopularMonsters,
+} from '@/utils/apiClient';
 
 // Cache for lazy-loaded data
 let bestiaryCache: ProcessedMonster[] | null = null;
@@ -25,15 +30,17 @@ export async function lazyLoadBestiary(): Promise<ProcessedMonster[]> {
   try {
     console.log('Lazy loading bestiary data...');
     const startTime = performance.now();
-    
+
     // Use API client for cleaner error handling
     const monsters = await fetchBestiary();
-    
+
     bestiaryCache = monsters;
-    
+
     const loadTime = performance.now() - startTime;
-    console.log(`Bestiary loaded: ${monsters.length} monsters in ${loadTime.toFixed(2)}ms`);
-    
+    console.log(
+      `Bestiary loaded: ${monsters.length} monsters in ${loadTime.toFixed(2)}ms`
+    );
+
     return monsters;
   } catch (error) {
     console.error('Failed to lazy load bestiary:', error);
@@ -52,15 +59,17 @@ export async function lazyLoadSpells(): Promise<ProcessedSpell[]> {
   try {
     console.log('Lazy loading spells data...');
     const startTime = performance.now();
-    
+
     // Use API client for cleaner error handling
     const spells = await fetchSpells();
-    
+
     spellsCache = spells;
-    
+
     const loadTime = performance.now() - startTime;
-    console.log(`Spells loaded: ${spells.length} spells in ${loadTime.toFixed(2)}ms`);
-    
+    console.log(
+      `Spells loaded: ${spells.length} spells in ${loadTime.toFixed(2)}ms`
+    );
+
     return spells;
   } catch (error) {
     console.error('Failed to lazy load spells:', error);
@@ -79,15 +88,17 @@ export async function lazyLoadClasses(): Promise<ProcessedClass[]> {
   try {
     console.log('Lazy loading classes data...');
     const startTime = performance.now();
-    
+
     // Use API client for cleaner error handling
     const classes = await fetchClasses();
-    
+
     classesCache = classes;
-    
+
     const loadTime = performance.now() - startTime;
-    console.log(`Classes loaded: ${classes.length} classes in ${loadTime.toFixed(2)}ms`);
-    
+    console.log(
+      `Classes loaded: ${classes.length} classes in ${loadTime.toFixed(2)}ms`
+    );
+
     return classes;
   } catch (error) {
     console.error('Failed to lazy load classes:', error);
@@ -103,7 +114,7 @@ export async function preloadPopularMonsters(): Promise<ProcessedMonster[]> {
   try {
     // Use the API client's popular monsters function
     const popularMonsters = await fetchPopularMonsters();
-    
+
     console.log(`Preloaded ${popularMonsters.length} popular monsters`);
     return popularMonsters;
   } catch (error) {

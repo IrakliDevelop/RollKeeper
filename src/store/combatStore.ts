@@ -1,74 +1,94 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { 
-  Encounter, 
-  CombatParticipant, 
-  CombatLogEntry, 
+import {
+  Encounter,
+  CombatParticipant,
+  CombatLogEntry,
   CombatCanvasState,
-  CombatLayoutMode 
+  CombatLayoutMode,
 } from '@/types/combat';
 
 import { useDMStore } from './dmStore';
-import { 
+import {
   applyDamage as calculateDamage,
   applyHealing as calculateHealing,
   addTemporaryHP as calculateTemporaryHP,
   makeDeathSave as calculateDeathSave,
-  resetDeathSaves as calculateResetDeathSaves
+  resetDeathSaves as calculateResetDeathSaves,
 } from '@/utils/hpCalculations';
 
 interface CombatState {
   // Current encounter
   activeEncounter: Encounter | null;
-  
+
   // Combat log for current encounter
   combatLog: CombatLogEntry[];
-  
+
   // Canvas/UI state
   canvasState: CombatCanvasState;
-  
+
   // Historical encounters
   encounterHistory: Encounter[];
-  
+
   // Actions - Encounter Management
-  startEncounter: (campaignId: string, participants: CombatParticipant[], name?: string) => void;
+  startEncounter: (
+    campaignId: string,
+    participants: CombatParticipant[],
+    name?: string
+  ) => void;
   endEncounter: () => void;
   pauseEncounter: () => void;
   resumeEncounter: () => void;
-  
+
   // Actions - Participant Management
-  addParticipant: (participant: Omit<CombatParticipant, 'id' | 'turnOrder'>) => void;
+  addParticipant: (
+    participant: Omit<CombatParticipant, 'id' | 'turnOrder'>
+  ) => void;
   removeParticipant: (participantId: string) => void;
-  updateParticipant: (participantId: string, updates: Partial<CombatParticipant>) => void;
-  
+  updateParticipant: (
+    participantId: string,
+    updates: Partial<CombatParticipant>
+  ) => void;
+
   // Actions - Turn Management
   advanceTurn: () => void;
   setCurrentTurn: (participantIndex: number) => void;
   rollInitiative: (participantId?: string) => void;
   reorderInitiative: (newOrder: string[]) => void;
-  
+
   // Actions - Combat Actions
   applyDamage: (participantId: string, damage: number, source?: string) => void;
-  applyHealing: (participantId: string, healing: number, source?: string) => void;
-  addTemporaryHP: (participantId: string, tempHP: number, source?: string) => void;
+  applyHealing: (
+    participantId: string,
+    healing: number,
+    source?: string
+  ) => void;
+  addTemporaryHP: (
+    participantId: string,
+    tempHP: number,
+    source?: string
+  ) => void;
   makeDeathSave: (participantId: string, roll: number) => void;
   resetDeathSaves: (participantId: string) => void;
-  
+
   // Actions - Combat Log
   addLogEntry: (entry: Omit<CombatLogEntry, 'id' | 'timestamp'>) => void;
   clearCombatLog: () => void;
-  
+
   // Actions - Canvas State
   setLayoutMode: (mode: CombatLayoutMode) => void;
   selectParticipant: (participantId: string, multiSelect?: boolean) => void;
   clearSelection: () => void;
-  updateParticipantPosition: (participantId: string, position: { x: number; y: number }) => void;
-  
+  updateParticipantPosition: (
+    participantId: string,
+    position: { x: number; y: number }
+  ) => void;
+
   // Utility Functions
   getCurrentParticipant: () => CombatParticipant | null;
   getParticipantById: (participantId: string) => CombatParticipant | null;
   getInitiativeOrder: () => CombatParticipant[];
-  
+
   // Character sync (for end of combat)
   syncCharacterChanges: () => void;
 }
@@ -93,7 +113,7 @@ const createLogEntry = (
   round,
   turn,
   target,
-  amount
+  amount,
 });
 
 export const useCombatStore = create<CombatState>()(
@@ -106,7 +126,7 @@ export const useCombatStore = create<CombatState>()(
         layoutMode: 'initiative',
         selectedParticipants: [],
         showInitiativeOrder: true,
-        compactCards: false
+        compactCards: false,
       },
       encounterHistory: [],
 
@@ -120,7 +140,7 @@ export const useCombatStore = create<CombatState>()(
           hasBonusAction: true,
           hasActed: false,
           turnOrder: index,
-          position: { x: index * 320 + 20, y: 20 } // Default card positions
+          position: { x: index * 320 + 20, y: 20 }, // Default card positions
         }));
 
         // Sort by initiative (highest first)
@@ -145,16 +165,23 @@ export const useCombatStore = create<CombatState>()(
           name,
           startedAt: new Date(),
           isActive: true,
-          logEntries: []
+          logEntries: [],
         };
 
-        set({ 
+        set({
           activeEncounter: encounter,
-          combatLog: [{
-            id: generateId(),
-            timestamp: new Date(),
-            ...createLogEntry('initiative', 'DM', `Combat started: ${name}`, 1)
-          }]
+          combatLog: [
+            {
+              id: generateId(),
+              timestamp: new Date(),
+              ...createLogEntry(
+                'initiative',
+                'DM',
+                `Combat started: ${name}`,
+                1
+              ),
+            },
+          ],
         });
       },
 
@@ -169,79 +196,93 @@ export const useCombatStore = create<CombatState>()(
           ...state.activeEncounter,
           endedAt: new Date(),
           isActive: false,
-          logEntries: state.combatLog
+          logEntries: state.combatLog,
         };
 
         set({
           encounterHistory: [...state.encounterHistory, finishedEncounter],
           activeEncounter: null,
-          combatLog: []
+          combatLog: [],
         });
       },
 
       pauseEncounter: () => {
         set(state => ({
-          activeEncounter: state.activeEncounter ? {
-            ...state.activeEncounter,
-            isActive: false
-          } : null
+          activeEncounter: state.activeEncounter
+            ? {
+                ...state.activeEncounter,
+                isActive: false,
+              }
+            : null,
         }));
       },
 
       resumeEncounter: () => {
         set(state => ({
-          activeEncounter: state.activeEncounter ? {
-            ...state.activeEncounter,
-            isActive: true
-          } : null
+          activeEncounter: state.activeEncounter
+            ? {
+                ...state.activeEncounter,
+                isActive: true,
+              }
+            : null,
         }));
       },
 
       // Participant Management
-      addParticipant: (participantData) => {
+      addParticipant: participantData => {
         const state = get();
         if (!state.activeEncounter) return;
 
         const newParticipant: CombatParticipant = {
           ...participantData,
           id: generateId(),
-          initiative: participantData.initiative || rollD20() + participantData.dexterityModifier,
+          initiative:
+            participantData.initiative ||
+            rollD20() + participantData.dexterityModifier,
           hasReaction: true,
           hasBonusAction: true,
           hasActed: false,
           turnOrder: state.activeEncounter.participants.length,
-          position: { 
-            x: state.activeEncounter.participants.length * 320 + 20, 
-            y: 20 
-          }
+          position: {
+            x: state.activeEncounter.participants.length * 320 + 20,
+            y: 20,
+          },
         };
 
-        const updatedParticipants = [...state.activeEncounter.participants, newParticipant]
-          .sort((a, b) => b.initiative - a.initiative);
+        const updatedParticipants = [
+          ...state.activeEncounter.participants,
+          newParticipant,
+        ].sort((a, b) => b.initiative - a.initiative);
 
         set({
           activeEncounter: {
             ...state.activeEncounter,
-            participants: updatedParticipants
-          }
+            participants: updatedParticipants,
+          },
         });
 
-        get().addLogEntry(createLogEntry(
-          'action',
-          'DM',
-          `${newParticipant.name} joined the combat`,
-          state.activeEncounter.currentRound
-        ));
+        get().addLogEntry(
+          createLogEntry(
+            'action',
+            'DM',
+            `${newParticipant.name} joined the combat`,
+            state.activeEncounter.currentRound
+          )
+        );
       },
 
-      removeParticipant: (participantId) => {
+      removeParticipant: participantId => {
         const state = get();
         if (!state.activeEncounter) return;
 
-        const participant = state.activeEncounter.participants.find(p => p.id === participantId);
+        const participant = state.activeEncounter.participants.find(
+          p => p.id === participantId
+        );
         if (!participant) return;
 
-        const updatedParticipants = state.activeEncounter.participants.filter(p => p.id !== participantId);
+        const updatedParticipants = state.activeEncounter.participants.filter(
+          p => p.id !== participantId
+        );
         let newCurrentTurn = state.activeEncounter.currentTurn;
 
         // Adjust current turn if necessary
@@ -253,16 +294,18 @@ export const useCombatStore = create<CombatState>()(
           activeEncounter: {
             ...state.activeEncounter,
             participants: updatedParticipants,
-            currentTurn: newCurrentTurn
-          }
+            currentTurn: newCurrentTurn,
+          },
         });
 
-        get().addLogEntry(createLogEntry(
-          'action',
-          'DM',
-          `${participant.name} left the combat`,
-          state.activeEncounter.currentRound
-        ));
+        get().addLogEntry(
+          createLogEntry(
+            'action',
+            'DM',
+            `${participant.name} left the combat`,
+            state.activeEncounter.currentRound
+          )
+        );
       },
 
       updateParticipant: (participantId, updates) => {
@@ -276,8 +319,8 @@ export const useCombatStore = create<CombatState>()(
         set({
           activeEncounter: {
             ...state.activeEncounter,
-            participants: updatedParticipants
-          }
+            participants: updatedParticipants,
+          },
         });
       },
 
@@ -295,115 +338,134 @@ export const useCombatStore = create<CombatState>()(
           nextRound++;
 
           // Reset round-based resources
-          const updatedParticipants = state.activeEncounter.participants.map(p => ({
-            ...p,
-            hasReaction: true,
-            hasBonusAction: true,
-            hasActed: false,
-            usedLegendaryActions: 0
-          }));
+          const updatedParticipants = state.activeEncounter.participants.map(
+            p => ({
+              ...p,
+              hasReaction: true,
+              hasBonusAction: true,
+              hasActed: false,
+              usedLegendaryActions: 0,
+            })
+          );
 
           set({
             activeEncounter: {
               ...state.activeEncounter,
               participants: updatedParticipants,
               currentTurn: nextTurn,
-              currentRound: nextRound
-            }
+              currentRound: nextRound,
+            },
           });
 
-          get().addLogEntry(createLogEntry(
-            'round',
-            'DM',
-            `Round ${nextRound} begins`,
-            nextRound
-          ));
+          get().addLogEntry(
+            createLogEntry(
+              'round',
+              'DM',
+              `Round ${nextRound} begins`,
+              nextRound
+            )
+          );
         } else {
           set({
             activeEncounter: {
               ...state.activeEncounter,
-              currentTurn: nextTurn
-            }
+              currentTurn: nextTurn,
+            },
           });
         }
 
         const currentParticipant = state.activeEncounter.participants[nextTurn];
         if (currentParticipant) {
-          get().addLogEntry(createLogEntry(
-            'turn',
-            'DM',
-            `${currentParticipant.name}'s turn`,
-            nextRound,
-            nextTurn
-          ));
+          get().addLogEntry(
+            createLogEntry(
+              'turn',
+              'DM',
+              `${currentParticipant.name}'s turn`,
+              nextRound,
+              nextTurn
+            )
+          );
         }
       },
 
-      setCurrentTurn: (participantIndex) => {
+      setCurrentTurn: participantIndex => {
         const state = get();
         if (!state.activeEncounter) return;
 
-        if (participantIndex >= 0 && participantIndex < state.activeEncounter.participants.length) {
+        if (
+          participantIndex >= 0 &&
+          participantIndex < state.activeEncounter.participants.length
+        ) {
           set({
             activeEncounter: {
               ...state.activeEncounter,
-              currentTurn: participantIndex
-            }
+              currentTurn: participantIndex,
+            },
           });
         }
       },
 
-      rollInitiative: (participantId) => {
+      rollInitiative: participantId => {
         const state = get();
         if (!state.activeEncounter) return;
 
         if (participantId) {
           // Roll for specific participant
-          const updatedParticipants = state.activeEncounter.participants.map(p => {
-            if (p.id === participantId) {
-              const newInitiative = rollD20() + p.dexterityModifier;
-              return { ...p, initiative: newInitiative };
+          const updatedParticipants = state.activeEncounter.participants.map(
+            p => {
+              if (p.id === participantId) {
+                const newInitiative = rollD20() + p.dexterityModifier;
+                return { ...p, initiative: newInitiative };
+              }
+              return p;
             }
-            return p;
-          });
+          );
 
           // Re-sort by initiative
-          const sortedParticipants = updatedParticipants.sort((a, b) => b.initiative - a.initiative);
+          const sortedParticipants = updatedParticipants.sort(
+            (a, b) => b.initiative - a.initiative
+          );
 
           set({
             activeEncounter: {
               ...state.activeEncounter,
               participants: sortedParticipants,
-              currentTurn: 0 // Reset to first participant
-            }
+              currentTurn: 0, // Reset to first participant
+            },
           });
         } else {
           // Roll for all participants
-          const updatedParticipants = state.activeEncounter.participants.map(p => ({
-            ...p,
-            initiative: rollD20() + p.dexterityModifier
-          }));
+          const updatedParticipants = state.activeEncounter.participants.map(
+            p => ({
+              ...p,
+              initiative: rollD20() + p.dexterityModifier,
+            })
+          );
 
-          const sortedParticipants = updatedParticipants.sort((a, b) => b.initiative - a.initiative);
+          const sortedParticipants = updatedParticipants.sort(
+            (a, b) => b.initiative - a.initiative
+          );
 
           set({
             activeEncounter: {
               ...state.activeEncounter,
               participants: sortedParticipants,
-              currentTurn: 0
-            }
+              currentTurn: 0,
+            },
           });
 
-          get().addLogEntry(createLogEntry(
-            'initiative',
-            'DM',
-            'Initiative rerolled for all participants',
-            state.activeEncounter.currentRound
-          ));
+          get().addLogEntry(
+            createLogEntry(
+              'initiative',
+              'DM',
+              'Initiative rerolled for all participants',
+              state.activeEncounter.currentRound
+            )
+          );
         }
       },
 
-      reorderInitiative: (newOrder) => {
+      reorderInitiative: newOrder => {
         const state = get();
         if (!state.activeEncounter) return;
 
@@ -415,8 +477,8 @@ export const useCombatStore = create<CombatState>()(
           activeEncounter: {
             ...state.activeEncounter,
             participants: reorderedParticipants,
-            currentTurn: 0 // Reset to first participant
-          }
+            currentTurn: 0, // Reset to first participant
+          },
         });
       },
 
@@ -425,33 +487,39 @@ export const useCombatStore = create<CombatState>()(
         const state = get();
         if (!state.activeEncounter) return;
 
-        const participant = state.activeEncounter.participants.find(p => p.id === participantId);
+        const participant = state.activeEncounter.participants.find(
+          p => p.id === participantId
+        );
         if (!participant) return;
 
         // Use existing damage calculation logic
         const newHitPoints = calculateDamage(participant.hitPoints, damage);
 
         get().updateParticipant(participantId, { hitPoints: newHitPoints });
-        get().addLogEntry(createLogEntry(
-          'damage',
-          source,
-          `${participant.name} takes ${damage} damage`,
-          state.activeEncounter.currentRound,
-          state.activeEncounter.currentTurn,
-          participant.name,
-          damage
-        ));
+        get().addLogEntry(
+          createLogEntry(
+            'damage',
+            source,
+            `${participant.name} takes ${damage} damage`,
+            state.activeEncounter.currentRound,
+            state.activeEncounter.currentTurn,
+            participant.name,
+            damage
+          )
+        );
 
         // Check for death/unconsciousness
         if (newHitPoints.current <= 0 && participant.hitPoints.current > 0) {
-          get().addLogEntry(createLogEntry(
-            'death',
-            source,
-            `${participant.name} falls unconscious`,
-            state.activeEncounter.currentRound,
-            state.activeEncounter.currentTurn,
-            participant.name
-          ));
+          get().addLogEntry(
+            createLogEntry(
+              'death',
+              source,
+              `${participant.name} falls unconscious`,
+              state.activeEncounter.currentRound,
+              state.activeEncounter.currentTurn,
+              participant.name
+            )
+          );
         }
       },
 
@@ -459,93 +527,123 @@ export const useCombatStore = create<CombatState>()(
         const state = get();
         if (!state.activeEncounter) return;
 
-        const participant = state.activeEncounter.participants.find(p => p.id === participantId);
+        const participant = state.activeEncounter.participants.find(
+          p => p.id === participantId
+        );
         if (!participant) return;
 
         const newHitPoints = calculateHealing(participant.hitPoints, healing);
 
         get().updateParticipant(participantId, { hitPoints: newHitPoints });
-        get().addLogEntry(createLogEntry(
-          'healing',
-          source,
-          `${participant.name} heals ${healing} HP`,
-          state.activeEncounter.currentRound,
-          state.activeEncounter.currentTurn,
-          participant.name,
-          healing
-        ));
+        get().addLogEntry(
+          createLogEntry(
+            'healing',
+            source,
+            `${participant.name} heals ${healing} HP`,
+            state.activeEncounter.currentRound,
+            state.activeEncounter.currentTurn,
+            participant.name,
+            healing
+          )
+        );
       },
 
       addTemporaryHP: (participantId, tempHP, source = 'Unknown') => {
         const state = get();
         if (!state.activeEncounter) return;
 
-        const participant = state.activeEncounter.participants.find(p => p.id === participantId);
+        const participant = state.activeEncounter.participants.find(
+          p => p.id === participantId
+        );
         if (!participant) return;
 
-        const newHitPoints = calculateTemporaryHP(participant.hitPoints, tempHP);
+        const newHitPoints = calculateTemporaryHP(
+          participant.hitPoints,
+          tempHP
+        );
 
         get().updateParticipant(participantId, { hitPoints: newHitPoints });
-        get().addLogEntry(createLogEntry(
-          'healing',
-          source,
-          `${participant.name} gains ${tempHP} temporary HP`,
-          state.activeEncounter.currentRound,
-          state.activeEncounter.currentTurn,
-          participant.name,
-          tempHP
-        ));
+        get().addLogEntry(
+          createLogEntry(
+            'healing',
+            source,
+            `${participant.name} gains ${tempHP} temporary HP`,
+            state.activeEncounter.currentRound,
+            state.activeEncounter.currentTurn,
+            participant.name,
+            tempHP
+          )
+        );
       },
 
       makeDeathSave: (participantId, roll) => {
         const state = get();
         if (!state.activeEncounter) return;
 
-        const participant = state.activeEncounter.participants.find(p => p.id === participantId);
+        const participant = state.activeEncounter.participants.find(
+          p => p.id === participantId
+        );
         if (!participant) return;
 
         const isSuccess = roll >= 10;
         const isCritical = roll === 20;
-        const newHitPoints = calculateDeathSave(participant.hitPoints, isSuccess, isCritical);
+        const newHitPoints = calculateDeathSave(
+          participant.hitPoints,
+          isSuccess,
+          isCritical
+        );
 
         get().updateParticipant(participantId, { hitPoints: newHitPoints });
-        
-        const result = isCritical ? 'critical success' : isSuccess ? 'success' : 'failure';
-        get().addLogEntry(createLogEntry(
-          'action',
-          participant.name,
-          `Death saving throw: ${roll} (${result})`,
-          state.activeEncounter.currentRound,
-          state.activeEncounter.currentTurn
-        ));
+
+        const result = isCritical
+          ? 'critical success'
+          : isSuccess
+            ? 'success'
+            : 'failure';
+        get().addLogEntry(
+          createLogEntry(
+            'action',
+            participant.name,
+            `Death saving throw: ${roll} (${result})`,
+            state.activeEncounter.currentRound,
+            state.activeEncounter.currentTurn
+          )
+        );
       },
 
-      resetDeathSaves: (participantId) => {
+      resetDeathSaves: participantId => {
         const state = get();
         if (!state.activeEncounter) return;
 
-        const participant = state.activeEncounter.participants.find(p => p.id === participantId);
+        const participant = state.activeEncounter.participants.find(
+          p => p.id === participantId
+        );
         if (!participant) return;
 
         const newHitPoints = calculateResetDeathSaves(participant.hitPoints);
 
         get().updateParticipant(participantId, { hitPoints: newHitPoints });
-        get().addLogEntry(createLogEntry(
-          'action',
-          'DM',
-          `${participant.name}'s death saves reset`,
-          state.activeEncounter.currentRound
-        ));
+        get().addLogEntry(
+          createLogEntry(
+            'action',
+            'DM',
+            `${participant.name}'s death saves reset`,
+            state.activeEncounter.currentRound
+          )
+        );
       },
 
       // Combat Log
-      addLogEntry: (entry) => {
+      addLogEntry: entry => {
         set(state => ({
-          combatLog: [...state.combatLog, {
-            ...entry,
-            id: generateId(),
-            timestamp: new Date()
-          }]
+          combatLog: [
+            ...state.combatLog,
+            {
+              ...entry,
+              id: generateId(),
+              timestamp: new Date(),
+            },
+          ],
         }));
       },
 
@@ -554,9 +652,9 @@ export const useCombatStore = create<CombatState>()(
       },
 
       // Canvas State
-      setLayoutMode: (mode) => {
+      setLayoutMode: mode => {
         set(state => ({
-          canvasState: { ...state.canvasState, layoutMode: mode }
+          canvasState: { ...state.canvasState, layoutMode: mode },
         }));
       },
 
@@ -574,14 +672,17 @@ export const useCombatStore = create<CombatState>()(
           }
 
           return {
-            canvasState: { ...state.canvasState, selectedParticipants: newSelection }
+            canvasState: {
+              ...state.canvasState,
+              selectedParticipants: newSelection,
+            },
           };
         });
       },
 
       clearSelection: () => {
         set(state => ({
-          canvasState: { ...state.canvasState, selectedParticipants: [] }
+          canvasState: { ...state.canvasState, selectedParticipants: [] },
         }));
       },
 
@@ -593,19 +694,29 @@ export const useCombatStore = create<CombatState>()(
       getCurrentParticipant: () => {
         const state = get();
         if (!state.activeEncounter) return null;
-        return state.activeEncounter.participants[state.activeEncounter.currentTurn] || null;
+        return (
+          state.activeEncounter.participants[
+            state.activeEncounter.currentTurn
+          ] || null
+        );
       },
 
-      getParticipantById: (participantId) => {
+      getParticipantById: participantId => {
         const state = get();
         if (!state.activeEncounter) return null;
-        return state.activeEncounter.participants.find(p => p.id === participantId) || null;
+        return (
+          state.activeEncounter.participants.find(
+            p => p.id === participantId
+          ) || null
+        );
       },
 
       getInitiativeOrder: () => {
         const state = get();
         if (!state.activeEncounter) return [];
-        return [...state.activeEncounter.participants].sort((a, b) => b.initiative - a.initiative);
+        return [...state.activeEncounter.participants].sort(
+          (a, b) => b.initiative - a.initiative
+        );
       },
 
       // Character sync
@@ -626,20 +737,20 @@ export const useCombatStore = create<CombatState>()(
                 {
                   characterData: {
                     ...participant.characterReference.characterData,
-                    hitPoints: participant.hitPoints
-                  }
+                    hitPoints: participant.hitPoints,
+                  },
                 }
               );
             }
           });
-      }
+      },
     }),
     {
       name: 'combat-store',
-      partialize: (state) => ({
+      partialize: state => ({
         encounterHistory: state.encounterHistory,
-        canvasState: state.canvasState
-      })
+        canvasState: state.canvasState,
+      }),
     }
   )
 );

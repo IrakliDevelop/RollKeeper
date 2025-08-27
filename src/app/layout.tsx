@@ -1,25 +1,25 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import ErrorBoundary from "@/components/ui/feedback/ErrorBoundary";
+import type { Metadata } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
+import './globals.css';
+import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
 });
 
 export const metadata: Metadata = {
-  title: "Rollkeeper",
-  description: "Rollkeeper is a character sheet for the game of D&D 5e.",
+  title: 'Rollkeeper',
+  description: 'Rollkeeper is a character sheet for the game of D&D 5e.',
   icons: {
-    icon: "/rollkeeper_favicon.svg",
-    shortcut: "/rollkeeper_favicon.svg",
-    apple: "/rollkeeper_favicon.svg",
+    icon: '/rollkeeper_favicon.svg',
+    shortcut: '/rollkeeper_favicon.svg',
+    apple: '/rollkeeper_favicon.svg',
   },
 };
 
@@ -34,9 +34,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning={true}
       >
-        <ErrorBoundary>
-          {children}
-        </ErrorBoundary>
+        <ErrorBoundary>{children}</ErrorBoundary>
       </body>
     </html>
   );

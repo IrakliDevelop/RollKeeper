@@ -8,7 +8,10 @@ interface ModalPortalProps {
   isOpen: boolean;
 }
 
-export const ModalPortal: React.FC<ModalPortalProps> = ({ children, isOpen }) => {
+export const ModalPortal: React.FC<ModalPortalProps> = ({
+  children,
+  isOpen,
+}) => {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -36,4 +39,4 @@ export const ModalPortal: React.FC<ModalPortalProps> = ({ children, isOpen }) =>
   }
 
   return createPortal(children, document.body);
-}; 
+};

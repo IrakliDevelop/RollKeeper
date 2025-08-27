@@ -28,11 +28,12 @@ export function monsterToCombatParticipant(
     current: maxHP,
     max: maxHP,
     temporary: 0,
-    calculationMode: 'manual' as const
+    calculationMode: 'manual' as const,
   };
 
   // Parse legendary actions if present
-  const hasLegendaryActions = monster.legendaryActions && monster.legendaryActions.length > 0;
+  const hasLegendaryActions =
+    monster.legendaryActions && monster.legendaryActions.length > 0;
   const legendaryActionCount = hasLegendaryActions ? 3 : undefined; // Most monsters have 3
 
   return {
@@ -51,8 +52,8 @@ export function monsterToCombatParticipant(
     conditions: [],
     monsterReference: {
       slug: monster.id,
-      monsterData: monster
-    }
+      monsterData: monster,
+    },
   };
 }
 
@@ -64,7 +65,7 @@ export function parseChallengeRating(cr: string): number {
   if (cr === '1/8') return 0.125;
   if (cr === '1/4') return 0.25;
   if (cr === '1/2') return 0.5;
-  
+
   const numericCR = parseFloat(cr);
   return isNaN(numericCR) ? 0 : numericCR;
 }
@@ -74,7 +75,7 @@ export function parseChallengeRating(cr: string): number {
  */
 export function getExpectedHPForCR(cr: string): { min: number; max: number } {
   const crValue = parseChallengeRating(cr);
-  
+
   if (crValue === 0) return { min: 1, max: 6 };
   if (crValue <= 0.25) return { min: 7, max: 35 };
   if (crValue <= 0.5) return { min: 36, max: 49 };
@@ -99,7 +100,7 @@ export function getExpectedHPForCR(cr: string): { min: number; max: number } {
   if (crValue <= 23) return { min: 401, max: 500 };
   if (crValue <= 26) return { min: 501, max: 600 };
   if (crValue <= 30) return { min: 601, max: 850 };
-  
+
   return { min: 851, max: 1000 };
 }
 
@@ -108,7 +109,7 @@ export function getExpectedHPForCR(cr: string): { min: number; max: number } {
  */
 export function getProficiencyBonusForCR(cr: string): number {
   const crValue = parseChallengeRating(cr);
-  
+
   if (crValue <= 4) return 2;
   if (crValue <= 8) return 3;
   if (crValue <= 12) return 4;
@@ -116,7 +117,7 @@ export function getProficiencyBonusForCR(cr: string): number {
   if (crValue <= 20) return 6;
   if (crValue <= 24) return 7;
   if (crValue <= 28) return 8;
-  
+
   return 9;
 }
 
@@ -124,7 +125,8 @@ export function getProficiencyBonusForCR(cr: string): number {
  * Format monster type string for display
  */
 export function formatMonsterType(monster: ProcessedMonster): string {
-  const type = typeof monster.type === 'string' ? monster.type : monster.type.type;
+  const type =
+    typeof monster.type === 'string' ? monster.type : monster.type.type;
   const size = monster.size.join('/');
   return `${size} ${type}`;
 }
@@ -149,11 +151,13 @@ export function formatModifier(modifier: number): string {
 export function calculatePassivePerception(monster: ProcessedMonster): number {
   const wisModifier = getAbilityModifier(monster.wis);
   const proficiencyBonus = getProficiencyBonusForCR(monster.cr);
-  
+
   // Check if monster has perception skill
-  const hasPerceptionProficiency = monster.skills.toLowerCase().includes('perception');
+  const hasPerceptionProficiency = monster.skills
+    .toLowerCase()
+    .includes('perception');
   const perceptionBonus = hasPerceptionProficiency ? proficiencyBonus : 0;
-  
+
   return 10 + wisModifier + perceptionBonus;
 }
 
@@ -167,6 +171,6 @@ export function getMonsterAbilityModifiers(monster: ProcessedMonster) {
     con: getAbilityModifier(monster.con),
     int: getAbilityModifier(monster.int),
     wis: getAbilityModifier(monster.wis),
-    cha: getAbilityModifier(monster.cha)
+    cha: getAbilityModifier(monster.cha),
   };
 }

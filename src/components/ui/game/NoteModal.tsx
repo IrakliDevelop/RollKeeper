@@ -7,7 +7,6 @@ import { ModalPortal } from '@/components/ui/feedback';
 import { RichTextEditor } from '@/components/ui/forms';
 import { RichTextRenderer } from '@/components/ui/utils';
 
-
 interface NoteModalProps {
   note: RichTextContent | null;
   isOpen: boolean;
@@ -21,7 +20,7 @@ export default function NoteModal({
   isOpen,
   onClose,
   onUpdate,
-  onDelete
+  onDelete,
 }: NoteModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -38,17 +37,17 @@ export default function NoteModal({
 
   const handleSave = () => {
     if (!note) return;
-    
+
     onUpdate(note.id, {
       title: editTitle.trim(),
-      content: editContent
+      content: editContent,
     });
     setIsEditing(false);
   };
 
   const handleCancel = () => {
     if (!note) return;
-    
+
     setEditTitle(note.title);
     setEditContent(note.content);
     setIsEditing(false);
@@ -56,45 +55,43 @@ export default function NoteModal({
 
   const handleDelete = () => {
     if (!note) return;
-    
+
     if (window.confirm('Are you sure you want to delete this note?')) {
       onDelete(note.id);
       onClose();
     }
   };
 
-
-
   if (!note) return null;
 
   return (
     <ModalPortal isOpen={isOpen}>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg shadow-xl border border-blue-200 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-blue-200 bg-white shadow-xl">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <div className="flex items-center space-x-3 flex-1 min-w-0">
+          <div className="flex items-center justify-between border-b border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-6">
+            <div className="flex min-w-0 flex-1 items-center space-x-3">
               {isEditing ? (
                 <input
                   type="text"
                   value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="text-xl font-semibold text-blue-900 bg-transparent border-b-2 border-blue-300 focus:border-blue-600 focus:outline-none flex-1 min-w-0"
+                  onChange={e => setEditTitle(e.target.value)}
+                  className="min-w-0 flex-1 border-b-2 border-blue-300 bg-transparent text-xl font-semibold text-blue-900 focus:border-blue-600 focus:outline-none"
                   autoFocus
                 />
               ) : (
-                <h2 className="text-xl font-semibold text-blue-900 truncate flex-1 min-w-0">
+                <h2 className="min-w-0 flex-1 truncate text-xl font-semibold text-blue-900">
                   {note.title}
                 </h2>
               )}
             </div>
-            
-            <div className="flex items-center space-x-2 ml-4">
+
+            <div className="ml-4 flex items-center space-x-2">
               {isEditing ? (
                 <>
                   <button
                     onClick={handleCancel}
-                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                    className="rounded-md p-2 text-gray-600 transition-colors hover:bg-gray-100"
                     title="Cancel editing"
                   >
                     <X size={20} />
@@ -102,7 +99,7 @@ export default function NoteModal({
                   <button
                     onClick={handleSave}
                     disabled={!editTitle.trim()}
-                    className="flex items-center space-x-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="flex items-center space-x-1 rounded-md bg-blue-600 px-3 py-2 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                     title="Save changes"
                   >
                     <Save size={16} />
@@ -113,14 +110,14 @@ export default function NoteModal({
                 <>
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="p-2 text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
+                    className="rounded-md p-2 text-blue-600 transition-colors hover:bg-blue-100"
                     title="Edit note"
                   >
                     <Edit3 size={20} />
                   </button>
                   <button
                     onClick={handleDelete}
-                    className="p-2 text-red-600 hover:bg-red-100 rounded-md transition-colors"
+                    className="rounded-md p-2 text-red-600 transition-colors hover:bg-red-100"
                     title="Delete note"
                   >
                     <Trash2 size={20} />
@@ -129,7 +126,7 @@ export default function NoteModal({
               )}
               <button
                 onClick={onClose}
-                className="p-2 text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                className="rounded-md p-2 text-gray-600 transition-colors hover:bg-gray-100"
                 title="Close modal"
               >
                 <X size={20} />
@@ -142,7 +139,7 @@ export default function NoteModal({
             {isEditing ? (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-blue-800 mb-2">
+                  <label className="mb-2 block text-sm font-medium text-blue-800">
                     Note Content
                   </label>
                   <RichTextEditor
@@ -158,10 +155,12 @@ export default function NoteModal({
                 {note.content ? (
                   <RichTextRenderer content={note.content} />
                 ) : (
-                  <div className="text-center py-12 text-gray-500">
-                    <Eye className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <p className="text-lg font-medium mb-2">No content yet</p>
-                    <p className="text-sm">Click Edit to add content to this note.</p>
+                  <div className="py-12 text-center text-gray-500">
+                    <Eye className="mx-auto mb-4 h-12 w-12 text-gray-400" />
+                    <p className="mb-2 text-lg font-medium">No content yet</p>
+                    <p className="text-sm">
+                      Click Edit to add content to this note.
+                    </p>
                   </div>
                 )}
               </div>
@@ -170,9 +169,10 @@ export default function NoteModal({
 
           {/* Footer */}
           {note.updatedAt && !isEditing && (
-            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <div className="border-t border-gray-200 bg-gray-50 px-6 py-4">
               <p className="text-sm text-gray-600">
-                Last updated: {new Date(note.updatedAt).toLocaleDateString()} at {new Date(note.updatedAt).toLocaleTimeString()}
+                Last updated: {new Date(note.updatedAt).toLocaleDateString()} at{' '}
+                {new Date(note.updatedAt).toLocaleTimeString()}
               </p>
             </div>
           )}
@@ -180,4 +180,4 @@ export default function NoteModal({
       </div>
     </ModalPortal>
   );
-} 
+}

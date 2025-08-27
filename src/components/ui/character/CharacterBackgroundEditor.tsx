@@ -27,48 +27,52 @@ const BACKGROUND_TABS: TabConfig[] = [
     id: 'backstory',
     label: 'Backstory',
     icon: <User size={16} />,
-    placeholder: 'Tell your character\'s story...',
-    description: 'Your character\'s history, origins, and important life events.',
-    color: 'blue'
+    placeholder: "Tell your character's story...",
+    description:
+      "Your character's history, origins, and important life events.",
+    color: 'blue',
   },
   {
     id: 'personality',
     label: 'Personality',
     icon: <Star size={16} />,
-    placeholder: 'Describe your character\'s personality...',
+    placeholder: "Describe your character's personality...",
     description: 'Personality traits, mannerisms, and behavioral quirks.',
-    color: 'purple'
+    color: 'purple',
   },
   {
     id: 'ideals',
     label: 'Ideals',
     icon: <Heart size={16} />,
     placeholder: 'What drives your character...',
-    description: 'Principles, values, and beliefs that motivate your character.',
-    color: 'rose'
+    description:
+      'Principles, values, and beliefs that motivate your character.',
+    color: 'rose',
   },
   {
     id: 'bonds',
     label: 'Bonds',
     icon: <Link size={16} />,
     placeholder: 'Who or what matters to your character...',
-    description: 'Important people, places, or things your character cares about.',
-    color: 'green'
+    description:
+      'Important people, places, or things your character cares about.',
+    color: 'green',
   },
   {
     id: 'flaws',
     label: 'Flaws',
     icon: <AlertTriangle size={16} />,
-    placeholder: 'Your character\'s weaknesses...',
-    description: 'Weaknesses, fears, or negative traits that create interesting roleplay.',
-    color: 'orange'
-  }
+    placeholder: "Your character's weaknesses...",
+    description:
+      'Weaknesses, fears, or negative traits that create interesting roleplay.',
+    color: 'orange',
+  },
 ];
 
 export default function CharacterBackgroundEditor({
   background,
   onChange,
-  className = ''
+  className = '',
 }: CharacterBackgroundEditorProps) {
   const [activeTab, setActiveTab] = useState<BackgroundTab>('backstory');
 
@@ -79,23 +83,25 @@ export default function CharacterBackgroundEditor({
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-lg border border-gray-200 ${className}`}>
+    <div
+      className={`rounded-lg border border-gray-200 bg-white shadow-lg ${className}`}
+    >
       <div className="border-b border-gray-200">
         <div className="p-4">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">
+          <h2 className="mb-4 text-lg font-bold text-gray-800">
             Character Background
           </h2>
-          
+
           {/* Tab Navigation */}
           <div className="flex flex-wrap gap-2">
-            {BACKGROUND_TABS.map((tab) => (
+            {BACKGROUND_TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`flex items-center space-x-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                   activeTab === tab.id
                     ? `bg-${tab.color}-100 text-${tab.color}-700 border border-${tab.color}-300`
-                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
                 }`}
               >
                 {tab.icon}
@@ -109,7 +115,7 @@ export default function CharacterBackgroundEditor({
       {/* Active Tab Content */}
       <div className="p-4">
         <div className="mb-4">
-          <div className="flex items-center space-x-2 mb-2">
+          <div className="mb-2 flex items-center space-x-2">
             <div className={`text-${activeTabConfig.color}-600`}>
               {activeTabConfig.icon}
             </div>
@@ -117,7 +123,7 @@ export default function CharacterBackgroundEditor({
               {activeTabConfig.label}
             </h3>
           </div>
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="mb-4 text-sm text-gray-600">
             {activeTabConfig.description}
           </p>
         </div>
@@ -125,7 +131,7 @@ export default function CharacterBackgroundEditor({
         <RichTextEditor
           key={activeTab} // Force re-render when tab changes
           content={background[activeTab]}
-          onChange={(content) => handleContentChange(activeTab, content)}
+          onChange={content => handleContentChange(activeTab, content)}
           placeholder={activeTabConfig.placeholder}
           minHeight="200px"
         />
@@ -135,12 +141,13 @@ export default function CharacterBackgroundEditor({
           <div className="text-xs text-gray-500">
             {background[activeTab] && (
               <span>
-                {background[activeTab].replace(/<[^>]*>/g, '').length} characters
+                {background[activeTab].replace(/<[^>]*>/g, '').length}{' '}
+                characters
               </span>
             )}
           </div>
-          
-          <div className="text-xs text-gray-500 max-w-sm">
+
+          <div className="max-w-sm text-xs text-gray-500">
             <details className="cursor-pointer">
               <summary className="font-medium hover:text-gray-700">
                 💡 Tips for {activeTabConfig.label}
@@ -188,4 +195,4 @@ export default function CharacterBackgroundEditor({
       </div>
     </div>
   );
-} 
+}

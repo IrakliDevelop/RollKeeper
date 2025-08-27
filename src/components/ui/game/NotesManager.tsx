@@ -10,7 +10,9 @@ import DragDropList from '@/components/ui/layout/DragDropList';
 
 interface NotesManagerProps {
   items: RichTextContent[];
-  onAdd: (item: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onAdd: (
+    item: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
   onUpdate: (id: string, updates: Partial<RichTextContent>) => void;
   onDelete: (id: string) => void;
   onReorder?: (sourceIndex: number, destinationIndex: number) => void;
@@ -23,11 +25,11 @@ export default function NotesManager({
   onUpdate,
   onDelete,
   onReorder,
-  className = ''
+  className = '',
 }: NotesManagerProps) {
   // Safety guard to ensure items is always an array
   const safeItems = Array.isArray(items) ? items : [];
-  
+
   // Sort items by order field if it exists, otherwise maintain current order
   const sortedItems = [...safeItems].sort((a, b) => {
     if (a.order !== undefined && b.order !== undefined) {
@@ -40,21 +42,26 @@ export default function NotesManager({
   const [isAdding, setIsAdding] = useState(false);
   const [newItem, setNewItem] = useState({ title: '', content: '' });
   const [viewMode, setViewMode] = useState<'read' | 'edit'>('read');
-  const [selectedNote, setSelectedNote] = useState<RichTextContent | null>(null);
+  const [selectedNote, setSelectedNote] = useState<RichTextContent | null>(
+    null
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const handleAdd = () => {
     if (newItem.title.trim()) {
       onAdd({
         title: newItem.title.trim(),
         content: newItem.content,
-        category: 'note'
+        category: 'note',
       });
       setNewItem({ title: '', content: '' });
       setIsAdding(false);
     }
   };
 
-  const handleUpdate = (id: string, updates: { title?: string; content?: string }) => {
+  const handleUpdate = (
+    id: string,
+    updates: { title?: string; content?: string }
+  ) => {
     onUpdate(id, updates);
     setEditingId(null);
   };
@@ -84,21 +91,21 @@ export default function NotesManager({
     }
   };
 
-
-
   return (
-    <div className={`bg-white rounded-lg shadow-lg border border-blue-200 p-6 ${className}`}>
-      <div className="flex items-center justify-between mb-6">
+    <div
+      className={`rounded-lg border border-blue-200 bg-white p-6 shadow-lg ${className}`}
+    >
+      <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <h2 className="text-xl font-bold text-blue-800 border-b border-gray-200 pb-2">
+          <h2 className="border-b border-gray-200 pb-2 text-xl font-bold text-blue-800">
             Session Notes
           </h2>
-          <div className="flex items-center bg-blue-50 rounded-lg p-1 border border-blue-200">
+          <div className="flex items-center rounded-lg border border-blue-200 bg-blue-50 p-1">
             <button
               onClick={() => setViewMode('read')}
-              className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm font-medium transition-all ${
-                viewMode === 'read' 
-                  ? 'bg-blue-600 text-white shadow-sm' 
+              className={`flex items-center space-x-1 rounded-md px-3 py-1 text-sm font-medium transition-all ${
+                viewMode === 'read'
+                  ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-blue-600 hover:bg-blue-100'
               }`}
             >
@@ -107,9 +114,9 @@ export default function NotesManager({
             </button>
             <button
               onClick={() => setViewMode('edit')}
-              className={`flex items-center space-x-1 px-3 py-1 rounded-md text-sm font-medium transition-all ${
-                viewMode === 'edit' 
-                  ? 'bg-blue-600 text-white shadow-sm' 
+              className={`flex items-center space-x-1 rounded-md px-3 py-1 text-sm font-medium transition-all ${
+                viewMode === 'edit'
+                  ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-blue-600 hover:bg-blue-100'
               }`}
             >
@@ -118,12 +125,12 @@ export default function NotesManager({
             </button>
           </div>
         </div>
-        
+
         {viewMode === 'edit' && (
           <button
             onClick={() => setIsAdding(true)}
             disabled={isAdding}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center space-x-2 rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus size={16} />
             <span>Add Note</span>
@@ -133,28 +140,30 @@ export default function NotesManager({
 
       {/* Add New Note Form */}
       {isAdding && viewMode === 'edit' && (
-        <div className="mb-6 p-6 border-2 bg-blue-50 border-blue-200 rounded-lg">
+        <div className="mb-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-6">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-blue-800 mb-2">
+              <label className="mb-2 block text-sm font-medium text-blue-800">
                 Note Title
               </label>
               <input
                 type="text"
                 value={newItem.title}
-                onChange={(e) => setNewItem({ ...newItem, title: e.target.value })}
+                onChange={e =>
+                  setNewItem({ ...newItem, title: e.target.value })
+                }
                 placeholder="Enter note title..."
-                className="w-full px-4 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800"
+                className="w-full rounded-md border border-blue-300 px-4 py-2 text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 autoFocus
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-blue-800 mb-2">
+              <label className="mb-2 block text-sm font-medium text-blue-800">
                 Note Content
               </label>
               <RichTextEditor
                 content={newItem.content}
-                onChange={(content) => setNewItem({ ...newItem, content })}
+                onChange={content => setNewItem({ ...newItem, content })}
                 placeholder="Write your note here..."
                 className="min-h-40"
               />
@@ -162,7 +171,7 @@ export default function NotesManager({
             <div className="flex justify-end space-x-3">
               <button
                 onClick={handleCancelAdd}
-                className="flex items-center space-x-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                className="flex items-center space-x-1 rounded-md border border-gray-300 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-50"
               >
                 <X size={16} />
                 <span>Cancel</span>
@@ -170,7 +179,7 @@ export default function NotesManager({
               <button
                 onClick={handleAdd}
                 disabled={!newItem.title.trim()}
-                className="flex items-center space-x-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center space-x-1 rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Save size={16} />
                 <span>Save Note</span>
@@ -183,55 +192,56 @@ export default function NotesManager({
       {/* Notes List */}
       <div className="space-y-6">
         {sortedItems.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <BookOpen className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <p className="text-lg font-medium mb-2">No notes yet</p>
+          <div className="py-12 text-center text-gray-500">
+            <BookOpen className="mx-auto mb-4 h-12 w-12 text-gray-400" />
+            <p className="mb-2 text-lg font-medium">No notes yet</p>
             <p className="text-sm">
-              {viewMode === 'edit' 
+              {viewMode === 'edit'
                 ? "Click 'Add Note' to start taking notes about your adventures."
-                : "Switch to Edit mode to start adding notes."
-              }
+                : 'Switch to Edit mode to start adding notes.'}
             </p>
           </div>
         ) : (
           <DragDropList
             items={sortedItems}
             onReorder={handleReorder}
-            keyExtractor={(item) => item.id}
+            keyExtractor={item => item.id}
             disabled={viewMode !== 'edit' || !onReorder}
             className="space-y-6"
             itemClassName="border border-blue-100 rounded-lg p-6 bg-gradient-to-r from-blue-25 to-indigo-25 hover:shadow-md transition-all cursor-pointer hover:shadow-lg hover:border-blue-200"
             showDragHandle={viewMode === 'edit' && Boolean(onReorder)}
             dragHandlePosition="left"
-            renderItem={(item) => (
+            renderItem={item => (
               <>
                 {editingId === item.id && viewMode === 'edit' ? (
                   // Edit mode for individual note
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-blue-800 mb-2">
+                      <label className="mb-2 block text-sm font-medium text-blue-800">
                         Note Title
                       </label>
                       <input
                         type="text"
                         defaultValue={item.title}
-                        onChange={(e) => {
+                        onChange={e => {
                           const newTitle = e.target.value;
                           // We'll save on blur or when save is clicked
                           e.target.setAttribute('data-title', newTitle);
                         }}
-                        className="w-full px-4 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800"
+                        className="w-full rounded-md border border-blue-300 px-4 py-2 text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-blue-800 mb-2">
+                      <label className="mb-2 block text-sm font-medium text-blue-800">
                         Note Content
                       </label>
                       <RichTextEditor
                         content={item.content}
-                        onChange={(content) => {
+                        onChange={content => {
                           // Store the content for saving later
-                          document.querySelector(`[data-editing="${item.id}"]`)?.setAttribute('data-content', content);
+                          document
+                            .querySelector(`[data-editing="${item.id}"]`)
+                            ?.setAttribute('data-content', content);
                         }}
                         className="min-h-40"
                       />
@@ -239,24 +249,33 @@ export default function NotesManager({
                     <div className="flex justify-end space-x-3">
                       <button
                         onClick={handleCancelEdit}
-                        className="flex items-center space-x-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                        className="flex items-center space-x-1 rounded-md border border-gray-300 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-50"
                       >
                         <X size={16} />
                         <span>Cancel</span>
                       </button>
                       <button
                         onClick={() => {
-                          const container = document.querySelector(`[data-editing="${item.id}"]`);
-                          const titleInput = container?.querySelector('input[data-title]') as HTMLInputElement;
-                          const newTitle = titleInput?.getAttribute('data-title') || titleInput?.value || item.title;
-                          const newContent = container?.getAttribute('data-content') || item.content;
-                          
+                          const container = document.querySelector(
+                            `[data-editing="${item.id}"]`
+                          );
+                          const titleInput = container?.querySelector(
+                            'input[data-title]'
+                          ) as HTMLInputElement;
+                          const newTitle =
+                            titleInput?.getAttribute('data-title') ||
+                            titleInput?.value ||
+                            item.title;
+                          const newContent =
+                            container?.getAttribute('data-content') ||
+                            item.content;
+
                           handleUpdate(item.id, {
                             title: newTitle,
-                            content: newContent
+                            content: newContent,
                           });
                         }}
-                        className="flex items-center space-x-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+                        className="flex items-center space-x-1 rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
                       >
                         <Save size={16} />
                         <span>Save</span>
@@ -265,31 +284,34 @@ export default function NotesManager({
                   </div>
                 ) : (
                   // Display mode
-                  <div data-editing={item.id} onClick={() => handleNoteClick(item)}>
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3 flex-1">
-                        <h3 className="text-xl font-semibold text-blue-900 flex-1">
+                  <div
+                    data-editing={item.id}
+                    onClick={() => handleNoteClick(item)}
+                  >
+                    <div className="mb-4 flex items-start justify-between">
+                      <div className="flex flex-1 items-center gap-3">
+                        <h3 className="flex-1 text-xl font-semibold text-blue-900">
                           {item.title}
                         </h3>
                       </div>
                       {viewMode === 'edit' && (
-                        <div className="flex items-center space-x-2 ml-4">
+                        <div className="ml-4 flex items-center space-x-2">
                           <button
-                            onClick={(e) => {
+                            onClick={e => {
                               e.stopPropagation();
                               setEditingId(item.id);
                             }}
-                            className="p-2 text-blue-600 hover:bg-blue-100 rounded-md transition-colors"
+                            className="rounded-md p-2 text-blue-600 transition-colors hover:bg-blue-100"
                             title="Edit note"
                           >
                             <Edit3 size={16} />
                           </button>
                           <button
-                            onClick={(e) => {
+                            onClick={e => {
                               e.stopPropagation();
                               onDelete(item.id);
                             }}
-                            className="p-2 text-red-600 hover:bg-red-100 rounded-md transition-colors"
+                            className="rounded-md p-2 text-red-600 transition-colors hover:bg-red-100"
                             title="Delete note"
                           >
                             <Trash2 size={16} />
@@ -297,7 +319,7 @@ export default function NotesManager({
                         </div>
                       )}
                     </div>
-                    
+
                     <div className="mt-4">
                       {item.content ? (
                         <div className="relative">
@@ -305,26 +327,32 @@ export default function NotesManager({
                             <RichTextRenderer content={item.content} />
                           </div>
                           {item.content.length > 200 && (
-                            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-blue-25 to-transparent"></div>
+                            <div className="from-blue-25 absolute right-0 bottom-0 left-0 h-8 bg-gradient-to-t to-transparent"></div>
                           )}
                         </div>
                       ) : (
-                        <p className="text-gray-500 italic">No content yet...</p>
+                        <p className="text-gray-500 italic">
+                          No content yet...
+                        </p>
                       )}
-                      
+
                       {viewMode === 'read' && (
-                        <div className="mt-4 pt-3 border-t border-blue-100">
-                          <p className="text-sm text-blue-600 font-medium">
-                            {item.content && item.content.length > 200 ? 'Click to read full note →' : 'Click to view or edit in detail →'}
+                        <div className="mt-4 border-t border-blue-100 pt-3">
+                          <p className="text-sm font-medium text-blue-600">
+                            {item.content && item.content.length > 200
+                              ? 'Click to read full note →'
+                              : 'Click to view or edit in detail →'}
                           </p>
                         </div>
                       )}
                     </div>
-                    
+
                     {item.updatedAt && (
-                      <div className="mt-6 pt-4 border-t border-blue-200">
+                      <div className="mt-6 border-t border-blue-200 pt-4">
                         <p className="text-sm text-blue-600">
-                          Last updated: {new Date(item.updatedAt).toLocaleDateString()} at {new Date(item.updatedAt).toLocaleTimeString()}
+                          Last updated:{' '}
+                          {new Date(item.updatedAt).toLocaleDateString()} at{' '}
+                          {new Date(item.updatedAt).toLocaleTimeString()}
                         </p>
                       </div>
                     )}
@@ -346,4 +374,4 @@ export default function NotesManager({
       />
     </div>
   );
-} 
+}

@@ -27,8 +27,8 @@ export default function NewCampaignPage() {
       canvasTheme: 'light' as const,
       autoBackup: true,
       backupInterval: 5,
-      maxBackups: 10
-    }
+      maxBackups: 10,
+    },
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,9 +52,9 @@ export default function NewCampaignPage() {
         sessions: [],
         encounters: [],
         notes: [],
-        isArchived: false
+        isArchived: false,
       });
-      
+
       // Navigate to the new campaign page
       router.push(`/dm/campaigns/${campaignId}`);
     } catch (error) {
@@ -65,20 +65,23 @@ export default function NewCampaignPage() {
     }
   };
 
-  const handleInputChange = (field: string, value: string | boolean | number) => {
+  const handleInputChange = (
+    field: string,
+    value: string | boolean | number
+  ) => {
     if (field.startsWith('settings.')) {
       const settingField = field.replace('settings.', '');
       setFormData(prev => ({
         ...prev,
         settings: {
           ...prev.settings,
-          [settingField]: value
-        }
+          [settingField]: value,
+        },
       }));
     } else {
       setFormData(prev => ({
         ...prev,
-        [field]: value
+        [field]: value,
       }));
     }
   };
@@ -86,10 +89,10 @@ export default function NewCampaignPage() {
   return (
     <div className="new-campaign-page">
       {/* Page Header */}
-      <div className="flex items-center gap-4 mb-8">
+      <div className="mb-8 flex items-center gap-4">
         <Link
           href="/dm/campaigns"
-          className="flex items-center gap-2 text-slate-600 hover:text-slate-800 transition-colors"
+          className="flex items-center gap-2 text-slate-600 transition-colors hover:text-slate-800"
         >
           <ArrowLeft size={20} />
           Back to Campaigns
@@ -106,17 +109,20 @@ export default function NewCampaignPage() {
 
       {/* Campaign Form */}
       <form onSubmit={handleSubmit} className="max-w-4xl">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           {/* Basic Information */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-lg p-6 shadow-md">
-              <h2 className="text-xl font-semibold text-slate-800 mb-4">
+          <div className="space-y-6 lg:col-span-2">
+            <div className="rounded-lg bg-white p-6 shadow-md">
+              <h2 className="mb-4 text-xl font-semibold text-slate-800">
                 Basic Information
               </h2>
-              
+
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-2">
+                  <label
+                    htmlFor="name"
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
                     Campaign Name *
                   </label>
                   <input
@@ -124,22 +130,27 @@ export default function NewCampaignPage() {
                     id="name"
                     required
                     value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    onChange={e => handleInputChange('name', e.target.value)}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500 focus:outline-none"
                     placeholder="The Lost Mine of Phandelver"
                   />
                 </div>
-                
+
                 <div>
-                  <label htmlFor="description" className="block text-sm font-medium text-slate-700 mb-2">
+                  <label
+                    htmlFor="description"
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
                     Description
                   </label>
                   <textarea
                     id="description"
                     rows={4}
                     value={formData.description}
-                    onChange={(e) => handleInputChange('description', e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    onChange={e =>
+                      handleInputChange('description', e.target.value)
+                    }
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500 focus:outline-none"
                     placeholder="A brief description of your campaign..."
                   />
                 </div>
@@ -147,47 +158,71 @@ export default function NewCampaignPage() {
             </div>
 
             {/* Rule Settings */}
-            <div className="bg-white rounded-lg p-6 shadow-md">
-              <h2 className="text-xl font-semibold text-slate-800 mb-4">
+            <div className="rounded-lg bg-white p-6 shadow-md">
+              <h2 className="mb-4 text-xl font-semibold text-slate-800">
                 Rule Settings
               </h2>
-              
+
               <div className="space-y-4">
                 <div className="flex items-center">
                   <input
                     type="checkbox"
                     id="useVariantRules"
                     checked={formData.settings.useVariantRules}
-                    onChange={(e) => handleInputChange('settings.useVariantRules', e.target.checked)}
-                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-slate-300 rounded"
+                    onChange={e =>
+                      handleInputChange(
+                        'settings.useVariantRules',
+                        e.target.checked
+                      )
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
                   />
-                  <label htmlFor="useVariantRules" className="ml-2 text-sm text-slate-700">
+                  <label
+                    htmlFor="useVariantRules"
+                    className="ml-2 text-sm text-slate-700"
+                  >
                     Use variant rules (flanking, etc.)
                   </label>
                 </div>
-                
+
                 <div className="flex items-center">
                   <input
                     type="checkbox"
                     id="allowMulticlassing"
                     checked={formData.settings.allowMulticlassing}
-                    onChange={(e) => handleInputChange('settings.allowMulticlassing', e.target.checked)}
-                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-slate-300 rounded"
+                    onChange={e =>
+                      handleInputChange(
+                        'settings.allowMulticlassing',
+                        e.target.checked
+                      )
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
                   />
-                  <label htmlFor="allowMulticlassing" className="ml-2 text-sm text-slate-700">
+                  <label
+                    htmlFor="allowMulticlassing"
+                    className="ml-2 text-sm text-slate-700"
+                  >
                     Allow multiclassing
                   </label>
                 </div>
-                
+
                 <div className="flex items-center">
                   <input
                     type="checkbox"
                     id="useOptionalFeats"
                     checked={formData.settings.useOptionalFeats}
-                    onChange={(e) => handleInputChange('settings.useOptionalFeats', e.target.checked)}
-                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-slate-300 rounded"
+                    onChange={e =>
+                      handleInputChange(
+                        'settings.useOptionalFeats',
+                        e.target.checked
+                      )
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
                   />
-                  <label htmlFor="useOptionalFeats" className="ml-2 text-sm text-slate-700">
+                  <label
+                    htmlFor="useOptionalFeats"
+                    className="ml-2 text-sm text-slate-700"
+                  >
                     Use optional feats
                   </label>
                 </div>
@@ -197,50 +232,74 @@ export default function NewCampaignPage() {
 
           {/* Combat Settings */}
           <div className="space-y-6">
-            <div className="bg-white rounded-lg p-6 shadow-md">
-              <h2 className="text-xl font-semibold text-slate-800 mb-4">
+            <div className="rounded-lg bg-white p-6 shadow-md">
+              <h2 className="mb-4 text-xl font-semibold text-slate-800">
                 Combat Settings
               </h2>
-              
+
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="initiativeType" className="block text-sm font-medium text-slate-700 mb-2">
+                  <label
+                    htmlFor="initiativeType"
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
                     Initiative Type
                   </label>
                   <select
                     id="initiativeType"
                     value={formData.settings.initiativeType}
-                    onChange={(e) => handleInputChange('settings.initiativeType', e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    onChange={e =>
+                      handleInputChange(
+                        'settings.initiativeType',
+                        e.target.value
+                      )
+                    }
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500 focus:outline-none"
                   >
                     <option value="individual">Individual</option>
                     <option value="group">Group</option>
                     <option value="side">Side-based</option>
                   </select>
                 </div>
-                
+
                 <div className="flex items-center">
                   <input
                     type="checkbox"
                     id="trackResources"
                     checked={formData.settings.trackResources}
-                    onChange={(e) => handleInputChange('settings.trackResources', e.target.checked)}
-                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-slate-300 rounded"
+                    onChange={e =>
+                      handleInputChange(
+                        'settings.trackResources',
+                        e.target.checked
+                      )
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
                   />
-                  <label htmlFor="trackResources" className="ml-2 text-sm text-slate-700">
+                  <label
+                    htmlFor="trackResources"
+                    className="ml-2 text-sm text-slate-700"
+                  >
                     Track spell slots and abilities
                   </label>
                 </div>
-                
+
                 <div className="flex items-center">
                   <input
                     type="checkbox"
                     id="showPlayerHP"
                     checked={formData.settings.showPlayerHP}
-                    onChange={(e) => handleInputChange('settings.showPlayerHP', e.target.checked)}
-                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-slate-300 rounded"
+                    onChange={e =>
+                      handleInputChange(
+                        'settings.showPlayerHP',
+                        e.target.checked
+                      )
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
                   />
-                  <label htmlFor="showPlayerHP" className="ml-2 text-sm text-slate-700">
+                  <label
+                    htmlFor="showPlayerHP"
+                    className="ml-2 text-sm text-slate-700"
+                  >
                     Show player HP to other players
                   </label>
                 </div>
@@ -248,27 +307,38 @@ export default function NewCampaignPage() {
             </div>
 
             {/* Canvas Settings */}
-            <div className="bg-white rounded-lg p-6 shadow-md">
-              <h2 className="text-xl font-semibold text-slate-800 mb-4">
+            <div className="rounded-lg bg-white p-6 shadow-md">
+              <h2 className="mb-4 text-xl font-semibold text-slate-800">
                 Canvas Settings
               </h2>
-              
+
               <div className="space-y-4">
                 <div className="flex items-center">
                   <input
                     type="checkbox"
                     id="showGridOnCanvas"
                     checked={formData.settings.showGridOnCanvas}
-                    onChange={(e) => handleInputChange('settings.showGridOnCanvas', e.target.checked)}
-                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-slate-300 rounded"
+                    onChange={e =>
+                      handleInputChange(
+                        'settings.showGridOnCanvas',
+                        e.target.checked
+                      )
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
                   />
-                  <label htmlFor="showGridOnCanvas" className="ml-2 text-sm text-slate-700">
+                  <label
+                    htmlFor="showGridOnCanvas"
+                    className="ml-2 text-sm text-slate-700"
+                  >
                     Show grid on combat canvas
                   </label>
                 </div>
-                
+
                 <div>
-                  <label htmlFor="defaultGridSize" className="block text-sm font-medium text-slate-700 mb-2">
+                  <label
+                    htmlFor="defaultGridSize"
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
                     Default Grid Size (feet)
                   </label>
                   <input
@@ -277,8 +347,13 @@ export default function NewCampaignPage() {
                     min="1"
                     max="10"
                     value={formData.settings.defaultGridSize}
-                    onChange={(e) => handleInputChange('settings.defaultGridSize', parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    onChange={e =>
+                      handleInputChange(
+                        'settings.defaultGridSize',
+                        parseInt(e.target.value)
+                      )
+                    }
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-purple-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -287,17 +362,17 @@ export default function NewCampaignPage() {
         </div>
 
         {/* Form Actions */}
-        <div className="flex items-center justify-end gap-4 mt-8 pt-6 border-t border-slate-200">
+        <div className="mt-8 flex items-center justify-end gap-4 border-t border-slate-200 pt-6">
           <Link
             href="/dm/campaigns"
-            className="px-6 py-2 text-slate-600 hover:text-slate-800 transition-colors"
+            className="px-6 py-2 text-slate-600 transition-colors hover:text-slate-800"
           >
             Cancel
           </Link>
           <button
             type="submit"
             disabled={isLoading || !formData.name.trim()}
-            className="flex items-center gap-2 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 rounded-lg bg-purple-600 px-6 py-2 text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Save size={16} />
             {isLoading ? 'Creating...' : 'Create Campaign'}

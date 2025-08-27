@@ -5,19 +5,19 @@ import { useCharacterStore } from '@/store/characterStore';
 import { InventoryManager as SharedInventoryManager } from '@/components/shared/character';
 
 export default function InventoryManager() {
-  const { 
-    character, 
-    addInventoryItem, 
-    updateInventoryItem, 
-    deleteInventoryItem, 
+  const {
+    character,
+    addInventoryItem,
+    updateInventoryItem,
+    deleteInventoryItem,
     updateItemQuantity,
-    reorderInventoryItems
+    reorderInventoryItems,
   } = useCharacterStore();
   return (
     <div className="space-y-6">
       <SharedInventoryManager
         items={character.inventoryItems}
-        onAddItem={(item) => addInventoryItem(item)}
+        onAddItem={item => addInventoryItem(item)}
         onUpdateItem={updateInventoryItem}
         onDeleteItem={deleteInventoryItem}
         onQuantityChange={updateItemQuantity}
@@ -31,4 +31,3 @@ export default function InventoryManager() {
     </div>
   );
 }
-

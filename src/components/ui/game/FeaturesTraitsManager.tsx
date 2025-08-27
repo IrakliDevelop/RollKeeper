@@ -8,7 +8,9 @@ import { RichTextEditor } from '@/components/ui/forms';
 interface FeaturesTraitsManagerProps {
   items: RichTextContent[];
   category: 'feature' | 'trait' | 'note';
-  onAdd: (item: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onAdd: (
+    item: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
   onUpdate: (id: string, updates: Partial<RichTextContent>) => void;
   onDelete: (id: string) => void;
   className?: string;
@@ -20,7 +22,7 @@ export default function FeaturesTraitsManager({
   onAdd,
   onUpdate,
   onDelete,
-  className = ''
+  className = '',
 }: FeaturesTraitsManagerProps) {
   // Safety guard to ensure items is always an array
   const safeItems = Array.isArray(items) ? items : [];
@@ -28,52 +30,61 @@ export default function FeaturesTraitsManager({
   const [isAdding, setIsAdding] = useState(false);
   const [newItem, setNewItem] = useState({ title: '', content: '' });
 
-  const categoryName = category === 'feature' ? 'Features' : category === 'trait' ? 'Traits' : 'Notes';
-  
+  const categoryName =
+    category === 'feature'
+      ? 'Features'
+      : category === 'trait'
+        ? 'Traits'
+        : 'Notes';
+
   // Define concrete styles to avoid Tailwind CSS purging issues
-  const styles = category === 'feature' 
-    ? {
-        containerBorder: 'border-amber-200',
-        headerText: 'text-amber-800',
-        addButton: 'bg-amber-600 hover:bg-amber-700',
-        formContainer: 'bg-amber-50 border-amber-200',
-        saveButton: 'bg-amber-600 hover:bg-amber-700',
-        itemBorder: 'border-amber-200',
-        itemTitle: 'text-amber-900'
-      }
-    : category === 'trait'
-    ? {
-        containerBorder: 'border-emerald-200',
-        headerText: 'text-emerald-800', 
-        addButton: 'bg-emerald-600 hover:bg-emerald-700',
-        formContainer: 'bg-emerald-50 border-emerald-200',
-        saveButton: 'bg-emerald-600 hover:bg-emerald-700',
-        itemBorder: 'border-emerald-200',
-        itemTitle: 'text-emerald-900'
-      }
-    : {
-        containerBorder: 'border-blue-200',
-        headerText: 'text-blue-800', 
-        addButton: 'bg-blue-600 hover:bg-blue-700',
-        formContainer: 'bg-blue-50 border-blue-200',
-        saveButton: 'bg-blue-600 hover:bg-blue-700',
-        itemBorder: 'border-blue-200',
-        itemTitle: 'text-blue-900'
-      };
+  const styles =
+    category === 'feature'
+      ? {
+          containerBorder: 'border-amber-200',
+          headerText: 'text-amber-800',
+          addButton: 'bg-amber-600 hover:bg-amber-700',
+          formContainer: 'bg-amber-50 border-amber-200',
+          saveButton: 'bg-amber-600 hover:bg-amber-700',
+          itemBorder: 'border-amber-200',
+          itemTitle: 'text-amber-900',
+        }
+      : category === 'trait'
+        ? {
+            containerBorder: 'border-emerald-200',
+            headerText: 'text-emerald-800',
+            addButton: 'bg-emerald-600 hover:bg-emerald-700',
+            formContainer: 'bg-emerald-50 border-emerald-200',
+            saveButton: 'bg-emerald-600 hover:bg-emerald-700',
+            itemBorder: 'border-emerald-200',
+            itemTitle: 'text-emerald-900',
+          }
+        : {
+            containerBorder: 'border-blue-200',
+            headerText: 'text-blue-800',
+            addButton: 'bg-blue-600 hover:bg-blue-700',
+            formContainer: 'bg-blue-50 border-blue-200',
+            saveButton: 'bg-blue-600 hover:bg-blue-700',
+            itemBorder: 'border-blue-200',
+            itemTitle: 'text-blue-900',
+          };
 
   const handleAdd = () => {
     if (newItem.title.trim()) {
       onAdd({
         title: newItem.title.trim(),
         content: newItem.content,
-        category
+        category,
       });
       setNewItem({ title: '', content: '' });
       setIsAdding(false);
     }
   };
 
-  const handleUpdate = (id: string, updates: { title?: string; content?: string }) => {
+  const handleUpdate = (
+    id: string,
+    updates: { title?: string; content?: string }
+  ) => {
     onUpdate(id, updates);
     setEditingId(null);
   };
@@ -88,45 +99,63 @@ export default function FeaturesTraitsManager({
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-lg border ${styles.containerBorder} p-6 ${className}`}>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className={`text-lg font-bold ${styles.headerText} border-b border-gray-200 pb-2`}>
+    <div
+      className={`rounded-lg border bg-white shadow-lg ${styles.containerBorder} p-6 ${className}`}
+    >
+      <div className="mb-4 flex items-center justify-between">
+        <h2
+          className={`text-lg font-bold ${styles.headerText} border-b border-gray-200 pb-2`}
+        >
           {categoryName}
         </h2>
         <button
           onClick={() => setIsAdding(true)}
           disabled={isAdding}
-          className={`flex items-center space-x-1 px-3 py-1 ${styles.addButton} text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm`}
+          className={`flex items-center space-x-1 px-3 py-1 ${styles.addButton} rounded-md text-sm text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50`}
         >
           <Plus size={14} />
-          <span>Add {category === 'feature' ? 'Feature' : category === 'trait' ? 'Trait' : 'Note'}</span>
+          <span>
+            Add{' '}
+            {category === 'feature'
+              ? 'Feature'
+              : category === 'trait'
+                ? 'Trait'
+                : 'Note'}
+          </span>
         </button>
       </div>
 
       {/* Add New Item Form */}
       {isAdding && (
-        <div className={`mb-4 p-4 border-2 ${styles.formContainer} rounded-lg`}>
+        <div className={`mb-4 border-2 p-4 ${styles.formContainer} rounded-lg`}>
           <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {category === 'feature' ? 'Feature' : category === 'trait' ? 'Trait' : 'Note'} Name
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                {category === 'feature'
+                  ? 'Feature'
+                  : category === 'trait'
+                    ? 'Trait'
+                    : 'Note'}{' '}
+                Name
               </label>
               <input
                 type="text"
                 value={newItem.title}
-                onChange={(e) => setNewItem({ ...newItem, title: e.target.value })}
+                onChange={e =>
+                  setNewItem({ ...newItem, title: e.target.value })
+                }
                 placeholder={`Enter ${category} name...`}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-800"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-800 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
                 autoFocus
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Description
               </label>
               <RichTextEditor
                 content={newItem.content}
-                onChange={(content) => setNewItem({ ...newItem, content })}
+                onChange={content => setNewItem({ ...newItem, content })}
                 placeholder={`Describe this ${category}...`}
                 minHeight="100px"
               />
@@ -135,14 +164,14 @@ export default function FeaturesTraitsManager({
               <button
                 onClick={handleAdd}
                 disabled={!newItem.title.trim()}
-                className={`flex items-center space-x-1 px-3 py-2 ${styles.saveButton} text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm`}
+                className={`flex items-center space-x-1 px-3 py-2 ${styles.saveButton} rounded-md text-sm text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 <Save size={14} />
                 <span>Save</span>
               </button>
               <button
                 onClick={handleCancelAdd}
-                className="flex items-center space-x-1 px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors text-sm"
+                className="flex items-center space-x-1 rounded-md bg-gray-500 px-3 py-2 text-sm text-white transition-colors hover:bg-gray-600"
               >
                 <X size={14} />
                 <span>Cancel</span>
@@ -155,20 +184,39 @@ export default function FeaturesTraitsManager({
       {/* Items List */}
       <div className="space-y-3">
         {safeItems.length === 0 && !isAdding && (
-          <div className="text-center py-8 text-gray-500">
-            <p>No {category === 'feature' ? 'features' : category === 'trait' ? 'traits' : 'notes'} added yet.</p>
-            <p className="text-sm mt-1">Click &quot;Add {category === 'feature' ? 'Feature' : category === 'trait' ? 'Trait' : 'Note'}&quot; to get started.</p>
+          <div className="py-8 text-center text-gray-500">
+            <p>
+              No{' '}
+              {category === 'feature'
+                ? 'features'
+                : category === 'trait'
+                  ? 'traits'
+                  : 'notes'}{' '}
+              added yet.
+            </p>
+            <p className="mt-1 text-sm">
+              Click &quot;Add{' '}
+              {category === 'feature'
+                ? 'Feature'
+                : category === 'trait'
+                  ? 'Trait'
+                  : 'Note'}
+              &quot; to get started.
+            </p>
           </div>
         )}
 
-        {safeItems.map((item) => (
-          <div key={item.id} className={`border ${styles.itemBorder} rounded-lg p-4 hover:shadow-sm transition-shadow`}>
+        {safeItems.map(item => (
+          <div
+            key={item.id}
+            className={`border ${styles.itemBorder} rounded-lg p-4 transition-shadow hover:shadow-sm`}
+          >
             {editingId === item.id ? (
               <EditItemForm
                 item={item}
                 category={category}
                 styles={styles}
-                onSave={(updates) => handleUpdate(item.id, updates)}
+                onSave={updates => handleUpdate(item.id, updates)}
                 onCancel={handleCancelEdit}
               />
             ) : (
@@ -204,7 +252,13 @@ interface EditItemFormProps {
   onCancel: () => void;
 }
 
-function EditItemForm({ item, category, styles, onSave, onCancel }: EditItemFormProps) {
+function EditItemForm({
+  item,
+  category,
+  styles,
+  onSave,
+  onCancel,
+}: EditItemFormProps) {
   const [title, setTitle] = useState(item.title);
   const [content, setContent] = useState(item.content);
 
@@ -217,18 +271,23 @@ function EditItemForm({ item, category, styles, onSave, onCancel }: EditItemForm
   return (
     <div className="space-y-3">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          {category === 'feature' ? 'Feature' : category === 'trait' ? 'Trait' : 'Note'} Name
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          {category === 'feature'
+            ? 'Feature'
+            : category === 'trait'
+              ? 'Trait'
+              : 'Note'}{' '}
+          Name
         </label>
         <input
           type="text"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-800"
+          onChange={e => setTitle(e.target.value)}
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-800 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="mb-1 block text-sm font-medium text-gray-700">
           Description
         </label>
         <RichTextEditor
@@ -241,14 +300,14 @@ function EditItemForm({ item, category, styles, onSave, onCancel }: EditItemForm
         <button
           onClick={handleSave}
           disabled={!title.trim()}
-          className={`flex items-center space-x-1 px-3 py-2 ${styles.saveButton} text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm`}
+          className={`flex items-center space-x-1 px-3 py-2 ${styles.saveButton} rounded-md text-sm text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50`}
         >
           <Save size={14} />
           <span>Save</span>
         </button>
         <button
           onClick={onCancel}
-          className="flex items-center space-x-1 px-3 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors text-sm"
+          className="flex items-center space-x-1 rounded-md bg-gray-500 px-3 py-2 text-sm text-white transition-colors hover:bg-gray-600"
         >
           <X size={14} />
           <span>Cancel</span>
@@ -268,30 +327,34 @@ interface ViewItemProps {
 function ViewItem({ item, styles, onEdit, onDelete }: ViewItemProps) {
   return (
     <>
-      <div className="flex items-start justify-between mb-2">
+      <div className="mb-2 flex items-start justify-between">
         <h3 className={`font-semibold ${styles.itemTitle}`}>{item.title}</h3>
         <div className="flex items-center space-x-1">
           <button
             onClick={onEdit}
-            className="p-1 text-gray-500 hover:text-blue-600 transition-colors"
+            className="p-1 text-gray-500 transition-colors hover:text-blue-600"
             title="Edit"
           >
             <Edit3 size={14} />
           </button>
           <button
             onClick={onDelete}
-            className="p-1 text-gray-500 hover:text-red-600 transition-colors"
+            className="p-1 text-gray-500 transition-colors hover:text-red-600"
             title="Delete"
           >
             <Trash2 size={14} />
           </button>
         </div>
       </div>
-      <div 
-        className="text-sm text-gray-700 rich-content"
-        dangerouslySetInnerHTML={{ __html: item.content || '<p class="text-gray-500 italic">No description provided.</p>' }}
+      <div
+        className="rich-content text-sm text-gray-700"
+        dangerouslySetInnerHTML={{
+          __html:
+            item.content ||
+            '<p class="text-gray-500 italic">No description provided.</p>',
+        }}
       />
-      
+
       {/* Inline styles for proper rendering of rich content */}
       <style jsx>{`
         .rich-content :global(h1) {
@@ -335,4 +398,4 @@ function ViewItem({ item, styles, onEdit, onDelete }: ViewItemProps) {
       `}</style>
     </>
   );
-} 
+}

@@ -11,7 +11,7 @@ import { FancySelect } from '@/components/ui/forms/FancySelect';
 export default function NewCharacterPage() {
   const router = useRouter();
   const { createCharacter } = usePlayerStore();
-  
+
   const [characterName, setCharacterName] = useState('');
   const [selectedRace, setSelectedRace] = useState('Human');
   const [selectedClass, setSelectedClass] = useState('Fighter');
@@ -38,18 +38,21 @@ export default function NewCharacterPage() {
           name: selectedClass,
           hitDie: 'd8',
           primaryAbility: 'strength',
-          savingThrowProficiencies:  [],
+          savingThrowProficiencies: [],
           skillOptions: [],
           armorProficiencies: [],
           weaponProficiencies: [],
-          spellcasting: null
+          spellcasting: null,
         },
         playerName: playerName.trim() || 'Player',
-        level: 1
+        level: 1,
       };
 
-      const characterId = createCharacter(characterName.trim(), partialCharacterData);
-      
+      const characterId = createCharacter(
+        characterName.trim(),
+        partialCharacterData
+      );
+
       // Navigate to the new character sheet
       router.push(`/player/characters/${characterId}`);
     } catch (error) {
@@ -68,35 +71,46 @@ export default function NewCharacterPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+      <header className="border-b border-slate-200 bg-white shadow-sm">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
             <div className="flex items-center">
-              <Link href="/player" className="flex items-center gap-2 text-slate-600 hover:text-slate-800 transition-colors mr-6">
+              <Link
+                href="/player"
+                className="mr-6 flex items-center gap-2 text-slate-600 transition-colors hover:text-slate-800"
+              >
                 <ArrowLeft size={20} />
                 Back to Characters
               </Link>
-              <h1 className="text-xl font-bold text-slate-800">Create New Character</h1>
+              <h1 className="text-xl font-bold text-slate-800">
+                Create New Character
+              </h1>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-md p-8">
-          <div className="text-center mb-8">
-            <Dice6 className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">Create Your Character</h1>
+      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="rounded-lg bg-white p-8 shadow-md">
+          <div className="mb-8 text-center">
+            <Dice6 className="mx-auto mb-4 h-16 w-16 text-blue-600" />
+            <h1 className="mb-2 text-3xl font-bold text-slate-800">
+              Create Your Character
+            </h1>
             <p className="text-slate-600">
-              Fill in the basic information to get started. You can customize everything else in the character sheet.
+              Fill in the basic information to get started. You can customize
+              everything else in the character sheet.
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {/* Character Name */}
               <div className="md:col-span-2">
-                <label htmlFor="characterName" className="block text-sm font-medium text-slate-700 mb-2">
+                <label
+                  htmlFor="characterName"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
                   Character Name *
                 </label>
                 <input
@@ -104,15 +118,18 @@ export default function NewCharacterPage() {
                   id="characterName"
                   required
                   value={characterName}
-                  onChange={(e) => setCharacterName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onChange={e => setCharacterName(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   placeholder="e.g., Thorin Ironbeard"
                 />
               </div>
 
               {/* Race */}
               <div>
-                <label htmlFor="race" className="block text-sm font-medium text-slate-700 mb-2">
+                <label
+                  htmlFor="race"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
                   Race
                 </label>
                 <FancySelect
@@ -126,10 +143,12 @@ export default function NewCharacterPage() {
                     { value: 'Half-Elf', label: 'Half-Elf' },
                     { value: 'Half-Orc', label: 'Half-Orc' },
                     { value: 'Tiefling', label: 'Tiefling' },
-                    { value: 'Other', label: 'Other' }
+                    { value: 'Other', label: 'Other' },
                   ]}
                   value={selectedRace}
-                  onChange={(selectedValue) => setSelectedRace(selectedValue as string)}
+                  onChange={selectedValue =>
+                    setSelectedRace(selectedValue as string)
+                  }
                   placeholder="Select a race..."
                   color="blue"
                 />
@@ -137,52 +156,71 @@ export default function NewCharacterPage() {
 
               {/* Class */}
               <div>
-                <label htmlFor="class" className="block text-sm font-medium text-slate-700 mb-2">
+                <label
+                  htmlFor="class"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
                   Class
                 </label>
                 <FancySelect
-            options={[
-              { value: '', label: 'Select a class...' },
-              ...COMMON_CLASSES.map((classData) => ({
-                value: classData.name,
-                label: classData.name,
-                description: classData.spellcaster !== 'none' ? 
-                  `${classData.spellcaster === 'full' ? 'Full' : 
-                     classData.spellcaster === 'half' ? 'Half' : 
-                     classData.spellcaster === 'third' ? '1/3' : 
-                     'Pact'} Caster` : 'Non-spellcaster'
-              }))
-            ]}
-            value={selectedClass}
-            onChange={(selectedValue) => setSelectedClass(selectedValue as string)}
-            placeholder="Select a class..."
-            color="blue"
-          />
+                  options={[
+                    { value: '', label: 'Select a class...' },
+                    ...COMMON_CLASSES.map(classData => ({
+                      value: classData.name,
+                      label: classData.name,
+                      description:
+                        classData.spellcaster !== 'none'
+                          ? `${
+                              classData.spellcaster === 'full'
+                                ? 'Full'
+                                : classData.spellcaster === 'half'
+                                  ? 'Half'
+                                  : classData.spellcaster === 'third'
+                                    ? '1/3'
+                                    : 'Pact'
+                            } Caster`
+                          : 'Non-spellcaster',
+                    })),
+                  ]}
+                  value={selectedClass}
+                  onChange={selectedValue =>
+                    setSelectedClass(selectedValue as string)
+                  }
+                  placeholder="Select a class..."
+                  color="blue"
+                />
               </div>
 
               {/* Player Name */}
               <div className="md:col-span-2">
-                <label htmlFor="playerName" className="block text-sm font-medium text-slate-700 mb-2">
+                <label
+                  htmlFor="playerName"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
                   Player Name
                 </label>
                 <input
                   type="text"
                   id="playerName"
                   value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onChange={e => setPlayerName(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   placeholder="Your name"
                 />
               </div>
             </div>
 
             {/* Character Preview */}
-            <div className="bg-slate-50 rounded-lg p-6">
-              <h3 className="text-lg font-medium text-slate-800 mb-4">Character Preview</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="rounded-lg bg-slate-50 p-6">
+              <h3 className="mb-4 text-lg font-medium text-slate-800">
+                Character Preview
+              </h3>
+              <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
                 <div>
                   <span className="text-slate-500">Name:</span>
-                  <p className="font-medium text-slate-800">{characterName || 'Character Name'}</p>
+                  <p className="font-medium text-slate-800">
+                    {characterName || 'Character Name'}
+                  </p>
                 </div>
                 <div>
                   <span className="text-slate-500">Race:</span>
@@ -200,27 +238,27 @@ export default function NewCharacterPage() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center justify-between pt-6 border-t border-slate-200">
+            <div className="flex items-center justify-between border-t border-slate-200 pt-6">
               <button
                 type="button"
                 onClick={rollStats}
-                className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 text-slate-600 transition-colors hover:text-slate-800"
               >
                 <Dice6 size={16} />
                 Quick Roll Stats
               </button>
-              
+
               <div className="flex space-x-4">
                 <Link
                   href="/player"
-                  className="px-6 py-2 text-slate-600 hover:text-slate-800 transition-colors"
+                  className="px-6 py-2 text-slate-600 transition-colors hover:text-slate-800"
                 >
                   Cancel
                 </Link>
                 <button
                   type="submit"
                   disabled={isCreating || !characterName.trim()}
-                  className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Save size={16} />
                   {isCreating ? 'Creating...' : 'Create Character'}

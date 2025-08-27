@@ -60,86 +60,106 @@ export default function FeaturesNavigationSection() {
   const [isExpanded, setIsExpanded] = useState(true);
 
   return (
-    <section className="max-w-7xl mx-auto mb-8">
-      <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border-2 border-slate-300 shadow-lg backdrop-blur-sm relative overflow-hidden">
+    <section className="mx-auto mb-8 max-w-7xl">
+      <div className="relative overflow-hidden rounded-xl border-2 border-slate-300 bg-gradient-to-r from-slate-50 to-slate-100 shadow-lg backdrop-blur-sm">
         {/* Background decoration */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-slate-400/10 to-slate-500/10 rounded-full blur-2xl"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-slate-300/10 to-slate-400/10 rounded-full blur-xl"></div>
-        
+        <div className="absolute top-0 right-0 h-32 w-32 rounded-full bg-gradient-to-br from-slate-400/10 to-slate-500/10 blur-2xl"></div>
+        <div className="absolute bottom-0 left-0 h-24 w-24 rounded-full bg-gradient-to-tr from-slate-300/10 to-slate-400/10 blur-xl"></div>
+
         <div className="relative">
           {/* Collapsible Header */}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="w-full p-6 text-left hover:bg-slate-200/50 transition-colors rounded-t-xl"
+            className="w-full rounded-t-xl p-6 text-left transition-colors hover:bg-slate-200/50"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="bg-gradient-to-br from-slate-600 to-slate-700 p-2 rounded-lg shadow-md">
+                <div className="rounded-lg bg-gradient-to-br from-slate-600 to-slate-700 p-2 shadow-md">
                   <Book className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                  <h2 className="flex items-center gap-2 text-2xl font-bold text-slate-800">
                     🎯 D&D Resources & Tools
                   </h2>
                   {!isExpanded && (
-                    <p className="text-sm text-slate-600 mt-1">
+                    <p className="mt-1 text-sm text-slate-600">
                       Spellbook, Classes, and more D&D content...
                     </p>
                   )}
                 </div>
               </div>
-              <div className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
-                <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              <div
+                className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+              >
+                <svg
+                  className="h-5 w-5 text-slate-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
                 </svg>
               </div>
             </div>
           </button>
 
           {/* Expandable Content */}
-          <div className={`transition-all duration-300 ease-in-out ${
-            isExpanded 
-              ? 'max-h-96 opacity-100' 
-              : 'max-h-0 opacity-0 overflow-hidden'
-          }`}>
+          <div
+            className={`transition-all duration-300 ease-in-out ${
+              isExpanded
+                ? 'max-h-96 opacity-100'
+                : 'max-h-0 overflow-hidden opacity-0'
+            }`}
+          >
             <div className="px-6 pb-6">
               <div className="border-t border-slate-300/50 pt-6">
-                
                 {/* Description */}
-                <div className="text-center mb-6">
+                <div className="mb-6 text-center">
                   <p className="text-slate-600">
-                    Explore comprehensive D&D content and tools to enhance your gameplay
+                    Explore comprehensive D&D content and tools to enhance your
+                    gameplay
                   </p>
                 </div>
 
                 {/* Navigation Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {navigationItems.map((item) => {
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  {navigationItems.map(item => {
                     const IconComponent = item.icon;
-                    
+
                     if (!item.available) {
                       return (
                         <div
                           key={item.title}
-                          className="relative bg-white rounded-lg p-4 border-2 border-slate-200 shadow-sm opacity-60"
+                          className="relative rounded-lg border-2 border-slate-200 bg-white p-4 opacity-60 shadow-sm"
                         >
                           {/* Coming Soon Badge */}
                           {item.comingSoon && (
-                            <div className="absolute -top-2 -right-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-2 py-1 rounded-full text-xs font-bold shadow-md">
+                            <div className="absolute -top-2 -right-2 rounded-full bg-gradient-to-r from-yellow-400 to-orange-400 px-2 py-1 text-xs font-bold text-white shadow-md">
                               Soon
                             </div>
                           )}
-                          
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className={`bg-gradient-to-br ${item.gradient} p-2 rounded-lg shadow-md opacity-50`}>
+
+                          <div className="mb-3 flex items-center gap-3">
+                            <div
+                              className={`bg-gradient-to-br ${item.gradient} rounded-lg p-2 opacity-50 shadow-md`}
+                            >
                               <IconComponent className="h-5 w-5 text-white" />
                             </div>
-                            <h3 className="font-semibold text-slate-800">{item.title}</h3>
+                            <h3 className="font-semibold text-slate-800">
+                              {item.title}
+                            </h3>
                           </div>
-                          
-                          <p className="text-sm text-slate-500 mb-3">{item.description}</p>
-                          
-                          <div className="text-xs text-slate-400 font-medium">
+
+                          <p className="mb-3 text-sm text-slate-500">
+                            {item.description}
+                          </p>
+
+                          <div className="text-xs font-medium text-slate-400">
                             Coming Soon...
                           </div>
                         </div>
@@ -150,26 +170,28 @@ export default function FeaturesNavigationSection() {
                       <Link
                         key={item.title}
                         href={item.href}
-                        className="group relative bg-white rounded-lg p-4 border-2 border-slate-200 shadow-sm hover:shadow-lg transition-all hover:scale-105 hover:border-slate-300"
+                        className="group relative rounded-lg border-2 border-slate-200 bg-white p-4 shadow-sm transition-all hover:scale-105 hover:border-slate-300 hover:shadow-lg"
                       >
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className={`bg-gradient-to-br ${item.gradient} group-hover:bg-gradient-to-br group-hover:${item.hoverGradient} p-2 rounded-lg shadow-md transition-all`}>
+                        <div className="mb-3 flex items-center gap-3">
+                          <div
+                            className={`bg-gradient-to-br ${item.gradient} group-hover:bg-gradient-to-br group-hover:${item.hoverGradient} rounded-lg p-2 shadow-md transition-all`}
+                          >
                             <IconComponent className="h-5 w-5 text-white" />
                           </div>
-                          <h3 className="font-semibold text-slate-800 group-hover:text-slate-900 transition-colors">
+                          <h3 className="font-semibold text-slate-800 transition-colors group-hover:text-slate-900">
                             {item.title}
                           </h3>
                         </div>
-                        
-                        <p className="text-sm text-slate-600 group-hover:text-slate-700 transition-colors mb-3">
+
+                        <p className="mb-3 text-sm text-slate-600 transition-colors group-hover:text-slate-700">
                           {item.description}
                         </p>
-                        
+
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-slate-500 font-medium">
+                          <span className="text-xs font-medium text-slate-500">
                             Click to explore
                           </span>
-                          <div className="text-slate-400 group-hover:text-slate-600 transition-colors">
+                          <div className="text-slate-400 transition-colors group-hover:text-slate-600">
                             →
                           </div>
                         </div>
@@ -179,12 +201,12 @@ export default function FeaturesNavigationSection() {
                 </div>
 
                 {/* Bottom accent line */}
-                <div className="mt-6 pt-4 border-t border-slate-300">
+                <div className="mt-6 border-t border-slate-300 pt-4">
                   <p className="text-center text-xs text-slate-500">
-                    More tools and resources coming soon to enhance your D&D experience!
+                    More tools and resources coming soon to enhance your D&D
+                    experience!
                   </p>
                 </div>
-                
               </div>
             </div>
           </div>
@@ -192,4 +214,4 @@ export default function FeaturesNavigationSection() {
       </div>
     </section>
   );
-} 
+}

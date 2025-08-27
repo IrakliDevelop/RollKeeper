@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { 
-  Scroll, 
-  Filter, 
-  ChevronDown, 
+import {
+  Scroll,
+  Filter,
+  ChevronDown,
   ChevronRight,
   Trash2,
   Download,
@@ -13,7 +13,7 @@ import {
   Heart,
   Zap,
   Skull,
-  RotateCcw
+  RotateCcw,
 } from 'lucide-react';
 import { CombatLogEntry } from '@/types/combat';
 
@@ -26,7 +26,15 @@ interface CombatLogProps {
   className?: string;
 }
 
-type LogFilter = 'all' | 'damage' | 'healing' | 'death' | 'action' | 'initiative' | 'turn' | 'round';
+type LogFilter =
+  | 'all'
+  | 'damage'
+  | 'healing'
+  | 'death'
+  | 'action'
+  | 'initiative'
+  | 'turn'
+  | 'round';
 
 export function CombatLog({
   entries,
@@ -34,31 +42,38 @@ export function CombatLog({
   onClear,
   onExport,
   compact = false,
-  className = ''
+  className = '',
 }: CombatLogProps) {
   const [selectedFilter, setSelectedFilter] = useState<LogFilter>('all');
-  const [collapsedRounds, setCollapsedRounds] = useState<Set<number>>(new Set());
+  const [collapsedRounds, setCollapsedRounds] = useState<Set<number>>(
+    new Set()
+  );
   const [showFilters, setShowFilters] = useState(false);
 
   // Group entries by round
   const groupedEntries = useMemo(() => {
-    const filtered = selectedFilter === 'all' 
-      ? entries 
-      : entries.filter(entry => entry.type === selectedFilter);
-    
-    const grouped = filtered.reduce((acc, entry) => {
-      const round = entry.round;
-      if (!acc[round]) {
-        acc[round] = [];
-      }
-      acc[round].push(entry);
-      return acc;
-    }, {} as Record<number, CombatLogEntry[]>);
+    const filtered =
+      selectedFilter === 'all'
+        ? entries
+        : entries.filter(entry => entry.type === selectedFilter);
+
+    const grouped = filtered.reduce(
+      (acc, entry) => {
+        const round = entry.round;
+        if (!acc[round]) {
+          acc[round] = [];
+        }
+        acc[round].push(entry);
+        return acc;
+      },
+      {} as Record<number, CombatLogEntry[]>
+    );
 
     // Sort entries within each round by timestamp
     Object.keys(grouped).forEach(round => {
-      grouped[parseInt(round)].sort((a, b) => 
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      grouped[parseInt(round)].sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
     });
 
@@ -83,37 +98,77 @@ export function CombatLog({
 
   const getEntryIcon = (type: CombatLogEntry['type']) => {
     switch (type) {
-      case 'damage': return <Sword size={14} className="text-red-500" />;
-      case 'healing': return <Heart size={14} className="text-green-500" />;
-      case 'death': return <Skull size={14} className="text-gray-600" />;
-      case 'condition': return <Zap size={14} className="text-yellow-500" />;
-      case 'initiative': return <RotateCcw size={14} className="text-purple-500" />;
-      case 'turn': return <ChevronRight size={14} className="text-blue-500" />;
-      case 'round': return <Clock size={14} className="text-indigo-500" />;
-      default: return <Scroll size={14} className="text-gray-500" />;
+      case 'damage':
+        return <Sword size={14} className="text-red-500" />;
+      case 'healing':
+        return <Heart size={14} className="text-green-500" />;
+      case 'death':
+        return <Skull size={14} className="text-gray-600" />;
+      case 'condition':
+        return <Zap size={14} className="text-yellow-500" />;
+      case 'initiative':
+        return <RotateCcw size={14} className="text-purple-500" />;
+      case 'turn':
+        return <ChevronRight size={14} className="text-blue-500" />;
+      case 'round':
+        return <Clock size={14} className="text-indigo-500" />;
+      default:
+        return <Scroll size={14} className="text-gray-500" />;
     }
   };
 
   const getEntryColor = (type: CombatLogEntry['type']) => {
     switch (type) {
-      case 'damage': return 'border-l-red-400 bg-red-50';
-      case 'healing': return 'border-l-green-400 bg-green-50';
-      case 'death': return 'border-l-gray-400 bg-gray-50';
-      case 'condition': return 'border-l-yellow-400 bg-yellow-50';
-      case 'initiative': return 'border-l-purple-400 bg-purple-50';
-      case 'turn': return 'border-l-blue-400 bg-blue-50';
-      case 'round': return 'border-l-indigo-400 bg-indigo-50';
-      default: return 'border-l-gray-300 bg-white';
+      case 'damage':
+        return 'border-l-red-400 bg-red-50';
+      case 'healing':
+        return 'border-l-green-400 bg-green-50';
+      case 'death':
+        return 'border-l-gray-400 bg-gray-50';
+      case 'condition':
+        return 'border-l-yellow-400 bg-yellow-50';
+      case 'initiative':
+        return 'border-l-purple-400 bg-purple-50';
+      case 'turn':
+        return 'border-l-blue-400 bg-blue-50';
+      case 'round':
+        return 'border-l-indigo-400 bg-indigo-50';
+      default:
+        return 'border-l-gray-300 bg-white';
     }
   };
 
-  const filterOptions: { value: LogFilter; label: string; icon: React.ReactNode }[] = [
+  const filterOptions: {
+    value: LogFilter;
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
     { value: 'all', label: 'All', icon: <Scroll size={14} /> },
-    { value: 'damage', label: 'Damage', icon: <Sword size={14} className="text-red-500" /> },
-    { value: 'healing', label: 'Healing', icon: <Heart size={14} className="text-green-500" /> },
-    { value: 'death', label: 'Deaths', icon: <Skull size={14} className="text-gray-600" /> },
-    { value: 'action', label: 'Actions', icon: <Zap size={14} className="text-yellow-500" /> },
-    { value: 'turn', label: 'Turns', icon: <ChevronRight size={14} className="text-blue-500" /> },
+    {
+      value: 'damage',
+      label: 'Damage',
+      icon: <Sword size={14} className="text-red-500" />,
+    },
+    {
+      value: 'healing',
+      label: 'Healing',
+      icon: <Heart size={14} className="text-green-500" />,
+    },
+    {
+      value: 'death',
+      label: 'Deaths',
+      icon: <Skull size={14} className="text-gray-600" />,
+    },
+    {
+      value: 'action',
+      label: 'Actions',
+      icon: <Zap size={14} className="text-yellow-500" />,
+    },
+    {
+      value: 'turn',
+      label: 'Turns',
+      icon: <ChevronRight size={14} className="text-blue-500" />,
+    },
   ];
 
   const containerClasses = compact
@@ -123,26 +178,30 @@ export function CombatLog({
   return (
     <div className={containerClasses}>
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="border-b border-gray-200 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Scroll size={compact ? 16 : 20} className="text-purple-600" />
-            <h3 className={`font-bold text-purple-800 ${compact ? 'text-base' : 'text-lg'}`}>
+            <h3
+              className={`font-bold text-purple-800 ${compact ? 'text-base' : 'text-lg'}`}
+            >
               Combat Log
             </h3>
             {entries.length > 0 && (
-              <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
+              <span className="rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-800">
                 {entries.length} entries
               </span>
             )}
           </div>
-          
+
           <div className="flex items-center gap-2">
             {/* Filter Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`p-2 rounded-lg transition-colors ${
-                showFilters ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              className={`rounded-lg p-2 transition-colors ${
+                showFilters
+                  ? 'bg-purple-100 text-purple-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
               title="Filter entries"
             >
@@ -153,7 +212,7 @@ export function CombatLog({
             {onExport && (
               <button
                 onClick={onExport}
-                className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                className="rounded-lg bg-gray-100 p-2 text-gray-600 transition-colors hover:bg-gray-200"
                 title="Export log"
               >
                 <Download size={16} />
@@ -163,7 +222,7 @@ export function CombatLog({
             {/* Clear Button */}
             <button
               onClick={onClear}
-              className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+              className="rounded-lg bg-red-100 p-2 text-red-600 transition-colors hover:bg-red-200"
               title="Clear log"
             >
               <Trash2 size={16} />
@@ -173,13 +232,13 @@ export function CombatLog({
 
         {/* Filters */}
         {showFilters && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+          <div className="mt-3 rounded-lg bg-gray-50 p-3">
             <div className="flex flex-wrap gap-2">
               {filterOptions.map(option => (
                 <button
                   key={option.value}
                   onClick={() => setSelectedFilter(option.value)}
-                  className={`flex items-center gap-1 px-3 py-1 text-xs rounded-full transition-colors ${
+                  className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs transition-colors ${
                     selectedFilter === option.value
                       ? 'bg-purple-600 text-white'
                       : 'bg-white text-gray-700 hover:bg-gray-100'
@@ -197,15 +256,15 @@ export function CombatLog({
       {/* Log Entries */}
       <div className={`${compact ? 'max-h-64' : 'max-h-96'} overflow-y-auto`}>
         {sortedRounds.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
+          <div className="py-8 text-center text-gray-500">
             <Scroll size={32} className="mx-auto mb-2 text-gray-300" />
             <p className="text-sm">No combat actions yet</p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="mt-1 text-xs text-gray-400">
               Actions will appear here as combat progresses
             </p>
           </div>
         ) : (
-          <div className="p-4 space-y-4">
+          <div className="space-y-4 p-4">
             {sortedRounds.map(round => {
               const roundEntries = groupedEntries[round];
               const isCollapsed = collapsedRounds.has(round);
@@ -216,19 +275,25 @@ export function CombatLog({
                   {/* Round Header */}
                   <button
                     onClick={() => toggleRoundCollapse(round)}
-                    className={`w-full flex items-center justify-between p-2 rounded-lg transition-colors ${
-                      isCurrentRound 
-                        ? 'bg-blue-100 text-blue-800 border border-blue-300' 
+                    className={`flex w-full items-center justify-between rounded-lg p-2 transition-colors ${
+                      isCurrentRound
+                        ? 'border border-blue-300 bg-blue-100 text-blue-800'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                      {isCollapsed ? (
+                        <ChevronRight size={16} />
+                      ) : (
+                        <ChevronDown size={16} />
+                      )}
                       <span className="font-medium">
                         Round {round}
-                        {isCurrentRound && <span className="ml-2 text-xs">(Current)</span>}
+                        {isCurrentRound && (
+                          <span className="ml-2 text-xs">(Current)</span>
+                        )}
                       </span>
-                      <span className="text-xs bg-white/60 px-2 py-1 rounded-full">
+                      <span className="rounded-full bg-white/60 px-2 py-1 text-xs">
                         {roundEntries.length} actions
                       </span>
                     </div>
@@ -236,25 +301,31 @@ export function CombatLog({
 
                   {/* Round Entries */}
                   {!isCollapsed && (
-                    <div className="space-y-1 ml-4">
+                    <div className="ml-4 space-y-1">
                       {roundEntries.map(entry => (
                         <div
                           key={entry.id}
-                          className={`flex items-start gap-3 p-2 rounded-lg border-l-4 ${getEntryColor(entry.type)}`}
+                          className={`flex items-start gap-3 rounded-lg border-l-4 p-2 ${getEntryColor(entry.type)}`}
                         >
-                          <div className="flex-shrink-0 mt-0.5">
+                          <div className="mt-0.5 flex-shrink-0">
                             {getEntryIcon(entry.type)}
                           </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-900">{entry.description}</p>
-                            <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                              <span>{new Date(entry.timestamp).toLocaleTimeString()}</span>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm text-gray-900">
+                              {entry.description}
+                            </p>
+                            <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+                              <span>
+                                {new Date(entry.timestamp).toLocaleTimeString()}
+                              </span>
                               {entry.target && entry.target !== entry.actor && (
                                 <span>→ {entry.target}</span>
                               )}
                               {entry.amount && (
-                                <span className="font-medium">({entry.amount})</span>
+                                <span className="font-medium">
+                                  ({entry.amount})
+                                </span>
                               )}
                             </div>
                           </div>
@@ -271,13 +342,15 @@ export function CombatLog({
 
       {/* Footer Stats */}
       {entries.length > 0 && (
-        <div className="p-3 border-t border-gray-200 bg-gray-50">
+        <div className="border-t border-gray-200 bg-gray-50 p-3">
           <div className="flex items-center justify-between text-xs text-gray-600">
             <span>
-              {sortedRounds.length} round{sortedRounds.length !== 1 ? 's' : ''} • {entries.length} total actions
+              {sortedRounds.length} round{sortedRounds.length !== 1 ? 's' : ''}{' '}
+              • {entries.length} total actions
             </span>
             <span>
-              Filter: {filterOptions.find(f => f.value === selectedFilter)?.label}
+              Filter:{' '}
+              {filterOptions.find(f => f.value === selectedFilter)?.label}
             </span>
           </div>
         </div>

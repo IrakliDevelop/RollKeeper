@@ -13,14 +13,14 @@ export interface Campaign extends DMEntityBase {
   name: string;
   description: string;
   dmId: string;
-  
+
   // Campaign data
   playerCharacters: PlayerCharacterReference[];
   sessions: Session[];
   encounters: SavedEncounter[];
   notes: CampaignNote[];
   settings: CampaignSettings;
-  
+
   // Metadata
   tags: string[];
   isArchived: boolean;
@@ -31,18 +31,18 @@ export interface CampaignSettings {
   useVariantRules: boolean;
   allowMulticlassing: boolean;
   useOptionalFeats: boolean;
-  
+
   // Combat settings
   initiativeType: 'individual' | 'group' | 'side';
   autoAdvanceTurns: boolean;
   trackResources: boolean;
   showPlayerHP: boolean;
-  
+
   // Display preferences
   showGridOnCanvas: boolean;
   defaultGridSize: number;
   canvasTheme: 'light' | 'dark' | 'tactical';
-  
+
   // Import/Export
   autoBackup: boolean;
   backupInterval: number; // minutes
@@ -54,17 +54,17 @@ export interface Session extends DMEntityBase {
   name: string;
   date: Date;
   duration?: number; // Session length in minutes
-  
+
   // Session content
   summary: string;
   encounters: string[]; // Encounter IDs from this session
   notes: CampaignNote[];
   xpAwarded: number;
-  
+
   // Participant tracking
   presentPlayers: string[]; // Character IDs who attended
   absentPlayers: string[]; // Character IDs who missed
-  
+
   // Session state
   isActive: boolean;
   startedAt?: Date;
@@ -76,30 +76,30 @@ export interface PlayerCharacterReference extends DMEntityBase {
   // Reference data
   characterId: string; // Original character sheet ID
   campaignId: string; // Associated campaign
-  
+
   // Character info
   characterName: string;
   playerName: string;
   class: string;
   level: number;
   race: string;
-  
+
   // Import metadata
   importSource: CharacterImportSource;
   importedAt: Date;
   lastSynced: Date;
   syncStatus: CharacterSyncStatus;
-  
+
   // DM overrides
   isActive: boolean; // Currently in campaign
   isVisible: boolean; // Visible to other players
   dmNotes: string; // Private DM notes about character
   customName?: string; // DM override for character name
-  
+
   // Cached character data (for offline access)
   characterData: CharacterState;
   lastKnownHash: string;
-  
+
   // Combat participation
   combatHistory: CombatParticipationRecord[];
   lastCombatStats?: CombatStats;
@@ -114,12 +114,12 @@ export interface CharacterImportSource {
   hash: string; // For change detection
 }
 
-export type CharacterSyncStatus = 
-  | 'synced'      // Up to date
-  | 'outdated'    // Character has been updated since last sync
-  | 'conflict'    // Conflicting changes detected
-  | 'manual'      // Manual override, don't sync
-  | 'error';      // Sync failed
+export type CharacterSyncStatus =
+  | 'synced' // Up to date
+  | 'outdated' // Character has been updated since last sync
+  | 'conflict' // Conflicting changes detected
+  | 'manual' // Manual override, don't sync
+  | 'error'; // Sync failed
 
 // Combat and encounter types (basic for now)
 export interface SavedEncounter extends DMEntityBase {
@@ -133,7 +133,7 @@ export interface SavedEncounter extends DMEntityBase {
 export interface CombatParticipationRecord {
   encounterId: string;
   participantId: string;
-  
+
   // Combat statistics
   roundsParticipated: number;
   damageDealt: number;
@@ -141,16 +141,16 @@ export interface CombatParticipationRecord {
   healingDone: number;
   spellsUsed: number;
   abilitiesUsed: string[];
-  
+
   // Outcomes
   wasKnockedOut: boolean;
   wasRevived: boolean;
   killingBlows: number;
-  
+
   // Timestamps
   joinedAt: Date;
   leftAt?: Date;
-  
+
   // XP and rewards
   xpEarned: number;
   treasureEarned: string[];
@@ -158,46 +158,46 @@ export interface CombatParticipationRecord {
 
 export enum EncounterDifficulty {
   TRIVIAL = 'trivial',
-  EASY = 'easy', 
+  EASY = 'easy',
   MEDIUM = 'medium',
   HARD = 'hard',
   DEADLY = 'deadly',
-  LEGENDARY = 'legendary'
+  LEGENDARY = 'legendary',
 }
 
 // Campaign notes
 export interface CampaignNote extends DMEntityBase {
   campaignId: string;
   sessionId?: string; // Associated session
-  
+
   // Content
   title: string;
   content: string; // Rich text content
   category: NoteCategory;
   tags: string[];
-  
+
   // Metadata
   isPrivate: boolean; // Only visible to DM
   isPinned: boolean;
-  
+
   // Linking
   linkedCharacters: string[]; // Character IDs
   linkedEncounters: string[]; // Encounter IDs
   linkedSessions: string[]; // Session IDs
-  
+
   // Canvas integration
   position?: { x: number; y: number }; // Position on notes canvas
   connections: string[]; // Connected note IDs
 }
 
-export type NoteCategory = 
+export type NoteCategory =
   | 'session'
-  | 'npc' 
-  | 'location' 
-  | 'plot' 
-  | 'rules' 
-  | 'treasure' 
-  | 'lore' 
+  | 'npc'
+  | 'location'
+  | 'plot'
+  | 'rules'
+  | 'treasure'
+  | 'lore'
   | 'reminder';
 
 // Utility types
@@ -212,26 +212,26 @@ export interface CombatEncounter extends DMEntityBase {
   campaignId: string;
   name: string;
   description: string;
-  
+
   // Combat state
   isActive: boolean;
   roundNumber: number;
   turnIndex: number;
   startedAt?: Date;
   endedAt?: Date;
-  
+
   // Participants
   participants: CombatParticipant[];
-  
-  // Canvas state  
+
+  // Canvas state
   canvasData: CombatCanvasData;
-  
+
   // Settings for this encounter
   settings: EncounterSettings;
-  
+
   // Combat log
   combatLog: CombatLogEntry[];
-  
+
   // Templates and saved states
   isTemplate: boolean;
   templateTags: string[];
@@ -241,15 +241,15 @@ export interface CombatParticipant {
   id: string;
   type: 'player' | 'enemy' | 'npc' | 'summon';
   name: string;
-  
+
   // Data sources
   characterReference?: string; // PlayerCharacterReference ID
   monsterReference?: string; // Monster ID from bestiary
   customData?: Partial<CharacterState>; // For custom/modified entities
-  
+
   // Combat stats (current state)
   combatStats: CombatStats;
-  
+
   // Position and display
   position: Position;
   facing?: number; // Degrees from north
@@ -257,17 +257,17 @@ export interface CombatParticipant {
   tokenImage?: string;
   tokenColor?: string;
   visibility: ParticipantVisibility;
-  
+
   // Initiative and turn order
   initiative: number;
   initiativeModifier: number;
   hasActed: boolean;
   isActive: boolean; // Currently their turn
-  
+
   // Status effects
   conditions: ActiveCondition[];
   temporaryEffects: TemporaryEffect[];
-  
+
   // Participation metadata
   joinedRound: number;
   leftRound?: number;
@@ -279,27 +279,27 @@ export interface CombatStats {
   currentHP: number;
   maxHP: number;
   tempHP: number;
-  
+
   // Armor Class
   currentAC: number;
   baseAC: number;
   tempAC: number;
-  
+
   // Spell Slots (if applicable)
   spellSlots?: SpellSlots;
   pactMagicSlots?: { current: number; max: number; level: number };
-  
+
   // Resource tracking
   usedAbilities: UsedAbility[];
   usedSpells: UsedSpell[];
-  
+
   // Death saves (for players/important NPCs)
   deathSaves?: {
     successes: number;
     failures: number;
     isStable: boolean;
   };
-  
+
   // Combat statistics
   damageDealt: number;
   damageTaken: number;
@@ -356,7 +356,7 @@ export interface CombatCanvasData {
   gridSize: number;
   gridVisible: boolean;
   gridSnap: boolean;
-  
+
   // Canvas dimensions and view
   width: number;
   height: number;
@@ -365,14 +365,14 @@ export interface CombatCanvasData {
     y: number;
     zoom: number;
   };
-  
+
   // Background
   backgroundImage?: string;
   backgroundColor: string;
-  
+
   // Annotations (lines, shapes, text)
   annotations: CanvasAnnotation[];
-  
+
   // Canvas state
   isDirty: boolean;
   lastSaved: Date;
@@ -400,19 +400,19 @@ export interface EncounterSettings {
   groupInitiative: boolean;
   autoAdvanceTurns: boolean;
   skipDefeatedCreatures: boolean;
-  
+
   // Display
   showEnemyHP: boolean;
   showEnemyAC: boolean;
   showConditions: boolean;
   hideDefeatedCreatures: boolean;
-  
+
   // Automation
   autoApplyDamage: boolean;
   autoRollDamage: boolean;
   autoCalculateXP: boolean;
   trackSpellSlots: boolean;
-  
+
   // Canvas
   enableGrid: boolean;
   measurementUnit: 'feet' | 'meters' | 'squares';
@@ -424,16 +424,16 @@ export interface CombatLogEntry {
   timestamp: Date;
   round: number;
   turn: number;
-  
+
   // Event details
   type: CombatEventType;
   actorId?: string; // Participant who acted
   targetIds: string[]; // Participants affected
-  
+
   // Content
   message: string;
   details?: Record<string, unknown>; // Structured data for the event
-  
+
   // Display
   isVisible: boolean; // Visible to players
   color?: string;
@@ -446,54 +446,54 @@ export enum CombatEventType {
   COMBAT_END = 'combat_end',
   ROUND_START = 'round_start',
   TURN_START = 'turn_start',
-  
+
   // Actions
   ATTACK = 'attack',
   SPELL_CAST = 'spell_cast',
   ABILITY_USED = 'ability_used',
   MOVE = 'move',
-  
+
   // Damage and healing
   DAMAGE_DEALT = 'damage_dealt',
   HEALING_DONE = 'healing_done',
   TEMP_HP_GAINED = 'temp_hp_gained',
-  
+
   // Status changes
   CONDITION_APPLIED = 'condition_applied',
   CONDITION_REMOVED = 'condition_removed',
   EFFECT_APPLIED = 'effect_applied',
   EFFECT_EXPIRED = 'effect_expired',
-  
+
   // Death and revival
   KNOCKED_OUT = 'knocked_out',
   DEATH_SAVE = 'death_save',
   STABILIZED = 'stabilized',
   REVIVED = 'revived',
   DIED = 'died',
-  
+
   // Participants
   PARTICIPANT_ADDED = 'participant_added',
   PARTICIPANT_REMOVED = 'participant_removed',
   INITIATIVE_ROLLED = 'initiative_rolled',
-  
+
   // Custom
-  CUSTOM = 'custom'
+  CUSTOM = 'custom',
 }
 
 export enum CreatureSize {
   TINY = 'tiny',
-  SMALL = 'small', 
+  SMALL = 'small',
   MEDIUM = 'medium',
   LARGE = 'large',
   HUGE = 'huge',
-  GARGANTUAN = 'gargantuan'
+  GARGANTUAN = 'gargantuan',
 }
 
 export enum ParticipantVisibility {
-  VISIBLE = 'visible',        // Visible to all players
-  HIDDEN = 'hidden',          // Hidden from players
-  PARTIAL = 'partial',        // Some info hidden (e.g., HP)
-  DM_ONLY = 'dm_only'        // Completely invisible to players
+  VISIBLE = 'visible', // Visible to all players
+  HIDDEN = 'hidden', // Hidden from players
+  PARTIAL = 'partial', // Some info hidden (e.g., HP)
+  DM_ONLY = 'dm_only', // Completely invisible to players
 }
 
 // Default values
@@ -510,7 +510,7 @@ export const DEFAULT_CAMPAIGN_SETTINGS: CampaignSettings = {
   canvasTheme: 'light',
   autoBackup: true,
   backupInterval: 5,
-  maxBackups: 10
+  maxBackups: 10,
 };
 
 export const DEFAULT_ENCOUNTER_SETTINGS: EncounterSettings = {
@@ -528,7 +528,7 @@ export const DEFAULT_ENCOUNTER_SETTINGS: EncounterSettings = {
   trackSpellSlots: true,
   enableGrid: true,
   measurementUnit: 'feet',
-  snapToGrid: true
+  snapToGrid: true,
 };
 
 export const DEFAULT_CANVAS_DATA: CombatCanvasData = {
@@ -541,5 +541,5 @@ export const DEFAULT_CANVAS_DATA: CombatCanvasData = {
   backgroundColor: '#f8fafc',
   annotations: [],
   isDirty: false,
-  lastSaved: new Date()
+  lastSaved: new Date(),
 };

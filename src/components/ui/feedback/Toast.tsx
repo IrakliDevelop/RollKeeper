@@ -72,47 +72,41 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
 
   return (
     <div
-      className={`
-        relative overflow-hidden rounded-lg shadow-2xl border-2 backdrop-blur-sm
-        transition-all duration-300 ease-out
-        ${getToastStyles()}
-        ${isVisible && !isExiting ? 'transform translate-x-0 opacity-100' : 'transform translate-x-full opacity-0'}
-        ${isExiting ? 'transform translate-x-full opacity-0' : ''}
-        min-w-[300px] max-w-[400px]
-      `}
+      className={`relative overflow-hidden rounded-lg border-2 shadow-2xl backdrop-blur-sm transition-all duration-300 ease-out ${getToastStyles()} ${isVisible && !isExiting ? 'translate-x-0 transform opacity-100' : 'translate-x-full transform opacity-0'} ${isExiting ? 'translate-x-full transform opacity-0' : ''} max-w-[400px] min-w-[300px]`}
     >
       {/* Background pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>
       </div>
-      
+
       <div className="relative p-4">
         <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 p-1">
-            {getIcon()}
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-1">
-              <h4 className="text-lg font-bold text-white truncate">
+          <div className="flex-shrink-0 p-1">{getIcon()}</div>
+
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 flex items-center justify-between">
+              <h4 className="truncate text-lg font-bold text-white">
                 {toast.title}
               </h4>
               <button
                 onClick={handleDismiss}
-                className="flex-shrink-0 text-white/80 hover:text-white transition-colors p-1 rounded hover:bg-white/20"
+                className="flex-shrink-0 rounded p-1 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
               >
                 <X size={16} />
               </button>
             </div>
-            
-            <p className="text-white/90 font-medium text-base mb-2">
+
+            <p className="mb-2 text-base font-medium text-white/90">
               {toast.message}
             </p>
-            
+
             {toast.details && toast.details.length > 0 && (
               <div className="space-y-1">
                 {toast.details.map((detail, index) => (
-                  <div key={index} className="text-white/80 text-sm font-medium">
+                  <div
+                    key={index}
+                    className="text-sm font-medium text-white/80"
+                  >
                     {detail}
                   </div>
                 ))}
@@ -121,18 +115,18 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
           </div>
         </div>
       </div>
-      
+
       {/* Progress bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
-        <div 
+      <div className="absolute right-0 bottom-0 left-0 h-1 bg-white/20">
+        <div
           className="h-full bg-white/60 transition-all ease-linear"
           style={{
             width: '100%',
-            animation: `toast-progress ${toast.duration || 5000}ms linear forwards`
+            animation: `toast-progress ${toast.duration || 5000}ms linear forwards`,
           }}
         />
       </div>
-      
+
       <style>{`
         @keyframes toast-progress {
           from { width: 100%; }
@@ -148,11 +142,14 @@ interface ToastContainerProps {
   onDismiss: (id: string) => void;
 }
 
-export const ToastContainer: React.FC<ToastContainerProps> = ({ toasts, onDismiss }) => {
+export const ToastContainer: React.FC<ToastContainerProps> = ({
+  toasts,
+  onDismiss,
+}) => {
   return (
-    <div className="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none">
-      <div className="space-y-2 pointer-events-auto">
-        {toasts.map((toast) => (
+    <div className="pointer-events-none fixed right-4 bottom-4 z-50 space-y-2">
+      <div className="pointer-events-auto space-y-2">
+        {toasts.map(toast => (
           <Toast key={toast.id} toast={toast} onDismiss={onDismiss} />
         ))}
       </div>
@@ -173,63 +170,98 @@ export const useToast = () => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   }, []);
 
-  const showAttackRoll = useCallback((weaponName: string, roll: number, bonus: number, isCrit: boolean, damage?: string, damageType?: string) => {
-    const total = roll + bonus;
-    let title = `🎲 ${weaponName}`;
-    let message = `${roll} + ${bonus} = ${total}`;
-    const details: string[] = [];
-    
-    if (isCrit) {
-      title += ' ✨ CRITICAL!';
-      message = `${roll} (CRIT!) + ${bonus} = ${total}`;
-    } else if (roll === 1) {
-      title += ' 💥 FUMBLE!';
-      message = `${roll} (FUMBLE!) + ${bonus} = ${total}`;
-    }
-    
-    if (damage) {
-      details.push(`💥 Damage: ${damage}${damageType ? ` (${damageType})` : ''}`);
+  const showAttackRoll = useCallback(
+    (
+      weaponName: string,
+      roll: number,
+      bonus: number,
+      isCrit: boolean,
+      damage?: string,
+      damageType?: string
+    ) => {
+      const total = roll + bonus;
+      let title = `🎲 ${weaponName}`;
+      let message = `${roll} + ${bonus} = ${total}`;
+      const details: string[] = [];
+
       if (isCrit) {
-        details.push('🔥 Don\'t forget to double the damage dice!');
+        title += ' ✨ CRITICAL!';
+        message = `${roll} (CRIT!) + ${bonus} = ${total}`;
+      } else if (roll === 1) {
+        title += ' 💥 FUMBLE!';
+        message = `${roll} (FUMBLE!) + ${bonus} = ${total}`;
       }
-    }
 
-    addToast({
-      type: 'attack',
-      title,
-      message,
-      details,
-      duration: isCrit ? 7000 : 5000
-    });
-  }, [addToast]);
+      if (damage) {
+        details.push(
+          `💥 Damage: ${damage}${damageType ? ` (${damageType})` : ''}`
+        );
+        if (isCrit) {
+          details.push("🔥 Don't forget to double the damage dice!");
+        }
+      }
 
-  const showSavingThrow = useCallback((spellName: string, saveDC: number, saveType?: string, damage?: string, damageType?: string) => {
-    const details: string[] = [];
-    
-    if (damage) {
-      details.push(`💥 Damage: ${damage}${damageType ? ` (${damageType})` : ''}`);
-      details.push('✅ Success: Half damage');
-      details.push('❌ Failure: Full damage');
-    }
+      addToast({
+        type: 'attack',
+        title,
+        message,
+        details,
+        duration: isCrit ? 7000 : 5000,
+      });
+    },
+    [addToast]
+  );
 
-    addToast({
-      type: 'save',
-      title: `🛡️ ${spellName}`,
-      message: `DC ${saveDC}${saveType ? ` ${saveType} Save` : ' Save'}`,
-      details,
-      duration: 6000
-    });
-  }, [addToast]);
+  const showSavingThrow = useCallback(
+    (
+      spellName: string,
+      saveDC: number,
+      saveType?: string,
+      damage?: string,
+      damageType?: string
+    ) => {
+      const details: string[] = [];
 
-  const showDamageRoll = useCallback((weaponName: string, damageRoll: string, damageType?: string, versatile = false) => {
-    addToast({
-      type: 'damage',
-      title: `💥 ${weaponName}${versatile ? ' (Versatile)' : ''}`,
-      message: `Damage: ${damageRoll}`,
-      details: damageType ? [`🗡️ ${damageType.charAt(0).toUpperCase() + damageType.slice(1)} damage`] : [],
-      duration: 4000
-    });
-  }, [addToast]);
+      if (damage) {
+        details.push(
+          `💥 Damage: ${damage}${damageType ? ` (${damageType})` : ''}`
+        );
+        details.push('✅ Success: Half damage');
+        details.push('❌ Failure: Full damage');
+      }
+
+      addToast({
+        type: 'save',
+        title: `🛡️ ${spellName}`,
+        message: `DC ${saveDC}${saveType ? ` ${saveType} Save` : ' Save'}`,
+        details,
+        duration: 6000,
+      });
+    },
+    [addToast]
+  );
+
+  const showDamageRoll = useCallback(
+    (
+      weaponName: string,
+      damageRoll: string,
+      damageType?: string,
+      versatile = false
+    ) => {
+      addToast({
+        type: 'damage',
+        title: `💥 ${weaponName}${versatile ? ' (Versatile)' : ''}`,
+        message: `Damage: ${damageRoll}`,
+        details: damageType
+          ? [
+              `🗡️ ${damageType.charAt(0).toUpperCase() + damageType.slice(1)} damage`,
+            ]
+          : [],
+        duration: 4000,
+      });
+    },
+    [addToast]
+  );
 
   return {
     toasts,
@@ -237,6 +269,6 @@ export const useToast = () => {
     dismissToast,
     showAttackRoll,
     showSavingThrow,
-    showDamageRoll
+    showDamageRoll,
   };
-}; 
+};

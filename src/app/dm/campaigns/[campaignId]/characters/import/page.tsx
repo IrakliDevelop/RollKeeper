@@ -3,7 +3,16 @@
 import React, { useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Upload, Users, FileText, AlertCircle, CheckCircle, X, Plus } from 'lucide-react';
+import {
+  ArrowLeft,
+  Upload,
+  Users,
+  FileText,
+  AlertCircle,
+  CheckCircle,
+  X,
+  Plus,
+} from 'lucide-react';
 import { useDMStore } from '@/store/dmStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { CharacterState } from '@/types/character';
@@ -21,29 +30,38 @@ export default function CharacterImportPage() {
   const params = useParams();
   const router = useRouter();
   const campaignId = params.campaignId as string;
-  
+
   const { getCampaignById, importPlayerCharacter } = useDMStore();
   const { characters: playerCharacters } = usePlayerStore();
-  
+
   const campaign = getCampaignById(campaignId);
-  
-  const [importedCharacters, setImportedCharacters] = useState<ImportedCharacterPreview[]>([]);
+
+  const [importedCharacters, setImportedCharacters] = useState<
+    ImportedCharacterPreview[]
+  >([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [importMode, setImportMode] = useState<'file' | 'player'>('file');
 
   // Validate character data
-  const validateCharacterData = (data: unknown, _fileName?: string): { isValid: boolean; errors: string[]; warnings: string[] } => {
+  const validateCharacterData = (
+    data: unknown,
+    _fileName?: string
+  ): { isValid: boolean; errors: string[]; warnings: string[] } => {
     const errors: string[] = [];
     const warnings: string[] = [];
 
     if (!data || typeof data !== 'object') {
-      return { isValid: false, errors: ['Invalid character data structure'], warnings: [] };
+      return {
+        isValid: false,
+        errors: ['Invalid character data structure'],
+        warnings: [],
+      };
     }
 
     let characterState: CharacterState;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const dataAny = data as any;
-    
+
     if (dataAny.state) {
       // Zustand persist format
       characterState = dataAny.state as CharacterState;
@@ -65,15 +83,19 @@ export default function CharacterImportPage() {
     if (!characterState.name && !characterState.playerName) {
       errors.push('Character name is required');
     }
-    
+
     if (!characterState.class || !characterState.class.name) {
       errors.push('Character class is required');
     }
-    
-    if (!characterState.level || characterState.level < 1 || characterState.level > 20) {
+
+    if (
+      !characterState.level ||
+      characterState.level < 1 ||
+      characterState.level > 20
+    ) {
       errors.push('Character level must be between 1 and 20');
     }
-    
+
     if (!characterState.race) {
       errors.push('Character race is required');
     }
@@ -82,7 +104,7 @@ export default function CharacterImportPage() {
     if (!characterState.hitPoints || !characterState.hitPoints.max) {
       warnings.push('Hit points data is missing or incomplete');
     }
-    
+
     if (!characterState.abilities) {
       warnings.push('Ability scores are missing');
     }
@@ -90,7 +112,7 @@ export default function CharacterImportPage() {
     return {
       isValid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   };
 
@@ -103,16 +125,16 @@ export default function CharacterImportPage() {
       try {
         const content = await file.text();
         const characterData = JSON.parse(content);
-        
+
         const validation = validateCharacterData(characterData, file.name);
-        
+
         newImportedCharacters.push({
           id: `import-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           data: characterData,
           fileName: file.name,
           isValid: validation.isValid,
           errors: validation.errors,
-          warnings: validation.warnings
+          warnings: validation.warnings,
         });
       } catch (error) {
         newImportedCharacters.push({
@@ -120,8 +142,10 @@ export default function CharacterImportPage() {
           data: {} as CharacterState,
           fileName: file.name,
           isValid: false,
-          errors: [`Failed to parse JSON: ${error instanceof Error ? error.message : 'Unknown error'}`],
-          warnings: []
+          errors: [
+            `Failed to parse JSON: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          ],
+          warnings: [],
         });
       }
     }
@@ -131,40 +155,49 @@ export default function CharacterImportPage() {
   }, []);
 
   // Handle drag and drop
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      handleFileImport(files);
-    }
-  }, [handleFileImport]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        handleFileImport(files);
+      }
+    },
+    [handleFileImport]
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
   }, []);
 
   // Handle file input change
-  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      handleFileImport(files);
-    }
-    // Reset input
-    e.target.value = '';
-  }, [handleFileImport]);
+  const handleFileInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (files && files.length > 0) {
+        handleFileImport(files);
+      }
+      // Reset input
+      e.target.value = '';
+    },
+    [handleFileImport]
+  );
 
   // Import from existing player characters
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleImportFromPlayer = (playerCharacter: any) => {
     const validation = validateCharacterData(playerCharacter);
-    
-    setImportedCharacters(prev => [...prev, {
-      id: `player-${playerCharacter.id}`,
-      data: playerCharacter,
-      isValid: validation.isValid,
-      errors: validation.errors,
-      warnings: validation.warnings
-    }]);
+
+    setImportedCharacters(prev => [
+      ...prev,
+      {
+        id: `player-${playerCharacter.id}`,
+        data: playerCharacter,
+        isValid: validation.isValid,
+        errors: validation.errors,
+        warnings: validation.warnings,
+      },
+    ]);
   };
 
   // Remove character from import list
@@ -175,7 +208,7 @@ export default function CharacterImportPage() {
   // Confirm import of valid characters
   const confirmImport = async () => {
     const validCharacters = importedCharacters.filter(char => char.isValid);
-    
+
     if (validCharacters.length === 0) {
       alert('No valid characters to import');
       return;
@@ -183,13 +216,13 @@ export default function CharacterImportPage() {
 
     try {
       setIsProcessing(true);
-      
+
       for (const character of validCharacters) {
         // Normalize character data based on format
         let characterState: CharacterState;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const dataAny = character.data as any;
-        
+
         if (dataAny.state) {
           characterState = dataAny.state as CharacterState;
         } else if (dataAny.character) {
@@ -204,7 +237,7 @@ export default function CharacterImportPage() {
         if (!characterState.id) {
           characterState.id = `char-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         }
-        
+
         const characterName = characterState.name || 'Imported Character';
         characterState.name = characterName;
 
@@ -214,15 +247,17 @@ export default function CharacterImportPage() {
           timestamp: new Date(),
           fileName: character.fileName,
           version: '1.0.0',
-          hash: JSON.stringify(characterState).length.toString()
+          hash: JSON.stringify(characterState).length.toString(),
         });
       }
 
       // Clear imported characters
       setImportedCharacters([]);
-      
+
       // Navigate back to campaign with success message
-      router.push(`/dm/campaigns/${campaignId}?imported=${validCharacters.length}`);
+      router.push(
+        `/dm/campaigns/${campaignId}?imported=${validCharacters.length}`
+      );
     } catch (error) {
       console.error('Import failed:', error);
       alert('Import failed. Please try again.');
@@ -233,9 +268,14 @@ export default function CharacterImportPage() {
 
   if (!campaign) {
     return (
-      <div className="text-center py-12">
-        <h1 className="text-2xl font-bold text-slate-800 mb-2">Campaign Not Found</h1>
-        <Link href="/dm/campaigns" className="text-blue-600 hover:text-blue-800">
+      <div className="py-12 text-center">
+        <h1 className="mb-2 text-2xl font-bold text-slate-800">
+          Campaign Not Found
+        </h1>
+        <Link
+          href="/dm/campaigns"
+          className="text-blue-600 hover:text-blue-800"
+        >
           Back to Campaigns
         </Link>
       </div>
@@ -248,43 +288,47 @@ export default function CharacterImportPage() {
   return (
     <div className="character-import-page">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
+      <div className="mb-8 flex items-center gap-4">
         <Link
           href={`/dm/campaigns/${campaignId}`}
-          className="flex items-center gap-2 text-slate-600 hover:text-slate-800 transition-colors"
+          className="flex items-center gap-2 text-slate-600 transition-colors hover:text-slate-800"
         >
           <ArrowLeft size={20} />
           Back to Campaign
         </Link>
         <div>
-          <h1 className="text-3xl font-bold text-slate-800">Import Characters</h1>
-          <p className="text-slate-600">Add player characters to &quot;{campaign.name}&quot;</p>
+          <h1 className="text-3xl font-bold text-slate-800">
+            Import Characters
+          </h1>
+          <p className="text-slate-600">
+            Add player characters to &quot;{campaign.name}&quot;
+          </p>
         </div>
       </div>
 
       {/* Import Mode Selector */}
       <div className="mb-8">
-        <div className="flex bg-slate-100 rounded-lg p-1 w-fit">
+        <div className="flex w-fit rounded-lg bg-slate-100 p-1">
           <button
             onClick={() => setImportMode('file')}
-            className={`px-4 py-2 rounded-md transition-colors ${
+            className={`rounded-md px-4 py-2 transition-colors ${
               importMode === 'file'
                 ? 'bg-white text-slate-800 shadow-sm'
                 : 'text-slate-600 hover:text-slate-800'
             }`}
           >
-            <FileText size={16} className="inline mr-2" />
+            <FileText size={16} className="mr-2 inline" />
             JSON Files
           </button>
           <button
             onClick={() => setImportMode('player')}
-            className={`px-4 py-2 rounded-md transition-colors ${
+            className={`rounded-md px-4 py-2 transition-colors ${
               importMode === 'player'
                 ? 'bg-white text-slate-800 shadow-sm'
                 : 'text-slate-600 hover:text-slate-800'
             }`}
           >
-            <Users size={16} className="inline mr-2" />
+            <Users size={16} className="mr-2 inline" />
             Player Characters
           </button>
         </div>
@@ -292,23 +336,25 @@ export default function CharacterImportPage() {
 
       {/* Import Interface */}
       {importMode === 'file' ? (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold text-slate-800 mb-4">Import from JSON Files</h2>
-          
+        <div className="mb-8 rounded-lg bg-white p-6 shadow-md">
+          <h2 className="mb-4 text-xl font-semibold text-slate-800">
+            Import from JSON Files
+          </h2>
+
           {/* File Drop Zone */}
           <div
             onDrop={handleDrop}
             onDragOver={handleDragOver}
-            className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors"
+            className="rounded-lg border-2 border-dashed border-slate-300 p-8 text-center transition-colors hover:border-blue-400"
           >
             <Upload size={48} className="mx-auto mb-4 text-slate-400" />
-            <h3 className="text-lg font-medium text-slate-800 mb-2">
+            <h3 className="mb-2 text-lg font-medium text-slate-800">
               Drop character files here or click to browse
             </h3>
-            <p className="text-slate-600 mb-4">
+            <p className="mb-4 text-slate-600">
               Supports JSON exports from RollKeeper and other compatible formats
             </p>
-            <label className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700">
               <Upload size={16} />
               Choose Files
               <input
@@ -322,43 +368,60 @@ export default function CharacterImportPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold text-slate-800 mb-4">Import from Player Characters</h2>
-          
+        <div className="mb-8 rounded-lg bg-white p-6 shadow-md">
+          <h2 className="mb-4 text-xl font-semibold text-slate-800">
+            Import from Player Characters
+          </h2>
+
           {playerCharacters.length === 0 ? (
-            <div className="text-center py-8">
+            <div className="py-8 text-center">
               <Users size={48} className="mx-auto mb-4 text-slate-400" />
-              <h3 className="text-lg font-medium text-slate-800 mb-2">No Player Characters Found</h3>
-              <p className="text-slate-600 mb-4">
-                Create characters in the Player Dashboard first, then import them here.
+              <h3 className="mb-2 text-lg font-medium text-slate-800">
+                No Player Characters Found
+              </h3>
+              <p className="mb-4 text-slate-600">
+                Create characters in the Player Dashboard first, then import
+                them here.
               </p>
               <Link
                 href="/player"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
               >
                 <Plus size={16} />
                 Go to Player Dashboard
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {playerCharacters
                 .filter(pc => !pc.isArchived)
                 .map(playerChar => (
-                <div key={playerChar.id} className="border border-slate-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-slate-800 mb-1">{playerChar.name}</h3>
-                  <p className="text-sm text-slate-600 mb-3">
-                    {playerChar.race} {playerChar.class} (Level {playerChar.level})
-                  </p>
-                  <button
-                    onClick={() => handleImportFromPlayer(playerChar)}
-                    className="w-full px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm"
-                    disabled={importedCharacters.some(ic => ic.id === `player-${playerChar.id}`)}
+                  <div
+                    key={playerChar.id}
+                    className="rounded-lg border border-slate-200 p-4"
                   >
-                    {importedCharacters.some(ic => ic.id === `player-${playerChar.id}`) ? 'Added' : 'Import'}
-                  </button>
-                </div>
-              ))}
+                    <h3 className="mb-1 font-semibold text-slate-800">
+                      {playerChar.name}
+                    </h3>
+                    <p className="mb-3 text-sm text-slate-600">
+                      {playerChar.race} {playerChar.class} (Level{' '}
+                      {playerChar.level})
+                    </p>
+                    <button
+                      onClick={() => handleImportFromPlayer(playerChar)}
+                      className="w-full rounded-md bg-green-600 px-3 py-2 text-sm text-white transition-colors hover:bg-green-700"
+                      disabled={importedCharacters.some(
+                        ic => ic.id === `player-${playerChar.id}`
+                      )}
+                    >
+                      {importedCharacters.some(
+                        ic => ic.id === `player-${playerChar.id}`
+                      )
+                        ? 'Added'
+                        : 'Import'}
+                    </button>
+                  </div>
+                ))}
             </div>
           )}
         </div>
@@ -366,9 +429,11 @@ export default function CharacterImportPage() {
 
       {/* Import Preview */}
       {importedCharacters.length > 0 && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-slate-800">Import Preview</h2>
+        <div className="mb-8 rounded-lg bg-white p-6 shadow-md">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-slate-800">
+              Import Preview
+            </h2>
             <span className="text-sm text-slate-600">
               {validCharacters.length} valid, {invalidCharacters.length} invalid
             </span>
@@ -378,40 +443,50 @@ export default function CharacterImportPage() {
             {importedCharacters.map(character => (
               <div
                 key={character.id}
-                className={`border rounded-lg p-4 ${
-                  character.isValid ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+                className={`rounded-lg border p-4 ${
+                  character.isValid
+                    ? 'border-green-200 bg-green-50'
+                    : 'border-red-200 bg-red-50'
                 }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="mb-2 flex items-center gap-2">
                       {character.isValid ? (
                         <CheckCircle size={16} className="text-green-600" />
                       ) : (
                         <AlertCircle size={16} className="text-red-600" />
                       )}
-                                          <h3 className="font-semibold text-slate-800">
-                      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                      {(character.data as any).name || character.fileName || 'Unknown Character'}
-                    </h3>
+                      <h3 className="font-semibold text-slate-800">
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        {(character.data as any).name ||
+                          character.fileName ||
+                          'Unknown Character'}
+                      </h3>
                       {character.fileName && (
-                        <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">
+                        <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">
                           {character.fileName}
                         </span>
                       )}
                     </div>
-                    
+
                     {character.isValid && (
-                      <p className="text-sm text-slate-600 mb-2">
+                      <p className="mb-2 text-sm text-slate-600">
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                        {(character.data as any).race} {(character.data as any).class?.name} (Level {(character.data as any).level})
+                        {(character.data as any).race}{' '}
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        {(character.data as any).class?.name} (Level{' '}
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        {(character.data as any).level})
                       </p>
                     )}
 
                     {character.errors.length > 0 && (
                       <div className="mb-2">
-                        <p className="text-sm font-medium text-red-800 mb-1">Errors:</p>
-                        <ul className="text-sm text-red-700 list-disc list-inside">
+                        <p className="mb-1 text-sm font-medium text-red-800">
+                          Errors:
+                        </p>
+                        <ul className="list-inside list-disc text-sm text-red-700">
                           {character.errors.map((error, index) => (
                             <li key={index}>{error}</li>
                           ))}
@@ -421,8 +496,10 @@ export default function CharacterImportPage() {
 
                     {character.warnings.length > 0 && (
                       <div>
-                        <p className="text-sm font-medium text-yellow-800 mb-1">Warnings:</p>
-                        <ul className="text-sm text-yellow-700 list-disc list-inside">
+                        <p className="mb-1 text-sm font-medium text-yellow-800">
+                          Warnings:
+                        </p>
+                        <ul className="list-inside list-disc text-sm text-yellow-700">
                           {character.warnings.map((warning, index) => (
                             <li key={index}>{warning}</li>
                           ))}
@@ -430,10 +507,10 @@ export default function CharacterImportPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   <button
                     onClick={() => removeImportedCharacter(character.id)}
-                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                    className="rounded p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
                   >
                     <X size={16} />
                   </button>
@@ -449,21 +526,24 @@ export default function CharacterImportPage() {
         <div className="flex items-center justify-between">
           <button
             onClick={() => setImportedCharacters([])}
-            className="px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors"
+            className="px-4 py-2 text-slate-600 transition-colors hover:text-slate-800"
           >
             Clear All
           </button>
-          
+
           <div className="flex items-center gap-4">
             <span className="text-sm text-slate-600">
-              {validCharacters.length} character{validCharacters.length !== 1 ? 's' : ''} ready to import
+              {validCharacters.length} character
+              {validCharacters.length !== 1 ? 's' : ''} ready to import
             </span>
             <button
               onClick={confirmImport}
               disabled={validCharacters.length === 0 || isProcessing}
-              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="rounded-lg bg-green-600 px-6 py-2 text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isProcessing ? 'Importing...' : `Import ${validCharacters.length} Character${validCharacters.length !== 1 ? 's' : ''}`}
+              {isProcessing
+                ? 'Importing...'
+                : `Import ${validCharacters.length} Character${validCharacters.length !== 1 ? 's' : ''}`}
             </button>
           </div>
         </div>
@@ -471,9 +551,9 @@ export default function CharacterImportPage() {
 
       {/* Processing Indicator */}
       {isProcessing && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 flex items-center gap-4">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+          <div className="flex items-center gap-4 rounded-lg bg-white p-6">
+            <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-blue-600"></div>
             <span className="text-slate-800">Processing characters...</span>
           </div>
         </div>

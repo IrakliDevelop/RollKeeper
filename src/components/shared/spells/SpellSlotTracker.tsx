@@ -11,7 +11,7 @@ interface SpellSlotTrackerProps {
   onPactMagicChange?: (used: number) => void;
   onResetSpellSlots?: () => void;
   onResetPactMagic?: () => void;
-  
+
   // Display options
   readonly?: boolean;
   compact?: boolean;
@@ -19,7 +19,7 @@ interface SpellSlotTrackerProps {
   hideResetButtons?: boolean;
   showOnlyUsed?: boolean;
   maxLevelToShow?: number;
-  
+
   className?: string;
 }
 
@@ -36,7 +36,7 @@ export function SpellSlotTracker({
   hideResetButtons = false,
   showOnlyUsed = false,
   maxLevelToShow = 9,
-  className = ''
+  className = '',
 }: SpellSlotTrackerProps) {
   // Check if character has any spell slots
   const hasSpellSlots = Object.values(spellSlots).some(slot => slot.max > 0);
@@ -46,10 +46,14 @@ export function SpellSlotTracker({
     return null; // Don't render if no spell slots
   }
 
-  const renderSlotCheckboxes = (max: number, used: number, onChange?: (used: number) => void) => {
+  const renderSlotCheckboxes = (
+    max: number,
+    used: number,
+    onChange?: (used: number) => void
+  ) => {
     const size = compact ? 'w-3 h-3' : 'w-4 h-4';
     const gap = compact ? 'gap-0.5' : 'gap-1';
-    
+
     return (
       <div className={`flex flex-wrap ${gap}`}>
         {Array.from({ length: max }, (_, index) => (
@@ -61,12 +65,12 @@ export function SpellSlotTracker({
               onChange(Math.max(0, Math.min(newUsed, max)));
             }}
             disabled={readonly || !onChange}
-            className={`${size} border-2 rounded transition-colors ${
+            className={`${size} rounded border-2 transition-colors ${
               index < used
-                ? 'bg-red-500 border-red-500' // Used slot
+                ? 'border-red-500 bg-red-500' // Used slot
                 : readonly
-                  ? 'bg-white border-gray-300'
-                  : 'bg-white border-gray-400 hover:border-gray-600' // Available slot
+                  ? 'border-gray-300 bg-white'
+                  : 'border-gray-400 bg-white hover:border-gray-600' // Available slot
             } ${readonly ? '' : 'cursor-pointer'}`}
             title={`Spell slot ${index + 1} - ${index < used ? 'Used' : 'Available'}`}
           />
@@ -93,7 +97,9 @@ export function SpellSlotTracker({
   return (
     <div className={containerClasses}>
       <div className="flex items-center justify-between">
-        <h3 className={`font-semibold text-purple-800 flex items-center gap-2 ${compact ? 'text-base' : 'text-lg'}`}>
+        <h3
+          className={`flex items-center gap-2 font-semibold text-purple-800 ${compact ? 'text-base' : 'text-lg'}`}
+        >
           <Zap size={compact ? 16 : 20} />
           Spell Slots
         </h3>
@@ -102,7 +108,7 @@ export function SpellSlotTracker({
             {hasSpellSlots && onResetSpellSlots && (
               <button
                 onClick={onResetSpellSlots}
-                className="text-sm text-purple-600 hover:text-purple-800 flex items-center space-x-1"
+                className="flex items-center space-x-1 text-sm text-purple-600 hover:text-purple-800"
                 title="Reset all spell slots"
               >
                 <RotateCcw size={14} />
@@ -112,7 +118,7 @@ export function SpellSlotTracker({
             {hasPactMagic && onResetPactMagic && (
               <button
                 onClick={onResetPactMagic}
-                className="text-sm text-purple-600 hover:text-purple-800 flex items-center space-x-1"
+                className="flex items-center space-x-1 text-sm text-purple-600 hover:text-purple-800"
                 title="Reset pact magic slots"
               >
                 <RotateCcw size={14} />
@@ -126,20 +132,34 @@ export function SpellSlotTracker({
       {/* Regular Spell Slots */}
       {hasSpellSlots && levelsToShow.length > 0 && (
         <div className={compact ? 'space-y-2' : 'space-y-3'}>
-          {!compact && <h4 className="text-sm font-medium text-gray-700">Spell Slots</h4>}
-          {levelsToShow.map((level) => {
+          {!compact && (
+            <h4 className="text-sm font-medium text-gray-700">Spell Slots</h4>
+          )}
+          {levelsToShow.map(level => {
             const slot = spellSlots[level];
             return (
               <div key={level} className="flex items-center justify-between">
-                <div className={`flex items-center space-x-3 ${compact ? 'min-w-[50px]' : 'min-w-[60px]'}`}>
-                  <span className={`font-medium text-gray-700 ${compact ? 'text-xs' : 'text-sm'}`}>
+                <div
+                  className={`flex items-center space-x-3 ${compact ? 'min-w-[50px]' : 'min-w-[60px]'}`}
+                >
+                  <span
+                    className={`font-medium text-gray-700 ${compact ? 'text-xs' : 'text-sm'}`}
+                  >
                     {compact ? `L${level}:` : `Level ${level}:`}
                   </span>
-                  <span className={`text-gray-500 ${compact ? 'text-xs' : 'text-xs'}`}>
+                  <span
+                    className={`text-gray-500 ${compact ? 'text-xs' : 'text-xs'}`}
+                  >
                     {slot.max - slot.used}/{slot.max}
                   </span>
                 </div>
-                {renderSlotCheckboxes(slot.max, slot.used, onSpellSlotChange ? (used) => onSpellSlotChange(level, used) : undefined)}
+                {renderSlotCheckboxes(
+                  slot.max,
+                  slot.used,
+                  onSpellSlotChange
+                    ? used => onSpellSlotChange(level, used)
+                    : undefined
+                )}
               </div>
             );
           })}
@@ -148,20 +168,33 @@ export function SpellSlotTracker({
 
       {/* Warlock Pact Magic */}
       {hasPactMagic && pactMagic && (
-        <div className={`space-y-3 border-t border-gray-200 pt-3 ${compact ? 'space-y-2 pt-2' : ''}`}>
-          <h4 className={`font-medium text-purple-700 ${compact ? 'text-xs' : 'text-sm'}`}>Pact Magic</h4>
+        <div
+          className={`space-y-3 border-t border-gray-200 pt-3 ${compact ? 'space-y-2 pt-2' : ''}`}
+        >
+          <h4
+            className={`font-medium text-purple-700 ${compact ? 'text-xs' : 'text-sm'}`}
+          >
+            Pact Magic
+          </h4>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <span className={`font-medium text-purple-700 ${compact ? 'text-xs' : 'text-sm'}`}>
-                {compact ? `L${pactMagic.level}:` : `Level ${pactMagic.level} Slots:`}
+              <span
+                className={`font-medium text-purple-700 ${compact ? 'text-xs' : 'text-sm'}`}
+              >
+                {compact
+                  ? `L${pactMagic.level}:`
+                  : `Level ${pactMagic.level} Slots:`}
               </span>
-              <span className={`text-gray-500 ${compact ? 'text-xs' : 'text-xs'}`}>
-                {pactMagic.slots.max - pactMagic.slots.used}/{pactMagic.slots.max}
+              <span
+                className={`text-gray-500 ${compact ? 'text-xs' : 'text-xs'}`}
+              >
+                {pactMagic.slots.max - pactMagic.slots.used}/
+                {pactMagic.slots.max}
               </span>
             </div>
             {renderSlotCheckboxes(
-              pactMagic.slots.max, 
-              pactMagic.slots.used, 
+              pactMagic.slots.max,
+              pactMagic.slots.used,
               onPactMagicChange
             )}
           </div>
@@ -175,8 +208,11 @@ export function SpellSlotTracker({
 
       {/* Usage Guide */}
       {!readonly && !hideControls && !compact && (
-        <div className="text-xs text-gray-500 pt-2 border-t border-gray-100">
-          <p>• Click empty slots to mark as used • Click used slots to mark as available</p>
+        <div className="border-t border-gray-100 pt-2 text-xs text-gray-500">
+          <p>
+            • Click empty slots to mark as used • Click used slots to mark as
+            available
+          </p>
         </div>
       )}
     </div>

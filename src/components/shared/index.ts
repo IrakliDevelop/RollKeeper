@@ -1,7 +1,7 @@
 // Character components
 export * from './character';
 
-// Combat components  
+// Combat components
 export * from './combat';
 
 // Stats components

@@ -5,11 +5,7 @@ import { useCharacterStore } from '@/store/characterStore';
 import { CurrencyManager as SharedCurrencyManager } from '@/components/shared/character';
 
 export default function CurrencyManager() {
-  const { 
-    character, 
-    addCurrency,
-    subtractCurrency
-  } = useCharacterStore();
+  const { character, addCurrency, subtractCurrency } = useCharacterStore();
 
   // Use the shared CurrencyManager component with full functionality
   return (
@@ -25,4 +21,4 @@ export default function CurrencyManager() {
       hideIndividualCurrencies={false}
     />
   );
-} 
+}

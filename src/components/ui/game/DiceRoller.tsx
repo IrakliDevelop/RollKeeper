@@ -3,7 +3,8 @@ import { useDiceRoller, UseDiceRollerOptions } from '@/hooks/useDiceRoller';
 import { DiceResultDisplay } from './DiceResultDisplay';
 import { RollSummary } from '@/types/dice';
 
-export interface DiceRollerProps extends Omit<UseDiceRollerOptions, 'containerId'> {
+export interface DiceRollerProps
+  extends Omit<UseDiceRollerOptions, 'containerId'> {
   containerId?: string;
   showControls?: boolean;
   showHistory?: boolean;
@@ -31,19 +32,25 @@ export function DiceRoller({
   quickButtons = [
     { label: '1d20', notation: '1d20', color: 'bg-blue-500 hover:bg-blue-600' },
     { label: '2d6', notation: '2d6', color: 'bg-green-500 hover:bg-green-600' },
-    { label: '1d12', notation: '1d12', color: 'bg-purple-500 hover:bg-purple-600' },
+    {
+      label: '1d12',
+      notation: '1d12',
+      color: 'bg-purple-500 hover:bg-purple-600',
+    },
     { label: '4d6', notation: '4d6', color: 'bg-red-500 hover:bg-red-600' },
   ],
   className = '',
   onRollResult,
   ...diceOptions
 }: DiceRollerProps) {
-  
   const [customNotation, setCustomNotation] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
 
   const addLog = (message: string) => {
-    setLogs(prev => [...prev.slice(-9), `${new Date().toLocaleTimeString()}: ${message}`]);
+    setLogs(prev => [
+      ...prev.slice(-9),
+      `${new Date().toLocaleTimeString()}: ${message}`,
+    ]);
   };
 
   const handleRollComplete = (summary: RollSummary) => {
@@ -60,13 +67,13 @@ export function DiceRoller({
     clearDice,
     clearHistory,
     setAutoClearDelay,
-    autoClearDelay
+    autoClearDelay,
   } = useDiceRoller({
     containerId,
     onRollComplete: handleRollComplete,
     onError: addLog,
     onLog: addLog,
-    ...diceOptions
+    ...diceOptions,
   });
 
   const handleCustomRoll = () => {
@@ -83,16 +90,16 @@ export function DiceRoller({
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Dice Container */}
-      <div 
+      <div
         id={containerId}
-        className="fixed inset-0 pointer-events-none"
+        className="pointer-events-none fixed inset-0"
         style={{
           width: '100vw',
           height: '100vh',
           top: 0,
           left: 0,
           zIndex: 9999,
-          position: 'fixed'
+          position: 'fixed',
         }}
       />
       <style jsx global>{`
@@ -118,23 +125,31 @@ export function DiceRoller({
 
       {/* Status */}
       {showControls && (
-        <div className="bg-white rounded-lg shadow p-4 border">
-          <div className="flex items-center justify-between mb-3">
+        <div className="rounded-lg border bg-white p-4 shadow">
+          <div className="mb-3 flex items-center justify-between">
             <h3 className="text-lg font-bold text-gray-900">Dice Roller</h3>
-            <div className={`flex items-center gap-2 ${isInitialized ? 'text-green-600' : 'text-yellow-600'}`}>
-              <div className={`w-3 h-3 rounded-full ${isInitialized ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+            <div
+              className={`flex items-center gap-2 ${isInitialized ? 'text-green-600' : 'text-yellow-600'}`}
+            >
+              <div
+                className={`h-3 w-3 rounded-full ${isInitialized ? 'bg-green-500' : 'bg-yellow-500'}`}
+              ></div>
               <span className="text-sm">
-                {isRolling ? 'Rolling...' : isInitialized ? 'Ready' : 'Initializing...'}
+                {isRolling
+                  ? 'Rolling...'
+                  : isInitialized
+                    ? 'Ready'
+                    : 'Initializing...'}
               </span>
             </div>
           </div>
 
           {/* Clear Controls */}
-          <div className="flex gap-2 mb-4">
+          <div className="mb-4 flex gap-2">
             <button
               onClick={clearDice}
               disabled={!isInitialized}
-              className="px-4 py-2 bg-red-500 text-white rounded disabled:bg-gray-300 hover:bg-red-600 transition-colors"
+              className="rounded bg-red-500 px-4 py-2 text-white transition-colors hover:bg-red-600 disabled:bg-gray-300"
             >
               🧹 Clear Dice
             </button>
@@ -142,7 +157,7 @@ export function DiceRoller({
               <button
                 onClick={clearHistory}
                 disabled={rollHistory.length === 0}
-                className="px-4 py-2 bg-gray-500 text-white rounded disabled:bg-gray-300 hover:bg-gray-600 transition-colors"
+                className="rounded bg-gray-500 px-4 py-2 text-white transition-colors hover:bg-gray-600 disabled:bg-gray-300"
               >
                 Clear History
               </button>
@@ -151,12 +166,14 @@ export function DiceRoller({
 
           {/* Auto-clear control */}
           {showAutoClearControl && (
-            <div className="flex items-center gap-2 mb-4">
-              <label className="text-sm font-medium text-gray-700">Auto-clear:</label>
+            <div className="mb-4 flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">
+                Auto-clear:
+              </label>
               <select
                 value={autoClearDelay}
-                onChange={(e) => setAutoClearDelay(Number(e.target.value))}
-                className="px-2 py-1 text-sm border border-gray-300 rounded"
+                onChange={e => setAutoClearDelay(Number(e.target.value))}
+                className="rounded border border-gray-300 px-2 py-1 text-sm"
               >
                 <option value={0}>Disabled</option>
                 <option value={2000}>2 seconds</option>
@@ -170,14 +187,16 @@ export function DiceRoller({
           {/* Quick Buttons */}
           {showQuickButtons && (
             <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Quick Rolls</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+              <h4 className="mb-2 text-sm font-medium text-gray-700">
+                Quick Rolls
+              </h4>
+              <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {quickButtons.map((button, index) => (
                   <button
                     key={index}
                     onClick={() => roll(button.notation)}
                     disabled={!isInitialized || isRolling}
-                    className={`px-3 py-2 text-white rounded disabled:bg-gray-300 transition-colors ${
+                    className={`rounded px-3 py-2 text-white transition-colors disabled:bg-gray-300 ${
                       button.color || 'bg-blue-500 hover:bg-blue-600'
                     }`}
                   >
@@ -191,15 +210,17 @@ export function DiceRoller({
           {/* Custom Input */}
           {showCustomInput && (
             <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Custom Roll</h4>
+              <h4 className="mb-2 text-sm font-medium text-gray-700">
+                Custom Roll
+              </h4>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={customNotation}
-                  onChange={(e) => setCustomNotation(e.target.value)}
+                  onChange={e => setCustomNotation(e.target.value)}
                   placeholder="e.g., 3d8+2"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  onKeyDown={(e) => {
+                  className="flex-1 rounded border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  onKeyDown={e => {
                     if (e.key === 'Enter') {
                       handleCustomRoll();
                     }
@@ -208,8 +229,10 @@ export function DiceRoller({
                 />
                 <button
                   onClick={handleCustomRoll}
-                  disabled={!isInitialized || isRolling || !customNotation.trim()}
-                  className="px-4 py-2 bg-orange-500 text-white rounded disabled:bg-gray-300 hover:bg-orange-600 transition-colors"
+                  disabled={
+                    !isInitialized || isRolling || !customNotation.trim()
+                  }
+                  className="rounded bg-orange-500 px-4 py-2 text-white transition-colors hover:bg-orange-600 disabled:bg-gray-300"
                 >
                   Roll
                 </button>
@@ -221,7 +244,7 @@ export function DiceRoller({
 
       {/* Results Display */}
       {showHistory && (
-        <DiceResultDisplay 
+        <DiceResultDisplay
           rollHistory={rollHistory}
           onClearHistory={clearHistory}
           maxResults={maxHistoryResults}
@@ -230,20 +253,20 @@ export function DiceRoller({
 
       {/* Debug Logs (minimal) */}
       {logs.length > 0 && (
-        <details className="bg-gray-50 rounded p-2">
-          <summary className="text-sm font-medium text-gray-700 cursor-pointer">
+        <details className="rounded bg-gray-50 p-2">
+          <summary className="cursor-pointer text-sm font-medium text-gray-700">
             Debug Logs ({logs.length})
           </summary>
-          <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+          <div className="mt-2 max-h-32 space-y-1 overflow-y-auto">
             {logs.map((log, index) => (
-              <div key={index} className="text-xs font-mono text-gray-600">
+              <div key={index} className="font-mono text-xs text-gray-600">
                 {log}
               </div>
             ))}
           </div>
           <button
             onClick={clearLogs}
-            className="mt-2 px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
+            className="mt-2 rounded bg-gray-500 px-2 py-1 text-xs text-white hover:bg-gray-600"
           >
             Clear Logs
           </button>

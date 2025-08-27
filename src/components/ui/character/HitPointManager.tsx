@@ -33,7 +33,7 @@ export default function HitPointManager({
   onToggleCalculationMode,
   onRecalculateMaxHP,
   onUpdateHitPoints,
-  className = ''
+  className = '',
 }: HitPointManagerProps) {
   // Use the shared HitPointTracker component with full functionality
   return (
@@ -59,4 +59,4 @@ export default function HitPointManager({
       className={className}
     />
   );
-} 
+}

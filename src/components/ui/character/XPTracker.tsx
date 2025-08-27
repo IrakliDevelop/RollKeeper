@@ -16,7 +16,7 @@ export default function XPTracker({
   currentLevel,
   onAddXP,
   onSetXP,
-  className = ''
+  className = '',
 }: XPTrackerProps) {
   // Use the shared XPTracker component with full functionality
   return (
@@ -34,4 +34,4 @@ export default function XPTracker({
       className={className}
     />
   );
-} 
+}

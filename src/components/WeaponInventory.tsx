@@ -11,20 +11,21 @@ export const WeaponInventory: React.FC = () => {
 
   // Calculate equipped items
   const equippedWeapons = character.weapons.filter(weapon => weapon.isEquipped);
-  const attunedItems = character.magicItems.filter(item => item.isAttuned).length + 
-                      character.weapons.filter(weapon => weapon.isAttuned).length;
+  const attunedItems =
+    character.magicItems.filter(item => item.isAttuned).length +
+    character.weapons.filter(weapon => weapon.isAttuned).length;
 
   return (
     <>
-      <div className="bg-white rounded-lg shadow border border-purple-200 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-purple-800 flex items-center gap-2">
+      <div className="rounded-lg border border-purple-200 bg-white p-4 shadow">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="flex items-center gap-2 text-lg font-bold text-purple-800">
             <span className="text-red-600">⚔️</span>
             Equipment & Magic Items
           </h3>
           <button
             onClick={() => setShowEquipmentModal(true)}
-            className="flex items-center gap-2 px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm"
+            className="flex items-center gap-2 rounded-md bg-purple-600 px-3 py-1 text-sm text-white transition-colors hover:bg-purple-700"
           >
             <Eye size={16} />
             View All
@@ -34,8 +35,8 @@ export const WeaponInventory: React.FC = () => {
         {/* Quick Overview */}
         <div className="space-y-3">
           {/* Weapons Summary */}
-          <div 
-            className="p-3 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
+          <div
+            className="cursor-pointer rounded-lg border border-blue-200 bg-blue-50 p-3 transition-colors hover:bg-blue-100"
             onClick={() => setShowEquipmentModal(true)}
           >
             <div className="flex items-center justify-between">
@@ -55,17 +56,17 @@ export const WeaponInventory: React.FC = () => {
             {equippedWeapons.length > 0 && (
               <div className="mt-2 text-sm text-blue-700">
                 <div className="font-medium">Ready:</div>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {equippedWeapons.slice(0, 3).map((weapon) => (
-                    <span 
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {equippedWeapons.slice(0, 3).map(weapon => (
+                    <span
                       key={weapon.id}
-                      className="px-2 py-1 bg-blue-200 text-blue-800 rounded text-xs"
+                      className="rounded bg-blue-200 px-2 py-1 text-xs text-blue-800"
                     >
                       {weapon.name}
                     </span>
                   ))}
                   {equippedWeapons.length > 3 && (
-                    <span className="px-2 py-1 bg-blue-200 text-blue-800 rounded text-xs">
+                    <span className="rounded bg-blue-200 px-2 py-1 text-xs text-blue-800">
                       +{equippedWeapons.length - 3} more
                     </span>
                   )}
@@ -75,8 +76,8 @@ export const WeaponInventory: React.FC = () => {
           </div>
 
           {/* Magic Items Summary */}
-          <div 
-            className="p-3 bg-purple-50 border border-purple-200 rounded-lg cursor-pointer hover:bg-purple-100 transition-colors"
+          <div
+            className="cursor-pointer rounded-lg border border-purple-200 bg-purple-50 p-3 transition-colors hover:bg-purple-100"
             onClick={() => setShowEquipmentModal(true)}
           >
             <div className="flex items-center justify-between">
@@ -96,17 +97,17 @@ export const WeaponInventory: React.FC = () => {
             {character.magicItems.length > 0 && (
               <div className="mt-2 text-sm text-purple-700">
                 <div className="font-medium">Recent:</div>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {character.magicItems.slice(0, 3).map((item) => (
-                    <span 
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {character.magicItems.slice(0, 3).map(item => (
+                    <span
                       key={item.id}
-                      className="px-2 py-1 bg-purple-200 text-purple-800 rounded text-xs"
+                      className="rounded bg-purple-200 px-2 py-1 text-xs text-purple-800"
                     >
                       {item.name}
                     </span>
                   ))}
                   {character.magicItems.length > 3 && (
-                    <span className="px-2 py-1 bg-purple-200 text-purple-800 rounded text-xs">
+                    <span className="rounded bg-purple-200 px-2 py-1 text-xs text-purple-800">
                       +{character.magicItems.length - 3} more
                     </span>
                   )}
@@ -116,24 +117,27 @@ export const WeaponInventory: React.FC = () => {
           </div>
 
           {/* Empty State */}
-          {character.weapons.length === 0 && character.magicItems.length === 0 && (
-            <div className="text-center py-6 text-gray-500">
-              <div className="flex justify-center gap-2 mb-2">
-                <Sword className="h-8 w-8 text-gray-300" />
-                <Wand2 className="h-8 w-8 text-gray-300" />
+          {character.weapons.length === 0 &&
+            character.magicItems.length === 0 && (
+              <div className="py-6 text-center text-gray-500">
+                <div className="mb-2 flex justify-center gap-2">
+                  <Sword className="h-8 w-8 text-gray-300" />
+                  <Wand2 className="h-8 w-8 text-gray-300" />
+                </div>
+                <p className="font-medium">No equipment added yet</p>
+                <p className="mt-1 text-sm">
+                  Click &quot;View All&quot; to add weapons and magic items
+                </p>
               </div>
-              <p className="font-medium">No equipment added yet</p>
-              <p className="text-sm mt-1">Click &quot;View All&quot; to add weapons and magic items</p>
-            </div>
-          )}
+            )}
         </div>
       </div>
 
       {/* Equipment Modal */}
-      <EquipmentModal 
+      <EquipmentModal
         isOpen={showEquipmentModal}
         onClose={() => setShowEquipmentModal(false)}
       />
     </>
   );
-}; 
+};

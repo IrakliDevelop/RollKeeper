@@ -1,24 +1,49 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { CharacterState, SaveStatus, CharacterExport, ClassInfo, SpellSlots, PactMagic, RichTextContent, CharacterBackground, Weapon, TrackableTrait, HeroicInspiration, MagicItem, ArmorItem, InventoryItem, ActiveCondition, ActiveDisease, ExhaustionVariant, WeaponDamage, DamageType } from '@/types/character';
+import {
+  CharacterState,
+  SaveStatus,
+  CharacterExport,
+  ClassInfo,
+  SpellSlots,
+  PactMagic,
+  RichTextContent,
+  CharacterBackground,
+  Weapon,
+  TrackableTrait,
+  HeroicInspiration,
+  MagicItem,
+  ArmorItem,
+  InventoryItem,
+  ActiveCondition,
+  ActiveDisease,
+  ExhaustionVariant,
+  WeaponDamage,
+  DamageType,
+} from '@/types/character';
 import { ProcessedSpell } from '@/types/spells';
-import { DEFAULT_CHARACTER_STATE, STORAGE_KEY, APP_VERSION, COMMON_CLASSES } from '@/utils/constants';
-import { 
-  calculateSpellSlots, 
-  calculatePactMagic, 
+import {
+  DEFAULT_CHARACTER_STATE,
+  STORAGE_KEY,
+  APP_VERSION,
+  COMMON_CLASSES,
+} from '@/utils/constants';
+import {
+  calculateSpellSlots,
+  calculatePactMagic,
   updateSpellSlotsPreservingUsed,
   calculateModifier,
   calculateLevelFromXP,
   calculateTraitMaxUses,
 } from '@/utils/calculations';
-import { 
-  applyDamage, 
-  applyHealing, 
-  addTemporaryHP, 
-  makeDeathSave, 
-  resetDeathSaves, 
-  calculateMaxHP, 
-  getClassHitDie 
+import {
+  applyDamage,
+  applyHealing,
+  addTemporaryHP,
+  makeDeathSave,
+  resetDeathSaves,
+  calculateMaxHP,
+  getClassHitDie,
 } from '@/utils/hpCalculations';
 
 // Function to migrate weapon damage from old format to new array format
@@ -30,28 +55,30 @@ function migrateWeaponDamage(weapon: Record<string, unknown>): Weapon {
 
   // If the weapon has the old damage object format, convert it
   const damage = weapon.damage as Record<string, unknown>;
-  if (damage && typeof damage === 'object' && 
-      typeof damage.dice === 'string' && 
-      typeof damage.type === 'string') {
-    
+  if (
+    damage &&
+    typeof damage === 'object' &&
+    typeof damage.dice === 'string' &&
+    typeof damage.type === 'string'
+  ) {
     const newDamage: WeaponDamage = {
       dice: damage.dice,
       type: damage.type as DamageType,
       versatiledice: damage.versatiledice as string | undefined,
-      label: 'Weapon Damage' // Default label for migrated weapons
+      label: 'Weapon Damage', // Default label for migrated weapons
     };
 
     return {
       ...weapon,
       damage: [newDamage],
-      legacyDamage: damage // Keep the old format for reference
+      legacyDamage: damage, // Keep the old format for reference
     } as unknown as Weapon;
   }
 
   // If no damage is defined, create a default empty array
   return {
     ...weapon,
-    damage: []
+    damage: [],
   } as unknown as Weapon;
 }
 
@@ -61,7 +88,7 @@ function migrateCharacterData(character: unknown): CharacterState {
   if (!character || typeof character !== 'object') {
     return {
       ...DEFAULT_CHARACTER_STATE,
-      id: generateId()
+      id: generateId(),
     };
   }
 
@@ -85,7 +112,11 @@ function migrateCharacterData(character: unknown): CharacterState {
       result.notes = DEFAULT_CHARACTER_STATE.notes;
     }
     // Ensure characterBackground exists
-    if (!result.characterBackground || typeof result.characterBackground !== 'object' || !('backstory' in result.characterBackground)) {
+    if (
+      !result.characterBackground ||
+      typeof result.characterBackground !== 'object' ||
+      !('backstory' in result.characterBackground)
+    ) {
       result.characterBackground = DEFAULT_CHARACTER_STATE.characterBackground;
     }
     // Ensure weapons array exists
@@ -93,7 +124,10 @@ function migrateCharacterData(character: unknown): CharacterState {
       result.weapons = DEFAULT_CHARACTER_STATE.weapons;
     }
     // Ensure weapon proficiencies exist
-    if (!result.weaponProficiencies || typeof result.weaponProficiencies !== 'object') {
+    if (
+      !result.weaponProficiencies ||
+      typeof result.weaponProficiencies !== 'object'
+    ) {
       result.weaponProficiencies = DEFAULT_CHARACTER_STATE.weaponProficiencies;
     }
     // Ensure spells array exists
@@ -101,11 +135,18 @@ function migrateCharacterData(character: unknown): CharacterState {
       result.spells = DEFAULT_CHARACTER_STATE.spells;
     }
     // Ensure spellcasting stats exist
-    if (!result.spellcastingStats || typeof result.spellcastingStats !== 'object') {
+    if (
+      !result.spellcastingStats ||
+      typeof result.spellcastingStats !== 'object'
+    ) {
       result.spellcastingStats = DEFAULT_CHARACTER_STATE.spellcastingStats;
     }
     // Ensure class has hitDie
-    if (result.class && typeof result.class === 'object' && !('hitDie' in result.class)) {
+    if (
+      result.class &&
+      typeof result.class === 'object' &&
+      !('hitDie' in result.class)
+    ) {
       (result.class as Record<string, unknown>).hitDie = 8; // Default to d8
     }
     // Ensure hitPoints has new properties
@@ -119,7 +160,10 @@ function migrateCharacterData(character: unknown): CharacterState {
       result.reaction = DEFAULT_CHARACTER_STATE.reaction;
     }
     // Ensure heroic inspiration exists
-    if (!result.heroicInspiration || typeof result.heroicInspiration !== 'object') {
+    if (
+      !result.heroicInspiration ||
+      typeof result.heroicInspiration !== 'object'
+    ) {
       result.heroicInspiration = DEFAULT_CHARACTER_STATE.heroicInspiration;
     }
     // Ensure temporary AC field exists
@@ -163,8 +207,12 @@ function migrateCharacterData(character: unknown): CharacterState {
       result.concentration = DEFAULT_CHARACTER_STATE.concentration;
     }
     // Ensure conditions and diseases tracking exists
-    if (!result.conditionsAndDiseases || typeof result.conditionsAndDiseases !== 'object') {
-      result.conditionsAndDiseases = DEFAULT_CHARACTER_STATE.conditionsAndDiseases;
+    if (
+      !result.conditionsAndDiseases ||
+      typeof result.conditionsAndDiseases !== 'object'
+    ) {
+      result.conditionsAndDiseases =
+        DEFAULT_CHARACTER_STATE.conditionsAndDiseases;
     }
     return result;
   }
@@ -175,62 +223,82 @@ function migrateCharacterData(character: unknown): CharacterState {
     ...DEFAULT_CHARACTER_STATE,
     ...(characterObj as Partial<CharacterState>),
     class: {
-      name: (characterObj.class && typeof characterObj.class === 'string') ? characterObj.class : '',
+      name:
+        characterObj.class && typeof characterObj.class === 'string'
+          ? characterObj.class
+          : '',
       isCustom: false,
       spellcaster: 'none' as const,
-      hitDie: 8 // Default to d8
+      hitDie: 8, // Default to d8
     },
     spellSlots: DEFAULT_CHARACTER_STATE.spellSlots,
     pactMagic: undefined,
-    features: Array.isArray(characterObj.features) ? characterObj.features : DEFAULT_CHARACTER_STATE.features,
-    traits: Array.isArray(characterObj.traits) ? characterObj.traits : DEFAULT_CHARACTER_STATE.traits,
-    characterBackground: (characterObj.characterBackground && 
+    features: Array.isArray(characterObj.features)
+      ? characterObj.features
+      : DEFAULT_CHARACTER_STATE.features,
+    traits: Array.isArray(characterObj.traits)
+      ? characterObj.traits
+      : DEFAULT_CHARACTER_STATE.traits,
+    characterBackground:
+      characterObj.characterBackground &&
       typeof characterObj.characterBackground === 'object' &&
-      'backstory' in characterObj.characterBackground) 
-      ? characterObj.characterBackground as CharacterState['characterBackground']
-      : DEFAULT_CHARACTER_STATE.characterBackground,
-    weapons: Array.isArray(characterObj.weapons) 
-      ? (characterObj.weapons as Record<string, unknown>[]).map(migrateWeaponDamage)
+      'backstory' in characterObj.characterBackground
+        ? (characterObj.characterBackground as CharacterState['characterBackground'])
+        : DEFAULT_CHARACTER_STATE.characterBackground,
+    weapons: Array.isArray(characterObj.weapons)
+      ? (characterObj.weapons as Record<string, unknown>[]).map(
+          migrateWeaponDamage
+        )
       : DEFAULT_CHARACTER_STATE.weapons,
-    weaponProficiencies: (characterObj.weaponProficiencies && typeof characterObj.weaponProficiencies === 'object') 
-      ? characterObj.weaponProficiencies as CharacterState['weaponProficiencies']
-      : DEFAULT_CHARACTER_STATE.weaponProficiencies,
-    jackOfAllTrades: (characterObj.jackOfAllTrades && typeof characterObj.jackOfAllTrades === 'boolean')
-      ? characterObj.jackOfAllTrades
-      : DEFAULT_CHARACTER_STATE.jackOfAllTrades
+    weaponProficiencies:
+      characterObj.weaponProficiencies &&
+      typeof characterObj.weaponProficiencies === 'object'
+        ? (characterObj.weaponProficiencies as CharacterState['weaponProficiencies'])
+        : DEFAULT_CHARACTER_STATE.weaponProficiencies,
+    jackOfAllTrades:
+      characterObj.jackOfAllTrades &&
+      typeof characterObj.jackOfAllTrades === 'boolean'
+        ? characterObj.jackOfAllTrades
+        : DEFAULT_CHARACTER_STATE.jackOfAllTrades,
   };
 
   // Try to detect spellcaster type from class name
   if (characterObj.class && typeof characterObj.class === 'string') {
     const className = characterObj.class;
-    const matchingClass = COMMON_CLASSES.find(c => 
-      c.name.toLowerCase() === className.toLowerCase()
+    const matchingClass = COMMON_CLASSES.find(
+      c => c.name.toLowerCase() === className.toLowerCase()
     );
     if (matchingClass) {
       migratedCharacter.class = {
         name: matchingClass.name,
         isCustom: false,
         spellcaster: matchingClass.spellcaster,
-        hitDie: matchingClass.hitDie
+        hitDie: matchingClass.hitDie,
       };
-      
+
       // Calculate initial spell slots
-      const level = (characterObj.level && typeof characterObj.level === 'number') ? characterObj.level : 1;
-      migratedCharacter.spellSlots = calculateSpellSlots(migratedCharacter.class, level);
-      
+      const level =
+        characterObj.level && typeof characterObj.level === 'number'
+          ? characterObj.level
+          : 1;
+      migratedCharacter.spellSlots = calculateSpellSlots(
+        migratedCharacter.class,
+        level
+      );
+
       // Add pact magic for warlocks
       if (matchingClass.spellcaster === 'warlock') {
         migratedCharacter.pactMagic = calculatePactMagic(level);
       }
-          } else {
-        // Unknown class, mark as custom
-        migratedCharacter.class = {
-          name: typeof characterObj.class === 'string' ? characterObj.class : '',
-          isCustom: true,
-          spellcaster: 'none',
-          hitDie: 8 // Default to d8 for custom classes
-        };
-      }
+    } else {
+      // Unknown class, mark as custom
+      migratedCharacter.class = {
+        name: typeof characterObj.class === 'string' ? characterObj.class : '',
+        isCustom: true,
+        spellcaster: 'none',
+        hitDie: 8, // Default to d8 for custom classes
+      };
+    }
   }
 
   return migratedCharacter;
@@ -239,43 +307,55 @@ function migrateCharacterData(character: unknown): CharacterState {
 interface CharacterStore {
   // Character data
   character: CharacterState;
-  
+
   // UI state
   saveStatus: SaveStatus;
   lastSaved: Date | string | null; // Can be string when rehydrated from localStorage
   hasUnsavedChanges: boolean;
   hasHydrated: boolean;
-  
+
   // Actions
   updateCharacter: (updates: Partial<CharacterState>) => void;
   loadCharacterState: (characterState: CharacterState) => void;
-  updateAbilityScore: (ability: keyof CharacterState['abilities'], value: number) => void;
-  updateSkillProficiency: (skill: keyof CharacterState['skills'], proficient: boolean) => void;
-  updateSkillExpertise: (skill: keyof CharacterState['skills'], expertise: boolean) => void;
-  updateSavingThrowProficiency: (ability: keyof CharacterState['savingThrows'], proficient: boolean) => void;
+  updateAbilityScore: (
+    ability: keyof CharacterState['abilities'],
+    value: number
+  ) => void;
+  updateSkillProficiency: (
+    skill: keyof CharacterState['skills'],
+    proficient: boolean
+  ) => void;
+  updateSkillExpertise: (
+    skill: keyof CharacterState['skills'],
+    expertise: boolean
+  ) => void;
+  updateSavingThrowProficiency: (
+    ability: keyof CharacterState['savingThrows'],
+    proficient: boolean
+  ) => void;
   updateHitPoints: (updates: Partial<CharacterState['hitPoints']>) => void;
   updateInitiative: (value: number, isOverride: boolean) => void;
   resetInitiativeToDefault: () => void;
-  
+
   // Reaction management
   toggleReaction: () => void;
   resetReaction: () => void;
-  
+
   // Class Features
   toggleJackOfAllTrades: () => void;
-  
+
   // Heroic inspiration management
   updateHeroicInspiration: (updates: Partial<HeroicInspiration>) => void;
   addHeroicInspiration: (amount?: number) => void;
   useHeroicInspiration: () => void;
   resetHeroicInspiration: () => void;
-  
+
   // Armor Class management
   updateTempArmorClass: (tempAC: number) => void;
   toggleShield: () => void;
   resetTempArmorClass: () => void;
   updateShieldBonus: (bonus: number) => void;
-  
+
   // HP management actions
   applyDamageToCharacter: (damage: number) => void;
   applyHealingToCharacter: (healing: number) => void;
@@ -284,7 +364,7 @@ interface CharacterStore {
   resetDeathSavingThrows: () => void;
   toggleHPCalculationMode: () => void;
   recalculateMaxHP: () => void;
-  
+
   // Class and spell management
   updateClass: (classInfo: ClassInfo) => void;
   updateLevel: (level: number) => void;
@@ -292,41 +372,71 @@ interface CharacterStore {
   updatePactMagicSlot: (used: number) => void;
   resetSpellSlots: () => void;
   resetPactMagicSlots: () => void;
-  
+
   // Concentration management
-  startConcentration: (spellName: string, spellId?: string, castAt?: number) => void;
+  startConcentration: (
+    spellName: string,
+    spellId?: string,
+    castAt?: number
+  ) => void;
   stopConcentration: () => void;
   isConcentratingOn: (spellName: string) => boolean;
 
   // Conditions and diseases management
-  addCondition: (conditionName: string, source: string, description: string, count?: number, notes?: string) => void;
-  updateCondition: (conditionId: string, updates: Partial<Pick<ActiveCondition, 'count' | 'notes'>>) => void;
+  addCondition: (
+    conditionName: string,
+    source: string,
+    description: string,
+    count?: number,
+    notes?: string
+  ) => void;
+  updateCondition: (
+    conditionId: string,
+    updates: Partial<Pick<ActiveCondition, 'count' | 'notes'>>
+  ) => void;
   removeCondition: (conditionId: string) => void;
-  addDisease: (diseaseName: string, source: string, description: string, onsetTime?: string, notes?: string) => void;
-  updateDisease: (diseaseId: string, updates: Partial<Pick<ActiveDisease, 'onsetTime' | 'notes'>>) => void;
+  addDisease: (
+    diseaseName: string,
+    source: string,
+    description: string,
+    onsetTime?: string,
+    notes?: string
+  ) => void;
+  updateDisease: (
+    diseaseId: string,
+    updates: Partial<Pick<ActiveDisease, 'onsetTime' | 'notes'>>
+  ) => void;
   removeDisease: (diseaseId: string) => void;
   setExhaustionVariant: (variant: ExhaustionVariant) => void;
   clearAllConditions: () => void;
   clearAllDiseases: () => void;
-  
+
   // XP management
   addExperience: (xpToAdd: number) => void;
   setExperience: (newXP: number) => void;
 
   // Rich text content management
-  addFeature: (feature: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addFeature: (
+    feature: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
   updateFeature: (id: string, updates: Partial<RichTextContent>) => void;
   deleteFeature: (id: string) => void;
-  addTrait: (trait: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addTrait: (
+    trait: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
   updateTrait: (id: string, updates: Partial<RichTextContent>) => void;
   deleteTrait: (id: string) => void;
-  addNote: (note: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addNote: (
+    note: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
   updateNote: (id: string, updates: Partial<RichTextContent>) => void;
   deleteNote: (id: string) => void;
   reorderNotes: (sourceIndex: number, destinationIndex: number) => void;
 
   // Trackable trait management
-  addTrackableTrait: (trait: Omit<TrackableTrait, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addTrackableTrait: (
+    trait: Omit<TrackableTrait, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
   updateTrackableTrait: (id: string, updates: Partial<TrackableTrait>) => void;
   deleteTrackableTrait: (id: string) => void;
   useTrackableTrait: (id: string) => void;
@@ -339,9 +449,11 @@ interface CharacterStore {
   deleteWeapon: (id: string) => void;
   equipWeapon: (id: string, equipped: boolean) => void;
   reorderWeapons: (sourceIndex: number, destinationIndex: number) => void;
-  
+
   // Magic item management
-  addMagicItem: (item: Omit<MagicItem, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addMagicItem: (
+    item: Omit<MagicItem, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
   updateMagicItem: (id: string, updates: Partial<MagicItem>) => void;
   deleteMagicItem: (id: string) => void;
   attuneMagicItem: (id: string, attuned: boolean) => void;
@@ -349,23 +461,38 @@ interface CharacterStore {
   reorderMagicItems: (sourceIndex: number, destinationIndex: number) => void;
 
   // Armor management
-  addArmorItem: (item: Omit<ArmorItem, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addArmorItem: (
+    item: Omit<ArmorItem, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
   updateArmorItem: (id: string, updates: Partial<ArmorItem>) => void;
   deleteArmorItem: (id: string) => void;
   equipArmorItem: (id: string, equipped: boolean) => void;
   reorderArmorItems: (sourceIndex: number, destinationIndex: number) => void;
 
   // Inventory management
-  addInventoryItem: (item: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addInventoryItem: (
+    item: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
   updateInventoryItem: (id: string, updates: Partial<InventoryItem>) => void;
   deleteInventoryItem: (id: string) => void;
   updateItemQuantity: (id: string, quantity: number) => void;
-  reorderInventoryItems: (sourceIndex: number, destinationIndex: number) => void;
+  reorderInventoryItems: (
+    sourceIndex: number,
+    destinationIndex: number
+  ) => void;
 
   // Currency management
-  updateCurrency: (updates: Partial<typeof DEFAULT_CHARACTER_STATE.currency>) => void;
-  addCurrency: (type: keyof typeof DEFAULT_CHARACTER_STATE.currency, amount: number) => void;
-  subtractCurrency: (type: keyof typeof DEFAULT_CHARACTER_STATE.currency, amount: number) => void;
+  updateCurrency: (
+    updates: Partial<typeof DEFAULT_CHARACTER_STATE.currency>
+  ) => void;
+  addCurrency: (
+    type: keyof typeof DEFAULT_CHARACTER_STATE.currency,
+    amount: number
+  ) => void;
+  subtractCurrency: (
+    type: keyof typeof DEFAULT_CHARACTER_STATE.currency,
+    amount: number
+  ) => void;
 
   // Spellbook management
   addSpellToSpellbook: (spellId: string) => void;
@@ -373,19 +500,26 @@ interface CharacterStore {
   toggleSpellFavorite: (spellId: string) => void;
   prepareSpell: (spellId: string) => void;
   unprepareSpell: (spellId: string) => void;
-  updateSpellbookSettings: (settings: Partial<typeof DEFAULT_CHARACTER_STATE.spellbook.spellbookSettings>) => void;
+  updateSpellbookSettings: (
+    settings: Partial<
+      typeof DEFAULT_CHARACTER_STATE.spellbook.spellbookSettings
+    >
+  ) => void;
   addCustomSpell: (spell: ProcessedSpell) => void; // We'll type this properly later
   removeCustomSpell: (spellId: string) => void;
-  reorderPreparedSpells: (sourceIndex: number, destinationIndex: number) => void;
+  reorderPreparedSpells: (
+    sourceIndex: number,
+    destinationIndex: number
+  ) => void;
   reorderSpells: (sourceIndex: number, destinationIndex: number) => void;
-  
+
   // Persistence actions
   saveCharacter: () => void;
   loadCharacter: (character: CharacterState) => void;
   resetCharacter: () => void;
   exportCharacter: () => CharacterExport;
   importCharacter: (exportData: CharacterExport) => boolean;
-  
+
   // Auto-save control
   setSaveStatus: (status: SaveStatus) => void;
   markSaved: () => void;
@@ -393,7 +527,8 @@ interface CharacterStore {
 }
 
 // Utility function to generate unique IDs
-const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
+const generateId = () =>
+  Date.now().toString(36) + Math.random().toString(36).substr(2);
 
 export const useCharacterStore = create<CharacterStore>()(
   persist(
@@ -401,7 +536,7 @@ export const useCharacterStore = create<CharacterStore>()(
       // Initial state
       character: {
         ...DEFAULT_CHARACTER_STATE,
-        id: generateId()
+        id: generateId(),
       },
       saveStatus: 'saved',
       lastSaved: null,
@@ -409,29 +544,29 @@ export const useCharacterStore = create<CharacterStore>()(
       hasHydrated: false,
 
       // Character update actions
-      updateCharacter: (updates) => {
-        set((state) => ({
+      updateCharacter: updates => {
+        set(state => ({
           character: { ...state.character, ...updates },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
-      
-      loadCharacterState: (characterState) => {
+
+      loadCharacterState: characterState => {
         const migratedCharacter = migrateCharacterData(characterState);
         set({
           character: migratedCharacter,
           hasUnsavedChanges: false,
           saveStatus: 'saved',
-          lastSaved: new Date()
+          lastSaved: new Date(),
         });
       },
 
       updateAbilityScore: (ability, value) => {
-        set((state) => {
+        set(state => {
           const newAbilities = {
             ...state.character.abilities,
-            [ability]: Math.max(1, Math.min(30, value))
+            [ability]: Math.max(1, Math.min(30, value)),
           };
 
           // Auto-update initiative if it's not overridden and dexterity changed
@@ -439,7 +574,7 @@ export const useCharacterStore = create<CharacterStore>()(
           if (ability === 'dexterity' && !initiative.isOverridden) {
             initiative = {
               ...initiative,
-              value: calculateModifier(newAbilities.dexterity)
+              value: calculateModifier(newAbilities.dexterity),
             };
           }
 
@@ -447,325 +582,337 @@ export const useCharacterStore = create<CharacterStore>()(
             character: {
               ...state.character,
               abilities: newAbilities,
-              initiative
+              initiative,
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       updateSkillProficiency: (skill, proficient) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             skills: {
               ...state.character.skills,
               [skill]: {
                 ...state.character.skills[skill],
-                proficient
-              }
-            }
+                proficient,
+              },
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       updateSkillExpertise: (skill, expertise) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             skills: {
               ...state.character.skills,
               [skill]: {
                 ...state.character.skills[skill],
-                expertise
-              }
-            }
+                expertise,
+              },
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       updateSavingThrowProficiency: (ability, proficient) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             savingThrows: {
               ...state.character.savingThrows,
               [ability]: {
                 ...state.character.savingThrows[ability],
-                proficient
-              }
-            }
+                proficient,
+              },
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      updateHitPoints: (updates) => {
-        set((state) => ({
+      updateHitPoints: updates => {
+        set(state => ({
           character: {
             ...state.character,
             hitPoints: {
               ...state.character.hitPoints,
-              ...updates
-            }
+              ...updates,
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       updateInitiative: (value, isOverride) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             initiative: {
               value,
-              isOverridden: isOverride
-            }
+              isOverridden: isOverride,
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       resetInitiativeToDefault: () => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             initiative: {
               value: calculateModifier(state.character.abilities.dexterity),
-              isOverridden: false
-            }
+              isOverridden: false,
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       // Reaction management actions
       toggleReaction: () => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             reaction: {
-              hasUsedReaction: !state.character.reaction.hasUsedReaction
-            }
+              hasUsedReaction: !state.character.reaction.hasUsedReaction,
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       resetReaction: () => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             reaction: {
-              hasUsedReaction: false
-            }
+              hasUsedReaction: false,
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       // Class Features actions
       toggleJackOfAllTrades: () => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
-            jackOfAllTrades: !state.character.jackOfAllTrades
+            jackOfAllTrades: !state.character.jackOfAllTrades,
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       // Heroic inspiration management actions
-      updateHeroicInspiration: (updates) => {
-        set((state) => ({
+      updateHeroicInspiration: updates => {
+        set(state => ({
           character: {
             ...state.character,
             heroicInspiration: {
               ...state.character.heroicInspiration,
-              ...updates
-            }
+              ...updates,
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       addHeroicInspiration: (amount = 1) => {
-        set((state) => {
+        set(state => {
           const current = state.character.heroicInspiration.count;
           const max = state.character.heroicInspiration.maxCount;
-          const newCount = max ? Math.min(current + amount, max) : current + amount;
-          
+          const newCount = max
+            ? Math.min(current + amount, max)
+            : current + amount;
+
           return {
             character: {
               ...state.character,
               heroicInspiration: {
                 ...state.character.heroicInspiration,
-                count: Math.max(0, newCount)
-              }
+                count: Math.max(0, newCount),
+              },
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       useHeroicInspiration: () => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             heroicInspiration: {
               ...state.character.heroicInspiration,
-              count: Math.max(0, state.character.heroicInspiration.count - 1)
-            }
+              count: Math.max(0, state.character.heroicInspiration.count - 1),
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       resetHeroicInspiration: () => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             heroicInspiration: {
               ...state.character.heroicInspiration,
-              count: 0
-            }
+              count: 0,
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       // Armor Class management
-      updateTempArmorClass: (tempAC) => {
-        set((state) => ({
+      updateTempArmorClass: tempAC => {
+        set(state => ({
           character: {
             ...state.character,
-            tempArmorClass: tempAC
+            tempArmorClass: tempAC,
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       toggleShield: () => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
-            isWearingShield: !state.character.isWearingShield
+            isWearingShield: !state.character.isWearingShield,
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       resetTempArmorClass: () => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
-            tempArmorClass: 0
+            tempArmorClass: 0,
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      updateShieldBonus: (bonus) => {
-        set((state) => ({
+      updateShieldBonus: bonus => {
+        set(state => ({
           character: {
             ...state.character,
-            shieldBonus: bonus
+            shieldBonus: bonus,
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       // HP management actions
-      applyDamageToCharacter: (damage) => {
-        set((state) => ({
+      applyDamageToCharacter: damage => {
+        set(state => ({
           character: {
             ...state.character,
-            hitPoints: applyDamage(state.character.hitPoints, damage)
+            hitPoints: applyDamage(state.character.hitPoints, damage),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      applyHealingToCharacter: (healing) => {
-        set((state) => ({
+      applyHealingToCharacter: healing => {
+        set(state => ({
           character: {
             ...state.character,
-            hitPoints: applyHealing(state.character.hitPoints, healing)
+            hitPoints: applyHealing(state.character.hitPoints, healing),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      addTemporaryHPToCharacter: (tempHP) => {
-        set((state) => ({
+      addTemporaryHPToCharacter: tempHP => {
+        set(state => ({
           character: {
             ...state.character,
-            hitPoints: addTemporaryHP(state.character.hitPoints, tempHP)
+            hitPoints: addTemporaryHP(state.character.hitPoints, tempHP),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       makeDeathSavingThrow: (isSuccess, isCritical = false) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
-            hitPoints: makeDeathSave(state.character.hitPoints, isSuccess, isCritical)
+            hitPoints: makeDeathSave(
+              state.character.hitPoints,
+              isSuccess,
+              isCritical
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       resetDeathSavingThrows: () => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
-            hitPoints: resetDeathSaves(state.character.hitPoints)
+            hitPoints: resetDeathSaves(state.character.hitPoints),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       toggleHPCalculationMode: () => {
-        set((state) => {
-          const newMode = state.character.hitPoints.calculationMode === 'auto' ? 'manual' : 'auto';
+        set(state => {
+          const newMode =
+            state.character.hitPoints.calculationMode === 'auto'
+              ? 'manual'
+              : 'auto';
           let newMaxHP = state.character.hitPoints.max;
-          
+
           // If switching to auto mode, recalculate max HP
           if (newMode === 'auto') {
-            const hitDie = getClassHitDie(state.character.class.name, state.character.class.hitDie);
+            const hitDie = getClassHitDie(
+              state.character.class.name,
+              state.character.class.hitDie
+            );
             newMaxHP = calculateMaxHP(
               { ...state.character.class, hitDie },
               state.character.level,
               state.character.abilities.constitution
             );
           }
-          
+
           return {
             character: {
               ...state.character,
@@ -773,48 +920,60 @@ export const useCharacterStore = create<CharacterStore>()(
                 ...state.character.hitPoints,
                 calculationMode: newMode,
                 max: newMaxHP,
-                manualMaxOverride: newMode === 'manual' ? state.character.hitPoints.max : undefined
-              }
+                manualMaxOverride:
+                  newMode === 'manual'
+                    ? state.character.hitPoints.max
+                    : undefined,
+              },
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       recalculateMaxHP: () => {
-        set((state) => {
+        set(state => {
           if (state.character.hitPoints.calculationMode === 'manual') {
             return state; // Don't recalculate in manual mode
           }
-          
-          const hitDie = getClassHitDie(state.character.class.name, state.character.class.hitDie);
+
+          const hitDie = getClassHitDie(
+            state.character.class.name,
+            state.character.class.hitDie
+          );
           const newMaxHP = calculateMaxHP(
             { ...state.character.class, hitDie },
             state.character.level,
             state.character.abilities.constitution
           );
-          
+
           return {
             character: {
               ...state.character,
               hitPoints: {
                 ...state.character.hitPoints,
-                max: newMaxHP
-              }
+                max: newMaxHP,
+              },
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       // Class and spell management
-      updateClass: (classInfo) => {
-        set((state) => {
-          const newSpellSlots = calculateSpellSlots(classInfo, state.character.level);
-          const preservedSpellSlots = updateSpellSlotsPreservingUsed(newSpellSlots, state.character.spellSlots);
-          
+      updateClass: classInfo => {
+        set(state => {
+          const newSpellSlots = calculateSpellSlots(
+            classInfo,
+            state.character.level
+          );
+          const preservedSpellSlots = updateSpellSlotsPreservingUsed(
+            newSpellSlots,
+            state.character.spellSlots
+          );
+
           let pactMagic: PactMagic | undefined = undefined;
           if (classInfo.spellcaster === 'warlock') {
             pactMagic = calculatePactMagic(state.character.level);
@@ -832,20 +991,26 @@ export const useCharacterStore = create<CharacterStore>()(
               ...state.character,
               class: classInfo,
               spellSlots: preservedSpellSlots,
-              pactMagic
+              pactMagic,
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
-      updateLevel: (level) => {
-        set((state) => {
+      updateLevel: level => {
+        set(state => {
           const clampedLevel = Math.max(1, Math.min(20, level));
-          const newSpellSlots = calculateSpellSlots(state.character.class, clampedLevel);
-          const preservedSpellSlots = updateSpellSlotsPreservingUsed(newSpellSlots, state.character.spellSlots);
-          
+          const newSpellSlots = calculateSpellSlots(
+            state.character.class,
+            clampedLevel
+          );
+          const preservedSpellSlots = updateSpellSlotsPreservingUsed(
+            newSpellSlots,
+            state.character.spellSlots
+          );
+
           let pactMagic: PactMagic | undefined = state.character.pactMagic;
           if (state.character.class.spellcaster === 'warlock') {
             pactMagic = calculatePactMagic(clampedLevel);
@@ -863,35 +1028,38 @@ export const useCharacterStore = create<CharacterStore>()(
               ...state.character,
               level: clampedLevel,
               spellSlots: preservedSpellSlots,
-              pactMagic
+              pactMagic,
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       updateSpellSlot: (level, used) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             spellSlots: {
               ...state.character.spellSlots,
               [level]: {
                 ...state.character.spellSlots[level],
-                used: Math.max(0, Math.min(used, state.character.spellSlots[level].max))
-              }
-            }
+                used: Math.max(
+                  0,
+                  Math.min(used, state.character.spellSlots[level].max)
+                ),
+              },
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      updatePactMagicSlot: (used) => {
-        set((state) => {
+      updatePactMagicSlot: used => {
+        set(state => {
           if (!state.character.pactMagic) return state;
-          
+
           return {
             character: {
               ...state.character,
@@ -899,18 +1067,21 @@ export const useCharacterStore = create<CharacterStore>()(
                 ...state.character.pactMagic,
                 slots: {
                   ...state.character.pactMagic.slots,
-                  used: Math.max(0, Math.min(used, state.character.pactMagic.slots.max))
-                }
-              }
+                  used: Math.max(
+                    0,
+                    Math.min(used, state.character.pactMagic.slots.max)
+                  ),
+                },
+              },
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       resetSpellSlots: () => {
-        set((state) => {
+        set(state => {
           const resetSlots: SpellSlots = {
             1: { ...state.character.spellSlots[1], used: 0 },
             2: { ...state.character.spellSlots[2], used: 0 },
@@ -926,18 +1097,18 @@ export const useCharacterStore = create<CharacterStore>()(
           return {
             character: {
               ...state.character,
-              spellSlots: resetSlots
+              spellSlots: resetSlots,
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       resetPactMagicSlots: () => {
-        set((state) => {
+        set(state => {
           if (!state.character.pactMagic) return state;
-          
+
           return {
             character: {
               ...state.character,
@@ -945,19 +1116,19 @@ export const useCharacterStore = create<CharacterStore>()(
                 ...state.character.pactMagic,
                 slots: {
                   ...state.character.pactMagic.slots,
-                  used: 0
-                }
-              }
+                  used: 0,
+                },
+              },
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       // Concentration management
       startConcentration: (spellName, spellId, castAt) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             concentration: {
@@ -966,15 +1137,15 @@ export const useCharacterStore = create<CharacterStore>()(
               spellId,
               castAt,
               startedAt: new Date().toISOString(),
-            }
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       stopConcentration: () => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             concentration: {
@@ -983,22 +1154,24 @@ export const useCharacterStore = create<CharacterStore>()(
               spellId: undefined,
               castAt: undefined,
               startedAt: undefined,
-            }
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      isConcentratingOn: (spellName) => {
+      isConcentratingOn: spellName => {
         const state = get();
-        return state.character.concentration.isConcentrating && 
-               state.character.concentration.spellName === spellName;
+        return (
+          state.character.concentration.isConcentrating &&
+          state.character.concentration.spellName === spellName
+        );
       },
 
       // Conditions and diseases management
       addCondition: (conditionName, source, description, count = 1, notes) => {
-        set((state) => {
+        set(state => {
           const newCondition: ActiveCondition = {
             id: `${conditionName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
             name: conditionName,
@@ -1007,7 +1180,7 @@ export const useCharacterStore = create<CharacterStore>()(
             stackable: conditionName.toLowerCase() === 'exhaustion',
             count,
             appliedAt: new Date().toISOString(),
-            notes
+            notes,
           };
 
           return {
@@ -1015,57 +1188,65 @@ export const useCharacterStore = create<CharacterStore>()(
               ...state.character,
               conditionsAndDiseases: {
                 ...state.character.conditionsAndDiseases,
-                activeConditions: [...state.character.conditionsAndDiseases.activeConditions, newCondition]
-              }
+                activeConditions: [
+                  ...state.character.conditionsAndDiseases.activeConditions,
+                  newCondition,
+                ],
+              },
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       updateCondition: (conditionId, updates) => {
-        set((state) => {
-          const updatedConditions = state.character.conditionsAndDiseases.activeConditions.map(condition =>
-            condition.id === conditionId ? { ...condition, ...updates } : condition
-          );
+        set(state => {
+          const updatedConditions =
+            state.character.conditionsAndDiseases.activeConditions.map(
+              condition =>
+                condition.id === conditionId
+                  ? { ...condition, ...updates }
+                  : condition
+            );
 
           return {
             character: {
               ...state.character,
               conditionsAndDiseases: {
                 ...state.character.conditionsAndDiseases,
-                activeConditions: updatedConditions
-              }
+                activeConditions: updatedConditions,
+              },
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
-      removeCondition: (conditionId) => {
-        set((state) => {
-          const filteredConditions = state.character.conditionsAndDiseases.activeConditions.filter(
-            condition => condition.id !== conditionId
-          );
+      removeCondition: conditionId => {
+        set(state => {
+          const filteredConditions =
+            state.character.conditionsAndDiseases.activeConditions.filter(
+              condition => condition.id !== conditionId
+            );
 
           return {
             character: {
               ...state.character,
               conditionsAndDiseases: {
                 ...state.character.conditionsAndDiseases,
-                activeConditions: filteredConditions
-              }
+                activeConditions: filteredConditions,
+              },
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       addDisease: (diseaseName, source, description, onsetTime, notes) => {
-        set((state) => {
+        set(state => {
           const newDisease: ActiveDisease = {
             id: `${diseaseName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
             name: diseaseName,
@@ -1073,7 +1254,7 @@ export const useCharacterStore = create<CharacterStore>()(
             description,
             onsetTime,
             appliedAt: new Date().toISOString(),
-            notes
+            notes,
           };
 
           return {
@@ -1081,104 +1262,115 @@ export const useCharacterStore = create<CharacterStore>()(
               ...state.character,
               conditionsAndDiseases: {
                 ...state.character.conditionsAndDiseases,
-                activeDiseases: [...state.character.conditionsAndDiseases.activeDiseases, newDisease]
-              }
+                activeDiseases: [
+                  ...state.character.conditionsAndDiseases.activeDiseases,
+                  newDisease,
+                ],
+              },
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       updateDisease: (diseaseId, updates) => {
-        set((state) => {
-          const updatedDiseases = state.character.conditionsAndDiseases.activeDiseases.map(disease =>
-            disease.id === diseaseId ? { ...disease, ...updates } : disease
-          );
+        set(state => {
+          const updatedDiseases =
+            state.character.conditionsAndDiseases.activeDiseases.map(disease =>
+              disease.id === diseaseId ? { ...disease, ...updates } : disease
+            );
 
           return {
             character: {
               ...state.character,
               conditionsAndDiseases: {
                 ...state.character.conditionsAndDiseases,
-                activeDiseases: updatedDiseases
-              }
+                activeDiseases: updatedDiseases,
+              },
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
-      removeDisease: (diseaseId) => {
-        set((state) => {
-          const filteredDiseases = state.character.conditionsAndDiseases.activeDiseases.filter(
-            disease => disease.id !== diseaseId
-          );
+      removeDisease: diseaseId => {
+        set(state => {
+          const filteredDiseases =
+            state.character.conditionsAndDiseases.activeDiseases.filter(
+              disease => disease.id !== diseaseId
+            );
 
           return {
             character: {
               ...state.character,
               conditionsAndDiseases: {
                 ...state.character.conditionsAndDiseases,
-                activeDiseases: filteredDiseases
-              }
+                activeDiseases: filteredDiseases,
+              },
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
-      setExhaustionVariant: (variant) => {
-        set((state) => ({
+      setExhaustionVariant: variant => {
+        set(state => ({
           character: {
             ...state.character,
             conditionsAndDiseases: {
               ...state.character.conditionsAndDiseases,
-              exhaustionVariant: variant
-            }
+              exhaustionVariant: variant,
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       clearAllConditions: () => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             conditionsAndDiseases: {
               ...state.character.conditionsAndDiseases,
-              activeConditions: []
-            }
+              activeConditions: [],
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       clearAllDiseases: () => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             conditionsAndDiseases: {
               ...state.character.conditionsAndDiseases,
-              activeDiseases: []
-            }
+              activeDiseases: [],
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       // XP management
-      addExperience: (xpToAdd) => {
-        set((state) => {
+      addExperience: xpToAdd => {
+        set(state => {
           const newXP = state.character.experience + xpToAdd;
           const newLevel = calculateLevelFromXP(newXP);
-          const newSpellSlots = calculateSpellSlots(state.character.class, newLevel);
-          const preservedSpellSlots = updateSpellSlotsPreservingUsed(newSpellSlots, state.character.spellSlots);
+          const newSpellSlots = calculateSpellSlots(
+            state.character.class,
+            newLevel
+          );
+          const preservedSpellSlots = updateSpellSlotsPreservingUsed(
+            newSpellSlots,
+            state.character.spellSlots
+          );
 
           let pactMagic: PactMagic | undefined = state.character.pactMagic;
           if (state.character.class.spellcaster === 'warlock') {
@@ -1198,19 +1390,25 @@ export const useCharacterStore = create<CharacterStore>()(
               experience: newXP,
               level: newLevel,
               spellSlots: preservedSpellSlots,
-              pactMagic
+              pactMagic,
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
-      setExperience: (newXP) => {
-        set((state) => {
+      setExperience: newXP => {
+        set(state => {
           const newLevel = calculateLevelFromXP(newXP);
-          const newSpellSlots = calculateSpellSlots(state.character.class, newLevel);
-          const preservedSpellSlots = updateSpellSlotsPreservingUsed(newSpellSlots, state.character.spellSlots);
+          const newSpellSlots = calculateSpellSlots(
+            state.character.class,
+            newLevel
+          );
+          const preservedSpellSlots = updateSpellSlotsPreservingUsed(
+            newSpellSlots,
+            state.character.spellSlots
+          );
 
           let pactMagic: PactMagic | undefined = state.character.pactMagic;
           if (state.character.class.spellcaster === 'warlock') {
@@ -1230,17 +1428,17 @@ export const useCharacterStore = create<CharacterStore>()(
               experience: newXP,
               level: newLevel,
               spellSlots: preservedSpellSlots,
-              pactMagic
+              pactMagic,
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       // Rich text content management
-      addFeature: (feature) => {
-        set((state) => {
+      addFeature: feature => {
+        set(state => {
           const newFeature: RichTextContent = {
             ...feature,
             id: generateId(),
@@ -1251,42 +1449,48 @@ export const useCharacterStore = create<CharacterStore>()(
           return {
             character: {
               ...state.character,
-              features: [...state.character.features, newFeature]
+              features: [...state.character.features, newFeature],
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       updateFeature: (id, updates) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             features: state.character.features.map(feature =>
               feature.id === id
-                ? { ...feature, ...updates, updatedAt: new Date().toISOString() }
+                ? {
+                    ...feature,
+                    ...updates,
+                    updatedAt: new Date().toISOString(),
+                  }
                 : feature
-            )
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      deleteFeature: (id) => {
-        set((state) => ({
+      deleteFeature: id => {
+        set(state => ({
           character: {
             ...state.character,
-            features: state.character.features.filter(feature => feature.id !== id)
+            features: state.character.features.filter(
+              feature => feature.id !== id
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      addTrait: (trait) => {
-        set((state) => {
+      addTrait: trait => {
+        set(state => {
           const newTrait: RichTextContent = {
             ...trait,
             id: generateId(),
@@ -1297,42 +1501,44 @@ export const useCharacterStore = create<CharacterStore>()(
           return {
             character: {
               ...state.character,
-              traits: [...state.character.traits, newTrait]
+              traits: [...state.character.traits, newTrait],
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       updateTrait: (id, updates) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             traits: state.character.traits.map(trait =>
               trait.id === id
                 ? { ...trait, ...updates, updatedAt: new Date().toISOString() }
                 : trait
-            )
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      deleteTrait: (id) => {
-        set((state) => ({
+      deleteTrait: id => {
+        set(state => ({
           character: {
             ...state.character,
-            traits: state.character.traits.filter(trait => trait.id !== id)
+            traits: state.character.traits.filter(trait => trait.id !== id),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      addNote: (note: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>) => {
-        set((state) => {
+      addNote: (
+        note: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>
+      ) => {
+        set(state => {
           const newNote: RichTextContent = {
             ...note,
             id: generateId(),
@@ -1344,42 +1550,42 @@ export const useCharacterStore = create<CharacterStore>()(
           return {
             character: {
               ...state.character,
-              notes: [...state.character.notes, newNote]
+              notes: [...state.character.notes, newNote],
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       updateNote: (id: string, updates: Partial<RichTextContent>) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             notes: state.character.notes.map(note =>
               note.id === id
                 ? { ...note, ...updates, updatedAt: new Date().toISOString() }
                 : note
-            )
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       deleteNote: (id: string) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
-            notes: state.character.notes.filter(note => note.id !== id)
+            notes: state.character.notes.filter(note => note.id !== id),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       reorderNotes: (sourceIndex: number, destinationIndex: number) => {
-        set((state) => {
+        set(state => {
           const notes = [...state.character.notes];
           const [removed] = notes.splice(sourceIndex, 1);
           notes.splice(destinationIndex, 0, removed);
@@ -1388,23 +1594,23 @@ export const useCharacterStore = create<CharacterStore>()(
           const updatedNotes = notes.map((note, index) => ({
             ...note,
             order: index,
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
           }));
 
           return {
             character: {
               ...state.character,
-              notes: updatedNotes
+              notes: updatedNotes,
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       // Trackable trait management
-      addTrackableTrait: (trait) => {
-        set((state) => {
+      addTrackableTrait: trait => {
+        set(state => {
           const newTrait: TrackableTrait = {
             ...trait,
             id: generateId(),
@@ -1415,91 +1621,110 @@ export const useCharacterStore = create<CharacterStore>()(
           return {
             character: {
               ...state.character,
-              trackableTraits: [...(state.character.trackableTraits || []), newTrait]
+              trackableTraits: [
+                ...(state.character.trackableTraits || []),
+                newTrait,
+              ],
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       updateTrackableTrait: (id, updates) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
-            trackableTraits: (state.character.trackableTraits || []).map(trait =>
-              trait.id === id
-                ? { ...trait, ...updates, updatedAt: new Date().toISOString() }
-                : trait
-            )
+            trackableTraits: (state.character.trackableTraits || []).map(
+              trait =>
+                trait.id === id
+                  ? {
+                      ...trait,
+                      ...updates,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : trait
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      deleteTrackableTrait: (id) => {
-        set((state) => ({
+      deleteTrackableTrait: id => {
+        set(state => ({
           character: {
             ...state.character,
-            trackableTraits: (state.character.trackableTraits || []).filter(trait => trait.id !== id)
+            trackableTraits: (state.character.trackableTraits || []).filter(
+              trait => trait.id !== id
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      useTrackableTrait: (id) => {
-        set((state) => ({
+      useTrackableTrait: id => {
+        set(state => ({
           character: {
             ...state.character,
-            trackableTraits: (state.character.trackableTraits || []).map(trait =>
-              trait.id === id
-                ? { 
-                    ...trait, 
-                    usedUses: Math.min(trait.usedUses + 1, calculateTraitMaxUses(trait, state.character.level)), 
-                    updatedAt: new Date().toISOString() 
-                  }
-                : trait
-            )
+            trackableTraits: (state.character.trackableTraits || []).map(
+              trait =>
+                trait.id === id
+                  ? {
+                      ...trait,
+                      usedUses: Math.min(
+                        trait.usedUses + 1,
+                        calculateTraitMaxUses(trait, state.character.level)
+                      ),
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : trait
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      resetTrackableTraits: (restType) => {
-        set((state) => ({
+      resetTrackableTraits: restType => {
+        set(state => ({
           character: {
             ...state.character,
-            trackableTraits: (state.character.trackableTraits || []).map(trait =>
-              trait.restType === restType || restType === 'long'
-                ? { ...trait, usedUses: 0, updatedAt: new Date().toISOString() }
-                : trait
-            )
+            trackableTraits: (state.character.trackableTraits || []).map(
+              trait =>
+                trait.restType === restType || restType === 'long'
+                  ? {
+                      ...trait,
+                      usedUses: 0,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : trait
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      updateCharacterBackground: (updates) => {
-        set((state) => ({
+      updateCharacterBackground: updates => {
+        set(state => ({
           character: {
             ...state.character,
             characterBackground: {
               ...state.character.characterBackground,
-              ...updates
-            }
+              ...updates,
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving' as SaveStatus
+          saveStatus: 'saving' as SaveStatus,
         }));
       },
 
       // Weapon management actions
-      addWeapon: (weapon) => {
-        set((state) => {
+      addWeapon: weapon => {
+        set(state => {
           const newWeapon: Weapon = {
             ...weapon,
             id: generateId(),
@@ -1510,81 +1735,85 @@ export const useCharacterStore = create<CharacterStore>()(
           return {
             character: {
               ...state.character,
-              weapons: [...state.character.weapons, newWeapon]
+              weapons: [...state.character.weapons, newWeapon],
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       updateWeapon: (id, updates) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             weapons: state.character.weapons.map(weapon =>
               weapon.id === id
                 ? { ...weapon, ...updates, updatedAt: new Date().toISOString() }
                 : weapon
-            )
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      deleteWeapon: (id) => {
-        set((state) => ({
+      deleteWeapon: id => {
+        set(state => ({
           character: {
             ...state.character,
-            weapons: state.character.weapons.filter(weapon => weapon.id !== id)
+            weapons: state.character.weapons.filter(weapon => weapon.id !== id),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       equipWeapon: (id, equipped) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             weapons: state.character.weapons.map(weapon =>
               weapon.id === id
-                ? { ...weapon, isEquipped: equipped, updatedAt: new Date().toISOString() }
+                ? {
+                    ...weapon,
+                    isEquipped: equipped,
+                    updatedAt: new Date().toISOString(),
+                  }
                 : weapon
-            )
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       reorderWeapons: (sourceIndex: number, destinationIndex: number) => {
-        set((state) => {
+        set(state => {
           const weapons = [...state.character.weapons];
           const [removed] = weapons.splice(sourceIndex, 1);
           weapons.splice(destinationIndex, 0, removed);
 
           // Update all weapons with new timestamps
-          const updatedWeapons = weapons.map((weapon) => ({
+          const updatedWeapons = weapons.map(weapon => ({
             ...weapon,
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
           }));
 
           return {
             character: {
               ...state.character,
-              weapons: updatedWeapons
+              weapons: updatedWeapons,
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       // Magic item management actions
-      addMagicItem: (item) => {
-        set((state) => {
+      addMagicItem: item => {
+        set(state => {
           const newItem: MagicItem = {
             ...item,
             id: generateId(),
@@ -1595,95 +1824,101 @@ export const useCharacterStore = create<CharacterStore>()(
           return {
             character: {
               ...state.character,
-              magicItems: [...(state.character.magicItems || []), newItem]
+              magicItems: [...(state.character.magicItems || []), newItem],
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       updateMagicItem: (id, updates) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             magicItems: (state.character.magicItems || []).map(item =>
               item.id === id
                 ? { ...item, ...updates, updatedAt: new Date().toISOString() }
                 : item
-            )
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      deleteMagicItem: (id) => {
-        set((state) => ({
+      deleteMagicItem: id => {
+        set(state => ({
           character: {
             ...state.character,
-            magicItems: (state.character.magicItems || []).filter(item => item.id !== id)
+            magicItems: (state.character.magicItems || []).filter(
+              item => item.id !== id
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       attuneMagicItem: (id, attuned) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             magicItems: (state.character.magicItems || []).map(item =>
               item.id === id
-                ? { ...item, isAttuned: attuned, updatedAt: new Date().toISOString() }
+                ? {
+                    ...item,
+                    isAttuned: attuned,
+                    updatedAt: new Date().toISOString(),
+                  }
                 : item
-            )
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      updateAttunementSlots: (max) => {
-        set((state) => ({
+      updateAttunementSlots: max => {
+        set(state => ({
           character: {
             ...state.character,
             attunementSlots: {
               ...state.character.attunementSlots,
-              max
-            }
+              max,
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       reorderMagicItems: (sourceIndex: number, destinationIndex: number) => {
-        set((state) => {
+        set(state => {
           const magicItems = [...(state.character.magicItems || [])];
           const [removed] = magicItems.splice(sourceIndex, 1);
           magicItems.splice(destinationIndex, 0, removed);
 
           // Update all magic items with new timestamps
-          const updatedMagicItems = magicItems.map((item) => ({
+          const updatedMagicItems = magicItems.map(item => ({
             ...item,
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
           }));
 
           return {
             character: {
               ...state.character,
-              magicItems: updatedMagicItems
+              magicItems: updatedMagicItems,
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       // Armor management
-      addArmorItem: (item) => {
-        set((state) => {
+      addArmorItem: item => {
+        set(state => {
           const newItem: ArmorItem = {
             ...item,
             id: generateId(),
@@ -1694,81 +1929,87 @@ export const useCharacterStore = create<CharacterStore>()(
           return {
             character: {
               ...state.character,
-              armorItems: [...(state.character.armorItems || []), newItem]
+              armorItems: [...(state.character.armorItems || []), newItem],
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       updateArmorItem: (id, updates) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             armorItems: state.character.armorItems.map(item =>
               item.id === id
                 ? { ...item, ...updates, updatedAt: new Date().toISOString() }
                 : item
-            )
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      deleteArmorItem: (id) => {
-        set((state) => ({
+      deleteArmorItem: id => {
+        set(state => ({
           character: {
             ...state.character,
-            armorItems: state.character.armorItems.filter(item => item.id !== id)
+            armorItems: state.character.armorItems.filter(
+              item => item.id !== id
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       equipArmorItem: (id, equipped) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             armorItems: state.character.armorItems.map(item =>
               item.id === id
-                ? { ...item, isEquipped: equipped, updatedAt: new Date().toISOString() }
+                ? {
+                    ...item,
+                    isEquipped: equipped,
+                    updatedAt: new Date().toISOString(),
+                  }
                 : item
-            )
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       reorderArmorItems: (sourceIndex: number, destinationIndex: number) => {
-        set((state) => {
+        set(state => {
           const armorItems = [...state.character.armorItems];
           const [removed] = armorItems.splice(sourceIndex, 1);
           armorItems.splice(destinationIndex, 0, removed);
 
           // Update all armor items with new timestamps
-          const updatedArmorItems = armorItems.map((item) => ({
+          const updatedArmorItems = armorItems.map(item => ({
             ...item,
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
           }));
 
           return {
             character: {
               ...state.character,
-              armorItems: updatedArmorItems
+              armorItems: updatedArmorItems,
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       // Inventory management
-      addInventoryItem: (item) => {
-        set((state) => {
+      addInventoryItem: item => {
+        set(state => {
           const newItem: InventoryItem = {
             ...item,
             id: generateId(),
@@ -1779,258 +2020,294 @@ export const useCharacterStore = create<CharacterStore>()(
           return {
             character: {
               ...state.character,
-              inventoryItems: [...(state.character.inventoryItems || []), newItem]
+              inventoryItems: [
+                ...(state.character.inventoryItems || []),
+                newItem,
+              ],
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       updateInventoryItem: (id, updates) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             inventoryItems: state.character.inventoryItems.map(item =>
               item.id === id
                 ? { ...item, ...updates, updatedAt: new Date().toISOString() }
                 : item
-            )
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      deleteInventoryItem: (id) => {
-        set((state) => ({
+      deleteInventoryItem: id => {
+        set(state => ({
           character: {
             ...state.character,
-            inventoryItems: state.character.inventoryItems.filter(item => item.id !== id)
+            inventoryItems: state.character.inventoryItems.filter(
+              item => item.id !== id
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       updateItemQuantity: (id, quantity) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             inventoryItems: state.character.inventoryItems.map(item =>
-              item.id === id
-                ? { ...item, quantity }
-                : item
-            )
+              item.id === id ? { ...item, quantity } : item
+            ),
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      reorderInventoryItems: (sourceIndex: number, destinationIndex: number) => {
-        set((state) => {
+      reorderInventoryItems: (
+        sourceIndex: number,
+        destinationIndex: number
+      ) => {
+        set(state => {
           const inventoryItems = [...state.character.inventoryItems];
           const [removed] = inventoryItems.splice(sourceIndex, 1);
           inventoryItems.splice(destinationIndex, 0, removed);
 
           // Update all inventory items with new timestamps
-          const updatedInventoryItems = inventoryItems.map((item) => ({
+          const updatedInventoryItems = inventoryItems.map(item => ({
             ...item,
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
           }));
 
           return {
             character: {
               ...state.character,
-              inventoryItems: updatedInventoryItems
+              inventoryItems: updatedInventoryItems,
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       // Currency management
-      updateCurrency: (updates) => {
-        set((state) => ({
+      updateCurrency: updates => {
+        set(state => ({
           character: {
             ...state.character,
             currency: {
               ...state.character.currency,
-              ...updates
-            }
+              ...updates,
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       addCurrency: (type, amount) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             currency: {
               ...state.character.currency,
-              [type]: (state.character.currency[type] || 0) + amount
-            }
+              [type]: (state.character.currency[type] || 0) + amount,
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       subtractCurrency: (type, amount) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             currency: {
               ...state.character.currency,
-              [type]: Math.max(0, (state.character.currency[type] || 0) - amount)
-            }
+              [type]: Math.max(
+                0,
+                (state.character.currency[type] || 0) - amount
+              ),
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       // Spellbook management
-      addSpellToSpellbook: (spellId) => {
-        set((state) => {
-          const isAlreadyKnown = state.character.spellbook.knownSpells.includes(spellId);
+      addSpellToSpellbook: spellId => {
+        set(state => {
+          const isAlreadyKnown =
+            state.character.spellbook.knownSpells.includes(spellId);
           if (!isAlreadyKnown) {
             return {
               character: {
                 ...state.character,
                 spellbook: {
                   ...state.character.spellbook,
-                  knownSpells: [...state.character.spellbook.knownSpells, spellId]
-                }
+                  knownSpells: [
+                    ...state.character.spellbook.knownSpells,
+                    spellId,
+                  ],
+                },
               },
               hasUnsavedChanges: true,
-              saveStatus: 'saving'
+              saveStatus: 'saving',
             };
           }
           return state;
         });
       },
 
-      removeSpellFromSpellbook: (spellId) => {
-        set((state) => ({
+      removeSpellFromSpellbook: spellId => {
+        set(state => ({
           character: {
             ...state.character,
             spellbook: {
               ...state.character.spellbook,
-              knownSpells: state.character.spellbook.knownSpells.filter(id => id !== spellId),
-              preparedSpells: state.character.spellbook.preparedSpells.filter(id => id !== spellId),
-              favoriteSpells: state.character.spellbook.favoriteSpells.filter(id => id !== spellId)
-            }
+              knownSpells: state.character.spellbook.knownSpells.filter(
+                id => id !== spellId
+              ),
+              preparedSpells: state.character.spellbook.preparedSpells.filter(
+                id => id !== spellId
+              ),
+              favoriteSpells: state.character.spellbook.favoriteSpells.filter(
+                id => id !== spellId
+              ),
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      toggleSpellFavorite: (spellId) => {
-        set((state) => {
-          const isFavorite = state.character.spellbook.favoriteSpells.includes(spellId);
+      toggleSpellFavorite: spellId => {
+        set(state => {
+          const isFavorite =
+            state.character.spellbook.favoriteSpells.includes(spellId);
           return {
             character: {
               ...state.character,
               spellbook: {
                 ...state.character.spellbook,
                 favoriteSpells: isFavorite
-                  ? state.character.spellbook.favoriteSpells.filter(id => id !== spellId)
-                  : [...state.character.spellbook.favoriteSpells, spellId]
-              }
+                  ? state.character.spellbook.favoriteSpells.filter(
+                      id => id !== spellId
+                    )
+                  : [...state.character.spellbook.favoriteSpells, spellId],
+              },
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
-      prepareSpell: (spellId) => {
-        set((state) => {
-          const isAlreadyPrepared = state.character.spellbook.preparedSpells.includes(spellId);
+      prepareSpell: spellId => {
+        set(state => {
+          const isAlreadyPrepared =
+            state.character.spellbook.preparedSpells.includes(spellId);
           if (!isAlreadyPrepared) {
             return {
               character: {
                 ...state.character,
                 spellbook: {
                   ...state.character.spellbook,
-                  preparedSpells: [...state.character.spellbook.preparedSpells, spellId]
-                }
+                  preparedSpells: [
+                    ...state.character.spellbook.preparedSpells,
+                    spellId,
+                  ],
+                },
               },
               hasUnsavedChanges: true,
-              saveStatus: 'saving'
+              saveStatus: 'saving',
             };
           }
           return state;
         });
       },
 
-      unprepareSpell: (spellId) => {
-        set((state) => ({
+      unprepareSpell: spellId => {
+        set(state => ({
           character: {
             ...state.character,
             spellbook: {
               ...state.character.spellbook,
-              preparedSpells: state.character.spellbook.preparedSpells.filter(id => id !== spellId)
-            }
+              preparedSpells: state.character.spellbook.preparedSpells.filter(
+                id => id !== spellId
+              ),
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      updateSpellbookSettings: (settings) => {
-        set((state) => ({
+      updateSpellbookSettings: settings => {
+        set(state => ({
           character: {
             ...state.character,
             spellbook: {
               ...state.character.spellbook,
               spellbookSettings: {
                 ...state.character.spellbook.spellbookSettings,
-                ...settings
-              }
-            }
+                ...settings,
+              },
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
       addCustomSpell: (spell: ProcessedSpell) => {
-        set((state) => ({
+        set(state => ({
           character: {
             ...state.character,
             spellbook: {
               ...state.character.spellbook,
-              customSpells: [...(state.character.spellbook.customSpells || []), spell]
-            }
+              customSpells: [
+                ...(state.character.spellbook.customSpells || []),
+                spell,
+              ],
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      removeCustomSpell: (spellId) => {
-        set((state) => ({
+      removeCustomSpell: spellId => {
+        set(state => ({
           character: {
             ...state.character,
             spellbook: {
               ...state.character.spellbook,
-              customSpells: (state.character.spellbook.customSpells || []).filter(s => s.id !== spellId)
-            }
+              customSpells: (
+                state.character.spellbook.customSpells || []
+              ).filter(s => s.id !== spellId),
+            },
           },
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         }));
       },
 
-      reorderPreparedSpells: (sourceIndex: number, destinationIndex: number) => {
-        set((state) => {
+      reorderPreparedSpells: (
+        sourceIndex: number,
+        destinationIndex: number
+      ) => {
+        set(state => {
           const preparedSpells = [...state.character.spellbook.preparedSpells];
           const [removed] = preparedSpells.splice(sourceIndex, 1);
           preparedSpells.splice(destinationIndex, 0, removed);
@@ -2040,17 +2317,17 @@ export const useCharacterStore = create<CharacterStore>()(
               ...state.character,
               spellbook: {
                 ...state.character.spellbook,
-                preparedSpells
-              }
+                preparedSpells,
+              },
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
 
       reorderSpells: (sourceIndex: number, destinationIndex: number) => {
-        set((state) => {
+        set(state => {
           const spells = [...state.character.spells];
           const [removed] = spells.splice(sourceIndex, 1);
           spells.splice(destinationIndex, 0, removed);
@@ -2058,10 +2335,10 @@ export const useCharacterStore = create<CharacterStore>()(
           return {
             character: {
               ...state.character,
-              spells
+              spells,
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving'
+            saveStatus: 'saving',
           };
         });
       },
@@ -2073,7 +2350,7 @@ export const useCharacterStore = create<CharacterStore>()(
           set({
             saveStatus: 'saved',
             lastSaved: new Date(),
-            hasUnsavedChanges: false
+            hasUnsavedChanges: false,
           });
         } catch (error) {
           console.error('Failed to save character:', error);
@@ -2081,12 +2358,12 @@ export const useCharacterStore = create<CharacterStore>()(
         }
       },
 
-      loadCharacter: (character) => {
+      loadCharacter: character => {
         set({
           character,
           saveStatus: 'saved',
           lastSaved: new Date(),
-          hasUnsavedChanges: false
+          hasUnsavedChanges: false,
         });
       },
 
@@ -2094,11 +2371,11 @@ export const useCharacterStore = create<CharacterStore>()(
         set({
           character: {
             ...DEFAULT_CHARACTER_STATE,
-            id: generateId()
+            id: generateId(),
           },
           saveStatus: 'saved',
           lastSaved: new Date(),
-          hasUnsavedChanges: false
+          hasUnsavedChanges: false,
         });
       },
 
@@ -2107,27 +2384,32 @@ export const useCharacterStore = create<CharacterStore>()(
         return {
           version: APP_VERSION,
           exportDate: new Date().toISOString(),
-          character: state.character
+          character: state.character,
         };
       },
 
-      importCharacter: (exportData) => {
+      importCharacter: exportData => {
         try {
           // Basic validation
-          if (!exportData.character || typeof exportData.character !== 'object') {
+          if (
+            !exportData.character ||
+            typeof exportData.character !== 'object'
+          ) {
             throw new Error('Invalid character data');
           }
 
           // Version compatibility check (for future use)
           if (exportData.version && exportData.version !== APP_VERSION) {
-            console.warn(`Version mismatch: expected ${APP_VERSION}, got ${exportData.version}`);
+            console.warn(
+              `Version mismatch: expected ${APP_VERSION}, got ${exportData.version}`
+            );
           }
 
           set({
             character: exportData.character,
             saveStatus: 'saved',
             lastSaved: new Date(),
-            hasUnsavedChanges: false
+            hasUnsavedChanges: false,
           });
 
           return true;
@@ -2139,7 +2421,7 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       // Auto-save control
-      setSaveStatus: (status) => {
+      setSaveStatus: status => {
         set({ saveStatus: status });
       },
 
@@ -2147,27 +2429,27 @@ export const useCharacterStore = create<CharacterStore>()(
         set({
           saveStatus: 'saved',
           lastSaved: new Date(),
-          hasUnsavedChanges: false
+          hasUnsavedChanges: false,
         });
       },
 
       markUnsaved: () => {
         set({
           hasUnsavedChanges: true,
-          saveStatus: 'saving'
+          saveStatus: 'saving',
         });
-      }
+      },
     }),
     {
       name: STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
       // Only persist the character data and save metadata
-      partialize: (state) => ({
+      partialize: state => ({
         character: state.character,
-        lastSaved: state.lastSaved
+        lastSaved: state.lastSaved,
       }),
       // Handle rehydration and migration
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => state => {
         if (state) {
           // Migrate character data if needed
           state.character = migrateCharacterData(state.character);
@@ -2175,7 +2457,7 @@ export const useCharacterStore = create<CharacterStore>()(
           state.hasUnsavedChanges = false;
           state.hasHydrated = true;
         }
-      }
+      },
     }
   )
-); 
+);

@@ -28,7 +28,7 @@ export default function CustomDropdown({
   placeholder = 'Select an option',
   className = '',
   disabled = false,
-  width = 'auto'
+  width = 'auto',
 }: CustomDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -37,7 +37,10 @@ export default function CustomDropdown({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
@@ -57,7 +60,8 @@ export default function CustomDropdown({
     setIsOpen(false);
   };
 
-  const widthClass = width === 'full' ? 'w-full' : width === 'auto' ? 'w-auto' : width;
+  const widthClass =
+    width === 'full' ? 'w-full' : width === 'auto' ? 'w-auto' : width;
 
   return (
     <div className={`relative ${widthClass} ${className}`} ref={dropdownRef}>
@@ -66,18 +70,9 @@ export default function CustomDropdown({
         type="button"
         onClick={handleToggle}
         disabled={disabled}
-        className={`
-          flex items-center justify-between w-full px-4 py-3 text-left
-          bg-slate-800/50 border border-slate-600/50 rounded-lg
-          text-white text-sm font-medium
-          hover:bg-slate-700/50 hover:border-slate-500/50
-          focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50
-          transition-all duration-200
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-          ${isOpen ? 'ring-2 ring-emerald-500/50 border-emerald-500/50' : ''}
-        `}
+        className={`flex w-full items-center justify-between rounded-lg border border-slate-600/50 bg-slate-800/50 px-4 py-3 text-left text-sm font-medium text-white transition-all duration-200 hover:border-slate-500/50 hover:bg-slate-700/50 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/50 focus:outline-none ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} ${isOpen ? 'border-emerald-500/50 ring-2 ring-emerald-500/50' : ''} `}
       >
-        <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           {selectedOption?.icon && (
             <span className="flex-shrink-0 text-slate-400">
               {selectedOption.icon}
@@ -87,11 +82,11 @@ export default function CustomDropdown({
             {selectedOption ? selectedOption.label : placeholder}
           </span>
         </div>
-        
-        <ChevronDown 
-          className={`flex-shrink-0 h-4 w-4 text-slate-400 transition-transform duration-200 ${
+
+        <ChevronDown
+          className={`h-4 w-4 flex-shrink-0 text-slate-400 transition-transform duration-200 ${
             isOpen ? 'rotate-180' : ''
-          }`} 
+          }`}
         />
       </button>
 
@@ -103,38 +98,40 @@ export default function CustomDropdown({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
-            className="absolute top-full left-0 right-0 mt-2 z-50"
+            className="absolute top-full right-0 left-0 z-50 mt-2"
           >
-            <div className="bg-slate-800/95 backdrop-blur-sm border border-slate-600/50 rounded-lg shadow-xl shadow-black/30 overflow-hidden">
-              <div className="py-2 max-h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
-                {options.map((option) => (
+            <div className="overflow-hidden rounded-lg border border-slate-600/50 bg-slate-800/95 shadow-xl shadow-black/30 backdrop-blur-sm">
+              <div className="scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800 max-h-64 overflow-y-auto py-2">
+                {options.map(option => (
                   <button
                     key={option.value}
                     type="button"
                     onClick={() => handleSelect(option.value)}
-                    className={`
-                      w-full px-4 py-3 text-left flex items-center gap-3
-                      hover:bg-slate-700/50 transition-colors duration-150
-                      ${value === option.value ? 'bg-emerald-600/20 text-emerald-300' : 'text-slate-200'}
-                    `}
+                    className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-slate-700/50 ${value === option.value ? 'bg-emerald-600/20 text-emerald-300' : 'text-slate-200'} `}
                   >
                     {option.icon && (
-                      <span className={`flex-shrink-0 ${
-                        value === option.value ? 'text-emerald-400' : 'text-slate-400'
-                      }`}>
+                      <span
+                        className={`flex-shrink-0 ${
+                          value === option.value
+                            ? 'text-emerald-400'
+                            : 'text-slate-400'
+                        }`}
+                      >
                         {option.icon}
                       </span>
                     )}
-                    
-                    <div className="flex-1 min-w-0">
+
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium truncate">{option.label}</span>
+                        <span className="truncate font-medium">
+                          {option.label}
+                        </span>
                         {value === option.value && (
-                          <Check className="h-4 w-4 text-emerald-400 flex-shrink-0 ml-2" />
+                          <Check className="ml-2 h-4 w-4 flex-shrink-0 text-emerald-400" />
                         )}
                       </div>
                       {option.description && (
-                        <p className="text-xs text-slate-400 mt-1 truncate">
+                        <p className="mt-1 truncate text-xs text-slate-400">
                           {option.description}
                         </p>
                       )}

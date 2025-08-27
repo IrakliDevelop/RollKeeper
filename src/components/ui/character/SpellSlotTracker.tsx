@@ -21,7 +21,7 @@ export default function SpellSlotTracker({
   onPactMagicChange,
   onResetSpellSlots,
   onResetPactMagic,
-  className = ''
+  className = '',
 }: SpellSlotTrackerProps) {
   // Use the shared SpellSlotTracker component with full functionality
   return (
@@ -41,4 +41,4 @@ export default function SpellSlotTracker({
       className={className}
     />
   );
-} 
+}

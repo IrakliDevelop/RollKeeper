@@ -13,13 +13,13 @@ interface SpellCastModalProps {
   onCastSpell: (spellLevel: number) => void;
 }
 
-export function SpellCastModal({ 
-  isOpen, 
-  onClose, 
-  spell, 
-  spellSlots, 
-  concentration, 
-  onCastSpell 
+export function SpellCastModal({
+  isOpen,
+  onClose,
+  spell,
+  spellSlots,
+  concentration,
+  onCastSpell,
 }: SpellCastModalProps) {
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
 
@@ -70,44 +70,50 @@ export function SpellCastModal({
     setSelectedLevel(null);
   };
 
-  const canCast = selectedLevel !== null && (
-    spell.level === 0 || // Cantrips can always be cast
-    availableLevels.includes(selectedLevel) // Or if we have the required slot
-  );
+  const canCast =
+    selectedLevel !== null &&
+    (spell.level === 0 || // Cantrips can always be cast
+      availableLevels.includes(selectedLevel)); // Or if we have the required slot
 
   return (
-    <div 
-      className="fixed inset-0 bg-white/20 backdrop-blur-md flex items-center justify-center z-50 p-4"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-white/20 p-4 backdrop-blur-md"
       onClick={handleBackdropClick}
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between border-b border-gray-200 p-4">
           <div className="flex items-center gap-2">
             <Sparkles className="text-purple-600" size={20} />
             <h2 className="text-lg font-semibold text-gray-900">Cast Spell</h2>
           </div>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 transition-colors hover:text-gray-600"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-4">
+        <div className="space-y-4 p-4">
           {/* Spell Info */}
           <div className="text-center">
-            <h3 className="text-xl font-bold text-purple-900 mb-1">{spell.name}</h3>
+            <h3 className="mb-1 text-xl font-bold text-purple-900">
+              {spell.name}
+            </h3>
             <div className="flex items-center justify-center gap-2 text-sm text-purple-600">
               <span>{spell.school}</span>
               <span>•</span>
-              <span>{spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}</span>
+              <span>
+                {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
+              </span>
               {spell.concentration && (
                 <>
                   <span>•</span>
-                  <span className="text-orange-600 font-medium">Concentration</span>
+                  <span className="font-medium text-orange-600">
+                    Concentration
+                  </span>
                 </>
               )}
             </div>
@@ -115,13 +121,20 @@ export function SpellCastModal({
 
           {/* Concentration Warning */}
           {concentrationWarning && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3">
-              <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={16} />
+            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <AlertTriangle
+                className="mt-0.5 flex-shrink-0 text-amber-600"
+                size={16}
+              />
               <div className="text-sm">
-                <p className="font-medium text-amber-800 mb-1">Concentration Warning</p>
+                <p className="mb-1 font-medium text-amber-800">
+                  Concentration Warning
+                </p>
                 <p className="text-amber-700">
-                  You are currently concentrating on <span className="font-medium">{concentration.spellName}</span>. 
-                  Casting this spell will end your concentration on the previous spell.
+                  You are currently concentrating on{' '}
+                  <span className="font-medium">{concentration.spellName}</span>
+                  . Casting this spell will end your concentration on the
+                  previous spell.
                 </p>
               </div>
             </div>
@@ -130,11 +143,15 @@ export function SpellCastModal({
           {/* Cantrip Cast */}
           {spell.level === 0 ? (
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-4">Cantrips don&apos;t use spell slots.</p>
-              <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-3 mb-4">
+              <p className="mb-4 text-sm text-gray-600">
+                Cantrips don&apos;t use spell slots.
+              </p>
+              <div className="mb-4 rounded-lg border-2 border-purple-300 bg-purple-50 p-3">
                 <div className="flex items-center justify-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                  <span className="font-medium text-purple-900">Cantrip Selected</span>
+                  <div className="h-3 w-3 rounded-full bg-purple-500"></div>
+                  <span className="font-medium text-purple-900">
+                    Cantrip Selected
+                  </span>
                 </div>
               </div>
             </div>
@@ -142,8 +159,10 @@ export function SpellCastModal({
             <>
               {/* No Available Slots */}
               {availableLevels.length === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-gray-600 mb-2">No available spell slots to cast this spell.</p>
+                <div className="py-4 text-center">
+                  <p className="mb-2 text-gray-600">
+                    No available spell slots to cast this spell.
+                  </p>
                   <p className="text-sm text-gray-500">
                     You need at least a level {spell.level} spell slot.
                   </p>
@@ -152,56 +171,71 @@ export function SpellCastModal({
                 <>
                   {/* Level Selection */}
                   <div>
-                    <h4 className="font-medium text-gray-900 mb-3">Choose spell slot level:</h4>
+                    <h4 className="mb-3 font-medium text-gray-900">
+                      Choose spell slot level:
+                    </h4>
                     <div className="space-y-2">
-                      {availableLevels.map((level) => {
+                      {availableLevels.map(level => {
                         const slot = spellSlots[level as keyof SpellSlots];
                         const available = slot.max - slot.used;
                         const isMinLevel = level === spell.level;
                         const isSelected = selectedLevel === level;
-                        
+
                         return (
                           <button
                             key={level}
                             onClick={() => setSelectedLevel(level)}
-                            className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all duration-200 ${
+                            className={`flex w-full items-center justify-between rounded-lg border-2 p-3 transition-all duration-200 ${
                               isSelected
                                 ? 'border-purple-500 bg-purple-100 shadow-md'
-                                : isMinLevel 
+                                : isMinLevel
                                   ? 'border-purple-300 bg-purple-50 hover:border-purple-400 hover:bg-purple-100'
                                   : 'border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100'
                             }`}
                           >
                             <div className="flex items-center gap-3">
-                              <div className={`w-3 h-3 rounded-full ${
-                                isSelected 
-                                  ? 'bg-purple-600' 
-                                  : isMinLevel 
-                                    ? 'bg-purple-400' 
-                                    : 'bg-slate-400'
-                              }`}></div>
-                              <span className={`font-medium ${
-                                isSelected 
-                                  ? 'text-purple-900' 
-                                  : isMinLevel 
-                                    ? 'text-purple-800' 
-                                    : 'text-slate-700'
-                              }`}>
+                              <div
+                                className={`h-3 w-3 rounded-full ${
+                                  isSelected
+                                    ? 'bg-purple-600'
+                                    : isMinLevel
+                                      ? 'bg-purple-400'
+                                      : 'bg-slate-400'
+                                }`}
+                              ></div>
+                              <span
+                                className={`font-medium ${
+                                  isSelected
+                                    ? 'text-purple-900'
+                                    : isMinLevel
+                                      ? 'text-purple-800'
+                                      : 'text-slate-700'
+                                }`}
+                              >
                                 Level {level}
                                 {isMinLevel && (
-                                  <span className={isSelected ? 'text-purple-700' : 'text-purple-600'}>
-                                    {' '}(Base Level)
+                                  <span
+                                    className={
+                                      isSelected
+                                        ? 'text-purple-700'
+                                        : 'text-purple-600'
+                                    }
+                                  >
+                                    {' '}
+                                    (Base Level)
                                   </span>
                                 )}
                               </span>
                             </div>
-                            <span className={`text-sm ${
-                              isSelected 
-                                ? 'text-purple-700' 
-                                : isMinLevel 
-                                  ? 'text-purple-600' 
-                                  : 'text-slate-600'
-                            }`}>
+                            <span
+                              className={`text-sm ${
+                                isSelected
+                                  ? 'text-purple-700'
+                                  : isMinLevel
+                                    ? 'text-purple-600'
+                                    : 'text-slate-600'
+                              }`}
+                            >
                               {available}/{slot.max} available
                             </span>
                           </button>
@@ -211,12 +245,18 @@ export function SpellCastModal({
                   </div>
 
                   {/* Higher Level Effects */}
-                  {spell.higherLevel && selectedLevel && selectedLevel > spell.level && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <h5 className="font-medium text-blue-900 mb-2">At Higher Levels</h5>
-                      <p className="text-sm text-blue-800">{spell.higherLevel}</p>
-                    </div>
-                  )}
+                  {spell.higherLevel &&
+                    selectedLevel &&
+                    selectedLevel > spell.level && (
+                      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                        <h5 className="mb-2 font-medium text-blue-900">
+                          At Higher Levels
+                        </h5>
+                        <p className="text-sm text-blue-800">
+                          {spell.higherLevel}
+                        </p>
+                      </div>
+                    )}
                 </>
               )}
             </>
@@ -224,18 +264,18 @@ export function SpellCastModal({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-between items-center gap-3 p-4 border-t border-gray-200">
+        <div className="flex items-center justify-between gap-3 border-t border-gray-200 p-4">
           <button
             onClick={handleClose}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+            className="px-4 py-2 text-gray-600 transition-colors hover:text-gray-800"
           >
             Cancel
           </button>
-          
+
           {canCast && (
             <button
               onClick={handleCast}
-              className="px-6 py-2 bg-gradient-to-r from-purple-600 to-violet-600 text-white font-medium rounded-lg hover:from-purple-700 hover:to-violet-700 transition-all duration-200 shadow-md hover:shadow-lg"
+              className="rounded-lg bg-gradient-to-r from-purple-600 to-violet-600 px-6 py-2 font-medium text-white shadow-md transition-all duration-200 hover:from-purple-700 hover:to-violet-700 hover:shadow-lg"
             >
               Cast {spell.name}
               {selectedLevel !== null && selectedLevel > 0 && (
@@ -249,4 +289,4 @@ export function SpellCastModal({
       </div>
     </div>
   );
-} 
+}

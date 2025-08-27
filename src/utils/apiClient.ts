@@ -23,11 +23,11 @@ interface ApiResponse<T> {
 async function apiRequest<T>(url: string): Promise<ApiResponse<T>> {
   try {
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const data = await response.json();
     return { data };
   } catch (error) {
@@ -40,7 +40,10 @@ async function apiRequest<T>(url: string): Promise<ApiResponse<T>> {
  * Fetch all monsters from the bestiary
  */
 export async function fetchBestiary(): Promise<ProcessedMonster[]> {
-  const result = await apiRequest<{ monsters: ProcessedMonster[]; total: number }>(`${API_BASE}/bestiary`);
+  const result = await apiRequest<{
+    monsters: ProcessedMonster[];
+    total: number;
+  }>(`${API_BASE}/bestiary`);
   return result.data?.monsters || [];
 }
 
@@ -62,25 +65,35 @@ export async function searchMonsters(
     limit: limit.toString(),
     offset: offset.toString(),
   });
-  
+
   // Add filters to params
   if (filters.sizes?.length) params.set('sizes', filters.sizes.join(','));
   if (filters.types?.length) params.set('types', filters.types.join(','));
-  if (filters.alignments?.length) params.set('alignments', filters.alignments.join(','));
+  if (filters.alignments?.length)
+    params.set('alignments', filters.alignments.join(','));
   if (filters.sources?.length) params.set('sources', filters.sources.join(','));
-  if (filters.crRange?.min !== undefined) params.set('crMin', filters.crRange.min.toString());
-  if (filters.crRange?.max !== undefined) params.set('crMax', filters.crRange.max.toString());
-  if (filters.hasLegendaryActions !== undefined) params.set('hasLegendaryActions', filters.hasLegendaryActions.toString());
-  if (filters.hasSpellcasting !== undefined) params.set('hasSpellcasting', filters.hasSpellcasting.toString());
-  if (filters.hasConditionImmunities !== undefined) params.set('hasConditionImmunities', filters.hasConditionImmunities.toString());
-  if (filters.hasDamageResistances !== undefined) params.set('hasDamageResistances', filters.hasDamageResistances.toString());
-  
+  if (filters.crRange?.min !== undefined)
+    params.set('crMin', filters.crRange.min.toString());
+  if (filters.crRange?.max !== undefined)
+    params.set('crMax', filters.crRange.max.toString());
+  if (filters.hasLegendaryActions !== undefined)
+    params.set('hasLegendaryActions', filters.hasLegendaryActions.toString());
+  if (filters.hasSpellcasting !== undefined)
+    params.set('hasSpellcasting', filters.hasSpellcasting.toString());
+  if (filters.hasConditionImmunities !== undefined)
+    params.set(
+      'hasConditionImmunities',
+      filters.hasConditionImmunities.toString()
+    );
+  if (filters.hasDamageResistances !== undefined)
+    params.set('hasDamageResistances', filters.hasDamageResistances.toString());
+
   const result = await apiRequest<{
     monsters: ProcessedMonster[];
     total: number;
     hasMore: boolean;
   }>(`${API_BASE}/bestiary/search?${params}`);
-  
+
   return {
     monsters: result.data?.monsters || [],
     total: result.data?.total || 0,
@@ -92,7 +105,9 @@ export async function searchMonsters(
  * Fetch all spells
  */
 export async function fetchSpells(): Promise<ProcessedSpell[]> {
-  const result = await apiRequest<{ spells: ProcessedSpell[]; total: number }>(`${API_BASE}/spells`);
+  const result = await apiRequest<{ spells: ProcessedSpell[]; total: number }>(
+    `${API_BASE}/spells`
+  );
   return result.data?.spells || [];
 }
 
@@ -100,7 +115,9 @@ export async function fetchSpells(): Promise<ProcessedSpell[]> {
  * Fetch all classes
  */
 export async function fetchClasses(): Promise<ProcessedClass[]> {
-  const result = await apiRequest<{ classes: ProcessedClass[]; total: number }>(`${API_BASE}/classes`);
+  const result = await apiRequest<{ classes: ProcessedClass[]; total: number }>(
+    `${API_BASE}/classes`
+  );
   return result.data?.classes || [];
 }
 

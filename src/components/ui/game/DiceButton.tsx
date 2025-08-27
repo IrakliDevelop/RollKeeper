@@ -33,12 +33,11 @@ export function DiceButton({
   onRollComplete,
   onError,
   showDiceIcon = true,
-  variant = 'primary'
+  variant = 'primary',
 }: DiceButtonProps) {
-  
   const { isReady, isRolling, roll } = useSimpleDiceRoll({
     onRollComplete,
-    onError
+    onError,
   });
 
   const handleClick = async () => {
@@ -47,26 +46,25 @@ export function DiceButton({
     }
   };
 
-  const baseStyles = 'px-3 py-2 rounded transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed';
+  const baseStyles =
+    'px-3 py-2 rounded transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed';
   const variantStyle = variantStyles[variant];
   const loadingStyle = isRolling ? 'opacity-75 cursor-wait' : '';
-  
+
   return (
     <button
       onClick={handleClick}
       disabled={!isReady || isRolling || disabled}
       className={`${baseStyles} ${variantStyle} ${loadingStyle} ${className}`}
       title={
-        !isReady ? 'Dice system initializing...' :
-        isRolling ? 'Rolling dice...' :
-        `Roll ${notation}`
+        !isReady
+          ? 'Dice system initializing...'
+          : isRolling
+            ? 'Rolling dice...'
+            : `Roll ${notation}`
       }
     >
-      {showDiceIcon && (
-        <span className="mr-1">
-          {isRolling ? '⏳' : '🎲'}
-        </span>
-      )}
+      {showDiceIcon && <span className="mr-1">{isRolling ? '⏳' : '🎲'}</span>}
       {children}
     </button>
   );

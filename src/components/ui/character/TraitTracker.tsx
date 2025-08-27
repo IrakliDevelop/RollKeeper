@@ -7,7 +7,9 @@ import { TraitTracker as SharedTraitTracker } from '@/components/shared/characte
 interface TraitTrackerProps {
   traits: TrackableTrait[];
   characterLevel: number;
-  onAddTrait: (trait: Omit<TrackableTrait, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onAddTrait: (
+    trait: Omit<TrackableTrait, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
   onUpdateTrait: (id: string, updates: Partial<TrackableTrait>) => void;
   onDeleteTrait: (id: string) => void;
   onUseTrait: (id: string) => void;
@@ -23,7 +25,7 @@ export default function TraitTracker({
   onDeleteTrait,
   onUseTrait,
   onResetTraits,
-  className = ''
+  className = '',
 }: TraitTrackerProps) {
   // Use the shared TraitTracker component with full functionality
   return (

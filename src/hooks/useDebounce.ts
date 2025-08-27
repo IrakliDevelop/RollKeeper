@@ -42,6 +42,6 @@ export function useDebouncedSearch(searchTerm: string, delay: number = 300) {
 
   return {
     debouncedSearchTerm,
-    isSearching
+    isSearching,
   };
 }

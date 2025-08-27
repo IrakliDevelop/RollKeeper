@@ -55,18 +55,13 @@ export default function DragDropList<T>({
         return (
           <div
             key={key}
-            className={`
-              ${itemClassName}
-              ${dragOverStyles}
-              ${draggedStyles}
-              transition-all duration-200
-            `}
+            className={` ${itemClassName} ${dragOverStyles} ${draggedStyles} transition-all duration-200`}
             draggable={!disabled}
-            onDragStart={(e) => handleDragStart(e, index)}
+            onDragStart={e => handleDragStart(e, index)}
             onDragEnd={handleDragEnd}
-            onDragOver={(e) => handleDragOver(e, index)}
+            onDragOver={e => handleDragOver(e, index)}
             onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, index)}
+            onDrop={e => handleDrop(e, index)}
           >
             {showDragHandle && dragHandlePosition === 'left' && (
               <div className="flex items-center">
@@ -76,7 +71,7 @@ export default function DragDropList<T>({
                 </div>
               </div>
             )}
-            
+
             {showDragHandle && dragHandlePosition === 'right' && (
               <div className="flex items-center">
                 <div className="flex-1">
@@ -85,11 +80,11 @@ export default function DragDropList<T>({
                 <DragHandle isDragEnabled={!disabled} className="ml-2" />
               </div>
             )}
-            
+
             {!showDragHandle && renderItem(item, index, isDragging)}
           </div>
         );
       })}
     </div>
   );
-} 
+}

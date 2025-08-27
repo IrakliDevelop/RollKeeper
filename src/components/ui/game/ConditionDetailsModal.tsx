@@ -21,7 +21,7 @@ export default function ConditionDetailsModal({
   condition,
   disease,
   onUpdateNotes,
-  onUpdateOnsetTime
+  onUpdateOnsetTime,
 }: ConditionDetailsModalProps) {
   if (!isOpen || (!condition && !disease)) return null;
 
@@ -36,45 +36,59 @@ export default function ConditionDetailsModal({
   };
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
       onClick={handleBackdropClick}
     >
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-2xl">
         {/* Header */}
-        <div className={`p-6 border-b ${isCondition ? 'bg-red-50 border-red-200' : 'bg-purple-50 border-purple-200'}`}>
+        <div
+          className={`border-b p-6 ${isCondition ? 'border-red-200 bg-red-50' : 'border-purple-200 bg-purple-50'}`}
+        >
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <div className={`p-2 rounded-lg ${isCondition ? 'bg-red-100' : 'bg-purple-100'}`}>
+              <div className="mb-2 flex items-center gap-3">
+                <div
+                  className={`rounded-lg p-2 ${isCondition ? 'bg-red-100' : 'bg-purple-100'}`}
+                >
                   {isCondition ? (
-                    <span className="text-red-600 text-xl">⚠️</span>
+                    <span className="text-xl text-red-600">⚠️</span>
                   ) : (
-                    <span className="text-purple-600 text-xl">🦠</span>
+                    <span className="text-xl text-purple-600">🦠</span>
                   )}
                 </div>
                 <div>
-                  <h2 className={`text-2xl font-bold ${isCondition ? 'text-red-800' : 'text-purple-800'}`}>
+                  <h2
+                    className={`text-2xl font-bold ${isCondition ? 'text-red-800' : 'text-purple-800'}`}
+                  >
                     {item!.name}
                     {condition?.stackable && condition.count > 1 && (
-                      <span className={`ml-2 px-3 py-1 rounded-full text-sm font-bold ${isCondition ? 'bg-red-200 text-red-800' : 'bg-purple-200 text-purple-800'}`}>
+                      <span
+                        className={`ml-2 rounded-full px-3 py-1 text-sm font-bold ${isCondition ? 'bg-red-200 text-red-800' : 'bg-purple-200 text-purple-800'}`}
+                      >
                         Level {condition.count}
                       </span>
                     )}
                   </h2>
-                  <div className="flex items-center gap-4 mt-1 text-sm text-gray-700">
+                  <div className="mt-1 flex items-center gap-4 text-sm text-gray-700">
                     <div className="flex items-center gap-1">
-                      <Book className="w-4 h-4" />
+                      <Book className="h-4 w-4" />
                       <span className="font-medium">{fullSourceName}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      <span>Applied: {new Date(item!.appliedAt).toLocaleDateString()}</span>
+                      <Calendar className="h-4 w-4" />
+                      <span>
+                        Applied:{' '}
+                        {new Date(item!.appliedAt).toLocaleDateString()}
+                      </span>
                     </div>
                     {disease?.onsetTime && (
                       <div className="flex items-center gap-1">
-                        <FileText className="w-4 h-4" />
-                        <span>Onset: {new Date(disease.onsetTime).toLocaleDateString()}</span>
+                        <FileText className="h-4 w-4" />
+                        <span>
+                          Onset:{' '}
+                          {new Date(disease.onsetTime).toLocaleDateString()}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -83,24 +97,24 @@ export default function ConditionDetailsModal({
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="rounded-lg p-2 transition-colors hover:bg-gray-100"
             >
-              <X className="w-5 h-5 text-gray-500" />
+              <X className="h-5 w-5 text-gray-500" />
             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
+        <div className="max-h-[60vh] overflow-y-auto p-6">
           {/* Description */}
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-              <FileText className="w-5 h-5" />
+            <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-gray-800">
+              <FileText className="h-5 w-5" />
               Description
             </h3>
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <div 
-                className="text-gray-800 leading-relaxed whitespace-pre-wrap"
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div
+                className="leading-relaxed whitespace-pre-wrap text-gray-800"
                 dangerouslySetInnerHTML={createSafeHtml(item!.description)}
               />
             </div>
@@ -108,14 +122,14 @@ export default function ConditionDetailsModal({
 
           {/* Notes Section */}
           <div className="mb-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">
+            <h3 className="mb-3 text-lg font-semibold text-gray-800">
               Personal Notes
             </h3>
             <textarea
               placeholder={`Add your notes about this ${isCondition ? 'condition' : 'disease'}...`}
               value={item!.notes || ''}
-              onChange={(e) => onUpdateNotes?.(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 placeholder:text-gray-600 resize-none"
+              onChange={e => onUpdateNotes?.(e.target.value)}
+              className="w-full resize-none rounded-lg border border-gray-300 p-3 text-gray-800 placeholder:text-gray-600 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               rows={3}
             />
           </div>
@@ -123,16 +137,16 @@ export default function ConditionDetailsModal({
           {/* Disease-specific fields */}
           {disease && (
             <div className="mb-4">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">
+              <h3 className="mb-3 text-lg font-semibold text-gray-800">
                 Onset Time
               </h3>
               <input
                 type="datetime-local"
                 value={disease.onsetTime || ''}
-                onChange={(e) => onUpdateOnsetTime?.(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                onChange={e => onUpdateOnsetTime?.(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 p-3 text-gray-800 focus:border-transparent focus:ring-2 focus:ring-blue-500 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
               />
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="mt-1 text-sm text-gray-600">
                 When did the symptoms first appear?
               </p>
             </div>
@@ -140,14 +154,14 @@ export default function ConditionDetailsModal({
         </div>
 
         {/* Footer */}
-        <div className="p-6 bg-gray-50 border-t border-gray-200">
+        <div className="border-t border-gray-200 bg-gray-50 p-6">
           <div className="flex justify-end">
             <button
               onClick={onClose}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                isCondition 
-                  ? 'bg-red-600 hover:bg-red-700 text-white' 
-                  : 'bg-purple-600 hover:bg-purple-700 text-white'
+              className={`rounded-lg px-4 py-2 font-medium transition-colors ${
+                isCondition
+                  ? 'bg-red-600 text-white hover:bg-red-700'
+                  : 'bg-purple-600 text-white hover:bg-purple-700'
               }`}
             >
               Close
@@ -157,4 +171,4 @@ export default function ConditionDetailsModal({
       </div>
     </div>
   );
-} 
+}

@@ -19,7 +19,7 @@ export default function HeroicInspirationTracker({
   onAddInspiration,
   onUseInspiration,
   onResetInspiration,
-  className = ''
+  className = '',
 }: HeroicInspirationTrackerProps) {
   // Use the shared HeroicInspirationTracker component with full functionality
   return (
@@ -37,4 +37,4 @@ export default function HeroicInspirationTracker({
       className={className}
     />
   );
-} 
+}

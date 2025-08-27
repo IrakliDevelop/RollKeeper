@@ -19,7 +19,10 @@ export default function DiceTestPage() {
 
   const addLog = (message: string) => {
     console.log(message);
-    setLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+    setLogs(prev => [
+      ...prev,
+      `${new Date().toLocaleTimeString()}: ${message}`,
+    ]);
   };
 
   useEffect(() => {
@@ -28,8 +31,8 @@ export default function DiceTestPage() {
       assetPath: '/assets/',
       container: '#dice-container',
       scale: 6,
-      theme: "diceOfRolling",
-      themeColor: "#feea03",
+      theme: 'diceOfRolling',
+      themeColor: '#feea03',
       offscreen: true,
       throwForce: 5,
       gravity: 1,
@@ -41,14 +44,18 @@ export default function DiceTestPage() {
     addLog('DiceBox instance created');
 
     // Initialize the dice box
-    box.init().then(() => {
-      addLog('DiceBox initialized successfully!');
-      setIsInitialized(true);
-    }).catch((error: unknown) => {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      addLog(`Failed to initialize DiceBox: ${errorMessage}`);
-      setInitError(errorMessage);
-    });
+    box
+      .init()
+      .then(() => {
+        addLog('DiceBox initialized successfully!');
+        setIsInitialized(true);
+      })
+      .catch((error: unknown) => {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        addLog(`Failed to initialize DiceBox: ${errorMessage}`);
+        setInitError(errorMessage);
+      });
 
     return () => {
       // Cleanup if needed
@@ -70,21 +77,23 @@ export default function DiceTestPage() {
       console.log(results);
       addLog(`Roll command sent: ${notation}`);
       addLog(`Results received: ${JSON.stringify(results, null, 2)}`);
-      
+
       // Calculate and store the roll summary
       const summary = calculateRollSummary(results, notation);
       setRollHistory(prev => [...prev, summary]);
-      addLog(`Total: ${summary.finalTotal} (dice: ${summary.total}, modifier: ${summary.modifier})`);
-      
+      addLog(
+        `Total: ${summary.finalTotal} (dice: ${summary.total}, modifier: ${summary.modifier})`
+      );
+
       // Auto-clear dice after a short delay to see the result (if enabled)
       if (autoClearDelay > 0) {
         autoClearDice(diceBox, autoClearDelay, () => {
           addLog(`Dice auto-cleared after ${autoClearDelay}ms`);
         });
       }
-      
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       addLog(`Error rolling dice: ${errorMessage}`);
     }
   };
@@ -104,7 +113,8 @@ export default function DiceTestPage() {
         addLog('Clear method not available on dice box');
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       addLog(`Error clearing dice: ${errorMessage}`);
     }
   };
@@ -119,34 +129,40 @@ export default function DiceTestPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white p-8 relative dice-test-page">
+    <div className="dice-test-page relative min-h-screen bg-white p-8">
       {/* Dice Container */}
-      <div 
+      <div
         id="dice-container"
         data-initialized={isInitialized}
-        className="fixed inset-0 pointer-events-none z-10"
+        className="pointer-events-none fixed inset-0 z-10"
         style={{
           width: '100vw',
           height: '100vh',
           top: 0,
-          left: 0
+          left: 0,
         }}
       ></div>
 
       {/* UI Content */}
-      <div className="relative z-20 max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8 text-center text-gray-900">3D Dice Test Page</h1>
+      <div className="relative z-20 mx-auto max-w-4xl">
+        <h1 className="mb-8 text-center text-3xl font-bold text-gray-900">
+          3D Dice Test Page
+        </h1>
 
         {/* Status */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6 border">
-          <h2 className="text-xl font-bold mb-4 text-gray-900">Status</h2>
+        <div className="mb-6 rounded-lg border bg-white p-6 shadow">
+          <h2 className="mb-4 text-xl font-bold text-gray-900">Status</h2>
           <div className="space-y-2">
-            <div className={`flex items-center gap-2 ${isInitialized ? 'text-green-600' : 'text-yellow-600'}`}>
-              <div className={`w-3 h-3 rounded-full ${isInitialized ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+            <div
+              className={`flex items-center gap-2 ${isInitialized ? 'text-green-600' : 'text-yellow-600'}`}
+            >
+              <div
+                className={`h-3 w-3 rounded-full ${isInitialized ? 'bg-green-500' : 'bg-yellow-500'}`}
+              ></div>
               <span>{isInitialized ? 'Initialized' : 'Initializing...'}</span>
             </div>
             {initError && (
-              <div className="text-red-600 text-sm bg-red-50 p-2 rounded">
+              <div className="rounded bg-red-50 p-2 text-sm text-red-600">
                 Error: {initError}
               </div>
             )}
@@ -154,26 +170,30 @@ export default function DiceTestPage() {
         </div>
 
         {/* Dice Controls */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6 border">
-          <h2 className="text-xl font-bold mb-4 text-gray-900">Dice Controls</h2>
-          
+        <div className="mb-6 rounded-lg border bg-white p-6 shadow">
+          <h2 className="mb-4 text-xl font-bold text-gray-900">
+            Dice Controls
+          </h2>
+
           {/* Clear Button and Auto-clear Settings */}
           <div className="mb-4 space-y-3">
             <button
               onClick={clearDice}
               disabled={!isInitialized}
-              className="w-full px-4 py-3 bg-red-500 text-white rounded-lg disabled:bg-gray-300 hover:bg-red-600 transition-colors font-semibold"
+              className="w-full rounded-lg bg-red-500 px-4 py-3 font-semibold text-white transition-colors hover:bg-red-600 disabled:bg-gray-300"
             >
               🧹 Clear All Dice from Screen
             </button>
-            
+
             {/* Auto-clear delay setting */}
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700">Auto-clear delay:</label>
+              <label className="text-sm font-medium text-gray-700">
+                Auto-clear delay:
+              </label>
               <select
                 value={autoClearDelay}
-                onChange={(e) => setAutoClearDelay(Number(e.target.value))}
-                className="px-2 py-1 text-sm border border-gray-300 rounded"
+                onChange={e => setAutoClearDelay(Number(e.target.value))}
+                className="rounded border border-gray-300 px-2 py-1 text-sm"
               >
                 <option value={0}>Disabled</option>
                 <option value={2000}>2 seconds</option>
@@ -183,81 +203,83 @@ export default function DiceTestPage() {
               </select>
             </div>
           </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <button
               onClick={() => rollDice('1d20')}
               disabled={!isInitialized}
-              className="px-4 py-2 bg-blue-500 text-white rounded disabled:bg-gray-300 hover:bg-blue-600 transition-colors"
+              className="rounded bg-blue-500 px-4 py-2 text-white transition-colors hover:bg-blue-600 disabled:bg-gray-300"
             >
               Roll 1d20
             </button>
             <button
               onClick={() => rollDice('2d6')}
               disabled={!isInitialized}
-              className="px-4 py-2 bg-green-500 text-white rounded disabled:bg-gray-300 hover:bg-green-600 transition-colors"
+              className="rounded bg-green-500 px-4 py-2 text-white transition-colors hover:bg-green-600 disabled:bg-gray-300"
             >
               Roll 2d6
             </button>
             <button
               onClick={() => rollDice('1d12')}
               disabled={!isInitialized}
-              className="px-4 py-2 bg-purple-500 text-white rounded disabled:bg-gray-300 hover:bg-purple-600 transition-colors"
+              className="rounded bg-purple-500 px-4 py-2 text-white transition-colors hover:bg-purple-600 disabled:bg-gray-300"
             >
               Roll 1d12
             </button>
             <button
               onClick={() => rollDice('4d6')}
               disabled={!isInitialized}
-              className="px-4 py-2 bg-red-500 text-white rounded disabled:bg-gray-300 hover:bg-red-600 transition-colors"
+              className="rounded bg-red-500 px-4 py-2 text-white transition-colors hover:bg-red-600 disabled:bg-gray-300"
             >
               Roll 4d6
             </button>
           </div>
-          
+
           {/* Test buttons with modifiers */}
           <div className="mt-4">
-            <h4 className="font-semibold mb-2 text-gray-900">Test Rolls with Modifiers</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <h4 className="mb-2 font-semibold text-gray-900">
+              Test Rolls with Modifiers
+            </h4>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               <button
                 onClick={() => rollDice('1d20+5')}
                 disabled={!isInitialized}
-                className="px-3 py-2 text-sm bg-indigo-500 text-white rounded disabled:bg-gray-300 hover:bg-indigo-600 transition-colors"
+                className="rounded bg-indigo-500 px-3 py-2 text-sm text-white transition-colors hover:bg-indigo-600 disabled:bg-gray-300"
               >
                 1d20+5
               </button>
               <button
                 onClick={() => rollDice('3d6+2')}
                 disabled={!isInitialized}
-                className="px-3 py-2 text-sm bg-teal-500 text-white rounded disabled:bg-gray-300 hover:bg-teal-600 transition-colors"
+                className="rounded bg-teal-500 px-3 py-2 text-sm text-white transition-colors hover:bg-teal-600 disabled:bg-gray-300"
               >
                 3d6+2
               </button>
               <button
                 onClick={() => rollDice('2d8-1')}
                 disabled={!isInitialized}
-                className="px-3 py-2 text-sm bg-orange-500 text-white rounded disabled:bg-gray-300 hover:bg-orange-600 transition-colors"
+                className="rounded bg-orange-500 px-3 py-2 text-sm text-white transition-colors hover:bg-orange-600 disabled:bg-gray-300"
               >
                 2d8-1
               </button>
               <button
                 onClick={() => rollDice('1d4+10')}
                 disabled={!isInitialized}
-                className="px-3 py-2 text-sm bg-pink-500 text-white rounded disabled:bg-gray-300 hover:bg-pink-600 transition-colors"
+                className="rounded bg-pink-500 px-3 py-2 text-sm text-white transition-colors hover:bg-pink-600 disabled:bg-gray-300"
               >
                 1d4+10
               </button>
             </div>
           </div>
-          
+
           <div className="mt-4">
-            <h3 className="font-semibold mb-2 text-gray-900">Custom Roll</h3>
+            <h3 className="mb-2 font-semibold text-gray-900">Custom Roll</h3>
             <div className="flex gap-2">
               <input
                 type="text"
                 placeholder="e.g., 3d8+2"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onKeyDown={(e) => {
+                className="flex-1 rounded border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                onKeyDown={e => {
                   if (e.key === 'Enter' && e.currentTarget.value) {
                     rollDice(e.currentTarget.value);
                     e.currentTarget.value = '';
@@ -265,15 +287,16 @@ export default function DiceTestPage() {
                 }}
               />
               <button
-                onClick={(e) => {
-                  const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                onClick={e => {
+                  const input = e.currentTarget
+                    .previousElementSibling as HTMLInputElement;
                   if (input.value) {
                     rollDice(input.value);
                     input.value = '';
                   }
                 }}
                 disabled={!isInitialized}
-                className="px-4 py-2 bg-orange-500 text-white rounded disabled:bg-gray-300 hover:bg-orange-600 transition-colors"
+                className="rounded bg-orange-500 px-4 py-2 text-white transition-colors hover:bg-orange-600 disabled:bg-gray-300"
               >
                 Roll
               </button>
@@ -282,30 +305,30 @@ export default function DiceTestPage() {
         </div>
 
         {/* Dice Results Display */}
-        <DiceResultDisplay 
+        <DiceResultDisplay
           rollHistory={rollHistory}
           onClearHistory={clearRollHistory}
           maxResults={10}
         />
 
         {/* Debug Info */}
-        <div className="bg-white rounded-lg shadow p-6 border">
-          <div className="flex justify-between items-center mb-4">
+        <div className="rounded-lg border bg-white p-6 shadow">
+          <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-900">Debug Logs</h2>
             <button
               onClick={clearLogs}
-              className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+              className="rounded bg-gray-500 px-3 py-1 text-sm text-white transition-colors hover:bg-gray-600"
             >
               Clear Logs
             </button>
           </div>
-          <div className="bg-gray-50 p-4 rounded max-h-96 overflow-y-auto">
+          <div className="max-h-96 overflow-y-auto rounded bg-gray-50 p-4">
             {logs.length === 0 ? (
               <p className="text-gray-500 italic">No logs yet...</p>
             ) : (
               <div className="space-y-1">
                 {logs.map((log, index) => (
-                  <div key={index} className="text-sm font-mono text-gray-800">
+                  <div key={index} className="font-mono text-sm text-gray-800">
                     {log}
                   </div>
                 ))}
@@ -316,9 +339,9 @@ export default function DiceTestPage() {
 
         {/* Navigation */}
         <div className="mt-8 text-center">
-          <Link 
+          <Link
             href="/"
-            className="inline-block px-6 py-3 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+            className="inline-block rounded bg-gray-600 px-6 py-3 text-white transition-colors hover:bg-gray-700"
           >
             ← Back to Character Sheet
           </Link>

@@ -6,24 +6,24 @@ import { DiceRollResults, ParsedDiceNotation, RollSummary } from '@/types/dice';
 export function parseDiceNotation(notation: string): ParsedDiceNotation {
   // Remove spaces
   const clean = notation.replace(/\s/g, '');
-  
+
   // Match pattern like "3d12+5" or "1d20-2"
   const match = clean.match(/^(\d+)?d(\d+)([+-]\d+)?$/i);
-  
+
   if (!match) {
     throw new Error(`Invalid dice notation: ${notation}`);
   }
-  
+
   const count = parseInt(match[1] || '1', 10);
   const sides = parseInt(match[2], 10);
   const modifierStr = match[3] || '+0';
   const modifier = parseInt(modifierStr, 10);
-  
+
   return {
     count,
     sides,
     modifier,
-    originalNotation: notation
+    originalNotation: notation,
   };
 }
 
@@ -31,14 +31,14 @@ export function parseDiceNotation(notation: string): ParsedDiceNotation {
  * Calculate roll summary from dice results
  */
 export function calculateRollSummary(
-  diceResults: DiceRollResults, 
+  diceResults: DiceRollResults,
   notation: string
 ): RollSummary {
   const parsed = parseDiceNotation(notation);
   const individualValues = diceResults.map(die => die.value);
   const diceTotal = individualValues.reduce((sum, value) => sum + value, 0);
   const finalTotal = diceTotal + parsed.modifier;
-  
+
   return {
     diceResults,
     individualValues,
@@ -47,7 +47,7 @@ export function calculateRollSummary(
     finalTotal,
     notation,
     rollTime: new Date(),
-    rollId: generateRollId()
+    rollId: generateRollId(),
   };
 }
 
@@ -63,9 +63,9 @@ function generateRollId(): string {
  */
 export function formatDiceResults(summary: RollSummary): string {
   const { individualValues, modifier, finalTotal, notation } = summary;
-  
+
   const diceStr = individualValues.join(' + ');
-  
+
   if (modifier === 0) {
     return `${notation}: [${diceStr}] = ${finalTotal}`;
   } else {

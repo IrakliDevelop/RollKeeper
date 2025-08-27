@@ -1,16 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  Grid3X3, 
-  List, 
-  Move, 
+import {
+  Grid3X3,
+  List,
+  Move,
   Plus,
   StopCircle,
   Scroll,
   Eye,
   EyeOff,
-  Users
+  Users,
 } from 'lucide-react';
 import { CombatParticipantCard } from './CombatParticipantCard';
 import { InitiativeTracker } from './InitiativeTracker';
@@ -26,11 +26,11 @@ interface CombatCanvasProps {
 
 export function CombatCanvas({
   campaignId,
-  className = ''
+  className = '',
 }: CombatCanvasProps) {
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [showLog, setShowLog] = useState(false);
-  
+
   const {
     activeEncounter,
     combatLog,
@@ -42,24 +42,30 @@ export function CombatCanvas({
     pauseEncounter,
     resumeEncounter,
     clearCombatLog,
-    startEncounter
+    startEncounter,
   } = useCombatStore();
 
   if (!activeEncounter) {
     return (
-      <div className={`flex items-center justify-center h-96 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 ${className}`}>
+      <div
+        className={`flex h-96 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 ${className}`}
+      >
         <div className="text-center">
-          <Users size={48} className="mx-auto text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Active Combat</h3>
-          <p className="text-gray-600 mb-4">Start a new encounter to begin combat tracking</p>
+          <Users size={48} className="mx-auto mb-4 text-gray-400" />
+          <h3 className="mb-2 text-lg font-medium text-gray-900">
+            No Active Combat
+          </h3>
+          <p className="mb-4 text-gray-600">
+            Start a new encounter to begin combat tracking
+          </p>
           <button
             onClick={() => {
               // Start a new encounter with no participants initially
               startEncounter(campaignId, [], 'New Combat Encounter');
             }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
           >
-            <Plus size={16} className="inline mr-2" />
+            <Plus size={16} className="mr-2 inline" />
             Start Combat
           </button>
         </div>
@@ -71,7 +77,10 @@ export function CombatCanvas({
     setLayoutMode(mode);
   };
 
-  const handleParticipantSelect = (participantId: string, multiSelect: boolean = false) => {
+  const handleParticipantSelect = (
+    participantId: string,
+    multiSelect: boolean = false
+  ) => {
     selectParticipant(participantId, multiSelect);
   };
 
@@ -80,7 +89,11 @@ export function CombatCanvas({
   };
 
   const handleEndCombat = () => {
-    if (window.confirm('Are you sure you want to end this combat encounter? This will save the final state to the encounter history.')) {
+    if (
+      window.confirm(
+        'Are you sure you want to end this combat encounter? This will save the final state to the encounter history.'
+      )
+    ) {
       endEncounter();
     }
   };
@@ -99,9 +112,9 @@ export function CombatCanvas({
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-lg ${className}`}>
+    <div className={`rounded-lg bg-white shadow-lg ${className}`}>
       {/* Combat Toolbar */}
-      <div className="bg-gray-50 border-b border-gray-200 p-4 rounded-t-lg">
+      <div className="rounded-t-lg border-b border-gray-200 bg-gray-50 p-4">
         <div className="flex items-center justify-between">
           {/* Combat Info */}
           <div className="flex items-center gap-4">
@@ -110,25 +123,28 @@ export function CombatCanvas({
                 {activeEncounter.name || 'Combat Encounter'}
               </h2>
               <div className="text-sm text-gray-600">
-                {activeEncounter.participants.length} participants • Round {activeEncounter.currentRound}
+                {activeEncounter.participants.length} participants • Round{' '}
+                {activeEncounter.currentRound}
               </div>
             </div>
-            
-            <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-              activeEncounter.isActive 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-yellow-100 text-yellow-800'
-            }`}>
+
+            <div
+              className={`rounded-full px-3 py-1 text-sm font-medium ${
+                activeEncounter.isActive
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-yellow-100 text-yellow-800'
+              }`}
+            >
               {activeEncounter.isActive ? 'Active' : 'Paused'}
             </div>
           </div>
 
           {/* Layout Controls */}
           <div className="flex items-center gap-2">
-            <div className="flex items-center bg-white border border-gray-300 rounded-lg">
+            <div className="flex items-center rounded-lg border border-gray-300 bg-white">
               <button
                 onClick={() => handleLayoutChange('initiative')}
-                className={`px-3 py-2 text-sm font-medium rounded-l-lg transition-colors ${
+                className={`rounded-l-lg px-3 py-2 text-sm font-medium transition-colors ${
                   canvasState.layoutMode === 'initiative'
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-700 hover:bg-gray-50'
@@ -150,7 +166,7 @@ export function CombatCanvas({
               </button>
               <button
                 onClick={() => handleLayoutChange('free')}
-                className={`px-3 py-2 text-sm font-medium rounded-r-lg transition-colors ${
+                className={`rounded-r-lg px-3 py-2 text-sm font-medium transition-colors ${
                   canvasState.layoutMode === 'free'
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-700 hover:bg-gray-50'
@@ -164,7 +180,7 @@ export function CombatCanvas({
             {/* Action Buttons */}
             <button
               onClick={() => setShowAddParticipant(true)}
-              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              className="rounded-lg bg-green-600 px-3 py-2 text-white transition-colors hover:bg-green-700"
               title="Add Participant"
             >
               <Plus size={16} />
@@ -172,9 +188,9 @@ export function CombatCanvas({
 
             <button
               onClick={() => setShowLog(!showLog)}
-              className={`px-3 py-2 rounded-lg transition-colors ${
-                showLog 
-                  ? 'bg-purple-600 text-white' 
+              className={`rounded-lg px-3 py-2 transition-colors ${
+                showLog
+                  ? 'bg-purple-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
               title="Combat Log"
@@ -183,16 +199,24 @@ export function CombatCanvas({
             </button>
 
             <button
-              onClick={() => activeEncounter.isActive ? pauseEncounter() : resumeEncounter()}
-              className="px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
-              title={activeEncounter.isActive ? 'Pause Combat' : 'Resume Combat'}
+              onClick={() =>
+                activeEncounter.isActive ? pauseEncounter() : resumeEncounter()
+              }
+              className="rounded-lg bg-yellow-600 px-3 py-2 text-white transition-colors hover:bg-yellow-700"
+              title={
+                activeEncounter.isActive ? 'Pause Combat' : 'Resume Combat'
+              }
             >
-              {activeEncounter.isActive ? <EyeOff size={16} /> : <Eye size={16} />}
+              {activeEncounter.isActive ? (
+                <EyeOff size={16} />
+              ) : (
+                <Eye size={16} />
+              )}
             </button>
 
             <button
               onClick={handleEndCombat}
-              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              className="rounded-lg bg-red-600 px-3 py-2 text-white transition-colors hover:bg-red-700"
               title="End Combat"
             >
               <StopCircle size={16} />
@@ -204,7 +228,7 @@ export function CombatCanvas({
       {/* Main Combat Area */}
       <div className="flex">
         {/* Left Sidebar - Initiative Tracker */}
-        <div className="w-80 border-r border-gray-200 p-4 bg-gray-50">
+        <div className="w-80 border-r border-gray-200 bg-gray-50 p-4">
           <InitiativeTracker
             participants={activeEncounter.participants}
             currentTurn={activeEncounter.currentTurn}
@@ -221,30 +245,40 @@ export function CombatCanvas({
                 key={participant.id}
                 participant={participant}
                 isCurrentTurn={index === activeEncounter.currentTurn}
-                isSelected={canvasState.selectedParticipants.includes(participant.id)}
+                isSelected={canvasState.selectedParticipants.includes(
+                  participant.id
+                )}
                 compact={canvasState.compactCards}
                 onSelect={() => handleParticipantSelect(participant.id)}
                 onRemove={() => handleParticipantRemove(participant.id)}
                 className={canvasState.layoutMode === 'free' ? 'absolute' : ''}
-                style={canvasState.layoutMode === 'free' ? {
-                  left: participant.position.x,
-                  top: participant.position.y
-                } : undefined}
+                style={
+                  canvasState.layoutMode === 'free'
+                    ? {
+                        left: participant.position.x,
+                        top: participant.position.y,
+                      }
+                    : undefined
+                }
               />
             ))}
           </div>
 
           {/* Empty state when no participants */}
           {activeEncounter.participants.length === 0 && (
-            <div className="text-center py-12">
-              <Users size={48} className="mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Participants</h3>
-              <p className="text-gray-600 mb-4">Add players and monsters to start combat</p>
+            <div className="py-12 text-center">
+              <Users size={48} className="mx-auto mb-4 text-gray-400" />
+              <h3 className="mb-2 text-lg font-medium text-gray-900">
+                No Participants
+              </h3>
+              <p className="mb-4 text-gray-600">
+                Add players and monsters to start combat
+              </p>
               <button
                 onClick={() => setShowAddParticipant(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
               >
-                <Plus size={16} className="inline mr-2" />
+                <Plus size={16} className="mr-2 inline" />
                 Add Participants
               </button>
             </div>
@@ -273,7 +307,3 @@ export function CombatCanvas({
     </div>
   );
 }
-
-
-
-
