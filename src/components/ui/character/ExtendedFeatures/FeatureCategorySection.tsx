@@ -69,13 +69,13 @@ export default function FeatureCategorySection({
 
       {/* Category Content */}
       {!isCollapsed && (
-        <div className="border-t border-gray-100 p-4">
+        <div className="border-t border-gray-100 p-6">
           <DragDropList
             items={features}
             onReorder={onReorderFeatures}
             keyExtractor={(feature) => feature.id}
             disabled={readonly}
-            className="space-y-3"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
             showDragHandle={!readonly}
             renderItem={(feature, index, isDragging) => (
               <FeatureCard

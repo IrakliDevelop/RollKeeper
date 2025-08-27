@@ -68,84 +68,53 @@ export default function FeatureCard({
   return (
     <>
       <div
-        className={`group rounded-lg border-2 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md ${
+        className={`group flex flex-col h-full min-h-[140px] rounded-lg border-2 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md ${
           isDragging ? 'opacity-50 scale-95' : ''
         } ${isExhausted ? 'border-red-200 bg-red-50' : 'border-gray-200 hover:border-indigo-300'}`}
       >
-        <div className="flex items-start justify-between gap-3">
-          {/* Feature Info */}
+        {/* Feature Header */}
+        <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <h4 className="font-semibold text-gray-900 truncate">
-                {feature.name}
-              </h4>
-              {feature.sourceDetail && (
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                  {feature.sourceDetail}
-                </span>
-              )}
-            </div>
-            
-            {feature.description && (
-              <p className="text-sm text-gray-600 line-clamp-2 mb-2">
-                {feature.description}
-              </p>
+            <h4 className="font-semibold text-gray-900 truncate text-sm leading-tight">
+              {feature.name}
+            </h4>
+            {feature.sourceDetail && (
+              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded mt-1 inline-block">
+                {feature.sourceDetail}
+              </span>
             )}
-
-            {/* Usage Info */}
-            <div className="flex items-center gap-4 text-sm">
-              <div className={`flex items-center gap-1 ${getUsageColor()}`}>
-                {getUsageIcon()}
-                {feature.isPassive ? (
-                  <span>Passive</span>
-                ) : hasUses ? (
-                  <span>
-                    {usesRemaining}/{maxUses} uses
-                  </span>
-                ) : (
-                  <span>Unlimited</span>
-                )}
-              </div>
-
-              {hasUses && (
-                <div className="flex items-center gap-1 text-gray-500">
-                  <Clock className="h-3 w-3" />
-                  <span className="capitalize">{feature.restType} rest</span>
-                </div>
-              )}
-            </div>
           </div>
-
+          
           {/* Action Buttons */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
             {/* Use Button */}
             {!readonly && hasUses && !isExhausted && (
               <button
                 onClick={onUse}
-                className="p-1.5 rounded-md text-indigo-600 hover:bg-indigo-100 transition-colors"
+                className="p-1 rounded-md text-indigo-600 hover:bg-indigo-100 transition-colors"
                 title="Use feature"
               >
-                <Zap className="h-4 w-4" />
+                <Zap className="h-3 w-3" />
               </button>
             )}
 
             {/* View Button */}
             <button
               onClick={handleViewClick}
-              className="p-1.5 rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
+              className="p-1 rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
               title="View details"
             >
-              <Eye className="h-4 w-4" />
+              <Eye className="h-3 w-3" />
             </button>
 
             {/* Edit Button */}
             {!readonly && (
               <button
                 onClick={handleEditClick}
-                className="p-1.5 rounded-md text-blue-600 hover:bg-blue-100 transition-colors"
+                className="p-1 rounded-md text-blue-600 hover:bg-blue-100 transition-colors"
                 title="Edit feature"
               >
-                <Edit3 className="h-4 w-4" />
+                <Edit3 className="h-3 w-3" />
               </button>
             )}
 
@@ -153,21 +122,55 @@ export default function FeatureCard({
             {!readonly && (
               <button
                 onClick={onDelete}
-                className="p-1.5 rounded-md text-red-600 hover:bg-red-100 transition-colors"
+                className="p-1 rounded-md text-red-600 hover:bg-red-100 transition-colors"
                 title="Delete feature"
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-3 w-3" />
               </button>
+            )}
+          </div>
+        </div>
+        
+        {/* Description */}
+        <div className="flex-1 mb-3">
+          {feature.description && (
+            <p className="text-xs text-gray-600 line-clamp-3">
+              {feature.description}
+            </p>
+          )}
+        </div>
+
+        {/* Usage Info */}
+        <div className="mt-auto">
+          <div className="flex items-center justify-between text-xs">
+            <div className={`flex items-center gap-1 ${getUsageColor()}`}>
+              {getUsageIcon()}
+              {feature.isPassive ? (
+                <span>Passive</span>
+              ) : hasUses ? (
+                <span>
+                  {usesRemaining}/{maxUses}
+                </span>
+              ) : (
+                <span>Unlimited</span>
+              )}
+            </div>
+
+            {hasUses && (
+              <div className="flex items-center gap-1 text-gray-500">
+                <Clock className="h-3 w-3" />
+                <span className="capitalize text-xs">{feature.restType}</span>
+              </div>
             )}
           </div>
         </div>
 
         {/* Usage Progress Bar */}
         {hasUses && maxUses > 1 && (
-          <div className="mt-3">
-            <div className="w-full bg-gray-200 rounded-full h-1.5">
+          <div className="mt-2">
+            <div className="w-full bg-gray-200 rounded-full h-1">
               <div
-                className={`h-1.5 rounded-full transition-all duration-300 ${
+                className={`h-1 rounded-full transition-all duration-300 ${
                   isExhausted ? 'bg-red-500' : 
                   usesRemaining <= 1 ? 'bg-orange-500' : 'bg-green-500'
                 }`}

@@ -151,7 +151,7 @@ export default function AddFeatureModal({
                 onChange={(e) => setNewFeature({ ...newFeature, isPassive: e.target.checked })}
                 className="rounded border-gray-300"
               />
-              <span className="text-sm">
+              <span className="text-sm text-gray-700">
                 Passive ability (always active, no usage tracking)
               </span>
             </label>
@@ -198,7 +198,7 @@ export default function AddFeatureModal({
                       onChange={(e) => setNewFeature({ ...newFeature, scaleWithProficiency: e.target.checked })}
                       className="rounded border-gray-300"
                     />
-                    <span className="text-sm">
+                    <span className="text-sm text-gray-700">
                       Scale uses with proficiency bonus
                     </span>
                   </label>

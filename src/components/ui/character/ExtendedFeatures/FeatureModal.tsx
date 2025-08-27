@@ -113,9 +113,9 @@ export default function FeatureModal({
       size="lg"
     >
       <div className="max-h-[80vh] overflow-y-auto">
-        <div className="space-y-6 p-6">
+        <div className="space-y-8 p-6">
           {/* Header Actions */}
-          <div className="flex items-center justify-between border-b border-gray-200 pb-6">
+          <div className="flex items-center justify-between border-b border-gray-200 pb-8 mb-2">
             <div className="flex items-center gap-3">
               <span className="rounded-lg bg-indigo-100 px-3 py-1.5 text-sm font-semibold text-indigo-800">
                 {FEATURE_SOURCE_LABELS[feature.sourceType]}
@@ -177,7 +177,7 @@ export default function FeatureModal({
 
           {/* Content */}
           {mode === 'view' ? (
-            <div className="space-y-6">
+            <div className="space-y-8 mt-4">
               {/* Usage Info */}
               <div className="rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-6 border border-blue-200">
                 <div className="flex items-center justify-between">
@@ -257,7 +257,7 @@ export default function FeatureModal({
               )}
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-8 mt-4">
               {/* Edit Form */}
               <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <h4 className="text-lg font-semibold text-gray-900 mb-6">Basic Information</h4>
