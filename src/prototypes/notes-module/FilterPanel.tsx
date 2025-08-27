@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Filter, X, Pin, Tag, Users, Package, Map, FileText } from 'lucide-react';
-import { FancySelect } from '@/components/ui/FancySelect';
+import { FancySelect } from '@/components/ui/forms/FancySelect';
 
 interface FilterOptions {
   categories: string[];

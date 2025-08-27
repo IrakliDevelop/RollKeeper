@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import DragDropList from '@/components/ui/DragDropList';
+import DragDropList from '@/components/ui/layout/DragDropList';
 import { Weapon, InventoryItem, MagicItem } from '@/types/character';
 import { Sword, Package, Sparkles, Trash2, Edit2 } from 'lucide-react';
 

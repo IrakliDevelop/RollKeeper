@@ -4,9 +4,9 @@ import React, { useState } from 'react';
 import { Spell, SpellActionType } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Edit2, Trash2, Eye, BookOpen } from 'lucide-react';
-import { FancySelect } from '@/components/ui/FancySelect';
-import { ModalPortal } from '@/components/ui/ModalPortal';
-import DragDropList from '@/components/ui/DragDropList';
+import { FancySelect } from '@/components/ui/forms/FancySelect';
+import { ModalPortal } from '@/components/ui/feedback/ModalPortal';
+import DragDropList from '@/components/ui/layout/DragDropList';
 
 // Constants for spell schools and common casting times
 const SPELL_SCHOOLS = [

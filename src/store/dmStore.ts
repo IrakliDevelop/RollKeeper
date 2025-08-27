@@ -13,7 +13,6 @@ import {
   DEFAULT_ENCOUNTER_SETTINGS,
   DEFAULT_CANVAS_DATA,
   CombatLogEntry,
-  CombatEventType,
   DMEntityBase
 } from '@/types/dm';
 import { CharacterState } from '@/types/character';

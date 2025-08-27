@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { User, Heart, Star, Link, AlertTriangle } from 'lucide-react';
 import { CharacterBackground } from '@/types/character';
-import RichTextEditor from './RichTextEditor';
+import { RichTextEditor } from '@/components/ui/forms';
 
 interface CharacterBackgroundEditorProps {
   background: CharacterBackground;

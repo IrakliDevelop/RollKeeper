@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import { ClassInfo } from '@/types/character';
 import { COMMON_CLASSES } from '@/utils/constants';
-import { CustomSwitcher } from './CustomSwitcher';
-import { FancySelect } from './FancySelect';
+import { CustomSwitcher } from '@/components/ui';
+import { FancySelect } from '@/components/ui/forms/FancySelect';
 
 interface ClassSelectorProps {
   value: ClassInfo;

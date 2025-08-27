@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Plus, Edit3, Trash2, Save, X } from 'lucide-react';
 import { RichTextContent } from '@/types/character';
-import RichTextEditor from './RichTextEditor';
+import { RichTextEditor } from '@/components/ui/forms';
 
 interface FeaturesTraitsManagerProps {
   items: RichTextContent[];

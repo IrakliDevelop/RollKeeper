@@ -4,8 +4,8 @@ import React, { useState } from 'react';
 import { Weapon, MagicItem, MagicItemCategory, MagicItemRarity, WeaponCategory, WeaponType, DamageType, WeaponDamage } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Edit2, Trash2, Sword, Wand2, X } from 'lucide-react';
-import { ModalPortal } from '@/components/ui/ModalPortal';
-import DragDropList from './DragDropList';
+import { ModalPortal } from '@/components/ui/feedback/ModalPortal';
+import DragDropList from '@/components/ui/layout/DragDropList';
 
 interface EquipmentModalProps {
   isOpen: boolean;

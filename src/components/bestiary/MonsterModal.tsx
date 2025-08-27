@@ -1,6 +1,6 @@
 import { ProcessedMonster } from '@/types/bestiary';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/feedback/dialog';
+import { Badge } from '@/components/ui';
 import { getCRColor, formatSize, formatAlignment } from '@/utils/bestiaryUtils';
 import { Shield, Heart, Zap, Swords, Brain, Star } from 'lucide-react';
 

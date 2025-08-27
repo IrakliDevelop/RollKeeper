@@ -14,7 +14,7 @@ import {
   calculateWeaponDamageBonus,
   rollDamage
 } from '@/utils/calculations';
-import DragDropList from '@/components/ui/DragDropList';
+import DragDropList from '@/components/ui/layout/DragDropList';
 
 interface EquippedWeaponsProps {
   showAttackRoll: (weaponName: string, roll: number, bonus: number, isCrit: boolean, damage?: string, damageType?: string) => void;

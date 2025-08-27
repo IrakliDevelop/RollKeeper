@@ -3,9 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, Edit3, Save, Eye, Trash2 } from 'lucide-react';
 import { RichTextContent } from '@/types/character';
-import { ModalPortal } from './ModalPortal';
-import RichTextEditor from './RichTextEditor';
-import RichTextRenderer from './RichTextRenderer';
+import { ModalPortal } from '@/components/ui/feedback';
+import { RichTextEditor } from '@/components/ui/forms';
+import { RichTextRenderer } from '@/components/ui/utils';
+
 
 interface NoteModalProps {
   note: RichTextContent | null;

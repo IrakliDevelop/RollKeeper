@@ -15,7 +15,7 @@ import { useCombatStore } from '@/store/combatStore';
 import { monsterToCombatParticipant, parseChallengeRating, formatMonsterType } from '@/utils/dm/monsterUtils';
 import { useDebouncedSearch } from '@/hooks/useDebounce';
 import { VirtualizedMonsterGrid } from './VirtualizedMonsterGrid';
-import { Modal } from '@/components/ui/Modal';
+import { Modal } from '@/components/ui/feedback/Modal';
 
 interface AddParticipantModalProps {
   campaignId: string;

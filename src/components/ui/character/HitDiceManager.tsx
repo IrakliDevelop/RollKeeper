@@ -4,7 +4,7 @@ import React from 'react';
 import { Dice6, Info } from 'lucide-react';
 import { ClassInfo } from '@/types/character';
 import { CLASS_HIT_DICE } from '@/utils/constants';
-import { FancySelect } from './FancySelect';
+import { FancySelect } from '../forms/FancySelect';
 
 interface HitDiceManagerProps {
   classInfo: ClassInfo;

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { BestiaryFilters, CREATURE_TYPES, ALIGNMENTS, SIZES } from '@/types/bestiary';
-import CustomCheckbox from '@/components/ui/CustomCheckbox';
+import { CustomCheckbox } from '@/components/ui';
 import { Filter, Skull, Shield, Zap, Crown, Sparkles, FileText } from 'lucide-react';
 
 interface BestiaryFiltersPanelProps {

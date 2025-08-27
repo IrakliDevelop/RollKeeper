@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Save, Dice6 } from 'lucide-react';
 import { usePlayerStore } from '@/store/playerStore';
 import { COMMON_CLASSES, DEFAULT_CHARACTER_STATE } from '@/utils/constants';
-import { FancySelect } from '@/components/ui/FancySelect';
+import { FancySelect } from '@/components/ui/forms/FancySelect';
 
 export default function NewCharacterPage() {
   const router = useRouter();

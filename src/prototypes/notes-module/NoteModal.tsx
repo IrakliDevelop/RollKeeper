@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useProtoNotesStore, type ProtoNote } from './notesStore';
-import RichTextEditor from '@/components/ui/RichTextEditor';
+import { RichTextEditor } from '@/components/ui/forms';
 import TagManager from './TagManager';
-import { FancySelect } from '@/components/ui/FancySelect';
+import { FancySelect } from '@/components/ui/forms/FancySelect';
 import { 
   X, 
   Save, 

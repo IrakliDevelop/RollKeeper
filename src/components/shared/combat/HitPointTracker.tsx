@@ -45,7 +45,6 @@ export function HitPointTracker({
   hitPoints,
   classInfo,
   level,
-  constitutionScore,
   onApplyDamage,
   onApplyHealing,
   onAddTemporaryHP,

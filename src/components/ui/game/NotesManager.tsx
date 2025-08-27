@@ -3,10 +3,10 @@
 import React, { useState } from 'react';
 import { Plus, Edit3, Trash2, Save, X, BookOpen, PenTool } from 'lucide-react';
 import { RichTextContent } from '@/types/character';
-import RichTextEditor from './RichTextEditor';
-import RichTextRenderer from './RichTextRenderer';
+import { RichTextEditor } from '@/components/ui/forms';
+import { RichTextRenderer } from '@/components/ui/utils';
 import NoteModal from './NoteModal';
-import DragDropList from './DragDropList';
+import DragDropList from '@/components/ui/layout/DragDropList';
 
 interface NotesManagerProps {
   items: RichTextContent[];

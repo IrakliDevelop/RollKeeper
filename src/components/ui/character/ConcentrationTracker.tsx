@@ -10,7 +10,7 @@ interface ConcentrationTrackerProps {
   className?: string;
 }
 
-export function ConcentrationTracker({ 
+export default function ConcentrationTracker({ 
   concentration, 
   onStopConcentration, 
   className = '' 

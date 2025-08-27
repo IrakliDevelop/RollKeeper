@@ -2,9 +2,9 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { DiceRoller } from '@/components/ui/DiceRoller';
-import { DiceButton } from '@/components/ui/DiceButton';
-import NotHydrated from '@/components/ui/NotHydrated';
+import { DiceRoller } from '@/components/ui/game/DiceRoller';
+import { DiceButton } from '@/components/ui/game/DiceButton';
+import NotHydrated from '@/components/ui/feedback/NotHydrated';
 import { RollSummary } from '@/types/dice';
 import { useHydration } from '@/hooks/useHydration';
 

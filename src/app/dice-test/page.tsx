@@ -7,7 +7,7 @@ import './dice-test.css';
 import DiceBox from '@3d-dice/dice-box';
 import { DiceRollResults, RollSummary } from '@/types/dice';
 import { calculateRollSummary, autoClearDice } from '@/utils/diceUtils';
-import { DiceResultDisplay } from '@/components/ui/DiceResultDisplay';
+import { DiceResultDisplay } from '@/components/ui/game/DiceResultDisplay';
 
 export default function DiceTestPage() {
   const [diceBox, setDiceBox] = useState<typeof DiceBox | null>(null);

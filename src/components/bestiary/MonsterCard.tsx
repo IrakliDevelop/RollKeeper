@@ -1,6 +1,6 @@
 import { ProcessedMonster } from '@/types/bestiary';
 import { Shield, Heart, Zap } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/components/ui';
 import { getCRColor, formatSize, formatAlignment } from '@/utils/bestiaryUtils';
 
 interface MonsterCardProps {

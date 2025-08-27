@@ -1,49 +1,49 @@
 'use client';
 
-import { Save, Download, Upload, RotateCcw, FileText, ArrowLeft } from "lucide-react";
+import { FileText, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { usePlayerStore } from "@/store/playerStore";
 import { useCharacterStore } from "@/store/characterStore";
 import { useAutoSave } from "@/hooks/useAutoSave";
-import { SaveIndicator } from "@/components/ui/SaveIndicator";
-import ClassSelector from "@/components/ui/ClassSelector";
-import SpellSlotTracker from "@/components/ui/SpellSlotTracker";
-import TraitTracker from "@/components/ui/TraitTracker";
-import HeroicInspirationTracker from "@/components/ui/HeroicInspirationTracker";
-import XPTracker from "@/components/ui/XPTracker";
-import FeaturesTraitsManager from "@/components/ui/FeaturesTraitsManager";
-import NotesManager from "@/components/ui/NotesManager";
-import CharacterBackgroundEditor from "@/components/ui/CharacterBackgroundEditor";
-import HitPointManager from "@/components/ui/HitPointManager";
-import ExperimentalFeaturesSection from "@/components/ui/ExperimentalFeaturesSection";
-import FeaturesNavigationSection from "@/components/ui/FeaturesNavigationSection";
-import HitDiceManager from "@/components/ui/HitDiceManager";
-import ErrorBoundary from "@/components/ui/ErrorBoundary";
+
+import SpellSlotTracker from "@/components/ui/character/SpellSlotTracker";
+import TraitTracker from "@/components/ui/character/TraitTracker";
+import HeroicInspirationTracker from "@/components/ui/character/HeroicInspirationTracker";
+import XPTracker from "@/components/ui/character/XPTracker";
+import FeaturesTraitsManager from "@/components/ui/game/FeaturesTraitsManager";
+import NotesManager from "@/components/ui/game/NotesManager";
+import CharacterBackgroundEditor from "@/components/ui/character/CharacterBackgroundEditor";
+import HitPointManager from "@/components/ui/character/HitPointManager";
+import ExperimentalFeaturesSection from "@/components/ui/layout/ExperimentalFeaturesSection";
+import FeaturesNavigationSection from "@/components/ui/layout/FeaturesNavigationSection";
+import HitDiceManager from "@/components/ui/character/HitDiceManager";
+import ErrorBoundary from "@/components/ui/feedback/ErrorBoundary";
 import { WeaponInventory } from "@/components/WeaponInventory";
-import { EquippedWeapons } from "@/components/EquippedWeapons";
 import { WeaponProficiencies } from "@/components/WeaponProficiencies";
 import { SpellcastingStats } from "@/components/SpellcastingStats";
 import { SpellManagement } from "@/components/SpellManagement";
-import { QuickSpells } from "@/components/QuickSpells";
-import { ConcentrationTracker } from "@/components/ui/ConcentrationTracker";
-import { ToastContainer, useToast } from "@/components/ui/Toast";
-import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
-import ConditionsDiseasesManager from "@/components/ui/ConditionsDiseasesManager";
+import { ToastContainer, useToast } from "@/components/ui/feedback/Toast";
+import { ConfirmationModal } from "@/components/ui/feedback/ConfirmationModal";
+import ConditionsDiseasesManager from "@/components/ui/game/ConditionsDiseasesManager";
+import CharacterSheetHeader from "@/components/ui/character/CharacterSheetHeader";
+import CharacterBasicInfo from "@/components/ui/character/CharacterBasicInfo";
+import AbilityScores from "@/components/ui/character/AbilityScores";
+import ArmorClassManager from "@/components/ui/character/ArmorClassManager";
+import SavingThrows from "@/components/ui/character/SavingThrows";
+import Skills from "@/components/ui/character/Skills";
+import CombatStats from "@/components/ui/character/CombatStats";
+import ActionsSection from "@/components/ui/character/ActionsSection";
+import QuickStats from "@/components/ui/character/QuickStats";
 import { useHydration } from "@/hooks/useHydration";
 import { 
-  ABILITY_ABBREVIATIONS, 
   ABILITY_NAMES, 
-  SKILL_NAMES, 
-  SKILL_ABILITY_MAP, 
-  ALIGNMENTS 
+  SKILL_NAMES
 } from "@/utils/constants";
 import { 
   calculateModifier, 
   getProficiencyBonus, 
-  formatModifier,
   hasSpellSlots,
-  calculateCharacterArmorClass,
   calculateSkillModifier,
 } from "@/utils/calculations";
 import { 
@@ -51,15 +51,15 @@ import {
 } from "@/utils/fileOperations";
 import { AbilityName, SkillName, CharacterState } from "@/types/character";
 import { useCallback, useEffect, useState, useRef } from "react";
-import GroupedTabs, { TabContent, GroupedTabsRef } from "@/components/ui/GroupedTabs";
+import GroupedTabs, { TabContent, GroupedTabsRef } from "@/components/ui/layout/GroupedTabs";
 import { NavigationContext } from "@/contexts/NavigationContext";
 import ArmorDefenseManager from "@/components/ArmorDefenseManager";
-import InventoryManager from "@/components/ui/InventoryManager";
-import CurrencyManager from "@/components/ui/CurrencyManager";
+import InventoryManager from "@/components/ui/game/InventoryManager";
+import CurrencyManager from "@/components/ui/game/CurrencyManager";
 import { useSimpleDiceRoll } from "@/hooks/useSimpleDiceRoll";
 
 import { RollSummary } from "@/types/dice";
-import NotHydrated from "@/components/ui/NotHydrated";
+import NotHydrated from "@/components/ui/feedback/NotHydrated";
 
 
 export default function CharacterSheet() {
@@ -458,111 +458,20 @@ export default function CharacterSheet() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 relative">
       
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center">
-              <Link href="/player" className="flex items-center gap-2 text-slate-600 hover:text-slate-800 transition-colors mr-6">
-                <ArrowLeft size={20} />
-                Back to Characters
-              </Link>
-              <div>
-                <h1 className="text-xl font-bold text-slate-800">{character.name}</h1>
-                <p className="text-sm text-slate-600">
-                  {character.race} {character.class?.name || 'Unknown Class'} • Level {character.level}
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <SaveIndicator 
+      <CharacterSheetHeader
+        characterName={character.name}
+        characterRace={character.race}
+        characterClass={character.class?.name || 'Unknown Class'}
+        characterLevel={character.level}
+        saveStatus={saveStatus}
                 lastSaved={lastSaved} 
-                status={saveStatus}
-              />
-              
-              {/* File Operations */}
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => {
-                    try {
-                      const exportData = exportCharacter();
-                      exportCharacterToFile(exportData);
-                      addToast({
-                        type: 'success',
-                        title: 'Export Successful',
-                        message: 'Character exported successfully!'
-                      });
-                    } catch (error) {
-                      console.error('Export failed:', error);
-                      addToast({
-                        type: 'error',
-                        title: 'Export Failed',
-                        message: 'Failed to export character.'
-                      });
-                    }
-                  }}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  title="Export Character"
-                >
-                  <Download size={16} />
-                  Export
-                </button>
-                
-                <label className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer">
-                  <Upload size={16} />
-                  Import
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        try {
-                          const text = await file.text();
-                          const data = JSON.parse(text);
-                          
-                          // Use the player store's import function
-                          const { importCharacter: importToPlayerStore } = usePlayerStore.getState();
-                          const newCharacterId = importToPlayerStore(data);
-                          
-                          addToast({
-                            type: 'success',
-                            title: 'Import Successful',
-                            message: 'Character imported successfully! Redirecting to new character...'
-                          });
-                          
-                          // Redirect to the newly imported character after a brief delay
-                          setTimeout(() => {
-                            window.location.href = `/player/characters/${newCharacterId}`;
-                          }, 1500);
-                        } catch (error) {
-                          console.error('Import failed:', error);
-                          addToast({
-                            type: 'error',
-                            title: 'Import Failed',
-                            message: 'Failed to import character. Please check the file format.'
-                          });
-                        }
-                      }
-                      e.target.value = '';
-                    }}
-                    className="hidden"
-                  />
-                </label>
-                
-                <button
-                  onClick={() => setShowResetModal(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  title="Reset Character"
-                >
-                  <RotateCcw size={16} />
-                  Reset
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+        hasUnsavedChanges={hasUnsavedChanges}
+        onManualSave={manualSave}
+        onExport={handleExport}
+        onShowResetModal={() => setShowResetModal(true)}
+        onUpdateName={(name) => updateCharacter({ name })}
+        onAddToast={addToast}
+      />
 
       <div className="p-4">
       {/* Main Dice Container */}
@@ -597,66 +506,7 @@ export default function CharacterSheet() {
         }
       `}</style>
       
-      {/* Header with Character Name and Actions */}
-      <header className="max-w-7xl mx-auto mb-8 relative z-20">{/* Increased z-index to be above dice */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-xl border border-slate-200 p-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="flex-1">
-              <input
-                type="text"
-                placeholder="Character Name"
-                value={character.name}
-                onChange={(e) => updateCharacter({ name: e.target.value })}
-                className="text-3xl font-bold bg-transparent border-none outline-none placeholder-gray-400 text-gray-800 w-full"
-              />
-              <SaveIndicator 
-                status={saveStatus}
-                lastSaved={lastSaved}
-                hasUnsavedChanges={hasUnsavedChanges}
-                className="mt-1"
-              />
-            </div>
-            <div className="flex gap-2">
 
-              
-
-              
-              <button 
-                onClick={manualSave}
-                disabled={!hasUnsavedChanges}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg hover:from-emerald-700 hover:to-emerald-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all shadow-md"
-              >
-                <Save size={16} />
-                Save
-              </button>
-              <button 
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-lg hover:from-slate-700 hover:to-slate-800 transition-all shadow-md"
-              >
-                <Download size={16} />
-                Export
-              </button>
-
-              <Link 
-                href="/prototype"
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-md"
-                title="Try the new Notes module prototype"
-              >
-                <FileText size={16} />
-                Notes Prototype
-              </Link>
-              <button 
-                onClick={() => setShowResetModal(true)}
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:from-red-700 hover:to-red-800 transition-all shadow-md"
-                title="Reset character - this will clear all data!"
-              >
-                <RotateCcw size={16} />
-                Reset
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
 
       {/* Features Navigation Section */}
       <FeaturesNavigationSection />
@@ -668,73 +518,15 @@ export default function CharacterSheet() {
       <main className="max-w-7xl mx-auto space-y-8 relative z-20">
         
         {/* Actions Section */}
-        <section className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-6 border-2 border-slate-300 shadow-lg backdrop-blur-sm">
-          <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center border-b-2 border-slate-400 pb-3">
-            ⚔️ Actions & Combat
-          </h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            
-            {/* Attack Actions */}
-            <ErrorBoundary fallback={
-              <div className="bg-white rounded-lg shadow border border-blue-200 p-4">
-                <h3 className="text-lg font-bold text-blue-800 mb-4 flex items-center gap-2">
-                  <span className="text-red-600">⚔️</span>
-                  Ready Weapons
-                </h3>
-                <p className="text-gray-500">Unable to load equipped weapons</p>
-              </div>
-            }>
-              <EquippedWeapons 
-                showAttackRoll={showAttackRoll} 
-                showDamageRoll={showDamageRoll}
-                animateRoll={diceBoxInitialized ? rollDice : undefined}
-              />
-            </ErrorBoundary>
-
-            {/* Cantrips & Spells */}
-            <ErrorBoundary fallback={
-              <div className="bg-white rounded-lg shadow border border-blue-200 p-4">
-                <h3 className="text-lg font-bold text-blue-800 mb-4 flex items-center gap-2">
-                  <span className="text-purple-600">✨</span>
-                  Quick Spells
-                </h3>
-                <p className="text-gray-500">Unable to load quick spells</p>
-              </div>
-            }>
-              <div className="bg-white rounded-lg shadow border border-blue-200 p-4">
-                <h3 className="text-lg font-bold text-blue-800 mb-4 flex items-center gap-2">
-                  <span className="text-purple-600">✨</span>
-                  Quick Spells
-                </h3>
-                <QuickSpells 
+        <ActionsSection
+          character={character}
                   showAttackRoll={showAttackRoll} 
                   showSavingThrow={showSavingThrow} 
                   showDamageRoll={showDamageRoll}
                   animateRoll={diceBoxInitialized ? rollDice : undefined}
-                />
-                <div className="mt-4 pt-3 border-t border-gray-200">
-                  <p className="text-xs text-gray-500 text-center">
-                    Manage spells in the{' '}
-                    <button
-                      onClick={() => switchToTab('spellcasting')}
-                      className="text-purple-600 hover:text-purple-800 underline hover:no-underline transition-colors font-semibold"
-                    >
-                      Spellcasting tab
-                    </button>.
-                  </p>
-                </div>
-              </div>
-            </ErrorBoundary>
-
-            {/* Concentration Tracker */}
-            {character.concentration.isConcentrating && (
-              <ConcentrationTracker
-                concentration={character.concentration}
+          switchToTab={switchToTab}
                 onStopConcentration={stopConcentration}
               />
-            )}
-          </div>
-        </section>
 
         {/* Section Divider */}
         <div className="flex items-center justify-center">
@@ -754,111 +546,28 @@ export default function CharacterSheet() {
           <div className="lg:col-span-4 space-y-6">
             
             {/* Basic Character Information */}
-            <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
-              <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
-                Character Information
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Race</label>
-                  <input 
-                    type="text" 
-                    placeholder="Human"
-                    value={character.race}
-                    onChange={(e) => updateCharacter({ race: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 placeholder-gray-400"
-                  />
-                </div>
-                <ClassSelector
-                  value={character.class}
-                  onChange={updateClass}
-                />
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Level</label>
-                  <input 
-                    type="number" 
-                    placeholder="1"
-                    min="1" 
-                    max="20"
-                    value={character.level}
-                    onChange={(e) => updateLevel(parseInt(e.target.value) || 1)}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 placeholder-gray-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Background</label>
-                  <input 
-                    type="text" 
-                    placeholder="Soldier"
-                    value={character.background}
-                    onChange={(e) => updateCharacter({ background: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 placeholder-gray-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Player Name</label>
-                  <input 
-                    type="text" 
-                    placeholder="Your Name"
-                    value={character.playerName}
-                    onChange={(e) => updateCharacter({ playerName: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800 placeholder-gray-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Alignment</label>
-                  <select 
-                    value={character.alignment}
-                    onChange={(e) => updateCharacter({ alignment: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
-                  >
-                    <option value="">Select...</option>
-                    {ALIGNMENTS.map(alignment => (
-                      <option key={alignment} value={alignment}>{alignment}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
+            <CharacterBasicInfo
+              race={character.race}
+              characterClass={character.class}
+              level={character.level}
+              background={character.background}
+              playerName={character.playerName}
+              alignment={character.alignment}
+              onUpdateRace={(race) => updateCharacter({ race })}
+              onUpdateClass={updateClass}
+              onUpdateLevel={updateLevel}
+              onUpdateBackground={(background) => updateCharacter({ background })}
+              onUpdatePlayerName={(playerName) => updateCharacter({ playerName })}
+              onUpdateAlignment={(alignment) => updateCharacter({ alignment })}
+            />
 
             {/* Ability Scores */}
-            <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
-              <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
-                Ability Scores
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-2 gap-3 sm:gap-4">
-                {(Object.keys(ABILITY_ABBREVIATIONS) as AbilityName[]).map((ability) => (
-                  <div key={ability} className="text-center">
-                    <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 hover:border-blue-400 transition-colors">
-                      <div className="font-bold text-sm text-blue-900 mb-2">
-                        {ABILITY_ABBREVIATIONS[ability]}
-                      </div>
-                      <input 
-                        type="number" 
-                        value={character.abilities[ability]}
-                        onChange={(e) => updateAbilityScore(ability, parseInt(e.target.value) || 10)}
-                        min="1" 
-                        max="30"
-                        className="w-full text-2xl font-bold text-center bg-transparent border-none outline-none text-blue-900"
-                      />
-                      <button
-                        onClick={() => rollAbilityCheck(ability)}
-                        className="text-lg font-semibold text-blue-700 mt-1 hover:text-blue-900 hover:bg-blue-100 px-2 py-1 rounded transition-colors cursor-pointer"
-                        title={`Roll ${ABILITY_NAMES[ability]} check (d20 + ${formatModifier(getAbilityModifier(ability))})`}
-                      >
-                        {formatModifier(getAbilityModifier(ability))}
-                      </button>
-                      <div className="text-xs text-blue-600">modifier</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-md">
-                <div className="text-sm font-medium text-indigo-900">
-                  Proficiency Bonus: <span className="font-bold">{formatModifier(proficiencyBonus)}</span>
-                </div>
-              </div>
-            </div>
+            <AbilityScores
+              abilities={character.abilities}
+              characterLevel={character.level}
+              onUpdateAbilityScore={updateAbilityScore}
+              onRollAbilityCheck={rollAbilityCheck}
+            />
 
             {/* Hit Dice */}
             <ErrorBoundary fallback={
@@ -929,23 +638,10 @@ export default function CharacterSheet() {
             )}
 
             {/* Quick Stats */}
-            <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
-              <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
-                Quick Stats
-              </h2>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Passive Perception</span>
-                  <span className="font-semibold text-gray-800">
-                    {10 + getSkillModifier('perception')}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Proficiency Bonus</span>
-                  <span className="font-semibold text-gray-800">{formatModifier(proficiencyBonus)}</span>
-                </div>
-              </div>
-            </div>
+            <QuickStats
+              passivePerception={10 + getSkillModifier('perception')}
+              proficiencyBonus={proficiencyBonus}
+            />
 
           </div>
 
@@ -953,152 +649,24 @@ export default function CharacterSheet() {
           <div className="lg:col-span-4 space-y-6">
             
             {/* Saving Throws */}
-            <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
-              <h2 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-200 pb-2">
-                Saving Throws
-              </h2>
-              <div className="space-y-2">
-                {(Object.keys(ABILITY_NAMES) as AbilityName[]).map((ability) => (
-                  <div key={ability} className="flex items-center gap-3 p-2 hover:bg-purple-50 rounded transition-colors">
-                    <input 
-                      type="checkbox" 
-                      checked={character.savingThrows[ability].proficient}
-                      onChange={(e) => updateSavingThrowProficiency(ability, e.target.checked)}
-                      className="w-4 h-4 text-purple-600 rounded" 
-                    />
-                    <span className="font-mono text-sm font-semibold w-8 text-right text-purple-800">
-                      {formatModifier(getSavingThrowModifier(ability))}
-                    </span>
-                    <button
-                      onClick={() => rollSavingThrow(ability)}
-                      className="text-sm text-gray-800 hover:text-purple-700 hover:bg-purple-100 px-2 py-1 rounded transition-colors cursor-pointer font-medium"
-                      title={`Roll ${ABILITY_NAMES[ability]} saving throw (d20 + ${formatModifier(getSavingThrowModifier(ability))})`}
-                    >
-                      {ABILITY_NAMES[ability]}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <SavingThrows
+              savingThrows={character.savingThrows}
+              getSavingThrowModifier={getSavingThrowModifier}
+              onUpdateSavingThrowProficiency={updateSavingThrowProficiency}
+              onRollSavingThrow={rollSavingThrow}
+            />
 
             {/* Skills */}
-            <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6 flex flex-col">
-            <div className="flex items-center justify-between mb-4 border-b border-gray-200 pb-2">
-                <h2 className="text-lg font-bold text-gray-800">
-                  Skills
-                </h2>
-                
-                {/* Jack of All Trades Toggle */}
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="jackOfAllTrades"
-                    checked={character.jackOfAllTrades ?? false}
-                    onChange={toggleJackOfAllTrades}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                  />
-                  <label htmlFor="jackOfAllTrades" className="text-sm font-medium text-gray-700">
-                    Jack of All Trades
-                  </label>
-                  <div className="group relative">
-                    <span className="text-gray-400 cursor-help">ⓘ</span>
-                    <div className="absolute right-0 top-6 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                      Bard feature: Add half proficiency bonus (rounded down) to ability checks using skills you&apos;re not proficient in.
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Skills Legend */}
-              <div className="flex items-center gap-4 mb-3 text-xs text-gray-600 bg-gray-50 p-2 rounded">
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 bg-green-600 rounded"></div>
-                  <span>P = Proficient ({formatModifier(proficiencyBonus)})</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 bg-yellow-600 rounded"></div>
-                  <span>E = Expertise ({formatModifier(proficiencyBonus * 2)})</span>
-                </div>
-                {character.jackOfAllTrades && (
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                    <span>J = Jack of All Trades ({formatModifier(Math.floor(proficiencyBonus / 2))})</span>
-                  </div>
-                )}
-              </div>
-              
-              <div className="space-y-1 flex-1 min-h-0 max-h-[40vh] lg:max-h-[60vh] xl:max-h-none overflow-y-auto border border-gray-100 rounded-lg p-2 bg-gradient-to-b from-white to-gray-50">
-                {(Object.keys(SKILL_NAMES) as SkillName[]).map((skillName) => {
-                  const skill = character.skills[skillName];
-                  const isProficient = skill.proficient;
-                  const hasExpertise = skill.expertise;
-                  
-                  return (
-                    <div key={skillName} className="flex items-center gap-2 p-1 hover:bg-green-50 rounded text-sm transition-colors">
-                      {/* Proficiency Checkbox */}
-                      <div className="flex flex-col items-center">
-                        <input 
-                          type="checkbox" 
-                          checked={isProficient}
-                          onChange={(e) => {
-                            updateSkillProficiency(skillName, e.target.checked);
-                            // Remove expertise if proficiency is removed
-                            if (!e.target.checked && hasExpertise) {
-                              updateSkillExpertise(skillName, false);
-                            }
-                          }}
-                          className="w-4 h-4 text-green-600 rounded" 
-                          title="Proficient"
-                        />
-                        <span className="text-xs text-gray-500 mt-0.5">P</span>
-                      </div>
-                      
-                      {/* Expertise Checkbox */}
-                      <div className="flex flex-col items-center">
-                        <input 
-                          type="checkbox" 
-                          checked={hasExpertise && isProficient}
-                          onChange={(e) => updateSkillExpertise(skillName, e.target.checked)}
-                          disabled={!isProficient}
-                          className={`w-4 h-4 rounded ${
-                            isProficient 
-                              ? 'text-yellow-600 focus:ring-yellow-500' 
-                              : 'text-gray-300 cursor-not-allowed'
-                          }`}
-                          title="Expertise (Double Proficiency)"
-                        />
-                        <span className={`text-xs mt-0.5 ${
-                          isProficient ? 'text-yellow-600' : 'text-gray-300'
-                        }`}>E</span>
-                      </div>
-                      
-                      {/* Skill Modifier */}
-                      <span className={`font-mono font-semibold w-10 text-right ${
-                        hasExpertise && isProficient ? 'text-yellow-700' : 
-                        isProficient ? 'text-green-800' : 
-                        character.jackOfAllTrades && !isProficient ? 'text-blue-600' : 'text-gray-600'
-                      }`}>
-                        {formatModifier(getSkillModifier(skillName))}
-                      </span>
-                      
-                      {/* Skill Name */}
-                      <button
-                        onClick={() => rollSkillCheck(skillName)}
-                        className="flex-1 text-left text-gray-800 hover:text-green-700 hover:bg-green-100 px-2 py-1 rounded transition-colors cursor-pointer font-medium"
-                        title={`Roll ${SKILL_NAMES[skillName]} check (d20 + ${formatModifier(getSkillModifier(skillName))})`}
-                      >
-                        {SKILL_NAMES[skillName]}
-                      </button>
-                      
-                      {/* Ability Abbreviation */}
-                      <span className="text-xs text-gray-500 w-8">
-                        {ABILITY_ABBREVIATIONS[SKILL_ABILITY_MAP[skillName]]}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <Skills
+              skills={character.skills}
+              jackOfAllTrades={character.jackOfAllTrades ?? false}
+              proficiencyBonus={proficiencyBonus}
+              getSkillModifier={getSkillModifier}
+              onUpdateSkillProficiency={updateSkillProficiency}
+              onUpdateSkillExpertise={updateSkillExpertise}
+              onToggleJackOfAllTrades={toggleJackOfAllTrades}
+              onRollSkillCheck={rollSkillCheck}
+            />
 
             {/* Experience Points */}
             <div className="bg-white rounded-lg shadow-lg border border-amber-200 p-6">
@@ -1123,229 +691,27 @@ export default function CharacterSheet() {
                 Combat Stats
               </h2>
               
-              {/* Armor Class - Full Width Row */}
-              <div className="mb-6">
-                <div className="bg-gradient-to-r from-red-50 to-red-100 border-2 border-red-200 rounded-xl p-6">
-                  <div className="text-center mb-6">
-                    <h3 className="text-xl font-bold text-red-800 mb-3 flex items-center justify-center gap-2">
-                      🛡️ ARMOR CLASS
-                    </h3>
-                    <div className="text-5xl font-bold text-red-900 mb-2">
-                      {calculateCharacterArmorClass(character)}
-                    </div>
-                    <div className="text-base text-red-700 font-medium">Total AC</div>
-                  </div>
-                  
-                  {/* AC Components - Row Layout */}
-                  <div className="space-y-4 mb-6">
-                    {/* Base AC Row */}
-                    <div className="bg-white rounded-lg border-2 border-red-300 p-4 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="text-lg font-bold text-red-800">Base AC</div>
-                          <div className="text-sm text-red-600">From armor & dexterity</div>
-                        </div>
-                        <input
-                          type="number"
-                          value={character.armorClass}
-                          onChange={(e) => updateCharacter({ armorClass: parseInt(e.target.value) || 10 })}
-                          className="w-20 h-12 text-2xl font-bold text-center bg-red-50 border-2 border-red-300 rounded-lg text-red-900 focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                          min="0"
-                          max="30"
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Temporary AC Row */}
-                    <div className="bg-white rounded-lg border-2 border-orange-300 p-4 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="text-lg font-bold text-orange-800">Temporary AC</div>
-                          <div className="text-sm text-orange-600">From spells & effects</div>
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold text-orange-700">+</span>
-                            <input
-                              type="number"
-                              value={character.tempArmorClass}
-                              onChange={(e) => updateTempArmorClass(parseInt(e.target.value) || 0)}
-                              className="w-20 h-12 text-2xl font-bold text-center bg-orange-50 border-2 border-orange-300 rounded-lg text-orange-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                              min="0"
-                              max="20"
-                            />
-                          </div>
-                          {character.tempArmorClass > 0 && (
-                            <button
-                              onClick={resetTempArmorClass}
-                              className="px-3 py-1 text-xs text-orange-600 hover:text-orange-800 hover:bg-orange-50 border border-orange-300 rounded-md transition-colors"
-                            >
-                              Reset
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Shield Row */}
-                    <div className="bg-white rounded-lg border-2 border-blue-300 p-4 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="text-lg font-bold text-blue-800">Shield</div>
-                          <div className="text-sm text-blue-600">
-                            {character.isWearingShield ? `+${character.shieldBonus} AC bonus` : 'Click to equip'}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={toggleShield}
-                            className={`w-12 h-12 rounded-lg text-2xl transition-all duration-200 flex items-center justify-center ${
-                              character.isWearingShield
-                                ? 'bg-blue-600 text-white shadow-lg transform scale-105 border-2 border-blue-700'
-                                : 'bg-blue-50 border-2 border-blue-300 text-blue-600 hover:bg-blue-100'
-                            }`}
-                            title={`${character.isWearingShield ? 'Unequip' : 'Equip'} shield`}
-                          >
-                            🛡️
-                          </button>
-                          
-                          {character.isWearingShield && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xl font-bold text-blue-700">+</span>
-                              <input
-                                type="number"
-                                value={character.shieldBonus}
-                                onChange={(e) => updateShieldBonus(parseInt(e.target.value) || 2)}
-                                className="w-16 h-10 text-lg font-bold text-center bg-blue-50 border-2 border-blue-300 rounded-lg text-blue-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                min="0"
-                                max="5"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* AC Formula Display */}
-                  <div className="text-center">
-                    <div className="inline-flex items-center gap-3 px-6 py-3 bg-white rounded-lg border-2 border-red-300 text-lg font-medium text-red-800 shadow-sm">
-                      <span className="text-xl font-bold">{character.armorClass}</span>
-                      <span className="text-red-600 text-lg">+</span>
-                      <span className="text-xl font-bold">{character.tempArmorClass}</span>
-                      {character.isWearingShield && (
-                        <>
-                          <span className="text-red-600 text-lg">+</span>
-                          <span className="text-xl font-bold">{character.shieldBonus}</span>
-                        </>
-                      )}
-                      <span className="text-red-600 text-lg">=</span>
-                      <span className="font-bold text-2xl text-red-900">{calculateCharacterArmorClass(character)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {/* Armor Class */}
+              <ArmorClassManager
+                character={character}
+                onUpdateArmorClass={(ac) => updateCharacter({ armorClass: ac })}
+                onUpdateTempArmorClass={updateTempArmorClass}
+                onResetTempArmorClass={resetTempArmorClass}
+                onToggleShield={toggleShield}
+                onUpdateShieldBonus={updateShieldBonus}
+              />
 
-              {/* Initiative and Speed Row */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  {/* Initiative */}
-                  <div className="text-center">
-                    <div className={`rounded-lg p-3 h-20 flex flex-col justify-center border-2 transition-colors ${
-                      character.initiative.isOverridden 
-                        ? 'bg-orange-50 border-orange-300' 
-                        : 'bg-yellow-50 border-yellow-200'
-                    }`}>
-                      <div className="text-xs font-medium text-yellow-700 mb-1 flex items-center justify-center gap-1">
-                        INITIATIVE
-                        {character.initiative.isOverridden && (
-                          <button
-                            onClick={resetInitiativeToDefault}
-                            className="text-orange-600 hover:text-orange-800 transition-colors"
-                            title="Reset to DEX modifier"
-                          >
-                            <RotateCcw size={10} />
-                          </button>
-                        )}
-                        <button
-                          onClick={rollInitiative}
-                          className="text-yellow-600 hover:text-yellow-800 transition-colors ml-1"
-                          title={`Roll initiative (d20 + ${formatModifier(getInitiativeModifier())})`}
-                        >
-                          🎲
-                        </button>
-                      </div>
-                      <input
-                        type="number"
-                        value={getInitiativeModifier()}
-                        onChange={(e) => updateInitiative(parseInt(e.target.value) || 0, true)}
-                        className={`text-xl font-bold bg-transparent border-none outline-none text-center w-full ${
-                          character.initiative.isOverridden ? 'text-orange-800' : 'text-yellow-800'
-                        }`}
-                        title={character.initiative.isOverridden ? 'Custom initiative (overridden)' : 'DEX modifier (auto-calculated)'}
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Speed */}
-                  <div className="text-center">
-                    <div className="bg-green-50 border-2 border-green-200 rounded-lg p-3 h-20 flex flex-col justify-center">
-                      <div className="text-xs font-medium text-green-700 mb-1">SPEED</div>
-                      <input
-                        type="number"
-                        value={character.speed}
-                        onChange={(e) => updateCharacter({ speed: parseInt(e.target.value) || 30 })}
-                        className="text-xl font-bold text-green-800 bg-transparent border-none outline-none text-center w-full"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-              {/* Reaction Tracking */}
-              <div className="mb-6">
-                <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="text-sm font-bold text-purple-800">REACTION</div>
-                      <div className="text-xs text-purple-600">
-                        {character.reaction.hasUsedReaction ? 'Used this turn' : 'Available'}
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={toggleReaction}
-                        className={`
-                          relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                          ${character.reaction.hasUsedReaction 
-                            ? 'bg-red-600' 
-                            : 'bg-green-600'
-                          }
-                        `}
-                        title={character.reaction.hasUsedReaction ? 'Mark reaction as available' : 'Mark reaction as used'}
-                      >
-                        <span
-                          className={`
-                            inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                            ${character.reaction.hasUsedReaction ? 'translate-x-6' : 'translate-x-1'}
-                          `}
-                        />
-                      </button>
-                      
-                      <button
-                        onClick={resetReaction}
-                        className="p-1 text-purple-600 hover:bg-purple-100 rounded transition-colors"
-                        title="Reset reaction to available"
-                      >
-                        <RotateCcw size={14} />
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-2 text-xs text-purple-700 bg-purple-100 rounded p-2">
-                    <strong>Reaction:</strong> One reaction per turn - used for opportunity attacks, spells like Shield, or other triggered abilities.
-                  </div>
-                </div>
-              </div>
+              {/* Combat Stats */}
+              <CombatStats
+                character={character}
+                getInitiativeModifier={getInitiativeModifier}
+                onUpdateInitiative={updateInitiative}
+                onResetInitiativeToDefault={resetInitiativeToDefault}
+                onUpdateSpeed={(speed) => updateCharacter({ speed })}
+                onToggleReaction={toggleReaction}
+                onResetReaction={resetReaction}
+                onRollInitiative={rollInitiative}
+              />
 
               {/* Hit Points - Now using comprehensive HP Manager */}
               <div className="mb-6">

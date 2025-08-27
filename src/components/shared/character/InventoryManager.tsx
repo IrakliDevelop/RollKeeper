@@ -5,8 +5,8 @@ import { InventoryItem, MagicItemRarity, MagicItemCategory } from '@/types/chara
 import { Plus, Edit2, Trash2, Package, Minus, MapPin, Filter, X } from 'lucide-react';
 import { formatCurrencyFromCopper } from '@/utils/currency';
 import { inputStyles, selectStyles, labelStyles } from '@/styles/inputs';
-import CustomDropdown from '@/components/ui/CustomDropdown';
-import DragDropList from '@/components/ui/DragDropList';
+import CustomDropdown from '@/components/ui/forms/CustomDropdown';
+import DragDropList from '@/components/ui/layout/DragDropList';
 
 const ITEM_CATEGORIES = ['weapon', 'armor', 'tool', 'consumable', 'treasure', 'misc'];
 

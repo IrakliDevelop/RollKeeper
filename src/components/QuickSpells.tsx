@@ -5,8 +5,8 @@ import { Shield, Sparkles, Dice6, Zap, Wand2 } from "lucide-react";
 import { useCharacterStore } from "@/store/characterStore";
 import { Spell } from "@/types/character";
 import { calculateSpellAttackBonus, calculateSpellSaveDC, getCharacterSpellcastingAbility, rollDamage } from "@/utils/calculations";
-import { SpellCastModal } from "@/components/ui/SpellCastModal";
-import DragDropList from "@/components/ui/DragDropList";
+import { SpellCastModal } from "@/components/ui/game/SpellCastModal";
+import DragDropList from "@/components/ui/layout/DragDropList";
 import { RollSummary } from "@/types/dice";
 
 interface QuickSpellsProps {

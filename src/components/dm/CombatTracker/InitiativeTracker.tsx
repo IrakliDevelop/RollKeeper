@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { CombatParticipant } from '@/types/combat';
 import { useCombatStore } from '@/store/combatStore';
-import { Modal } from '@/components/ui/Modal';
+import { Modal } from '@/components/ui/feedback/Modal';
 import { isDying, isDead, isStabilized } from '@/utils/hpCalculations';
 
 interface InitiativeTrackerProps {

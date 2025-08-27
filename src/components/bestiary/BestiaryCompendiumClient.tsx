@@ -5,7 +5,7 @@ import { ProcessedMonster, BestiaryFilters } from '@/types/bestiary';
 import MonsterCard from './MonsterCard';
 import MonsterModal from './MonsterModal';
 import BestiaryFiltersPanel from './BestiaryFiltersPanel';
-import CustomDropdown, { DropdownOption } from '@/components/ui/CustomDropdown';
+import CustomDropdown, { DropdownOption } from '@/components/ui/forms/CustomDropdown';
 import { filterMonsters } from '@/utils/bestiaryFilters';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, ChevronDown, Search, Filter, ArrowUpAZ, ArrowDownAZ, TrendingUp, TrendingDown } from 'lucide-react';

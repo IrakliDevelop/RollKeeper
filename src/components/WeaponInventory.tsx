@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useCharacterStore } from '@/store/characterStore';
 import { Eye, Sword, Wand2 } from 'lucide-react';
-import EquipmentModal from '@/components/ui/EquipmentModal';
+import EquipmentModal from '@/components/ui/game/EquipmentModal';
 
 export const WeaponInventory: React.FC = () => {
   const { character } = useCharacterStore();

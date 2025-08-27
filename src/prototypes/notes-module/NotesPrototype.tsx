@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useProtoNotesStore, createSampleNotes, initializeSampleNotesIfEmpty, type ProtoNote } from './notesStore';
-import RichTextEditor from '@/components/ui/RichTextEditor';
+import { RichTextEditor } from '@/components/ui';
 import TagManager from './TagManager';
 import FilterPanel, { type FilterOptions } from './FilterPanel';
-import { FancySelect } from '@/components/ui/FancySelect';
+import { FancySelect } from '@/components/ui/forms/FancySelect';
 import dynamic from 'next/dynamic';
 
 // Dynamically import canvas with fallback

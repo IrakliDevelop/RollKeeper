@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { ArmorItem, ArmorCategory, ArmorType } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Edit2, Trash2, Shield, CheckCircle } from 'lucide-react';
-import DragDropList from '@/components/ui/DragDropList';
+import DragDropList from '@/components/ui/layout/DragDropList';
 
 const ARMOR_CATEGORIES: ArmorCategory[] = ['light', 'medium', 'heavy', 'shield'];
 const ARMOR_TYPES: { [key in ArmorCategory]: ArmorType[] } = {

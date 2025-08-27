@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { ProcessedMonster } from '@/types/bestiary';
-import { useVirtualizedGrid } from '@/components/ui/VirtualizedList';
+import { useVirtualizedGrid } from '@/components/ui/layout/VirtualizedList';
 import { formatMonsterType, parseChallengeRating } from '@/utils/dm/monsterUtils';
 import { Plus, Crown, Skull } from 'lucide-react';
 

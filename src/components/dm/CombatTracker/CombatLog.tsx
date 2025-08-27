@@ -4,7 +4,6 @@ import React, { useState, useMemo } from 'react';
 import { 
   Scroll, 
   Filter, 
-  X, 
   ChevronDown, 
   ChevronRight,
   Trash2,

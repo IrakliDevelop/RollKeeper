@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { TrendingUp } from 'lucide-react';
-import { CustomSwitcher } from '@/components/ui/CustomSwitcher';
+import { CustomSwitcher } from '@/components/ui';
 import { 
   getXPForLevel, 
   getXPToNextLevel, 

@@ -3,8 +3,7 @@
 import React, { useState } from 'react';
 import { useCharacterStore } from '@/store/characterStore';
 import { SpellcastingAbility } from '@/types/character';
-import { CustomSwitcher } from './ui/CustomSwitcher';
-import { FancySelect } from './ui/FancySelect';
+import { CustomSwitcher, FancySelect } from '@/components/ui';
 import { Edit3, Calculator, Zap, Shield } from 'lucide-react';
 import { 
   getClassSpellcastingAbility, 
