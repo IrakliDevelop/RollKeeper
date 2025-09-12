@@ -272,13 +272,6 @@ export interface MulticlassValidation {
   warnings?: string[];
 }
 
-// Hit dice pools for multiclass characters
-export interface HitDicePools {
-  [dieType: string]: {
-    max: number; // Total available
-    used: number; // Used during short rests
-  };
-}
 
 // Weapon and magic item types
 export type WeaponCategory = 'simple' | 'martial' | 'magic' | 'artifact';
@@ -749,4 +742,27 @@ export function createDefaultExtendedFeature(
     scaleWithProficiency: false,
     proficiencyMultiplier: 1,
   };
+}
+
+// Multiclassing types
+export interface MulticlassInfo {
+  className: string;
+  level: number;
+  isCustom: boolean;
+  spellcaster?: 'full' | 'half' | 'third' | 'warlock' | 'none';
+  hitDie: number;
+  subclass?: string;
+}
+
+export interface HitDicePools {
+  [key: string]: {
+    max: number;
+    used: number;
+  };
+}
+
+export interface MulticlassValidation {
+  valid: boolean;
+  errors: string[];
+  warnings?: string[];
 }

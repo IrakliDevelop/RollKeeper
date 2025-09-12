@@ -55,6 +55,36 @@ export function isMulticlassed(character: CharacterState): boolean {
 }
 
 /**
+ * Calculate hit dice pools from multiclass data
+ */
+export function calculateHitDicePools(classes: MulticlassInfo[], existingPools?: HitDicePools): HitDicePools {
+  const hitDicePools: HitDicePools = {};
+  
+  // Calculate max dice for each die type
+  classes.forEach(cls => {
+    const dieType = `d${cls.hitDie}`;
+    if (!hitDicePools[dieType]) {
+      hitDicePools[dieType] = { max: 0, used: 0 };
+    }
+    hitDicePools[dieType].max += cls.level;
+  });
+  
+  // Preserve used dice from existing pools, but cap at new max
+  if (existingPools) {
+    Object.keys(hitDicePools).forEach(dieType => {
+      if (existingPools[dieType]) {
+        hitDicePools[dieType].used = Math.min(
+          existingPools[dieType].used,
+          hitDicePools[dieType].max
+        );
+      }
+    });
+  }
+  
+  return hitDicePools;
+}
+
+/**
  * Get the total character level from multiclass data
  */
 export function getTotalLevel(character: CharacterState): number {
@@ -130,22 +160,24 @@ export function calculateMulticlassSpellSlots(classes: MulticlassInfo[]): SpellS
   return calculateSpellSlots(dummyClassInfo, casterLevel);
 }
 
-/**
- * Calculate hit dice pools for multiclass characters
- */
-export function calculateHitDicePools(classes: MulticlassInfo[]): HitDicePools {
-  const hitDicePools: HitDicePools = {};
 
-  for (const classInfo of classes) {
-    const dieType = `d${classInfo.hitDie}`;
-    if (!hitDicePools[dieType]) {
-      hitDicePools[dieType] = { max: 0, used: 0 };
-    }
-    hitDicePools[dieType].max += classInfo.level;
-  }
-
-  return hitDicePools;
-}
+// Hardcoded multiclassing requirements as fallback
+const MULTICLASS_REQUIREMENTS: Record<string, Record<string, number>> = {
+  'Barbarian': { strength: 13 },
+  'Bard': { charisma: 13 },
+  'Cleric': { wisdom: 13 },
+  'Druid': { wisdom: 13 },
+  'Fighter': { strength: 13 }, // Note: Fighter can also use DEX 13, but we'll use STR as primary
+  'Monk': { dexterity: 13, wisdom: 13 },
+  'Paladin': { strength: 13, charisma: 13 },
+  'Ranger': { dexterity: 13, wisdom: 13 },
+  'Rogue': { dexterity: 13 },
+  'Sorcerer': { charisma: 13 },
+  'Warlock': { charisma: 13 },
+  'Wizard': { intelligence: 13 },
+  'Artificer': { intelligence: 13 },
+  'Blood Hunter': { strength: 13 }, // Assuming STR for Blood Hunter
+};
 
 /**
  * Validate multiclassing requirements
@@ -159,36 +191,48 @@ export function validateMulticlassRequirements(
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Find the class data for the new class
+  // Try to get requirements from API data first, then fallback to hardcoded
+  let newClassRequirements: Record<string, number> = {};
+  
   const newClassData = classData?.find(cls => cls.name === newClassName);
-  if (!newClassData?.multiclassing) {
-    errors.push(`Multiclassing data not found for ${newClassName}`);
-    return { valid: false, errors, warnings };
+  if (newClassData?.multiclassing?.requirements && Object.keys(newClassData.multiclassing.requirements).length > 0) {
+    newClassRequirements = newClassData.multiclassing.requirements;
+  } else {
+    newClassRequirements = MULTICLASS_REQUIREMENTS[newClassName] || {};
+    
+    if (Object.keys(newClassRequirements).length === 0) {
+      errors.push(`Multiclassing requirements not found for ${newClassName}`);
+      return { valid: false, errors, warnings };
+    }
   }
 
   // Check requirements for the new class
-  const newClassRequirements = newClassData.multiclassing.requirements;
   for (const [ability, requiredScore] of Object.entries(newClassRequirements)) {
     const abilityScore = abilities[ability as keyof CharacterAbilities];
     if (abilityScore < requiredScore) {
       errors.push(
-        `${newClassName} requires ${ability.toUpperCase()} ${requiredScore} (you have ${abilityScore})`
+        `${newClassName} requires ${ability.charAt(0).toUpperCase() + ability.slice(1)} ${requiredScore} (you have ${abilityScore})`
       );
     }
   }
 
   // Check requirements for existing classes (must maintain them)
   for (const existingClass of currentClasses) {
+    let existingClassRequirements: Record<string, number> = {};
+    
     const existingClassData = classData?.find(cls => cls.name === existingClass.className);
-    if (existingClassData?.multiclassing) {
-      const requirements = existingClassData.multiclassing.requirements;
-      for (const [ability, requiredScore] of Object.entries(requirements)) {
-        const abilityScore = abilities[ability as keyof CharacterAbilities];
-        if (abilityScore < requiredScore) {
-          errors.push(
-            `You must maintain ${ability.toUpperCase()} ${requiredScore} for ${existingClass.className} (you have ${abilityScore})`
-          );
-        }
+    if (existingClassData?.multiclassing?.requirements && Object.keys(existingClassData.multiclassing.requirements).length > 0) {
+      existingClassRequirements = existingClassData.multiclassing.requirements;
+    } else {
+      existingClassRequirements = MULTICLASS_REQUIREMENTS[existingClass.className] || {};
+    }
+    
+    for (const [ability, requiredScore] of Object.entries(existingClassRequirements)) {
+      const abilityScore = abilities[ability as keyof CharacterAbilities];
+      if (abilityScore < requiredScore) {
+        errors.push(
+          `You must maintain ${ability.charAt(0).toUpperCase() + ability.slice(1)} ${requiredScore} for ${existingClass.className} (you have ${abilityScore})`
+        );
       }
     }
   }
@@ -203,9 +247,8 @@ export function validateMulticlassRequirements(
   if (currentClasses.length === 0) {
     warnings.push('Consider taking your first class to level 2 before multiclassing to gain important features');
   }
-
   const hasSpellcaster = currentClasses.some(cls => cls.spellcaster && cls.spellcaster !== 'none');
-  const newClassIsSpellcaster = newClassData.spellcasting?.type && newClassData.spellcasting.type !== 'none';
+  const newClassIsSpellcaster = newClassData?.spellcasting?.type && newClassData.spellcasting.type !== 'none';
   
   if (hasSpellcaster && newClassIsSpellcaster) {
     warnings.push('Multiclassing spellcasters have complex spell slot and spell preparation rules');

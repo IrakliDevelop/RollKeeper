@@ -5,7 +5,6 @@ import {
   SaveStatus,
   CharacterExport,
   ClassInfo,
-  MulticlassInfo,
   SpellSlots,
   PactMagic,
   RichTextContent,
@@ -41,7 +40,7 @@ import {
   calculateLevelFromXP,
   calculateTraitMaxUses,
 } from '@/utils/calculations';
-import { migrateToMulticlass } from '@/utils/multiclass';
+import { migrateToMulticlass, calculateHitDicePools } from '@/utils/multiclass';
 import {
   applyDamage,
   applyHealing,
@@ -391,6 +390,12 @@ interface CharacterStore {
   updateClassLevel: (className: string, newLevel: number) => void;
   isMulticlassed: () => boolean;
   getClassDisplayString: () => string;
+
+  // Hit dice management
+  useHitDie: (dieType: string, count?: number) => void;
+  restoreHitDice: (dieType: string, count?: number) => void;
+  resetAllHitDice: () => void; // Long rest - restore all hit dice
+  resetHalfHitDice: () => void; // Long rest - restore half hit dice (optional rule)
 
   // Concentration management
   startConcentration: (
@@ -1262,10 +1267,14 @@ export const useCharacterStore = create<CharacterStore>()(
             hitDie: primaryClass.hitDie,
           };
 
+          // Recalculate hit dice pools
+          const hitDicePools = calculateHitDicePools(classes, migratedCharacter.hitDicePools);
+
           const updatedCharacter = {
             ...migratedCharacter,
             classes,
             totalLevel,
+            hitDicePools,
             class: compatibilityClass,
             level: totalLevel,
           };
@@ -1337,10 +1346,14 @@ export const useCharacterStore = create<CharacterStore>()(
             hitDie: primaryClass.hitDie,
           };
 
+          // Recalculate hit dice pools
+          const hitDicePools = calculateHitDicePools(classes, migratedCharacter.hitDicePools);
+
           const updatedCharacter = {
             ...migratedCharacter,
             classes,
             totalLevel,
+            hitDicePools,
             class: compatibilityClass,
             level: totalLevel,
           };
@@ -1396,10 +1409,14 @@ export const useCharacterStore = create<CharacterStore>()(
             hitDie: primaryClass.hitDie,
           };
 
+          // Recalculate hit dice pools
+          const hitDicePools = calculateHitDicePools(classes, migratedCharacter.hitDicePools);
+
           const updatedCharacter = {
             ...migratedCharacter,
             classes,
             totalLevel,
+            hitDicePools,
             class: compatibilityClass,
             level: totalLevel,
           };
@@ -1455,6 +1472,110 @@ export const useCharacterStore = create<CharacterStore>()(
         const totalLevel = getCharacterTotalLevel(character);
         
         return `${classStrings.join(' / ')} (Level ${totalLevel})`;
+      },
+
+      // Hit dice management
+      useHitDie: (dieType, count = 1) => {
+        set(state => {
+          const hitDicePools = { ...state.character.hitDicePools };
+          
+          if (hitDicePools[dieType]) {
+            const pool = hitDicePools[dieType];
+            const actualCount = Math.min(count, pool.max - pool.used);
+            
+            if (actualCount > 0) {
+              hitDicePools[dieType] = {
+                ...pool,
+                used: pool.used + actualCount,
+              };
+            }
+          }
+
+          return {
+            character: {
+              ...state.character,
+              hitDicePools,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      restoreHitDice: (dieType, count = 1) => {
+        set(state => {
+          const hitDicePools = { ...state.character.hitDicePools };
+          
+          if (hitDicePools[dieType]) {
+            const pool = hitDicePools[dieType];
+            const actualCount = Math.min(count, pool.used);
+            
+            if (actualCount > 0) {
+              hitDicePools[dieType] = {
+                ...pool,
+                used: pool.used - actualCount,
+              };
+            }
+          }
+
+          return {
+            character: {
+              ...state.character,
+              hitDicePools,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      resetAllHitDice: () => {
+        set(state => {
+          const hitDicePools = { ...state.character.hitDicePools };
+          
+          // Reset all hit dice pools to 0 used
+          Object.keys(hitDicePools).forEach(dieType => {
+            hitDicePools[dieType] = {
+              ...hitDicePools[dieType],
+              used: 0,
+            };
+          });
+
+          return {
+            character: {
+              ...state.character,
+              hitDicePools,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      resetHalfHitDice: () => {
+        set(state => {
+          const hitDicePools = { ...state.character.hitDicePools };
+          
+          // Restore half of used hit dice (rounded down)
+          Object.keys(hitDicePools).forEach(dieType => {
+            const pool = hitDicePools[dieType];
+            const restoreCount = Math.floor(pool.used / 2);
+            
+            hitDicePools[dieType] = {
+              ...pool,
+              used: pool.used - restoreCount,
+            };
+          });
+
+          return {
+            character: {
+              ...state.character,
+              hitDicePools,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
       },
 
       // Concentration management
