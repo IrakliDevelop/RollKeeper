@@ -1,12 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { Book, Users } from 'lucide-react';
+import React from 'react';
 
 export default function ExperimentalFeaturesSection() {
-  const [experimentalFeaturesExpanded, setExperimentalFeaturesExpanded] =
-    useState(false);
 
   return (
     <section className="mx-auto mb-6 max-w-7xl">

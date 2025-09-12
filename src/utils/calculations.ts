@@ -5,6 +5,8 @@ import {
   SpellSlots,
   PactMagic,
   ClassInfo,
+  MulticlassInfo,
+  HitDicePools,
   Weapon,
   SpellcastingAbility,
   TrackableTrait,
@@ -778,4 +780,174 @@ export function calculateTraitMaxUses(
   const multiplier = trait.proficiencyMultiplier || 1;
 
   return Math.max(1, Math.floor(proficiencyBonus * multiplier));
+}
+
+// ===== MULTICLASS CALCULATION FUNCTIONS =====
+
+/**
+ * Calculate spell slots for multiclass characters
+ * This is the main function that should be used for all characters (single or multiclass)
+ */
+export function calculateCharacterSpellSlots(character: CharacterState): SpellSlots {
+  // If character has multiclass data, use multiclass calculation
+  if (character.classes && character.classes.length > 0) {
+    return calculateMulticlassSpellSlots(character.classes);
+  }
+  
+  // Fallback to single class calculation
+  return calculateSpellSlots(character.class, character.level);
+}
+
+/**
+ * Calculate spell slots for multiclass characters based on combined caster levels
+ */
+export function calculateMulticlassSpellSlots(classes: MulticlassInfo[]): SpellSlots {
+  let casterLevel = 0;
+  
+  for (const classInfo of classes) {
+    switch (classInfo.spellcaster) {
+      case 'full':
+        casterLevel += classInfo.level;
+        break;
+      case 'half':
+        casterLevel += Math.floor(classInfo.level / 2);
+        break;
+      case 'third':
+        casterLevel += Math.floor(classInfo.level / 3);
+        break;
+      case 'warlock':
+        // Warlocks don't contribute to multiclass spell slots
+        break;
+      case 'none':
+      default:
+        // Non-casters don't contribute
+        break;
+    }
+  }
+
+  // If no caster levels, return empty slots
+  if (casterLevel === 0) {
+    return {
+      1: { max: 0, used: 0 },
+      2: { max: 0, used: 0 },
+      3: { max: 0, used: 0 },
+      4: { max: 0, used: 0 },
+      5: { max: 0, used: 0 },
+      6: { max: 0, used: 0 },
+      7: { max: 0, used: 0 },
+      8: { max: 0, used: 0 },
+      9: { max: 0, used: 0 },
+    };
+  }
+
+  // Use full caster progression table for the combined caster level
+  const levelSlots = FULL_CASTER_SPELL_SLOTS[casterLevel] || {};
+  
+  const result: SpellSlots = {
+    1: { max: 0, used: 0 },
+    2: { max: 0, used: 0 },
+    3: { max: 0, used: 0 },
+    4: { max: 0, used: 0 },
+    5: { max: 0, used: 0 },
+    6: { max: 0, used: 0 },
+    7: { max: 0, used: 0 },
+    8: { max: 0, used: 0 },
+    9: { max: 0, used: 0 },
+  };
+
+  for (const [spellLevel, maxSlots] of Object.entries(levelSlots)) {
+    const level = parseInt(spellLevel) as keyof SpellSlots;
+    result[level] = { max: maxSlots, used: 0 };
+  }
+
+  return result;
+}
+
+/**
+ * Calculate pact magic for multiclass characters (only considers warlock levels)
+ */
+export function calculateCharacterPactMagic(character: CharacterState): PactMagic | undefined {
+  // If character has multiclass data, find warlock levels
+  if (character.classes && character.classes.length > 0) {
+    const warlockClass = character.classes.find(cls => cls.spellcaster === 'warlock');
+    if (warlockClass) {
+      return calculatePactMagic(warlockClass.level);
+    }
+    return undefined;
+  }
+  
+  // Fallback to single class calculation
+  if (character.class.spellcaster === 'warlock') {
+    return calculatePactMagic(character.level);
+  }
+  
+  return undefined;
+}
+
+/**
+ * Calculate hit dice pools for multiclass characters
+ */
+export function calculateCharacterHitDicePools(character: CharacterState): HitDicePools {
+  // If character has multiclass data, calculate from classes
+  if (character.classes && character.classes.length > 0) {
+    const hitDicePools: HitDicePools = {};
+
+    for (const classInfo of character.classes) {
+      const dieType = `d${classInfo.hitDie}`;
+      if (!hitDicePools[dieType]) {
+        hitDicePools[dieType] = { max: 0, used: 0 };
+      }
+      hitDicePools[dieType].max += classInfo.level;
+    }
+
+    return hitDicePools;
+  }
+  
+  // Fallback to single class calculation
+  const dieType = `d${character.class.hitDie}`;
+  return {
+    [dieType]: {
+      max: character.level,
+      used: 0,
+    },
+  };
+}
+
+/**
+ * Get the total character level (works for both single and multiclass)
+ */
+export function getCharacterTotalLevel(character: CharacterState): number {
+  if (character.totalLevel !== undefined) {
+    return character.totalLevel;
+  }
+  
+  if (character.classes && character.classes.length > 0) {
+    return character.classes.reduce((total, cls) => total + cls.level, 0);
+  }
+  
+  return character.level || 1;
+}
+
+/**
+ * Check if character has any spellcasting ability
+ */
+export function hasSpellcasting(character: CharacterState): boolean {
+  if (character.classes && character.classes.length > 0) {
+    return character.classes.some(cls => 
+      cls.spellcaster && cls.spellcaster !== 'none'
+    );
+  }
+  
+  return character.class.spellcaster !== 'none' && character.class.spellcaster !== undefined;
+}
+
+/**
+ * Check if character has warlock levels
+ */
+export function hasWarlockLevels(character: CharacterState): boolean {
+  if (character.classes && character.classes.length > 0) {
+    return character.classes.some(cls => cls.spellcaster === 'warlock');
+  }
+  
+  return character.class.spellcaster === 'warlock';
 }

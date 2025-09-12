@@ -14,7 +14,6 @@ import XPTracker from '@/components/ui/character/XPTracker';
 
 import HitPointManager from '@/components/ui/character/HitPointManager';
 import ExperimentalFeaturesSection from '@/components/ui/layout/ExperimentalFeaturesSection';
-import HitDiceManager from '@/components/ui/character/HitDiceManager';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { WeaponProficiencies } from '@/components/WeaponProficiencies';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
@@ -22,6 +21,7 @@ import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
 
 import CharacterSheetHeader from '@/components/ui/character/CharacterSheetHeader';
 import CharacterBasicInfo from '@/components/ui/character/CharacterBasicInfo';
+import HitDiceTracker from '@/components/ui/character/HitDiceTracker';
 import AbilityScores from '@/components/ui/character/AbilityScores';
 import ArmorClassManager from '@/components/ui/character/ArmorClassManager';
 import SavingThrows from '@/components/ui/character/SavingThrows';
@@ -146,6 +146,16 @@ export default function CharacterSheet() {
     updateShieldBonus,
     stopConcentration,
     loadCharacterState,
+    // Multiclass methods
+    addClassLevel,
+    removeClassLevel,
+    updateClassLevel,
+    getClassDisplayString,
+    // Hit dice methods
+    useHitDie,
+    restoreHitDice,
+    resetAllHitDice,
+    resetHalfHitDice,
   } = useCharacterStore();
 
   const [showResetModal, setShowResetModal] = useState(false);
@@ -208,7 +218,8 @@ export default function CharacterSheet() {
   }, [character, characterId, updateCharacterData, hasHydrated, isInitialLoad]);
 
   // Calculate derived values (needs to be before early returns due to hooks)
-  const proficiencyBonus = getProficiencyBonus(character.level);
+  const totalLevel = character.totalLevel || character.level;
+  const proficiencyBonus = getProficiencyBonus(totalLevel);
 
   // Helper function to get ability modifier
   const getAbilityModifier = useCallback(
@@ -600,7 +611,7 @@ export default function CharacterSheet() {
                 badge={
                   <div className="flex items-center gap-2">
                     <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
-                      Level {character.level}
+                      Level {totalLevel}
                     </span>
                     <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
                       HP: {character.hitPoints.current}/{character.hitPoints.max}
@@ -613,6 +624,7 @@ export default function CharacterSheet() {
                   <div className="space-y-6 lg:col-span-4">
                     {/* Basic Character Information */}
                     <CharacterBasicInfo
+                      character={character}
                       race={character.race}
                       characterClass={character.class}
                       level={character.level}
@@ -631,39 +643,20 @@ export default function CharacterSheet() {
                       onUpdateAlignment={alignment =>
                         updateCharacter({ alignment })
                       }
+                      onAddClassLevel={addClassLevel}
+                      onRemoveClassLevel={removeClassLevel}
+                      onUpdateClassLevel={updateClassLevel}
+                      getClassDisplayString={getClassDisplayString}
                     />
 
                     {/* Ability Scores */}
                     <AbilityScores
                       abilities={character.abilities}
-                      characterLevel={character.level}
+                      characterLevel={totalLevel}
                       onUpdateAbilityScore={updateAbilityScore}
                       onRollAbilityCheck={rollAbilityCheck}
                     />
 
-                    {/* Hit Dice */}
-                    <ErrorBoundary
-                      fallback={
-                        <div className="rounded-lg border border-purple-200 bg-white p-4 shadow">
-                          <h3 className="mb-2 text-sm font-medium text-gray-700">
-                            Hit Dice
-                          </h3>
-                          <p className="text-gray-500">
-                            Unable to load hit dice manager
-                          </p>
-                        </div>
-                      }
-                    >
-                      <HitDiceManager
-                        classInfo={character.class}
-                        level={character.level}
-                        hitDice={character.hitDice}
-                        onUpdateClass={updateClass}
-                        onUpdateHitDice={hitDice =>
-                          updateCharacter({ hitDice })
-                        }
-                      />
-                    </ErrorBoundary>
 
                     {/* Weapon Proficiencies */}
                     <ErrorBoundary
@@ -750,6 +743,16 @@ export default function CharacterSheet() {
                       passivePerception={10 + getSkillModifier('perception')}
                       proficiencyBonus={proficiencyBonus}
                     />
+                    {/* Special Abilities */}
+                    <TraitTracker
+                      traits={character.trackableTraits || []}
+                      characterLevel={totalLevel}
+                      onAddTrait={addTrackableTrait}
+                      onUpdateTrait={updateTrackableTrait}
+                      onDeleteTrait={deleteTrackableTrait}
+                      onUseTrait={useTrackableTrait}
+                      onResetTraits={resetTrackableTraits}
+                    />
                   </div>
 
                   {/* Middle Column - Skills & Saving Throws */}
@@ -783,11 +786,27 @@ export default function CharacterSheet() {
                       </h2>
                       <XPTracker
                         currentXP={character.experience}
-                        currentLevel={character.level}
+                        currentLevel={totalLevel}
                         onAddXP={addExperience}
                         onSetXP={setExperience}
                       />
                     </div>
+
+                    {/* Spell Slots */}
+                    {characterHasSpells && (
+                      <SpellSlotTracker
+                        spellSlots={character.spellSlots}
+                        pactMagic={character.pactMagic}
+                        onSpellSlotChange={updateSpellSlot}
+                        onPactMagicChange={
+                          character.pactMagic ? updatePactMagicSlot : undefined
+                        }
+                        onResetSpellSlots={resetSpellSlots}
+                        onResetPactMagic={
+                          character.pactMagic ? resetPactMagicSlots : undefined
+                        }
+                      />
+                    )}
                   </div>
 
                   {/* Right Column - Combat Stats & Features */}
@@ -839,7 +858,7 @@ export default function CharacterSheet() {
                           <HitPointManager
                             hitPoints={character.hitPoints}
                             classInfo={character.class}
-                            level={character.level}
+                            level={totalLevel}
                             constitutionScore={character.abilities.constitution}
                             onApplyDamage={applyDamageToCharacter}
                             onApplyHealing={applyHealingToCharacter}
@@ -852,34 +871,29 @@ export default function CharacterSheet() {
                           />
                         </ErrorBoundary>
                       </div>
+
+                      {/* Hit Dice */}
+                      <ErrorBoundary
+                        fallback={
+                          <div className="rounded-lg border border-purple-200 bg-white p-4 shadow">
+                            <h3 className="mb-2 text-sm font-medium text-gray-700">
+                              Hit Dice
+                            </h3>
+                            <p className="text-gray-500">
+                              Unable to load hit dice tracker
+                            </p>
+                          </div>
+                        }
+                      >
+                        <HitDiceTracker
+                          hitDicePools={character.hitDicePools || {}}
+                          onUseHitDie={useHitDie}
+                          onRestoreHitDice={restoreHitDice}
+                          onResetAllHitDice={resetAllHitDice}
+                          onResetHalfHitDice={resetHalfHitDice}
+                        />
+                      </ErrorBoundary>
                     </div>
-
-                    {/* Spell Slots */}
-                    {characterHasSpells && (
-                      <SpellSlotTracker
-                        spellSlots={character.spellSlots}
-                        pactMagic={character.pactMagic}
-                        onSpellSlotChange={updateSpellSlot}
-                        onPactMagicChange={
-                          character.pactMagic ? updatePactMagicSlot : undefined
-                        }
-                        onResetSpellSlots={resetSpellSlots}
-                        onResetPactMagic={
-                          character.pactMagic ? resetPactMagicSlots : undefined
-                        }
-                      />
-                    )}
-
-                    {/* Special Abilities */}
-                    <TraitTracker
-                      traits={character.trackableTraits || []}
-                      characterLevel={character.level}
-                      onAddTrait={addTrackableTrait}
-                      onUpdateTrait={updateTrackableTrait}
-                      onDeleteTrait={deleteTrackableTrait}
-                      onUseTrait={useTrackableTrait}
-                      onResetTraits={resetTrackableTraits}
-                    />
                   </div>
                 </div>
               </CollapsibleSection>

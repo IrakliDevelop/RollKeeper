@@ -80,8 +80,16 @@ const createPlayerCharacter = (
   characterData: CharacterState
 ): PlayerCharacter => {
   const now = new Date();
+  const playerId = generateId();
+  
+  // Ensure characterData has the same ID as the PlayerCharacter
+  const characterDataWithId: CharacterState = {
+    ...characterData,
+    id: playerId,
+  };
+  
   return {
-    id: generateId(),
+    id: playerId,
     name,
     race: characterData.race || 'Human',
     class: characterData.class?.name || 'Fighter',
@@ -89,7 +97,7 @@ const createPlayerCharacter = (
     createdAt: now,
     updatedAt: now,
     lastPlayed: now,
-    characterData,
+    characterData: characterDataWithId,
     tags: [],
     isArchived: false,
   };
@@ -178,7 +186,14 @@ export const usePlayerStore = create<PlayerStoreState>()(
       },
 
       getCharacterById: (id: string) => {
-        return get().characters.find(c => c.id === id) || null;
+        const character = get().characters.find(c => c.id === id) || null;
+        
+        // Ensure characterData has the correct ID (migration for existing characters)
+        if (character && !character.characterData.id) {
+          character.characterData.id = character.id;
+        }
+        
+        return character;
       },
 
       getActiveCharacters: () => {
@@ -237,7 +252,7 @@ export const usePlayerStore = create<PlayerStoreState>()(
                   name: characterData.name || char.name,
                   race: characterData.race || char.race,
                   class: characterData.class?.name || char.class,
-                  level: characterData.level || char.level,
+                  level: characterData.totalLevel || characterData.level || char.level,
                   updatedAt: new Date(),
                   lastPlayed: new Date(),
                 }

@@ -154,12 +154,24 @@ export default function ActionsSection({
                   {actionSpells.length} ready
                 </span>
               )}
-              <button
-                onClick={() => switchToTab('spellcasting')}
-                className="rounded-lg bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-200 hover:text-purple-800"
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  switchToTab('spellcasting');
+                }}
+                className="cursor-pointer rounded-lg bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-200 hover:text-purple-800"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    switchToTab('spellcasting');
+                  }
+                }}
               >
                 Manage
-              </button>
+              </div>
             </div>
           }
         >
