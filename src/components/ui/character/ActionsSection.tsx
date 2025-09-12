@@ -1,8 +1,10 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { EquippedWeapons } from '@/components/EquippedWeapons';
-import { QuickSpells } from '@/components/QuickSpells';
+import { EnhancedQuickSpells } from '@/components/EnhancedQuickSpells';
 import { ConcentrationTracker } from '@/components/ui/character';
 import { CharacterState } from '@/types/character';
 
@@ -32,6 +34,65 @@ interface ActionsSectionProps {
   onStopConcentration: () => void;
 }
 
+// Simple collapsible component for subsections
+interface CollapsibleSubsectionProps {
+  title: string;
+  icon: string;
+  children: React.ReactNode;
+  defaultExpanded?: boolean;
+  persistKey: string;
+  badge?: React.ReactNode;
+}
+
+const CollapsibleSubsection: React.FC<CollapsibleSubsectionProps> = ({
+  title,
+  icon,
+  children,
+  defaultExpanded = true,
+  persistKey,
+  badge,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  useEffect(() => {
+    const savedState = localStorage.getItem(`subsection-${persistKey}`);
+    if (savedState !== null) {
+      setIsExpanded(JSON.parse(savedState));
+    }
+  }, [persistKey]);
+
+  const toggleExpanded = () => {
+    const newState = !isExpanded;
+    setIsExpanded(newState);
+    localStorage.setItem(`subsection-${persistKey}`, JSON.stringify(newState));
+  };
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white shadow">
+      <button
+        onClick={toggleExpanded}
+        className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-gray-50"
+        aria-expanded={isExpanded}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-lg">{icon}</span>
+          <h3 className="text-lg font-bold text-gray-800">{title}</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          {badge}
+          {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+        </div>
+      </button>
+      
+      {isExpanded && (
+        <div className="border-t border-gray-200 p-4">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function ActionsSection({
   character,
   showAttackRoll,
@@ -41,68 +102,82 @@ export default function ActionsSection({
   switchToTab,
   onStopConcentration,
 }: ActionsSectionProps) {
-  return (
-    <section className="rounded-xl border-2 border-slate-300 bg-gradient-to-r from-slate-50 to-slate-100 p-6 shadow-lg backdrop-blur-sm">
-      <h2 className="mb-6 border-b-2 border-slate-400 pb-3 text-center text-2xl font-bold text-slate-800">
-        ⚔️ Actions & Combat
-      </h2>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Attack Actions */}
-        <ErrorBoundary
-          fallback={
-            <div className="rounded-lg border border-blue-200 bg-white p-4 shadow">
-              <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-blue-800">
-                <span className="text-red-600">⚔️</span>
-                Ready Weapons
-              </h3>
-              <p className="text-gray-500">Unable to load equipped weapons</p>
-            </div>
-          }
-        >
-          <EquippedWeapons
-            showAttackRoll={showAttackRoll}
-            showDamageRoll={showDamageRoll}
-            animateRoll={animateRoll}
-          />
-        </ErrorBoundary>
+  const equippedWeapons = character.weapons.filter(weapon => weapon.isEquipped);
+  const actionSpells = character.spells.filter(spell => 
+    spell.isPrepared && 
+    (spell.castingTime?.includes('action') || spell.castingTime?.includes('reaction'))
+  );
 
-        {/* Cantrips & Spells */}
-        <ErrorBoundary
-          fallback={
-            <div className="rounded-lg border border-blue-200 bg-white p-4 shadow">
-              <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-blue-800">
-                <span className="text-purple-600">✨</span>
-                Quick Spells
-              </h3>
-              <p className="text-gray-500">Unable to load quick spells</p>
+  return (
+    <div className="space-y-6">
+        {/* Ready Weapons - Collapsible */}
+        <CollapsibleSubsection
+          title="Ready Weapons"
+          icon="⚔️"
+          persistKey="ready-weapons"
+          defaultExpanded={true}
+          badge={
+            equippedWeapons.length > 0 && (
+              <span className="rounded-full bg-blue-100 px-2 py-1 text-sm font-medium text-blue-800">
+                {equippedWeapons.length} equipped
+              </span>
+            )
+          }
+        >
+          <ErrorBoundary
+            fallback={
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                <p className="text-red-600">Unable to load equipped weapons</p>
+              </div>
+            }
+          >
+            <div className="-m-4">
+              <EquippedWeapons
+                showAttackRoll={showAttackRoll}
+                showDamageRoll={showDamageRoll}
+                animateRoll={animateRoll}
+              />
+            </div>
+          </ErrorBoundary>
+        </CollapsibleSubsection>
+
+        {/* Quick Spells - Collapsible */}
+        <CollapsibleSubsection
+          title="Quick Spells"
+          icon="✨"
+          persistKey="quick-spells"
+          defaultExpanded={true}
+          badge={
+            <div className="flex items-center gap-2">
+              {actionSpells.length > 0 && (
+                <span className="rounded-full bg-purple-100 px-2 py-1 text-sm font-medium text-purple-800">
+                  {actionSpells.length} ready
+                </span>
+              )}
+              <button
+                onClick={() => switchToTab('spellcasting')}
+                className="rounded-lg bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-200 hover:text-purple-800"
+              >
+                Manage
+              </button>
             </div>
           }
         >
-          <div className="rounded-lg border border-blue-200 bg-white p-4 shadow">
-            <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-blue-800">
-              <span className="text-purple-600">✨</span>
-              Quick Spells
-            </h3>
-            <QuickSpells
+          <ErrorBoundary
+            fallback={
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                <p className="text-red-600">Unable to load quick spells</p>
+              </div>
+            }
+          >
+            <EnhancedQuickSpells
               showAttackRoll={showAttackRoll}
               showSavingThrow={showSavingThrow}
               showDamageRoll={showDamageRoll}
               animateRoll={animateRoll}
             />
-            <div className="mt-4 border-t border-gray-200 pt-3">
-              <p className="text-center text-xs text-gray-500">
-                Manage spells in the{' '}
-                <button
-                  onClick={() => switchToTab('spellcasting')}
-                  className="font-semibold text-purple-600 underline transition-colors hover:text-purple-800 hover:no-underline"
-                >
-                  Spellcasting tab
-                </button>
-                .
-              </p>
-            </div>
-          </div>
-        </ErrorBoundary>
+          </ErrorBoundary>
+        </CollapsibleSubsection>
 
         {/* Concentration Tracker */}
         {character.concentration.isConcentrating && (
@@ -111,7 +186,6 @@ export default function ActionsSection({
             onStopConcentration={onStopConcentration}
           />
         )}
-      </div>
-    </section>
+    </div>
   );
 }

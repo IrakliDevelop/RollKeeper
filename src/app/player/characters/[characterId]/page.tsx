@@ -28,6 +28,7 @@ import SavingThrows from '@/components/ui/character/SavingThrows';
 import Skills from '@/components/ui/character/Skills';
 import CombatStats from '@/components/ui/character/CombatStats';
 import ActionsSection from '@/components/ui/character/ActionsSection';
+import CollapsibleSection from '@/components/ui/layout/CollapsibleSection';
 import QuickStats from '@/components/ui/character/QuickStats';
 import { ExtendedFeaturesSection } from '@/components/ui/character/ExtendedFeatures';
 import { useHydration } from '@/hooks/useHydration';
@@ -551,15 +552,32 @@ export default function CharacterSheet() {
             {/* Main Character Sheet */}
             <main className="relative z-10 mx-auto max-w-7xl space-y-8">
               {/* Actions Section */}
-              <ActionsSection
-                character={character}
-                showAttackRoll={showAttackRoll}
-                showSavingThrow={showSavingThrow}
-                showDamageRoll={showDamageRoll}
-                animateRoll={diceBoxInitialized ? rollDice : undefined}
-                switchToTab={switchToTab}
-                onStopConcentration={stopConcentration}
-              />
+              <CollapsibleSection
+                title="Actions & Combat"
+                icon="⚔️"
+                defaultExpanded={true}
+                persistKey="actions-combat"
+                className="rounded-xl border-2 border-slate-300 bg-gradient-to-r from-slate-50 to-slate-100 shadow-lg backdrop-blur-sm"
+                headerClassName="rounded-t-xl"
+                contentClassName="px-6 pb-6"
+                badge={
+                  character.concentration.isConcentrating && (
+                    <span className="rounded-full bg-orange-100 px-3 py-1 text-sm font-medium text-orange-800">
+                      Concentrating
+                    </span>
+                  )
+                }
+              >
+                <ActionsSection
+                  character={character}
+                  showAttackRoll={showAttackRoll}
+                  showSavingThrow={showSavingThrow}
+                  showDamageRoll={showDamageRoll}
+                  animateRoll={diceBoxInitialized ? rollDice : undefined}
+                  switchToTab={switchToTab}
+                  onStopConcentration={stopConcentration}
+                />
+              </CollapsibleSection>
 
               {/* Section Divider */}
               <div className="flex items-center justify-center">
@@ -571,10 +589,25 @@ export default function CharacterSheet() {
               </div>
 
               {/* Core D&D Stats Section */}
-              <section className="rounded-xl border-2 border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 shadow-lg backdrop-blur-sm">
-                <h2 className="mb-6 border-b-2 border-blue-400 pb-3 text-center text-2xl font-bold text-blue-900">
-                  📊 Character Statistics
-                </h2>
+              <CollapsibleSection
+                title="Character Statistics"
+                icon="📊"
+                defaultExpanded={true}
+                persistKey="character-statistics"
+                className="rounded-xl border-2 border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg backdrop-blur-sm"
+                headerClassName="rounded-t-xl"
+                contentClassName="px-6 pb-6"
+                badge={
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
+                      Level {character.level}
+                    </span>
+                    <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
+                      HP: {character.hitPoints.current}/{character.hitPoints.max}
+                    </span>
+                  </div>
+                }
+              >
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
                   {/* Left Column - Basic Info & Ability Scores */}
                   <div className="space-y-6 lg:col-span-4">
@@ -849,10 +882,32 @@ export default function CharacterSheet() {
                     />
                   </div>
                 </div>
-              </section>
+              </CollapsibleSection>
 
-              {/* Extended Character Features Section */}
-              <section className="mt-8">
+              {/* Active Abilities & Features Section */}
+              <CollapsibleSection
+                title="Active Abilities & Features"
+                icon="⚡"
+                defaultExpanded={false}
+                persistKey="active-features"
+                className="rounded-xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 shadow-lg backdrop-blur-sm"
+                headerClassName="rounded-t-xl"
+                contentClassName="px-6 pb-6"
+                badge={
+                  <div className="flex items-center gap-2">
+                    {(character.extendedFeatures?.length || 0) > 0 && (
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-800">
+                        {character.extendedFeatures?.length || 0} abilities
+                      </span>
+                    )}
+                    {character.extendedFeatures?.some(f => f.usedUses > 0) && (
+                      <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">
+                        {character.extendedFeatures?.filter(f => f.usedUses > 0).length} used
+                      </span>
+                    )}
+                  </div>
+                }
+              >
                 <ExtendedFeaturesSection
                   features={character.extendedFeatures || []}
                   characterLevel={character.level}
@@ -863,10 +918,32 @@ export default function CharacterSheet() {
                   onResetFeatures={resetExtendedFeatures}
                   onReorderFeatures={reorderExtendedFeatures}
                 />
-              </section>
+              </CollapsibleSection>
 
               {/* Grouped Tabbed Interface for Additional Sections */}
-              <section className="mt-8">
+              <CollapsibleSection
+                title="Character Details & Management"
+                icon="📋"
+                defaultExpanded={true}
+                persistKey="character-details"
+                className="rounded-xl border-2 border-green-300 bg-gradient-to-r from-green-50 to-emerald-50 shadow-lg backdrop-blur-sm"
+                headerClassName="rounded-t-xl"
+                contentClassName="px-6 pb-6"
+                badge={
+                  <div className="flex items-center gap-2">
+                    {character.spells.length > 0 && (
+                      <span className="rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-800">
+                        {character.spells.length} spells
+                      </span>
+                    )}
+                    {(character.features?.length || 0) > 0 && (
+                      <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
+                        {character.features?.length || 0} features
+                      </span>
+                    )}
+                  </div>
+                }
+              >
                 <GroupedTabs
                   defaultTab="spellcasting"
                   className="w-full"
@@ -887,7 +964,7 @@ export default function CharacterSheet() {
                   })}
                   ref={tabsRef}
                 />
-              </section>
+              </CollapsibleSection>
             </main>
 
             <ToastContainer toasts={toasts} onDismiss={dismissToast} />

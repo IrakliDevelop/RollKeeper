@@ -8,9 +8,8 @@ import NotesManager from '@/components/ui/game/NotesManager';
 import InventoryManager from '@/components/ui/game/InventoryManager';
 import CurrencyManager from '@/components/ui/game/CurrencyManager';
 import { SpellcastingStats } from '@/components/SpellcastingStats';
-import { SpellManagement } from '@/components/SpellManagement';
-import { WeaponInventory } from '@/components/WeaponInventory';
-import ArmorDefenseManager from '@/components/ArmorDefenseManager';
+import { EnhancedSpellManagement } from '@/components/EnhancedSpellManagement';
+import EquipmentSection from '@/components/ui/character/EquipmentSection';
 import {
   CharacterState,
   RichTextContent,
@@ -66,8 +65,8 @@ export const createCharacterSheetTabsConfig = ({
         icon: '✨',
         content: (
           <TabContent>
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-              {/* Spellcasting Statistics */}
+            <div className="space-y-6">
+              {/* Spellcasting Statistics - Full Width at Top */}
               <ErrorBoundary
                 fallback={
                   <div className="rounded-lg border border-purple-200 bg-white p-4 shadow">
@@ -83,7 +82,7 @@ export const createCharacterSheetTabsConfig = ({
                 <SpellcastingStats />
               </ErrorBoundary>
 
-              {/* Spell Management */}
+              {/* Enhanced Spell Management - Full Width */}
               <ErrorBoundary
                 fallback={
                   <div className="rounded-lg border border-purple-200 bg-white p-4 shadow">
@@ -96,7 +95,7 @@ export const createCharacterSheetTabsConfig = ({
                   </div>
                 }
               >
-                <SpellManagement />
+                <EnhancedSpellManagement />
               </ErrorBoundary>
             </div>
           </TabContent>
@@ -108,41 +107,7 @@ export const createCharacterSheetTabsConfig = ({
         icon: '🛡️',
         content: (
           <TabContent>
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* Weapons */}
-              <ErrorBoundary
-                fallback={
-                  <div className="rounded-lg border border-purple-200 bg-white p-4 shadow">
-                    <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-purple-800">
-                      <span className="text-red-600">⚔️</span>
-                      Weapons
-                    </h3>
-                    <p className="text-gray-500">
-                      Unable to load weapon inventory
-                    </p>
-                  </div>
-                }
-              >
-                <WeaponInventory />
-              </ErrorBoundary>
-
-              {/* Armor & Defense */}
-              <ErrorBoundary
-                fallback={
-                  <div className="rounded-lg border border-purple-200 bg-white p-4 shadow">
-                    <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-purple-800">
-                      <span className="text-blue-600">🛡️</span>
-                      Armor & Defense
-                    </h3>
-                    <p className="text-gray-500">
-                      Unable to load armor management
-                    </p>
-                  </div>
-                }
-              >
-                <ArmorDefenseManager />
-              </ErrorBoundary>
-            </div>
+            <EquipmentSection character={character} />
           </TabContent>
         ),
       },

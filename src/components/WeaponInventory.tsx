@@ -17,18 +17,14 @@ export const WeaponInventory: React.FC = () => {
 
   return (
     <>
-      <div className="rounded-lg border border-purple-200 bg-white p-4 shadow">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-lg font-bold text-purple-800">
-            <span className="text-red-600">⚔️</span>
-            Equipment & Magic Items
-          </h3>
+      <div>
+        <div className="mb-4 flex items-center justify-end">
           <button
             onClick={() => setShowEquipmentModal(true)}
-            className="flex items-center gap-2 rounded-md bg-purple-600 px-3 py-1 text-sm text-white transition-colors hover:bg-purple-700"
+            className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm text-white transition-colors hover:bg-purple-700"
           >
             <Eye size={16} />
-            View All
+            View All Equipment
           </button>
         </div>
 

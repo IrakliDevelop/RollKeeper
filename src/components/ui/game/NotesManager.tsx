@@ -41,6 +41,7 @@ export default function NotesManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [newItem, setNewItem] = useState({ title: '', content: '' });
+  const [editingItem, setEditingItem] = useState({ title: '', content: '' });
   const [viewMode, setViewMode] = useState<'read' | 'edit'>('read');
   const [selectedNote, setSelectedNote] = useState<RichTextContent | null>(
     null
@@ -64,10 +65,24 @@ export default function NotesManager({
   ) => {
     onUpdate(id, updates);
     setEditingId(null);
+    setEditingItem({ title: '', content: '' });
+  };
+
+  const handleStartEdit = (item: RichTextContent) => {
+    setEditingId(item.id);
+    setEditingItem({ title: item.title, content: item.content });
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
+    setEditingItem({ title: '', content: '' });
+  };
+
+  const handleSaveEdit = (id: string) => {
+    handleUpdate(id, {
+      title: editingItem.title,
+      content: editingItem.content,
+    });
   };
 
   const handleCancelAdd = () => {
@@ -222,13 +237,12 @@ export default function NotesManager({
                       </label>
                       <input
                         type="text"
-                        defaultValue={item.title}
-                        onChange={e => {
-                          const newTitle = e.target.value;
-                          // We'll save on blur or when save is clicked
-                          e.target.setAttribute('data-title', newTitle);
-                        }}
+                        value={editingItem.title}
+                        onChange={e => 
+                          setEditingItem({ ...editingItem, title: e.target.value })
+                        }
                         className="w-full rounded-md border border-blue-300 px-4 py-2 text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        autoFocus
                       />
                     </div>
                     <div>
@@ -236,13 +250,10 @@ export default function NotesManager({
                         Note Content
                       </label>
                       <RichTextEditor
-                        content={item.content}
-                        onChange={content => {
-                          // Store the content for saving later
-                          document
-                            .querySelector(`[data-editing="${item.id}"]`)
-                            ?.setAttribute('data-content', content);
-                        }}
+                        content={editingItem.content}
+                        onChange={content => 
+                          setEditingItem({ ...editingItem, content })
+                        }
                         className="min-h-40"
                       />
                     </div>
@@ -255,27 +266,9 @@ export default function NotesManager({
                         <span>Cancel</span>
                       </button>
                       <button
-                        onClick={() => {
-                          const container = document.querySelector(
-                            `[data-editing="${item.id}"]`
-                          );
-                          const titleInput = container?.querySelector(
-                            'input[data-title]'
-                          ) as HTMLInputElement;
-                          const newTitle =
-                            titleInput?.getAttribute('data-title') ||
-                            titleInput?.value ||
-                            item.title;
-                          const newContent =
-                            container?.getAttribute('data-content') ||
-                            item.content;
-
-                          handleUpdate(item.id, {
-                            title: newTitle,
-                            content: newContent,
-                          });
-                        }}
-                        className="flex items-center space-x-1 rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+                        onClick={() => handleSaveEdit(item.id)}
+                        disabled={!editingItem.title.trim()}
+                        className="flex items-center space-x-1 rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Save size={16} />
                         <span>Save</span>
@@ -284,10 +277,7 @@ export default function NotesManager({
                   </div>
                 ) : (
                   // Display mode
-                  <div
-                    data-editing={item.id}
-                    onClick={() => handleNoteClick(item)}
-                  >
+                  <div onClick={() => handleNoteClick(item)}>
                     <div className="mb-4 flex items-start justify-between">
                       <div className="flex flex-1 items-center gap-3">
                         <h3 className="flex-1 text-xl font-semibold text-blue-900">
@@ -299,7 +289,7 @@ export default function NotesManager({
                           <button
                             onClick={e => {
                               e.stopPropagation();
-                              setEditingId(item.id);
+                              handleStartEdit(item);
                             }}
                             className="rounded-md p-2 text-blue-600 transition-colors hover:bg-blue-100"
                             title="Edit note"

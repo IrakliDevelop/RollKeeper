@@ -25,21 +25,31 @@ export default function NoteModal({
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
+  const [initialNoteId, setInitialNoteId] = useState<string | null>(null);
 
-  // Reset editing state when modal opens/closes or note changes
+  // Reset editing state when modal opens/closes or when a different note is selected
   useEffect(() => {
-    if (note) {
-      setEditTitle(note.title);
-      setEditContent(note.content);
+    if (note && isOpen) {
+      if (!initialNoteId || initialNoteId !== note.id || !isEditing) {
+        setEditTitle(note.title);
+        setEditContent(note.content);
+        setIsEditing(false);
+        setInitialNoteId(note.id);
+      }
+    } else if (!isOpen) {
+      setInitialNoteId(null);
       setIsEditing(false);
     }
-  }, [note, isOpen]);
+  }, [note?.id, isOpen, initialNoteId, isEditing]);
 
   const handleSave = () => {
     if (!note) return;
 
+    const trimmedTitle = editTitle.trim();
+    if (!trimmedTitle) return;
+
     onUpdate(note.id, {
-      title: editTitle.trim(),
+      title: trimmedTitle,
       content: editContent,
     });
     setIsEditing(false);

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -33,6 +34,12 @@ export function Modal({
   className = '',
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = React.useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
 
   // Handle escape key press
   useEffect(() => {
@@ -61,10 +68,10 @@ export function Modal({
     }
   };
 
-  // Don't render if not open
-  if (!isOpen) return null;
+  // Don't render if not open or not mounted
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop with blur effect */}
       <div
@@ -102,7 +109,8 @@ export function Modal({
           <div className="flex-1 overflow-y-auto p-6">{children}</div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

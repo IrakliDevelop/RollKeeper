@@ -264,14 +264,8 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
   }
 
   return (
-    <div className="rounded-lg border border-blue-200 bg-white p-4 shadow">
-      <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-blue-800">
-        <span className="text-red-600">⚔️</span>
-        Ready Weapons
-        <span className="ml-2 text-sm font-normal text-gray-600">
-          ({equippedWeapons.length} equipped)
-        </span>
-      </h3>
+    <div className="p-4">
+      {/* Weapons list without header since it's now in the collapsible section */}
 
       <DragDropList
         items={equippedWeapons}

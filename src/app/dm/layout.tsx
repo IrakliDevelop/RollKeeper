@@ -38,10 +38,10 @@ export default function DMLayout({ children }: { children: React.ReactNode }) {
                 Settings
               </Link>
               <Link
-                href="/"
+                href="/player"
                 className="transition-colors hover:text-purple-200"
               >
-                Character Sheet
+                Character Sheets
               </Link>
             </nav>
           </div>

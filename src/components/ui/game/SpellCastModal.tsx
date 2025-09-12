@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, AlertTriangle, Sparkles } from 'lucide-react';
+import { AlertTriangle, Sparkles } from 'lucide-react';
 import { Spell, SpellSlots, ConcentrationState } from '@/types/character';
+import { Modal } from '@/components/ui/feedback/Modal';
 
 interface SpellCastModalProps {
   isOpen: boolean;
@@ -58,12 +59,6 @@ export function SpellCastModal({
     }
   };
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-      setSelectedLevel(null);
-    }
-  };
 
   const handleClose = () => {
     onClose();
@@ -76,89 +71,79 @@ export function SpellCastModal({
       availableLevels.includes(selectedLevel)); // Or if we have the required slot
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-white/20 p-4 backdrop-blur-md"
-      onClick={handleBackdropClick}
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Cast Spell"
+      size="md"
+      closeOnBackdropClick={true}
     >
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 p-4">
-          <div className="flex items-center gap-2">
+      <div className="space-y-4">
+        {/* Spell Info */}
+        <div className="text-center">
+          <div className="mb-2 flex items-center justify-center gap-2">
             <Sparkles className="text-purple-600" size={20} />
-            <h2 className="text-lg font-semibold text-gray-900">Cast Spell</h2>
           </div>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 transition-colors hover:text-gray-600"
-          >
-            <X size={20} />
-          </button>
+          <h3 className="mb-1 text-xl font-bold text-purple-900">
+            {spell.name}
+          </h3>
+          <div className="flex items-center justify-center gap-2 text-sm text-purple-600">
+            <span>{spell.school}</span>
+            <span>•</span>
+            <span>
+              {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
+            </span>
+            {spell.concentration && (
+              <>
+                <span>•</span>
+                <span className="font-medium text-orange-600">
+                  Concentration
+                </span>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="space-y-4 p-4">
-          {/* Spell Info */}
-          <div className="text-center">
-            <h3 className="mb-1 text-xl font-bold text-purple-900">
-              {spell.name}
-            </h3>
-            <div className="flex items-center justify-center gap-2 text-sm text-purple-600">
-              <span>{spell.school}</span>
-              <span>•</span>
-              <span>
-                {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
-              </span>
-              {spell.concentration && (
-                <>
-                  <span>•</span>
-                  <span className="font-medium text-orange-600">
-                    Concentration
-                  </span>
-                </>
-              )}
+        {/* Concentration Warning */}
+        {concentrationWarning && (
+          <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <AlertTriangle
+              className="mt-0.5 flex-shrink-0 text-amber-600"
+              size={16}
+            />
+            <div className="text-sm">
+              <p className="mb-1 font-medium text-amber-800">
+                Concentration Warning
+              </p>
+              <p className="text-amber-700">
+                You are currently concentrating on{' '}
+                <span className="font-medium">{concentration.spellName}</span>
+                . Casting this spell will end your concentration on the
+                previous spell.
+              </p>
             </div>
           </div>
+        )}
 
-          {/* Concentration Warning */}
-          {concentrationWarning && (
-            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-              <AlertTriangle
-                className="mt-0.5 flex-shrink-0 text-amber-600"
-                size={16}
-              />
-              <div className="text-sm">
-                <p className="mb-1 font-medium text-amber-800">
-                  Concentration Warning
-                </p>
-                <p className="text-amber-700">
-                  You are currently concentrating on{' '}
-                  <span className="font-medium">{concentration.spellName}</span>
-                  . Casting this spell will end your concentration on the
-                  previous spell.
-                </p>
+        {/* Cantrip Cast */}
+        {spell.level === 0 ? (
+          <div className="text-center">
+            <p className="mb-4 text-sm text-gray-600">
+              Cantrips don&apos;t use spell slots.
+            </p>
+            <div className="mb-4 rounded-lg border-2 border-purple-300 bg-purple-50 p-3">
+              <div className="flex items-center justify-center gap-2">
+                <div className="h-3 w-3 rounded-full bg-purple-500"></div>
+                <span className="font-medium text-purple-900">
+                  Cantrip Selected
+                </span>
               </div>
             </div>
-          )}
-
-          {/* Cantrip Cast */}
-          {spell.level === 0 ? (
-            <div className="text-center">
-              <p className="mb-4 text-sm text-gray-600">
-                Cantrips don&apos;t use spell slots.
-              </p>
-              <div className="mb-4 rounded-lg border-2 border-purple-300 bg-purple-50 p-3">
-                <div className="flex items-center justify-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-purple-500"></div>
-                  <span className="font-medium text-purple-900">
-                    Cantrip Selected
-                  </span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* No Available Slots */}
-              {availableLevels.length === 0 ? (
+          </div>
+        ) : (
+          <>
+            {/* No Available Slots */}
+            {availableLevels.length === 0 ? (
                 <div className="py-4 text-center">
                   <p className="mb-2 text-gray-600">
                     No available spell slots to cast this spell.
@@ -286,7 +271,6 @@ export function SpellCastModal({
             </button>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

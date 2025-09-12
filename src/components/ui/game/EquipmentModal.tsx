@@ -12,8 +12,8 @@ import {
   WeaponDamage,
 } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
-import { Plus, Edit2, Trash2, Sword, Wand2, X } from 'lucide-react';
-import { ModalPortal } from '@/components/ui/feedback/ModalPortal';
+import { Plus, Edit2, Trash2, Sword, Wand2 } from 'lucide-react';
+import { Modal } from '@/components/ui/feedback/Modal';
 import DragDropList from '@/components/ui/layout/DragDropList';
 
 interface EquipmentModalProps {
@@ -344,30 +344,13 @@ export default function EquipmentModal({
   if (!isOpen) return null;
 
   return (
-    <ModalPortal isOpen={isOpen}>
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-        onClick={e => e.target === e.currentTarget && handleCloseModal()}
-      >
-        <div className="max-h-[90vh] w-full max-w-7xl overflow-hidden rounded-xl bg-white shadow-2xl">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50 p-6">
-            <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-800">
-              ⚔️ Equipment & Magic Items
-            </h2>
-            <div className="flex items-center gap-4">
-              <div className="text-sm text-gray-600">
-                <span className="font-medium">Attunement:</span> {totalAttuned}/
-                {character.attunementSlots.max}
-              </div>
-              <button
-                onClick={handleCloseModal}
-                className="rounded-lg p-2 transition-colors hover:bg-gray-200"
-              >
-                <X size={20} />
-              </button>
-            </div>
-          </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={handleCloseModal}
+      title={`⚔️ Equipment & Magic Items (Attunement: ${totalAttuned}/${character.attunementSlots.max})`}
+      size="full"
+      closeOnBackdropClick={true}
+    >
 
           {/* Show forms if active, otherwise show main content */}
           {showWeaponForm ? (
@@ -1143,8 +1126,6 @@ export default function EquipmentModal({
               </div>
             </div>
           )}
-        </div>
-      </div>
-    </ModalPortal>
+    </Modal>
   );
 }

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ArmorItem, ArmorCategory, ArmorType } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Edit2, Trash2, Shield, CheckCircle } from 'lucide-react';
+import { Modal } from '@/components/ui/feedback/Modal';
 import DragDropList from '@/components/ui/layout/DragDropList';
 
 const ARMOR_CATEGORIES: ArmorCategory[] = [
@@ -194,12 +195,8 @@ export default function ArmorDefenseManager() {
 
   return (
     <div className="space-y-6">
-      {/* Header with Add Button */}
-      <div className="flex items-center justify-between">
-        <h3 className="flex items-center gap-2 text-lg font-bold text-purple-800">
-          <span className="text-blue-600">🛡️</span>
-          Armor & Defense ({character.armorItems.length})
-        </h3>
+      {/* Add Button */}
+      <div className="flex items-center justify-end">
         <button
           onClick={() => setShowForm(true)}
           className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
@@ -278,15 +275,14 @@ export default function ArmorDefenseManager() {
       )}
 
       {/* Add/Edit Form */}
-      {showForm && (
-        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-2xl">
-            <div className="p-6">
-              <h3 className="mb-4 text-xl font-bold text-gray-800">
-                {editingId ? 'Edit Armor' : 'Add Armor'}
-              </h3>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
+      <Modal
+        isOpen={showForm}
+        onClose={resetForm}
+        title={editingId ? 'Edit Armor' : 'Add Armor'}
+        size="lg"
+        closeOnBackdropClick={true}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
                     Name
@@ -497,10 +493,7 @@ export default function ArmorDefenseManager() {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }
