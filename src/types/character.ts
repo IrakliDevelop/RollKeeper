@@ -255,6 +255,31 @@ export interface ClassInfo {
   hitDie: number; // d6, d8, d10, d12 - the size of the hit die for this class
 }
 
+// Multiclass information for individual classes
+export interface MulticlassInfo {
+  className: string;
+  level: number;
+  isCustom: boolean;
+  spellcaster?: 'full' | 'half' | 'third' | 'warlock' | 'none';
+  hitDie: number; // d6, d8, d10, d12 - the size of the hit die for this class
+  subclass?: string; // Optional subclass name
+}
+
+// Multiclass validation result
+export interface MulticlassValidation {
+  valid: boolean;
+  errors: string[];
+  warnings?: string[];
+}
+
+// Hit dice pools for multiclass characters
+export interface HitDicePools {
+  [dieType: string]: {
+    max: number; // Total available
+    used: number; // Used during short rests
+  };
+}
+
 // Weapon and magic item types
 export type WeaponCategory = 'simple' | 'martial' | 'magic' | 'artifact';
 export type WeaponType =
@@ -440,8 +465,16 @@ export interface CharacterState {
   // Basic Information
   name: string;
   race: string;
-  class: ClassInfo;
-  level: number;
+  
+  // Multiclass Support (new)
+  classes?: MulticlassInfo[]; // Array of classes for multiclass characters
+  totalLevel?: number; // Sum of all class levels
+  hitDicePools?: HitDicePools; // Hit dice pools by die type
+  
+  // Backwards Compatibility (deprecated but maintained)
+  class: ClassInfo; // Single class info (for backwards compatibility)
+  level: number; // Total character level (for backwards compatibility)
+  
   experience: number;
   background: string;
   alignment: string;
@@ -481,7 +514,7 @@ export interface CharacterState {
   initiative: InitiativeData;
   reaction: ReactionData;
   speed: number;
-  hitDice: string; // e.g., "1d8", "2d6"
+  hitDice: string; // e.g., "1d8", "2d6" (for backwards compatibility)
 
   // Saving Throws
   savingThrows: {
