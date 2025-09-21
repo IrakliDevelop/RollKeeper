@@ -975,6 +975,7 @@ export default function CharacterSheet() {
                     updateNote,
                     deleteNote,
                     reorderNotes,
+                    addToast,
                   })}
                   ref={tabsRef}
                 />
