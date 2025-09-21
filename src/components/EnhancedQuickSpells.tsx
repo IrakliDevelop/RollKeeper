@@ -2,10 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-  Shield,
   Sparkles,
   Dice6,
-  Zap,
   Wand2,
   Search,
   ChevronDown,
@@ -61,6 +59,7 @@ interface LevelSectionProps {
   isExpanded: boolean;
   onToggle: () => void;
   compactView: boolean;
+  spellSaveDC: number | null;
   onSpellAction: (spell: Spell, action: string) => void;
   favoriteSpells: string[];
   onToggleFavorite: (spellId: string) => void;
@@ -70,9 +69,10 @@ const SpellCard: React.FC<{
   spell: Spell;
   compact: boolean;
   isFavorite: boolean;
+  spellSaveDC: number | null;
   onAction: (action: string) => void;
   onToggleFavorite: () => void;
-}> = ({ spell, compact, isFavorite, onAction, onToggleFavorite }) => {
+}> = ({ spell, compact, isFavorite, spellSaveDC, onAction, onToggleFavorite }) => {
   if (compact) {
     return (
       <div className="group flex items-center justify-between rounded-lg border border-purple-200 bg-gradient-to-r from-purple-50 to-violet-50 p-2 hover:shadow-md transition-all duration-200">
@@ -112,24 +112,6 @@ const SpellCard: React.FC<{
               title="Attack roll"
             >
               <Dice6 size={12} />
-            </button>
-          )}
-          {spell.actionType === 'save' && (
-            <button
-              onClick={() => onAction('save')}
-              className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 transition-colors"
-              title="Saving throw"
-            >
-              <Shield size={12} />
-            </button>
-          )}
-          {spell.damage && (
-            <button
-              onClick={() => onAction('damage')}
-              className="rounded bg-amber-500 px-2 py-1 text-xs text-white hover:bg-amber-600 transition-colors"
-              title="Roll damage"
-            >
-              <Zap size={12} />
             </button>
           )}
         </div>
@@ -192,31 +174,19 @@ const SpellCard: React.FC<{
           </button>
         )}
 
-        {spell.actionType === 'save' && (
-          <button
-            onClick={() => onAction('save')}
-            className="group flex transform items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 px-3 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:scale-105 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg"
-          >
-            <Shield size={14} className="transition-transform group-hover:scale-110" />
-            {spell.savingThrow ? `${spell.savingThrow} Save` : 'Save'}
-          </button>
-        )}
-
-        {spell.damage && (
-          <button
-            onClick={() => onAction('damage')}
-            className="group flex transform items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 px-3 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:scale-105 hover:from-amber-600 hover:to-orange-700 hover:shadow-lg"
-          >
-            <Zap size={14} className="group-hover:animate-pulse" />
-            Damage
-          </button>
-        )}
-
-        {spell.damage && (
-          <div className="flex items-center gap-1 text-xs text-gray-600">
-            <span className="rounded-lg border border-gray-300 bg-gradient-to-r from-gray-100 to-gray-200 px-2 py-1 font-medium shadow-sm">
-              {spell.damage} {spell.damageType && `${spell.damageType}`}
-            </span>
+        {/* Show spell info for reference */}
+        {(spell.actionType === 'save' || spell.damage) && (
+          <div className="flex items-center gap-2 text-xs text-gray-600">
+            {spell.actionType === 'save' && spell.savingThrow && (
+              <span className="rounded-lg border border-blue-300 bg-gradient-to-r from-blue-100 to-blue-200 px-2 py-1 font-medium shadow-sm">
+                {spell.savingThrow} Save DC {spellSaveDC || '?'}
+              </span>
+            )}
+            {spell.damage && (
+              <span className="rounded-lg border border-amber-300 bg-gradient-to-r from-amber-100 to-amber-200 px-2 py-1 font-medium shadow-sm">
+                {spell.damage} {spell.damageType && `${spell.damageType}`}
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -230,6 +200,7 @@ const LevelSection: React.FC<LevelSectionProps> = ({
   isExpanded,
   onToggle,
   compactView,
+  spellSaveDC,
   onSpellAction,
   favoriteSpells,
   onToggleFavorite,
@@ -264,6 +235,7 @@ const LevelSection: React.FC<LevelSectionProps> = ({
                 spell={spell}
                 compact={compactView}
                 isFavorite={favoriteSpells.includes(spell.id)}
+                spellSaveDC={spellSaveDC}
                 onAction={(action) => onSpellAction(spell, action)}
                 onToggleFavorite={() => onToggleFavorite(spell.id)}
               />
@@ -309,13 +281,8 @@ export function EnhancedQuickSpells({
       spell.isAlwaysPrepared // Always prepared spells
   );
 
-  // Filter spells that have actions (attack, save, or damage)
-  const actionSpells = quickAccessSpells.filter(
-    spell =>
-      spell.actionType === 'attack' ||
-      spell.actionType === 'save' ||
-      spell.damage // Include any spell with damage dice
-  );
+  // Show all prepared spells in quick access (not just action spells)
+  const actionSpells = quickAccessSpells;
 
   // Filter by search query
   const filteredSpells = useMemo(() => {
@@ -548,6 +515,7 @@ export function EnhancedQuickSpells({
                   spell={spell}
                   compact={compactView}
                   isFavorite={true}
+                  spellSaveDC={spellSaveDC}
                   onAction={(action) => handleSpellAction(spell, action)}
                   onToggleFavorite={() => toggleSpellFavorite(spell.id)}
                 />
@@ -566,6 +534,7 @@ export function EnhancedQuickSpells({
               isExpanded={expandedLevels.has(level)}
               onToggle={() => toggleLevelExpanded(level)}
               compactView={compactView}
+              spellSaveDC={spellSaveDC}
               onSpellAction={handleSpellAction}
               favoriteSpells={favoriteSpells}
               onToggleFavorite={toggleSpellFavorite}

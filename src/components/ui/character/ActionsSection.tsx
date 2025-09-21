@@ -103,9 +103,10 @@ export default function ActionsSection({
   onStopConcentration,
 }: ActionsSectionProps) {
   const equippedWeapons = character.weapons.filter(weapon => weapon.isEquipped);
-  const actionSpells = character.spells.filter(spell => 
-    spell.isPrepared && 
-    (spell.castingTime?.includes('action') || spell.castingTime?.includes('reaction'))
+  const actionSpells = character.spells.filter(spell =>
+    spell.level === 0 || // All cantrips
+    spell.isPrepared || // Prepared spells
+    spell.isAlwaysPrepared // Always prepared spells
   );
 
   return (
