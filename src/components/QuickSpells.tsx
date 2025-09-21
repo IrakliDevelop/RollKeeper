@@ -65,13 +65,8 @@ export function QuickSpells({
       spell.isAlwaysPrepared // Always prepared spells
   );
 
-  // Filter spells that have actions (attack, save, or damage)
-  const actionSpells = quickAccessSpells.filter(
-    spell =>
-      spell.actionType === 'attack' ||
-      spell.actionType === 'save' ||
-      spell.damage // Include any spell with damage dice
-  );
+  // Show all prepared spells in quick access (not just action spells)
+  const actionSpells = quickAccessSpells;
 
   // Get spellcasting ability and modifiers
   const spellcastingAbility = getCharacterSpellcastingAbility(character);
@@ -335,37 +330,19 @@ export function QuickSpells({
                   </button>
                 )}
 
-                {spell.actionType === 'save' && (
-                  <button
-                    onClick={() => showSavingThrow(spell)}
-                    className="group flex transform items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-700 px-4 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:scale-105 hover:from-blue-700 hover:to-indigo-800 hover:shadow-lg"
-                  >
-                    <Shield
-                      size={16}
-                      className="transition-transform group-hover:scale-110"
-                    />
-                    {spell.savingThrow
-                      ? `${spell.savingThrow} Save`
-                      : 'Saving Throw'}
-                  </button>
-                )}
-
-                {spell.damage && (
-                  <button
-                    onClick={() => rollSpellDamage(spell)}
-                    className="group flex transform items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:scale-105 hover:from-amber-600 hover:to-orange-700 hover:shadow-lg"
-                    title="Roll spell damage"
-                  >
-                    <Zap size={16} className="group-hover:animate-pulse" />
-                    Damage
-                  </button>
-                )}
-
-                {spell.damage && (
-                  <div className="flex items-center gap-1 text-xs text-gray-600">
-                    <span className="rounded-lg border border-gray-300 bg-gradient-to-r from-gray-100 to-gray-200 px-3 py-1.5 font-medium shadow-sm">
-                      {spell.damage} {spell.damageType && `${spell.damageType}`}
-                    </span>
+                {/* Show spell info for reference */}
+                {(spell.actionType === 'save' || spell.damage) && (
+                  <div className="flex items-center gap-2 text-xs text-gray-600">
+                    {spell.actionType === 'save' && spell.savingThrow && (
+                      <span className="rounded-lg border border-blue-300 bg-gradient-to-r from-blue-100 to-blue-200 px-3 py-1.5 font-medium shadow-sm">
+                        {spell.savingThrow} Save DC {spellSaveDC}
+                      </span>
+                    )}
+                    {spell.damage && (
+                      <span className="rounded-lg border border-amber-300 bg-gradient-to-r from-amber-100 to-amber-200 px-3 py-1.5 font-medium shadow-sm">
+                        {spell.damage} {spell.damageType && `${spell.damageType}`}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
