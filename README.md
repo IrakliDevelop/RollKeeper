@@ -1,130 +1,165 @@
-# RollKeeper - D&D Character Sheet Web App
+# RollKeeper - Complete D&D Companion App
 
-A modern, web-based D&D character sheet application built with Next.js, featuring auto-save functionality, calculated fields, and an intuitive interface.
+A comprehensive, web-based Dungeons & Dragons companion application built with Next.js, featuring character management, combat tracking, campaign tools, and an intuitive interface designed for both players and Dungeon Masters.
 
-## 🎲 Project Overview
+## 🎲 What is RollKeeper?
 
-RollKeeper is designed to provide D&D players with a seamless character sheet experience that automatically calculates modifiers, saves progress, and provides a clean, D&D Beyond-inspired interface.
+RollKeeper is your all-in-one digital companion for Dungeons & Dragons. Whether you're a player managing multiple characters or a DM running campaigns, RollKeeper provides the tools you need to enhance your tabletop experience.
+
+### ✨ Key Features
+
+- **🎭 Character Management**: Create and manage multiple D&D characters with auto-calculating sheets
+- **⚔️ Combat Tracking**: Visual initiative tracker with drag-and-drop functionality
+- **📚 Campaign Tools**: Comprehensive DM toolset for session management and notes
+- **🐉 Monster Bestiary**: Access to creature database and stat blocks
+- **📖 Spell Management**: Complete spell tracking and quick-cast system
+- **🎲 Integrated Dice Rolling**: 3D dice with advantage/disadvantage support
+- **💾 Auto-Save**: Automatic character data persistence with visual feedback
+- **📱 Responsive Design**: Works seamlessly on desktop, tablet, and mobile
 
 ## 🚀 Tech Stack
 
 - **Framework**: Next.js 15.4.1 with App Router
-- **Language**: TypeScript
+- **Language**: TypeScript 5
 - **Styling**: Tailwind CSS 4
-- **UI Components**: Radix UI
-- **State Management**: Zustand (ready to implement)
-- **Form Handling**: React Hook Form (ready to implement)
-- **Validation**: Zod (ready to implement)
+- **UI Components**: Radix UI (accessible, unstyled components)
+- **State Management**: Zustand
+- **Form Handling**: React Hook Form with Zod validation
+- **Rich Text**: TipTap editor for notes and descriptions
+- **3D Dice**: @3d-dice/dice-box for immersive rolling
+- **Animations**: Framer Motion for smooth interactions
 - **Icons**: Lucide React
 
 ## 📁 Project Structure
 
 ```
 src/
-├── app/                 # Next.js 14+ App Router
-│   ├── layout.tsx       # Root layout
-│   ├── page.tsx         # Home page
-│   └── globals.css      # Global styles
-├── components/          # React components (to be created)
-│   ├── character/       # Character-specific components
-│   ├── ui/             # Reusable UI components
-│   └── layout/         # Layout components
-├── hooks/              # Custom React hooks (to be created)
-├── store/              # Zustand stores (to be created)
-├── types/              # TypeScript type definitions
-│   └── character.ts    # ✅ Core character interfaces
-├── utils/              # Utility functions
-│   ├── calculations.ts # ✅ D&D calculation functions
-│   └── constants.ts    # ✅ D&D game constants
+├── app/                    # Next.js App Router
+│   ├── page.tsx           # Landing page
+│   ├── player/            # Player tools and character management
+│   ├── dm/                # DM tools and campaign management
+│   ├── bestiary/          # Monster database
+│   ├── spellbook/         # Spell management
+│   ├── classes/           # Character class information
+│   └── api/               # API routes
+├── components/             # Reusable React components
+│   ├── character/         # Character sheet components
+│   ├── ui/                # Base UI components
+│   ├── layout/            # Layout and navigation
+│   └── dice/              # Dice rolling components
+├── hooks/                  # Custom React hooks
+├── store/                  # Zustand state management
+├── types/                  # TypeScript type definitions
+├── utils/                  # Utility functions and calculations
+└── styles/                 # Global styles and themes
 ```
 
-## ✅ Completed Setup (Stage 1)
+## 🎯 Current Features
 
-- [x] Next.js 15 project initialized with TypeScript
-- [x] Tailwind CSS configured
-- [x] Essential dependencies installed:
-  - Zustand for state management
-  - React Hook Form for form handling
-  - Zod for validation
-  - Radix UI components for accessible UI
-  - Lucide React for icons
-- [x] Project structure created
-- [x] TypeScript interfaces defined for character data
-- [x] D&D calculation functions implemented
-- [x] Game constants and mappings defined
-- [x] Enhanced .gitignore with project-specific entries
+### ✅ Implemented
 
-## 🔧 Available Scripts
+- **Landing Page**: Beautiful, responsive homepage with feature overview
+- **Character Management**: Full character creation and editing system
+- **Auto-Calculations**: Automatic stat calculations, modifiers, and proficiency bonuses
+- **Combat Tracking**: Visual initiative tracker with drag-and-drop
+- **Spell Management**: Complete spell system with damage rolling
+- **Monster Bestiary**: Creature database with search and filtering
+- **Rich Text Editor**: Notes, features, and traits with formatting
+- **3D Dice Rolling**: Immersive dice rolling with advantage/disadvantage
+- **Responsive Design**: Mobile-first design that works on all devices
+- **Auto-Save**: Automatic character data persistence
+- **Export/Import**: JSON-based character data portability
+
+### 🚧 In Development
+
+- **Campaign Management**: Session tracking and story progression
+- **Advanced Combat**: Initiative order management and turn tracking
+- **Spell Components**: Material and somatic component tracking
+- **Inventory System**: Equipment and item management
+- **Multiplayer Support**: Real-time character sharing (future)
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18+ 
+- npm or yarn package manager
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/rollkeeper.git
+   cd rollkeeper
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
+
+3. **Start the development server**
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
+
+4. **Open your browser**
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+### Available Scripts
 
 ```bash
-npm run dev          # Start development server
+npm run dev          # Start development server with Turbopack
 npm run build        # Build for production
 npm run start        # Start production server
 npm run lint         # Run ESLint
 npm run type-check   # TypeScript type checking
 ```
 
-## 🎯 Next Steps (Stage 2)
+## 🎮 How to Use
 
-The foundation is set! Next development stages include:
+### For Players
 
-1. **Basic Character Info Component** - Name, race, class, level input form
-2. **Ability Scores Component** - Six core abilities with auto-calculated modifiers
-3. **Zustand Store Implementation** - Character state management
-4. **LocalStorage Integration** - Data persistence
-5. **Auto-save Functionality** - Debounced saving with visual feedback
+1. **Access Player Dashboard**: Click "Player Dashboard" from the main page
+2. **Create Characters**: Build new characters with the intuitive character builder
+3. **Manage Sheets**: Edit character details, stats, and abilities
+4. **Track Resources**: Monitor spells, hit points, and character progression
+5. **Roll Dice**: Use the integrated 3D dice system for all your rolls
 
-## 🧠 Key Features Planned
+### For Dungeon Masters
 
-- **Auto-calculated Modifiers**: Automatic calculation of skill modifiers, saving throws, and other derived values
-- **Real-time Auto-save**: Changes saved automatically with visual feedback
-- **Export/Import**: JSON-based character data portability
-- **Responsive Design**: Works seamlessly on desktop, tablet, and mobile
-- **Accessibility**: Full keyboard navigation and screen reader support
+1. **Access DM Toolset**: Click "DM Toolset" from the main page
+2. **Manage Campaigns**: Organize sessions, notes, and story progression
+3. **Track Combat**: Use the visual initiative tracker for smooth combat
+4. **Access Bestiary**: Search and reference monster stat blocks
+5. **Import Characters**: Manage player character sheets
 
-## 🚀 Getting Started
+## 🔧 Configuration
 
-1. The project is already set up and running!
-2. Access the development server at: `http://localhost:3000`
-3. Begin implementing components as outlined in the TODO.md plan
+### Environment Variables
 
-## 📊 Current Status
+Create a `.env.local` file in the root directory:
 
-**Stage 1 Complete** ✅ - Project foundation established
-- Development environment ready
-- TypeScript types defined
-- Calculation utilities implemented  
-- Project structure organized
+```env
+# Optional: Database connection (for future features)
+DATABASE_URL=your_database_url_here
 
-**Ready for Stage 2** 🚧 - Core character data implementation
+# Optional: Authentication (for future features)
+NEXTAUTH_SECRET=your_secret_here
+NEXTAUTH_URL=http://localhost:3000
+```
 
----
+### Tailwind CSS
 
-## 📝 Notes
+The project uses Tailwind CSS 4 with custom configurations. Styles are automatically processed and optimized.
 
-- All D&D 5e calculations are implemented following official rules
-- 18 skills with proper ability associations defined
-- Proficiency bonus progression (levels 1-20) included
-- Character export format designed for future compatibility
+## 📱 Browser Support
 
-For detailed development plans and feature specifications, see `TODO.md`.
-
-## 🔧 Recent Improvements
-
-### Modal Portal System
-- **Fixed modal rendering issues**: Implemented React Portal system for all modals (weapon management, spell management, confirmation dialogs)
-- **Full-page backdrop blur**: Modals now properly blur the entire page instead of just their parent containers
-- **No more clipping**: Modals are rendered at the document body level, preventing parent container CSS from causing clipping issues
-- **Improved accessibility**: Added proper body scroll management when modals are open
-
-### Enhanced Quick Spells Action System
-- **Added damage roll functionality**: Spells with damage dice now have dedicated damage roll buttons
-- **Expanded spell filtering**: QuickSpells now includes utility spells with damage, not just attack/save spells
-- **Consistent UI patterns**: Damage roll buttons match the styling of weapon damage rolls for consistency
-- **Automatic damage calculation**: Uses the same `rollDamage` utility as weapons for accurate dice rolling
-
-### Notes Section & Rich Text Editor Improvements
-- **Added Notes section**: New dedicated notes area using the same interface as Features and Traits
-- **Fixed rich text editor**: Lists (bullet/numbered) and headers (H1/H2) now work properly
-- **Improved text rendering**: Consistent styling for rich text content across all editors
-- **Better extension configuration**: Explicit TipTap extension setup resolves formatting conflicts
+- Chrome 90+
+- Firefox 88+
+- Safari 14+
+- Edge 90+

@@ -1,6 +1,30 @@
 // Basic character types for D&D 5e character sheet
-export type AbilityName = 'strength' | 'dexterity' | 'constitution' | 'intelligence' | 'wisdom' | 'charisma';
-export type SkillName = 'acrobatics' | 'animalHandling' | 'arcana' | 'athletics' | 'deception' | 'history' | 'insight' | 'intimidation' | 'investigation' | 'medicine' | 'nature' | 'perception' | 'performance' | 'persuasion' | 'religion' | 'sleightOfHand' | 'stealth' | 'survival';
+export type AbilityName =
+  | 'strength'
+  | 'dexterity'
+  | 'constitution'
+  | 'intelligence'
+  | 'wisdom'
+  | 'charisma';
+export type SkillName =
+  | 'acrobatics'
+  | 'animalHandling'
+  | 'arcana'
+  | 'athletics'
+  | 'deception'
+  | 'history'
+  | 'insight'
+  | 'intimidation'
+  | 'investigation'
+  | 'medicine'
+  | 'nature'
+  | 'perception'
+  | 'performance'
+  | 'persuasion'
+  | 'religion'
+  | 'sleightOfHand'
+  | 'stealth'
+  | 'survival';
 
 import type { SpellbookState } from './spells';
 
@@ -33,7 +57,7 @@ export type HPCalculationMode = 'auto' | 'manual';
 // Death Saving Throws
 export interface DeathSavingThrows {
   successes: number; // 0-3
-  failures: number;  // 0-3
+  failures: number; // 0-3
   isStabilized: boolean;
 }
 
@@ -118,6 +142,52 @@ export interface TrackableTrait {
   updatedAt: string;
 }
 
+// Extended feature source types
+export type FeatureSourceType = 
+  | 'class'        // Class features (e.g., Action Surge, Sneak Attack)
+  | 'race'         // Racial features (e.g., Darkvision, Breath Weapon)
+  | 'feat'         // Feat abilities (e.g., Great Weapon Master, Lucky)
+  | 'background'   // Background features (e.g., Criminal Contact)
+  | 'magic-item'   // Magic item abilities
+  | 'other';       // Custom/miscellaneous features
+
+// Extended feature interface that builds upon TrackableTrait
+export interface ExtendedFeature extends TrackableTrait {
+  sourceType: FeatureSourceType;
+  sourceDetail?: string; // e.g., "Fighter Level 2", "Hill Dwarf", "Winged Boots"
+  category?: string; // Custom categorization within source type
+  displayOrder: number; // For drag & drop ordering within categories
+  isPassive?: boolean; // True for passive abilities (no usage tracking)
+}
+
+// Feature category grouping for UI organization
+export interface FeatureCategory {
+  sourceType: FeatureSourceType;
+  label: string;
+  description: string;
+  features: ExtendedFeature[];
+  isCollapsed?: boolean;
+}
+
+// Constants for feature source types
+export const FEATURE_SOURCE_LABELS: Record<FeatureSourceType, string> = {
+  class: 'Class Features',
+  race: 'Racial Features', 
+  feat: 'Feats',
+  background: 'Background Features',
+  'magic-item': 'Magic Items',
+  other: 'Other/Custom',
+};
+
+export const FEATURE_SOURCE_DESCRIPTIONS: Record<FeatureSourceType, string> = {
+  class: 'Abilities gained from your character class and level',
+  race: 'Traits and abilities from your character\'s race and subrace',
+  feat: 'Special abilities gained from feats',
+  background: 'Features from your character\'s background',
+  'magic-item': 'Abilities granted by magic items and equipment',
+  other: 'Custom or miscellaneous abilities',
+};
+
 // Warlock pact magic slots
 export interface PactMagic {
   slots: SpellSlot;
@@ -185,10 +255,52 @@ export interface ClassInfo {
   hitDie: number; // d6, d8, d10, d12 - the size of the hit die for this class
 }
 
+// Multiclass information for individual classes
+export interface MulticlassInfo {
+  className: string;
+  level: number;
+  isCustom: boolean;
+  spellcaster?: 'full' | 'half' | 'third' | 'warlock' | 'none';
+  hitDie: number; // d6, d8, d10, d12 - the size of the hit die for this class
+  subclass?: string; // Optional subclass name
+}
+
+// Multiclass validation result
+export interface MulticlassValidation {
+  valid: boolean;
+  errors: string[];
+  warnings?: string[];
+}
+
+
 // Weapon and magic item types
 export type WeaponCategory = 'simple' | 'martial' | 'magic' | 'artifact';
-export type WeaponType = 'melee' | 'ranged' | 'finesse' | 'versatile' | 'light' | 'heavy' | 'reach' | 'thrown' | 'ammunition' | 'loading' | 'special';
-export type DamageType = 'acid' | 'bludgeoning' | 'cold' | 'fire' | 'force' | 'lightning' | 'necrotic' | 'piercing' | 'poison' | 'psychic' | 'radiant' | 'slashing' | 'thunder';
+export type WeaponType =
+  | 'melee'
+  | 'ranged'
+  | 'finesse'
+  | 'versatile'
+  | 'light'
+  | 'heavy'
+  | 'reach'
+  | 'thrown'
+  | 'ammunition'
+  | 'loading'
+  | 'special';
+export type DamageType =
+  | 'acid'
+  | 'bludgeoning'
+  | 'cold'
+  | 'fire'
+  | 'force'
+  | 'lightning'
+  | 'necrotic'
+  | 'piercing'
+  | 'poison'
+  | 'psychic'
+  | 'radiant'
+  | 'slashing'
+  | 'thunder';
 
 // Weapon damage entry for multiple damage types
 export interface WeaponDamage {
@@ -230,8 +342,25 @@ export interface Weapon {
 }
 
 // Magic item categories and types
-export type MagicItemCategory = 'wondrous' | 'armor' | 'shield' | 'ring' | 'staff' | 'wand' | 'rod' | 'scroll' | 'potion' | 'artifact' | 'other';
-export type MagicItemRarity = 'common' | 'uncommon' | 'rare' | 'very rare' | 'legendary' | 'artifact';
+export type MagicItemCategory =
+  | 'wondrous'
+  | 'armor'
+  | 'shield'
+  | 'ring'
+  | 'staff'
+  | 'wand'
+  | 'rod'
+  | 'scroll'
+  | 'potion'
+  | 'artifact'
+  | 'other';
+export type MagicItemRarity =
+  | 'common'
+  | 'uncommon'
+  | 'rare'
+  | 'very rare'
+  | 'legendary'
+  | 'artifact';
 
 // Magic item interface
 export interface MagicItem {
@@ -261,7 +390,21 @@ export interface AttunementSlots {
 
 // Armor types and interfaces
 export type ArmorCategory = 'light' | 'medium' | 'heavy' | 'shield';
-export type ArmorType = 'padded' | 'leather' | 'studded-leather' | 'hide' | 'chain-shirt' | 'scale-mail' | 'breastplate' | 'half-plate' | 'ring-mail' | 'chain-mail' | 'splint' | 'plate' | 'shield' | 'custom';
+export type ArmorType =
+  | 'padded'
+  | 'leather'
+  | 'studded-leather'
+  | 'hide'
+  | 'chain-shirt'
+  | 'scale-mail'
+  | 'breastplate'
+  | 'half-plate'
+  | 'ring-mail'
+  | 'chain-mail'
+  | 'splint'
+  | 'plate'
+  | 'shield'
+  | 'custom';
 
 export interface ArmorItem {
   id: string;
@@ -311,19 +454,28 @@ export interface Currency {
 
 // Main character state interface
 export interface CharacterState {
+  id: string;
   // Basic Information
   name: string;
   race: string;
-  class: ClassInfo;
-  level: number;
+  
+  // Multiclass Support (new)
+  classes?: MulticlassInfo[]; // Array of classes for multiclass characters
+  totalLevel?: number; // Sum of all class levels
+  hitDicePools?: HitDicePools; // Hit dice pools by die type
+  
+  // Backwards Compatibility (deprecated but maintained)
+  class: ClassInfo; // Single class info (for backwards compatibility)
+  level: number; // Total character level (for backwards compatibility)
+  
   experience: number;
   background: string;
   alignment: string;
   playerName: string;
-  
+
   // Ability Scores
   abilities: CharacterAbilities;
-  
+
   // Skills (all 18 D&D skills)
   skills: {
     acrobatics: SkillProficiency;
@@ -345,7 +497,7 @@ export interface CharacterState {
     stealth: SkillProficiency;
     survival: SkillProficiency;
   };
-  
+
   // Combat Stats
   hitPoints: HitPoints;
   armorClass: number;
@@ -355,8 +507,8 @@ export interface CharacterState {
   initiative: InitiativeData;
   reaction: ReactionData;
   speed: number;
-  hitDice: string; // e.g., "1d8", "2d6"
-  
+  hitDice: string; // e.g., "1d8", "2d6" (for backwards compatibility)
+
   // Saving Throws
   savingThrows: {
     strength: SavingThrowProficiency;
@@ -376,6 +528,9 @@ export interface CharacterState {
 
   // Trackable Traits
   trackableTraits: TrackableTrait[];
+
+  // Extended Features (new system)
+  extendedFeatures: ExtendedFeature[];
 
   // Rich Text Content
   features: RichTextContent[];
@@ -431,7 +586,7 @@ export interface CharacterExport {
 }
 
 // Save state type
-export type SaveStatus = 'saving' | 'saved' | 'error'; 
+export type SaveStatus = 'saving' | 'saved' | 'error';
 
 // Exhaustion variants (2014 vs 2024)
 export type ExhaustionVariant = '2014' | '2024';
@@ -448,7 +603,7 @@ export interface ActiveCondition {
   notes?: string; // Optional player notes
 }
 
-// Active disease tracking  
+// Active disease tracking
 export interface ActiveDisease {
   id: string;
   name: string;
@@ -464,7 +619,7 @@ export interface ConditionsDiseasesState {
   activeConditions: ActiveCondition[];
   activeDiseases: ActiveDisease[];
   exhaustionVariant: ExhaustionVariant; // Player's preference for exhaustion rules
-} 
+}
 
 // Raw JSON data types for conditions/diseases
 export interface RawConditionEntry {
@@ -538,4 +693,76 @@ export interface ProcessedStatus {
   name: string;
   source: string;
   description: string;
-} 
+}
+
+// Utility functions for extended features
+export function migrateTraitToExtendedFeature(trait: TrackableTrait, index: number): ExtendedFeature {
+  return {
+    ...trait,
+    sourceType: 'other' as const,
+    sourceDetail: trait.source || undefined,
+    displayOrder: index,
+    isPassive: trait.maxUses === 0,
+  };
+}
+
+export function groupFeaturesBySource(features: ExtendedFeature[]): FeatureCategory[] {
+  const grouped = features.reduce((acc, feature) => {
+    if (!acc[feature.sourceType]) {
+      acc[feature.sourceType] = [];
+    }
+    acc[feature.sourceType].push(feature);
+    return acc;
+  }, {} as Record<FeatureSourceType, ExtendedFeature[]>);
+
+  return Object.entries(grouped).map(([sourceType, features]) => ({
+    sourceType: sourceType as FeatureSourceType,
+    label: FEATURE_SOURCE_LABELS[sourceType as FeatureSourceType],
+    description: FEATURE_SOURCE_DESCRIPTIONS[sourceType as FeatureSourceType],
+    features: features.sort((a, b) => a.displayOrder - b.displayOrder),
+    isCollapsed: false,
+  }));
+}
+
+export function createDefaultExtendedFeature(
+  sourceType: FeatureSourceType = 'other'
+): Omit<ExtendedFeature, 'id' | 'createdAt' | 'updatedAt'> {
+  return {
+    name: '',
+    description: '',
+    maxUses: 1,
+    usedUses: 0,
+    restType: 'long',
+    source: '',
+    sourceType,
+    sourceDetail: '',
+    category: '',
+    displayOrder: 0,
+    isPassive: false,
+    scaleWithProficiency: false,
+    proficiencyMultiplier: 1,
+  };
+}
+
+// Multiclassing types
+export interface MulticlassInfo {
+  className: string;
+  level: number;
+  isCustom: boolean;
+  spellcaster?: 'full' | 'half' | 'third' | 'warlock' | 'none';
+  hitDie: number;
+  subclass?: string;
+}
+
+export interface HitDicePools {
+  [key: string]: {
+    max: number;
+    used: number;
+  };
+}
+
+export interface MulticlassValidation {
+  valid: boolean;
+  errors: string[];
+  warnings?: string[];
+}

@@ -9,16 +9,16 @@ interface UseAutoSaveOptions {
 
 export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
   const { delay = AUTOSAVE_DELAY, enabled = true } = options;
-  
+
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialMount = useRef(true);
-  
-  const { 
-    hasUnsavedChanges, 
-    saveStatus, 
-    saveCharacter, 
-    setSaveStatus, 
-    markSaved 
+
+  const {
+    hasUnsavedChanges,
+    saveStatus,
+    saveCharacter,
+    setSaveStatus,
+    markSaved,
   } = useCharacterStore();
 
   // Debounced save function
@@ -43,7 +43,14 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
         setSaveStatus('error');
       }
     }, delay);
-  }, [enabled, hasUnsavedChanges, delay, saveCharacter, setSaveStatus, markSaved]);
+  }, [
+    enabled,
+    hasUnsavedChanges,
+    delay,
+    saveCharacter,
+    setSaveStatus,
+    markSaved,
+  ]);
 
   // Manual save function (for Ctrl+S, etc.)
   const manualSave = useCallback(() => {
@@ -56,7 +63,7 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
     }
 
     setSaveStatus('saving');
-    
+
     try {
       saveCharacter();
       setSaveStatus('saved');
@@ -98,7 +105,7 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
@@ -112,7 +119,7 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
         }
-        
+
         // Attempt immediate save
         try {
           saveCharacter();
@@ -128,7 +135,7 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
-    
+
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
@@ -142,7 +149,7 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
         }
-        
+
         try {
           saveCharacter();
           markSaved();
@@ -153,7 +160,7 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -163,6 +170,6 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
     saveStatus,
     hasUnsavedChanges,
     manualSave,
-    isAutoSaveEnabled: enabled
+    isAutoSaveEnabled: enabled,
   };
-}; 
+};
