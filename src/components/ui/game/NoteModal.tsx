@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Edit3, Save, Eye, Trash2 } from 'lucide-react';
 import { RichTextContent } from '@/types/character';
 import { ModalPortal } from '@/components/ui/feedback';
 import { RichTextEditor } from '@/components/ui/forms';
 import { RichTextRenderer } from '@/components/ui/utils';
+import { ToastData } from '@/components/ui/feedback/Toast';
 
 interface NoteModalProps {
   note: RichTextContent | null;
@@ -13,6 +14,7 @@ interface NoteModalProps {
   onClose: () => void;
   onUpdate: (id: string, updates: Partial<RichTextContent>) => void;
   onDelete: (id: string) => void;
+  onAddToast?: (toast: Omit<ToastData, 'id'>) => void;
 }
 
 export default function NoteModal({
@@ -21,26 +23,35 @@ export default function NoteModal({
   onClose,
   onUpdate,
   onDelete,
+  onAddToast,
 }: NoteModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
   const [initialNoteId, setInitialNoteId] = useState<string | null>(null);
+  const isSavingRef = useRef(false);
 
   // Reset editing state when modal opens/closes or when a different note is selected
   useEffect(() => {
     if (note && isOpen) {
-      if (!initialNoteId || initialNoteId !== note.id || !isEditing) {
+      // Only reset if it's a different note or the modal is opening for the first time
+      // Don't reset if we're currently saving to prevent overwriting user changes
+      if ((!initialNoteId || initialNoteId !== note.id) && !isSavingRef.current) {
         setEditTitle(note.title);
         setEditContent(note.content);
         setIsEditing(false);
         setInitialNoteId(note.id);
       }
+      // Reset the saving flag after the note has been updated
+      if (isSavingRef.current && initialNoteId === note.id) {
+        isSavingRef.current = false;
+      }
     } else if (!isOpen) {
       setInitialNoteId(null);
       setIsEditing(false);
+      isSavingRef.current = false;
     }
-  }, [note?.id, isOpen, initialNoteId, isEditing]);
+  }, [note, isOpen, initialNoteId]);
 
   const handleSave = () => {
     if (!note) return;
@@ -48,11 +59,27 @@ export default function NoteModal({
     const trimmedTitle = editTitle.trim();
     if (!trimmedTitle) return;
 
+    // Set saving flag to prevent useEffect from resetting our changes
+    isSavingRef.current = true;
+    
     onUpdate(note.id, {
       title: trimmedTitle,
       content: editContent,
     });
     setIsEditing(false);
+    
+    // Show success toast
+    if (onAddToast) {
+      onAddToast({
+        type: 'success',
+        title: '✅ Note Saved',
+        message: `"${trimmedTitle}" has been saved successfully`,
+        duration: 3000,
+      });
+    }
+    
+    // Close the modal after saving
+    onClose();
   };
 
   const handleCancel = () => {

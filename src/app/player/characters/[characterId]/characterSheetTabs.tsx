@@ -10,6 +10,7 @@ import CurrencyManager from '@/components/ui/game/CurrencyManager';
 import { SpellcastingStats } from '@/components/SpellcastingStats';
 import { EnhancedSpellManagement } from '@/components/EnhancedSpellManagement';
 import EquipmentSection from '@/components/ui/character/EquipmentSection';
+import { ToastData } from '@/components/ui/feedback/Toast';
 import {
   CharacterState,
   RichTextContent,
@@ -36,6 +37,7 @@ interface CharacterSheetTabsConfig {
   updateNote: (id: string, updates: Partial<RichTextContent>) => void;
   deleteNote: (id: string) => void;
   reorderNotes: (sourceIndex: number, destinationIndex: number) => void;
+  addToast: (toast: Omit<ToastData, 'id'>) => void;
 }
 
 export const createCharacterSheetTabsConfig = ({
@@ -52,6 +54,7 @@ export const createCharacterSheetTabsConfig = ({
   updateNote,
   deleteNote,
   reorderNotes,
+  addToast,
 }: CharacterSheetTabsConfig) => [
   {
     id: 'combat-magic',
@@ -309,6 +312,7 @@ export const createCharacterSheetTabsConfig = ({
                   onUpdate={updateNote}
                   onDelete={deleteNote}
                   onReorder={reorderNotes}
+                  onAddToast={addToast}
                 />
               </ErrorBoundary>
             </div>

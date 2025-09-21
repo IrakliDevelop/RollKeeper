@@ -5,6 +5,7 @@ import { Plus, Edit3, Trash2, Save, X, BookOpen, PenTool } from 'lucide-react';
 import { RichTextContent } from '@/types/character';
 import { RichTextEditor } from '@/components/ui/forms';
 import { RichTextRenderer } from '@/components/ui/utils';
+import { ToastData } from '@/components/ui/feedback/Toast';
 import NoteModal from './NoteModal';
 import DragDropList from '@/components/ui/layout/DragDropList';
 
@@ -16,6 +17,7 @@ interface NotesManagerProps {
   onUpdate: (id: string, updates: Partial<RichTextContent>) => void;
   onDelete: (id: string) => void;
   onReorder?: (sourceIndex: number, destinationIndex: number) => void;
+  onAddToast?: (toast: Omit<ToastData, 'id'>) => void;
   className?: string;
 }
 
@@ -25,6 +27,7 @@ export default function NotesManager({
   onUpdate,
   onDelete,
   onReorder,
+  onAddToast,
   className = '',
 }: NotesManagerProps) {
   // Safety guard to ensure items is always an array
@@ -361,6 +364,7 @@ export default function NotesManager({
         onClose={handleCloseModal}
         onUpdate={onUpdate}
         onDelete={onDelete}
+        onAddToast={onAddToast}
       />
     </div>
   );
