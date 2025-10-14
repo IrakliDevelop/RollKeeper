@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
+import { HeaderAuthButton } from '@/components/ui/auth/AuthButton';
 
 export const metadata: Metadata = {
   title: 'DM Toolset - RollKeeper',
@@ -18,32 +19,35 @@ export default function DMLayout({ children }: { children: React.ReactNode }) {
               <h1 className="text-xl font-bold">DM Toolset</h1>
               <span className="ml-2 text-sm text-purple-200">RollKeeper</span>
             </div>
-            <nav className="hidden space-x-6 md:flex">
-              <Link
-                href="/dm"
-                className="transition-colors hover:text-purple-200"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/dm/campaigns"
-                className="transition-colors hover:text-purple-200"
-              >
-                Campaigns
-              </Link>
-              <Link
-                href="/dm/settings"
-                className="transition-colors hover:text-purple-200"
-              >
-                Settings
-              </Link>
-              <Link
-                href="/player"
-                className="transition-colors hover:text-purple-200"
-              >
-                Character Sheets
-              </Link>
-            </nav>
+            <div className="flex items-center space-x-6">
+              <nav className="hidden space-x-6 md:flex">
+                <Link
+                  href="/dm"
+                  className="transition-colors hover:text-purple-200"
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  href="/dm/campaigns"
+                  className="transition-colors hover:text-purple-200"
+                >
+                  Campaigns
+                </Link>
+                <Link
+                  href="/dm/settings"
+                  className="transition-colors hover:text-purple-200"
+                >
+                  DM Settings
+                </Link>
+                <Link
+                  href="/player"
+                  className="transition-colors hover:text-purple-200"
+                >
+                  Character Sheets
+                </Link>
+              </nav>
+              <HeaderAuthButton />
+            </div>
           </div>
         </div>
       </header>
