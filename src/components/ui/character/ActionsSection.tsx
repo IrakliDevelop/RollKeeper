@@ -104,8 +104,8 @@ export default function ActionsSection({
 }: ActionsSectionProps) {
   const equippedWeapons = character.weapons.filter(weapon => weapon.isEquipped);
   const actionSpells = character.spells.filter(spell =>
-    spell.level === 0 || // All cantrips
-    spell.isPrepared || // Prepared spells
+    (spell.level === 0 && spell.isPrepared) || // Only prepared cantrips
+    (spell.level > 0 && spell.isPrepared) || // Prepared spells
     spell.isAlwaysPrepared // Always prepared spells
   );
 

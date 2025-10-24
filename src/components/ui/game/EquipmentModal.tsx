@@ -348,15 +348,14 @@ export default function EquipmentModal({
       isOpen={isOpen}
       onClose={handleCloseModal}
       title={`⚔️ Equipment & Magic Items (Attunement: ${totalAttuned}/${character.attunementSlots.max})`}
-      size="full"
+      size="xl"
       closeOnBackdropClick={true}
     >
 
           {/* Show forms if active, otherwise show main content */}
           {showWeaponForm ? (
-            <div className="max-h-[calc(90vh-120px)] overflow-y-auto p-6">
-              <div className="mx-auto max-w-2xl">
-                <h3 className="mb-4 text-xl font-bold text-gray-800">
+            <div className="space-y-4">
+                <h3 className="text-xl font-bold text-gray-800">
                   {editingWeapon ? 'Edit Weapon' : 'Add Weapon'}
                 </h3>
 
@@ -703,12 +702,10 @@ export default function EquipmentModal({
                     {editingWeapon ? 'Update' : 'Add'} Weapon
                   </button>
                 </div>
-              </div>
             </div>
           ) : showMagicItemForm ? (
-            <div className="max-h-[calc(90vh-120px)] overflow-y-auto p-6">
-              <div className="mx-auto max-w-2xl">
-                <h3 className="mb-4 text-xl font-bold text-gray-800">
+            <div className="space-y-4">
+                <h3 className="text-xl font-bold text-gray-800">
                   {editingMagicItem ? 'Edit Magic Item' : 'Add Magic Item'}
                 </h3>
 
@@ -865,11 +862,10 @@ export default function EquipmentModal({
                     {editingMagicItem ? 'Update' : 'Add'} Item
                   </button>
                 </div>
-              </div>
             </div>
           ) : (
             // Main equipment view
-            <div className="grid max-h-[calc(90vh-120px)] grid-cols-1 gap-6 overflow-y-auto p-6 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {/* Weapons Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -886,7 +882,7 @@ export default function EquipmentModal({
                   </button>
                 </div>
 
-                <div className="max-h-96 space-y-3 overflow-y-auto">
+                <div className="space-y-3">
                   {character.weapons.length === 0 ? (
                     <div className="py-8 text-center text-gray-500">
                       <Sword className="mx-auto mb-2 h-12 w-12 text-gray-300" />
@@ -1025,7 +1021,7 @@ export default function EquipmentModal({
                   </button>
                 </div>
 
-                <div className="max-h-96 space-y-3 overflow-y-auto">
+                <div className="space-y-3">
                   {character.magicItems.length === 0 ? (
                     <div className="py-8 text-center text-gray-500">
                       <Wand2 className="mx-auto mb-2 h-12 w-12 text-gray-300" />

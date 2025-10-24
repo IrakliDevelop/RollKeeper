@@ -21,6 +21,8 @@ import {
   ExhaustionVariant,
   WeaponDamage,
   DamageType,
+  ToolProficiency,
+  Language,
 } from '@/types/character';
 import { ProcessedSpell } from '@/types/spells';
 import {
@@ -394,8 +396,7 @@ interface CharacterStore {
   // Hit dice management
   useHitDie: (dieType: string, count?: number) => void;
   restoreHitDice: (dieType: string, count?: number) => void;
-  resetAllHitDice: () => void; // Long rest - restore all hit dice
-  resetHalfHitDice: () => void; // Long rest - restore half hit dice (optional rule)
+  resetAllHitDice: () => void; // Long rest - restore all hit dice (D&D 2024 rules)
 
   // Concentration management
   startConcentration: (
@@ -480,6 +481,19 @@ interface CharacterStore {
     sourceType?: string
   ) => void;
   migrateTraitsToExtendedFeatures: () => void;
+
+  // Language management
+  addLanguage: (language: Omit<Language, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  deleteLanguage: (id: string) => void;
+
+  // Tool proficiency management
+  addToolProficiency: (tool: Omit<ToolProficiency, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateToolProficiency: (id: string, updates: Partial<ToolProficiency>) => void;
+  deleteToolProficiency: (id: string) => void;
+
+  // Rest management (centralized)
+  takeShortRest: () => void; // Resets all short rest abilities, pact magic, reaction
+  takeLongRest: () => void; // Resets everything: all abilities, all spell slots, hit dice, HP, etc.
 
   updateCharacterBackground: (updates: Partial<CharacterBackground>) => void;
 
@@ -2488,6 +2502,217 @@ export const useCharacterStore = create<CharacterStore>()(
             character: {
               ...state.character,
               extendedFeatures: migratedFeatures,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      // Language management
+      addLanguage: (language: Omit<Language, 'id' | 'createdAt' | 'updatedAt'>) => {
+        set(state => {
+          const newLanguage: Language = {
+            ...language,
+            id: generateId(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          return {
+            character: {
+              ...state.character,
+              languages: [...(state.character.languages || []), newLanguage],
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      deleteLanguage: (id: string) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            languages: (state.character.languages || []).filter(lang => lang.id !== id),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      // Tool proficiency management
+      addToolProficiency: (tool: Omit<ToolProficiency, 'id' | 'createdAt' | 'updatedAt'>) => {
+        set(state => {
+          const newTool: ToolProficiency = {
+            ...tool,
+            id: generateId(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          return {
+            character: {
+              ...state.character,
+              toolProficiencies: [...(state.character.toolProficiencies || []), newTool],
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      updateToolProficiency: (id: string, updates: Partial<ToolProficiency>) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            toolProficiencies: (state.character.toolProficiencies || []).map(tool =>
+              tool.id === id
+                ? { ...tool, ...updates, updatedAt: new Date().toISOString() }
+                : tool
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      deleteToolProficiency: (id: string) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            toolProficiencies: (state.character.toolProficiencies || []).filter(tool => tool.id !== id),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      // Rest management (centralized)
+      takeShortRest: () => {
+        set(state => {
+          const { character } = state;
+          
+          // Reset short rest abilities (trackableTraits and extendedFeatures)
+          const resetTrackableTraits = character.trackableTraits.map(trait =>
+            trait.restType === 'short'
+              ? { ...trait, usedUses: 0 }
+              : trait
+          );
+
+          const resetExtendedFeatures = character.extendedFeatures.map(feature =>
+            feature.restType === 'short' && !feature.isPassive
+              ? { ...feature, usedUses: 0 }
+              : feature
+          );
+
+          // Reset Pact Magic slots (if Warlock)
+          let resetPactMagic = character.pactMagic;
+          if (resetPactMagic) {
+            resetPactMagic = {
+              ...resetPactMagic,
+              slots: {
+                ...resetPactMagic.slots,
+                used: 0,
+              },
+            };
+          }
+
+          // Reset reaction
+          const resetReaction = {
+            hasUsedReaction: false,
+          };
+
+          return {
+            character: {
+              ...character,
+              trackableTraits: resetTrackableTraits,
+              extendedFeatures: resetExtendedFeatures,
+              pactMagic: resetPactMagic,
+              reaction: resetReaction,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      takeLongRest: () => {
+        set(state => {
+          const { character } = state;
+          
+          // Reset ALL abilities (both short and long rest)
+          const resetTrackableTraits = character.trackableTraits.map(trait => ({
+            ...trait,
+            usedUses: 0,
+          }));
+
+          const resetExtendedFeatures = character.extendedFeatures.map(feature =>
+            feature.isPassive
+              ? feature
+              : { ...feature, usedUses: 0 }
+          );
+
+          // Reset ALL spell slots
+          const resetSpellSlots = { ...character.spellSlots };
+          for (let level = 1; level <= 9; level++) {
+            const slot = character.spellSlots[level as keyof SpellSlots];
+            if (slot) {
+              resetSpellSlots[level as keyof SpellSlots] = {
+                ...slot,
+                used: 0,
+              };
+            }
+          }
+
+          // Reset Pact Magic slots (if Warlock)
+          let resetPactMagic = character.pactMagic;
+          if (resetPactMagic) {
+            resetPactMagic = {
+              ...resetPactMagic,
+              slots: {
+                ...resetPactMagic.slots,
+                used: 0,
+              },
+            };
+          }
+
+          // Reset ALL hit dice
+          const resetHitDicePools = { ...character.hitDicePools };
+          Object.keys(resetHitDicePools).forEach(dieType => {
+            resetHitDicePools[dieType] = {
+              ...resetHitDicePools[dieType],
+              used: 0,
+            };
+          });
+
+          // Reset HP to max (remove temp HP, heal to full)
+          const resetHitPoints = {
+            ...character.hitPoints,
+            current: character.hitPoints.max,
+            temporary: 0,
+            deathSaves: undefined, // Clear death saves
+          };
+
+          // Reset reaction
+          const resetReaction = {
+            hasUsedReaction: false,
+          };
+
+          // Reset temp AC
+          const resetTempArmorClass = 0;
+
+          return {
+            character: {
+              ...character,
+              trackableTraits: resetTrackableTraits,
+              extendedFeatures: resetExtendedFeatures,
+              spellSlots: resetSpellSlots,
+              pactMagic: resetPactMagic,
+              hitDicePools: resetHitDicePools,
+              hitPoints: resetHitPoints,
+              reaction: resetReaction,
+              tempArmorClass: resetTempArmorClass,
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',

@@ -84,12 +84,12 @@ export function Modal({
       <div className="flex min-h-full items-center justify-center p-4">
         <div
           ref={modalRef}
-          className={`relative w-full ${sizeClasses[size]} max-h-[90vh] transform overflow-hidden rounded-xl bg-white shadow-2xl transition-all duration-300 ${className} `}
+          className={`relative w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col transform rounded-xl bg-white shadow-2xl transition-all duration-300 ${className} `}
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
           {(title || showCloseButton) && (
-            <div className="flex items-center justify-between border-b border-gray-200 p-6">
+            <div className="flex items-center justify-between border-b border-gray-200 p-6 flex-shrink-0">
               {title && (
                 <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
               )}
@@ -105,8 +105,8 @@ export function Modal({
             </div>
           )}
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6">{children}</div>
+          {/* Content - Scrollable area with default padding */}
+          <div className="flex-1 overflow-y-auto min-h-0 p-6">{children}</div>
         </div>
       </div>
     </div>,

@@ -147,6 +147,12 @@ const SpellCard: React.FC<{
         <span>{spell.castingTime}</span>
         <span>•</span>
         <span>{spell.range}</span>
+        {spell.duration && (
+          <>
+            <span>•</span>
+            <span>{spell.duration}</span>
+          </>
+        )}
         {spell.concentration && (
           <>
             <span>•</span>
@@ -273,11 +279,11 @@ export function EnhancedQuickSpells({
   const spellAttackBonus = calculateSpellAttackBonus(character);
   const spellSaveDC = calculateSpellSaveDC(character);
 
-  // Get all available spells for quick access
+  // Get all available spells for quick access (prepared cantrips + prepared spells)
   const quickAccessSpells = character.spells.filter(
     spell =>
-      spell.level === 0 || // All cantrips
-      spell.isPrepared || // Prepared spells
+      (spell.level === 0 && spell.isPrepared) || // Only prepared cantrips
+      (spell.level > 0 && spell.isPrepared) || // Prepared spells
       spell.isAlwaysPrepared // Always prepared spells
   );
 

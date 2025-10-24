@@ -22,6 +22,7 @@ import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
 import CharacterSheetHeader from '@/components/ui/character/CharacterSheetHeader';
 import CharacterBasicInfo from '@/components/ui/character/CharacterBasicInfo';
 import HitDiceTracker from '@/components/ui/character/HitDiceTracker';
+import RestManager from '@/components/ui/character/RestManager';
 import AbilityScores from '@/components/ui/character/AbilityScores';
 import ArmorClassManager from '@/components/ui/character/ArmorClassManager';
 import SavingThrows from '@/components/ui/character/SavingThrows';
@@ -30,6 +31,7 @@ import CombatStats from '@/components/ui/character/CombatStats';
 import ActionsSection from '@/components/ui/character/ActionsSection';
 import CollapsibleSection from '@/components/ui/layout/CollapsibleSection';
 import QuickStats from '@/components/ui/character/QuickStats';
+import LanguagesAndProficiencies from '@/components/ui/character/LanguagesAndProficiencies';
 import { ExtendedFeaturesSection } from '@/components/ui/character/ExtendedFeatures';
 import { useHydration } from '@/hooks/useHydration';
 import { ABILITY_NAMES, SKILL_NAMES } from '@/utils/constants';
@@ -40,7 +42,7 @@ import {
   calculateSkillModifier,
 } from '@/utils/calculations';
 import { exportCharacterToFile } from '@/utils/fileOperations';
-import { AbilityName, SkillName, CharacterState } from '@/types/character';
+import { AbilityName, SkillName, CharacterState, ExtendedFeature } from '@/types/character';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import GroupedTabs, {
   GroupedTabsRef,
@@ -118,11 +120,6 @@ export default function CharacterSheet() {
     updateNote,
     deleteNote,
     reorderNotes,
-    addTrackableTrait,
-    updateTrackableTrait,
-    deleteTrackableTrait,
-    useTrackableTrait,
-    resetTrackableTraits,
     addExtendedFeature,
     updateExtendedFeature,
     deleteExtendedFeature,
@@ -155,7 +152,15 @@ export default function CharacterSheet() {
     useHitDie,
     restoreHitDice,
     resetAllHitDice,
-    resetHalfHitDice,
+    // Rest management (centralized)
+    takeShortRest,
+    takeLongRest,
+    // Language and tool proficiency methods
+    addLanguage,
+    deleteLanguage,
+    addToolProficiency,
+    updateToolProficiency,
+    deleteToolProficiency,
   } = useCharacterStore();
 
   const [showResetModal, setShowResetModal] = useState(false);
@@ -590,6 +595,31 @@ export default function CharacterSheet() {
                 />
               </CollapsibleSection>
 
+              {/* Rest & Recovery - Standalone Section */}
+              <CollapsibleSection
+                title="Rest & Recovery"
+                icon="🛌"
+                defaultExpanded={false}
+                persistKey="rest-recovery"
+                className="rounded-lg border border-gray-200 bg-white shadow-lg"
+                contentClassName="px-6 pb-6"
+                badge={
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                      Short Rest
+                    </span>
+                    <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                      Long Rest
+                    </span>
+                  </div>
+                }
+              >
+                <RestManager
+                  onShortRest={takeShortRest}
+                  onLongRest={takeLongRest}
+                />
+              </CollapsibleSection>
+
               {/* Section Divider */}
               <div className="flex items-center justify-center">
                 <div className="h-px w-full max-w-md bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
@@ -598,6 +628,7 @@ export default function CharacterSheet() {
                 </span>
                 <div className="h-px w-full max-w-md bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
               </div>
+
 
               {/* Core D&D Stats Section */}
               <CollapsibleSection
@@ -743,15 +774,20 @@ export default function CharacterSheet() {
                       passivePerception={10 + getSkillModifier('perception')}
                       proficiencyBonus={proficiencyBonus}
                     />
-                    {/* Special Abilities */}
-                    <TraitTracker
-                      traits={character.trackableTraits || []}
+
+                    {/* Special Abilities - Read-only, only show active abilities from extendedFeatures */}
+                    <TraitTracker<ExtendedFeature>
+                      traits={(character.extendedFeatures || []).filter(trait => !trait.isPassive)}
                       characterLevel={totalLevel}
-                      onAddTrait={addTrackableTrait}
-                      onUpdateTrait={updateTrackableTrait}
-                      onDeleteTrait={deleteTrackableTrait}
-                      onUseTrait={useTrackableTrait}
-                      onResetTraits={resetTrackableTraits}
+                      onAddTrait={addExtendedFeature}
+                      onUpdateTrait={updateExtendedFeature}
+                      onDeleteTrait={deleteExtendedFeature}
+                      onUseTrait={useExtendedFeature}
+                      onResetTraits={resetExtendedFeatures}
+                      readonly={false}
+                      hideAddButton={true}
+                      hideControls={true}
+                      enableViewModal={true}
                     />
                   </div>
 
@@ -807,6 +843,19 @@ export default function CharacterSheet() {
                         }
                       />
                     )}
+
+                    {/* Languages & Tool Proficiencies */}
+                    <LanguagesAndProficiencies
+                      languages={character.languages || []}
+                      toolProficiencies={character.toolProficiencies || []}
+                      proficiencyBonus={proficiencyBonus}
+                      onAddLanguage={addLanguage}
+                      onDeleteLanguage={deleteLanguage}
+                      onAddToolProficiency={addToolProficiency}
+                      onUpdateToolProficiency={updateToolProficiency}
+                      onDeleteToolProficiency={deleteToolProficiency}
+                    />
+
                   </div>
 
                   {/* Right Column - Combat Stats & Features */}
@@ -890,7 +939,6 @@ export default function CharacterSheet() {
                           onUseHitDie={useHitDie}
                           onRestoreHitDice={restoreHitDice}
                           onResetAllHitDice={resetAllHitDice}
-                          onResetHalfHitDice={resetHalfHitDice}
                         />
                       </ErrorBoundary>
                     </div>

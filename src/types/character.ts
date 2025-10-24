@@ -45,6 +45,27 @@ export interface SkillProficiency {
   customModifier?: number;
 }
 
+// Tool proficiency levels
+export type ToolProficiencyLevel = 'none' | 'proficient' | 'expertise';
+
+// Tool proficiency tracking
+export interface ToolProficiency {
+  id: string;
+  name: string; // e.g., "Thieves' Tools", "Smith's Tools", "Lute"
+  proficiencyLevel: ToolProficiencyLevel;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Language tracking
+export interface Language {
+  id: string;
+  name: string; // e.g., "Common", "Elvish", "Draconic"
+  script?: string; // e.g., "Common", "Elvish", "Draconic" (optional)
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Saving throw proficiency
 export interface SavingThrowProficiency {
   proficient: boolean;
@@ -138,6 +159,7 @@ export interface TrackableTrait {
   source?: string; // e.g., "Racial", "Feat", "Class Feature", etc.
   scaleWithProficiency?: boolean; // If true, maxUses scales with proficiency bonus
   proficiencyMultiplier?: number; // Multiplier for proficiency bonus (default 1)
+  isPassive?: boolean; // If true, this is a passive ability (no usage tracking needed)
   createdAt: string;
   updatedAt: string;
 }
@@ -567,6 +589,10 @@ export interface CharacterState {
 
   // Class Features
   jackOfAllTrades: boolean; // Bard feature: add half proficiency to non-proficient skills
+
+  // Languages and Tool Proficiencies
+  languages: Language[];
+  toolProficiencies: ToolProficiency[];
 
   // Miscellaneous
 }
