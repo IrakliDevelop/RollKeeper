@@ -73,7 +73,6 @@ export default function TraitTracker<T extends TraitType = TrackableTrait>({
       <SharedTraitTracker
           traits={traits as TrackableTrait[]}
           characterLevel={characterLevel}
-          onAddTrait={onAddTrait as (trait: Omit<TrackableTrait, 'id' | 'createdAt' | 'updatedAt'>) => void}
           onUpdateTrait={onUpdateTrait as (id: string, updates: Partial<TrackableTrait>) => void}
           onDeleteTrait={onDeleteTrait}
           onUseTrait={onUseTrait}
@@ -82,12 +81,9 @@ export default function TraitTracker<T extends TraitType = TrackableTrait>({
           readonly={readonly}
           compact={false}
           hideControls={hideControls}
-          hideAddButton={hideAddButton}
-          hideResetButtons={false}
           showOnlyUsed={false}
           className={className}
         />
-      {/* Feature Modal for viewing/editing ExtendedFeatures */}
       {enableViewModal && viewingTrait && isExtendedFeature(viewingTrait) && (
         <FeatureModal
           feature={viewingTrait}
