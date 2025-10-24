@@ -491,6 +491,10 @@ interface CharacterStore {
   updateToolProficiency: (id: string, updates: Partial<ToolProficiency>) => void;
   deleteToolProficiency: (id: string) => void;
 
+  // Rest management (centralized)
+  takeShortRest: () => void; // Resets all short rest abilities, pact magic, reaction
+  takeLongRest: () => void; // Resets everything: all abilities, all spell slots, hit dice, HP, etc.
+
   updateCharacterBackground: (updates: Partial<CharacterBackground>) => void;
 
   // Weapon management
@@ -2582,6 +2586,138 @@ export const useCharacterStore = create<CharacterStore>()(
           hasUnsavedChanges: true,
           saveStatus: 'saving',
         }));
+      },
+
+      // Rest management (centralized)
+      takeShortRest: () => {
+        set(state => {
+          const { character } = state;
+          
+          // Reset short rest abilities (trackableTraits and extendedFeatures)
+          const resetTrackableTraits = character.trackableTraits.map(trait =>
+            trait.restType === 'short'
+              ? { ...trait, usedUses: 0 }
+              : trait
+          );
+
+          const resetExtendedFeatures = character.extendedFeatures.map(feature =>
+            feature.restType === 'short' && !feature.isPassive
+              ? { ...feature, usedUses: 0 }
+              : feature
+          );
+
+          // Reset Pact Magic slots (if Warlock)
+          let resetPactMagic = character.pactMagic;
+          if (resetPactMagic) {
+            resetPactMagic = {
+              ...resetPactMagic,
+              slots: {
+                ...resetPactMagic.slots,
+                used: 0,
+              },
+            };
+          }
+
+          // Reset reaction
+          const resetReaction = {
+            hasUsedReaction: false,
+          };
+
+          return {
+            character: {
+              ...character,
+              trackableTraits: resetTrackableTraits,
+              extendedFeatures: resetExtendedFeatures,
+              pactMagic: resetPactMagic,
+              reaction: resetReaction,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      takeLongRest: () => {
+        set(state => {
+          const { character } = state;
+          
+          // Reset ALL abilities (both short and long rest)
+          const resetTrackableTraits = character.trackableTraits.map(trait => ({
+            ...trait,
+            usedUses: 0,
+          }));
+
+          const resetExtendedFeatures = character.extendedFeatures.map(feature =>
+            feature.isPassive
+              ? feature
+              : { ...feature, usedUses: 0 }
+          );
+
+          // Reset ALL spell slots
+          const resetSpellSlots = { ...character.spellSlots };
+          for (let level = 1; level <= 9; level++) {
+            const slot = character.spellSlots[level as keyof SpellSlots];
+            if (slot) {
+              resetSpellSlots[level as keyof SpellSlots] = {
+                ...slot,
+                used: 0,
+              };
+            }
+          }
+
+          // Reset Pact Magic slots (if Warlock)
+          let resetPactMagic = character.pactMagic;
+          if (resetPactMagic) {
+            resetPactMagic = {
+              ...resetPactMagic,
+              slots: {
+                ...resetPactMagic.slots,
+                used: 0,
+              },
+            };
+          }
+
+          // Reset ALL hit dice
+          const resetHitDicePools = { ...character.hitDicePools };
+          Object.keys(resetHitDicePools).forEach(dieType => {
+            resetHitDicePools[dieType] = {
+              ...resetHitDicePools[dieType],
+              used: 0,
+            };
+          });
+
+          // Reset HP to max (remove temp HP, heal to full)
+          const resetHitPoints = {
+            ...character.hitPoints,
+            current: character.hitPoints.max,
+            temporary: 0,
+            deathSaves: undefined, // Clear death saves
+          };
+
+          // Reset reaction
+          const resetReaction = {
+            hasUsedReaction: false,
+          };
+
+          // Reset temp AC
+          const resetTempArmorClass = 0;
+
+          return {
+            character: {
+              ...character,
+              trackableTraits: resetTrackableTraits,
+              extendedFeatures: resetExtendedFeatures,
+              spellSlots: resetSpellSlots,
+              pactMagic: resetPactMagic,
+              hitDicePools: resetHitDicePools,
+              hitPoints: resetHitPoints,
+              reaction: resetReaction,
+              tempArmorClass: resetTempArmorClass,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
       },
 
       updateCharacterBackground: updates => {
