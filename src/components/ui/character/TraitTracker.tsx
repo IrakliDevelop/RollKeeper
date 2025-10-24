@@ -15,6 +15,10 @@ interface TraitTrackerProps {
   onUseTrait: (id: string) => void;
   onResetTraits: (restType: 'short' | 'long') => void;
   className?: string;
+  // Display options
+  readonly?: boolean;
+  hideAddButton?: boolean;
+  hideControls?: boolean;
 }
 
 export default function TraitTracker({
@@ -26,6 +30,9 @@ export default function TraitTracker({
   onUseTrait,
   onResetTraits,
   className = '',
+  readonly = false,
+  hideAddButton = false,
+  hideControls = false,
 }: TraitTrackerProps) {
   // Use the shared TraitTracker component with full functionality
   return (
@@ -37,10 +44,10 @@ export default function TraitTracker({
       onDeleteTrait={onDeleteTrait}
       onUseTrait={onUseTrait}
       onResetTraits={onResetTraits}
-      readonly={false}
+      readonly={readonly}
       compact={false}
-      hideControls={false}
-      hideAddButton={false}
+      hideControls={hideControls}
+      hideAddButton={hideAddButton}
       hideResetButtons={false}
       showOnlyUsed={false}
       className={className}
