@@ -151,7 +151,6 @@ export default function CharacterSheet() {
     useHitDie,
     restoreHitDice,
     resetAllHitDice,
-    resetHalfHitDice,
     // Language and tool proficiency methods
     addLanguage,
     deleteLanguage,
@@ -910,7 +909,6 @@ export default function CharacterSheet() {
                           onUseHitDie={useHitDie}
                           onRestoreHitDice={restoreHitDice}
                           onResetAllHitDice={resetAllHitDice}
-                          onResetHalfHitDice={resetHalfHitDice}
                         />
                       </ErrorBoundary>
                     </div>
