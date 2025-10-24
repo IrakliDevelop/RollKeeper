@@ -743,15 +743,18 @@ export default function CharacterSheet() {
                       passivePerception={10 + getSkillModifier('perception')}
                       proficiencyBonus={proficiencyBonus}
                     />
-                    {/* Special Abilities */}
+                    {/* Special Abilities - Read-only, only show active abilities */}
                     <TraitTracker
-                      traits={character.trackableTraits || []}
+                      traits={(character.trackableTraits || []).filter(trait => !trait.isPassive)}
                       characterLevel={totalLevel}
                       onAddTrait={addTrackableTrait}
                       onUpdateTrait={updateTrackableTrait}
                       onDeleteTrait={deleteTrackableTrait}
                       onUseTrait={useTrackableTrait}
                       onResetTraits={resetTrackableTraits}
+                      readonly={true}
+                      hideAddButton={true}
+                      hideControls={true}
                     />
                   </div>
 

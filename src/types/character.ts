@@ -138,6 +138,7 @@ export interface TrackableTrait {
   source?: string; // e.g., "Racial", "Feat", "Class Feature", etc.
   scaleWithProficiency?: boolean; // If true, maxUses scales with proficiency bonus
   proficiencyMultiplier?: number; // Multiplier for proficiency bonus (default 1)
+  isPassive?: boolean; // If true, this is a passive ability (no usage tracking needed)
   createdAt: string;
   updatedAt: string;
 }
