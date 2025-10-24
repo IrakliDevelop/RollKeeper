@@ -999,10 +999,8 @@ export const EnhancedSpellManagement: React.FC = () => {
           title={editingId ? 'Edit Spell' : 'Add New Spell'}
           size="lg"
           closeOnBackdropClick={true}
-          className="overflow-y-auto"
         >
-
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4 p-6">
                 {/* Basic Information */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
