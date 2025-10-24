@@ -507,6 +507,8 @@ export const DEFAULT_CHARACTER_STATE = {
 
   // Class Features
   jackOfAllTrades: false, // Bard feature: add half proficiency to non-proficient skills
+  languages: [], // Known languages
+  toolProficiencies: [], // Tool proficiencies with levels
 };
 
 // spell source books and colors mapping, key should be SPELL_SOURCE_BOOKS keys

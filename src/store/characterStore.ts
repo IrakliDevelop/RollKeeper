@@ -21,6 +21,8 @@ import {
   ExhaustionVariant,
   WeaponDamage,
   DamageType,
+  ToolProficiency,
+  Language,
 } from '@/types/character';
 import { ProcessedSpell } from '@/types/spells';
 import {
@@ -480,6 +482,15 @@ interface CharacterStore {
     sourceType?: string
   ) => void;
   migrateTraitsToExtendedFeatures: () => void;
+
+  // Language management
+  addLanguage: (language: Omit<Language, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  deleteLanguage: (id: string) => void;
+
+  // Tool proficiency management
+  addToolProficiency: (tool: Omit<ToolProficiency, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateToolProficiency: (id: string, updates: Partial<ToolProficiency>) => void;
+  deleteToolProficiency: (id: string) => void;
 
   updateCharacterBackground: (updates: Partial<CharacterBackground>) => void;
 
@@ -2493,6 +2504,85 @@ export const useCharacterStore = create<CharacterStore>()(
             saveStatus: 'saving',
           };
         });
+      },
+
+      // Language management
+      addLanguage: (language: Omit<Language, 'id' | 'createdAt' | 'updatedAt'>) => {
+        set(state => {
+          const newLanguage: Language = {
+            ...language,
+            id: generateId(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          return {
+            character: {
+              ...state.character,
+              languages: [...(state.character.languages || []), newLanguage],
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      deleteLanguage: (id: string) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            languages: (state.character.languages || []).filter(lang => lang.id !== id),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      // Tool proficiency management
+      addToolProficiency: (tool: Omit<ToolProficiency, 'id' | 'createdAt' | 'updatedAt'>) => {
+        set(state => {
+          const newTool: ToolProficiency = {
+            ...tool,
+            id: generateId(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          return {
+            character: {
+              ...state.character,
+              toolProficiencies: [...(state.character.toolProficiencies || []), newTool],
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      updateToolProficiency: (id: string, updates: Partial<ToolProficiency>) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            toolProficiencies: (state.character.toolProficiencies || []).map(tool =>
+              tool.id === id
+                ? { ...tool, ...updates, updatedAt: new Date().toISOString() }
+                : tool
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      deleteToolProficiency: (id: string) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            toolProficiencies: (state.character.toolProficiencies || []).filter(tool => tool.id !== id),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
       },
 
       updateCharacterBackground: updates => {
