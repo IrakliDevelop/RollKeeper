@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, RotateCcw, Moon } from 'lucide-react';
+import { Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Moon, RefreshCw } from 'lucide-react';
 import { HitDicePools } from '@/types/character';
 
 interface HitDiceTrackerProps {
@@ -9,7 +9,6 @@ interface HitDiceTrackerProps {
   onUseHitDie: (dieType: string, count?: number) => void;
   onRestoreHitDice: (dieType: string, count?: number) => void;
   onResetAllHitDice: () => void;
-  onResetHalfHitDice: () => void;
 }
 
 // Map die types to appropriate icons
@@ -70,7 +69,6 @@ export default function HitDiceTracker({
   onUseHitDie,
   onRestoreHitDice,
   onResetAllHitDice,
-  onResetHalfHitDice,
 }: HitDiceTrackerProps) {
   const dieTypes = Object.keys(hitDicePools).sort((a, b) => {
     const aNum = parseInt(a.replace('d', ''));
@@ -96,24 +94,14 @@ export default function HitDiceTracker({
           </div>
           <h3 className="text-xl font-bold text-gray-900">Hit Dice</h3>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={onResetHalfHitDice}
-            className="flex items-center gap-2 rounded-lg bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700 transition-all hover:bg-blue-200 hover:shadow-md active:scale-95"
-            title="Long Rest (restore half hit dice - standard D&D rule)"
-          >
-            <Moon size={16} />
-            Long Rest
-          </button>
-          <button
-            onClick={onResetAllHitDice}
-            className="flex items-center gap-2 rounded-lg bg-green-100 px-4 py-2 text-sm font-medium text-green-700 transition-all hover:bg-green-200 hover:shadow-md active:scale-95"
-            title="Restore All (house rule or special circumstances)"
-          >
-            <RotateCcw size={16} />
-            Restore All
-          </button>
-        </div>
+        <button
+          onClick={onResetAllHitDice}
+          className="flex items-center gap-2 rounded-lg bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700 transition-all hover:bg-blue-200 hover:shadow-md active:scale-95"
+          title="Long Rest (restore all hit dice - D&D 2024 rules)"
+        >
+          <Moon size={16} />
+          Long Rest
+        </button>
       </div>
 
       <div className="space-y-4">
@@ -225,7 +213,7 @@ export default function HitDiceTracker({
                         onClick={() => onRestoreHitDice(dieType, pool.used)}
                         className="flex items-center gap-1 rounded-lg bg-white bg-opacity-90 px-3 py-2 text-xs font-medium shadow-sm transition-all hover:bg-opacity-100 hover:shadow-md active:scale-95"
                       >
-                        <RotateCcw size={12} />
+                        <RefreshCw size={12} />
                         All
                       </button>
                     </>
@@ -249,8 +237,7 @@ export default function HitDiceTracker({
             <div className="text-sm text-blue-800 space-y-1">
               <p><strong>Click any die:</strong> Use/restore all dice from that position to the end</p>
               <p><strong>Short Rest:</strong> Spend hit dice to regain HP (roll die + CON modifier)</p>
-              <p><strong>Long Rest:</strong> Regain half your max hit dice (D&D standard)</p>
-              <p><strong>Restore All:</strong> House rule or special circumstances</p>
+              <p><strong>Long Rest:</strong> Regain all your max hit dice (D&D 2024 rules)</p>
             </div>
           </div>
         </div>

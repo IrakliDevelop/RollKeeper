@@ -396,8 +396,7 @@ interface CharacterStore {
   // Hit dice management
   useHitDie: (dieType: string, count?: number) => void;
   restoreHitDice: (dieType: string, count?: number) => void;
-  resetAllHitDice: () => void; // Long rest - restore all hit dice
-  resetHalfHitDice: () => void; // Long rest - restore half hit dice (optional rule)
+  resetAllHitDice: () => void; // Long rest - restore all hit dice (D&D 2024 rules)
 
   // Concentration management
   startConcentration: (
