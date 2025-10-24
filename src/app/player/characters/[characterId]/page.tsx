@@ -747,7 +747,7 @@ export default function CharacterSheet() {
                       onDeleteTrait={deleteExtendedFeature}
                       onUseTrait={useExtendedFeature}
                       onResetTraits={resetExtendedFeatures}
-                      readonly={true}
+                      readonly={false}
                       hideAddButton={true}
                       hideControls={true}
                     />
