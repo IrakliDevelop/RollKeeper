@@ -112,7 +112,6 @@ export default function FeatureModal({
       title={mode === 'edit' ? 'Edit Feature' : feature.name}
       size="lg"
     >
-      <div className="max-h-[80vh] overflow-y-auto">
         <div className="space-y-8 p-6">
           {/* Header Actions */}
           <div className="flex items-center justify-between border-b border-gray-200 pb-8 mb-2">
@@ -453,7 +452,6 @@ export default function FeatureModal({
             </div>
           )}
         </div>
-      </div>
     </Modal>
   );
 }
