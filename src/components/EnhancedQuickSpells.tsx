@@ -273,11 +273,11 @@ export function EnhancedQuickSpells({
   const spellAttackBonus = calculateSpellAttackBonus(character);
   const spellSaveDC = calculateSpellSaveDC(character);
 
-  // Get all available spells for quick access
+  // Get all available spells for quick access (prepared cantrips + prepared spells)
   const quickAccessSpells = character.spells.filter(
     spell =>
-      spell.level === 0 || // All cantrips
-      spell.isPrepared || // Prepared spells
+      (spell.level === 0 && spell.isPrepared) || // Only prepared cantrips
+      (spell.level > 0 && spell.isPrepared) || // Prepared spells
       spell.isAlwaysPrepared // Always prepared spells
   );
 

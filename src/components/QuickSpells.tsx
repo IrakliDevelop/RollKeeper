@@ -57,11 +57,11 @@ export function QuickSpells({
   const [castModalOpen, setCastModalOpen] = useState(false);
   const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null);
 
-  // Get all available spells for quick access (cantrips + prepared spells)
+  // Get all available spells for quick access (prepared cantrips + prepared spells)
   const quickAccessSpells = character.spells.filter(
     spell =>
-      spell.level === 0 || // All cantrips
-      spell.isPrepared || // Prepared spells
+      (spell.level === 0 && spell.isPrepared) || // Only prepared cantrips
+      (spell.level > 0 && spell.isPrepared) || // Prepared spells
       spell.isAlwaysPrepared // Always prepared spells
   );
 
