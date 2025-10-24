@@ -348,15 +348,14 @@ export default function EquipmentModal({
       isOpen={isOpen}
       onClose={handleCloseModal}
       title={`⚔️ Equipment & Magic Items (Attunement: ${totalAttuned}/${character.attunementSlots.max})`}
-      size="full"
+      size="xl"
       closeOnBackdropClick={true}
     >
 
           {/* Show forms if active, otherwise show main content */}
           {showWeaponForm ? (
-            <div>
-              <div className="mx-auto max-w-2xl">
-                <h3 className="mb-4 text-xl font-bold text-gray-800">
+            <div className="space-y-4">
+                <h3 className="text-xl font-bold text-gray-800">
                   {editingWeapon ? 'Edit Weapon' : 'Add Weapon'}
                 </h3>
 
@@ -703,12 +702,10 @@ export default function EquipmentModal({
                     {editingWeapon ? 'Update' : 'Add'} Weapon
                   </button>
                 </div>
-              </div>
             </div>
           ) : showMagicItemForm ? (
-            <div>
-              <div className="mx-auto max-w-2xl">
-                <h3 className="mb-4 text-xl font-bold text-gray-800">
+            <div className="space-y-4">
+                <h3 className="text-xl font-bold text-gray-800">
                   {editingMagicItem ? 'Edit Magic Item' : 'Add Magic Item'}
                 </h3>
 
@@ -865,7 +862,6 @@ export default function EquipmentModal({
                     {editingMagicItem ? 'Update' : 'Add'} Item
                   </button>
                 </div>
-              </div>
             </div>
           ) : (
             // Main equipment view
