@@ -22,6 +22,7 @@ import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
 import CharacterSheetHeader from '@/components/ui/character/CharacterSheetHeader';
 import CharacterBasicInfo from '@/components/ui/character/CharacterBasicInfo';
 import HitDiceTracker from '@/components/ui/character/HitDiceTracker';
+import RestManager from '@/components/ui/character/RestManager';
 import AbilityScores from '@/components/ui/character/AbilityScores';
 import ArmorClassManager from '@/components/ui/character/ArmorClassManager';
 import SavingThrows from '@/components/ui/character/SavingThrows';
@@ -151,6 +152,9 @@ export default function CharacterSheet() {
     useHitDie,
     restoreHitDice,
     resetAllHitDice,
+    // Rest management (centralized)
+    takeShortRest,
+    takeLongRest,
     // Language and tool proficiency methods
     addLanguage,
     deleteLanguage,
@@ -599,6 +603,31 @@ export default function CharacterSheet() {
                 </span>
                 <div className="h-px w-full max-w-md bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
               </div>
+
+              {/* Rest & Recovery - Standalone Section */}
+              <CollapsibleSection
+                title="Rest & Recovery"
+                icon="🛌"
+                defaultExpanded={false}
+                persistKey="rest-recovery"
+                className="rounded-lg border border-gray-200 bg-white shadow-lg"
+                contentClassName="px-6 pb-6"
+                badge={
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                      Short Rest
+                    </span>
+                    <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                      Long Rest
+                    </span>
+                  </div>
+                }
+              >
+                <RestManager
+                  onShortRest={takeShortRest}
+                  onLongRest={takeLongRest}
+                />
+              </CollapsibleSection>
 
               {/* Core D&D Stats Section */}
               <CollapsibleSection
