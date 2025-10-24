@@ -229,6 +229,9 @@ const SpellCard: React.FC<{
             }`} />
             <span className="font-bold text-gray-800 truncate">{spell.name}</span>
             <span className="text-xs text-gray-500 flex-shrink-0">{spell.school}</span>
+            {spell.duration && (
+              <span className="text-xs text-gray-500 flex-shrink-0">• {spell.duration}</span>
+            )}
           </div>
           
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -317,6 +320,7 @@ const SpellCard: React.FC<{
             <span><strong>School:</strong> {spell.school}</span>
             <span><strong>Time:</strong> {spell.castingTime}</span>
             <span><strong>Range:</strong> {spell.range}</span>
+            {spell.duration && <span><strong>Duration:</strong> {spell.duration}</span>}
           </div>
           
           <div className="mb-2 text-sm text-gray-600">

@@ -296,6 +296,12 @@ export function QuickSpells({
                 <span>{spell.castingTime}</span>
                 <span>•</span>
                 <span>{spell.range}</span>
+                {spell.duration && (
+                  <>
+                    <span>•</span>
+                    <span>{spell.duration}</span>
+                  </>
+                )}
                 {spell.concentration && (
                   <>
                     <span>•</span>
