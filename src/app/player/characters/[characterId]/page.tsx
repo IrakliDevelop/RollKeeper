@@ -30,6 +30,7 @@ import CombatStats from '@/components/ui/character/CombatStats';
 import ActionsSection from '@/components/ui/character/ActionsSection';
 import CollapsibleSection from '@/components/ui/layout/CollapsibleSection';
 import QuickStats from '@/components/ui/character/QuickStats';
+import LanguagesAndProficiencies from '@/components/ui/character/LanguagesAndProficiencies';
 import { ExtendedFeaturesSection } from '@/components/ui/character/ExtendedFeatures';
 import { useHydration } from '@/hooks/useHydration';
 import { ABILITY_NAMES, SKILL_NAMES } from '@/utils/constants';
@@ -151,6 +152,12 @@ export default function CharacterSheet() {
     restoreHitDice,
     resetAllHitDice,
     resetHalfHitDice,
+    // Language and tool proficiency methods
+    addLanguage,
+    deleteLanguage,
+    addToolProficiency,
+    updateToolProficiency,
+    deleteToolProficiency,
   } = useCharacterStore();
 
   const [showResetModal, setShowResetModal] = useState(false);
@@ -738,6 +745,7 @@ export default function CharacterSheet() {
                       passivePerception={10 + getSkillModifier('perception')}
                       proficiencyBonus={proficiencyBonus}
                     />
+
                     {/* Special Abilities - Read-only, only show active abilities from extendedFeatures */}
                     <TraitTracker<ExtendedFeature>
                       traits={(character.extendedFeatures || []).filter(trait => !trait.isPassive)}
@@ -806,6 +814,19 @@ export default function CharacterSheet() {
                         }
                       />
                     )}
+
+                    {/* Languages & Tool Proficiencies */}
+                    <LanguagesAndProficiencies
+                      languages={character.languages || []}
+                      toolProficiencies={character.toolProficiencies || []}
+                      proficiencyBonus={proficiencyBonus}
+                      onAddLanguage={addLanguage}
+                      onDeleteLanguage={deleteLanguage}
+                      onAddToolProficiency={addToolProficiency}
+                      onUpdateToolProficiency={updateToolProficiency}
+                      onDeleteToolProficiency={deleteToolProficiency}
+                    />
+
                   </div>
 
                   {/* Right Column - Combat Stats & Features */}
