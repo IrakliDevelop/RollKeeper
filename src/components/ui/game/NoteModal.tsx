@@ -110,7 +110,7 @@ export default function NoteModal({
       showCloseButton={true}
       closeOnBackdropClick={true}
     >
-      <div className="p-6">
+      <div>
         {/* Header - Only show when editing for title input */}
         {isEditing && (
           <div className="mb-6">

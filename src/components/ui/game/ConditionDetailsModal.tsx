@@ -40,7 +40,7 @@ export default function ConditionDetailsModal({
       closeOnBackdropClick={true}
     >
       {/* Enhanced Header with Icon and Metadata */}
-      <div className={`border-b p-6 ${isCondition ? 'bg-red-50' : 'bg-purple-50'}`}>
+      <div className={`border-b p-6 -m-6 mb-6 ${isCondition ? 'bg-red-50' : 'bg-purple-50'}`}>
         <div className="mb-4 flex items-center gap-3">
           <div
             className={`rounded-lg p-2 ${isCondition ? 'bg-red-100' : 'bg-purple-100'}`}
@@ -89,7 +89,7 @@ export default function ConditionDetailsModal({
         </div>
       </div>
 
-      <div className="p-6 space-y-6">
+      <div className="space-y-6">
         {/* Description */}
         <div>
           <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-gray-800">

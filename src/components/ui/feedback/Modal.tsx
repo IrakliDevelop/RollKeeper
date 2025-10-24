@@ -105,8 +105,8 @@ export function Modal({
             </div>
           )}
 
-          {/* Content - Scrollable area */}
-          <div className="flex-1 overflow-y-auto min-h-0">{children}</div>
+          {/* Content - Scrollable area with default padding */}
+          <div className="flex-1 overflow-y-auto min-h-0 p-6">{children}</div>
         </div>
       </div>
     </div>,
