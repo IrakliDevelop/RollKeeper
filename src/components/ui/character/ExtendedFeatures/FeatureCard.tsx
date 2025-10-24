@@ -91,30 +91,30 @@ export default function FeatureCard({
             {!readonly && hasUses && !isExhausted && (
               <button
                 onClick={onUse}
-                className="p-1 rounded-md text-indigo-600 hover:bg-indigo-100 transition-colors"
+                className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-100 transition-colors"
                 title="Use feature"
               >
-                <Zap className="h-3 w-3" />
+                <Zap className="h-5 w-5" />
               </button>
             )}
 
             {/* View Button */}
             <button
               onClick={handleViewClick}
-              className="p-1 rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
+              className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
               title="View details"
             >
-              <Eye className="h-3 w-3" />
+              <Eye className="h-5 w-5" />
             </button>
 
             {/* Edit Button */}
             {!readonly && (
               <button
                 onClick={handleEditClick}
-                className="p-1 rounded-md text-blue-600 hover:bg-blue-100 transition-colors"
+                className="p-2 rounded-lg text-blue-600 hover:bg-blue-100 transition-colors"
                 title="Edit feature"
               >
-                <Edit3 className="h-3 w-3" />
+                <Edit3 className="h-5 w-5" />
               </button>
             )}
 
@@ -122,10 +122,10 @@ export default function FeatureCard({
             {!readonly && (
               <button
                 onClick={onDelete}
-                className="p-1 rounded-md text-red-600 hover:bg-red-100 transition-colors"
+                className="p-2 rounded-lg text-red-600 hover:bg-red-100 transition-colors"
                 title="Delete feature"
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash2 className="h-5 w-5" />
               </button>
             )}
           </div>

@@ -6,7 +6,7 @@ import {
   calculateTraitMaxUses,
   getProficiencyBonus,
 } from '@/utils/calculations';
-import { RotateCcw, Plus, Edit3, Trash2, Zap } from 'lucide-react';
+import { RotateCcw, Plus, Edit3, Trash2, Zap, Eye } from 'lucide-react';
 
 interface TraitTrackerProps {
   traits: TrackableTrait[];
@@ -18,6 +18,7 @@ interface TraitTrackerProps {
   onDeleteTrait?: (id: string) => void;
   onUseTrait?: (id: string) => void;
   onResetTraits?: (restType: 'short' | 'long') => void;
+  onTraitClick?: (trait: TrackableTrait) => void;
 
   // Display options
   readonly?: boolean;
@@ -39,6 +40,7 @@ export function TraitTracker({
   onDeleteTrait,
   onUseTrait,
   onResetTraits,
+  onTraitClick,
   readonly = false,
   compact = false,
   hideControls = false,
@@ -705,26 +707,47 @@ export function TraitTracker({
                   </div>
                   {!readonly && !hideControls && (
                     <div className="ml-2 flex items-center space-x-1">
+                      {onTraitClick && (
+                        <button
+                          onClick={() => onTraitClick(trait)}
+                          className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+                          title="View ability details"
+                        >
+                          <Eye size={18} />
+                        </button>
+                      )}
                       {!compact && onUpdateTrait && (
                         <button
                           onClick={() => handleEdit(trait)}
                           disabled={isAdding}
-                          className="rounded p-1 text-indigo-600 transition-colors hover:bg-indigo-100 disabled:opacity-50"
+                          className="rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-100 disabled:opacity-50"
                           title="Edit ability"
                         >
-                          <Edit3 size={14} />
+                          <Edit3 size={18} />
                         </button>
                       )}
                       {onDeleteTrait && (
                         <button
                           onClick={() => onDeleteTrait(trait.id)}
                           disabled={isAdding}
-                          className="rounded p-1 text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
+                          className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
                           title="Delete ability"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={18} />
                         </button>
                       )}
+                    </div>
+                  )}
+                  {/* View button even when controls are hidden */}
+                  {(readonly || hideControls) && onTraitClick && (
+                    <div className="ml-2">
+                      <button
+                        onClick={() => onTraitClick(trait)}
+                        className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+                        title="View ability details"
+                      >
+                        <Eye size={18} />
+                      </button>
                     </div>
                   )}
                 </div>
@@ -753,10 +776,10 @@ export function TraitTracker({
                         trait.usedUses >=
                         calculateTraitMaxUses(trait, characterLevel)
                       }
-                      className={`rounded bg-indigo-600 px-2 py-1 text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 ${compact ? 'text-xs' : 'text-sm'}`}
+                      className={`rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50`}
                       title="Use ability"
                     >
-                      Use
+                      <Zap size={18} />
                     </button>
                   )}
                 </div>

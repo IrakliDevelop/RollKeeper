@@ -750,6 +750,7 @@ export default function CharacterSheet() {
                       readonly={false}
                       hideAddButton={true}
                       hideControls={true}
+                      enableViewModal={true}
                     />
                   </div>
 
