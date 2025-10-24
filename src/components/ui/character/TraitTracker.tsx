@@ -1,16 +1,16 @@
 'use client';
 
 import React from 'react';
-import { TrackableTrait } from '@/types/character';
+import { TrackableTrait, ExtendedFeature } from '@/types/character';
 import { TraitTracker as SharedTraitTracker } from '@/components/shared/character';
 
-interface TraitTrackerProps {
-  traits: TrackableTrait[];
+type TraitType = TrackableTrait | ExtendedFeature;
+
+interface TraitTrackerProps<T extends TraitType = TrackableTrait> {
+  traits: T[];
   characterLevel: number;
-  onAddTrait: (
-    trait: Omit<TrackableTrait, 'id' | 'createdAt' | 'updatedAt'>
-  ) => void;
-  onUpdateTrait: (id: string, updates: Partial<TrackableTrait>) => void;
+  onAddTrait: (trait: Omit<T, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onUpdateTrait: (id: string, updates: Partial<T>) => void;
   onDeleteTrait: (id: string) => void;
   onUseTrait: (id: string) => void;
   onResetTraits: (restType: 'short' | 'long') => void;
@@ -21,7 +21,7 @@ interface TraitTrackerProps {
   hideControls?: boolean;
 }
 
-export default function TraitTracker({
+export default function TraitTracker<T extends TraitType = TrackableTrait>({
   traits,
   characterLevel,
   onAddTrait,
@@ -33,14 +33,13 @@ export default function TraitTracker({
   readonly = false,
   hideAddButton = false,
   hideControls = false,
-}: TraitTrackerProps) {
-  // Use the shared TraitTracker component with full functionality
+}: TraitTrackerProps<T>) {
   return (
     <SharedTraitTracker
-      traits={traits}
+      traits={traits as TrackableTrait[]}
       characterLevel={characterLevel}
-      onAddTrait={onAddTrait}
-      onUpdateTrait={onUpdateTrait}
+      onAddTrait={onAddTrait as (trait: Omit<TrackableTrait, 'id' | 'createdAt' | 'updatedAt'>) => void}
+      onUpdateTrait={onUpdateTrait as (id: string, updates: Partial<TrackableTrait>) => void}
       onDeleteTrait={onDeleteTrait}
       onUseTrait={onUseTrait}
       onResetTraits={onResetTraits}
