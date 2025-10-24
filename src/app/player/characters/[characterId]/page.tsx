@@ -40,7 +40,7 @@ import {
   calculateSkillModifier,
 } from '@/utils/calculations';
 import { exportCharacterToFile } from '@/utils/fileOperations';
-import { AbilityName, SkillName, CharacterState } from '@/types/character';
+import { AbilityName, SkillName, CharacterState, ExtendedFeature } from '@/types/character';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import GroupedTabs, {
   GroupedTabsRef,
@@ -118,11 +118,6 @@ export default function CharacterSheet() {
     updateNote,
     deleteNote,
     reorderNotes,
-    addTrackableTrait,
-    updateTrackableTrait,
-    deleteTrackableTrait,
-    useTrackableTrait,
-    resetTrackableTraits,
     addExtendedFeature,
     updateExtendedFeature,
     deleteExtendedFeature,
@@ -743,15 +738,15 @@ export default function CharacterSheet() {
                       passivePerception={10 + getSkillModifier('perception')}
                       proficiencyBonus={proficiencyBonus}
                     />
-                    {/* Special Abilities - Read-only, only show active abilities */}
-                    <TraitTracker
-                      traits={(character.trackableTraits || []).filter(trait => !trait.isPassive)}
+                    {/* Special Abilities - Read-only, only show active abilities from extendedFeatures */}
+                    <TraitTracker<ExtendedFeature>
+                      traits={(character.extendedFeatures || []).filter(trait => !trait.isPassive)}
                       characterLevel={totalLevel}
-                      onAddTrait={addTrackableTrait}
-                      onUpdateTrait={updateTrackableTrait}
-                      onDeleteTrait={deleteTrackableTrait}
-                      onUseTrait={useTrackableTrait}
-                      onResetTraits={resetTrackableTraits}
+                      onAddTrait={addExtendedFeature}
+                      onUpdateTrait={updateExtendedFeature}
+                      onDeleteTrait={deleteExtendedFeature}
+                      onUseTrait={useExtendedFeature}
+                      onResetTraits={resetExtendedFeatures}
                       readonly={true}
                       hideAddButton={true}
                       hideControls={true}
