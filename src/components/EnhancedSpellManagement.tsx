@@ -1000,7 +1000,7 @@ export const EnhancedSpellManagement: React.FC = () => {
           size="lg"
           closeOnBackdropClick={true}
         >
-              <form onSubmit={handleSubmit} className="space-y-4 p-6">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Basic Information */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>

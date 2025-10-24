@@ -354,7 +354,7 @@ export default function EquipmentModal({
 
           {/* Show forms if active, otherwise show main content */}
           {showWeaponForm ? (
-            <div className="p-6">
+            <div>
               <div className="mx-auto max-w-2xl">
                 <h3 className="mb-4 text-xl font-bold text-gray-800">
                   {editingWeapon ? 'Edit Weapon' : 'Add Weapon'}
@@ -706,7 +706,7 @@ export default function EquipmentModal({
               </div>
             </div>
           ) : showMagicItemForm ? (
-            <div className="p-6">
+            <div>
               <div className="mx-auto max-w-2xl">
                 <h3 className="mb-4 text-xl font-bold text-gray-800">
                   {editingMagicItem ? 'Edit Magic Item' : 'Add Magic Item'}
@@ -869,7 +869,7 @@ export default function EquipmentModal({
             </div>
           ) : (
             // Main equipment view
-            <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {/* Weapons Section */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
