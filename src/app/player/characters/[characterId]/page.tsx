@@ -595,15 +595,6 @@ export default function CharacterSheet() {
                 />
               </CollapsibleSection>
 
-              {/* Section Divider */}
-              <div className="flex items-center justify-center">
-                <div className="h-px w-full max-w-md bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
-                <span className="px-4 font-medium text-gray-500">
-                  Core Stats
-                </span>
-                <div className="h-px w-full max-w-md bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
-              </div>
-
               {/* Rest & Recovery - Standalone Section */}
               <CollapsibleSection
                 title="Rest & Recovery"
@@ -628,6 +619,16 @@ export default function CharacterSheet() {
                   onLongRest={takeLongRest}
                 />
               </CollapsibleSection>
+
+              {/* Section Divider */}
+              <div className="flex items-center justify-center">
+                <div className="h-px w-full max-w-md bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+                <span className="px-4 font-medium text-gray-500">
+                  Core Stats
+                </span>
+                <div className="h-px w-full max-w-md bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+              </div>
+
 
               {/* Core D&D Stats Section */}
               <CollapsibleSection
