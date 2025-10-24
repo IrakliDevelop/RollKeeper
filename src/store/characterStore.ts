@@ -1113,11 +1113,15 @@ export const useCharacterStore = create<CharacterStore>()(
             }
           }
 
+          // Recalculate hit dice pools
+          const hitDicePools = calculateHitDicePools(updatedClasses, migratedCharacter.hitDicePools);
+
           const updatedCharacter = {
             ...migratedCharacter,
             classes: updatedClasses,
             totalLevel: clampedLevel,
             level: clampedLevel, // Keep for backwards compatibility
+            hitDicePools,
           };
 
           // Recalculate spell slots and pact magic using multiclass-aware functions
@@ -1829,32 +1833,65 @@ export const useCharacterStore = create<CharacterStore>()(
         set(state => {
           const newXP = state.character.experience + xpToAdd;
           const newLevel = calculateLevelFromXP(newXP);
-          const newSpellSlots = calculateSpellSlots(
-            state.character.class,
-            newLevel
-          );
+          
+          // Ensure character has multiclass structure
+          const migratedCharacter = migrateToMulticlass(state.character);
+          
+          // Update class levels based on new total level
+          const updatedClasses = [...(migratedCharacter.classes || [])];
+          if (updatedClasses.length === 1) {
+            updatedClasses[0] = {
+              ...updatedClasses[0],
+              level: newLevel,
+            };
+          } else if (updatedClasses.length > 1) {
+            // Adjust the primary class to reach the target total level
+            const currentTotal = updatedClasses.reduce((sum, cls) => sum + cls.level, 0);
+            const levelDifference = newLevel - currentTotal;
+            
+            if (levelDifference !== 0) {
+              const primaryIndex = updatedClasses.reduce((maxIndex, cls, index) => 
+                cls.level > updatedClasses[maxIndex].level ? index : maxIndex, 0
+              );
+              
+              updatedClasses[primaryIndex] = {
+                ...updatedClasses[primaryIndex],
+                level: Math.max(1, updatedClasses[primaryIndex].level + levelDifference),
+              };
+            }
+          }
+
+          // Recalculate hit dice pools
+          const hitDicePools = calculateHitDicePools(updatedClasses, migratedCharacter.hitDicePools);
+
+          const updatedCharacter = {
+            ...migratedCharacter,
+            classes: updatedClasses,
+            totalLevel: newLevel,
+            level: newLevel,
+            hitDicePools,
+          };
+
+          // Recalculate spell slots using multiclass-aware functions
+          const newSpellSlots = calculateCharacterSpellSlots(updatedCharacter);
           const preservedSpellSlots = updateSpellSlotsPreservingUsed(
             newSpellSlots,
             state.character.spellSlots
           );
 
-          let pactMagic: PactMagic | undefined = state.character.pactMagic;
-          if (state.character.class.spellcaster === 'warlock') {
-            pactMagic = calculatePactMagic(newLevel);
-            // Preserve existing pact magic used slots if possible
-            if (state.character.pactMagic && pactMagic) {
-              pactMagic.slots.used = Math.min(
-                state.character.pactMagic.slots.used,
-                pactMagic.slots.max
-              );
-            }
+          const pactMagic = calculateCharacterPactMagic(updatedCharacter);
+          // Preserve existing pact magic used slots if possible
+          if (state.character.pactMagic && pactMagic) {
+            pactMagic.slots.used = Math.min(
+              state.character.pactMagic.slots.used,
+              pactMagic.slots.max
+            );
           }
 
           return {
             character: {
-              ...state.character,
+              ...updatedCharacter,
               experience: newXP,
-              level: newLevel,
               spellSlots: preservedSpellSlots,
               pactMagic,
             },
@@ -1867,32 +1904,65 @@ export const useCharacterStore = create<CharacterStore>()(
       setExperience: newXP => {
         set(state => {
           const newLevel = calculateLevelFromXP(newXP);
-          const newSpellSlots = calculateSpellSlots(
-            state.character.class,
-            newLevel
-          );
+          
+          // Ensure character has multiclass structure
+          const migratedCharacter = migrateToMulticlass(state.character);
+          
+          // Update class levels based on new total level
+          const updatedClasses = [...(migratedCharacter.classes || [])];
+          if (updatedClasses.length === 1) {
+            updatedClasses[0] = {
+              ...updatedClasses[0],
+              level: newLevel,
+            };
+          } else if (updatedClasses.length > 1) {
+            // Adjust the primary class to reach the target total level
+            const currentTotal = updatedClasses.reduce((sum, cls) => sum + cls.level, 0);
+            const levelDifference = newLevel - currentTotal;
+            
+            if (levelDifference !== 0) {
+              const primaryIndex = updatedClasses.reduce((maxIndex, cls, index) => 
+                cls.level > updatedClasses[maxIndex].level ? index : maxIndex, 0
+              );
+              
+              updatedClasses[primaryIndex] = {
+                ...updatedClasses[primaryIndex],
+                level: Math.max(1, updatedClasses[primaryIndex].level + levelDifference),
+              };
+            }
+          }
+
+          // Recalculate hit dice pools
+          const hitDicePools = calculateHitDicePools(updatedClasses, migratedCharacter.hitDicePools);
+
+          const updatedCharacter = {
+            ...migratedCharacter,
+            classes: updatedClasses,
+            totalLevel: newLevel,
+            level: newLevel,
+            hitDicePools,
+          };
+
+          // Recalculate spell slots using multiclass-aware functions
+          const newSpellSlots = calculateCharacterSpellSlots(updatedCharacter);
           const preservedSpellSlots = updateSpellSlotsPreservingUsed(
             newSpellSlots,
             state.character.spellSlots
           );
 
-          let pactMagic: PactMagic | undefined = state.character.pactMagic;
-          if (state.character.class.spellcaster === 'warlock') {
-            pactMagic = calculatePactMagic(newLevel);
-            // Preserve existing pact magic used slots if possible
-            if (state.character.pactMagic && pactMagic) {
-              pactMagic.slots.used = Math.min(
-                state.character.pactMagic.slots.used,
-                pactMagic.slots.max
-              );
-            }
+          const pactMagic = calculateCharacterPactMagic(updatedCharacter);
+          // Preserve existing pact magic used slots if possible
+          if (state.character.pactMagic && pactMagic) {
+            pactMagic.slots.used = Math.min(
+              state.character.pactMagic.slots.used,
+              pactMagic.slots.max
+            );
           }
 
           return {
             character: {
-              ...state.character,
+              ...updatedCharacter,
               experience: newXP,
-              level: newLevel,
               spellSlots: preservedSpellSlots,
               pactMagic,
             },
