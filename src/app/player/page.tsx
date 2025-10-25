@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Plus,
@@ -15,8 +15,11 @@ import {
   ArrowLeft,
   Upload,
   Download,
+  Users,
 } from 'lucide-react';
 import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
+import { HeaderAuthButton } from '@/components/ui/auth/AuthButton';
+import { JoinCampaignModal } from '@/components/campaigns/JoinCampaignModal';
 
 export default function PlayerDashboardPage() {
   const {
@@ -31,6 +34,8 @@ export default function PlayerDashboardPage() {
     migrateFromOldStorage,
     importCharacter,
   } = usePlayerStore();
+
+  const [isJoinCampaignModalOpen, setIsJoinCampaignModalOpen] = useState(false);
 
   const activeCharacters = getActiveCharacters();
   const archivedCharacters = getArchivedCharacters();
@@ -284,6 +289,7 @@ export default function PlayerDashboardPage() {
                 <Crown size={16} />
                 DM Tools
               </Link>
+              <HeaderAuthButton />
             </div>
           </div>
         </div>
@@ -301,6 +307,15 @@ export default function PlayerDashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {/* Join Campaign */}
+            <button
+              onClick={() => setIsJoinCampaignModalOpen(true)}
+              className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-white shadow-md transition-colors hover:bg-purple-700"
+            >
+              <Users size={18} />
+              Join Campaign
+            </button>
+
             {/* Import Character */}
             <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white shadow-md transition-colors hover:bg-green-700">
               <Upload size={18} />
@@ -463,6 +478,12 @@ export default function PlayerDashboardPage() {
           </>
         )}
       </main>
+
+      {/* Join Campaign Modal */}
+      <JoinCampaignModal
+        isOpen={isJoinCampaignModalOpen}
+        onClose={() => setIsJoinCampaignModalOpen(false)}
+      />
     </div>
   );
 }

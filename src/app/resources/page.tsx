@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Book, Users, Scroll, Skull, Library } from 'lucide-react';
+import { HeaderAuthButton } from '@/components/ui/auth/AuthButton';
 
 interface ResourceItem {
   title: string;
@@ -81,20 +82,23 @@ export default function ResourcesPage() {
                 </h1>
               </div>
             </div>
-            <nav className="hidden space-x-6 md:flex">
-              <Link
-                href="/player"
-                className="font-medium text-slate-600 transition-colors hover:text-indigo-600"
-              >
-                Player Dashboard
-              </Link>
-              <Link
-                href="/dm"
-                className="font-medium text-slate-600 transition-colors hover:text-indigo-600"
-              >
-                DM Toolset
-              </Link>
-            </nav>
+            <div className="flex items-center space-x-6">
+              <nav className="hidden space-x-6 md:flex">
+                <Link
+                  href="/player"
+                  className="font-medium text-slate-600 transition-colors hover:text-indigo-600"
+                >
+                  Player Dashboard
+                </Link>
+                <Link
+                  href="/dm"
+                  className="font-medium text-slate-600 transition-colors hover:text-indigo-600"
+                >
+                  DM Toolset
+                </Link>
+              </nav>
+              <HeaderAuthButton />
+            </div>
           </div>
         </div>
       </header>

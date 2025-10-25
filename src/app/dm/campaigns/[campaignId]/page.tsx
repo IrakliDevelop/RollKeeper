@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -11,22 +11,106 @@ import {
   FileText,
   Plus,
   Calendar,
+  Loader2,
+  AlertCircle,
+  Trash2,
 } from 'lucide-react';
-import { useDMStore } from '@/store/dmStore';
+import { useCampaignStore } from '@/store/campaignStore';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function CampaignDetailPage() {
   const params = useParams();
   const campaignId = params.campaignId as string;
+  
+  const { isAuthenticated } = useAuth();
+  const { 
+    getCampaignById, 
+    setActiveCampaign, 
+    fetchCampaigns, 
+    removeMember,
+    isLoading, 
+    error 
+  } = useCampaignStore();
 
-  const { getCampaignById, setActiveCampaign } = useDMStore();
+  // Fetch campaigns on mount if authenticated
+  useEffect(() => {
+    if (isAuthenticated && !getCampaignById(campaignId)) {
+      fetchCampaigns();
+    }
+  }, [isAuthenticated, campaignId, fetchCampaigns, getCampaignById]);
+
   const campaign = getCampaignById(campaignId);
+  const isDM = campaign?.userRole === 'dm';
+
+  // Handler for removing a member
+  const handleRemoveMember = async (memberId: string, memberName: string) => {
+    if (!confirm(`Are you sure you want to remove ${memberName} from this campaign?`)) {
+      return;
+    }
+
+    const success = await removeMember(campaignId, memberId);
+    if (success) {
+      // Optionally show a success message
+      console.log(`Successfully removed ${memberName} from campaign`);
+    }
+  };
 
   // Set this as the active campaign
-  React.useEffect(() => {
+  useEffect(() => {
     if (campaign) {
       setActiveCampaign(campaignId);
     }
   }, [campaign, campaignId, setActiveCampaign]);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="py-12 text-center">
+        <AlertCircle className="mx-auto mb-4 text-red-500" size={48} />
+        <h1 className="mb-2 text-2xl font-bold text-slate-800">
+          Authentication Required
+        </h1>
+        <p className="mb-4 text-slate-600">
+          Please sign in to access this campaign.
+        </p>
+        <Link
+          href="/auth"
+          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+        >
+          Sign In
+        </Link>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="py-12 text-center">
+        <Loader2 className="mx-auto mb-4 animate-spin text-blue-500" size={48} />
+        <h1 className="mb-2 text-2xl font-bold text-slate-800">
+          Loading Campaign...
+        </h1>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="py-12 text-center">
+        <AlertCircle className="mx-auto mb-4 text-red-500" size={48} />
+        <h1 className="mb-2 text-2xl font-bold text-slate-800">
+          Error Loading Campaign
+        </h1>
+        <p className="mb-4 text-slate-600">{error}</p>
+        <Link
+          href="/dm/campaigns"
+          className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700"
+        >
+          <ArrowLeft size={16} />
+          Back to Campaigns
+        </Link>
+      </div>
+    );
+  }
 
   if (!campaign) {
     return (
@@ -36,8 +120,7 @@ export default function CampaignDetailPage() {
           Campaign Not Found
         </h1>
         <p className="mb-6 text-slate-600">
-          The campaign you&apos;re looking for doesn&apos;t exist or has been
-          deleted.
+          The campaign you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
         </p>
         <Link
           href="/dm/campaigns"
@@ -50,8 +133,9 @@ export default function CampaignDetailPage() {
     );
   }
 
-  const activePlayers = campaign.playerCharacters.filter(pc => pc.isActive);
-  const recentSessions = campaign.sessions.slice(-3).reverse();
+  // For now, use placeholder data since we haven't implemented these features yet
+  const activePlayers = campaign.campaign_members?.filter(member => member.is_active) || [];
+  const memberCount = campaign.memberCount || 0;
 
   return (
     <div className="campaign-detail-page">
@@ -69,9 +153,9 @@ export default function CampaignDetailPage() {
             <h1 className="text-3xl font-bold text-slate-800">
               {campaign.name}
             </h1>
-            {campaign.isArchived && (
+            {!campaign.is_active && (
               <span className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-600">
-                Archived
+                Inactive
               </span>
             )}
           </div>
@@ -88,9 +172,9 @@ export default function CampaignDetailPage() {
             <Users className="mr-3 h-8 w-8 text-blue-500" />
             <div>
               <h3 className="text-2xl font-bold text-slate-800">
-                {activePlayers.length}
+                {memberCount}
               </h3>
-              <p className="text-slate-600">Active Players</p>
+              <p className="text-slate-600">Campaign Members</p>
             </div>
           </div>
         </div>
@@ -100,7 +184,7 @@ export default function CampaignDetailPage() {
             <Calendar className="mr-3 h-8 w-8 text-green-500" />
             <div>
               <h3 className="text-2xl font-bold text-slate-800">
-                {campaign.sessions.length}
+                0
               </h3>
               <p className="text-slate-600">Sessions Played</p>
             </div>
@@ -112,7 +196,7 @@ export default function CampaignDetailPage() {
             <Sword className="mr-3 h-8 w-8 text-red-500" />
             <div>
               <h3 className="text-2xl font-bold text-slate-800">
-                {campaign.encounters.length}
+                0
               </h3>
               <p className="text-slate-600">Encounters</p>
             </div>
@@ -124,7 +208,7 @@ export default function CampaignDetailPage() {
             <FileText className="mr-3 h-8 w-8 text-purple-500" />
             <div>
               <h3 className="text-2xl font-bold text-slate-800">
-                {campaign.notes.length}
+                0
               </h3>
               <p className="text-slate-600">Notes</p>
             </div>
@@ -141,7 +225,7 @@ export default function CampaignDetailPage() {
             <div className="flex items-center justify-between border-b border-slate-200 p-6">
               <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-800">
                 <Users size={20} />
-                Player Characters ({activePlayers.length})
+                Campaign Members ({activePlayers.length})
               </h2>
               <Link
                 href={`/dm/campaigns/${campaignId}/characters`}
@@ -157,51 +241,62 @@ export default function CampaignDetailPage() {
                 <div className="py-8 text-center">
                   <Users className="mx-auto mb-4 h-16 w-16 text-slate-300" />
                   <h3 className="mb-2 text-lg font-medium text-slate-800">
-                    No player characters
+                    No campaign members
                   </h3>
                   <p className="mb-4 text-slate-600">
-                    Import player character sheets to start managing your
-                    campaign.
+                    Share your campaign invite code with players to get started.
                   </p>
-                  <Link
-                    href={`/dm/campaigns/${campaignId}/characters/import`}
-                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-                  >
-                    <Plus size={16} />
-                    Import First Character
-                  </Link>
+                  <div className="rounded-lg bg-gray-100 p-4">
+                    <p className="text-sm text-gray-700 mb-2">
+                      <strong>Invite Code:</strong> {campaign.invite_code || 'Generating...'}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Share this code with players so they can join your campaign.
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {activePlayers.map(pc => (
+                  {activePlayers.map(member => (
                     <div
-                      key={pc.id}
+                      key={member.id}
                       className="rounded-lg border border-slate-200 p-4 transition-shadow hover:shadow-md"
                     >
                       <div className="mb-2 flex items-center justify-between">
                         <h3 className="font-semibold text-slate-800">
-                          {pc.characterName}
+                          {member.users?.display_name || member.users?.username || 'Unknown User'}
                         </h3>
-                        <span className="rounded bg-green-100 px-2 py-1 text-xs text-green-800">
-                          Level {pc.level}
+                        <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800">
+                          {member.role}
                         </span>
                       </div>
                       <p className="mb-1 text-sm text-slate-600">
-                        {pc.race} {pc.class}
+                        {member.characters?.name || 'No character assigned'}
                       </p>
                       <p className="text-xs text-slate-500">
-                        Player: {pc.playerName}
+                        Joined: {new Date(member.joined_at).toLocaleDateString()}
                       </p>
                       <div className="mt-3 flex gap-2">
-                        <Link
-                          href={`/dm/campaigns/${campaignId}/characters/${pc.id}`}
-                          className="flex-1 rounded bg-slate-100 px-2 py-1 text-center text-xs text-slate-700 transition-colors hover:bg-slate-200"
-                        >
-                          View
-                        </Link>
+                        {member.characters && (
+                          <button className="flex-1 rounded bg-slate-100 px-2 py-1 text-center text-xs text-slate-700 transition-colors hover:bg-slate-200">
+                            View Character
+                          </button>
+                        )}
                         <button className="rounded bg-red-100 px-2 py-1 text-xs text-red-700 transition-colors hover:bg-red-200">
                           Combat
                         </button>
+                        {isDM && (
+                          <button 
+                            onClick={() => handleRemoveMember(
+                              member.id, 
+                              member.users?.display_name || member.users?.username || 'Unknown User'
+                            )}
+                            className="rounded bg-red-500 px-2 py-1 text-xs text-white transition-colors hover:bg-red-600"
+                            title="Remove player from campaign"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -227,56 +322,15 @@ export default function CampaignDetailPage() {
             </div>
 
             <div className="p-6">
-              {recentSessions.length === 0 ? (
-                <div className="py-8 text-center">
-                  <Calendar className="mx-auto mb-4 h-16 w-16 text-slate-300" />
-                  <h3 className="mb-2 text-lg font-medium text-slate-800">
-                    No sessions yet
-                  </h3>
-                  <p className="mb-4 text-slate-600">
-                    Start logging your campaign sessions and track your
-                    progress.
-                  </p>
-                  <Link
-                    href={`/dm/campaigns/${campaignId}/sessions/new`}
-                    className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white transition-colors hover:bg-green-700"
-                  >
-                    <Plus size={16} />
-                    Log First Session
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {recentSessions.map(session => (
-                    <div
-                      key={session.id}
-                      className="rounded-lg border border-slate-200 p-4"
-                    >
-                      <div className="mb-2 flex items-center justify-between">
-                        <h3 className="font-semibold text-slate-800">
-                          {session.name}
-                        </h3>
-                        <span className="text-xs text-slate-500">
-                          {new Date(session.date).toLocaleDateString()}
-                        </span>
-                      </div>
-                      {session.summary && (
-                        <p className="mb-2 text-sm text-slate-600">
-                          {session.summary}
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between text-xs text-slate-500">
-                        <span>
-                          {session.presentPlayers.length} players present
-                        </span>
-                        {session.xpAwarded > 0 && (
-                          <span>{session.xpAwarded} XP awarded</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="py-8 text-center">
+                <Calendar className="mx-auto mb-4 h-16 w-16 text-slate-300" />
+                <h3 className="mb-2 text-lg font-medium text-slate-800">
+                  Session Tracking Coming Soon
+                </h3>
+                <p className="mb-4 text-slate-600">
+                  Session logging and tracking features are being developed.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -346,30 +400,27 @@ export default function CampaignDetailPage() {
               <div>
                 <span className="text-slate-500">Created:</span>
                 <span className="ml-2 text-slate-800">
-                  {new Date(campaign.createdAt).toLocaleDateString()}
+                  {new Date(campaign.created_at).toLocaleDateString()}
                 </span>
               </div>
               <div>
                 <span className="text-slate-500">Last Updated:</span>
                 <span className="ml-2 text-slate-800">
-                  {new Date(campaign.updatedAt).toLocaleDateString()}
+                  {new Date(campaign.updated_at).toLocaleDateString()}
                 </span>
               </div>
-              {campaign.tags.length > 0 && (
-                <div>
-                  <span className="mb-2 block text-slate-500">Tags:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {campaign.tags.map(tag => (
-                      <span
-                        key={tag}
-                        className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div>
+                <span className="text-slate-500">Invite Code:</span>
+                <span className="ml-2 font-mono text-slate-800">
+                  {campaign.invite_code || 'Generating...'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-500">Status:</span>
+                <span className={`ml-2 ${campaign.is_active ? 'text-green-600' : 'text-gray-600'}`}>
+                  {campaign.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
             </div>
           </div>
         </div>

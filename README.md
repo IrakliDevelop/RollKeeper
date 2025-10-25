@@ -69,6 +69,10 @@ src/
 - **Responsive Design**: Mobile-first design that works on all devices
 - **Auto-Save**: Automatic character data persistence
 - **Export/Import**: JSON-based character data portability
+- **User Authentication**: Secure account system with JWT tokens
+- **Cloud Sync**: Real-time character synchronization across devices
+- **Real-Time Multiplayer**: Server-Sent Events for live campaign updates
+- **Enhanced Battle Tracker**: Compact DM view with real-time player monitoring
 
 ### 🚧 In Development
 
@@ -76,7 +80,7 @@ src/
 - **Advanced Combat**: Initiative order management and turn tracking
 - **Spell Components**: Material and somatic component tracking
 - **Inventory System**: Equipment and item management
-- **Multiplayer Support**: Real-time character sharing (future)
+- **Mobile Apps**: Native iOS/Android applications
 
 ## 🚀 Getting Started
 
@@ -133,10 +137,19 @@ npm run type-check   # TypeScript type checking
 ### For Dungeon Masters
 
 1. **Access DM Toolset**: Click "DM Toolset" from the main page
-2. **Manage Campaigns**: Organize sessions, notes, and story progression
-3. **Track Combat**: Use the visual initiative tracker for smooth combat
-4. **Access Bestiary**: Search and reference monster stat blocks
-5. **Import Characters**: Manage player character sheets
+2. **Create Account**: Sign up to enable campaign management and real-time features
+3. **Manage Campaigns**: Create campaigns and invite players
+4. **Track Combat**: Use the enhanced battle tracker with real-time player monitoring
+5. **Access Bestiary**: Search and reference monster stat blocks
+6. **Monitor Players**: See live HP, spell slots, and condition updates
+
+### Authentication & Cloud Features
+
+1. **Create Account**: Sign up at `/auth` to unlock cloud features
+2. **Cloud Sync**: Characters automatically sync across all devices
+3. **Real-Time Campaigns**: Join DM campaigns for live multiplayer sessions
+4. **Offline Support**: Continue playing without internet, sync when reconnected
+5. **Data Security**: All data encrypted and securely stored
 
 ## 🔧 Configuration
 

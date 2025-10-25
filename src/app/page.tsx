@@ -11,6 +11,7 @@ import {
   Star,
   ArrowRight,
 } from 'lucide-react';
+import { AuthButton } from '@/components/ui/auth/AuthButton';
 
 export default function LandingPage() {
   return (
@@ -44,6 +45,7 @@ export default function LandingPage() {
               >
                 Resources
               </Link>
+              <AuthButton variant="compact" />
             </div>
           </div>
         </div>

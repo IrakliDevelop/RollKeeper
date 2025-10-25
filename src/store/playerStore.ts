@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { CharacterState, CharacterExport } from '@/types/character';
 import { DEFAULT_CHARACTER_STATE, STORAGE_KEY } from '@/utils/constants';
+import { generateCharacterId } from '@/utils/uuid';
 
 // Storage configuration
 const PLAYER_STORAGE_KEY = 'rollkeeper-player-data';
@@ -71,16 +72,12 @@ interface PlayerStoreState {
 }
 
 // Utility functions
-const generateId = (): string => {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
-};
-
 const createPlayerCharacter = (
   name: string,
   characterData: CharacterState
 ): PlayerCharacter => {
   const now = new Date();
-  const playerId = generateId();
+  const playerId = generateCharacterId();
   
   // Ensure characterData has the same ID as the PlayerCharacter
   const characterDataWithId: CharacterState = {
@@ -210,7 +207,7 @@ export const usePlayerStore = create<PlayerStoreState>()(
           ...DEFAULT_CHARACTER_STATE,
           ...partialCharacterData,
           name: name,
-          id: generateId(),
+          id: generateCharacterId(),
         };
 
         const playerCharacter = createPlayerCharacter(name, characterData);
@@ -305,7 +302,7 @@ export const usePlayerStore = create<PlayerStoreState>()(
 
         const duplicatedCharacterData = {
           ...originalCharacter.characterData,
-          id: generateId(),
+          id: generateCharacterId(),
           name: newName,
         };
 

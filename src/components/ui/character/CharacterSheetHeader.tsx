@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { SaveIndicator } from '@/components/ui/feedback/SaveIndicator';
+import { SyncIndicator } from '@/components/ui/sync/SyncIndicator';
+import { HeaderAuthButton } from '@/components/ui/auth/AuthButton';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
 import { exportCharacterToFile } from '@/utils/fileOperations';
@@ -115,7 +117,9 @@ export default function CharacterSheetHeader({
             </div>
 
             <div className="flex items-center space-x-4">
+              <SyncIndicator compact />
               <SaveIndicator lastSaved={lastSaved} status={saveStatus} />
+              <HeaderAuthButton />
 
               {/* File Operations */}
               <div className="flex items-center space-x-2">
