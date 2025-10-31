@@ -19,14 +19,10 @@ import {
   SortAsc,
   SortDesc,
   X,
-  Clock,
-  Target,
-  Zap,
-  Book,
-  Sparkles
 } from 'lucide-react';
 import { FancySelect } from '@/components/ui/forms/FancySelect';
 import { Modal } from '@/components/ui/feedback/Modal';
+import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import DragDropList from '@/components/ui/layout/DragDropList';
 
 // Constants for spell schools and common casting times
@@ -1353,167 +1349,15 @@ export const EnhancedSpellManagement: React.FC = () => {
         </Modal>
       )}
 
-      {/* View Spell Modal - Redesigned with Dark Theme */}
+      {/* View Spell Modal - Using unified SpellDetailsModal */}
       {viewingSpell && (
-        <Modal
-          isOpen={viewingSpell !== null}
+        <SpellDetailsModal
+          spell={viewingSpell}
+          isOpen={true}
           onClose={() => setViewingSpell(null)}
-          title=""
-          size="xl"
-          closeOnBackdropClick={true}
-        >
-          <div className="space-y-6">
-            {/* Header with spell name and level */}
-            <div className="rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">{viewingSpell.name}</h2>
-                  <div className="mt-2 flex items-center gap-3">
-                    {viewingSpell.level === 0 ? (
-                      <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
-                        Cantrip
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-800">
-                        Level {viewingSpell.level}
-                      </span>
-                    )}
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-800">
-                      {viewingSpell.school}
-                    </span>
-                    {viewingSpell.ritual && (
-                      <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-800">
-                        Ritual
-                      </span>
-                    )}
-                    {viewingSpell.concentration && (
-                      <span className="rounded-full bg-orange-100 px-3 py-1 text-sm font-medium text-orange-800">
-                        Concentration
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {viewingSpell.isPrepared && (
-                    <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
-                      Prepared
-                    </span>
-                  )}
-                  {viewingSpell.isAlwaysPrepared && (
-                    <span className="rounded-full bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-800">
-                      Always Prepared
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Spell Details Grid */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {/* Casting Information */}
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-blue-800">
-                  <Clock className="h-5 w-5 text-blue-600" />
-                  Casting Details
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="font-medium text-gray-600">Casting Time:</span>
-                    <span className="text-gray-900">{viewingSpell.castingTime}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium text-gray-600">Range:</span>
-                    <span className="text-gray-900">{viewingSpell.range}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium text-gray-600">Duration:</span>
-                    <span className="text-gray-900">{viewingSpell.duration}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium text-gray-600">Source:</span>
-                    <span className="text-gray-900">{viewingSpell.source || 'Unknown'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Components */}
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-amber-800">
-                  <Sparkles className="h-5 w-5 text-amber-600" />
-                  Components
-                </h3>
-                <div className="flex items-center gap-2 mb-3">
-                  {viewingSpell.components.verbal && (
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-300 bg-blue-100 text-sm font-semibold text-blue-700">
-                      V
-                    </span>
-                  )}
-                  {viewingSpell.components.somatic && (
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-green-300 bg-green-100 text-sm font-semibold text-green-700">
-                      S
-                    </span>
-                  )}
-                  {viewingSpell.components.material && (
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-purple-300 bg-purple-100 text-sm font-semibold text-purple-700">
-                      M
-                    </span>
-                  )}
-                </div>
-                {viewingSpell.components.material && viewingSpell.components.materialDescription && (
-                  <p className="text-sm text-gray-700 italic">
-                    ({viewingSpell.components.materialDescription})
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Description */}
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-              <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-emerald-800">
-                <Book className="h-5 w-5 text-emerald-600" />
-                Description
-              </h3>
-              <div className="prose max-w-none">
-                <p className="leading-relaxed text-gray-800">{viewingSpell.description}</p>
-              </div>
-            </div>
-
-            {/* Higher Level */}
-            {viewingSpell.higherLevel && (
-              <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
-                <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-orange-800">
-                  <Zap className="h-5 w-5 text-orange-600" />
-                  At Higher Levels
-                </h3>
-                <p className="leading-relaxed text-gray-800">{viewingSpell.higherLevel}</p>
-              </div>
-            )}
-
-            {/* Combat Information */}
-            {(viewingSpell.actionType === 'attack' || viewingSpell.actionType === 'save' || viewingSpell.damage) && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-red-800">
-                  <Target className="h-5 w-5 text-red-600" />
-                  Combat Details
-                </h3>
-                <div className="space-y-2">
-                  {viewingSpell.damage && (
-                    <div>
-                      <span className="font-medium text-gray-600">Damage:</span>{' '}
-                      <span className="text-gray-900 font-semibold">{viewingSpell.damage} {viewingSpell.damageType}</span>
-                    </div>
-                  )}
-                  {viewingSpell.actionType === 'save' && viewingSpell.savingThrow && (
-                    <div>
-                      <span className="font-medium text-gray-600">Saving Throw:</span>{' '}
-                      <span className="text-gray-900 font-semibold">{viewingSpell.savingThrow}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </Modal>
+          isFavorite={favoriteSpells.includes(viewingSpell.id)}
+          onToggleFavorite={() => toggleSpellFavorite(viewingSpell.id)}
+        />
       )}
     </div>
   );
