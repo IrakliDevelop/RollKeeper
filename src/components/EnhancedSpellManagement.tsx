@@ -20,6 +20,8 @@ import {
   SortDesc,
   X,
 } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
+import { Badge } from '@/components/ui/layout/badge';
 import { FancySelect } from '@/components/ui/forms/FancySelect';
 import { Modal } from '@/components/ui/feedback/Modal';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
@@ -202,12 +204,14 @@ const SpellCard: React.FC<{
   onTogglePrepared: () => void;
   onToggleFavorite: () => void;
 }> = ({ spell, compact, isFavorite, onEdit, onDelete, onView, onTogglePrepared, onToggleFavorite }) => {
+  const isCantrip = spell.level === 0;
+  
   if (compact) {
     return (
-      <div className={`flex items-center justify-between rounded-lg border p-3 transition-all hover:shadow-md ${
+      <div className={`flex items-center justify-between rounded-lg border-2 p-3 transition-all hover:shadow-md ${
         spell.isPrepared
-          ? 'border-green-400 bg-green-50'
-          : 'border-gray-200 bg-gray-50 hover:border-purple-300'
+          ? 'border-green-300 bg-white'
+          : 'border-gray-200 bg-white hover:border-purple-300'
       }`}>
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <button
@@ -220,75 +224,75 @@ const SpellCard: React.FC<{
           </button>
           
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className={`h-2 w-2 rounded-full flex-shrink-0 ${
-              spell.level === 0 ? 'bg-yellow-400' : 'bg-purple-400'
-            }`} />
             <span className="font-bold text-gray-800 truncate">{spell.name}</span>
-            <span className="text-xs text-gray-500 flex-shrink-0">{spell.school}</span>
-            {spell.duration && (
-              <span className="text-xs text-gray-500 flex-shrink-0">• {spell.duration}</span>
-            )}
+            <Badge 
+              variant={isCantrip ? "warning" : "primary"} 
+              size="sm"
+              className={isCantrip ? "bg-yellow-100 text-yellow-800 flex-shrink-0" : "bg-purple-100 text-purple-800 flex-shrink-0"}
+            >
+              {isCantrip ? 'Cantrip' : `Lv${spell.level}`}
+            </Badge>
+            <span className="text-xs text-gray-500 flex-shrink-0 hidden sm:inline">{spell.school}</span>
           </div>
           
           <div className="flex items-center gap-1 flex-shrink-0">
-            {spell.level === 0 && (
-              <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800">Cantrip</span>
-            )}
             {spell.concentration && (
-              <span className="rounded bg-yellow-100 px-1 py-0.5 text-xs text-yellow-800">C</span>
+              <Badge variant="warning" size="sm">C</Badge>
             )}
             {spell.ritual && (
-              <span className="rounded bg-purple-100 px-1 py-0.5 text-xs text-purple-800">R</span>
+              <Badge variant="secondary" size="sm">R</Badge>
             )}
           </div>
         </div>
         
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button
+        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+          <Button
             onClick={onTogglePrepared}
-            className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-              spell.isPrepared
-                ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+            variant={spell.isPrepared ? "success" : "outline"}
+            size="xs"
           >
             {spell.isPrepared ? 'Prepared' : 'Prepare'}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onView}
-            className="rounded p-1 text-gray-600 hover:bg-gray-200 hover:text-gray-800"
+            variant="ghost"
+            size="xs"
             title="View details"
           >
             <Eye size={14} />
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onEdit}
-            className="rounded p-1 text-blue-600 hover:bg-blue-100 hover:text-blue-800"
+            variant="ghost"
+            size="xs"
             title="Edit spell"
+            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
           >
             <Edit2 size={14} />
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onDelete}
-            className="rounded p-1 text-red-600 hover:bg-red-100 hover:text-red-800"
+            variant="ghost"
+            size="xs"
             title="Delete spell"
+            className="text-red-600 hover:text-red-800 hover:bg-red-50"
           >
             <Trash2 size={14} />
-          </button>
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`rounded-lg border p-4 transition-all hover:shadow-md ${
+    <div className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${
       spell.isPrepared
-        ? 'border-green-400 bg-green-50'
-        : 'border-gray-200 bg-gray-50 hover:border-purple-300'
+        ? 'border-green-300 bg-white'
+        : 'border-gray-200 bg-white hover:border-purple-300'
     }`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="mb-2 flex items-center gap-2">
+          <div className="mb-2 flex items-center gap-2 flex-wrap">
             <button
               onClick={onToggleFavorite}
               className={`transition-colors ${
@@ -298,21 +302,25 @@ const SpellCard: React.FC<{
               <Star size={18} fill={isFavorite ? 'currentColor' : 'none'} />
             </button>
             <h5 className="font-bold text-gray-800">{spell.name}</h5>
-            {spell.level === 0 && (
-              <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800">Cantrip</span>
-            )}
+            <Badge 
+              variant={isCantrip ? "warning" : "primary"} 
+              size="sm"
+              className={isCantrip ? "bg-yellow-100 text-yellow-800" : "bg-purple-100 text-purple-800"}
+            >
+              {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
+            </Badge>
             {spell.concentration && (
-              <span className="rounded bg-yellow-100 px-2 py-1 text-xs text-yellow-800">Concentration</span>
+              <Badge variant="warning" size="sm">Concentration</Badge>
             )}
             {spell.ritual && (
-              <span className="rounded bg-purple-100 px-2 py-1 text-xs text-purple-800">Ritual</span>
+              <Badge variant="secondary" size="sm">Ritual</Badge>
             )}
             {spell.isAlwaysPrepared && (
-              <span className="rounded bg-indigo-100 px-2 py-1 text-xs text-indigo-800">Always Prepared</span>
+              <Badge variant="info" size="sm">Always Prepared</Badge>
             )}
           </div>
           
-          <div className="mb-2 flex items-center gap-4 text-sm text-gray-600">
+          <div className="mb-2 flex items-center gap-4 text-sm text-gray-600 flex-wrap">
             <span><strong>School:</strong> {spell.school}</span>
             <span><strong>Time:</strong> {spell.castingTime}</span>
             <span><strong>Range:</strong> {spell.range}</span>
@@ -332,10 +340,10 @@ const SpellCard: React.FC<{
           </div>
           
           {spell.damage && (
-            <div className="mb-2 text-sm">
-              <span className="rounded bg-red-100 px-2 py-1 text-red-800">
+            <div className="mb-2">
+              <Badge variant="danger" size="sm">
                 {spell.damage} {spell.damageType}
-              </span>
+              </Badge>
             </div>
           )}
           
@@ -343,39 +351,41 @@ const SpellCard: React.FC<{
         </div>
         
         <div className="ml-4 flex flex-col gap-2">
-          <button
+          <Button
             onClick={onTogglePrepared}
-            className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
-              spell.isPrepared
-                ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+            variant={spell.isPrepared ? "success" : "outline"}
+            size="sm"
           >
             {spell.isPrepared ? 'Prepared' : 'Prepare'}
-          </button>
+          </Button>
           
           <div className="flex gap-1">
-            <button
+            <Button
               onClick={onView}
-              className="rounded p-2 text-gray-600 hover:bg-gray-200 hover:text-gray-800"
+              variant="outline"
+              size="sm"
               title="View details"
             >
               <Eye size={16} />
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={onEdit}
-              className="rounded p-2 text-blue-600 hover:bg-blue-100 hover:text-blue-800"
+              variant="outline"
+              size="sm"
               title="Edit spell"
+              className="border-blue-300 text-blue-700 hover:bg-blue-50"
             >
               <Edit2 size={16} />
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={onDelete}
-              className="rounded p-2 text-red-600 hover:bg-red-100 hover:text-red-800"
+              variant="outline"
+              size="sm"
               title="Delete spell"
+              className="border-red-300 text-red-700 hover:bg-red-50"
             >
               <Trash2 size={16} />
-            </button>
+            </Button>
           </div>
         </div>
       </div>
