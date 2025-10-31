@@ -191,7 +191,7 @@ export interface SelectFieldProps {
 }
 
 const SelectField = React.forwardRef<
-  React.ElementRef<typeof SelectPrimitive.Root>,
+  React.ComponentRef<typeof SelectPrimitive.Trigger>,
   SelectFieldProps &
     Omit<
       React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root>,

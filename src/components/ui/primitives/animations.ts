@@ -8,9 +8,9 @@
 import { type Variants, type Transition } from 'framer-motion';
 
 /**
- * Standard transition timings
+ * Standard transition timings for animations
  */
-export const transitions = {
+export const animationTransitions = {
   fast: { duration: 0.15, ease: 'easeOut' } as Transition,
   normal: { duration: 0.2, ease: 'easeOut' } as Transition,
   slow: { duration: 0.3, ease: 'easeOut' } as Transition,
@@ -111,7 +111,7 @@ export const pressAnimation = {
  */
 export const tapAnimation = {
   scale: 0.95,
-  transition: transitions.spring,
+  transition: animationTransitions.spring,
 };
 
 /**
@@ -119,7 +119,7 @@ export const tapAnimation = {
  */
 export const hoverLiftAnimation = {
   y: -2,
-  transition: transitions.fast,
+  transition: animationTransitions.fast,
 };
 
 /**
