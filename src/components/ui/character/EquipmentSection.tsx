@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { WeaponInventory } from '@/components/WeaponInventory';
 import ArmorDefenseManager from '@/components/ArmorDefenseManager';
+import { Badge } from '@/components/ui/layout/badge';
 import { CharacterState } from '@/types/character';
 
 interface EquipmentSectionProps {
@@ -89,19 +90,19 @@ export default function EquipmentSection({
         badge={
           <div className="flex items-center gap-2">
             {character.weapons.length > 0 && (
-              <span className="rounded-full bg-purple-100 px-2 py-1 text-sm font-medium text-purple-800">
+              <Badge variant="primary" size="sm">
                 {character.weapons.length} weapons
-              </span>
+              </Badge>
             )}
             {character.magicItems.length > 0 && (
-              <span className="rounded-full bg-blue-100 px-2 py-1 text-sm font-medium text-blue-800">
+              <Badge variant="info" size="sm">
                 {character.magicItems.length} items
-              </span>
+              </Badge>
             )}
             {attunedItems > 0 && (
-              <span className="rounded-full bg-amber-100 px-2 py-1 text-sm font-medium text-amber-800">
+              <Badge variant="warning" size="sm">
                 {attunedItems} attuned
-              </span>
+              </Badge>
             )}
           </div>
         }
@@ -126,14 +127,14 @@ export default function EquipmentSection({
         badge={
           <div className="flex items-center gap-2">
             {character.armorItems.length > 0 && (
-              <span className="rounded-full bg-blue-100 px-2 py-1 text-sm font-medium text-blue-800">
+              <Badge variant="info" size="sm">
                 {character.armorItems.length} pieces
-              </span>
+              </Badge>
             )}
             {equippedArmor.length > 0 && (
-              <span className="rounded-full bg-green-100 px-2 py-1 text-sm font-medium text-green-800">
+              <Badge variant="success" size="sm">
                 {equippedArmor.length} equipped
-              </span>
+              </Badge>
             )}
           </div>
         }
