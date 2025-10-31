@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { SpellSlots, PactMagic } from '@/types/character';
+import { Button } from '@/components/ui/forms';
 import { RotateCcw, Zap } from 'lucide-react';
 
 interface SpellSlotTrackerProps {
@@ -106,24 +107,28 @@ export function SpellSlotTracker({
         {!readonly && !hideResetButtons && !hideControls && (
           <div className="flex items-center space-x-2">
             {hasSpellSlots && onResetSpellSlots && (
-              <button
+              <Button
                 onClick={onResetSpellSlots}
-                className="flex items-center space-x-1 text-sm text-purple-600 hover:text-purple-800"
+                variant="ghost"
+                size="xs"
+                leftIcon={<RotateCcw className="h-3 w-3" />}
+                className="text-purple-600 hover:text-purple-800"
                 title="Reset all spell slots"
               >
-                <RotateCcw size={14} />
-                <span>Reset Slots</span>
-              </button>
+                Reset Slots
+              </Button>
             )}
             {hasPactMagic && onResetPactMagic && (
-              <button
+              <Button
                 onClick={onResetPactMagic}
-                className="flex items-center space-x-1 text-sm text-purple-600 hover:text-purple-800"
+                variant="ghost"
+                size="xs"
+                leftIcon={<RotateCcw className="h-3 w-3" />}
+                className="text-purple-600 hover:text-purple-800"
                 title="Reset pact magic slots"
               >
-                <RotateCcw size={14} />
-                <span>Reset Pact</span>
-              </button>
+                Reset Pact
+              </Button>
             )}
           </div>
         )}

@@ -3,6 +3,7 @@
 import React from 'react';
 import { TrackableTrait } from '@/types/character';
 import { calculateTraitMaxUses } from '@/utils/calculations';
+import { Button } from '@/components/ui/forms';
 import { RotateCcw, Zap, Eye, Trash2 } from 'lucide-react';
 
 interface TraitTrackerProps {
@@ -135,26 +136,30 @@ export function TraitTracker({
             {!hideResetButtons &&
               onResetTraits &&
               shortRestTraits.length > 0 && (
-                <button
+                <Button
                   onClick={() => onResetTraits('short')}
-                  className="flex items-center space-x-1 text-sm text-blue-600 hover:text-blue-800"
+                  variant="ghost"
+                  size="xs"
+                  leftIcon={<RotateCcw className="h-3 w-3" />}
+                  className="text-blue-600 hover:text-blue-800"
                   title="Reset short rest abilities"
                 >
-                  <RotateCcw size={14} />
-                  <span>Short Rest</span>
-                </button>
+                  Short Rest
+                </Button>
               )}
             {!hideResetButtons &&
               onResetTraits &&
               longRestTraits.length > 0 && (
-                <button
+                <Button
                   onClick={() => onResetTraits('long')}
-                  className="flex items-center space-x-1 text-sm text-indigo-600 hover:text-indigo-800"
+                  variant="ghost"
+                  size="xs"
+                  leftIcon={<RotateCcw className="h-3 w-3" />}
+                  className="text-indigo-600 hover:text-indigo-800"
                   title="Reset all abilities"
                 >
-                  <RotateCcw size={14} />
-                  <span>Long Rest</span>
-                </button>
+                  Long Rest
+                </Button>
               )}
           </div>
         )}
@@ -206,35 +211,41 @@ export function TraitTracker({
                 {!readonly && !hideControls && (
                   <div className="ml-2 flex items-center space-x-1">
                     {onTraitClick && (
-                      <button
+                      <Button
                         onClick={() => onTraitClick(trait)}
-                        className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+                        variant="ghost"
+                        size="xs"
+                        className="text-gray-600 hover:bg-gray-100 p-2"
                         title="View ability details"
                       >
-                        <Eye size={18} />
-                      </button>
+                        <Eye className="h-4 w-4" />
+                      </Button>
                     )}
                     {onDeleteTrait && (
-                      <button
+                      <Button
                         onClick={() => onDeleteTrait(trait.id)}
-                        className="rounded-lg p-2 text-red-600 transition-colors hover:bg-red-100"
+                        variant="ghost"
+                        size="xs"
+                        className="text-red-600 hover:bg-red-100 p-2"
                         title="Delete ability"
                       >
-                        <Trash2 size={18} />
-                      </button>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     )}
                   </div>
                 )}
                 {/* View button even when controls are hidden */}
                 {(readonly || hideControls) && onTraitClick && (
                   <div className="ml-2">
-                    <button
+                    <Button
                       onClick={() => onTraitClick(trait)}
-                      className="rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100"
+                      variant="ghost"
+                      size="xs"
+                      className="text-gray-600 hover:bg-gray-100 p-2"
                       title="View ability details"
                     >
-                      <Eye size={18} />
-                    </button>
+                      <Eye className="h-4 w-4" />
+                    </Button>
                   </div>
                 )}
               </div>
@@ -257,17 +268,19 @@ export function TraitTracker({
                   {renderUsageCheckboxes(trait)}
                 </div>
                 {!readonly && onUseTrait && (
-                  <button
+                  <Button
                     onClick={() => onUseTrait(trait.id)}
                     disabled={
                       trait.usedUses >=
                       calculateTraitMaxUses(trait, characterLevel)
                     }
-                    className={`rounded-lg p-2 text-indigo-600 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50`}
+                    variant="ghost"
+                    size="xs"
+                    className="text-indigo-600 hover:bg-indigo-100 p-2"
                     title="Use ability"
                   >
-                    <Zap size={18} />
-                  </button>
+                    <Zap className="h-4 w-4" />
+                  </Button>
                 )}
               </div>
             </div>

@@ -43,6 +43,8 @@ The main player character sheet (`/app/player/characters/[characterId]/page.tsx`
 - [x] CharacterHeaderSection ✅ (already migrated)
 - [x] RestManager - Short/long rest buttons ✅
 - [x] HitDiceTracker - Hit dice management buttons (Long Rest, Use, Restore) ✅
+- [x] SpellSlotTracker - Spell slot reset buttons (Reset Slots, Reset Pact) ✅
+- [x] TraitTracker - Trait management buttons (Short Rest, Long Rest, Use, View, Delete) ✅
 - [ ] CharacterSheetHeader - Action buttons (save, export, etc.)
 - [ ] CharacterBasicInfo - Character info inputs
 - [ ] AbilityScores - Ability score inputs and buttons
