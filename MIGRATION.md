@@ -119,10 +119,27 @@ Located in grouped tabs under "Character Details & Management" with 3 main group
     - Consistent hover states and transitions
     - Professional, organized form layouts
 
-- [ ] **ConditionsDiseasesManager** (`/src/components/ui/game/ConditionsDiseasesManager.tsx`)
-  - **Issues**: Condition cards, modal buttons, status badges
-  - **Components needed**: Button, Badge, Card, Modal
-  - **Priority**: MEDIUM
+- [x] **ConditionsDiseasesManager** (`/src/components/ui/game/ConditionsDiseasesManager.tsx`) ✅
+  - **Status**: FULLY MIGRATED WITH COMPLETE UX REDESIGN
+  - **Completed**: Total overhaul with modern tab-based interface
+  - **Extracted Components** (new):
+    - `ConditionCard.tsx`: Reusable condition display card
+    - `DiseaseCard.tsx`: Reusable disease display card
+  - **Components Refactored**:
+    - `ConditionsDiseasesManager.tsx`: Main component with tabs and modern UX
+    - `ConditionDetailsModal.tsx`: Modal with unified components
+  - **Details**:
+    - Tab-based interface (Conditions / Diseases)
+    - Collapsible add panels with search
+    - All inputs → Input components
+    - All selects → SelectField + SelectItem
+    - All buttons → Button components
+    - All badges → Badge components
+    - Enhanced exhaustion controls with large display
+    - Professional empty states
+    - Gradient headers and panels
+    - Consistent hover states and transitions
+    - Better visual hierarchy throughout
 
 #### Group 2: Items & Wealth 💰
 - [ ] **InventoryManager** (`/src/components/ui/game/InventoryManager.tsx`)
