@@ -155,8 +155,10 @@ export default function CharacterHeaderSection() {
                 size="sm"
               >
                 <label className="cursor-pointer">
-                  <Upload className="h-4 w-4" />
-                  Import
+                  <span className="flex items-center gap-2">
+                    <Upload className="h-4 w-4" />
+                    Import
+                  </span>
                   <input
                     type="file"
                     accept=".json"

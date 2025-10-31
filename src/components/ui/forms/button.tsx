@@ -55,13 +55,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const Comp = asChild ? Slot : 'button';
     const isDisabled = disabled || loading;
 
-    return (
-      <Comp
-        className={cn(buttonVariants({ variant, size, fullWidth }), className)}
-        ref={ref}
-        disabled={isDisabled}
-        {...props}
-      >
+    // When using asChild with icons, we need to ensure there's only one child
+    // Wrap content if using asChild AND we have icons or loading state
+    const shouldWrapContent = asChild && (loading || leftIcon || rightIcon);
+
+    const content = (
+      <>
         {loading && (
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
         )}
@@ -76,6 +75,17 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             {rightIcon}
           </span>
         )}
+      </>
+    );
+
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, fullWidth }), className)}
+        ref={ref}
+        disabled={isDisabled}
+        {...props}
+      >
+        {shouldWrapContent ? <span className="flex items-center gap-2">{content}</span> : content}
       </Comp>
     );
   }

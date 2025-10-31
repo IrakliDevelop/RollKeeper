@@ -153,8 +153,10 @@ export default function CharacterSheetHeader({
                   size="sm"
                 >
                   <label className="cursor-pointer">
-                    <Upload size={16} className="mr-2" />
-                    Import
+                    <span className="flex items-center gap-2">
+                      <Upload size={16} />
+                      Import
+                    </span>
                     <input
                       type="file"
                       accept=".json"
@@ -261,8 +263,8 @@ export default function CharacterSheetHeader({
                 className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md"
                 title="Try the new Notes module prototype"
               >
-                <Link href="/prototype">
-                  <FileText size={16} className="mr-2" />
+                <Link href="/prototype" className="flex items-center gap-2">
+                  <FileText size={16} />
                   Notes Prototype
                 </Link>
               </Button>
