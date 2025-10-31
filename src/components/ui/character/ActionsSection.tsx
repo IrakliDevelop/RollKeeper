@@ -6,6 +6,7 @@ import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { EquippedWeapons } from '@/components/EquippedWeapons';
 import { EnhancedQuickSpells } from '@/components/EnhancedQuickSpells';
 import { ConcentrationTracker } from '@/components/ui/character';
+import { Button } from '@/components/ui/forms';
 import { CharacterState } from '@/types/character';
 
 interface ActionsSectionProps {
@@ -155,24 +156,17 @@ export default function ActionsSection({
                   {actionSpells.length} ready
                 </span>
               )}
-              <div
+              <Button
                 onClick={(e) => {
                   e.stopPropagation();
                   switchToTab('spellcasting');
                 }}
-                className="cursor-pointer rounded-lg bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-200 hover:text-purple-800"
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    switchToTab('spellcasting');
-                  }
-                }}
+                variant="ghost"
+                size="xs"
+                className="bg-purple-100 text-purple-700 hover:bg-purple-200 hover:text-purple-800"
               >
                 Manage
-              </div>
+              </Button>
             </div>
           }
         >

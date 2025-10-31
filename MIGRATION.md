@@ -48,10 +48,10 @@ The main player character sheet (`/app/player/characters/[characterId]/page.tsx`
 - [x] Skills - Skill proficiency checkboxes and Jack of All Trades toggle ✅
 - [x] SavingThrows - Saving throw proficiency checkboxes and roll buttons ✅
 - [x] AbilityScores - Ability score inputs and modifier buttons ✅
-- [x] CharacterBasicInfo - Character info inputs and multiclass button ✅
+- [x] CharacterBasicInfo - Character info inputs, multiclass button, and dropdowns (Class & Alignment) ✅
 - [x] CombatStats - Initiative/Speed inputs, Reaction switch and reset button ✅
+- [x] ActionsSection - Manage spells button ✅
 - [ ] CharacterSheetHeader - Action buttons (save, export, etc.)
-- [ ] ActionsSection - Attack/action buttons
 - [ ] LanguagesAndProficiencies - Text inputs
 - [ ] ExtendedFeaturesSection - Feature cards and buttons
 - [ ] ArmorClassManager - AC calculation inputs
