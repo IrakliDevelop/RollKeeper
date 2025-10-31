@@ -42,7 +42,7 @@ This document tracks the migration from the old inconsistent component implement
 **Files to Migrate:**
 
 **High Priority (Highly Visible):**
-- [ ] `/src/components/ui/character/CharacterHeaderSection.tsx` - Save, Export, Import, Reset buttons
+- [x] `/src/components/ui/character/CharacterHeaderSection.tsx` - Save, Export, Import, Reset buttons ✅
 - [ ] `/src/components/ui/character/CharacterSheetHeader.tsx` - Action buttons
 - [ ] `/src/app/player/page.tsx` - Dashboard buttons
 - [ ] `/src/app/dm/page.tsx` - DM dashboard buttons
