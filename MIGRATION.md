@@ -23,8 +23,43 @@ This document tracks the migration from the old inconsistent component implement
   - Badge component refactored
   - Dialog component created (dialog-new.tsx)
 
-- **Phase 4: Migration to New Components** 🚧 **IN PROGRESS**
-- **Phase 5: Cleanup & Documentation** 📋 **PENDING**
+- **Phase 4: Character Sheet Migration (HIGH PRIORITY)** 🚧 **IN PROGRESS**
+  - Focus on player character sheet components
+  - Main use case of the application
+
+- **Phase 5: DM Tools Migration** 📋 **LOW PRIORITY**
+  - DM toolset is prototype UI
+  - Can be migrated last
+
+- **Phase 6: Cleanup & Documentation** 📋 **PENDING**
+
+---
+
+## 🎯 Priority: Character Sheet Components
+
+The main player character sheet (`/app/player/characters/[characterId]/page.tsx`) uses these components:
+
+**Character Sheet Components (Priority Order):**
+- [x] CharacterHeaderSection ✅ (already migrated)
+- [x] RestManager - Short/long rest buttons ✅
+- [ ] CharacterSheetHeader - Action buttons (save, export, etc.)
+- [ ] CharacterBasicInfo - Character info inputs
+- [ ] HitPointManager - HP tracking buttons (complex, uses HitPointTracker)
+- [ ] HitDiceTracker - Hit dice management buttons
+- [ ] AbilityScores - Ability score inputs and buttons
+- [ ] SavingThrows - Saving throw checkboxes/buttons
+- [ ] Skills - Skill proficiency checkboxes
+- [ ] CombatStats - Combat stat inputs
+- [ ] ActionsSection - Attack/action buttons
+- [ ] SpellSlotTracker - Spell slot buttons
+- [ ] TraitTracker - Trait management
+- [ ] LanguagesAndProficiencies - Text inputs
+- [ ] ExtendedFeaturesSection - Feature cards and buttons
+- [ ] ArmorClassManager - AC calculation inputs
+- [ ] QuickStats - Quick stats display
+- [ ] WeaponProficiencies - Weapon selection
+- [ ] XPTracker - XP inputs
+- [ ] HeroicInspirationTracker - Inspiration tracking
 
 ---
 

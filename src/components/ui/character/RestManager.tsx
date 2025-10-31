@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Moon, Sun } from 'lucide-react';
+import { Button } from '@/components/ui/forms';
 
 interface RestManagerProps {
   onShortRest: () => void;
@@ -51,13 +52,16 @@ export default function RestManager({
             <p>• Spend Hit Dice to heal (manual)</p>
           </div>
 
-          <button
+          <Button
             onClick={handleShortRest}
-            className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition-all hover:from-blue-600 hover:to-cyan-700 hover:shadow-lg active:scale-95"
+            fullWidth
+            variant="secondary"
+            size="md"
+            leftIcon={<Sun className="h-4 w-4" />}
+            className="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700"
           >
-            <Sun size={18} />
             Take Short Rest
-          </button>
+          </Button>
         </div>
 
         {/* Long Rest */}
@@ -78,13 +82,16 @@ export default function RestManager({
             <p>• Resets reaction & death saves</p>
           </div>
 
-          <button
+          <Button
             onClick={handleLongRest}
-            className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition-all hover:from-indigo-600 hover:to-purple-700 hover:shadow-lg active:scale-95"
+            fullWidth
+            variant="secondary"
+            size="md"
+            leftIcon={<Moon className="h-4 w-4" />}
+            className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
           >
-            <Moon size={18} />
             Take Long Rest
-          </button>
+          </Button>
         </div>
       </div>
 
