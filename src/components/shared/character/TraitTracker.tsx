@@ -4,6 +4,7 @@ import React from 'react';
 import { TrackableTrait } from '@/types/character';
 import { calculateTraitMaxUses } from '@/utils/calculations';
 import { Button } from '@/components/ui/forms';
+import { Badge } from '@/components/ui/layout';
 import { RotateCcw, Zap, Eye, Trash2 } from 'lucide-react';
 
 interface TraitTrackerProps {
@@ -95,8 +96,8 @@ export function TraitTracker({
   );
 
   const containerClasses = compact
-    ? `bg-white rounded-lg border border-gray-200 p-3 ${className}`
-    : `bg-white rounded-lg border border-gray-200 p-4 space-y-4 ${className}`;
+    ? `rounded-lg border-2 border-indigo-200 bg-white p-3 shadow-sm ${className}`
+    : `rounded-lg border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 space-y-4 shadow-sm ${className}`;
 
   if (displayTraits.length === 0) {
     return (
@@ -110,10 +111,10 @@ export function TraitTracker({
           </h3>
         </div>
         {!compact && (
-          <div className="py-6 text-center text-gray-500">
-            <Zap className="mx-auto mb-2 h-8 w-8 text-gray-400" />
-            <p className="font-medium">No special abilities yet</p>
-            <p className="mt-1 text-sm">
+          <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 py-8 text-center">
+            <Zap className="mx-auto mb-2 h-10 w-10 text-gray-400" />
+            <p className="font-medium text-gray-600">No special abilities yet</p>
+            <p className="mt-1 text-sm text-gray-500">
               Special abilities appear here when added through Active Abilities & Features
             </p>
           </div>
@@ -170,37 +171,30 @@ export function TraitTracker({
         {displayTraits.map(trait => (
           <div
             key={trait.id}
-            className={`rounded-lg border border-gray-200 ${compact ? 'p-2' : 'p-3'}`}
+            className={`rounded-lg border-2 border-indigo-200 bg-white ${compact ? 'p-2' : 'p-3'} hover:shadow-md transition-shadow`}
           >
             <div>
               <div
                 className={`mb-2 flex items-start justify-between ${compact ? 'mb-1' : ''}`}
               >
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center flex-wrap gap-2">
                     <h4
-                      className={`truncate font-medium text-gray-900 ${compact ? 'text-sm' : ''}`}
+                      className={`font-medium text-gray-900 ${compact ? 'text-sm' : 'text-base'}`}
                     >
                       {trait.name}
                     </h4>
                     {trait.source && (
-                      <span
-                        className={`rounded bg-gray-100 px-2 py-1 text-gray-600 ${compact ? 'text-xs' : 'text-xs'}`}
-                      >
+                      <Badge variant="neutral" size="sm">
                         {trait.source}
-                      </span>
+                      </Badge>
                     )}
-                    <span
-                      className={`rounded px-2 py-1 ${compact ? 'text-xs' : 'text-xs'} ${
-                        trait.restType === 'short'
-                          ? 'bg-blue-100 text-blue-700'
-                          : 'bg-purple-100 text-purple-700'
-                      }`}
+                    <Badge
+                      variant={trait.restType === 'short' ? 'info' : 'secondary'}
+                      size="sm"
                     >
-                      {trait.restType === 'short'
-                        ? 'Short Rest'
-                        : 'Long Rest'}
-                    </span>
+                      {trait.restType === 'short' ? 'Short Rest' : 'Long Rest'}
+                    </Badge>
                   </div>
                   {trait.description && !compact && (
                     <p className="mt-1 text-sm text-gray-600 line-clamp-2">
@@ -215,7 +209,7 @@ export function TraitTracker({
                         onClick={() => onTraitClick(trait)}
                         variant="ghost"
                         size="xs"
-                        className="text-gray-600 hover:bg-gray-100 p-2"
+                        className="text-indigo-600 hover:bg-indigo-100"
                         title="View ability details"
                       >
                         <Eye className="h-4 w-4" />
@@ -226,7 +220,7 @@ export function TraitTracker({
                         onClick={() => onDeleteTrait(trait.id)}
                         variant="ghost"
                         size="xs"
-                        className="text-red-600 hover:bg-red-100 p-2"
+                        className="text-red-600 hover:bg-red-100"
                         title="Delete ability"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -241,7 +235,7 @@ export function TraitTracker({
                       onClick={() => onTraitClick(trait)}
                       variant="ghost"
                       size="xs"
-                      className="text-gray-600 hover:bg-gray-100 p-2"
+                      className="text-indigo-600 hover:bg-indigo-100"
                       title="View ability details"
                     >
                       <Eye className="h-4 w-4" />
@@ -251,20 +245,19 @@ export function TraitTracker({
               </div>
 
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <span
-                    className={`font-medium text-gray-700 ${compact ? 'text-xs' : 'text-sm'}`}
+                <div className="flex items-center flex-wrap gap-2">
+                  <Badge
+                    variant={
+                      calculateTraitMaxUses(trait, characterLevel) - trait.usedUses > 0
+                        ? 'success'
+                        : 'neutral'
+                    }
+                    size="sm"
                   >
-                    Uses:{' '}
-                    {calculateTraitMaxUses(trait, characterLevel) -
-                      trait.usedUses}
-                    /{calculateTraitMaxUses(trait, characterLevel)}
-                    {trait.scaleWithProficiency && (
-                      <span className="ml-1 text-xs text-indigo-600">
-                        (Proficiency)
-                      </span>
-                    )}
-                  </span>
+                    {calculateTraitMaxUses(trait, characterLevel) - trait.usedUses}/
+                    {calculateTraitMaxUses(trait, characterLevel)} Uses
+                    {trait.scaleWithProficiency && ' (Prof.)'}
+                  </Badge>
                   {renderUsageCheckboxes(trait)}
                 </div>
                 {!readonly && onUseTrait && (
@@ -276,7 +269,7 @@ export function TraitTracker({
                     }
                     variant="ghost"
                     size="xs"
-                    className="text-indigo-600 hover:bg-indigo-100 p-2"
+                    className="text-indigo-600 hover:bg-indigo-100"
                     title="Use ability"
                   >
                     <Zap className="h-4 w-4" />

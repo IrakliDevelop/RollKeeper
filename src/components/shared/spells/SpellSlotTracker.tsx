@@ -3,6 +3,7 @@
 import React from 'react';
 import { SpellSlots, PactMagic } from '@/types/character';
 import { Button } from '@/components/ui/forms';
+import { Badge } from '@/components/ui/layout';
 import { RotateCcw, Zap } from 'lucide-react';
 
 interface SpellSlotTrackerProps {
@@ -81,8 +82,8 @@ export function SpellSlotTracker({
   };
 
   const containerClasses = compact
-    ? `bg-white rounded-lg border border-gray-200 p-3 space-y-3 ${className}`
-    : `bg-white rounded-lg border border-gray-200 p-4 space-y-4 ${className}`;
+    ? `rounded-lg border-2 border-purple-200 bg-white p-3 space-y-3 shadow-sm ${className}`
+    : `rounded-lg border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-violet-50 p-4 space-y-4 shadow-sm ${className}`;
 
   // Filter spell levels to show
   const levelsToShow = ([1, 2, 3, 4, 5, 6, 7, 8, 9] as const)
@@ -138,25 +139,23 @@ export function SpellSlotTracker({
       {hasSpellSlots && levelsToShow.length > 0 && (
         <div className={compact ? 'space-y-2' : 'space-y-3'}>
           {!compact && (
-            <h4 className="text-sm font-medium text-gray-700">Spell Slots</h4>
+            <h4 className="text-sm font-semibold text-purple-700">Spell Slots</h4>
           )}
           {levelsToShow.map(level => {
             const slot = spellSlots[level];
+            const remaining = slot.max - slot.used;
             return (
-              <div key={level} className="flex items-center justify-between">
-                <div
-                  className={`flex items-center space-x-3 ${compact ? 'min-w-[50px]' : 'min-w-[60px]'}`}
-                >
-                  <span
-                    className={`font-medium text-gray-700 ${compact ? 'text-xs' : 'text-sm'}`}
+              <div key={level} className="flex items-center justify-between rounded-lg border-2 border-purple-200 bg-white p-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" size="sm">
+                    {compact ? `L${level}` : `Level ${level}`}
+                  </Badge>
+                  <Badge
+                    variant={remaining > 0 ? 'success' : 'neutral'}
+                    size="sm"
                   >
-                    {compact ? `L${level}:` : `Level ${level}:`}
-                  </span>
-                  <span
-                    className={`text-gray-500 ${compact ? 'text-xs' : 'text-xs'}`}
-                  >
-                    {slot.max - slot.used}/{slot.max}
-                  </span>
+                    {remaining}/{slot.max}
+                  </Badge>
                 </div>
                 {renderSlotCheckboxes(
                   slot.max,
@@ -174,28 +173,24 @@ export function SpellSlotTracker({
       {/* Warlock Pact Magic */}
       {hasPactMagic && pactMagic && (
         <div
-          className={`space-y-3 border-t border-gray-200 pt-3 ${compact ? 'space-y-2 pt-2' : ''}`}
+          className={`space-y-3 border-t-2 border-purple-200 pt-3 ${compact ? 'space-y-2 pt-2' : ''}`}
         >
           <h4
-            className={`font-medium text-purple-700 ${compact ? 'text-xs' : 'text-sm'}`}
+            className={`font-semibold text-purple-700 ${compact ? 'text-xs' : 'text-sm'}`}
           >
             Pact Magic
           </h4>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <span
-                className={`font-medium text-purple-700 ${compact ? 'text-xs' : 'text-sm'}`}
+          <div className="flex items-center justify-between rounded-lg border-2 border-purple-300 bg-white p-2">
+            <div className="flex items-center gap-2">
+              <Badge variant="info" size="sm">
+                {compact ? `L${pactMagic.level}` : `Level ${pactMagic.level}`}
+              </Badge>
+              <Badge
+                variant={pactMagic.slots.max - pactMagic.slots.used > 0 ? 'success' : 'neutral'}
+                size="sm"
               >
-                {compact
-                  ? `L${pactMagic.level}:`
-                  : `Level ${pactMagic.level} Slots:`}
-              </span>
-              <span
-                className={`text-gray-500 ${compact ? 'text-xs' : 'text-xs'}`}
-              >
-                {pactMagic.slots.max - pactMagic.slots.used}/
-                {pactMagic.slots.max}
-              </span>
+                {pactMagic.slots.max - pactMagic.slots.used}/{pactMagic.slots.max}
+              </Badge>
             </div>
             {renderSlotCheckboxes(
               pactMagic.slots.max,
@@ -205,7 +200,7 @@ export function SpellSlotTracker({
           </div>
           {!compact && (
             <p className="text-xs text-purple-600 italic">
-              Pact magic slots recharge on a short rest
+              ⚡ Pact magic slots recharge on a short rest
             </p>
           )}
         </div>
@@ -213,10 +208,9 @@ export function SpellSlotTracker({
 
       {/* Usage Guide */}
       {!readonly && !hideControls && !compact && (
-        <div className="border-t border-gray-100 pt-2 text-xs text-gray-500">
+        <div className="border-t-2 border-purple-100 pt-2 text-xs text-gray-500">
           <p>
-            • Click empty slots to mark as used • Click used slots to mark as
-            available
+            💡 Click empty slots to mark as used • Click used slots to mark as available
           </p>
         </div>
       )}

@@ -1,11 +1,13 @@
 'use client';
 
-import { FileText, ArrowLeft } from 'lucide-react';
+import { FileText, ArrowLeft, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { Button } from '@/components/ui/forms';
+import { Badge } from '@/components/ui/layout';
 
 import SpellSlotTracker from '@/components/ui/character/SpellSlotTracker';
 import TraitTracker from '@/components/ui/character/TraitTracker';
@@ -724,35 +726,43 @@ export default function CharacterSheet() {
                         ?.length > 0 ||
                         character.conditionsAndDiseases?.activeDiseases
                           ?.length > 0) && (
-                        <div className="rounded-lg border border-red-200 bg-white p-4 shadow">
-                          <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700">
-                            <span className="text-red-600">🤒</span>
-                            Active Conditions & Diseases
-                            <button
+                        <div className="rounded-lg border-2 border-red-200 bg-gradient-to-br from-red-50 to-pink-50 p-4 shadow-sm">
+                          <div className="mb-3 flex items-center justify-between">
+                            <h3 className="flex items-center gap-2 text-base font-semibold text-red-800">
+                              <AlertTriangle className="h-5 w-5" />
+                              Active Conditions & Diseases
+                            </h3>
+                            <Button
                               onClick={() =>
                                 tabsRef.current?.switchToTab('conditions')
                               }
-                              className="ml-auto text-xs text-blue-600 hover:text-blue-800"
+                              variant="ghost"
+                              size="xs"
+                              className="text-red-600 hover:bg-red-100"
                             >
                               Manage →
-                            </button>
-                          </h3>
-                          <div className="space-y-1">
+                            </Button>
+                          </div>
+                          <div className="space-y-2">
                             {character.conditionsAndDiseases?.activeConditions?.map?.(
                               condition => (
                                 <div
                                   key={condition.id}
-                                  className="flex items-center justify-between text-xs text-red-700"
+                                  className="flex items-center justify-between gap-2 rounded-lg border-2 border-red-200 bg-white p-2"
                                 >
-                                  <span>
-                                    {condition.name}
-                                    {condition.stackable &&
-                                      condition.count > 1 &&
-                                      ` (Level ${condition.count})`}
-                                  </span>
-                                  <span className="text-gray-500">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="danger" size="sm">
+                                      {condition.name}
+                                    </Badge>
+                                    {condition.stackable && condition.count > 1 && (
+                                      <Badge variant="warning" size="sm">
+                                        Level {condition.count}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <Badge variant="neutral" size="sm">
                                     {condition.source}
-                                  </span>
+                                  </Badge>
                                 </div>
                               )
                             )}
@@ -760,12 +770,14 @@ export default function CharacterSheet() {
                               disease => (
                                 <div
                                   key={disease.id}
-                                  className="flex items-center justify-between text-xs text-purple-700"
+                                  className="flex items-center justify-between gap-2 rounded-lg border-2 border-purple-200 bg-white p-2"
                                 >
-                                  <span>{disease.name}</span>
-                                  <span className="text-gray-500">
+                                  <Badge variant="info" size="sm">
+                                    {disease.name}
+                                  </Badge>
+                                  <Badge variant="neutral" size="sm">
                                     {disease.source}
-                                  </span>
+                                  </Badge>
                                 </div>
                               )
                             )}
