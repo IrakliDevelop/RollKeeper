@@ -55,27 +55,39 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const Comp = asChild ? Slot : 'button';
     const isDisabled = disabled || loading;
 
-    // When using asChild with icons, we need to ensure there's only one child
-    // Wrap content if using asChild AND we have icons or loading state
-    const shouldWrapContent = asChild && (loading || leftIcon || rightIcon);
-
-    const content = (
-      <>
-        {loading && (
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-        )}
-        {!loading && leftIcon && (
-          <span className="inline-flex shrink-0" aria-hidden="true">
+    // Build content array
+    const contentParts = [];
+    
+    if (loading) {
+      contentParts.push(
+        <Loader2 key="loader" className="h-4 w-4 animate-spin" aria-hidden="true" />
+      );
+    } else {
+      if (leftIcon) {
+        contentParts.push(
+          <span key="left-icon" className="inline-flex shrink-0" aria-hidden="true">
             {leftIcon}
           </span>
-        )}
-        {children}
-        {!loading && rightIcon && (
-          <span className="inline-flex shrink-0" aria-hidden="true">
-            {rightIcon}
-          </span>
-        )}
-      </>
+        );
+      }
+    }
+    
+    contentParts.push(children);
+    
+    if (!loading && rightIcon) {
+      contentParts.push(
+        <span key="right-icon" className="inline-flex shrink-0" aria-hidden="true">
+          {rightIcon}
+        </span>
+      );
+    }
+
+    // When using asChild with icons, wrap all content in a single element
+    const shouldWrapContent = asChild && (loading || leftIcon || rightIcon);
+    const content = shouldWrapContent ? (
+      <span className="flex items-center gap-2">{contentParts}</span>
+    ) : (
+      contentParts
     );
 
     return (
@@ -85,7 +97,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={isDisabled}
         {...props}
       >
-        {shouldWrapContent ? <span className="flex items-center gap-2">{content}</span> : content}
+        {content}
       </Comp>
     );
   }

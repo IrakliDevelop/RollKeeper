@@ -139,7 +139,7 @@ export default function CharacterSheetHeader({
                       });
                     }
                   }}
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
                   leftIcon={<Download size={16} />}
                   title="Export Character"
@@ -149,7 +149,7 @@ export default function CharacterSheetHeader({
 
                 <Button
                   asChild
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
                 >
                   <label className="cursor-pointer">
@@ -248,19 +248,19 @@ export default function CharacterSheetHeader({
               </Button>
               <Button
                 onClick={onExport}
-                variant="secondary"
+                variant="outline"
                 size="sm"
                 leftIcon={<Download size={16} />}
-                className="bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 shadow-md"
+                className="shadow-sm"
               >
                 Export
               </Button>
 
               <Button
                 asChild
-                variant="primary"
+                variant="secondary"
                 size="sm"
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md"
+                className="shadow-sm"
                 title="Try the new Notes module prototype"
               >
                 <Link href="/prototype" className="flex items-center gap-2">

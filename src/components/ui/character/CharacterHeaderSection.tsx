@@ -142,7 +142,7 @@ export default function CharacterHeaderSection() {
 
               <Button
                 onClick={handleExport}
-                variant="secondary"
+                variant="outline"
                 size="sm"
                 leftIcon={<Download className="h-4 w-4" />}
               >
@@ -151,7 +151,7 @@ export default function CharacterHeaderSection() {
 
               <Button
                 asChild
-                variant="secondary"
+                variant="outline"
                 size="sm"
               >
                 <label className="cursor-pointer">
