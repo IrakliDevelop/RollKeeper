@@ -6,6 +6,7 @@ import {
   getProficiencyBonus,
   formatModifier,
 } from '@/utils/calculations';
+import { Button, Input } from '@/components/ui/forms';
 import { AbilityName, CharacterState } from '@/types/character';
 
 interface AbilityScoresProps {
@@ -39,23 +40,26 @@ export default function AbilityScores({
               <div className="mb-2 text-sm font-bold text-blue-900">
                 {ABILITY_ABBREVIATIONS[ability]}
               </div>
-              <input
+              <Input
                 type="number"
-                value={abilities[ability]}
+                value={abilities[ability].toString()}
                 onChange={e =>
                   onUpdateAbilityScore(ability, parseInt(e.target.value) || 10)
                 }
                 min="1"
                 max="30"
-                className="w-full border-none bg-transparent text-center text-2xl font-bold text-blue-900 outline-none"
+                size="lg"
+                className="border-none bg-transparent text-center text-2xl font-bold text-blue-900 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
-              <button
+              <Button
                 onClick={() => onRollAbilityCheck(ability)}
-                className="mt-1 cursor-pointer rounded px-2 py-1 text-lg font-semibold text-blue-700 transition-colors hover:bg-blue-100 hover:text-blue-900"
+                variant="ghost"
+                size="sm"
+                className="mt-1 text-lg font-semibold text-blue-700 hover:bg-blue-100 hover:text-blue-900"
                 title={`Roll ${ABILITY_NAMES[ability]} check (d20 + ${formatModifier(getAbilityModifier(ability))})`}
               >
                 {formatModifier(getAbilityModifier(ability))}
-              </button>
+              </Button>
               <div className="text-xs text-blue-600">modifier</div>
             </div>
           </div>

@@ -47,9 +47,9 @@ The main player character sheet (`/app/player/characters/[characterId]/page.tsx`
 - [x] TraitTracker - Trait management buttons (Short Rest, Long Rest, Use, View, Delete) ✅
 - [x] Skills - Skill proficiency checkboxes and Jack of All Trades toggle ✅
 - [x] SavingThrows - Saving throw proficiency checkboxes and roll buttons ✅
+- [x] AbilityScores - Ability score inputs and modifier buttons ✅
+- [x] CharacterBasicInfo - Character info inputs and multiclass button ✅
 - [ ] CharacterSheetHeader - Action buttons (save, export, etc.)
-- [ ] CharacterBasicInfo - Character info inputs
-- [ ] AbilityScores - Ability score inputs and buttons
 - [ ] CombatStats - Combat stat inputs
 - [ ] ActionsSection - Attack/action buttons
 - [ ] LanguagesAndProficiencies - Text inputs
