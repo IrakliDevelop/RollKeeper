@@ -22,7 +22,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
-import { FancySelect } from '@/components/ui/forms/FancySelect';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { Checkbox } from '@/components/ui/forms/checkbox';
 import { Modal } from '@/components/ui/feedback/Modal';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import DragDropList from '@/components/ui/layout/DragDropList';
@@ -420,37 +421,47 @@ const LevelSection: React.FC<{
   onToggleFavorite,
   onReorder,
 }) => {
-  const levelName = level === 0 ? 'Cantrips' : `Level ${level}`;
-  const levelColor = level === 0 ? 'text-yellow-600' : 'text-purple-600';
-  const levelBg = level === 0 ? 'bg-yellow-50' : 'bg-purple-50';
+  const isCantrip = level === 0;
+  const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
+  const levelColor = isCantrip ? 'text-yellow-700' : 'text-purple-700';
+  const levelBg = isCantrip ? 'bg-gradient-to-r from-yellow-50 to-amber-50' : 'bg-gradient-to-r from-purple-50 to-violet-50';
+  const borderColor = isCantrip ? 'border-yellow-200' : 'border-purple-200';
   const preparedCount = spells.filter(s => s.isPrepared || s.isAlwaysPrepared).length;
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className={`border-2 ${borderColor} rounded-lg overflow-hidden bg-white`}>
       <button
         onClick={onToggle}
-        className={`w-full flex items-center justify-between p-4 ${levelBg} hover:bg-opacity-80 transition-colors`}
+        className={`w-full flex items-center justify-between p-4 ${levelBg} hover:opacity-90 transition-all`}
       >
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-            <span className={`font-bold ${levelColor}`}>{levelName}</span>
+            {isExpanded ? (
+              <ChevronDown size={18} className={levelColor} />
+            ) : (
+              <ChevronRight size={18} className={levelColor} />
+            )}
+            <span className={`font-bold text-base ${levelColor}`}>{levelName}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="rounded-full bg-white px-3 py-1 text-sm font-medium text-gray-600">
-              {spells.length} total
-            </span>
+            <Badge 
+              variant={isCantrip ? "warning" : "primary"}
+              size="sm"
+              className={isCantrip ? "bg-yellow-100 text-yellow-800" : "bg-purple-100 text-purple-800"}
+            >
+              {spells.length} spell{spells.length !== 1 ? 's' : ''}
+            </Badge>
             {preparedCount > 0 && (
-              <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
+              <Badge variant="success" size="sm" className="bg-green-100 text-green-800">
                 {preparedCount} prepared
-              </span>
+              </Badge>
             )}
           </div>
         </div>
       </button>
       
       {isExpanded && (
-        <div className="p-4 bg-white">
+        <div className="p-4 bg-white border-t-2 border-gray-100">
           <DragDropList
             items={spells}
             onReorder={onReorder}
@@ -729,51 +740,49 @@ export const EnhancedSpellManagement: React.FC = () => {
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-xl font-bold text-purple-800">
-            <span className="text-purple-600">📚</span>
+          <h3 className="flex items-center gap-2 text-xl font-bold text-gray-800">
+            <BookOpen className="text-purple-600" size={24} />
             Spells & Cantrips
-            <span className="rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-700">
+            <Badge variant="secondary" size="sm">
               {filteredSpells.length} of {character.spells.length}
-            </span>
+            </Badge>
           </h3>
 
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={() => setCompactView(!compactView)}
-              className={`rounded p-2 transition-colors ${
-                compactView
-                  ? 'bg-purple-100 text-purple-700'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              variant={compactView ? "primary" : "ghost"}
+              size="sm"
               title={compactView ? 'Switch to detailed view' : 'Switch to compact view'}
+              className={compactView ? "bg-purple-600 hover:bg-purple-700" : ""}
             >
               {compactView ? <List size={18} /> : <Grid3X3 size={18} />}
-            </button>
+            </Button>
             
-            <button
+            <Button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 rounded px-3 py-2 transition-colors ${
-                showFilters || activeFilterCount > 0
-                  ? 'bg-purple-100 text-purple-700'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              variant={showFilters || activeFilterCount > 0 ? "primary" : "ghost"}
+              size="sm"
+              leftIcon={<Filter size={16} />}
+              className={showFilters || activeFilterCount > 0 ? "bg-purple-600 hover:bg-purple-700" : ""}
             >
-              <Filter size={16} />
               Filters
               {activeFilterCount > 0 && (
-                <span className="rounded-full bg-purple-600 px-2 py-0.5 text-xs text-white">
+                <Badge variant="danger" size="sm" className="ml-1 bg-red-600 text-white">
                   {activeFilterCount}
-                </span>
+                </Badge>
               )}
-            </button>
+            </Button>
             
-            <button
+            <Button
               onClick={() => setIsFormOpen(true)}
-              className="flex items-center gap-2 rounded-md bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700"
+              variant="primary"
+              size="sm"
+              leftIcon={<Plus size={16} />}
+              className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
             >
-              <Plus size={16} />
               Add Spell
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -785,168 +794,159 @@ export const EnhancedSpellManagement: React.FC = () => {
             placeholder="Search spells by name, school, description, or damage type..."
             value={filters.searchQuery}
             onChange={(e) => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
-            className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-10 pr-4 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
+            className="w-full rounded-lg border-2 border-gray-300 bg-white py-2.5 pl-10 pr-4 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition-all"
           />
         </div>
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="rounded-lg border-2 border-gray-200 bg-white p-4 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h4 className="font-semibold text-gray-800">Advanced Filters</h4>
+              <h4 className="font-bold text-gray-800">Advanced Filters</h4>
               <div className="flex items-center gap-2">
                 {activeFilterCount > 0 && (
-                  <button
+                  <Button
                     onClick={clearFilters}
-                    className="flex items-center gap-1 rounded px-2 py-1 text-sm text-gray-600 hover:bg-gray-200"
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<X size={14} />}
                   >
-                    <X size={14} />
                     Clear All
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
                   onClick={() => setShowFilters(false)}
-                  className="rounded p-1 text-gray-600 hover:bg-gray-200"
+                  variant="ghost"
+                  size="sm"
                 >
                   <X size={16} />
-                </button>
+                </Button>
               </div>
             </div>
             
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
               {/* Level Filter */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Level</label>
-                <FancySelect
-                  options={[
-                    { value: 'all', label: 'All Levels' },
-                    { value: 0, label: 'Cantrips' },
-                    ...Array.from({ length: 9 }, (_, i) => ({
-                      value: i + 1,
-                      label: `Level ${i + 1}`,
-                    })),
-                  ]}
-                  value={filters.level}
-                  onChange={value => setFilters(prev => ({ ...prev, level: value as number | 'all' }))}
-                  color="purple"
-                  className="w-full"
-                />
+                <label className="mb-2 block text-sm font-medium text-gray-700">Level</label>
+                <SelectField
+                  value={filters.level.toString()}
+                  onValueChange={value => setFilters(prev => ({ ...prev, level: value === 'all' ? 'all' : parseInt(value) }))}
+                >
+                  <SelectItem value="all">All Levels</SelectItem>
+                  <SelectItem value="0">Cantrips</SelectItem>
+                  {Array.from({ length: 9 }, (_, i) => (
+                    <SelectItem key={i + 1} value={(i + 1).toString()}>
+                      Level {i + 1}
+                    </SelectItem>
+                  ))}
+                </SelectField>
               </div>
 
               {/* School Filter */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">School</label>
-                <FancySelect
-                  options={[
-                    { value: 'all', label: 'All Schools' },
-                    ...SPELL_SCHOOLS.map(school => ({ value: school, label: school })),
-                  ]}
+                <label className="mb-2 block text-sm font-medium text-gray-700">School</label>
+                <SelectField
                   value={filters.school}
-                  onChange={value => setFilters(prev => ({ ...prev, school: value as string }))}
-                  color="purple"
-                  className="w-full"
-                />
+                  onValueChange={value => setFilters(prev => ({ ...prev, school: value }))}
+                >
+                  <SelectItem value="all">All Schools</SelectItem>
+                  {SPELL_SCHOOLS.map(school => (
+                    <SelectItem key={school} value={school}>{school}</SelectItem>
+                  ))}
+                </SelectField>
               </div>
 
               {/* Action Type Filter */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Action Type</label>
-                <FancySelect
-                  options={[
-                    { value: 'all', label: 'All Types' },
-                    ...ACTION_TYPES.map(type => ({ value: type.value, label: type.label })),
-                  ]}
+                <label className="mb-2 block text-sm font-medium text-gray-700">Action Type</label>
+                <SelectField
                   value={filters.actionType}
-                  onChange={value => setFilters(prev => ({ ...prev, actionType: value as string }))}
-                  color="purple"
-                  className="w-full"
-                />
+                  onValueChange={value => setFilters(prev => ({ ...prev, actionType: value }))}
+                >
+                  <SelectItem value="all">All Types</SelectItem>
+                  {ACTION_TYPES.map(type => (
+                    <SelectItem key={type.value || 'none'} value={type.value || 'none'}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectField>
               </div>
 
               {/* Prepared Filter */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Preparation</label>
-                <FancySelect
-                  options={[
-                    { value: 'all', label: 'All Spells' },
-                    { value: 'prepared', label: 'Prepared Only' },
-                    { value: 'unprepared', label: 'Unprepared Only' },
-                  ]}
+                <label className="mb-2 block text-sm font-medium text-gray-700">Preparation</label>
+                <SelectField
                   value={filters.prepared}
-                  onChange={value => setFilters(prev => ({ ...prev, prepared: value as 'all' | 'prepared' | 'unprepared' }))}
-                  color="purple"
-                  className="w-full"
-                />
+                  onValueChange={value => setFilters(prev => ({ ...prev, prepared: value as 'all' | 'prepared' | 'unprepared' }))}
+                >
+                  <SelectItem value="all">All Spells</SelectItem>
+                  <SelectItem value="prepared">Prepared Only</SelectItem>
+                  <SelectItem value="unprepared">Unprepared Only</SelectItem>
+                </SelectField>
               </div>
 
               {/* Concentration Filter */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Concentration</label>
-                <FancySelect
-                  options={[
-                    { value: 'all', label: 'All' },
-                    { value: 'yes', label: 'Concentration' },
-                    { value: 'no', label: 'No Concentration' },
-                  ]}
+                <label className="mb-2 block text-sm font-medium text-gray-700">Concentration</label>
+                <SelectField
                   value={filters.concentration}
-                  onChange={value => setFilters(prev => ({ ...prev, concentration: value as 'all' | 'yes' | 'no' }))}
-                  color="purple"
-                  className="w-full"
-                />
+                  onValueChange={value => setFilters(prev => ({ ...prev, concentration: value as 'all' | 'yes' | 'no' }))}
+                >
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="yes">Concentration</SelectItem>
+                  <SelectItem value="no">No Concentration</SelectItem>
+                </SelectField>
               </div>
 
               {/* Ritual Filter */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Ritual</label>
-                <FancySelect
-                  options={[
-                    { value: 'all', label: 'All' },
-                    { value: 'yes', label: 'Ritual' },
-                    { value: 'no', label: 'No Ritual' },
-                  ]}
+                <label className="mb-2 block text-sm font-medium text-gray-700">Ritual</label>
+                <SelectField
                   value={filters.ritual}
-                  onChange={value => setFilters(prev => ({ ...prev, ritual: value as 'all' | 'yes' | 'no' }))}
-                  color="purple"
-                  className="w-full"
-                />
+                  onValueChange={value => setFilters(prev => ({ ...prev, ritual: value as 'all' | 'yes' | 'no' }))}
+                >
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="yes">Ritual</SelectItem>
+                  <SelectItem value="no">No Ritual</SelectItem>
+                </SelectField>
               </div>
 
               {/* Sort Options */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Sort By</label>
-                <div className="flex gap-1">
-                  <FancySelect
-                    options={[
-                      { value: 'level', label: 'Level' },
-                      { value: 'name', label: 'Name' },
-                      { value: 'school', label: 'School' },
-                    ]}
-                    value={sortBy}
-                    onChange={value => setSortBy(value as 'name' | 'level' | 'school')}
-                    color="purple"
-                    className="flex-1"
-                  />
-                  <button
+                <label className="mb-2 block text-sm font-medium text-gray-700">Sort By</label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <SelectField
+                      value={sortBy}
+                      onValueChange={value => setSortBy(value as 'name' | 'level' | 'school')}
+                    >
+                      <SelectItem value="level">Level</SelectItem>
+                      <SelectItem value="name">Name</SelectItem>
+                      <SelectItem value="school">School</SelectItem>
+                    </SelectField>
+                  </div>
+                  <Button
                     onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="rounded border border-gray-300 p-2 hover:bg-gray-100"
+                    variant="outline"
+                    size="md"
                     title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
                   >
                     {sortOrder === 'asc' ? <SortAsc size={16} /> : <SortDesc size={16} />}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
               {/* Favorites Toggle */}
               <div className="flex items-end">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={filters.favorites}
-                    onChange={(e) => setFilters(prev => ({ ...prev, favorites: e.target.checked }))}
-                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    onCheckedChange={(checked) => setFilters(prev => ({ ...prev, favorites: checked as boolean }))}
                   />
-                  <span className="text-sm font-medium text-gray-700">Favorites Only</span>
-                  <Star size={16} className="text-yellow-500" />
+                  <span className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                    Favorites Only
+                    <Star size={16} className="text-yellow-500" />
+                  </span>
                 </label>
               </div>
             </div>
@@ -972,12 +972,14 @@ export const EnhancedSpellManagement: React.FC = () => {
               Try adjusting your search terms or clearing some filters
             </p>
             {activeFilterCount > 0 && (
-              <button
+              <Button
                 onClick={clearFilters}
-                className="mt-4 rounded bg-purple-600 px-4 py-2 text-white hover:bg-purple-700"
+                variant="primary"
+                size="md"
+                className="mt-4 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
               >
                 Clear All Filters
-              </button>
+              </Button>
             )}
           </div>
         ) : (
