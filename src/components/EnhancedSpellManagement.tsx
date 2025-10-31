@@ -24,6 +24,8 @@ import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Checkbox } from '@/components/ui/forms/checkbox';
+import { Input } from '@/components/ui/forms/input';
+import { Textarea } from '@/components/ui/forms/textarea';
 import { Modal } from '@/components/ui/feedback/Modal';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import DragDropList from '@/components/ui/layout/DragDropList';
@@ -1012,352 +1014,318 @@ export const EnhancedSpellManagement: React.FC = () => {
           size="lg"
           closeOnBackdropClick={true}
         >
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Basic Information */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Spell Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                      required
-                    />
-                  </div>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Section: Basic Information */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+                Basic Information
+              </h4>
+              
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Input
+                  label="Spell Name"
+                  value={formData.name}
+                  onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  required
+                  placeholder="Enter spell name"
+                />
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Level
-                    </label>
-                    <select
-                      value={formData.level}
-                      onChange={e => setFormData(prev => ({ ...prev, level: parseInt(e.target.value) }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    >
-                      <option value={0}>Cantrip</option>
-                      {Array.from({ length: 9 }, (_, i) => (
-                        <option key={i + 1} value={i + 1}>
-                          Level {i + 1}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      School
-                    </label>
-                    <select
-                      value={formData.school}
-                      onChange={e => setFormData(prev => ({ ...prev, school: e.target.value }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    >
-                      {SPELL_SCHOOLS.map(school => (
-                        <option key={school} value={school}>
-                          {school}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Casting Time
-                    </label>
-                    <select
-                      value={formData.castingTime}
-                      onChange={e => setFormData(prev => ({ ...prev, castingTime: e.target.value }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    >
-                      {CASTING_TIMES.map(time => (
-                        <option key={time} value={time}>
-                          {time}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Range
-                    </label>
-                    <select
-                      value={formData.range}
-                      onChange={e => setFormData(prev => ({ ...prev, range: e.target.value }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    >
-                      {RANGES.map(range => (
-                        <option key={range} value={range}>
-                          {range}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Duration
-                    </label>
-                    <select
-                      value={formData.duration}
-                      onChange={e => setFormData(prev => ({ ...prev, duration: e.target.value }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    >
-                      {DURATIONS.map(duration => (
-                        <option key={duration} value={duration}>
-                          {duration}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Components */}
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Components
-                  </label>
-                  <div className="flex flex-wrap gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.components.verbal}
-                        onChange={e => setFormData(prev => ({
-                          ...prev,
-                          components: { ...prev.components, verbal: e.target.checked }
-                        }))}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Verbal (V)</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.components.somatic}
-                        onChange={e => setFormData(prev => ({
-                          ...prev,
-                          components: { ...prev.components, somatic: e.target.checked }
-                        }))}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Somatic (S)</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.components.material}
-                        onChange={e => setFormData(prev => ({
-                          ...prev,
-                          components: { ...prev.components, material: e.target.checked }
-                        }))}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Material (M)</span>
-                    </label>
-                  </div>
-                  {formData.components.material && (
-                    <div className="mt-2">
-                      <input
-                        type="text"
-                        placeholder="Material component description..."
-                        value={formData.components.materialDescription}
-                        onChange={e => setFormData(prev => ({
-                          ...prev,
-                          components: { ...prev.components, materialDescription: e.target.value }
-                        }))}
-                        className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Description *
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    rows={4}
-                    className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    required
-                  />
-                </div>
-
-                {/* Higher Level */}
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    At Higher Levels
-                  </label>
-                  <textarea
-                    value={formData.higherLevel}
-                    onChange={e => setFormData(prev => ({ ...prev, higherLevel: e.target.value }))}
-                    rows={2}
-                    className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    placeholder="Describe what happens when cast at higher levels..."
-                  />
-                </div>
-
-                {/* Action Type and Damage */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Action Type
-                    </label>
-                    <select
-                      value={formData.actionType}
-                      onChange={e => setFormData(prev => ({ ...prev, actionType: e.target.value as SpellActionType | '' }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    >
-                      {ACTION_TYPES.map(type => (
-                        <option key={type.value} value={type.value}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {formData.actionType === 'save' && (
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
-                        Saving Throw
-                      </label>
-                      <select
-                        value={formData.savingThrow}
-                        onChange={e => setFormData(prev => ({ ...prev, savingThrow: e.target.value }))}
-                        className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                      >
-                        <option value="">Select...</option>
-                        {SAVING_THROWS.map(save => (
-                          <option key={save} value={save}>
-                            {save}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-
-                {/* Damage */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Damage Dice
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.damage}
-                      onChange={e => setFormData(prev => ({ ...prev, damage: e.target.value }))}
-                      placeholder="e.g., 1d8, 3d6"
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    />
-                  </div>
-
-                  {formData.damage && (
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
-                        Damage Type
-                      </label>
-                      <select
-                        value={formData.damageType}
-                        onChange={e => setFormData(prev => ({ ...prev, damageType: e.target.value }))}
-                        className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                      >
-                        <option value="">Select...</option>
-                        {DAMAGE_TYPES.map(type => (
-                          <option key={type} value={type}>
-                            {type}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-
-                {/* Flags */}
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Spell Properties
-                  </label>
-                  <div className="flex flex-wrap gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.ritual}
-                        onChange={e => setFormData(prev => ({ ...prev, ritual: e.target.checked }))}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Ritual</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.concentration}
-                        onChange={e => setFormData(prev => ({ ...prev, concentration: e.target.checked }))}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Concentration</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.isPrepared}
-                        onChange={e => setFormData(prev => ({ ...prev, isPrepared: e.target.checked }))}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Prepared</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.isAlwaysPrepared}
-                        onChange={e => setFormData(prev => ({ ...prev, isAlwaysPrepared: e.target.checked }))}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Always Prepared</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Source */}
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Source
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.source}
-                    onChange={e => setFormData(prev => ({ ...prev, source: e.target.value }))}
-                    placeholder="e.g., PHB, XGE, TCE"
-                    className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                  />
-                </div>
-
-                {/* Form Actions */}
-                <div className="flex justify-end gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="rounded border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Level</label>
+                  <SelectField
+                    value={formData.level.toString()}
+                    onValueChange={value => setFormData(prev => ({ ...prev, level: parseInt(value) }))}
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded bg-purple-600 px-4 py-2 text-white hover:bg-purple-700"
-                  >
-                    {editingId ? 'Update Spell' : 'Add Spell'}
-                  </button>
+                    <SelectItem value="0">Cantrip</SelectItem>
+                    {Array.from({ length: 9 }, (_, i) => (
+                      <SelectItem key={i + 1} value={(i + 1).toString()}>
+                        Level {i + 1}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
                 </div>
-              </form>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">School</label>
+                  <SelectField
+                    value={formData.school}
+                    onValueChange={value => setFormData(prev => ({ ...prev, school: value }))}
+                  >
+                    {SPELL_SCHOOLS.map(school => (
+                      <SelectItem key={school} value={school}>
+                        {school}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
+                </div>
+
+                <Input
+                  label="Source"
+                  value={formData.source}
+                  onChange={e => setFormData(prev => ({ ...prev, source: e.target.value }))}
+                  placeholder="e.g., PHB, XGE, TCE"
+                />
+              </div>
+            </div>
+
+            {/* Section: Casting Details */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+                Casting Details
+              </h4>
+              
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Casting Time</label>
+                  <SelectField
+                    value={formData.castingTime}
+                    onValueChange={value => setFormData(prev => ({ ...prev, castingTime: value }))}
+                  >
+                    {CASTING_TIMES.map(time => (
+                      <SelectItem key={time} value={time}>
+                        {time}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Range</label>
+                  <SelectField
+                    value={formData.range}
+                    onValueChange={value => setFormData(prev => ({ ...prev, range: value }))}
+                  >
+                    {RANGES.map(range => (
+                      <SelectItem key={range} value={range}>
+                        {range}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Duration</label>
+                  <SelectField
+                    value={formData.duration}
+                    onValueChange={value => setFormData(prev => ({ ...prev, duration: value }))}
+                  >
+                    {DURATIONS.map(duration => (
+                      <SelectItem key={duration} value={duration}>
+                        {duration}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Components */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+                Components
+              </h4>
+              
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.components.verbal}
+                    onCheckedChange={checked => setFormData(prev => ({
+                      ...prev,
+                      components: { ...prev.components, verbal: checked as boolean }
+                    }))}
+                  />
+                  <span className="text-sm font-medium text-gray-800">Verbal (V)</span>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.components.somatic}
+                    onCheckedChange={checked => setFormData(prev => ({
+                      ...prev,
+                      components: { ...prev.components, somatic: checked as boolean }
+                    }))}
+                  />
+                  <span className="text-sm font-medium text-gray-800">Somatic (S)</span>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.components.material}
+                    onCheckedChange={checked => setFormData(prev => ({
+                      ...prev,
+                      components: { ...prev.components, material: checked as boolean }
+                    }))}
+                  />
+                  <span className="text-sm font-medium text-gray-800">Material (M)</span>
+                </label>
+              </div>
+              
+              {formData.components.material && (
+                <Input
+                  label="Material Component Description"
+                  value={formData.components.materialDescription}
+                  onChange={e => setFormData(prev => ({
+                    ...prev,
+                    components: { ...prev.components, materialDescription: e.target.value }
+                  }))}
+                  placeholder="Describe the material components..."
+                />
+              )}
+            </div>
+
+            {/* Section: Spell Properties */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+                Spell Properties
+              </h4>
+              
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.ritual}
+                    onCheckedChange={checked => setFormData(prev => ({ ...prev, ritual: checked as boolean }))}
+                  />
+                  <span className="text-sm font-medium text-gray-800">Ritual</span>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.concentration}
+                    onCheckedChange={checked => setFormData(prev => ({ ...prev, concentration: checked as boolean }))}
+                  />
+                  <span className="text-sm font-medium text-gray-800">Concentration</span>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.isPrepared}
+                    onCheckedChange={checked => setFormData(prev => ({ ...prev, isPrepared: checked as boolean }))}
+                  />
+                  <span className="text-sm font-medium text-gray-800">Prepared</span>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.isAlwaysPrepared}
+                    onCheckedChange={checked => setFormData(prev => ({ ...prev, isAlwaysPrepared: checked as boolean }))}
+                  />
+                  <span className="text-sm font-medium text-gray-800">Always Prepared</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Section: Description */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+                Description
+              </h4>
+              
+              <Textarea
+                label="Spell Description"
+                value={formData.description}
+                onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                rows={4}
+                required
+                placeholder="Describe what the spell does..."
+              />
+
+              <Textarea
+                label="At Higher Levels"
+                value={formData.higherLevel}
+                onChange={e => setFormData(prev => ({ ...prev, higherLevel: e.target.value }))}
+                rows={2}
+                placeholder="Describe what happens when cast at higher levels..."
+              />
+            </div>
+
+            {/* Section: Combat Details */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+                Combat Details
+              </h4>
+              
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Action Type</label>
+                  <SelectField
+                    value={formData.actionType}
+                    onValueChange={value => setFormData(prev => ({ ...prev, actionType: value as SpellActionType | '' }))}
+                  >
+                    {ACTION_TYPES.map(type => (
+                      <SelectItem key={type.value || 'none'} value={type.value || 'none'}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
+                </div>
+
+                {formData.actionType === 'save' && (
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">Saving Throw</label>
+                    <SelectField
+                      value={formData.savingThrow}
+                      onValueChange={value => setFormData(prev => ({ ...prev, savingThrow: value }))}
+                    >
+                      <SelectItem value="">Select...</SelectItem>
+                      {SAVING_THROWS.map(save => (
+                        <SelectItem key={save} value={save}>
+                          {save}
+                        </SelectItem>
+                      ))}
+                    </SelectField>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Input
+                  label="Damage Dice"
+                  value={formData.damage}
+                  onChange={e => setFormData(prev => ({ ...prev, damage: e.target.value }))}
+                  placeholder="e.g., 1d8, 3d6"
+                />
+
+                {formData.damage && (
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">Damage Type</label>
+                    <SelectField
+                      value={formData.damageType}
+                      onValueChange={value => setFormData(prev => ({ ...prev, damageType: value }))}
+                    >
+                      <SelectItem value="">Select...</SelectItem>
+                      {DAMAGE_TYPES.map(type => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectField>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Form Actions */}
+            <div className="flex justify-end gap-3 pt-4 border-t-2 border-gray-200">
+              <Button
+                type="button"
+                onClick={resetForm}
+                variant="outline"
+                size="md"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+              >
+                {editingId ? 'Update Spell' : 'Add Spell'}
+              </Button>
+            </div>
+          </form>
         </Modal>
       )}
 
