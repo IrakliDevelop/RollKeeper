@@ -136,13 +136,11 @@ export default function ActionsSection({
               </div>
             }
           >
-            <div className="-m-4">
-              <EquippedWeapons
-                showAttackRoll={showAttackRoll}
-                showDamageRoll={showDamageRoll}
-                animateRoll={animateRoll}
-              />
-            </div>
+            <EquippedWeapons
+              showAttackRoll={showAttackRoll}
+              showDamageRoll={showDamageRoll}
+              animateRoll={animateRoll}
+            />
           </ErrorBoundary>
         </CollapsibleSubsection>
 
