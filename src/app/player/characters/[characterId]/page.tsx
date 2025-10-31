@@ -79,6 +79,8 @@ export default function CharacterSheet() {
     showAttackRoll,
     showSavingThrow,
     showDamageRoll,
+    showShortRest,
+    showLongRest,
     addToast,
   } = useToast();
 
@@ -617,6 +619,8 @@ export default function CharacterSheet() {
                 <RestManager
                   onShortRest={takeShortRest}
                   onLongRest={takeLongRest}
+                  onShowShortRestToast={showShortRest}
+                  onShowLongRestToast={showLongRest}
                 />
               </CollapsibleSection>
 

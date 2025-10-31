@@ -6,14 +6,28 @@ import { Moon, Sun } from 'lucide-react';
 interface RestManagerProps {
   onShortRest: () => void;
   onLongRest: () => void;
+  onShowShortRestToast?: () => void;
+  onShowLongRestToast?: () => void;
   className?: string;
 }
 
 export default function RestManager({
   onShortRest,
   onLongRest,
+  onShowShortRestToast,
+  onShowLongRestToast,
   className = '',
 }: RestManagerProps) {
+  const handleShortRest = () => {
+    onShortRest();
+    onShowShortRestToast?.();
+  };
+
+  const handleLongRest = () => {
+    onLongRest();
+    onShowLongRestToast?.();
+  };
+
   return (
     <div className={className}>
       <p className="mb-4 text-sm text-gray-600">
@@ -38,7 +52,7 @@ export default function RestManager({
           </div>
 
           <button
-            onClick={onShortRest}
+            onClick={handleShortRest}
             className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition-all hover:from-blue-600 hover:to-cyan-700 hover:shadow-lg active:scale-95"
           >
             <Sun size={18} />
@@ -65,7 +79,7 @@ export default function RestManager({
           </div>
 
           <button
-            onClick={onLongRest}
+            onClick={handleLongRest}
             className="w-full flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-md transition-all hover:from-indigo-600 hover:to-purple-700 hover:shadow-lg active:scale-95"
           >
             <Moon size={18} />
