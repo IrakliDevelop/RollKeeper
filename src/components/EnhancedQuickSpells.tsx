@@ -12,6 +12,7 @@ import {
   Heart,
   Grid3X3,
   List,
+  Eye,
 } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
 import { Spell } from '@/types/character';
@@ -22,6 +23,7 @@ import {
   rollDamage,
 } from '@/utils/calculations';
 import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
+import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import { RollSummary } from '@/types/dice';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
@@ -99,6 +101,14 @@ const SpellCard: React.FC<{
         </div>
         <div className="flex gap-1.5 flex-shrink-0">
           <Button
+            onClick={() => onAction('view')}
+            variant="ghost"
+            size="xs"
+            title="View details"
+          >
+            <Eye size={12} />
+          </Button>
+          <Button
             onClick={() => onAction('cast')}
             variant="primary"
             size="xs"
@@ -162,6 +172,15 @@ const SpellCard: React.FC<{
       </div>
 
       <div className="flex flex-wrap gap-2">
+        <Button
+          onClick={() => onAction('view')}
+          variant="ghost"
+          size="sm"
+          leftIcon={<Eye size={14} />}
+        >
+          View
+        </Button>
+
         <Button
           onClick={() => onAction('cast')}
           variant="primary"
@@ -279,6 +298,7 @@ export function EnhancedQuickSpells({
   // Local state
   const [castModalOpen, setCastModalOpen] = useState(false);
   const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null);
+  const [viewingSpell, setViewingSpell] = useState<Spell | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [compactView, setCompactView] = useState(false);
   const [expandedLevels, setExpandedLevels] = useState<Set<number>>(new Set([0, 1, 2])); // Default: cantrips and levels 1-2 expanded
@@ -405,6 +425,9 @@ export function EnhancedQuickSpells({
 
   const handleSpellAction = (spell: Spell, action: string) => {
     switch (action) {
+      case 'view':
+        setViewingSpell(spell);
+        break;
       case 'cast':
         openCastModal(spell);
         break;
@@ -608,6 +631,19 @@ export function EnhancedQuickSpells({
           spellSlots={character.spellSlots}
           concentration={character.concentration}
           onCastSpell={handleCastSpell}
+        />
+      )}
+
+      {/* Spell Detail Modal */}
+      {viewingSpell && (
+        <SpellDetailsModal
+          spell={viewingSpell}
+          isOpen={true}
+          onClose={() => setViewingSpell(null)}
+          isFavorite={favoriteSpells.includes(viewingSpell.id)}
+          onToggleFavorite={() => {
+            toggleSpellFavorite(viewingSpell.id);
+          }}
         />
       )}
     </>
