@@ -70,7 +70,7 @@ export default function LanguagesAndProficiencies({
   };
 
   return (
-    <div className="space-y-4 rounded-lg border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-md">
+    <div className="space-y-4 rounded-lg border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-md mt-4">
       {/* Languages Section */}
       <div>
         <div className="mb-3 flex items-center justify-between">
