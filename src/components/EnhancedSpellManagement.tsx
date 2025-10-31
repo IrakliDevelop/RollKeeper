@@ -1264,10 +1264,10 @@ export const EnhancedSpellManagement: React.FC = () => {
                   <div>
                     <label className="mb-2 block text-sm font-medium text-gray-700">Saving Throw</label>
                     <SelectField
-                      value={formData.savingThrow}
-                      onValueChange={value => setFormData(prev => ({ ...prev, savingThrow: value }))}
+                      value={formData.savingThrow || '__none__'}
+                      onValueChange={value => setFormData(prev => ({ ...prev, savingThrow: value === '__none__' ? '' : value }))}
                     >
-                      <SelectItem value="">Select...</SelectItem>
+                      <SelectItem value="__none__" disabled>Select...</SelectItem>
                       {SAVING_THROWS.map(save => (
                         <SelectItem key={save} value={save}>
                           {save}
@@ -1290,10 +1290,10 @@ export const EnhancedSpellManagement: React.FC = () => {
                   <div>
                     <label className="mb-2 block text-sm font-medium text-gray-700">Damage Type</label>
                     <SelectField
-                      value={formData.damageType}
-                      onValueChange={value => setFormData(prev => ({ ...prev, damageType: value }))}
+                      value={formData.damageType || '__none__'}
+                      onValueChange={value => setFormData(prev => ({ ...prev, damageType: value === '__none__' ? '' : value }))}
                     >
-                      <SelectItem value="">Select...</SelectItem>
+                      <SelectItem value="__none__" disabled>Select...</SelectItem>
                       {DAMAGE_TYPES.map(type => (
                         <SelectItem key={type} value={type}>
                           {type}
