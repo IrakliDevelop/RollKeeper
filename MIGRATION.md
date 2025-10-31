@@ -64,6 +64,153 @@ The main player character sheet (`/app/player/characters/[characterId]/page.tsx`
 
 ---
 
+## 🎯 Priority: Character Details & Management Section
+
+The Character Details & Management section (`characterSheetTabs.tsx`) needs comprehensive refactoring:
+
+### Section Overview
+Located in grouped tabs under "Character Details & Management" with 3 main groups:
+1. **Combat & Magic** ⚔️ (default open)
+2. **Items & Wealth** 💰
+3. **Character & Story** 📖
+
+### Components to Refactor (Priority Order)
+
+#### Group 1: Combat & Magic ⚔️
+- [ ] **SpellcastingStats** (`/src/components/SpellcastingStats.tsx`)
+  - **Issues**: Mixed badge styles, inline buttons, inconsistent inputs
+  - **Components needed**: Button, Input, Badge, Card
+  - **Priority**: HIGH - Frequently used
+
+- [x] **EnhancedSpellManagement** (`/src/components/EnhancedSpellManagement.tsx`) ✅
+  - **Status**: Partially migrated (SpellDetailsModal done)
+  - **Remaining**: Spell cards, form inputs, badges
+  - **Components needed**: Button, Input, Textarea, Select, Badge, Card
+
+- [ ] **EquipmentSection** (`/src/components/ui/character/EquipmentSection.tsx`)
+  - **Issues**: Weapon/armor cards with mixed styles, inline buttons
+  - **Components needed**: Button, Card, Badge
+  - **Priority**: HIGH - Core functionality
+
+- [ ] **ConditionsDiseasesManager** (`/src/components/ui/game/ConditionsDiseasesManager.tsx`)
+  - **Issues**: Condition cards, modal buttons, status badges
+  - **Components needed**: Button, Badge, Card, Modal
+  - **Priority**: MEDIUM
+
+#### Group 2: Items & Wealth 💰
+- [ ] **InventoryManager** (`/src/components/ui/game/InventoryManager.tsx`)
+  - **Issues**: Item cards, inline buttons, mixed input styles, search bars
+  - **Components needed**: Button, Input, Textarea, Badge, Card
+  - **Priority**: MEDIUM
+
+- [ ] **CurrencyManager** (`/src/components/ui/game/CurrencyManager.tsx`)
+  - **Issues**: Currency inputs, inline buttons for add/subtract
+  - **Components needed**: Button, Input, Card
+  - **Priority**: LOW
+
+#### Group 3: Character & Story 📖
+- [ ] **FeaturesTraitsManager** (`/src/components/ui/game/FeaturesTraitsManager.tsx`)
+  - **Issues**: Feature/trait cards, inline buttons, rich text editor, badges
+  - **Components needed**: Button, Input, Textarea, Badge, Card
+  - **Priority**: MEDIUM - Used for Features and Traits
+
+- [ ] **CharacterBackgroundEditor** (`/src/components/ui/character/CharacterBackgroundEditor.tsx`)
+  - **Issues**: Textareas for backstory, personality, ideals, bonds, flaws
+  - **Components needed**: Textarea, Card
+  - **Priority**: LOW - Less frequently accessed
+
+- [ ] **NotesManager** (`/src/components/ui/game/NotesManager.tsx`)
+  - **Issues**: Note cards, inline buttons, mixed styles, rich text editor
+  - **Components needed**: Button, Textarea, Badge, Card
+  - **Priority**: LOW - Utility feature
+
+### Specific Issues to Fix
+
+#### SpellcastingStats Component
+```typescript
+// Issues:
+// - Inline stat displays with inconsistent styling
+// - Override checkboxes not using unified Checkbox
+// - Number inputs not using unified Input
+// - Mixed gradient cards (purple, blue, amber)
+
+// Needs:
+- Card component for stat display containers
+- Input component for override inputs
+- Checkbox component for override toggles
+- Badge component for ability modifiers
+- Consistent purple/blue theme throughout
+```
+
+#### EnhancedSpellManagement Component
+```typescript
+// Current Issues:
+// - Spell cards use inline gradient backgrounds (purple, green)
+// - Mixed badge styles (blue, purple, amber, orange, indigo)
+// - Form inputs for adding spells use inline styles
+// - Search/filter inputs inconsistent
+// - Action buttons have custom gradients
+
+// Already Fixed:
+- ✅ SpellDetailsModal uses unified modal
+
+// Still Needs:
+- Spell list cards (prepared/unprepared styling)
+- Add/Edit spell form
+- Search and filter inputs
+- All action buttons (Add, Edit, Delete, View, Prepare)
+- Level/school/component badges
+```
+
+#### EquipmentSection Component
+```typescript
+// Issues:
+// - Weapon cards with green gradient backgrounds
+// - Armor cards with blue gradients  
+// - Mixed badge colors for proficiency/equipped status
+// - Inline action buttons
+
+// Needs:
+- White cards with gray borders (consistent with design system)
+- Unified Badge variants (success, warning, danger, neutral)
+- Button component for all actions
+- Consistent hover states
+```
+
+#### InventoryManager Component
+```typescript
+// Issues:
+// - Item cards with varying colored borders
+// - Quantity/weight inputs inline styled
+// - Category badges inconsistent
+// - Add item form uses mixed styles
+
+// Needs:
+- Card component for item display
+- Input component for quantity, weight, value
+- Textarea for item description
+- Badge for item categories
+- Button for add/edit/delete actions
+```
+
+### Migration Strategy
+
+1. **Start with SpellcastingStats** - Small, contained, high visibility
+2. **Continue with EquipmentSection** - Core functionality, clear wins
+3. **Tackle FeaturesTraitsManager** - Used in two places (Features & Traits)
+4. **Move to InventoryManager** - Large but straightforward
+5. **Finish with remaining managers** - NotesManager, CurrencyManager, etc.
+
+### Expected Improvements
+
+- **Consistency**: All cards white with gray borders
+- **Readability**: Better contrast and spacing
+- **Performance**: Fewer style recalculations
+- **Maintenance**: Single source of truth for styling
+- **Accessibility**: Proper focus states and keyboard navigation
+
+---
+
 ## Component Migration Checklist
 
 ### Buttons
