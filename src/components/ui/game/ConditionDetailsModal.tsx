@@ -1,11 +1,14 @@
 'use client';
 
 import React from 'react';
-import { Book, Calendar, FileText } from 'lucide-react';
+import { Book, Calendar, FileText, AlertTriangle, Shield } from 'lucide-react';
 import { ActiveCondition, ActiveDisease } from '@/types/character';
 import { SPELL_SOURCE_BOOKS } from '@/utils/constants';
 import { createSafeHtml } from '@/utils/textFormatting';
 import { Modal } from '@/components/ui/feedback';
+import { Badge } from '@/components/ui/layout/badge';
+import { Textarea } from '@/components/ui/forms/textarea';
+import { Input } from '@/components/ui/forms/input';
 
 interface ConditionDetailsModalProps {
   isOpen: boolean;
@@ -40,49 +43,57 @@ export default function ConditionDetailsModal({
       closeOnBackdropClick={true}
     >
       {/* Enhanced Header with Icon and Metadata */}
-      <div className={`border-b p-6 -m-6 mb-6 ${isCondition ? 'bg-red-50' : 'bg-purple-50'}`}>
+      <div
+        className={`-m-6 mb-6 border-b-2 p-6 ${
+          isCondition
+            ? 'border-red-200 bg-gradient-to-r from-red-50 to-orange-50'
+            : 'border-purple-200 bg-gradient-to-r from-purple-50 to-violet-50'
+        }`}
+      >
         <div className="mb-4 flex items-center gap-3">
           <div
-            className={`rounded-lg p-2 ${isCondition ? 'bg-red-100' : 'bg-purple-100'}`}
+            className={`flex h-12 w-12 items-center justify-center rounded-lg ${
+              isCondition ? 'bg-red-100' : 'bg-purple-100'
+            }`}
           >
             {isCondition ? (
-              <span className="text-2xl text-red-600">⚠️</span>
+              <AlertTriangle className="h-6 w-6 text-red-600" />
             ) : (
-              <span className="text-2xl text-purple-600">🦠</span>
+              <Shield className="h-6 w-6 text-purple-600" />
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`text-sm font-medium uppercase tracking-wide ${isCondition ? 'text-red-700' : 'text-purple-700'}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge
+              variant={isCondition ? 'danger' : 'primary'}
+              size="md"
+              className="uppercase tracking-wide"
+            >
               {isCondition ? 'Condition' : 'Disease'}
-            </span>
+            </Badge>
             {condition?.stackable && condition.count > 1 && (
-              <span
-                className={`rounded-full px-3 py-1 text-sm font-bold ${isCondition ? 'bg-red-200 text-red-800' : 'bg-purple-200 text-purple-800'}`}
-              >
+              <Badge variant="warning" size="md">
                 Level {condition.count}
-              </span>
+              </Badge>
             )}
           </div>
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-4 text-sm text-gray-700">
-          <div className="flex items-center gap-1">
-            <Book className="h-4 w-4" />
-            <span className="font-medium">{fullSourceName}</span>
+          <div className="flex items-center gap-2">
+            <Book className="h-4 w-4 text-gray-500" />
+            <span className="font-semibold">{fullSourceName}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <Calendar className="h-4 w-4" />
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-gray-500" />
             <span>
-              Applied:{' '}
-              {new Date(item!.appliedAt).toLocaleDateString()}
+              Applied: {new Date(item!.appliedAt).toLocaleDateString()}
             </span>
           </div>
           {disease?.onsetTime && (
-            <div className="flex items-center gap-1">
-              <FileText className="h-4 w-4" />
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-gray-500" />
               <span>
-                Onset:{' '}
-                {new Date(disease.onsetTime).toLocaleDateString()}
+                Onset: {new Date(disease.onsetTime).toLocaleDateString()}
               </span>
             </div>
           )}
@@ -92,49 +103,44 @@ export default function ConditionDetailsModal({
       <div className="space-y-6">
         {/* Description */}
         <div>
-          <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-gray-800">
-            <FileText className="h-5 w-5" />
+          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-800 border-b-2 border-gray-200 pb-2">
             Description
           </h3>
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="rounded-lg border-2 border-gray-200 bg-white p-4">
             <div
-              className="leading-relaxed whitespace-pre-wrap text-gray-800"
+              className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800"
               dangerouslySetInnerHTML={createSafeHtml(item!.description)}
             />
           </div>
         </div>
 
-        {/* Notes Section */}
-        <div>
-          <h3 className="mb-3 text-lg font-semibold text-gray-800">
-            Personal Notes
-          </h3>
-          <textarea
-            placeholder={`Add your notes about this ${isCondition ? 'condition' : 'disease'}...`}
-            value={item!.notes || ''}
-            onChange={e => onUpdateNotes?.(e.target.value)}
-            className="w-full resize-none rounded-lg border border-gray-300 p-3 text-gray-800 placeholder:text-gray-600 focus:border-transparent focus:ring-2 focus:ring-blue-500"
-            rows={3}
-          />
-        </div>
-
         {/* Disease-specific fields */}
         {disease && (
           <div>
-            <h3 className="mb-3 text-lg font-semibold text-gray-800">
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-800 border-b-2 border-gray-200 pb-2">
               Onset Time
             </h3>
-            <input
+            <Input
               type="datetime-local"
               value={disease.onsetTime || ''}
               onChange={e => onUpdateOnsetTime?.(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 p-3 text-gray-800 focus:border-transparent focus:ring-2 focus:ring-blue-500 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+              helperText="When did the symptoms first appear?"
             />
-            <p className="mt-1 text-sm text-gray-600">
-              When did the symptoms first appear?
-            </p>
           </div>
         )}
+
+        {/* Notes Section */}
+        <div>
+          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-800 border-b-2 border-gray-200 pb-2">
+            Personal Notes
+          </h3>
+          <Textarea
+            placeholder={`Add your notes about this ${isCondition ? 'condition' : 'disease'}...`}
+            value={item!.notes || ''}
+            onChange={e => onUpdateNotes?.(e.target.value)}
+            rows={4}
+          />
+        </div>
       </div>
     </Modal>
   );
