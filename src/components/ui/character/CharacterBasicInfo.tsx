@@ -5,6 +5,7 @@ import { Settings } from 'lucide-react';
 import SimpleClassSelector from '@/components/ui/character/SimpleClassSelector';
 import MulticlassManager from '@/components/ui/character/MulticlassManager';
 import { Button, Input } from '@/components/ui/forms';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { ALIGNMENTS } from '@/utils/constants';
 import { CharacterState } from '@/types/character';
 
@@ -147,21 +148,17 @@ export default function CharacterBasicInfo({
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Alignment
-            </label>
-            <select
+            <SelectField
+              label="Alignment"
               value={alignment}
-              onChange={e => onUpdateAlignment(e.target.value)}
-              className="w-full rounded-md border border-gray-300 p-2 text-gray-800 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              onValueChange={onUpdateAlignment}
             >
-              <option value="">Select...</option>
-              {ALIGNMENTS.map(alignment => (
-                <option key={alignment} value={alignment}>
-                  {alignment}
-                </option>
+              {ALIGNMENTS.map(align => (
+                <SelectItem key={align} value={align}>
+                  {align}
+                </SelectItem>
               ))}
-            </select>
+            </SelectField>
           </div>
         </div>
       </div>
