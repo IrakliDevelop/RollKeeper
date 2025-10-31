@@ -8,11 +8,15 @@ import {
   Filter,
   MapPin,
   X,
+  Search,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { formatCurrencyFromCopper } from '@/utils/currency';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
+import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { ItemCard, ItemForm, initialInventoryFormData, type InventoryFormData } from '../../ui/game/inventory';
 
@@ -80,7 +84,9 @@ export function InventoryManager({
   const [formData, setFormData] = useState<InventoryFormData>(initialInventoryFormData);
   const [filterLocation, setFilterLocation] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [collapsedLocations, setCollapsedLocations] = useState<Set<string>>(new Set());
 
   // Get all unique locations from items
   const allLocations = useMemo(() => {
@@ -113,7 +119,13 @@ export function InventoryManager({
         const categoryMatch =
           filterCategory === 'all' || item.category === filterCategory;
 
-        return locationMatch && categoryMatch;
+        const searchMatch =
+          !searchQuery ||
+          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+
+        return locationMatch && categoryMatch && searchMatch;
       });
     }
 
@@ -122,7 +134,7 @@ export function InventoryManager({
     }
 
     return result;
-  }, [items, filterLocation, filterCategory, showOnlyLocation, maxItemsToShow]);
+  }, [items, filterLocation, filterCategory, searchQuery, showOnlyLocation, maxItemsToShow]);
 
   // Group items by location
   const itemsByLocation = useMemo(() => {
@@ -186,9 +198,22 @@ export function InventoryManager({
     setFormData(initialInventoryFormData);
   };
 
+  const toggleLocationCollapse = (location: string) => {
+    setCollapsedLocations(prev => {
+      const next = new Set(prev);
+      if (next.has(location)) {
+        next.delete(location);
+      } else {
+        next.add(location);
+      }
+      return next;
+    });
+  };
+
   const activeFilterCount = [
     filterLocation !== 'all' ? 1 : 0,
     filterCategory !== 'all' ? 1 : 0,
+    searchQuery ? 1 : 0,
   ].reduce((a, b) => a + b, 0);
 
   return (
@@ -265,6 +290,20 @@ export function InventoryManager({
 
           {showFilters && (
             <>
+              <div className="mb-3">
+                <label className="mb-2 flex items-center gap-1 text-sm font-medium text-gray-700">
+                  <Search className="h-3 w-3" />
+                  Search Items
+                </label>
+                <Input
+                  leftIcon={<Search className="h-4 w-4" />}
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search by name, description, or tags..."
+                  className="w-full"
+                />
+              </div>
+
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-2 flex items-center gap-1 text-sm font-medium text-gray-700">
@@ -309,6 +348,7 @@ export function InventoryManager({
                   onClick={() => {
                     setFilterLocation('all');
                     setFilterCategory('all');
+                    setSearchQuery('');
                   }}
                   variant="ghost"
                   size="sm"
@@ -353,38 +393,58 @@ export function InventoryManager({
             />
           ) : (
             // Grouped by location
-            <div className="space-y-6">
-              {Object.entries(itemsByLocation).map(([location, locationItems]) => (
-                <div key={location}>
-                  <div className="mb-3 flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-purple-600" />
-                    <h4 className="font-bold text-gray-800">{location}</h4>
-                    <Badge variant="secondary" size="sm">
-                      {locationItems.length}
-                    </Badge>
+            <div className="space-y-4">
+              {Object.entries(itemsByLocation).map(([location, locationItems]) => {
+                const isCollapsed = collapsedLocations.has(location);
+                
+                return (
+                  <div key={location} className="rounded-lg border-2 border-gray-200 bg-white">
+                    <button
+                      onClick={() => toggleLocationCollapse(location)}
+                      className="w-full flex items-center justify-between p-4 text-left transition-colors hover:bg-gray-50"
+                    >
+                      <div className="flex items-center gap-2">
+                        {isCollapsed ? (
+                          <ChevronRight className="h-4 w-4 text-purple-600" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-purple-600" />
+                        )}
+                        <MapPin className="h-4 w-4 text-purple-600" />
+                        <h4 className="font-bold text-gray-800">{location}</h4>
+                        <Badge variant="secondary" size="sm">
+                          {locationItems.length}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {isCollapsed ? 'Click to expand' : 'Click to collapse'}
+                      </div>
+                    </button>
+                    
+                    {!isCollapsed && (
+                      <div className="space-y-3 p-4 pt-0">
+                        {locationItems.map(item => (
+                          <ItemCard
+                            key={item.id}
+                            item={item}
+                            onEdit={readonly || !onUpdateItem ? undefined : handleEditItem}
+                            onDelete={
+                              readonly || !onDeleteItem
+                                ? undefined
+                                : () => onDeleteItem(item.id)
+                            }
+                            onQuantityChange={
+                              readonly || !onQuantityChange
+                                ? undefined
+                                : (quantity: number) => onQuantityChange(item.id, quantity)
+                            }
+                            compact={compact}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-3">
-                    {locationItems.map(item => (
-                      <ItemCard
-                        key={item.id}
-                        item={item}
-                        onEdit={readonly || !onUpdateItem ? undefined : handleEditItem}
-                        onDelete={
-                          readonly || !onDeleteItem
-                            ? undefined
-                            : () => onDeleteItem(item.id)
-                        }
-                        onQuantityChange={
-                          readonly || !onQuantityChange
-                            ? undefined
-                            : (quantity: number) => onQuantityChange(item.id, quantity)
-                        }
-                        compact={compact}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )
         ) : (
