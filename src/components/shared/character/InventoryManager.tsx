@@ -1,25 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
-import {
-  InventoryItem,
-  MagicItemRarity,
-  MagicItemCategory,
-} from '@/types/character';
+import React, { useState, useMemo } from 'react';
+import { InventoryItem } from '@/types/character';
 import {
   Plus,
-  Edit2,
-  Trash2,
   Package,
-  Minus,
-  MapPin,
   Filter,
+  MapPin,
   X,
 } from 'lucide-react';
 import { formatCurrencyFromCopper } from '@/utils/currency';
-import { inputStyles, selectStyles, labelStyles } from '@/styles/inputs';
-import CustomDropdown from '@/components/ui/forms/CustomDropdown';
 import DragDropList from '@/components/ui/layout/DragDropList';
+import { Button } from '@/components/ui/forms/button';
+import { Badge } from '@/components/ui/layout/badge';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { ItemCard, ItemForm, initialInventoryFormData, type InventoryFormData } from './inventory';
 
 const ITEM_CATEGORIES = [
   'weapon',
@@ -28,29 +23,6 @@ const ITEM_CATEGORIES = [
   'consumable',
   'treasure',
   'misc',
-];
-
-const ITEM_RARITIES: MagicItemRarity[] = [
-  'common',
-  'uncommon',
-  'rare',
-  'very rare',
-  'legendary',
-  'artifact',
-];
-
-const ITEM_TYPES: MagicItemCategory[] = [
-  'wondrous',
-  'armor',
-  'shield',
-  'ring',
-  'staff',
-  'wand',
-  'rod',
-  'scroll',
-  'potion',
-  'artifact',
-  'other',
 ];
 
 const DEFAULT_LOCATIONS = [
@@ -64,53 +36,6 @@ const DEFAULT_LOCATIONS = [
   'On Person',
   'Left Behind',
 ];
-
-const getRarityColor = (rarity?: MagicItemRarity) => {
-  if (!rarity) return 'text-gray-600 bg-gray-100';
-
-  switch (rarity) {
-    case 'common':
-      return 'text-gray-600 bg-gray-100';
-    case 'uncommon':
-      return 'text-green-600 bg-green-100';
-    case 'rare':
-      return 'text-blue-600 bg-blue-100';
-    case 'very rare':
-      return 'text-purple-600 bg-purple-100';
-    case 'legendary':
-      return 'text-orange-600 bg-orange-100';
-    case 'artifact':
-      return 'text-red-600 bg-red-100';
-    default:
-      return 'text-gray-600 bg-gray-100';
-  }
-};
-
-interface InventoryFormData {
-  name: string;
-  category: string;
-  location: string;
-  rarity?: MagicItemRarity;
-  type?: MagicItemCategory;
-  quantity: number;
-  weight?: number;
-  value?: number;
-  description: string;
-  tags: string[];
-}
-
-const initialFormData: InventoryFormData = {
-  name: '',
-  category: 'misc',
-  location: 'Backpack',
-  rarity: undefined,
-  type: undefined,
-  quantity: 1,
-  weight: undefined,
-  value: undefined,
-  description: '',
-  tags: [],
-};
 
 interface InventoryManagerProps {
   items: InventoryItem[];
@@ -151,120 +76,86 @@ export function InventoryManager({
   className = '',
 }: InventoryManagerProps) {
   const [showItemForm, setShowItemForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<InventoryFormData>(initialFormData);
-  const [tagInput, setTagInput] = useState('');
-  const [customLocation, setCustomLocation] = useState('');
-  const [showCustomLocation, setShowCustomLocation] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [formData, setFormData] = useState<InventoryFormData>(initialInventoryFormData);
   const [filterLocation, setFilterLocation] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   // Get all unique locations from items
-  const allLocations = [
-    ...new Set([
-      ...DEFAULT_LOCATIONS,
-      ...items.map(item => item.location).filter(Boolean),
-    ]),
-  ].sort();
-
-  // Prepare dropdown options
-  const locationOptions = [
-    { value: 'all', label: 'All Locations' },
-    ...allLocations
-      .filter((location): location is string => Boolean(location))
-      .map(location => ({ value: location, label: location })),
-    { value: 'Unassigned', label: 'Unassigned' },
-  ];
-
-  const categoryOptions = [
-    { value: 'all', label: 'All Categories' },
-    ...ITEM_CATEGORIES.map(category => ({
-      value: category,
-      label: category.charAt(0).toUpperCase() + category.slice(1),
-    })),
-  ];
+  const allLocations = useMemo(() => {
+    return [
+      ...new Set([
+        ...DEFAULT_LOCATIONS,
+        ...items.map(item => item.location).filter(Boolean),
+      ]),
+    ].sort();
+  }, [items]);
 
   // Filter items based on selected filters and display options
-  let filteredItems = items;
+  const filteredItems = useMemo(() => {
+    let result = items;
 
-  if (showOnlyLocation) {
-    filteredItems = filteredItems.filter(item =>
-      showOnlyLocation === 'Unassigned'
-        ? !item.location || item.location === null
-        : item.location === showOnlyLocation
-    );
-  } else {
-    filteredItems = filteredItems.filter(item => {
-      const locationMatch =
-        filterLocation === 'all' ||
-        (filterLocation === 'Unassigned' &&
-          (item.location === undefined || item.location === null)) ||
-        item.location === filterLocation;
-      const categoryMatch =
-        filterCategory === 'all' || item.category === filterCategory;
-      return locationMatch && categoryMatch;
-    });
-  }
+    if (showOnlyLocation) {
+      result = result.filter(item =>
+        showOnlyLocation === 'Unassigned'
+          ? !item.location || item.location === null
+          : item.location === showOnlyLocation
+      );
+    } else {
+      result = result.filter(item => {
+        const locationMatch =
+          filterLocation === 'all' ||
+          (filterLocation === 'Unassigned' &&
+            (!item.location || item.location === null)) ||
+          item.location === filterLocation;
 
-  if (maxItemsToShow) {
-    filteredItems = filteredItems.slice(0, maxItemsToShow);
-  }
+        const categoryMatch =
+          filterCategory === 'all' || item.category === filterCategory;
+
+        return locationMatch && categoryMatch;
+      });
+    }
+
+    if (maxItemsToShow && result.length > maxItemsToShow) {
+      result = result.slice(0, maxItemsToShow);
+    }
+
+    return result;
+  }, [items, filterLocation, filterCategory, showOnlyLocation, maxItemsToShow]);
 
   // Group items by location
-  const itemsByLocation = filteredItems.reduce(
-    (acc, item) => {
+  const itemsByLocation = useMemo(() => {
+    const grouped: Record<string, InventoryItem[]> = {};
+    
+    filteredItems.forEach(item => {
       const location = item.location || 'Unassigned';
-      if (!acc[location]) {
-        acc[location] = [];
+      if (!grouped[location]) {
+        grouped[location] = [];
       }
-      acc[location].push(item);
-      return acc;
-    },
-    {} as Record<string, InventoryItem[]>
-  );
+      grouped[location].push(item);
+    });
 
-  const handleItemSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    return grouped;
+  }, [filteredItems]);
 
-    if (!formData.name.trim() || !onAddItem || !onUpdateItem) return;
+  // Calculate statistics
+  const stats = useMemo(() => {
+    const totalItems = filteredItems.reduce((sum, item) => sum + item.quantity, 0);
+    const totalWeight = filteredItems.reduce(
+      (sum, item) => sum + (item.weight || 0) * item.quantity,
+      0
+    );
+    const totalValue = filteredItems.reduce(
+      (sum, item) => sum + (item.value || 0) * item.quantity,
+      0
+    );
 
-    const finalLocation = showCustomLocation
-      ? customLocation.trim()
-      : formData.location;
-
-    const itemData = {
-      ...formData,
-      name: formData.name.trim(),
-      location: finalLocation || undefined,
-      tags: formData.tags.filter(tag => tag.trim()),
-    };
-
-    if (editingId) {
-      onUpdateItem(editingId, itemData);
-      setEditingId(null);
-    } else {
-      onAddItem(itemData);
-    }
-
-    resetItemForm();
-  };
-
-  const resetItemForm = () => {
-    setFormData(initialFormData);
-    setShowItemForm(false);
-    setEditingId(null);
-    setTagInput('');
-    setCustomLocation('');
-    setShowCustomLocation(false);
-  };
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      resetItemForm();
-    }
-  };
+    return { totalItems, totalWeight, totalValue };
+  }, [filteredItems]);
 
   const handleEditItem = (item: InventoryItem) => {
+    setEditingItem(item);
     setFormData({
       name: item.name,
       category: item.category,
@@ -274,686 +165,248 @@ export function InventoryManager({
       quantity: item.quantity,
       weight: item.weight,
       value: item.value,
-      description: item.description || '',
+      description: item.description,
       tags: item.tags,
     });
-
-    // Check if location is custom (not in any existing locations)
-    if (item.location && !allLocations.includes(item.location)) {
-      setCustomLocation(item.location);
-      setShowCustomLocation(true);
-    }
-
-    setEditingId(item.id);
     setShowItemForm(true);
   };
 
-  const addTag = () => {
-    if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, tagInput.trim()],
-      }));
-      setTagInput('');
+  const handleFormSubmit = (data: InventoryFormData) => {
+    if (editingItem && onUpdateItem) {
+      onUpdateItem(editingItem.id, data);
+    } else if (onAddItem) {
+      onAddItem(data);
     }
+    resetForm();
   };
 
-  const removeTag = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter((_, i) => i !== index),
-    }));
+  const resetForm = () => {
+    setShowItemForm(false);
+    setEditingItem(null);
+    setFormData(initialInventoryFormData);
   };
 
-  const getTotalWeight = (items: InventoryItem[]) => {
-    return items.reduce((total, item) => {
-      return total + (item.weight ? item.weight * item.quantity : 0);
-    }, 0);
-  };
-
-  const getTotalValue = (items: InventoryItem[]) => {
-    return items.reduce((total, item) => {
-      return total + (item.value ? item.value * item.quantity : 0);
-    }, 0);
-  };
-
-  // Custom reorder handler for items within the same location
-  const handleReorderItemsInLocation =
-    (location: string) => (sourceIndex: number, destinationIndex: number) => {
-      if (!onReorderItems) return;
-
-      const itemsInLocation = itemsByLocation[location];
-      const sourceItemId = itemsInLocation[sourceIndex].id;
-      const destinationItemId = itemsInLocation[destinationIndex].id;
-
-      // Find the indices in the main inventory array
-      const sourceGlobalIndex = items.findIndex(
-        item => item.id === sourceItemId
-      );
-      const destinationGlobalIndex = items.findIndex(
-        item => item.id === destinationItemId
-      );
-
-      if (sourceGlobalIndex !== -1 && destinationGlobalIndex !== -1) {
-        onReorderItems(sourceGlobalIndex, destinationGlobalIndex);
-      }
-    };
-
-  const containerClasses = compact
-    ? `bg-white rounded-lg shadow border border-purple-200 p-3 space-y-3 ${className}`
-    : `bg-white rounded-lg shadow-lg border border-purple-200 p-6 space-y-6 ${className}`;
+  const activeFilterCount = [
+    filterLocation !== 'all' ? 1 : 0,
+    filterCategory !== 'all' ? 1 : 0,
+  ].reduce((a, b) => a + b, 0);
 
   return (
-    <div className={containerClasses}>
-      <div className="flex items-center justify-between">
-        <h2
-          className={`flex items-center gap-2 font-bold text-purple-800 ${compact ? 'text-base' : 'text-xl'}`}
-        >
-          <Package className={compact ? 'h-5 w-5' : 'h-6 w-6'} />
-          {compact ? 'Items' : 'Inventory'} ({filteredItems.length} items)
-        </h2>
-        {!readonly && !hideAddButton && onAddItem && (
-          <button
-            onClick={() => setShowItemForm(true)}
-            className={`flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700 ${compact ? 'text-sm' : ''}`}
-          >
-            <Plus size={16} />
-            Add Item
-          </button>
-        )}
+    <div className={`rounded-lg border-2 border-gray-200 bg-white shadow-sm ${className}`}>
+      {/* Header */}
+      <div className="border-b-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="flex items-center gap-2 text-xl font-bold text-gray-800">
+            <Package className="h-6 w-6 text-purple-600" />
+            {compact ? 'Inventory' : 'Inventory & Equipment'}
+          </h2>
+          <div className="flex items-center gap-2">
+            <Badge variant="primary" size="md">
+              {filteredItems.length} items
+            </Badge>
+            {!readonly && !hideAddButton && onAddItem && (
+              <Button
+                onClick={() => setShowItemForm(true)}
+                variant="primary"
+                size="sm"
+                leftIcon={<Plus size={16} />}
+                className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+              >
+                Add Item
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Statistics */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-lg border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-violet-50 p-3 text-center">
+            <div className="text-2xl font-bold text-purple-800">
+              {stats.totalItems}
+            </div>
+            <div className="text-xs font-medium text-purple-600">Total Items</div>
+          </div>
+          <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-cyan-50 p-3 text-center">
+            <div className="text-2xl font-bold text-blue-800">
+              {stats.totalWeight.toFixed(1)}
+            </div>
+            <div className="text-xs font-medium text-blue-600">lbs</div>
+          </div>
+          <div className="rounded-lg border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50 p-3 text-center">
+            <div className="text-xl font-bold text-yellow-800">
+              {formatCurrencyFromCopper(stats.totalValue)}
+            </div>
+            <div className="text-xs font-medium text-yellow-600">Total Value</div>
+          </div>
+        </div>
       </div>
 
       {/* Filters */}
-      {!hideFilters && !showOnlyLocation && !compact && (
-        <div className="mb-6 flex flex-wrap gap-4 rounded-lg border border-purple-200 bg-purple-50 p-4">
-          <div className="flex items-center gap-2">
-            <Filter size={16} className="text-purple-600" />
-            <span className="text-sm font-medium text-purple-800">
-              Filters:
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-purple-700">
-              Location:
-            </label>
-            <CustomDropdown
-              options={locationOptions}
-              value={filterLocation}
-              onChange={setFilterLocation}
-              className="min-w-44"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-purple-700">
-              Category:
-            </label>
-            <CustomDropdown
-              options={categoryOptions}
-              value={filterCategory}
-              onChange={setFilterCategory}
-              className="min-w-44"
-            />
-          </div>
-
-          {(filterLocation !== 'all' || filterCategory !== 'all') && (
-            <button
-              onClick={() => {
-                setFilterLocation('all');
-                setFilterCategory('all');
-              }}
-              className="rounded-md bg-red-100 px-3 py-1 text-sm text-red-700 transition-colors hover:bg-red-200"
+      {!hideFilters && !showOnlyLocation && (
+        <div className="border-b-2 border-gray-200 bg-gray-50 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="flex items-center gap-2 text-sm font-bold text-gray-800 uppercase tracking-wide">
+              <Filter className="h-4 w-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <Badge variant="primary" size="sm">
+                  {activeFilterCount}
+                </Badge>
+              )}
+            </h3>
+            <Button
+              onClick={() => setShowFilters(!showFilters)}
+              variant="ghost"
+              size="xs"
             >
-              Clear Filters
-            </button>
+              {showFilters ? 'Hide' : 'Show'}
+            </Button>
+          </div>
+
+          {showFilters && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  Location
+                </label>
+                <SelectField
+                  value={filterLocation}
+                  onValueChange={setFilterLocation}
+                >
+                  <SelectItem value="all">All Locations</SelectItem>
+                  {allLocations.map(location => (
+                    <SelectItem key={location} value={location}>
+                      {location}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="Unassigned">Unassigned</SelectItem>
+                </SelectField>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700 flex items-center gap-1">
+                  <Package className="h-3 w-3" />
+                  Category
+                </label>
+                <SelectField
+                  value={filterCategory}
+                  onValueChange={setFilterCategory}
+                >
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {ITEM_CATEGORIES.map(category => (
+                    <SelectItem key={category} value={category}>
+                      {category.charAt(0).toUpperCase() + category.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectField>
+              </div>
+            </div>
+
+            {activeFilterCount > 0 && (
+              <Button
+                onClick={() => {
+                  setFilterLocation('all');
+                  setFilterCategory('all');
+                }}
+                variant="ghost"
+                size="sm"
+                leftIcon={<X size={14} />}
+                className="mt-3"
+              >
+                Clear Filters
+              </Button>
+            )}
           )}
         </div>
       )}
 
-      {/* Items by Location */}
-      {Object.keys(itemsByLocation).length > 0 ? (
-        <div className={compact ? 'space-y-3' : 'space-y-6'}>
-          {Object.entries(itemsByLocation).map(([location, locationItems]) => (
-            <div
-              key={location}
-              className={`rounded-lg border border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50 ${compact ? 'p-3' : 'p-4'}`}
-            >
-              {!hideLocations && (
-                <div
-                  className={`flex items-center justify-between ${compact ? 'mb-2' : 'mb-4'}`}
-                >
-                  <h3
-                    className={`flex items-center gap-2 font-semibold text-purple-800 ${compact ? 'text-sm' : ''}`}
-                  >
-                    <MapPin size={compact ? 16 : 18} />
-                    {location} ({locationItems.length} items)
-                  </h3>
-                  {!compact && (
-                    <div className="text-sm text-purple-600">
-                      <span className="mr-4">
-                        Weight: {getTotalWeight(locationItems).toFixed(1)} lbs
-                      </span>
-                      <span>
-                        Value:{' '}
-                        {formatCurrencyFromCopper(getTotalValue(locationItems))}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-              {readonly || !onReorderItems ? (
-                <div
-                  className={`grid ${compact ? 'grid-cols-1 gap-2' : 'grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3'}`}
-                >
-                  {locationItems.map(item => (
-                    <ItemCard
-                      key={item.id}
-                      item={item}
-                      onEdit={readonly ? undefined : handleEditItem}
-                      onDelete={
-                        readonly || !onDeleteItem
-                          ? undefined
-                          : () => onDeleteItem(item.id)
-                      }
-                      onQuantityChange={
-                        readonly || !onQuantityChange
-                          ? undefined
-                          : quantity => onQuantityChange(item.id, quantity)
-                      }
-                      compact={compact}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <DragDropList
-                  items={locationItems}
-                  onReorder={handleReorderItemsInLocation(location)}
-                  keyExtractor={item => item.id}
-                  className={`grid ${compact ? 'grid-cols-1 gap-2' : 'grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3'}`}
-                  showDragHandle={true}
-                  dragHandlePosition="left"
-                  renderItem={item => (
-                    <ItemCard
-                      item={item}
-                      onEdit={readonly ? undefined : handleEditItem}
-                      onDelete={
-                        readonly || !onDeleteItem
-                          ? undefined
-                          : () => onDeleteItem(item.id)
-                      }
-                      onQuantityChange={
-                        readonly || !onQuantityChange
-                          ? undefined
-                          : quantity => onQuantityChange(item.id, quantity)
-                      }
-                      compact={compact}
-                    />
-                  )}
+      {/* Items Display */}
+      <div className="p-6">
+        {filteredItems.length > 0 ? (
+          hideLocations ? (
+            // Simple list view
+            <DragDropList
+              items={filteredItems}
+              onReorder={onReorderItems || (() => {})}
+              keyExtractor={item => item.id}
+              className="space-y-3"
+              showDragHandle={!readonly && !!onReorderItems}
+              dragHandlePosition="left"
+              renderItem={item => (
+                <ItemCard
+                  item={item}
+                  onEdit={readonly || !onUpdateItem ? undefined : handleEditItem}
+                  onDelete={
+                    readonly || !onDeleteItem ? undefined : () => onDeleteItem(item.id)
+                  }
+                  onQuantityChange={
+                    readonly || !onQuantityChange
+                      ? undefined
+                      : quantity => onQuantityChange(item.id, quantity)
+                  }
+                  compact={compact}
                 />
               )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="py-12 text-center text-gray-500">
-          <Package className="mx-auto mb-2 h-12 w-12 text-gray-300" />
-          <p className="font-medium">No items found</p>
-          <p className="mt-1 text-sm">
-            {filterLocation !== 'all' || filterCategory !== 'all'
-              ? 'Try adjusting your filters or add new items'
-              : 'Add items to track your equipment and supplies'}
-          </p>
-        </div>
-      )}
-
-      {/* Item Form Modal */}
-      {!readonly && showItemForm && onAddItem && onUpdateItem && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-          onClick={handleBackdropClick}
-        >
-          <div className="animate-in zoom-in-95 max-h-[90vh] w-full max-w-2xl transform overflow-y-auto rounded-xl bg-white shadow-2xl duration-200">
-            <div className="p-6">
-              <div className="mb-6 flex items-center justify-between">
-                <h3 className="text-xl font-bold text-gray-800">
-                  {editingId ? 'Edit Item' : 'Add Item'}
-                </h3>
-                <button
-                  type="button"
-                  onClick={resetItemForm}
-                  className="p-1 text-gray-400 transition-colors hover:text-gray-600"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <form onSubmit={handleItemSubmit} className="space-y-6">
-                <div>
-                  <label className={labelStyles.base}>Name</label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={e =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    className={inputStyles.purple}
-                    placeholder="e.g., Rope (50 feet), Healing Potion"
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelStyles.base}>Category</label>
-                    <select
-                      value={formData.category}
-                      onChange={e =>
-                        setFormData({ ...formData, category: e.target.value })
-                      }
-                      className={selectStyles.purple}
-                    >
-                      {ITEM_CATEGORIES.map(category => (
-                        <option key={category} value={category}>
-                          {category.charAt(0).toUpperCase() + category.slice(1)}
-                        </option>
-                      ))}
-                    </select>
+            />
+          ) : (
+            // Grouped by location
+            <div className="space-y-6">
+              {Object.entries(itemsByLocation).map(([location, locationItems]) => (
+                <div key={location}>
+                  <div className="mb-3 flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-purple-600" />
+                    <h4 className="font-bold text-gray-800">{location}</h4>
+                    <Badge variant="secondary" size="sm">
+                      {locationItems.length}
+                    </Badge>
                   </div>
-
-                  <div>
-                    <label className={labelStyles.base}>Quantity</label>
-                    <input
-                      type="number"
-                      value={formData.quantity}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          quantity: parseInt(e.target.value) || 1,
-                        })
-                      }
-                      className={inputStyles.purple}
-                      min="1"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Rarity and Type */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelStyles.base}>Rarity</label>
-                    <select
-                      value={formData.rarity || ''}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          rarity:
-                            (e.target.value as MagicItemRarity) || undefined,
-                        })
-                      }
-                      className={selectStyles.purple}
-                    >
-                      <option value="">None/Standard</option>
-                      {ITEM_RARITIES.map(rarity => (
-                        <option key={rarity} value={rarity}>
-                          {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className={labelStyles.base}>Type</label>
-                    <select
-                      value={formData.type || ''}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          type:
-                            (e.target.value as MagicItemCategory) || undefined,
-                        })
-                      }
-                      className={selectStyles.purple}
-                    >
-                      <option value="">Standard Item</option>
-                      {ITEM_TYPES.map(type => (
-                        <option key={type} value={type}>
-                          {type.charAt(0).toUpperCase() + type.slice(1)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Location Selection */}
-                <div>
-                  <label className={labelStyles.base}>Location</label>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={
-                          showCustomLocation ? 'custom' : formData.location
+                  <div className="space-y-3">
+                    {locationItems.map(item => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        onEdit={readonly || !onUpdateItem ? undefined : handleEditItem}
+                        onDelete={
+                          readonly || !onDeleteItem
+                            ? undefined
+                            : () => onDeleteItem(item.id)
                         }
-                        onChange={e => {
-                          if (e.target.value === 'custom') {
-                            setShowCustomLocation(true);
-                          } else {
-                            setShowCustomLocation(false);
-                            setFormData({
-                              ...formData,
-                              location: e.target.value,
-                            });
-                          }
-                        }}
-                        className={selectStyles.purple.replace(
-                          'w-full',
-                          'flex-1'
-                        )}
-                      >
-                        {allLocations
-                          .filter((location): location is string =>
-                            Boolean(location)
-                          )
-                          .map(location => (
-                            <option key={location} value={location}>
-                              {location}
-                            </option>
-                          ))}
-                        <option value="custom">Custom Location...</option>
-                      </select>
-                    </div>
-
-                    {showCustomLocation && (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={customLocation}
-                          onChange={e => setCustomLocation(e.target.value)}
-                          className={inputStyles.purple.replace(
-                            'w-full',
-                            'flex-1'
-                          )}
-                          placeholder="Enter custom location..."
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowCustomLocation(false);
-                            setCustomLocation('');
-                          }}
-                          className="rounded-lg border-2 border-gray-300 px-3 py-3 text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-700"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className={labelStyles.base}>Weight (lbs)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={formData.weight || ''}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          weight: e.target.value
-                            ? parseFloat(e.target.value)
-                            : undefined,
-                        })
-                      }
-                      className={inputStyles.purple}
-                      placeholder="Per item"
-                      min="0"
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelStyles.base}>Value (cp)</label>
-                    <input
-                      type="number"
-                      value={formData.value || ''}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          value: e.target.value
-                            ? parseInt(e.target.value)
-                            : undefined,
-                        })
-                      }
-                      className={inputStyles.purple}
-                      placeholder="Per item"
-                      min="0"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className={labelStyles.base}>Description</label>
-                  <textarea
-                    value={formData.description}
-                    onChange={e =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    className={inputStyles.textarea.replace(
-                      'focus:border-blue-500 focus:ring-blue-500',
-                      'focus:border-purple-500 focus:ring-purple-500'
-                    )}
-                    rows={3}
-                    placeholder="Item description, properties, or notes..."
-                  />
-                </div>
-
-                <div>
-                  <label className={labelStyles.base}>Tags</label>
-                  <div className="mb-3 flex gap-2">
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={e => setTagInput(e.target.value)}
-                      className={inputStyles.purple.replace('w-full', 'flex-1')}
-                      placeholder="Add tag..."
-                      onKeyPress={e =>
-                        e.key === 'Enter' && (e.preventDefault(), addTag())
-                      }
-                    />
-                    <button
-                      type="button"
-                      onClick={addTag}
-                      className="rounded-lg bg-purple-600 px-6 py-3 font-medium text-white transition-colors hover:bg-purple-700"
-                    >
-                      Add
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {formData.tags.map((tag, index) => (
-                      <span
-                        key={index}
-                        className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-3 py-1 text-sm text-purple-800"
-                      >
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={() => removeTag(index)}
-                          className="text-purple-600 hover:text-purple-800"
-                        >
-                          ×
-                        </button>
-                      </span>
+                        onQuantityChange={
+                          readonly || !onQuantityChange
+                            ? undefined
+                            : quantity => onQuantityChange(item.id, quantity)
+                        }
+                        compact={compact}
+                      />
                     ))}
                   </div>
                 </div>
-
-                <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
-                  <button
-                    type="button"
-                    onClick={resetItemForm}
-                    className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700"
-                  >
-                    {editingId ? 'Update' : 'Add'} Item
-                  </button>
-                </div>
-              </form>
+              ))}
             </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface ItemCardProps {
-  item: InventoryItem;
-  onEdit?: (item: InventoryItem) => void;
-  onDelete?: () => void;
-  onQuantityChange?: (quantity: number) => void;
-  compact?: boolean;
-}
-
-function ItemCard({
-  item,
-  onEdit,
-  onDelete,
-  onQuantityChange,
-  compact = false,
-}: ItemCardProps) {
-  const totalWeight = item.weight ? item.weight * item.quantity : undefined;
-  const totalValue = item.value ? item.value * item.quantity : undefined;
-
-  return (
-    <div
-      className={`rounded-lg border border-gray-200 bg-white shadow-sm transition-all hover:border-gray-300 ${compact ? 'p-2' : 'p-3'}`}
-    >
-      <div
-        className={`flex items-start justify-between ${compact ? 'mb-1' : 'mb-2'}`}
-      >
-        <h5
-          className={`font-semibold text-gray-800 ${compact ? 'text-xs' : 'text-sm'}`}
-        >
-          {item.name}
-        </h5>
-        {(onEdit || onDelete) && (
-          <div className="flex gap-1">
-            {onEdit && (
-              <button
-                onClick={() => onEdit(item)}
-                className="p-1 text-gray-600 transition-colors hover:text-blue-600"
-                title="Edit item"
-              >
-                <Edit2 size={12} />
-              </button>
-            )}
-            {onDelete && (
-              <button
-                onClick={onDelete}
-                className="p-1 text-gray-600 transition-colors hover:text-red-600"
-                title="Delete item"
-              >
-                <Trash2 size={12} />
-              </button>
-            )}
+          )
+        ) : (
+          <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 py-12 text-center">
+            <Package className="mx-auto mb-3 h-12 w-12 text-gray-300" />
+            <p className="font-medium text-gray-600">No items found</p>
+            <p className="mt-1 text-sm text-gray-500">
+              {activeFilterCount > 0
+                ? 'Try adjusting your filters or add new items'
+                : 'Add items to track your equipment and supplies'}
+            </p>
           </div>
         )}
       </div>
 
-      <div
-        className={`space-y-1 text-gray-600 ${compact ? 'text-xs' : 'text-xs'}`}
-      >
-        <div className="flex justify-between">
-          <span>Category:</span>
-          <span className="capitalize">{item.category}</span>
-        </div>
-
-        {/* Rarity and Type */}
-        {(item.rarity || item.type) && !compact && (
-          <div className="mb-2 flex flex-wrap gap-1">
-            {item.rarity && (
-              <span
-                className={`rounded-full px-2 py-1 text-xs font-medium ${getRarityColor(item.rarity)}`}
-              >
-                {item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)}
-              </span>
-            )}
-            {item.type && (
-              <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
-                {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-              </span>
-            )}
-          </div>
-        )}
-
-        <div className="flex items-center justify-between">
-          <span>Quantity:</span>
-          {onQuantityChange ? (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => onQuantityChange(Math.max(1, item.quantity - 1))}
-                className="flex h-5 w-5 items-center justify-center rounded bg-red-100 text-red-600 transition-colors hover:bg-red-200"
-              >
-                <Minus size={10} />
-              </button>
-              <span className="px-2 font-medium">{item.quantity}</span>
-              <button
-                onClick={() => onQuantityChange(item.quantity + 1)}
-                className="flex h-5 w-5 items-center justify-center rounded bg-green-100 text-green-600 transition-colors hover:bg-green-200"
-              >
-                <Plus size={10} />
-              </button>
-            </div>
-          ) : (
-            <span className="font-medium">{item.quantity}</span>
-          )}
-        </div>
-
-        {totalWeight !== undefined && !compact && (
-          <div className="flex justify-between">
-            <span>Weight:</span>
-            <span>{totalWeight} lbs</span>
-          </div>
-        )}
-
-        {totalValue !== undefined && !compact && (
-          <div className="flex justify-between">
-            <span>Value:</span>
-            <span>{formatCurrencyFromCopper(totalValue)}</span>
-          </div>
-        )}
-
-        {item.tags.length > 0 && !compact && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {item.tags.slice(0, 2).map((tag, index) => (
-              <span
-                key={index}
-                className="rounded bg-gray-100 px-1 py-0.5 text-xs text-gray-600"
-              >
-                {tag}
-              </span>
-            ))}
-            {item.tags.length > 2 && (
-              <span className="rounded bg-gray-100 px-1 py-0.5 text-xs text-gray-600">
-                +{item.tags.length - 2}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {item.description && !compact && (
-        <p className="mt-2 line-clamp-2 text-xs text-gray-700">
-          {item.description}
-        </p>
-      )}
+      {/* Item Form Modal */}
+      <ItemForm
+        isOpen={showItemForm}
+        onClose={resetForm}
+        onSubmit={handleFormSubmit}
+        initialData={formData}
+        availableLocations={allLocations}
+        isEditing={!!editingItem}
+      />
     </div>
   );
 }
