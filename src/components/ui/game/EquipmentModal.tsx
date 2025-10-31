@@ -15,6 +15,12 @@ import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Edit2, Trash2, Sword, Wand2 } from 'lucide-react';
 import { Modal } from '@/components/ui/feedback/Modal';
 import DragDropList from '@/components/ui/layout/DragDropList';
+import { Button } from '@/components/ui/forms/button';
+import { Badge } from '@/components/ui/layout/badge';
+import { Input } from '@/components/ui/forms/input';
+import { Textarea } from '@/components/ui/forms/textarea';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { Checkbox } from '@/components/ui/forms/checkbox';
 
 interface EquipmentModalProps {
   isOpen: boolean;
@@ -151,22 +157,22 @@ const DAMAGE_TYPES: DamageType[] = [
   'thunder',
 ];
 
-const getRarityColor = (rarity: MagicItemRarity) => {
+const getRarityVariant = (rarity: MagicItemRarity): 'secondary' | 'success' | 'info' | 'primary' | 'warning' | 'danger' => {
   switch (rarity) {
     case 'common':
-      return 'text-gray-600 bg-gray-100';
+      return 'secondary';
     case 'uncommon':
-      return 'text-green-600 bg-green-100';
+      return 'success';
     case 'rare':
-      return 'text-blue-600 bg-blue-100';
+      return 'info';
     case 'very rare':
-      return 'text-purple-600 bg-purple-100';
+      return 'primary';
     case 'legendary':
-      return 'text-orange-600 bg-orange-100';
+      return 'warning';
     case 'artifact':
-      return 'text-red-600 bg-red-100';
+      return 'danger';
     default:
-      return 'text-gray-600 bg-gray-100';
+      return 'secondary';
   }
 };
 
