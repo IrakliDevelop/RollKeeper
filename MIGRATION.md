@@ -45,15 +45,13 @@ The main player character sheet (`/app/player/characters/[characterId]/page.tsx`
 - [x] HitDiceTracker - Hit dice management buttons (Long Rest, Use, Restore) ✅
 - [x] SpellSlotTracker - Spell slot reset buttons (Reset Slots, Reset Pact) ✅
 - [x] TraitTracker - Trait management buttons (Short Rest, Long Rest, Use, View, Delete) ✅
+- [x] Skills - Skill proficiency checkboxes and Jack of All Trades toggle ✅
+- [x] SavingThrows - Saving throw proficiency checkboxes and roll buttons ✅
 - [ ] CharacterSheetHeader - Action buttons (save, export, etc.)
 - [ ] CharacterBasicInfo - Character info inputs
 - [ ] AbilityScores - Ability score inputs and buttons
-- [ ] SavingThrows - Saving throw checkboxes/buttons
-- [ ] Skills - Skill proficiency checkboxes
 - [ ] CombatStats - Combat stat inputs
 - [ ] ActionsSection - Attack/action buttons
-- [ ] SpellSlotTracker - Spell slot buttons
-- [ ] TraitTracker - Trait management
 - [ ] LanguagesAndProficiencies - Text inputs
 - [ ] ExtendedFeaturesSection - Feature cards and buttons
 - [ ] ArmorClassManager - AC calculation inputs

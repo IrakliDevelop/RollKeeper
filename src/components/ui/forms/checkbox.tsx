@@ -21,7 +21,7 @@ export interface CheckboxProps
   /**
    * Checkbox checked state.
    */
-  checked?: boolean;
+  checked?: boolean | 'indeterminate';
   /**
    * Callback when checked state changes.
    */
@@ -132,13 +132,22 @@ const Checkbox = React.forwardRef<
       checked === true || checked === 'indeterminate';
 
     return (
-      <label
+      <div
         className={cn(
           'flex items-start group',
           sizeStyle.gap,
           disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           wrapperClassName
         )}
+        onClick={(e) => {
+          // Only trigger when clicking label text, not the checkbox itself
+          if (e.target !== e.currentTarget || disabled) {
+            return;
+          }
+          // Toggle the checkbox when clicking the label text
+          const newValue = checked === true ? false : true;
+          onCheckedChange?.(newValue);
+        }}
       >
         <CheckboxPrimitive.Root
           ref={ref}
@@ -170,7 +179,7 @@ const Checkbox = React.forwardRef<
           {/* Check/Indeterminate Icon */}
           <AnimatePresence mode="wait">
             {isCheckedOrIndeterminate && (
-              <CheckboxPrimitive.Indicator forceMount asChild>
+              <CheckboxPrimitive.Indicator asChild>
                 <motion.div
                   key={checked === 'indeterminate' ? 'minus' : 'check'}
                   initial={{ scale: 0, opacity: 0 }}
@@ -230,7 +239,7 @@ const Checkbox = React.forwardRef<
             )}
           </div>
         )}
-      </label>
+      </div>
     );
   }
 );

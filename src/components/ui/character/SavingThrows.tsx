@@ -2,6 +2,7 @@
 
 import { ABILITY_NAMES } from '@/utils/constants';
 import { formatModifier } from '@/utils/calculations';
+import { Button, Checkbox } from '@/components/ui/forms';
 import { AbilityName, CharacterState } from '@/types/character';
 
 interface SavingThrowsProps {
@@ -31,24 +32,26 @@ export default function SavingThrows({
             key={ability}
             className="flex items-center gap-3 rounded p-2 transition-colors hover:bg-purple-50"
           >
-            <input
-              type="checkbox"
+            <Checkbox
               checked={savingThrows[ability].proficient}
-              onChange={e =>
-                onUpdateSavingThrowProficiency(ability, e.target.checked)
+              onCheckedChange={checked =>
+                onUpdateSavingThrowProficiency(ability, checked)
               }
-              className="h-4 w-4 rounded text-purple-600"
+              size="sm"
+              variant="primary"
             />
             <span className="w-8 text-right font-mono text-sm font-semibold text-purple-800">
               {formatModifier(getSavingThrowModifier(ability))}
             </span>
-            <button
+            <Button
               onClick={() => onRollSavingThrow(ability)}
-              className="cursor-pointer rounded px-2 py-1 text-sm font-medium text-gray-800 transition-colors hover:bg-purple-100 hover:text-purple-700"
+              variant="ghost"
+              size="sm"
+              className="hover:bg-purple-100 hover:text-purple-700"
               title={`Roll ${ABILITY_NAMES[ability]} saving throw (d20 + ${formatModifier(getSavingThrowModifier(ability))})`}
             >
               {ABILITY_NAMES[ability]}
-            </button>
+            </Button>
           </div>
         ))}
       </div>
