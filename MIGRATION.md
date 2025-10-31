@@ -55,7 +55,7 @@ This document tracks the migration from the old inconsistent component implement
 - [ ] `/src/components/ui/game/ConditionDetailsModal.tsx` - Modal buttons
 
 **Combat & DM Tools:**
-- [ ] `/src/components/dm/CombatTracker/CombatCanvas.tsx` - Layout toggle buttons, action buttons
+- [x] `/src/components/dm/CombatTracker/CombatCanvas.tsx` - Action buttons (Add, Log, Pause/Resume, End) ✅
 - [ ] `/src/components/dm/CombatTracker/CombatLog.tsx` - Log action buttons
 - [ ] `/src/components/dm/CombatTracker/AddParticipantModal.tsx` - Form buttons
 

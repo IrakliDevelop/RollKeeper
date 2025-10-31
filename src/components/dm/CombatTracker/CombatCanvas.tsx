@@ -12,6 +12,7 @@ import {
   EyeOff,
   Users,
 } from 'lucide-react';
+import { Button } from '@/components/ui/forms';
 import { CombatParticipantCard } from './CombatParticipantCard';
 import { InitiativeTracker } from './InitiativeTracker';
 import { CombatLog } from './CombatLog';
@@ -178,49 +179,47 @@ export function CombatCanvas({
             </div>
 
             {/* Action Buttons */}
-            <button
+            <Button
               onClick={() => setShowAddParticipant(true)}
-              className="rounded-lg bg-green-600 px-3 py-2 text-white transition-colors hover:bg-green-700"
+              variant="success"
+              size="sm"
+              leftIcon={<Plus className="h-4 w-4" />}
               title="Add Participant"
-            >
-              <Plus size={16} />
-            </button>
+            />
 
-            <button
+            <Button
               onClick={() => setShowLog(!showLog)}
-              className={`rounded-lg px-3 py-2 transition-colors ${
-                showLog
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              variant={showLog ? 'secondary' : 'outline'}
+              size="sm"
+              leftIcon={<Scroll className="h-4 w-4" />}
               title="Combat Log"
-            >
-              <Scroll size={16} />
-            </button>
+            />
 
-            <button
+            <Button
               onClick={() =>
                 activeEncounter.isActive ? pauseEncounter() : resumeEncounter()
               }
-              className="rounded-lg bg-yellow-600 px-3 py-2 text-white transition-colors hover:bg-yellow-700"
+              variant="warning"
+              size="sm"
+              leftIcon={
+                activeEncounter.isActive ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )
+              }
               title={
                 activeEncounter.isActive ? 'Pause Combat' : 'Resume Combat'
               }
-            >
-              {activeEncounter.isActive ? (
-                <EyeOff size={16} />
-              ) : (
-                <Eye size={16} />
-              )}
-            </button>
+            />
 
-            <button
+            <Button
               onClick={handleEndCombat}
-              className="rounded-lg bg-red-600 px-3 py-2 text-white transition-colors hover:bg-red-700"
+              variant="danger"
+              size="sm"
+              leftIcon={<StopCircle className="h-4 w-4" />}
               title="End Combat"
-            >
-              <StopCircle size={16} />
-            </button>
+            />
           </div>
         </div>
       </div>
