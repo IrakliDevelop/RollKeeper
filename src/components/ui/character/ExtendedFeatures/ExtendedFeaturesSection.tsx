@@ -5,6 +5,7 @@ import { ExtendedFeature, FeatureCategory, groupFeaturesBySource } from '@/types
 import { ChevronDown, ChevronRight, Plus, Settings } from 'lucide-react';
 import FeatureCategorySection from '@/components/ui/character/ExtendedFeatures/FeatureCategorySection';
 import AddFeatureModal from '@/components/ui/character/ExtendedFeatures/AddFeatureModal';
+import { Button } from '@/components/ui/forms';
 
 interface ExtendedFeaturesSectionProps {
   features: ExtendedFeature[];
@@ -86,14 +87,16 @@ export default function ExtendedFeaturesSection({
           {/* Action buttons */}
           {!readonly && !isCollapsed && (
             <div className="flex gap-2">
-              <button
+              <Button
                 onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+                variant="primary"
+                size="sm"
+                leftIcon={<Plus className="h-4 w-4" />}
+                className="bg-indigo-600 hover:bg-indigo-700"
                 title="Add new feature"
               >
-                <Plus className="h-4 w-4" />
                 Add Feature
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -111,13 +114,15 @@ export default function ExtendedFeaturesSection({
                   Add class features, racial abilities, feats, and more to organize your character&apos;s capabilities.
                 </p>
                 {!readonly && (
-                  <button
+                  <Button
                     onClick={() => setIsAddModalOpen(true)}
-                    className="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
+                    variant="primary"
+                    size="sm"
+                    leftIcon={<Plus className="h-4 w-4" />}
+                    className="mt-4 bg-indigo-600 hover:bg-indigo-700"
                   >
-                    <Plus className="h-4 w-4" />
                     Add Your First Feature
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -145,18 +150,21 @@ export default function ExtendedFeaturesSection({
           {/* Reset buttons */}
           {!readonly && features.some(f => f.usedUses > 0) && (
             <div className="mt-4 flex gap-2 pt-4 border-t border-indigo-200">
-              <button
+              <Button
                 onClick={() => onResetFeatures('short')}
-                className="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+                variant="success"
+                size="sm"
               >
                 Short Rest Reset
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => onResetFeatures('long')}
-                className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                variant="primary"
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700"
               >
                 Long Rest Reset
-              </button>
+              </Button>
             </div>
           )}
         </div>

@@ -54,11 +54,13 @@ The main player character sheet (`/app/player/characters/[characterId]/page.tsx`
 - [x] LanguagesAndProficiencies - Add/delete buttons and text inputs for languages and tools ✅
 - [x] ArmorClassManager - Base AC, Temp AC, Shield inputs and toggle button ✅
 - [x] XPTracker - XP input, Add/Set button, and mode switch ✅
-- [ ] CharacterSheetHeader - Action buttons (save, export, etc.)
-- [ ] ExtendedFeaturesSection - Feature cards and buttons
-- [ ] QuickStats - Quick stats display
-- [ ] WeaponProficiencies - Weapon selection
-- [ ] HeroicInspirationTracker - Inspiration tracking
+- [x] CharacterSheetHeader - Save, Export, Import, Reset buttons and character name input ✅
+- [x] ExtendedFeaturesSection - Add feature buttons and reset buttons ✅
+- [x] QuickStats - Display only (no interactive elements) ✅
+- [x] WeaponProficiencies - Weapon category checkboxes, specific weapon input and buttons ✅
+- [x] HeroicInspirationTracker - Settings, Reset, Add, Use buttons and Max Inspiration input ✅
+
+**✅ Character Sheet Migration Complete! (19/19 components - 100%)**
 
 ---
 

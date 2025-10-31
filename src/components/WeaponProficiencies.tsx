@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useCharacterStore } from '@/store/characterStore';
 import { Shield, Plus, X } from 'lucide-react';
+import { Checkbox, Input, Button } from '@/components/ui/forms';
 
 export const WeaponProficiencies: React.FC = () => {
   const { character, updateCharacter } = useCharacterStore();
@@ -67,25 +68,23 @@ export const WeaponProficiencies: React.FC = () => {
       <div className="space-y-3">
         {/* Category Proficiencies */}
         <div className="space-y-2">
-          <label className="flex items-center rounded-lg p-2 text-sm transition-colors hover:bg-blue-50">
-            <input
-              type="checkbox"
-              checked={character.weaponProficiencies.simpleWeapons}
-              onChange={toggleSimpleWeapons}
-              className="mr-3 h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
-            />
-            <span className="font-medium text-gray-800">Simple Weapons</span>
-          </label>
+          <Checkbox
+            checked={character.weaponProficiencies.simpleWeapons}
+            onCheckedChange={toggleSimpleWeapons}
+            label="Simple Weapons"
+            size="sm"
+            variant="primary"
+            className="rounded-lg p-2 transition-colors hover:bg-blue-50"
+          />
 
-          <label className="flex items-center rounded-lg p-2 text-sm transition-colors hover:bg-blue-50">
-            <input
-              type="checkbox"
-              checked={character.weaponProficiencies.martialWeapons}
-              onChange={toggleMartialWeapons}
-              className="mr-3 h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
-            />
-            <span className="font-medium text-gray-800">Martial Weapons</span>
-          </label>
+          <Checkbox
+            checked={character.weaponProficiencies.martialWeapons}
+            onCheckedChange={toggleMartialWeapons}
+            label="Martial Weapons"
+            size="sm"
+            variant="primary"
+            className="rounded-lg p-2 transition-colors hover:bg-blue-50"
+          />
         </div>
 
         {/* Specific Weapons */}
@@ -95,22 +94,25 @@ export const WeaponProficiencies: React.FC = () => {
           </h4>
 
           <div className="mb-2 flex gap-2">
-            <input
+            <Input
               type="text"
               value={specificWeaponInput}
               onChange={e => setSpecificWeaponInput(e.target.value)}
-              className="flex-1 rounded-lg border border-gray-300 p-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               placeholder="Rapier, Longbow, etc."
+              size="sm"
+              className="flex-1"
               onKeyPress={e =>
                 e.key === 'Enter' && (e.preventDefault(), addSpecificWeapon())
               }
             />
-            <button
+            <Button
               onClick={addSpecificWeapon}
-              className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-white transition-colors hover:bg-blue-700"
+              variant="primary"
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700"
             >
               <Plus size={14} />
-            </button>
+            </Button>
           </div>
 
           <div className="flex flex-wrap gap-1">
@@ -121,12 +123,14 @@ export const WeaponProficiencies: React.FC = () => {
                   className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800"
                 >
                   {weapon}
-                  <button
+                  <Button
                     onClick={() => removeSpecificWeapon(weapon)}
-                    className="ml-1 text-green-600 hover:text-green-800"
+                    variant="ghost"
+                    size="xs"
+                    className="ml-1 h-auto p-0 text-green-600 hover:bg-transparent hover:text-green-800"
                   >
                     <X size={12} />
-                  </button>
+                  </Button>
                 </span>
               )
             )}

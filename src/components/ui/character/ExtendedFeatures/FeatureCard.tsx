@@ -9,11 +9,11 @@ import {
   Trash2, 
   Zap, 
   Clock, 
-
   AlertCircle,
   CheckCircle2
 } from 'lucide-react';
 import FeatureModal from '@/components/ui/character/ExtendedFeatures/FeatureModal';
+import { Button } from '@/components/ui/forms';
 
 interface FeatureCardProps {
   feature: ExtendedFeature;
@@ -89,44 +89,52 @@ export default function FeatureCard({
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
             {/* Use Button */}
             {!readonly && hasUses && !isExhausted && (
-              <button
+              <Button
                 onClick={onUse}
-                className="p-2 rounded-lg text-indigo-600 hover:bg-indigo-100 transition-colors"
+                variant="ghost"
+                size="xs"
+                className="text-indigo-600 hover:bg-indigo-100"
                 title="Use feature"
               >
                 <Zap className="h-5 w-5" />
-              </button>
+              </Button>
             )}
 
             {/* View Button */}
-            <button
+            <Button
               onClick={handleViewClick}
-              className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+              variant="ghost"
+              size="xs"
+              className="text-gray-600 hover:bg-gray-100"
               title="View details"
             >
               <Eye className="h-5 w-5" />
-            </button>
+            </Button>
 
             {/* Edit Button */}
             {!readonly && (
-              <button
+              <Button
                 onClick={handleEditClick}
-                className="p-2 rounded-lg text-blue-600 hover:bg-blue-100 transition-colors"
+                variant="ghost"
+                size="xs"
+                className="text-blue-600 hover:bg-blue-100"
                 title="Edit feature"
               >
                 <Edit3 className="h-5 w-5" />
-              </button>
+              </Button>
             )}
 
             {/* Delete Button */}
             {!readonly && (
-              <button
+              <Button
                 onClick={onDelete}
-                className="p-2 rounded-lg text-red-600 hover:bg-red-100 transition-colors"
+                variant="ghost"
+                size="xs"
+                className="text-red-600 hover:bg-red-100"
                 title="Delete feature"
               >
                 <Trash2 className="h-5 w-5" />
-              </button>
+              </Button>
             )}
           </div>
         </div>
