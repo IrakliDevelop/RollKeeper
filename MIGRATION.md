@@ -142,15 +142,29 @@ Located in grouped tabs under "Character Details & Management" with 3 main group
     - Better visual hierarchy throughout
 
 #### Group 2: Items & Wealth 💰
-- [ ] **InventoryManager** (`/src/components/ui/game/InventoryManager.tsx`)
-  - **Issues**: Item cards, inline buttons, mixed input styles, search bars
-  - **Components needed**: Button, Input, Textarea, Badge, Card
-  - **Priority**: MEDIUM
+- [x] **CurrencyManager** (`/src/components/shared/character/CurrencyManager.tsx`) ✅
+  - **Status**: FULLY MIGRATED
+  - **Completed**: Complete refactor with unified design system
+  - **Details**:
+    - All inputs → Input components
+    - All buttons → Button components (with icons)
+    - All badges → Badge components
+    - border-2 for better definition throughout
+    - Gradient backgrounds for currency displays
+    - Badge components for currency types and totals
+    - Button icons for Add (Plus) and Spend (Minus)
+    - Success variant for Add, Danger variant for Spend
+    - Disabled states when amount is 0
+    - Info icon in conversion helper
+    - Professional, polished appearance
 
-- [ ] **CurrencyManager** (`/src/components/ui/game/CurrencyManager.tsx`)
-  - **Issues**: Currency inputs, inline buttons for add/subtract
-  - **Components needed**: Button, Input, Card
-  - **Priority**: LOW
+- [ ] **InventoryManager** (`/src/components/shared/character/InventoryManager.tsx`)
+  - **Status**: IN PROGRESS (ItemCard extracted)
+  - **Extracted Components** (new):
+    - `ItemCard.tsx`: Reusable inventory item card with Button/Badge components
+  - **Remaining**: Full refactor of 959-line component (ItemForm extraction, main component redesign)
+  - **Notes**: Large, complex component requiring significant refactoring effort
+  - **Priority**: MEDIUM - Core functionality but needs extensive work
 
 #### Group 3: Character & Story 📖
 - [ ] **FeaturesTraitsManager** (`/src/components/ui/game/FeaturesTraitsManager.tsx`)
