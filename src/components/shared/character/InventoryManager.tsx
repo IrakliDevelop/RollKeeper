@@ -14,7 +14,7 @@ import DragDropList from '@/components/ui/layout/DragDropList';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
-import { ItemCard, ItemForm, initialInventoryFormData, type InventoryFormData } from './inventory';
+import { ItemCard, ItemForm, initialInventoryFormData, type InventoryFormData } from '../../ui/game/inventory';
 
 const ITEM_CATEGORIES = [
   'weapon',
@@ -87,7 +87,7 @@ export function InventoryManager({
     return [
       ...new Set([
         ...DEFAULT_LOCATIONS,
-        ...items.map(item => item.location).filter(Boolean),
+        ...items.map(item => item.location).filter((loc): loc is string => Boolean(loc)),
       ]),
     ].sort();
   }, [items]);
@@ -165,7 +165,7 @@ export function InventoryManager({
       quantity: item.quantity,
       weight: item.weight,
       value: item.value,
-      description: item.description,
+      description: item.description || '',
       tags: item.tags,
     });
     setShowItemForm(true);
@@ -264,59 +264,61 @@ export function InventoryManager({
           </div>
 
           {showFilters && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700 flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  Location
-                </label>
-                <SelectField
-                  value={filterLocation}
-                  onValueChange={setFilterLocation}
-                >
-                  <SelectItem value="all">All Locations</SelectItem>
-                  {allLocations.map(location => (
-                    <SelectItem key={location} value={location}>
-                      {location}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="Unassigned">Unassigned</SelectItem>
-                </SelectField>
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-2 flex items-center gap-1 text-sm font-medium text-gray-700">
+                    <MapPin className="h-3 w-3" />
+                    Location
+                  </label>
+                  <SelectField
+                    value={filterLocation}
+                    onValueChange={setFilterLocation}
+                  >
+                    <SelectItem value="all">All Locations</SelectItem>
+                    {allLocations.map(location => (
+                      <SelectItem key={location} value={location}>
+                        {location}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="Unassigned">Unassigned</SelectItem>
+                  </SelectField>
+                </div>
+
+                <div>
+                  <label className="mb-2 flex items-center gap-1 text-sm font-medium text-gray-700">
+                    <Package className="h-3 w-3" />
+                    Category
+                  </label>
+                  <SelectField
+                    value={filterCategory}
+                    onValueChange={setFilterCategory}
+                  >
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {ITEM_CATEGORIES.map(category => (
+                      <SelectItem key={category} value={category}>
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
+                </div>
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700 flex items-center gap-1">
-                  <Package className="h-3 w-3" />
-                  Category
-                </label>
-                <SelectField
-                  value={filterCategory}
-                  onValueChange={setFilterCategory}
+              {activeFilterCount > 0 && (
+                <Button
+                  onClick={() => {
+                    setFilterLocation('all');
+                    setFilterCategory('all');
+                  }}
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<X size={14} />}
+                  className="mt-3"
                 >
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {ITEM_CATEGORIES.map(category => (
-                    <SelectItem key={category} value={category}>
-                      {category.charAt(0).toUpperCase() + category.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectField>
-              </div>
-            </div>
-
-            {activeFilterCount > 0 && (
-              <Button
-                onClick={() => {
-                  setFilterLocation('all');
-                  setFilterCategory('all');
-                }}
-                variant="ghost"
-                size="sm"
-                leftIcon={<X size={14} />}
-                className="mt-3"
-              >
-                Clear Filters
-              </Button>
-            )}
+                  Clear Filters
+                </Button>
+              )}
+            </>
           )}
         </div>
       )}
@@ -343,7 +345,7 @@ export function InventoryManager({
                   onQuantityChange={
                     readonly || !onQuantityChange
                       ? undefined
-                      : quantity => onQuantityChange(item.id, quantity)
+                      : (quantity: number) => onQuantityChange(item.id, quantity)
                   }
                   compact={compact}
                 />
@@ -375,7 +377,7 @@ export function InventoryManager({
                         onQuantityChange={
                           readonly || !onQuantityChange
                             ? undefined
-                            : quantity => onQuantityChange(item.id, quantity)
+                            : (quantity: number) => onQuantityChange(item.id, quantity)
                         }
                         compact={compact}
                       />
