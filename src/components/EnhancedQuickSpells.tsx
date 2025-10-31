@@ -101,14 +101,6 @@ const SpellCard: React.FC<{
         </div>
         <div className="flex gap-1.5 flex-shrink-0">
           <Button
-            onClick={() => onAction('view')}
-            variant="ghost"
-            size="xs"
-            title="View details"
-          >
-            <Eye size={12} />
-          </Button>
-          <Button
             onClick={() => onAction('cast')}
             variant="primary"
             size="xs"
@@ -127,6 +119,14 @@ const SpellCard: React.FC<{
               <Dice6 size={12} />
             </Button>
           )}
+          <Button
+            onClick={() => onAction('view')}
+            variant="outline"
+            size="xs"
+            title="View details"
+          >
+            <Eye size={12} />
+          </Button>
         </div>
       </div>
     );
@@ -173,15 +173,6 @@ const SpellCard: React.FC<{
 
       <div className="flex flex-wrap gap-2">
         <Button
-          onClick={() => onAction('view')}
-          variant="ghost"
-          size="sm"
-          leftIcon={<Eye size={14} />}
-        >
-          View
-        </Button>
-
-        <Button
           onClick={() => onAction('cast')}
           variant="primary"
           size="sm"
@@ -201,6 +192,15 @@ const SpellCard: React.FC<{
             Attack
           </Button>
         )}
+
+        <Button
+          onClick={() => onAction('view')}
+          variant="outline"
+          size="sm"
+          leftIcon={<Eye size={14} />}
+        >
+          View
+        </Button>
 
         {/* Show spell info for reference */}
         {spell.actionType === 'save' && spell.savingThrow && (
