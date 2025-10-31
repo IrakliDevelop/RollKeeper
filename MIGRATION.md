@@ -64,6 +64,72 @@ The main player character sheet (`/app/player/characters/[characterId]/page.tsx`
 
 ---
 
+## 🎯 Character Statistics Section
+
+The Character Statistics section (left column) displays quick-access combat and character info:
+
+### Components Refactored
+
+- [x] **Active Conditions & Diseases** (inline in `/app/player/characters/[characterId]/page.tsx`) ✅
+  - **Status**: FULLY MIGRATED
+  - **Using**: Button, Badge, AlertTriangle icon
+  - **Details**:
+    - Gradient background (red-50 to pink-50)
+    - Border-2 for definition
+    - AlertTriangle icon in header
+    - Badge components for conditions (danger variant)
+    - Badge components for count levels (warning variant)
+    - Badge components for diseases (info variant)
+    - Badge components for sources (neutral variant)
+    - Individual white cards for each condition/disease
+    - "Manage" button using Button component (ghost variant)
+    - Improved visual hierarchy with better spacing
+
+- [x] **Special Abilities** (`/src/components/shared/character/TraitTracker.tsx`) ✅
+  - **Status**: FULLY MIGRATED
+  - **Using**: Button, Badge
+  - **Details**:
+    - Gradient background (indigo-50 to purple-50)
+    - Border-2 for all containers and cards
+    - Badge components for:
+      - Source (neutral variant)
+      - Rest type (info for short rest, secondary for long rest)
+      - Uses remaining (success if available, neutral if depleted)
+    - Individual ability cards with border-2 and hover shadow
+    - Improved empty state with dashed border
+    - Better spacing with flex-wrap for badges
+    - Enhanced button styling (indigo colors)
+    - Professional card-based layout
+
+- [x] **Spell Slots** (`/src/components/shared/spells/SpellSlotTracker.tsx`) ✅
+  - **Status**: FULLY MIGRATED
+  - **Using**: Button, Badge
+  - **Details**:
+    - Gradient background (purple-50 to violet-50)
+    - Border-2 for all containers and slot cards
+    - Individual slot cards with white background
+    - Badge components for:
+      - Spell level (secondary variant)
+      - Remaining slots (success if available, neutral if depleted)
+    - Separate enhanced styling for Pact Magic:
+      - Border-2 with purple-300 for distinction
+      - Info variant badges for pact slot levels
+    - Enhanced usage guide with emoji (💡)
+    - Improved visual consistency and hierarchy
+
+**Character Statistics Improvements:**
+- Consistent border-2 usage across all sections
+- Modern gradient backgrounds for visual appeal
+- Badge components replace all inline spans
+- Better visual hierarchy with proper spacing
+- Improved hover states and transitions
+- Professional card-based layouts
+- Enhanced color schemes matching section purpose
+- Better empty states with dashed borders
+- All sections now fully aligned with unified design system
+
+---
+
 ## 🎯 Priority: Character Details & Management Section
 
 The Character Details & Management section (`characterSheetTabs.tsx`) needs comprehensive refactoring:
