@@ -77,15 +77,16 @@ Located in grouped tabs under "Character Details & Management" with 3 main group
 ### Components to Refactor (Priority Order)
 
 #### Group 1: Combat & Magic ⚔️
-- [ ] **SpellcastingStats** (`/src/components/SpellcastingStats.tsx`)
-  - **Issues**: Mixed badge styles, inline buttons, inconsistent inputs
-  - **Components needed**: Button, Input, Badge, Card
+- [x] **SpellcastingStats** (`/src/components/SpellcastingStats.tsx`) ✅
+  - **Completed**: Replaced CustomSwitcher, FancySelect, inline buttons/inputs
+  - **Using**: Button, Input, Switch, SelectField, Badge
   - **Priority**: HIGH - Frequently used
 
 - [x] **EnhancedSpellManagement** (`/src/components/EnhancedSpellManagement.tsx`) ✅
-  - **Status**: Partially migrated (SpellDetailsModal done)
-  - **Remaining**: Spell cards, form inputs, badges
-  - **Components needed**: Button, Input, Textarea, Select, Badge, Card
+  - **Status**: Spell cards migrated (main display)
+  - **Completed**: Buttons, badges, card styling
+  - **Remaining**: Filter form inputs (FancySelect usage)
+  - **Using**: Button, Badge, SpellDetailsModal
 
 - [ ] **EquipmentSection** (`/src/components/ui/character/EquipmentSection.tsx`)
   - **Issues**: Weapon/armor cards with mixed styles, inline buttons
