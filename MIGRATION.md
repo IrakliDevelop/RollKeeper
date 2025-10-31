@@ -42,10 +42,9 @@ The main player character sheet (`/app/player/characters/[characterId]/page.tsx`
 **Character Sheet Components (Priority Order):**
 - [x] CharacterHeaderSection ✅ (already migrated)
 - [x] RestManager - Short/long rest buttons ✅
+- [x] HitDiceTracker - Hit dice management buttons (Long Rest, Use, Restore) ✅
 - [ ] CharacterSheetHeader - Action buttons (save, export, etc.)
 - [ ] CharacterBasicInfo - Character info inputs
-- [ ] HitPointManager - HP tracking buttons (complex, uses HitPointTracker)
-- [ ] HitDiceTracker - Hit dice management buttons
 - [ ] AbilityScores - Ability score inputs and buttons
 - [ ] SavingThrows - Saving throw checkboxes/buttons
 - [ ] Skills - Skill proficiency checkboxes

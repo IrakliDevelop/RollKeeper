@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Moon, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/forms';
 import { HitDicePools } from '@/types/character';
 
 interface HitDiceTrackerProps {
@@ -94,14 +95,16 @@ export default function HitDiceTracker({
           </div>
           <h3 className="text-xl font-bold text-gray-900">Hit Dice</h3>
         </div>
-        <button
+        <Button
           onClick={onResetAllHitDice}
-          className="flex items-center gap-2 rounded-lg bg-blue-100 px-4 py-2 text-sm font-medium text-blue-700 transition-all hover:bg-blue-200 hover:shadow-md active:scale-95"
+          variant="secondary"
+          size="sm"
+          leftIcon={<Moon className="h-4 w-4" />}
+          className="bg-blue-100 text-blue-700 hover:bg-blue-200"
           title="Long Rest (restore all hit dice - D&D 2024 rules)"
         >
-          <Moon size={16} />
           Long Rest
-        </button>
+        </Button>
       </div>
 
       <div className="space-y-4">
@@ -183,39 +186,47 @@ export default function HitDiceTracker({
               {/* Controls */}
               <div className="flex items-center justify-between border-t border-current border-opacity-20 pt-4">
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     onClick={() => onUseHitDie(dieType, 1)}
                     disabled={available === 0}
-                    className="rounded-lg bg-white bg-opacity-90 px-3 py-2 text-xs font-medium shadow-sm transition-all hover:bg-opacity-100 hover:shadow-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                    variant="outline"
+                    size="xs"
+                    className="bg-white bg-opacity-90 hover:bg-opacity-100"
                   >
                     Use 1
-                  </button>
+                  </Button>
                   {available > 1 && (
-                    <button
+                    <Button
                       onClick={() => onUseHitDie(dieType, Math.min(available, 5))}
-                      className="rounded-lg bg-white bg-opacity-90 px-3 py-2 text-xs font-medium shadow-sm transition-all hover:bg-opacity-100 hover:shadow-md active:scale-95"
+                      variant="outline"
+                      size="xs"
+                      className="bg-white bg-opacity-90 hover:bg-opacity-100"
                     >
                       Use {Math.min(available, 5)}
-                    </button>
+                    </Button>
                   )}
                 </div>
 
                 <div className="flex gap-2">
                   {pool.used > 0 && (
                     <>
-                      <button
+                      <Button
                         onClick={() => onRestoreHitDice(dieType, 1)}
-                        className="rounded-lg bg-white bg-opacity-90 px-3 py-2 text-xs font-medium shadow-sm transition-all hover:bg-opacity-100 hover:shadow-md active:scale-95"
+                        variant="outline"
+                        size="xs"
+                        className="bg-white bg-opacity-90 hover:bg-opacity-100"
                       >
                         Restore 1
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => onRestoreHitDice(dieType, pool.used)}
-                        className="flex items-center gap-1 rounded-lg bg-white bg-opacity-90 px-3 py-2 text-xs font-medium shadow-sm transition-all hover:bg-opacity-100 hover:shadow-md active:scale-95"
+                        variant="outline"
+                        size="xs"
+                        leftIcon={<RefreshCw className="h-3 w-3" />}
+                        className="bg-white bg-opacity-90 hover:bg-opacity-100"
                       >
-                        <RefreshCw size={12} />
                         All
-                      </button>
+                      </Button>
                     </>
                   )}
                 </div>
