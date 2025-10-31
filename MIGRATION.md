@@ -48,7 +48,7 @@ This document tracks the migration from the old inconsistent component implement
 - [ ] `/src/app/dm/page.tsx` - DM dashboard buttons
 
 **Medium Priority (Forms & Modals):**
-- [ ] `/src/components/ui/game/NoteModal.tsx` - Modal action buttons
+- [x] `/src/components/ui/game/NoteModal.tsx` - Modal action buttons, input ✅
 - [ ] `/src/components/ui/game/EquipmentModal.tsx` - Form buttons
 - [ ] `/src/components/ui/character/ExtendedFeatures/FeatureModal.tsx` - Modal buttons
 - [ ] `/src/components/ui/character/ExtendedFeatures/AddFeatureModal.tsx` - Form buttons

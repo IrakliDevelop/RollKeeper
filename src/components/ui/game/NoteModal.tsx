@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Edit3, Save, Eye, Trash2 } from 'lucide-react';
 import { RichTextContent } from '@/types/character';
 import { Modal } from '@/components/ui/feedback';
-import { RichTextEditor } from '@/components/ui/forms';
+import { Button, Input, RichTextEditor } from '@/components/ui/forms';
 import { RichTextRenderer } from '@/components/ui/utils';
 import { ToastData } from '@/components/ui/feedback/Toast';
 
@@ -114,13 +114,12 @@ export default function NoteModal({
         {/* Header - Only show when editing for title input */}
         {isEditing && (
           <div className="mb-6">
-            <input
-              type="text"
+            <Input
               value={editTitle}
               onChange={e => setEditTitle(e.target.value)}
-              className="w-full border-b-2 border-blue-300 bg-transparent text-xl font-semibold text-blue-900 focus:border-blue-600 focus:outline-none"
-              autoFocus
               placeholder="Note title..."
+              className="border-b-2 border-blue-300 text-xl font-semibold text-blue-900"
+              autoFocus
             />
           </div>
         )}
@@ -129,39 +128,44 @@ export default function NoteModal({
         <div className="mb-6 flex items-center justify-end space-x-2 border-b border-gray-200 pb-4">
           {isEditing ? (
             <>
-              <button
+              <Button
                 onClick={handleCancel}
-                className="rounded-md p-2 text-gray-600 transition-colors hover:bg-gray-100"
-                title="Cancel editing"
+                variant="ghost"
+                size="sm"
+                leftIcon={<X className="h-4 w-4" />}
               >
-                <X size={20} />
-              </button>
-              <button
+                Cancel
+              </Button>
+              <Button
                 onClick={handleSave}
                 disabled={!editTitle.trim()}
-                className="flex items-center space-x-1 rounded-md bg-blue-600 px-3 py-2 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                title="Save changes"
+                variant="secondary"
+                size="sm"
+                leftIcon={<Save className="h-4 w-4" />}
               >
-                <Save size={16} />
-                <span>Save</span>
-              </button>
+                Save
+              </Button>
             </>
           ) : (
             <>
-              <button
+              <Button
                 onClick={() => setIsEditing(true)}
-                className="rounded-md p-2 text-blue-600 transition-colors hover:bg-blue-100"
-                title="Edit note"
+                variant="ghost"
+                size="sm"
+                leftIcon={<Edit3 className="h-4 w-4" />}
+                className="text-blue-600 hover:bg-blue-100"
               >
-                <Edit3 size={20} />
-              </button>
-              <button
+                Edit
+              </Button>
+              <Button
                 onClick={handleDelete}
-                className="rounded-md p-2 text-red-600 transition-colors hover:bg-red-100"
-                title="Delete note"
+                variant="ghost"
+                size="sm"
+                leftIcon={<Trash2 className="h-4 w-4" />}
+                className="text-red-600 hover:bg-red-100"
               >
-                <Trash2 size={20} />
-              </button>
+                Delete
+              </Button>
             </>
           )}
         </div>
