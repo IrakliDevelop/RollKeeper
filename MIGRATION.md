@@ -51,8 +51,8 @@ The main player character sheet (`/app/player/characters/[characterId]/page.tsx`
 - [x] CharacterBasicInfo - Character info inputs, multiclass button, and dropdowns (Class & Alignment) ✅
 - [x] CombatStats - Initiative/Speed inputs, Reaction switch and reset button ✅
 - [x] ActionsSection - Manage spells button ✅
+- [x] LanguagesAndProficiencies - Add/delete buttons and text inputs for languages and tools ✅
 - [ ] CharacterSheetHeader - Action buttons (save, export, etc.)
-- [ ] LanguagesAndProficiencies - Text inputs
 - [ ] ExtendedFeaturesSection - Feature cards and buttons
 - [ ] ArmorClassManager - AC calculation inputs
 - [ ] QuickStats - Quick stats display
