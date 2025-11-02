@@ -19,6 +19,7 @@ import {
   SortAsc,
   SortDesc,
   X,
+  Wand2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -28,6 +29,7 @@ import { Input } from '@/components/ui/forms/input';
 import { Textarea } from '@/components/ui/forms/textarea';
 import { Modal } from '@/components/ui/feedback/Modal';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
+import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
 import DragDropList from '@/components/ui/layout/DragDropList';
 
 // Constants for spell schools and common casting times
@@ -206,7 +208,8 @@ const SpellCard: React.FC<{
   onView: () => void;
   onTogglePrepared: () => void;
   onToggleFavorite: () => void;
-}> = ({ spell, compact, isFavorite, onEdit, onDelete, onView, onTogglePrepared, onToggleFavorite }) => {
+  onCast: () => void;
+}> = ({ spell, compact, isFavorite, onEdit, onDelete, onView, onTogglePrepared, onToggleFavorite, onCast }) => {
   const isCantrip = spell.level === 0;
   
   if (compact) {
@@ -249,6 +252,15 @@ const SpellCard: React.FC<{
         </div>
         
         <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+          <Button
+            onClick={onCast}
+            variant="primary"
+            size="xs"
+            className="bg-purple-600 hover:bg-purple-700"
+            title="Cast spell"
+          >
+            <Wand2 size={12} />
+          </Button>
           <Button
             onClick={onTogglePrepared}
             variant={spell.isPrepared ? "success" : "outline"}
@@ -355,6 +367,16 @@ const SpellCard: React.FC<{
         
         <div className="ml-4 flex flex-col gap-2">
           <Button
+            onClick={onCast}
+            variant="primary"
+            size="sm"
+            leftIcon={<Wand2 size={14} />}
+            className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+          >
+            Cast
+          </Button>
+          
+          <Button
             onClick={onTogglePrepared}
             variant={spell.isPrepared ? "success" : "outline"}
             size="sm"
@@ -408,6 +430,7 @@ const LevelSection: React.FC<{
   onSpellView: (spell: Spell) => void;
   onTogglePrepared: (id: string) => void;
   onToggleFavorite: (id: string) => void;
+  onSpellCast: (spell: Spell) => void;
   onReorder: (sourceIndex: number, destinationIndex: number) => void;
 }> = ({
   level,
@@ -421,6 +444,7 @@ const LevelSection: React.FC<{
   onSpellView,
   onTogglePrepared,
   onToggleFavorite,
+  onSpellCast,
   onReorder,
 }) => {
   const isCantrip = level === 0;
@@ -482,6 +506,7 @@ const LevelSection: React.FC<{
                 onView={() => onSpellView(spell)}
                 onTogglePrepared={() => onTogglePrepared(spell.id)}
                 onToggleFavorite={() => onToggleFavorite(spell.id)}
+                onCast={() => onSpellCast(spell)}
               />
             )}
           />
@@ -492,11 +517,13 @@ const LevelSection: React.FC<{
 };
 
 export const EnhancedSpellManagement: React.FC = () => {
-  const { character, updateCharacter, reorderSpells, toggleSpellFavorite } = useCharacterStore();
+  const { character, updateCharacter, reorderSpells, toggleSpellFavorite, updateSpellSlot, startConcentration, stopConcentration } = useCharacterStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<SpellFormData>(initialFormData);
   const [viewingSpell, setViewingSpell] = useState<Spell | null>(null);
+  const [castModalOpen, setCastModalOpen] = useState(false);
+  const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null);
   const [filters, setFilters] = useState<SpellFilters>(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
   const [compactView, setCompactView] = useState(false);
@@ -715,6 +742,32 @@ export const EnhancedSpellManagement: React.FC = () => {
     }
   };
 
+  const handleCastSpell = (spell: Spell) => {
+    setSelectedSpell(spell);
+    setCastModalOpen(true);
+  };
+
+  const handleCastSpellConfirm = (spellLevel: number) => {
+    if (!selectedSpell) return;
+
+    if (selectedSpell.concentration) {
+      if (character.concentration.isConcentrating) {
+        stopConcentration();
+      }
+      startConcentration(selectedSpell.name, selectedSpell.id, spellLevel);
+    }
+
+    if (selectedSpell.level > 0) {
+      updateSpellSlot(
+        spellLevel as keyof typeof character.spellSlots,
+        character.spellSlots[spellLevel as keyof typeof character.spellSlots].used + 1
+      );
+    }
+
+    setCastModalOpen(false);
+    setSelectedSpell(null);
+  };
+
   const toggleLevelExpanded = (level: number) => {
     const newExpanded = new Set(expandedLevels);
     if (newExpanded.has(level)) {
@@ -737,6 +790,13 @@ export const EnhancedSpellManagement: React.FC = () => {
 
   const sortedLevels = Object.keys(spellsByLevel).map(Number).sort((a, b) => a - b);
 
+  // Calculate total prepared spells (excluding cantrips)
+  const preparedSpellsCount = useMemo(() => {
+    return character.spells.filter(spell => 
+      spell.level > 0 && (spell.isPrepared || spell.isAlwaysPrepared)
+    ).length;
+  }, [character.spells]);
+
   return (
     <div className="rounded-lg border border-purple-200 bg-white p-6 shadow">
       {/* Header */}
@@ -748,6 +808,11 @@ export const EnhancedSpellManagement: React.FC = () => {
             <Badge variant="secondary" size="sm">
               {filteredSpells.length} of {character.spells.length}
             </Badge>
+            {preparedSpellsCount > 0 && (
+              <Badge variant="success" size="sm" className="bg-green-100 text-green-800">
+                {preparedSpellsCount} prepared
+              </Badge>
+            )}
           </h3>
 
           <div className="flex items-center gap-2">
@@ -998,6 +1063,7 @@ export const EnhancedSpellManagement: React.FC = () => {
               onSpellView={setViewingSpell}
               onTogglePrepared={handlePreparedToggle}
               onToggleFavorite={toggleSpellFavorite}
+              onSpellCast={handleCastSpell}
               onReorder={handleReorderSpellsInLevel(level)}
             />
           ))
@@ -1336,6 +1402,21 @@ export const EnhancedSpellManagement: React.FC = () => {
           onClose={() => setViewingSpell(null)}
           isFavorite={favoriteSpells.includes(viewingSpell.id)}
           onToggleFavorite={() => toggleSpellFavorite(viewingSpell.id)}
+        />
+      )}
+
+      {/* Spell Cast Modal */}
+      {selectedSpell && (
+        <SpellCastModal
+          isOpen={castModalOpen}
+          onClose={() => {
+            setCastModalOpen(false);
+            setSelectedSpell(null);
+          }}
+          spell={selectedSpell}
+          spellSlots={character.spellSlots}
+          concentration={character.concentration}
+          onCastSpell={handleCastSpellConfirm}
         />
       )}
     </div>

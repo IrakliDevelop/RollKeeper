@@ -7,6 +7,7 @@ import { EquippedWeapons } from '@/components/EquippedWeapons';
 import { EnhancedQuickSpells } from '@/components/EnhancedQuickSpells';
 import { ConcentrationTracker } from '@/components/ui/character';
 import { Button } from '@/components/ui/forms';
+import { Badge } from '@/components/ui/layout';
 import { CharacterState } from '@/types/character';
 
 interface ActionsSectionProps {
@@ -112,6 +113,11 @@ export default function ActionsSection({
     (spell.level > 0 && spell.isPrepared) || // Prepared spells
     spell.isAlwaysPrepared // Always prepared spells
   );
+  
+  // Calculate prepared spells count (excluding cantrips)
+  const preparedSpellsCount = character.spells.filter(spell =>
+    spell.level > 0 && (spell.isPrepared || spell.isAlwaysPrepared)
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -151,11 +157,18 @@ export default function ActionsSection({
           persistKey="quick-spells"
           defaultExpanded={true}
           badge={
-            actionSpells.length > 0 && (
-              <span className="rounded-full bg-purple-100 px-2 py-1 text-sm font-medium text-purple-800">
-                {actionSpells.length} ready
-              </span>
-            )
+            <div className="flex items-center gap-2">
+              {actionSpells.length > 0 && (
+                <span className="rounded-full bg-purple-100 px-2 py-1 text-sm font-medium text-purple-800">
+                  {actionSpells.length} ready
+                </span>
+              )}
+              {preparedSpellsCount > 0 && (
+                <Badge variant="success" size="sm" className="bg-green-100 text-green-800">
+                  {preparedSpellsCount} prepared
+                </Badge>
+              )}
+            </div>
           }
           extraContent={
             <Button
