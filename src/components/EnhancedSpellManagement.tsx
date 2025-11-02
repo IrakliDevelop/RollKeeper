@@ -1402,6 +1402,7 @@ export const EnhancedSpellManagement: React.FC = () => {
           onClose={() => setViewingSpell(null)}
           isFavorite={favoriteSpells.includes(viewingSpell.id)}
           onToggleFavorite={() => toggleSpellFavorite(viewingSpell.id)}
+          onCast={() => handleCastSpell(viewingSpell)}
         />
       )}
 

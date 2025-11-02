@@ -644,6 +644,7 @@ export function EnhancedQuickSpells({
           onToggleFavorite={() => {
             toggleSpellFavorite(viewingSpell.id);
           }}
+          onCast={() => openCastModal(viewingSpell)}
         />
       )}
     </>
