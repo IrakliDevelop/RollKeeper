@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { HeroicInspiration } from '@/types/character';
 import { Star, Plus, Minus, RotateCcw, Settings } from 'lucide-react';
+import { Button, Input } from '@/components/ui/forms';
 
 interface HeroicInspirationTrackerProps {
   inspiration: HeroicInspiration;
@@ -129,21 +130,25 @@ export function HeroicInspirationTracker({
 
           {!readonly && !hideSettings && (
             <div className="flex items-center gap-1">
-              <button
+              <Button
                 onClick={() => setShowSettings(!showSettings)}
-                className="rounded p-1 text-yellow-600 transition-colors hover:bg-yellow-100"
+                variant="ghost"
+                size="xs"
+                className="text-yellow-600 hover:bg-yellow-100"
                 title="Settings"
               >
                 <Settings size={16} />
-              </button>
+              </Button>
               {onResetInspiration && (
-                <button
+                <Button
                   onClick={onResetInspiration}
-                  className="rounded p-1 text-yellow-600 transition-colors hover:bg-yellow-100"
+                  variant="ghost"
+                  size="xs"
+                  className="text-yellow-600 hover:bg-yellow-100"
                   title="Reset to 0"
                 >
                   <RotateCcw size={16} />
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -157,26 +162,30 @@ export function HeroicInspirationTracker({
             <label className="text-sm font-medium text-gray-700">
               Max Inspiration:
             </label>
-            <input
+            <Input
               type="number"
               value={maxCountInput}
               onChange={e => setMaxCountInput(e.target.value)}
               placeholder="Unlimited"
               min="0"
-              className="w-20 rounded border border-gray-300 px-2 py-1 text-sm focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500"
+              className="w-20 text-sm"
+              size="sm"
             />
-            <button
+            <Button
               onClick={handleMaxCountChange}
-              className="rounded bg-yellow-600 px-3 py-1 text-sm text-white transition-colors hover:bg-yellow-700"
+              variant="warning"
+              size="sm"
+              className="bg-yellow-600 hover:bg-yellow-700"
             >
               Set
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setShowSettings(false)}
-              className="rounded bg-gray-400 px-3 py-1 text-sm text-white transition-colors hover:bg-gray-500"
+              variant="secondary"
+              size="sm"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -213,28 +222,30 @@ export function HeroicInspirationTracker({
       {!readonly && !hideControls && (
         <div className="flex justify-center gap-2">
           {onAddInspiration && (
-            <button
+            <Button
               onClick={() => onAddInspiration(1)}
               disabled={
                 inspiration.maxCount
                   ? inspiration.count >= inspiration.maxCount
                   : false
               }
-              className="flex items-center gap-1 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+              variant="success"
+              size="sm"
+              leftIcon={<Plus size={16} />}
             >
-              <Plus size={16} />
               Add
-            </button>
+            </Button>
           )}
           {onUseInspiration && (
-            <button
+            <Button
               onClick={onUseInspiration}
               disabled={inspiration.count === 0}
-              className="flex items-center gap-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+              variant="danger"
+              size="sm"
+              leftIcon={<Minus size={16} />}
             >
-              <Minus size={16} />
               Use
-            </button>
+            </Button>
           )}
         </div>
       )}

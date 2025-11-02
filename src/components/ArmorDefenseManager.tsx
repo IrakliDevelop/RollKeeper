@@ -6,6 +6,12 @@ import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Edit2, Trash2, Shield, CheckCircle } from 'lucide-react';
 import { Modal } from '@/components/ui/feedback/Modal';
 import DragDropList from '@/components/ui/layout/DragDropList';
+import { Button } from '@/components/ui/forms/button';
+import { Badge } from '@/components/ui/layout/badge';
+import { Input } from '@/components/ui/forms/input';
+import { Textarea } from '@/components/ui/forms/textarea';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { Checkbox } from '@/components/ui/forms/checkbox';
 
 const ARMOR_CATEGORIES: ArmorCategory[] = [
   'light',
@@ -197,13 +203,15 @@ export default function ArmorDefenseManager() {
     <div className="space-y-6">
       {/* Add Button */}
       <div className="flex items-center justify-end">
-        <button
+        <Button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+          variant="primary"
+          size="sm"
+          leftIcon={<Plus size={16} />}
+          className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
         >
-          <Plus size={16} />
           Add Armor
-        </button>
+        </Button>
       </div>
 
       {/* Equipped Armor */}
@@ -282,217 +290,180 @@ export default function ArmorDefenseManager() {
         size="lg"
         closeOnBackdropClick={true}
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={e =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., Chain Mail, Leather Armor +1"
-                    required
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Section: Basic Information */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+              Basic Information
+            </h4>
+            
+            <Input
+              label="Name"
+              value={formData.name}
+              onChange={e => setFormData({ ...formData, name: e.target.value })}
+              placeholder="e.g., Chain Mail, Leather Armor +1"
+              required
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">Category</label>
+                <SelectField
+                  value={formData.category}
+                  onValueChange={value => {
+                    const category = value as ArmorCategory;
+                    const firstType = ARMOR_TYPES[category][0];
+                    setFormData({ ...formData, category });
+                    handleTypeChange(firstType);
+                  }}
+                >
+                  {ARMOR_CATEGORIES.map(category => (
+                    <SelectItem key={category} value={category}>
+                      {category.charAt(0).toUpperCase() + category.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectField>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">Type</label>
+                <SelectField
+                  value={formData.type}
+                  onValueChange={value => handleTypeChange(value as ArmorType)}
+                >
+                  {ARMOR_TYPES[formData.category].map(type => (
+                    <SelectItem key={type} value={type}>
+                      {type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ')}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectField>
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Armor Stats */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+              Armor Stats
+            </h4>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <Input
+                label="Base AC"
+                type="number"
+                value={formData.baseAC.toString()}
+                onChange={e => setFormData({ ...formData, baseAC: parseInt(e.target.value) || 10 })}
+                min={10}
+                max={30}
+              />
+
+              <Input
+                label="Max Dex Bonus"
+                type="number"
+                value={formData.maxDexBonus?.toString() || ''}
+                onChange={e => setFormData({
+                  ...formData,
+                  maxDexBonus: e.target.value ? parseInt(e.target.value) : undefined,
+                })}
+                placeholder="Unlimited"
+                min={0}
+                max={10}
+              />
+
+              <Input
+                label="Enhancement"
+                type="number"
+                value={formData.enhancementBonus.toString()}
+                onChange={e => setFormData({ ...formData, enhancementBonus: parseInt(e.target.value) || 0 })}
+                min={0}
+                max={3}
+              />
+            </div>
+          </div>
+
+          {/* Section: Description */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+              Description
+            </h4>
+            
+            <Textarea
+              label="Special Properties"
+              value={formData.description}
+              onChange={e => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+              placeholder="Special properties, abilities, or description..."
+            />
+          </div>
+
+          {/* Section: Properties */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+              Properties
+            </h4>
+            
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={formData.isEquipped}
+                  onCheckedChange={checked => setFormData({ ...formData, isEquipped: checked as boolean })}
+                />
+                <span className="text-sm font-medium text-gray-800">Currently Equipped</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={formData.stealthDisadvantage}
+                  onCheckedChange={checked => setFormData({ ...formData, stealthDisadvantage: checked as boolean })}
+                />
+                <span className="text-sm font-medium text-gray-800">Stealth Disadvantage</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={formData.requiresAttunement}
+                  onCheckedChange={checked => setFormData({
+                    ...formData,
+                    requiresAttunement: checked as boolean,
+                    isAttuned: checked ? formData.isAttuned : false,
+                  })}
+                />
+                <span className="text-sm font-medium text-gray-800">Requires Attunement</span>
+              </label>
+
+              {formData.requiresAttunement && (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.isAttuned}
+                    onCheckedChange={checked => setFormData({ ...formData, isAttuned: checked as boolean })}
                   />
-                </div>
+                  <span className="text-sm font-medium text-gray-800">Attuned</span>
+                </label>
+              )}
+            </div>
+          </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Category
-                    </label>
-                    <select
-                      value={formData.category}
-                      onChange={e => {
-                        const category = e.target.value as ArmorCategory;
-                        const firstType = ARMOR_TYPES[category][0];
-                        setFormData({ ...formData, category });
-                        handleTypeChange(firstType);
-                      }}
-                      className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                    >
-                      {ARMOR_CATEGORIES.map(category => (
-                        <option key={category} value={category}>
-                          {category.charAt(0).toUpperCase() + category.slice(1)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Type
-                    </label>
-                    <select
-                      value={formData.type}
-                      onChange={e =>
-                        handleTypeChange(e.target.value as ArmorType)
-                      }
-                      className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                    >
-                      {ARMOR_TYPES[formData.category].map(type => (
-                        <option key={type} value={type}>
-                          {type.charAt(0).toUpperCase() +
-                            type.slice(1).replace('-', ' ')}
-                        </option>
-                      ))}
-                      <option value="custom">Custom</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Base AC
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.baseAC}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          baseAC: parseInt(e.target.value) || 10,
-                        })
-                      }
-                      className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                      min="10"
-                      max="30"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Max Dex Bonus
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.maxDexBonus || ''}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          maxDexBonus: e.target.value
-                            ? parseInt(e.target.value)
-                            : undefined,
-                        })
-                      }
-                      className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                      placeholder="Unlimited"
-                      min="0"
-                      max="10"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Enhancement
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.enhancementBonus}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          enhancementBonus: parseInt(e.target.value) || 0,
-                        })
-                      }
-                      className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                      min="0"
-                      max="3"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Description
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={e =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                    rows={3}
-                    placeholder="Special properties, abilities, or description..."
-                  />
-                </div>
-
-                <div className="flex items-center space-x-4">
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.isEquipped}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          isEquipped: e.target.checked,
-                        })
-                      }
-                      className="rounded"
-                    />
-                    <span className="text-sm text-gray-800">
-                      Currently Equipped
-                    </span>
-                  </label>
-
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.stealthDisadvantage}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          stealthDisadvantage: e.target.checked,
-                        })
-                      }
-                      className="rounded"
-                    />
-                    <span className="text-sm text-gray-800">
-                      Stealth Disadvantage
-                    </span>
-                  </label>
-
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.requiresAttunement}
-                      onChange={e =>
-                        setFormData({
-                          ...formData,
-                          requiresAttunement: e.target.checked,
-                          isAttuned: e.target.checked
-                            ? formData.isAttuned
-                            : false,
-                        })
-                      }
-                      className="rounded"
-                    />
-                    <span className="text-sm text-gray-800">
-                      Requires Attunement
-                    </span>
-                  </label>
-                </div>
-
-                <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-                  >
-                    {editingId ? 'Update' : 'Add'} Armor
-                  </button>
-                </div>
-              </form>
+          {/* Form Actions */}
+          <div className="flex justify-end gap-3 pt-4 border-t-2 border-gray-200">
+            <Button
+              type="button"
+              onClick={resetForm}
+              variant="outline"
+              size="md"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+            >
+              {editingId ? 'Update' : 'Add'} Armor
+            </Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );
@@ -517,80 +488,78 @@ function ArmorCard({
 
   return (
     <div
-      className={`rounded-lg border p-4 transition-all ${
+      className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${
         equipped
-          ? 'border-green-300 bg-green-50'
+          ? 'border-green-300 bg-white'
           : 'border-gray-200 bg-white hover:border-gray-300'
       }`}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="mb-1 flex items-center gap-2">
-            <h4 className="font-semibold text-gray-800">{armor.name}</h4>
+          <div className="mb-2 flex items-center gap-2 flex-wrap">
+            <h4 className="font-bold text-gray-800">{armor.name}</h4>
             {armor.enhancementBonus > 0 && (
-              <span className="rounded bg-yellow-100 px-2 py-1 text-xs text-yellow-800">
+              <Badge variant="warning" size="sm">
                 +{armor.enhancementBonus}
-              </span>
+              </Badge>
             )}
             {armor.requiresAttunement && (
-              <span
-                className={`rounded px-2 py-1 text-xs ${
-                  armor.isAttuned
-                    ? 'bg-purple-100 text-purple-800'
-                    : 'bg-gray-100 text-gray-600'
-                }`}
+              <Badge
+                variant={armor.isAttuned ? "primary" : "secondary"}
+                size="sm"
               >
                 {armor.isAttuned ? 'Attuned' : 'Requires Attunement'}
-              </span>
+              </Badge>
             )}
           </div>
 
           <div className="mb-2 text-sm text-gray-600">
-            <span className="font-medium">AC {totalAC}</span> • {armor.category}{' '}
-            armor
+            <span className="font-semibold text-gray-800">AC {totalAC}</span> • {armor.category} armor
             {armor.maxDexBonus !== undefined && (
               <span> • Max Dex +{armor.maxDexBonus}</span>
             )}
           </div>
 
           {armor.stealthDisadvantage && (
-            <div className="mb-1 text-xs text-red-600">
+            <Badge variant="danger" size="sm" className="mb-2">
               ⚠️ Stealth Disadvantage
-            </div>
+            </Badge>
           )}
 
           {armor.description && (
-            <p className="text-sm text-gray-700">{armor.description}</p>
+            <p className="text-sm text-gray-700 mt-2">{armor.description}</p>
           )}
         </div>
 
         <div className="ml-4 flex flex-col gap-2">
-          <div className="flex gap-2">
-            <button
+          <div className="flex gap-1">
+            <Button
               onClick={() => onEdit(armor)}
-              className="p-1 text-gray-600 transition-colors hover:text-blue-600"
+              variant="ghost"
+              size="xs"
               title="Edit armor"
+              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
             >
               <Edit2 size={16} />
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={onDelete}
-              className="p-1 text-gray-600 transition-colors hover:text-red-600"
+              variant="ghost"
+              size="xs"
               title="Delete armor"
+              className="text-red-600 hover:text-red-800 hover:bg-red-50"
             >
               <Trash2 size={16} />
-            </button>
+            </Button>
           </div>
-          <button
+          <Button
             onClick={onToggleEquip}
-            className={`rounded px-2 py-1 text-xs transition-colors ${
-              equipped
-                ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-gray-200 text-gray-700 hover:bg-green-100'
-            }`}
+            variant={equipped ? "success" : "outline"}
+            size="sm"
+            className={equipped ? "" : "hover:bg-green-50 hover:border-green-300"}
           >
             {equipped ? 'Equipped' : 'Equip'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

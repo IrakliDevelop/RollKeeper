@@ -12,6 +12,7 @@ import {
   Heart,
   Grid3X3,
   List,
+  Eye,
 } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
 import { Spell } from '@/types/character';
@@ -22,7 +23,10 @@ import {
   rollDamage,
 } from '@/utils/calculations';
 import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
+import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import { RollSummary } from '@/types/dice';
+import { Button } from '@/components/ui/forms';
+import { Badge } from '@/components/ui/layout';
 
 interface EnhancedQuickSpellsProps {
   showAttackRoll: (
@@ -73,77 +77,89 @@ const SpellCard: React.FC<{
   onAction: (action: string) => void;
   onToggleFavorite: () => void;
 }> = ({ spell, compact, isFavorite, spellSaveDC, onAction, onToggleFavorite }) => {
+  const isCantrip = spell.level === 0;
+  
   if (compact) {
     return (
-      <div className="group flex items-center justify-between rounded-lg border border-purple-200 bg-gradient-to-r from-purple-50 to-violet-50 p-2 hover:shadow-md transition-all duration-200">
+      <div className="group flex items-center justify-between rounded-lg border-2 border-gray-200 bg-white p-2.5 hover:shadow-md hover:border-gray-300 transition-all">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <button
             onClick={onToggleFavorite}
             className={`flex-shrink-0 transition-colors ${
               isFavorite ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-500'
             }`}
+            title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
           >
             <Star size={14} fill={isFavorite ? 'currentColor' : 'none'} />
           </button>
-          <div
-            className={`h-2 w-2 rounded-full flex-shrink-0 ${
-              spell.level === 0 ? 'bg-yellow-400' : 'bg-purple-400'
-            }`}
-          />
-          <span className="font-medium text-purple-900 truncate text-sm">
+          <span className="font-medium text-gray-900 truncate text-sm">
             {spell.name}
           </span>
           {spell.concentration && (
-            <span className="text-xs text-orange-600 flex-shrink-0">⏱</span>
+            <Badge variant="warning" size="sm" className="flex-shrink-0">⏱</Badge>
           )}
         </div>
-        <div className="flex gap-1 flex-shrink-0">
-          <button
+        <div className="flex gap-1.5 flex-shrink-0">
+          <Button
             onClick={() => onAction('cast')}
-            className="rounded bg-purple-600 px-2 py-1 text-xs text-white hover:bg-purple-700 transition-colors"
+            variant="primary"
+            size="xs"
+            className="bg-purple-600 hover:bg-purple-700"
             title="Cast spell"
           >
             <Wand2 size={12} />
-          </button>
+          </Button>
           {spell.actionType === 'attack' && (
-            <button
+            <Button
               onClick={() => onAction('attack')}
-              className="rounded bg-slate-600 px-2 py-1 text-xs text-white hover:bg-slate-700 transition-colors"
+              variant="secondary"
+              size="xs"
               title="Attack roll"
             >
               <Dice6 size={12} />
-            </button>
+            </Button>
           )}
+          <Button
+            onClick={() => onAction('view')}
+            variant="outline"
+            size="xs"
+            title="View details"
+          >
+            <Eye size={12} />
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border border-purple-200 bg-gradient-to-r from-purple-50 to-violet-50 p-3 hover:shadow-md transition-all duration-200">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+    <div className="rounded-lg border-2 border-gray-200 bg-white p-4 hover:shadow-md hover:border-gray-300 transition-all">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={onToggleFavorite}
             className={`transition-colors ${
               isFavorite ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-500'
             }`}
+            title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
           >
             <Star size={16} fill={isFavorite ? 'currentColor' : 'none'} />
           </button>
-          <div
-            className={`h-2 w-2 rounded-full ${
-              spell.level === 0 ? 'bg-yellow-400' : 'bg-purple-400'
-            }`}
-          />
-          <span className="font-semibold text-purple-900">{spell.name}</span>
-          <span className="rounded bg-purple-100 px-2 py-1 text-xs text-purple-700">
-            {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
-          </span>
+          <span className="font-bold text-gray-900">{spell.name}</span>
+          <Badge 
+            variant={isCantrip ? "warning" : "primary"} 
+            size="sm"
+            className={isCantrip ? "bg-yellow-100 text-yellow-800" : "bg-purple-100 text-purple-800"}
+          >
+            {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
+          </Badge>
+          {spell.concentration && (
+            <Badge variant="warning" size="sm">⏱ Concentration</Badge>
+          )}
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2 text-xs text-purple-600">
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-gray-600">
         <span>{spell.castingTime}</span>
         <span>•</span>
         <span>{spell.range}</span>
@@ -153,47 +169,49 @@ const SpellCard: React.FC<{
             <span>{spell.duration}</span>
           </>
         )}
-        {spell.concentration && (
-          <>
-            <span>•</span>
-            <span className="text-orange-600">Concentration</span>
-          </>
-        )}
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button
+        <Button
           onClick={() => onAction('cast')}
-          className="group flex transform items-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-violet-600 px-3 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:scale-105 hover:from-purple-700 hover:to-violet-700 hover:shadow-lg"
+          variant="primary"
+          size="sm"
+          leftIcon={<Wand2 size={14} />}
+          className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
         >
-          <Wand2 size={14} className="transition-transform group-hover:rotate-12" />
           Cast
-        </button>
+        </Button>
 
         {spell.actionType === 'attack' && (
-          <button
+          <Button
             onClick={() => onAction('attack')}
-            className="group flex transform items-center gap-2 rounded-lg bg-gradient-to-r from-slate-600 to-slate-700 px-3 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:scale-105 hover:from-slate-700 hover:to-slate-800 hover:shadow-lg"
+            variant="secondary"
+            size="sm"
+            leftIcon={<Dice6 size={14} />}
           >
-            <Dice6 size={14} className="transition-transform group-hover:rotate-12" />
             Attack
-          </button>
+          </Button>
         )}
 
+        <Button
+          onClick={() => onAction('view')}
+          variant="outline"
+          size="sm"
+          leftIcon={<Eye size={14} />}
+        >
+          View
+        </Button>
+
         {/* Show spell info for reference */}
-        {(spell.actionType === 'save' || spell.damage) && (
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            {spell.actionType === 'save' && spell.savingThrow && (
-              <span className="rounded-lg border border-blue-300 bg-gradient-to-r from-blue-100 to-blue-200 px-2 py-1 font-medium shadow-sm">
-                {spell.savingThrow} Save DC {spellSaveDC || '?'}
-              </span>
-            )}
-            {spell.damage && (
-              <span className="rounded-lg border border-amber-300 bg-gradient-to-r from-amber-100 to-amber-200 px-2 py-1 font-medium shadow-sm">
-                {spell.damage} {spell.damageType && `${spell.damageType}`}
-              </span>
-            )}
-          </div>
+        {spell.actionType === 'save' && spell.savingThrow && (
+          <Badge variant="info" size="sm">
+            {spell.savingThrow} Save DC {spellSaveDC || '?'}
+          </Badge>
+        )}
+        {spell.damage && (
+          <Badge variant="warning" size="sm">
+            {spell.damage} {spell.damageType && `${spell.damageType}`}
+          </Badge>
         )}
       </div>
     </div>
@@ -211,29 +229,39 @@ const LevelSection: React.FC<LevelSectionProps> = ({
   favoriteSpells,
   onToggleFavorite,
 }) => {
-  const levelName = level === 0 ? 'Cantrips' : `Level ${level}`;
-  const levelColor = level === 0 ? 'text-yellow-600' : 'text-purple-600';
-  const levelBg = level === 0 ? 'bg-yellow-50' : 'bg-purple-50';
+  const isCantrip = level === 0;
+  const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
+  const levelColor = isCantrip ? 'text-yellow-700' : 'text-purple-700';
+  const levelBg = isCantrip ? 'bg-gradient-to-r from-yellow-50 to-amber-50' : 'bg-gradient-to-r from-purple-50 to-violet-50';
+  const borderColor = isCantrip ? 'border-yellow-200' : 'border-purple-200';
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className={`border-2 ${borderColor} rounded-lg overflow-hidden bg-white`}>
       <button
         onClick={onToggle}
-        className={`w-full flex items-center justify-between p-3 ${levelBg} hover:bg-opacity-80 transition-colors`}
+        className={`w-full flex items-center justify-between p-4 ${levelBg} hover:opacity-90 transition-all`}
       >
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            <span className={`font-semibold ${levelColor}`}>{levelName}</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {isExpanded ? (
+              <ChevronDown size={18} className={levelColor} />
+            ) : (
+              <ChevronRight size={18} className={levelColor} />
+            )}
+            <span className={`font-bold text-base ${levelColor}`}>{levelName}</span>
           </div>
-          <span className="rounded-full bg-white px-2 py-1 text-xs font-medium text-gray-600">
-            {spells.length}
-          </span>
+          <Badge 
+            variant={isCantrip ? "warning" : "primary"}
+            size="sm"
+            className={isCantrip ? "bg-yellow-100 text-yellow-800" : "bg-purple-100 text-purple-800"}
+          >
+            {spells.length} spell{spells.length !== 1 ? 's' : ''}
+          </Badge>
         </div>
       </button>
       
       {isExpanded && (
-        <div className="p-3 bg-white">
+        <div className="p-4 bg-white border-t-2 border-gray-100">
           <div className={compactView ? 'space-y-2' : 'space-y-3'}>
             {spells.map(spell => (
               <SpellCard
@@ -270,6 +298,7 @@ export function EnhancedQuickSpells({
   // Local state
   const [castModalOpen, setCastModalOpen] = useState(false);
   const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null);
+  const [viewingSpell, setViewingSpell] = useState<Spell | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [compactView, setCompactView] = useState(false);
   const [expandedLevels, setExpandedLevels] = useState<Set<number>>(new Set([0, 1, 2])); // Default: cantrips and levels 1-2 expanded
@@ -396,6 +425,9 @@ export function EnhancedQuickSpells({
 
   const handleSpellAction = (spell: Spell, action: string) => {
     switch (action) {
+      case 'view':
+        setViewingSpell(spell);
+        break;
       case 'cast':
         openCastModal(spell);
         break;
@@ -448,47 +480,56 @@ export function EnhancedQuickSpells({
 
   if (actionSpells.length === 0) {
     return (
-      <div className="py-8 text-center text-gray-500">
+      <div className="rounded-lg border-2 border-gray-200 bg-white p-8 text-center">
         <div className="mb-3 text-5xl">🔮</div>
-        <p className="font-medium text-lg">No action spells ready</p>
-        <p className="mt-2 text-sm">
-          Add spells with attack rolls, saving throws, or damage dice to see them here.
+        <p className="font-semibold text-gray-700 text-lg">No spells prepared</p>
+        <p className="mt-2 text-sm text-gray-500">
+          Prepare spells in the Spellcasting tab to see them here.
         </p>
       </div>
     );
   }
+
+  // Separate cantrips and leveled spells
+  const cantrips = spellsByLevel[0] || [];
+  const leveledSpells = Object.keys(spellsByLevel)
+    .map(Number)
+    .filter(level => level > 0)
+    .sort((a, b) => a - b);
 
   return (
     <>
       <div className="space-y-4">
         {/* Header with stats and controls */}
         <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm text-purple-700">
-              <Sparkles size={16} />
-              <span className="font-medium">
-                Spell Attack: +{spellAttackBonus ?? 0} | Save DC: {spellSaveDC ?? 8}
-              </span>
-              {spellcastingAbility && (
-                <span className="rounded bg-purple-100 px-2 py-1 text-xs">
-                  {spellcastingAbility.charAt(0).toUpperCase() + spellcastingAbility.slice(1)}
-                </span>
-              )}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2 text-sm">
+                <Sparkles size={16} className="text-purple-600" />
+                <Badge variant="primary" size="sm" className="bg-blue-100 text-blue-800">
+                  Attack: +{spellAttackBonus ?? 0}
+                </Badge>
+                <Badge variant="primary" size="sm" className="bg-indigo-100 text-indigo-800">
+                  Save DC: {spellSaveDC ?? 8}
+                </Badge>
+                {spellcastingAbility && (
+                  <Badge variant="secondary" size="sm">
+                    {spellcastingAbility.charAt(0).toUpperCase() + spellcastingAbility.slice(1)}
+                  </Badge>
+                )}
+              </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCompactView(!compactView)}
-                className={`rounded p-2 transition-colors ${
-                  compactView
-                    ? 'bg-purple-100 text-purple-700'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-                title={compactView ? 'Switch to detailed view' : 'Switch to compact view'}
-              >
-                {compactView ? <List size={16} /> : <Grid3X3 size={16} />}
-              </button>
-            </div>
+            <Button
+              onClick={() => setCompactView(!compactView)}
+              variant={compactView ? "primary" : "ghost"}
+              size="sm"
+              leftIcon={compactView ? <List size={16} /> : <Grid3X3 size={16} />}
+              title={compactView ? 'Switch to detailed view' : 'Switch to compact view'}
+              className={compactView ? "bg-purple-600 hover:bg-purple-700" : ""}
+            >
+              {compactView ? 'Detailed' : 'Compact'}
+            </Button>
           </div>
 
           {/* Search bar */}
@@ -499,20 +540,20 @@ export function EnhancedQuickSpells({
               placeholder="Search spells..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
+              className="w-full rounded-lg border-2 border-gray-300 bg-white py-2.5 pl-10 pr-4 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition-all"
             />
           </div>
         </div>
 
         {/* Favorites section */}
         {favoriteActionSpells.length > 0 && (
-          <div className="rounded-lg border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50 p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Heart className="text-yellow-600" size={16} />
-              <span className="font-semibold text-yellow-800">Favorite Spells</span>
-              <span className="rounded-full bg-yellow-200 px-2 py-1 text-xs font-medium text-yellow-800">
+          <div className="rounded-lg border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50 p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-3">
+              <Heart className="text-yellow-600" size={18} fill="currentColor" />
+              <span className="font-bold text-yellow-800">Favorite Spells</span>
+              <Badge variant="warning" size="sm" className="bg-yellow-100 text-yellow-800">
                 {favoriteActionSpells.length}
-              </span>
+              </Badge>
             </div>
             <div className={compactView ? 'space-y-2' : 'space-y-3'}>
               {favoriteActionSpells.map(spell => (
@@ -530,30 +571,48 @@ export function EnhancedQuickSpells({
           </div>
         )}
 
-        {/* Spell levels */}
-        <div className="space-y-3">
-          {sortedLevels.map(level => (
-            <LevelSection
-              key={level}
-              level={level}
-              spells={spellsByLevel[level]}
-              isExpanded={expandedLevels.has(level)}
-              onToggle={() => toggleLevelExpanded(level)}
-              compactView={compactView}
-              spellSaveDC={spellSaveDC}
-              onSpellAction={handleSpellAction}
-              favoriteSpells={favoriteSpells}
-              onToggleFavorite={toggleSpellFavorite}
-            />
-          ))}
-        </div>
+        {/* Cantrips section - Always separate and highlighted */}
+        {cantrips.length > 0 && (
+          <LevelSection
+            key={0}
+            level={0}
+            spells={cantrips}
+            isExpanded={expandedLevels.has(0)}
+            onToggle={() => toggleLevelExpanded(0)}
+            compactView={compactView}
+            spellSaveDC={spellSaveDC}
+            onSpellAction={handleSpellAction}
+            favoriteSpells={favoriteSpells}
+            onToggleFavorite={toggleSpellFavorite}
+          />
+        )}
+
+        {/* Leveled spells */}
+        {leveledSpells.length > 0 && (
+          <div className="space-y-3">
+            {leveledSpells.map(level => (
+              <LevelSection
+                key={level}
+                level={level}
+                spells={spellsByLevel[level]}
+                isExpanded={expandedLevels.has(level)}
+                onToggle={() => toggleLevelExpanded(level)}
+                compactView={compactView}
+                spellSaveDC={spellSaveDC}
+                onSpellAction={handleSpellAction}
+                favoriteSpells={favoriteSpells}
+                onToggleFavorite={toggleSpellFavorite}
+              />
+            ))}
+          </div>
+        )}
 
         {/* No results message */}
         {searchQuery && sortedLevels.length === 0 && (
-          <div className="py-6 text-center text-gray-500">
-            <div className="mb-2 text-3xl">🔍</div>
-            <p className="font-medium">No spells found</p>
-            <p className="mt-1 text-sm">
+          <div className="rounded-lg border-2 border-gray-200 bg-white p-8 text-center">
+            <div className="mb-2 text-4xl">🔍</div>
+            <p className="font-semibold text-gray-700">No spells found</p>
+            <p className="mt-1 text-sm text-gray-500">
               Try adjusting your search terms or check your prepared spells.
             </p>
           </div>
@@ -572,6 +631,19 @@ export function EnhancedQuickSpells({
           spellSlots={character.spellSlots}
           concentration={character.concentration}
           onCastSpell={handleCastSpell}
+        />
+      )}
+
+      {/* Spell Detail Modal */}
+      {viewingSpell && (
+        <SpellDetailsModal
+          spell={viewingSpell}
+          isOpen={true}
+          onClose={() => setViewingSpell(null)}
+          isFavorite={favoriteSpells.includes(viewingSpell.id)}
+          onToggleFavorite={() => {
+            toggleSpellFavorite(viewingSpell.id);
+          }}
         />
       )}
     </>

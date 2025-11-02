@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { TrendingUp } from 'lucide-react';
-import { CustomSwitcher } from '@/components/ui';
+import { Button, Input, Switch } from '@/components/ui/forms';
 import {
   getXPForLevel,
   getXPToNextLevel,
@@ -161,35 +161,40 @@ export function XPTracker({
           className={`space-y-3 border-t border-gray-100 pt-3 ${compact ? 'space-y-2 pt-2' : ''}`}
         >
           {onAddXP && onSetXP && !compact && (
-            <CustomSwitcher
-              leftLabel="➕ Add XP"
-              rightLabel="✏️ Set XP"
-              leftValue="add"
-              rightValue="set"
-              currentValue={mode}
-              onChange={value => setMode(value as 'add' | 'set')}
-              color="blue"
-              size="md"
-              className="w-full max-w-xs"
-            />
+            <div className="flex items-center justify-center gap-3">
+              <span className={`text-sm font-medium ${mode === 'add' ? 'text-indigo-600' : 'text-gray-600'}`}>
+                ➕ Add XP
+              </span>
+              <Switch
+                checked={mode === 'set'}
+                onCheckedChange={(checked) => setMode(checked ? 'set' : 'add')}
+                size="sm"
+                variant="default"
+              />
+              <span className={`text-sm font-medium ${mode === 'set' ? 'text-indigo-600' : 'text-gray-600'}`}>
+                ✏️ Set XP
+              </span>
+            </div>
           )}
 
           <form onSubmit={handleSubmit} className="flex space-x-2">
-            <input
+            <Input
               type="number"
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               placeholder={mode === 'add' ? 'XP to add...' : 'Total XP...'}
               min="0"
-              className={`flex-1 rounded-md border border-gray-300 px-3 py-2 text-gray-800 focus:border-blue-500 focus:ring-blue-500 focus:outline-none ${compact ? 'text-sm' : 'text-sm'}`}
+              className={`flex-1 ${compact ? 'text-sm' : 'text-sm'}`}
             />
-            <button
+            <Button
               type="submit"
               disabled={!inputValue || isNaN(parseInt(inputValue))}
-              className={`rounded-md bg-indigo-600 px-4 py-2 font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-300 ${compact ? 'text-sm' : 'text-sm'}`}
+              variant="primary"
+              size={compact ? 'sm' : 'md'}
+              className="bg-indigo-600 hover:bg-indigo-700"
             >
               {mode === 'add' ? 'Add' : 'Set'}
-            </button>
+            </Button>
           </form>
 
           {!compact && (

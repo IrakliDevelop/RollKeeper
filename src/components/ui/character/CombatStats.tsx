@@ -2,6 +2,7 @@
 
 import { RotateCcw } from 'lucide-react';
 import { formatModifier } from '@/utils/calculations';
+import { Button, Input, Switch } from '@/components/ui/forms';
 import { CharacterState } from '@/types/character';
 
 interface CombatStatsProps {
@@ -41,29 +42,33 @@ export default function CombatStats({
             <div className="mb-1 flex items-center justify-center gap-1 text-xs font-medium text-yellow-700">
               INITIATIVE
               {character.initiative.isOverridden && (
-                <button
+                <Button
                   onClick={onResetInitiativeToDefault}
-                  className="text-orange-600 transition-colors hover:text-orange-800"
+                  variant="ghost"
+                  size="xs"
+                  className="h-4 w-4 p-0 text-orange-600 hover:text-orange-800"
                   title="Reset to DEX modifier"
                 >
                   <RotateCcw size={10} />
-                </button>
+                </Button>
               )}
-              <button
+              <Button
                 onClick={onRollInitiative}
-                className="ml-1 text-yellow-600 transition-colors hover:text-yellow-800"
+                variant="ghost"
+                size="xs"
+                className="ml-1 h-4 w-4 p-0 text-yellow-600 hover:text-yellow-800"
                 title={`Roll initiative (d20 + ${formatModifier(getInitiativeModifier())})`}
               >
                 🎲
-              </button>
+              </Button>
             </div>
-            <input
+            <Input
               type="number"
-              value={getInitiativeModifier()}
+              value={getInitiativeModifier().toString()}
               onChange={e =>
                 onUpdateInitiative(parseInt(e.target.value) || 0, true)
               }
-              className={`w-full border-none bg-transparent text-center text-xl font-bold outline-none ${
+              className={`border-none bg-transparent text-center text-xl font-bold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                 character.initiative.isOverridden
                   ? 'text-orange-800'
                   : 'text-yellow-800'
@@ -81,11 +86,11 @@ export default function CombatStats({
         <div className="text-center">
           <div className="flex h-20 flex-col justify-center rounded-lg border-2 border-green-200 bg-green-50 p-3">
             <div className="mb-1 text-xs font-medium text-green-700">SPEED</div>
-            <input
+            <Input
               type="number"
-              value={character.speed}
+              value={character.speed.toString()}
               onChange={e => onUpdateSpeed(parseInt(e.target.value) || 30)}
-              className="w-full border-none bg-transparent text-center text-xl font-bold text-green-800 outline-none"
+              className="border-none bg-transparent text-center text-xl font-bold text-green-800 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
         </div>
@@ -105,31 +110,27 @@ export default function CombatStats({
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={onToggleReaction}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  character.reaction.hasUsedReaction
-                    ? 'bg-red-600'
-                    : 'bg-green-600'
-                } `}
+              <Switch
+                checked={!character.reaction.hasUsedReaction}
+                onCheckedChange={() => onToggleReaction()}
+                size="sm"
+                variant="success"
                 title={
                   character.reaction.hasUsedReaction
                     ? 'Mark reaction as available'
                     : 'Mark reaction as used'
                 }
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${character.reaction.hasUsedReaction ? 'translate-x-6' : 'translate-x-1'} `}
-                />
-              </button>
+              />
 
-              <button
+              <Button
                 onClick={onResetReaction}
-                className="rounded p-1 text-purple-600 transition-colors hover:bg-purple-100"
+                variant="ghost"
+                size="xs"
+                className="p-1 text-purple-600 hover:bg-purple-100"
                 title="Reset reaction to available"
               >
                 <RotateCcw size={14} />
-              </button>
+              </Button>
             </div>
           </div>
 

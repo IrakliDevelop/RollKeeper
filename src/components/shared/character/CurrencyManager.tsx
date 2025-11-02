@@ -2,17 +2,19 @@
 
 import React, { useState } from 'react';
 import { Currency } from '@/types/character';
-import { Coins } from 'lucide-react';
-import { inputStyles } from '@/styles/inputs';
+import { Coins, Plus, Minus, Info } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
+import { Badge } from '@/components/ui/layout/badge';
+import { Input } from '@/components/ui/forms/input';
 
 const CURRENCY_TYPES: {
-  [key in keyof Currency]: { name: string; abbr: string; color: string };
+  [key in keyof Currency]: { name: string; abbr: string; color: string; badgeVariant: 'secondary' | 'warning' | 'success' | 'neutral' | 'danger' };
 } = {
-  platinum: { name: 'Platinum', abbr: 'pp', color: 'text-slate-600' },
-  gold: { name: 'Gold', abbr: 'gp', color: 'text-yellow-600' },
-  electrum: { name: 'Electrum', abbr: 'ep', color: 'text-green-600' },
-  silver: { name: 'Silver', abbr: 'sp', color: 'text-gray-600' },
-  copper: { name: 'Copper', abbr: 'cp', color: 'text-orange-600' },
+  platinum: { name: 'Platinum', abbr: 'pp', color: 'text-slate-700', badgeVariant: 'neutral' },
+  gold: { name: 'Gold', abbr: 'gp', color: 'text-yellow-700', badgeVariant: 'warning' },
+  electrum: { name: 'Electrum', abbr: 'ep', color: 'text-green-700', badgeVariant: 'success' },
+  silver: { name: 'Silver', abbr: 'sp', color: 'text-gray-700', badgeVariant: 'secondary' },
+  copper: { name: 'Copper', abbr: 'cp', color: 'text-orange-700', badgeVariant: 'danger' },
 };
 
 // Currency conversion rates (all relative to copper)
@@ -130,35 +132,40 @@ export function CurrencyManager({
   };
 
   const containerClasses = compact
-    ? `bg-white rounded-lg shadow border border-yellow-200 p-3 ${className}`
-    : `bg-white rounded-lg shadow-lg border border-yellow-200 p-6 ${className}`;
+    ? `bg-white rounded-lg shadow-sm border-2 border-yellow-200 p-4 ${className}`
+    : `bg-white rounded-lg shadow-sm border-2 border-yellow-200 p-6 ${className}`;
 
   return (
     <div className={containerClasses}>
-      <h2
-        className={`flex items-center gap-2 font-bold text-amber-800 ${compact ? 'mb-3 text-base' : 'mb-6 text-xl'}`}
-      >
-        <Coins className={compact ? 'h-5 w-5' : 'h-6 w-6'} />
-        {compact ? 'Currency' : 'Currency & Wealth'}
-      </h2>
+      <div className="mb-6 flex items-center justify-between border-b-2 border-yellow-200 pb-4">
+        <h2
+          className={`flex items-center gap-2 font-bold text-amber-800 ${compact ? 'text-base' : 'text-xl'}`}
+        >
+          <Coins className={compact ? 'h-5 w-5' : 'h-6 w-6'} />
+          {compact ? 'Currency' : 'Currency & Wealth'}
+        </h2>
+        <Badge variant="warning" size="md">
+          {totalWealthInCopper.toLocaleString()} cp
+        </Badge>
+      </div>
 
       {/* Show only total wealth */}
       {showOnlyTotal ? (
-        <div className="rounded-lg border border-yellow-300 bg-gradient-to-r from-yellow-100 to-amber-100 p-4 text-center">
+        <div className="rounded-lg border-2 border-yellow-300 bg-gradient-to-r from-yellow-50 to-amber-50 p-6 text-center">
           <div
-            className={`font-semibold text-amber-800 ${compact ? 'mb-1 text-sm' : 'mb-1 text-lg'}`}
+            className={`font-bold text-amber-800 ${compact ? 'mb-2 text-sm' : 'mb-2 text-lg'}`}
           >
             Total Wealth
           </div>
           <div
-            className={`font-bold text-amber-900 ${compact ? 'text-lg' : 'text-xl'}`}
+            className={`font-bold text-amber-900 ${compact ? 'text-xl' : 'text-2xl'}`}
           >
             {getWealthBreakdown(totalWealthInCopper)}
           </div>
           {!compact && (
-            <div className="mt-1 text-sm text-amber-700">
-              ({totalWealthInCopper.toLocaleString()} copper pieces)
-            </div>
+            <Badge variant="warning" size="md" className="mt-3">
+              {totalWealthInCopper.toLocaleString()} copper pieces
+            </Badge>
           )}
         </div>
       ) : (
@@ -166,25 +173,23 @@ export function CurrencyManager({
           {/* Current Currency Display */}
           {!hideIndividualCurrencies && (
             <div
-              className={`grid gap-4 ${compact ? 'mb-3 grid-cols-3' : 'mb-6 grid-cols-2 sm:grid-cols-5'}`}
+              className={`grid gap-4 ${compact ? 'mb-4 grid-cols-3' : 'mb-6 grid-cols-2 sm:grid-cols-5'}`}
             >
               {Object.entries(CURRENCY_TYPES).map(([type, config]) => (
                 <div key={type} className="text-center">
                   <div
-                    className={`rounded-lg border border-yellow-300 bg-gradient-to-b from-yellow-50 to-amber-50 shadow-sm ${compact ? 'p-2' : 'p-4'}`}
+                    className={`rounded-lg border-2 border-yellow-200 bg-gradient-to-b from-yellow-50 to-amber-50 transition-all hover:shadow-md hover:border-yellow-300 ${compact ? 'p-3' : 'p-4'}`}
                   >
                     <div
-                      className={`font-bold ${config.color} ${compact ? 'mb-1 text-lg' : 'mb-1 text-3xl'}`}
+                      className={`font-bold ${config.color} ${compact ? 'mb-1 text-2xl' : 'mb-2 text-4xl'}`}
                     >
                       {currency[type as keyof Currency] || 0}
                     </div>
-                    <div
-                      className={`font-medium text-gray-600 ${compact ? 'text-xs' : 'text-sm'}`}
-                    >
+                    <Badge variant={config.badgeVariant} size="sm">
                       {config.abbr}
-                    </div>
+                    </Badge>
                     {!compact && (
-                      <div className="mt-1 text-xs text-gray-500">
+                      <div className="mt-2 text-xs font-medium text-gray-600">
                         {config.name}
                       </div>
                     )}
@@ -196,22 +201,22 @@ export function CurrencyManager({
 
           {/* Total Wealth */}
           <div
-            className={`rounded-lg border border-yellow-300 bg-gradient-to-r from-yellow-100 to-amber-100 p-4 text-center ${compact ? 'mb-3' : 'mb-6'}`}
+            className={`rounded-lg border-2 border-yellow-300 bg-gradient-to-r from-yellow-50 to-amber-50 p-6 text-center ${compact ? 'mb-4' : 'mb-6'}`}
           >
             <div
-              className={`font-semibold text-amber-800 ${compact ? 'mb-1 text-sm' : 'mb-1 text-lg'}`}
+              className={`font-bold text-amber-800 ${compact ? 'mb-2 text-sm' : 'mb-2 text-lg'}`}
             >
               Total Wealth
             </div>
             <div
-              className={`font-bold text-amber-900 ${compact ? 'text-lg' : 'text-xl'}`}
+              className={`font-bold text-amber-900 ${compact ? 'text-xl' : 'text-2xl'}`}
             >
               {getWealthBreakdown(totalWealthInCopper)}
             </div>
             {!compact && (
-              <div className="mt-1 text-sm text-amber-700">
-                ({totalWealthInCopper.toLocaleString()} copper pieces)
-              </div>
+              <Badge variant="warning" size="md" className="mt-3">
+                {totalWealthInCopper.toLocaleString()} copper pieces
+              </Badge>
             )}
           </div>
 
@@ -220,10 +225,10 @@ export function CurrencyManager({
             !hideControls &&
             (onAddCurrency || onSubtractCurrency) && (
               <div
-                className={`rounded-lg border border-yellow-200 bg-yellow-50 ${compact ? 'p-3' : 'p-4'}`}
+                className={`rounded-lg border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50 ${compact ? 'p-4' : 'p-6'}`}
               >
                 <h3
-                  className={`font-semibold text-amber-800 ${compact ? 'mb-3 text-sm' : 'mb-4 text-lg'}`}
+                  className={`font-bold text-amber-800 ${compact ? 'mb-4 text-sm uppercase tracking-wide' : 'mb-4 text-base uppercase tracking-wide border-b-2 border-yellow-200 pb-2'}`}
                 >
                   Manage Currency
                 </h3>
@@ -233,47 +238,51 @@ export function CurrencyManager({
                   {Object.entries(CURRENCY_TYPES).map(([type, config]) => (
                     <div key={type} className="space-y-2">
                       <label
-                        className={`block font-medium text-amber-800 ${compact ? 'mb-1 text-xs' : 'mb-1 text-sm'}`}
+                        className={`block font-bold text-amber-800 ${compact ? 'text-xs' : 'text-sm'}`}
                       >
                         {config.name}
                       </label>
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          value={currencyAmounts[type as keyof Currency] || ''}
-                          onChange={e =>
-                            handleCurrencyChange(
-                              type as keyof Currency,
-                              e.target.value
-                            )
-                          }
-                          className={`${inputStyles.green.replace('px-4 py-3', compact ? 'px-2 py-1 text-sm' : 'px-3 py-2').replace('text-gray-900', 'bg-white text-gray-900')}`}
-                          placeholder="0"
-                          min="0"
-                        />
-                      </div>
+                      <Input
+                        type="number"
+                        value={currencyAmounts[type as keyof Currency] || ''}
+                        onChange={e =>
+                          handleCurrencyChange(
+                            type as keyof Currency,
+                            e.target.value
+                          )
+                        }
+                        placeholder="0"
+                        min={0}
+                        className="text-center"
+                      />
                       <div className="flex gap-1">
                         {onAddCurrency && (
-                          <button
+                          <Button
                             onClick={() =>
                               addCurrencyAmount(type as keyof Currency)
                             }
-                            className={`flex-1 rounded bg-green-600 text-white transition-colors hover:bg-green-700 ${compact ? 'px-1 py-1 text-xs' : 'px-2 py-1 text-xs'}`}
-                            title="Add"
+                            variant="success"
+                            size="xs"
+                            fullWidth
+                            leftIcon={<Plus size={12} />}
+                            disabled={currencyAmounts[type as keyof Currency] <= 0}
                           >
-                            + Add
-                          </button>
+                            Add
+                          </Button>
                         )}
                         {onSubtractCurrency && (
-                          <button
+                          <Button
                             onClick={() =>
                               subtractCurrencyAmount(type as keyof Currency)
                             }
-                            className={`flex-1 rounded bg-red-600 text-white transition-colors hover:bg-red-700 ${compact ? 'px-1 py-1 text-xs' : 'px-2 py-1 text-xs'}`}
-                            title="Subtract"
+                            variant="danger"
+                            size="xs"
+                            fullWidth
+                            leftIcon={<Minus size={12} />}
+                            disabled={currencyAmounts[type as keyof Currency] <= 0}
                           >
-                            - Spend
-                          </button>
+                            Spend
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -284,18 +293,40 @@ export function CurrencyManager({
 
           {/* Currency Conversion Helper */}
           {!hideConversionInfo && !compact && (
-            <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
-              <h4 className="text-md mb-2 font-semibold text-amber-800">
+            <div className="mt-6 rounded-lg border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 p-5">
+              <h4 className="mb-3 flex items-center gap-2 text-base font-bold text-amber-800 uppercase tracking-wide border-b-2 border-amber-200 pb-2">
+                <Info className="h-4 w-4" />
                 Currency Conversion
               </h4>
-              <div className="space-y-1 text-sm text-amber-700">
-                <div>
-                  1 platinum (pp) = 10 gold (gp) = 100 silver (sp) = 1,000
-                  copper (cp)
+              <div className="space-y-2 text-sm text-amber-800">
+                <div className="flex items-center gap-2">
+                  <Badge variant="neutral" size="sm">1 pp</Badge>
+                  <span>=</span>
+                  <Badge variant="warning" size="sm">10 gp</Badge>
+                  <span>=</span>
+                  <Badge variant="secondary" size="sm">100 sp</Badge>
+                  <span>=</span>
+                  <Badge variant="danger" size="sm">1,000 cp</Badge>
                 </div>
-                <div>1 gold (gp) = 10 silver (sp) = 100 copper (cp)</div>
-                <div>1 electrum (ep) = 5 silver (sp) = 50 copper (cp)</div>
-                <div>1 silver (sp) = 10 copper (cp)</div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="warning" size="sm">1 gp</Badge>
+                  <span>=</span>
+                  <Badge variant="secondary" size="sm">10 sp</Badge>
+                  <span>=</span>
+                  <Badge variant="danger" size="sm">100 cp</Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="success" size="sm">1 ep</Badge>
+                  <span>=</span>
+                  <Badge variant="secondary" size="sm">5 sp</Badge>
+                  <span>=</span>
+                  <Badge variant="danger" size="sm">50 cp</Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" size="sm">1 sp</Badge>
+                  <span>=</span>
+                  <Badge variant="danger" size="sm">10 cp</Badge>
+                </div>
               </div>
             </div>
           )}

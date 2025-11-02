@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Plus, X, Languages as LanguagesIcon, Wrench } from 'lucide-react';
+import { Button, Input } from '@/components/ui/forms';
 import { Language, ToolProficiency, ToolProficiencyLevel } from '@/types/character';
 
 interface LanguagesAndProficienciesProps {
@@ -69,7 +70,7 @@ export default function LanguagesAndProficiencies({
   };
 
   return (
-    <div className="space-y-4 rounded-lg border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-md">
+    <div className="space-y-4 rounded-lg border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-md mt-4">
       {/* Languages Section */}
       <div>
         <div className="mb-3 flex items-center justify-between">
@@ -78,19 +79,20 @@ export default function LanguagesAndProficiencies({
             Languages
           </h3>
           {!isAddingLanguage && (
-            <button
+            <Button
               onClick={() => setIsAddingLanguage(true)}
-              className="rounded-lg bg-indigo-600 p-1.5 text-white transition-all hover:bg-indigo-700 hover:shadow-md"
+              variant="primary"
+              size="xs"
+              leftIcon={<Plus size={16} />}
+              className="bg-indigo-600 hover:bg-indigo-700"
               title="Add language"
-            >
-              <Plus size={16} />
-            </button>
+            />
           )}
         </div>
 
         {isAddingLanguage && (
           <div className="mb-3 flex items-center gap-2">
-            <input
+            <Input
               type="text"
               value={newLanguageName}
               onChange={(e) => setNewLanguageName(e.target.value)}
@@ -102,24 +104,28 @@ export default function LanguagesAndProficiencies({
                 }
               }}
               placeholder="e.g., Elvish"
-              className="flex-1 rounded-lg border-2 border-indigo-300 bg-white px-3 py-2 text-sm shadow-sm transition-all focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              className="flex-1"
               autoFocus
             />
-            <button
+            <Button
               onClick={handleAddLanguage}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-md transition-all hover:bg-indigo-700 hover:shadow-lg"
+              variant="primary"
+              size="sm"
+              className="bg-indigo-600 hover:bg-indigo-700"
             >
               Add
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => {
                 setIsAddingLanguage(false);
                 setNewLanguageName('');
               }}
-              className="rounded-lg bg-gray-300 px-4 py-2 text-sm font-medium text-gray-700 shadow-md transition-all hover:bg-gray-400"
+              variant="ghost"
+              size="sm"
+              className="bg-gray-300 hover:bg-gray-400"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         )}
 
@@ -133,13 +139,15 @@ export default function LanguagesAndProficiencies({
               className="group flex items-center gap-2 rounded-full border-2 border-indigo-300 bg-gradient-to-r from-indigo-100 to-purple-100 px-4 py-1.5 text-sm font-medium text-indigo-900 shadow-sm transition-all hover:shadow-md"
             >
               <span>{lang.name}</span>
-              <button
+              <Button
                 onClick={() => onDeleteLanguage(lang.id)}
-                className="rounded-full p-0.5 opacity-0 transition-all hover:bg-red-100 group-hover:opacity-100"
+                variant="ghost"
+                size="xs"
+                className="h-5 w-5 rounded-full p-0.5 opacity-0 hover:bg-red-100 group-hover:opacity-100"
                 title="Remove language"
               >
                 <X size={14} className="text-red-600" />
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -153,19 +161,20 @@ export default function LanguagesAndProficiencies({
             Tool Proficiencies
           </h3>
           {!isAddingTool && (
-            <button
+            <Button
               onClick={() => setIsAddingTool(true)}
-              className="rounded-lg bg-indigo-600 p-1.5 text-white transition-all hover:bg-indigo-700 hover:shadow-md"
+              variant="primary"
+              size="xs"
+              leftIcon={<Plus size={16} />}
+              className="bg-indigo-600 hover:bg-indigo-700"
               title="Add tool proficiency"
-            >
-              <Plus size={16} />
-            </button>
+            />
           )}
         </div>
 
         {isAddingTool && (
           <div className="mb-3 flex items-center gap-2">
-            <input
+            <Input
               type="text"
               value={newToolName}
               onChange={(e) => setNewToolName(e.target.value)}
@@ -177,24 +186,28 @@ export default function LanguagesAndProficiencies({
                 }
               }}
               placeholder="e.g., Thieves' Tools"
-              className="flex-1 rounded-lg border-2 border-indigo-300 bg-white px-3 py-2 text-sm shadow-sm transition-all focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              className="flex-1"
               autoFocus
             />
-            <button
+            <Button
               onClick={handleAddTool}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-md transition-all hover:bg-indigo-700 hover:shadow-lg"
+              variant="primary"
+              size="sm"
+              className="bg-indigo-600 hover:bg-indigo-700"
             >
               Add
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => {
                 setIsAddingTool(false);
                 setNewToolName('');
               }}
-              className="rounded-lg bg-gray-300 px-4 py-2 text-sm font-medium text-gray-700 shadow-md transition-all hover:bg-gray-400"
+              variant="ghost"
+              size="sm"
+              className="bg-gray-300 hover:bg-gray-400"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         )}
 
@@ -209,8 +222,10 @@ export default function LanguagesAndProficiencies({
             >
               <div className="flex items-center gap-3">
                 <span className="text-sm font-semibold text-gray-800">{tool.name}</span>
-                <button
+                <Button
                   onClick={() => cycleProficiencyLevel(tool)}
+                  variant="ghost"
+                  size="xs"
                   className={`cursor-pointer rounded-full border-2 px-3 py-1 text-xs font-bold transition-all hover:scale-105 hover:shadow-md ${getProficiencyColor(tool.proficiencyLevel)}`}
                   title="Click to cycle proficiency level"
                 >
@@ -220,15 +235,17 @@ export default function LanguagesAndProficiencies({
                   {tool.proficiencyLevel !== 'none' && (
                     <span className="ml-1.5 font-mono">{getProficiencyModifier(tool.proficiencyLevel)}</span>
                   )}
-                </button>
+                </Button>
               </div>
-              <button
+              <Button
                 onClick={() => onDeleteToolProficiency(tool.id)}
-                className="rounded-full p-1.5 opacity-0 transition-all hover:bg-red-100 group-hover:opacity-100"
+                variant="ghost"
+                size="xs"
+                className="rounded-full p-1.5 opacity-0 hover:bg-red-100 group-hover:opacity-100"
                 title="Remove tool"
               >
                 <X size={16} className="text-red-600" />
-              </button>
+              </Button>
             </div>
           ))}
         </div>

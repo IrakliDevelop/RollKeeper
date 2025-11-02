@@ -14,6 +14,7 @@ import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
 import { exportCharacterToFile } from '@/utils/fileOperations';
 import { useState, useEffect } from 'react';
+import { Button, Input } from '@/components/ui/forms';
 
 interface CharacterSheetHeaderProps {
   characterName: string;
@@ -119,7 +120,7 @@ export default function CharacterSheetHeader({
 
               {/* File Operations */}
               <div className="flex items-center space-x-2">
-                <button
+                <Button
                   onClick={() => {
                     try {
                       const exportData = exportCharacter();
@@ -138,66 +139,76 @@ export default function CharacterSheetHeader({
                       });
                     }
                   }}
-                  className="flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Download size={16} />}
                   title="Export Character"
                 >
-                  <Download size={16} />
                   Export
-                </button>
+                </Button>
 
-                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none">
-                  <Upload size={16} />
-                  Import
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={async e => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        try {
-                          const text = await file.text();
-                          const data = JSON.parse(text);
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                >
+                  <label className="cursor-pointer">
+                    <span className="flex items-center gap-2">
+                      <Upload size={16} />
+                      Import
+                    </span>
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={async e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            const text = await file.text();
+                            const data = JSON.parse(text);
 
-                          // Use the player store's import function
-                          const { importCharacter: importToPlayerStore } =
-                            usePlayerStore.getState();
-                          const newCharacterId = importToPlayerStore(data);
+                            // Use the player store's import function
+                            const { importCharacter: importToPlayerStore } =
+                              usePlayerStore.getState();
+                            const newCharacterId = importToPlayerStore(data);
 
-                          onAddToast({
-                            type: 'success',
-                            title: 'Import Successful',
-                            message:
-                              'Character imported successfully! Redirecting to new character...',
-                          });
+                            onAddToast({
+                              type: 'success',
+                              title: 'Import Successful',
+                              message:
+                                'Character imported successfully! Redirecting to new character...',
+                            });
 
-                          // Redirect to the newly imported character after a brief delay
-                          setTimeout(() => {
-                            window.location.href = `/player/characters/${newCharacterId}`;
-                          }, 1500);
-                        } catch (error) {
-                          console.error('Import failed:', error);
-                          onAddToast({
-                            type: 'error',
-                            title: 'Import Failed',
-                            message:
-                              'Failed to import character. Please check the file format.',
-                          });
+                            // Redirect to the newly imported character after a brief delay
+                            setTimeout(() => {
+                              window.location.href = `/player/characters/${newCharacterId}`;
+                            }, 1500);
+                          } catch (error) {
+                            console.error('Import failed:', error);
+                            onAddToast({
+                              type: 'error',
+                              title: 'Import Failed',
+                              message:
+                                'Failed to import character. Please check the file format.',
+                            });
+                          }
                         }
-                      }
-                      e.target.value = '';
-                    }}
-                    className="hidden"
-                  />
-                </label>
+                        e.target.value = '';
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                </Button>
 
-                <button
+                <Button
                   onClick={onShowResetModal}
-                  className="flex items-center gap-2 rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:outline-none"
+                  variant="danger"
+                  size="sm"
+                  leftIcon={<RotateCcw size={16} />}
                   title="Reset Character"
                 >
-                  <RotateCcw size={16} />
                   Reset
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -209,12 +220,13 @@ export default function CharacterSheetHeader({
         <div className="rounded-xl border border-slate-200 bg-white/90 p-6 shadow-xl backdrop-blur-sm">
           <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex-1">
-              <input
+              <Input
                 type="text"
                 placeholder="Character Name"
                 value={characterName}
                 onChange={e => onUpdateName(e.target.value)}
                 className="w-full border-none bg-transparent text-3xl font-bold text-gray-800 placeholder-gray-400 outline-none"
+                size="lg"
               />
               <SaveIndicator
                 status={saveStatus}
@@ -224,38 +236,49 @@ export default function CharacterSheetHeader({
               />
             </div>
             <div className="flex gap-2">
-              <button
+              <Button
                 onClick={onManualSave}
                 disabled={!hasUnsavedChanges}
-                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-2 text-sm text-white shadow-md transition-all hover:from-emerald-700 hover:to-emerald-800 disabled:cursor-not-allowed disabled:bg-gray-400"
+                variant="success"
+                size="sm"
+                leftIcon={<Save size={16} />}
+                className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-md"
               >
-                <Save size={16} />
                 Save
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={onExport}
-                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-slate-600 to-slate-700 px-4 py-2 text-sm text-white shadow-md transition-all hover:from-slate-700 hover:to-slate-800"
+                variant="outline"
+                size="sm"
+                leftIcon={<Download size={16} />}
+                className="shadow-sm"
               >
-                <Download size={16} />
                 Export
-              </button>
+              </Button>
 
-              <Link
-                href="/prototype"
-                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 text-sm text-white shadow-md transition-all hover:from-blue-700 hover:to-blue-800"
+              <Button
+                asChild
+                variant="secondary"
+                size="sm"
+                className="shadow-sm"
                 title="Try the new Notes module prototype"
               >
-                <FileText size={16} />
-                Notes Prototype
-              </Link>
-              <button
+                <Link href="/prototype" className="flex items-center gap-2">
+                  <FileText size={16} />
+                  Notes Prototype
+                </Link>
+              </Button>
+              
+              <Button
                 onClick={onShowResetModal}
-                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-2 text-sm text-white shadow-md transition-all hover:from-red-700 hover:to-red-800"
+                variant="danger"
+                size="sm"
+                leftIcon={<RotateCcw size={16} />}
+                className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-md"
                 title="Reset character - this will clear all data!"
               >
-                <RotateCcw size={16} />
                 Reset
-              </button>
+              </Button>
             </div>
           </div>
         </div>

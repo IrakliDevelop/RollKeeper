@@ -1,6 +1,7 @@
 'use client';
 
 import { calculateCharacterArmorClass } from '@/utils/calculations';
+import { Button, Input } from '@/components/ui/forms';
 import { CharacterState } from '@/types/character';
 
 interface ArmorClassManagerProps {
@@ -37,20 +38,18 @@ export default function ArmorClassManager({
         <div className="mb-6 space-y-4">
           {/* Base AC Row */}
           <div className="rounded-lg border-2 border-red-300 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="text-lg font-bold text-red-800">Base AC</div>
-                <div className="text-sm text-red-600">
-                  From armor & dexterity
-                </div>
+            <div className="flex items-center gap-4">
+              <div className="text-lg font-bold text-red-800 w-32">Base AC</div>
+              <div className="flex-1 text-sm text-red-600">
+                From armor & dexterity
               </div>
-              <input
+              <Input
                 type="number"
-                value={character.armorClass}
+                value={character.armorClass.toString()}
                 onChange={e =>
                   onUpdateArmorClass(parseInt(e.target.value) || 10)
                 }
-                className="h-12 w-20 rounded-lg border-2 border-red-300 bg-red-50 text-center text-2xl font-bold text-red-900 focus:border-red-500 focus:ring-2 focus:ring-red-500"
+                className="h-12 w-20 border-2 border-red-300 bg-red-50 text-center text-2xl font-bold text-red-900 focus:border-red-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 min="0"
                 max="30"
               />
@@ -59,36 +58,36 @@ export default function ArmorClassManager({
 
           {/* Temporary AC Row */}
           <div className="rounded-lg border-2 border-orange-300 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="text-lg font-bold text-orange-800">
-                  Temporary AC
-                </div>
-                <div className="text-sm text-orange-600">
-                  From spells & effects
-                </div>
+            <div className="flex items-center gap-4">
+              <div className="text-lg font-bold text-orange-800 w-32">
+                Temporary AC
+              </div>
+              <div className="flex-1 text-sm text-orange-600">
+                From spells & effects
               </div>
               <div className="flex flex-col items-end gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xl font-bold text-orange-700">+</span>
-                  <input
+                  <Input
                     type="number"
-                    value={character.tempArmorClass}
+                    value={character.tempArmorClass.toString()}
                     onChange={e =>
                       onUpdateTempArmorClass(parseInt(e.target.value) || 0)
                     }
-                    className="h-12 w-20 rounded-lg border-2 border-orange-300 bg-orange-50 text-center text-2xl font-bold text-orange-900 focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
+                    className="h-12 w-20 border-2 border-orange-300 bg-orange-50 text-center text-2xl font-bold text-orange-900 focus:border-orange-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     min="0"
                     max="20"
                   />
                 </div>
                 {character.tempArmorClass > 0 && (
-                  <button
+                  <Button
                     onClick={onResetTempArmorClass}
-                    className="rounded-md border border-orange-300 px-3 py-1 text-xs text-orange-600 transition-colors hover:bg-orange-50 hover:text-orange-800"
+                    variant="ghost"
+                    size="xs"
+                    className="border border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-800"
                   >
                     Reset
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -96,38 +95,38 @@ export default function ArmorClassManager({
 
           {/* Shield Row */}
           <div className="rounded-lg border-2 border-blue-300 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="text-lg font-bold text-blue-800">Shield</div>
-                <div className="text-sm text-blue-600">
-                  {character.isWearingShield
-                    ? `+${character.shieldBonus} AC bonus`
-                    : 'Click to equip'}
-                </div>
+            <div className="flex items-center gap-4">
+              <div className="text-lg font-bold text-blue-800 w-32">Shield</div>
+              <div className="flex-1 text-sm text-blue-600">
+                {character.isWearingShield
+                  ? `+${character.shieldBonus} AC bonus`
+                  : 'Click to equip'}
               </div>
               <div className="flex items-center gap-3">
-                <button
+                <Button
                   onClick={onToggleShield}
-                  className={`flex h-12 w-12 items-center justify-center rounded-lg text-2xl transition-all duration-200 ${
+                  variant="ghost"
+                  size="md"
+                  className={`h-12 w-12 rounded-lg text-2xl transition-all duration-200 ${
                     character.isWearingShield
-                      ? 'scale-105 transform border-2 border-blue-700 bg-blue-600 text-white shadow-lg'
+                      ? 'scale-105 transform border-2 border-blue-700 bg-blue-600 text-white shadow-lg hover:bg-blue-700'
                       : 'border-2 border-blue-300 bg-blue-50 text-blue-600 hover:bg-blue-100'
                   }`}
                   title={`${character.isWearingShield ? 'Unequip' : 'Equip'} shield`}
                 >
                   🛡️
-                </button>
+                </Button>
 
                 {character.isWearingShield && (
                   <div className="flex items-center gap-2">
                     <span className="text-xl font-bold text-blue-700">+</span>
-                    <input
+                    <Input
                       type="number"
-                      value={character.shieldBonus}
+                      value={character.shieldBonus.toString()}
                       onChange={e =>
                         onUpdateShieldBonus(parseInt(e.target.value) || 2)
                       }
-                      className="h-10 w-16 rounded-lg border-2 border-blue-300 bg-blue-50 text-center text-lg font-bold text-blue-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                      className="h-10 w-16 border-2 border-blue-300 bg-blue-50 text-center text-lg font-bold text-blue-900 focus:border-blue-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                       min="0"
                       max="5"
                     />

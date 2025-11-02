@@ -4,6 +4,7 @@ import React from 'react';
 import { useCharacterStore } from '@/store/characterStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { SaveIndicator } from '@/components/ui/feedback/SaveIndicator';
+import { Button } from '@/components/ui/forms';
 import { Save, Download, Upload, RotateCcw } from 'lucide-react';
 
 export default function CharacterHeaderSection() {
@@ -129,41 +130,52 @@ export default function CharacterHeaderSection() {
             <SaveIndicator status={saveStatus} />
 
             <div className="flex gap-2">
-              <button
+              <Button
                 onClick={manualSave}
                 disabled={!hasUnsavedChanges}
-                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-2 text-sm text-white shadow-md transition-all hover:from-emerald-700 hover:to-emerald-800 disabled:cursor-not-allowed disabled:bg-gray-400"
+                variant="primary"
+                size="sm"
+                leftIcon={<Save className="h-4 w-4" />}
               >
-                <Save size={16} />
                 Save
-              </button>
+              </Button>
 
-              <button
+              <Button
                 onClick={handleExport}
-                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 text-sm text-white shadow-md transition-all hover:from-blue-700 hover:to-blue-800"
+                variant="outline"
+                size="sm"
+                leftIcon={<Download className="h-4 w-4" />}
               >
-                <Download size={16} />
                 Export
-              </button>
+              </Button>
 
-              <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 px-4 py-2 text-sm text-white shadow-md transition-all hover:from-purple-700 hover:to-purple-800">
-                <Upload size={16} />
-                Import
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleImport}
-                  className="hidden"
-                />
-              </label>
-
-              <button
-                onClick={handleReset}
-                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-red-600 to-red-700 px-4 py-2 text-sm text-white shadow-md transition-all hover:from-red-700 hover:to-red-800"
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
               >
-                <RotateCcw size={16} />
+                <label className="cursor-pointer">
+                  <span className="flex items-center gap-2">
+                    <Upload className="h-4 w-4" />
+                    Import
+                  </span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImport}
+                    className="hidden"
+                  />
+                </label>
+              </Button>
+
+              <Button
+                onClick={handleReset}
+                variant="danger"
+                size="sm"
+                leftIcon={<RotateCcw className="h-4 w-4" />}
+              >
                 Reset
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -6,6 +6,7 @@ import {
   ABILITY_ABBREVIATIONS,
 } from '@/utils/constants';
 import { formatModifier } from '@/utils/calculations';
+import { Checkbox } from '@/components/ui/forms';
 import { SkillName, CharacterState } from '@/types/character';
 
 interface SkillsProps {
@@ -36,19 +37,13 @@ export default function Skills({
 
         {/* Jack of All Trades Toggle */}
         <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            id="jackOfAllTrades"
+          <Checkbox
             checked={jackOfAllTrades ?? false}
-            onChange={onToggleJackOfAllTrades}
-            className="h-4 w-4 rounded border-gray-300 bg-gray-100 text-blue-600 focus:ring-2 focus:ring-blue-500"
+            onCheckedChange={onToggleJackOfAllTrades}
+            label="Jack of All Trades"
+            size="sm"
+            variant="primary"
           />
-          <label
-            htmlFor="jackOfAllTrades"
-            className="text-sm font-medium text-gray-700"
-          >
-            Jack of All Trades
-          </label>
           <div className="group relative">
             <span className="cursor-help text-gray-400">ⓘ</span>
             <div className="absolute top-6 right-0 z-10 w-64 rounded bg-gray-800 p-2 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
@@ -93,17 +88,17 @@ export default function Skills({
             >
               {/* Proficiency Checkbox */}
               <div className="flex flex-col items-center">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={isProficient}
-                  onChange={e => {
-                    onUpdateSkillProficiency(skillName, e.target.checked);
+                  onCheckedChange={checked => {
+                    onUpdateSkillProficiency(skillName, checked);
                     // Remove expertise if proficiency is removed
-                    if (!e.target.checked && hasExpertise) {
+                    if (!checked && hasExpertise) {
                       onUpdateSkillExpertise(skillName, false);
                     }
                   }}
-                  className="h-4 w-4 rounded text-green-600"
+                  size="sm"
+                  variant="success"
                   title="Proficient"
                 />
                 <span className="mt-0.5 text-xs text-gray-500">P</span>
@@ -111,18 +106,14 @@ export default function Skills({
 
               {/* Expertise Checkbox */}
               <div className="flex flex-col items-center">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={hasExpertise && isProficient}
-                  onChange={e =>
-                    onUpdateSkillExpertise(skillName, e.target.checked)
+                  onCheckedChange={checked =>
+                    onUpdateSkillExpertise(skillName, checked)
                   }
                   disabled={!isProficient}
-                  className={`h-4 w-4 rounded ${
-                    isProficient
-                      ? 'text-yellow-600 focus:ring-yellow-500'
-                      : 'cursor-not-allowed text-gray-300'
-                  }`}
+                  size="sm"
+                  variant="warning"
                   title="Expertise (Double Proficiency)"
                 />
                 <span

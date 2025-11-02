@@ -15,6 +15,8 @@ import {
   rollDamage,
 } from '@/utils/calculations';
 import DragDropList from '@/components/ui/layout/DragDropList';
+import { Button } from '@/components/ui/forms';
+import { Badge } from '@/components/ui/layout';
 
 interface EquippedWeaponsProps {
   showAttackRoll: (
@@ -247,32 +249,24 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
 
   if (equippedWeapons.length === 0) {
     return (
-      <div className="rounded-lg border border-blue-200 bg-white p-4 shadow">
-        <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-blue-800">
-          <span className="text-red-600">⚔️</span>
-          Ready Weapons
-        </h3>
-        <div className="py-6 text-center text-gray-500">
-          <div className="mb-2 text-4xl">🗡️</div>
-          <p className="font-medium">No weapons equipped</p>
-          <p className="mt-1 text-sm">
-            Equip weapons in the Equipment section below to see them here.
-          </p>
-        </div>
+      <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
+        <div className="mb-3 text-5xl">🗡️</div>
+        <p className="font-semibold text-gray-700">No weapons equipped</p>
+        <p className="mt-1 text-sm text-gray-500">
+          Equip weapons in the Equipment section to see them here.
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="p-4">
-      {/* Weapons list without header since it's now in the collapsible section */}
-
+    <div className="space-y-3">
       <DragDropList
         items={equippedWeapons}
         onReorder={handleReorderEquippedWeapons}
         keyExtractor={weapon => weapon.id}
         className="space-y-3"
-        itemClassName="p-3 rounded-lg border-2 border-green-300 bg-green-50 transition-all hover:shadow-md hover:border-green-400"
+        itemClassName="p-4 rounded-lg border-2 border-gray-200 bg-white transition-all hover:shadow-md hover:border-gray-300"
         showDragHandle={true}
         dragHandlePosition="left"
         renderItem={weapon => {
@@ -285,7 +279,6 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                 ? getWeaponDamageString(character, weapon, true)
                 : null;
             } else {
-              // Old format
               const legacyDamage = weapon.damage as {
                 dice: string;
                 type: string;
@@ -298,126 +291,122 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
           })();
 
           return (
-            <>
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="mb-2 flex items-center gap-2">
-                    <h4 className="font-bold text-gray-800">{weapon.name}</h4>
-                    <span className="flex items-center gap-1 rounded bg-green-200 px-2 py-1 text-xs text-green-800">
-                      <Shield size={12} />
-                      Equipped
-                    </span>
-                    {weapon.enhancementBonus > 0 && (
-                      <span className="rounded bg-yellow-200 px-2 py-1 text-xs font-semibold text-yellow-800">
-                        +{weapon.enhancementBonus}
-                      </span>
-                    )}
-                    {!isProficient && (
-                      <span className="rounded bg-red-200 px-2 py-1 text-xs text-red-800">
-                        Not Proficient
-                        {weapon.manualProficiency !== undefined && ' (Manual)'}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">🎯 Attack: </span>
-                      <span className="font-bold text-red-600">
-                        {attackString}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">⚔️ Damage: </span>
-                      <span className="font-bold text-blue-600">
-                        {damageString}
-                      </span>
-                    </div>
-                  </div>
-
-                  {versatileDamageString && (
-                    <div className="mt-1 text-sm">
-                      <span className="text-gray-600">🗡️ Versatile: </span>
-                      <span className="font-bold text-purple-600">
-                        {versatileDamageString}
-                      </span>
-                    </div>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                {/* Title and badges */}
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <h4 className="font-bold text-gray-900">{weapon.name}</h4>
+                  <Badge variant="success" size="sm" leftIcon={<Shield size={12} />}>
+                    Equipped
+                  </Badge>
+                  {weapon.enhancementBonus > 0 && (
+                    <Badge variant="warning" size="sm">
+                      +{weapon.enhancementBonus}
+                    </Badge>
                   )}
+                  {!isProficient && (
+                    <Badge variant="danger" size="sm">
+                      Not Proficient
+                      {weapon.manualProficiency !== undefined && ' (Manual)'}
+                    </Badge>
+                  )}
+                </div>
 
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800 capitalize">
-                      {weapon.category}
-                    </span>
-                    {weapon.weaponType.map((type, index) => (
-                      <span
-                        key={index}
-                        className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 capitalize"
-                      >
-                        {type}
-                      </span>
-                    ))}
+                {/* Attack and Damage stats */}
+                <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">🎯 Attack: </span>
+                    <span className="font-bold text-red-600">{attackString}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">⚔️ Damage: </span>
+                    <span className="font-bold text-blue-600">{damageString}</span>
                   </div>
                 </div>
 
-                <div className="ml-3 flex flex-col items-center gap-2">
-                  <button
-                    onClick={() => rollWeaponAttack(weapon)}
-                    className="group flex transform items-center gap-2 rounded-lg bg-gradient-to-r from-slate-600 to-slate-700 px-4 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:scale-105 hover:from-slate-700 hover:to-slate-800 hover:shadow-lg"
-                    title="Roll attack"
-                  >
-                    <Dice6
-                      size={14}
-                      className="transition-transform group-hover:rotate-12"
-                    />
-                    Attack
-                  </button>
-                  <button
-                    onClick={() => rollWeaponDamage(weapon)}
-                    className="group flex transform items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-600 px-4 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:scale-105 hover:from-amber-600 hover:to-orange-700 hover:shadow-lg"
-                    title="Roll damage"
-                  >
-                    <Zap size={14} className="group-hover:animate-pulse" />
-                    Damage
-                  </button>
-                  {(() => {
-                    if (Array.isArray(weapon.damage)) {
-                      return weapon.damage.some(dmg => dmg.versatiledice);
-                    } else {
-                      const legacyDamage = weapon.damage as {
-                        dice: string;
-                        type: string;
-                        versatiledice?: string;
-                      };
-                      return legacyDamage && legacyDamage.versatiledice;
-                    }
-                  })() && (
-                    <button
-                      onClick={() => rollWeaponDamage(weapon, true)}
-                      className="group flex transform items-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-violet-700 px-4 py-2 text-sm font-medium text-white shadow-md transition-all duration-200 hover:scale-105 hover:from-purple-700 hover:to-violet-800 hover:shadow-lg"
-                      title="Roll versatile damage"
-                    >
-                      <Zap size={14} className="group-hover:animate-pulse" />
-                      Versatile
-                    </button>
-                  )}
-                  <button
-                    onClick={() => equipWeapon(weapon.id, false)}
-                    className="transform rounded-lg border border-orange-300 bg-gradient-to-r from-orange-100 to-orange-200 px-3 py-1.5 text-xs font-medium text-orange-800 shadow-sm transition-all duration-200 hover:scale-105 hover:from-orange-200 hover:to-orange-300 hover:shadow-md"
-                    title="Unequip weapon"
-                  >
-                    Unequip
-                  </button>
+                {versatileDamageString && (
+                  <div className="mb-3 text-sm">
+                    <span className="text-gray-600">🗡️ Versatile: </span>
+                    <span className="font-bold text-purple-600">{versatileDamageString}</span>
+                  </div>
+                )}
+
+                {/* Weapon properties */}
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary" size="sm">
+                    {weapon.category}
+                  </Badge>
+                  {weapon.weaponType.map((type, index) => (
+                    <Badge key={index} variant="neutral" size="sm">
+                      {type}
+                    </Badge>
+                  ))}
                 </div>
               </div>
-            </>
+
+              {/* Action buttons */}
+              <div className="flex flex-col gap-2 flex-shrink-0">
+                <Button
+                  onClick={() => rollWeaponAttack(weapon)}
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<Dice6 size={14} />}
+                  className="min-w-[110px]"
+                  title="Roll attack"
+                >
+                  Attack
+                </Button>
+                <Button
+                  onClick={() => rollWeaponDamage(weapon)}
+                  variant="warning"
+                  size="sm"
+                  leftIcon={<Zap size={14} />}
+                  className="min-w-[110px] bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
+                  title="Roll damage"
+                >
+                  Damage
+                </Button>
+                {(() => {
+                  if (Array.isArray(weapon.damage)) {
+                    return weapon.damage.some(dmg => dmg.versatiledice);
+                  } else {
+                    const legacyDamage = weapon.damage as {
+                      dice: string;
+                      type: string;
+                      versatiledice?: string;
+                    };
+                    return legacyDamage && legacyDamage.versatiledice;
+                  }
+                })() && (
+                  <Button
+                    onClick={() => rollWeaponDamage(weapon, true)}
+                    variant="primary"
+                    size="sm"
+                    leftIcon={<Zap size={14} />}
+                    className="min-w-[110px] bg-gradient-to-r from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800"
+                    title="Roll versatile damage"
+                  >
+                    Versatile
+                  </Button>
+                )}
+                <Button
+                  onClick={() => equipWeapon(weapon.id, false)}
+                  variant="outline"
+                  size="sm"
+                  className="min-w-[110px] border-orange-300 text-orange-700 hover:bg-orange-50"
+                  title="Unequip weapon"
+                >
+                  Unequip
+                </Button>
+              </div>
+            </div>
           );
         }}
       />
 
       <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
         <p className="text-center text-sm text-blue-800">
-          <strong>💡 Quick Reference:</strong> Manage your full weapon inventory
-          in the{' '}
+          <strong>💡 Quick Reference:</strong> Manage your full weapon inventory in the{' '}
           <button
             onClick={() => switchToTab('equipment')}
             className="font-semibold text-blue-600 underline transition-colors hover:text-blue-800 hover:no-underline"

@@ -3,7 +3,7 @@
 import React from 'react';
 import { ClassInfo } from '@/types/character';
 import { COMMON_CLASSES } from '@/utils/constants';
-import { FancySelect } from '@/components/ui/forms/FancySelect';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
 
 interface SimpleClassSelectorProps {
   value: ClassInfo;
@@ -29,40 +29,37 @@ export default function SimpleClassSelector({
   };
 
   return (
-    <div className={`space-y-2 ${className}`}>
-      <label className="mb-1 block text-sm font-medium text-gray-700">
-        Class
-      </label>
-      
-      <FancySelect
-        options={[
-          { value: '', label: 'Select a class...' },
-          ...COMMON_CLASSES.map(classData => ({
-            value: classData.name,
-            label: classData.name,
-            description:
-              classData.spellcaster !== 'none'
-                ? `${
-                    classData.spellcaster === 'full'
-                      ? 'Full'
-                      : classData.spellcaster === 'half'
-                        ? 'Half'
-                        : classData.spellcaster === 'third'
-                          ? '1/3'
-                          : 'Pact'
-                  } Caster`
-                : 'Non-spellcaster',
-          })),
-        ]}
+    <div className={className}>
+      <SelectField
+        label="Class"
         value={value.name}
-        onChange={selectedValue => handleClassChange(selectedValue as string)}
-        placeholder="Select a class..."
-        color="blue"
-      />
+        onValueChange={handleClassChange}
+      >
+        {COMMON_CLASSES.map(classData => (
+          <SelectItem key={classData.name} value={classData.name}>
+            <div className="flex flex-col">
+              <span className="font-medium">{classData.name}</span>
+              <span className="text-xs text-gray-600">
+                {classData.spellcaster !== 'none'
+                  ? `${
+                      classData.spellcaster === 'full'
+                        ? 'Full'
+                        : classData.spellcaster === 'half'
+                          ? 'Half'
+                          : classData.spellcaster === 'third'
+                            ? '1/3'
+                            : 'Pact'
+                    } Caster`
+                  : 'Non-spellcaster'}
+              </span>
+            </div>
+          </SelectItem>
+        ))}
+      </SelectField>
 
       {/* Show spellcaster info for selected class */}
       {value.name && (
-        <div className="text-xs text-gray-600">
+        <div className="mt-2 text-xs text-gray-600">
           {value.spellcaster === 'none' && '• Non-spellcaster'}
           {value.spellcaster === 'full' &&
             '• Full spellcaster (Spell slots by class level)'}

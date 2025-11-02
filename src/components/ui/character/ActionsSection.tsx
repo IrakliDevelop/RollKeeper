@@ -6,6 +6,7 @@ import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { EquippedWeapons } from '@/components/EquippedWeapons';
 import { EnhancedQuickSpells } from '@/components/EnhancedQuickSpells';
 import { ConcentrationTracker } from '@/components/ui/character';
+import { Button } from '@/components/ui/forms';
 import { CharacterState } from '@/types/character';
 
 interface ActionsSectionProps {
@@ -42,6 +43,7 @@ interface CollapsibleSubsectionProps {
   defaultExpanded?: boolean;
   persistKey: string;
   badge?: React.ReactNode;
+  extraContent?: React.ReactNode;
 }
 
 const CollapsibleSubsection: React.FC<CollapsibleSubsectionProps> = ({
@@ -51,6 +53,7 @@ const CollapsibleSubsection: React.FC<CollapsibleSubsectionProps> = ({
   defaultExpanded = true,
   persistKey,
   badge,
+  extraContent,
 }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
@@ -69,20 +72,21 @@ const CollapsibleSubsection: React.FC<CollapsibleSubsectionProps> = ({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white shadow">
-      <button
-        onClick={toggleExpanded}
-        className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-gray-50"
-        aria-expanded={isExpanded}
-      >
-        <div className="flex items-center gap-2">
+      <div className="flex w-full items-center justify-between p-4">
+        <button
+          onClick={toggleExpanded}
+          className="flex flex-1 items-center gap-2 text-left transition-colors hover:opacity-80"
+          aria-expanded={isExpanded}
+        >
           <span className="text-lg">{icon}</span>
           <h3 className="text-lg font-bold text-gray-800">{title}</h3>
-        </div>
-        <div className="flex items-center gap-2">
+          {isExpanded ? <ChevronDown size={20} className="ml-2" /> : <ChevronRight size={20} className="ml-2" />}
+        </button>
+        <div className="flex items-center gap-2 ml-4">
           {badge}
-          {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+          {extraContent}
         </div>
-      </button>
+      </div>
       
       {isExpanded && (
         <div className="border-t border-gray-200 p-4">
@@ -132,13 +136,11 @@ export default function ActionsSection({
               </div>
             }
           >
-            <div className="-m-4">
-              <EquippedWeapons
-                showAttackRoll={showAttackRoll}
-                showDamageRoll={showDamageRoll}
-                animateRoll={animateRoll}
-              />
-            </div>
+            <EquippedWeapons
+              showAttackRoll={showAttackRoll}
+              showDamageRoll={showDamageRoll}
+              animateRoll={animateRoll}
+            />
           </ErrorBoundary>
         </CollapsibleSubsection>
 
@@ -149,31 +151,24 @@ export default function ActionsSection({
           persistKey="quick-spells"
           defaultExpanded={true}
           badge={
-            <div className="flex items-center gap-2">
-              {actionSpells.length > 0 && (
-                <span className="rounded-full bg-purple-100 px-2 py-1 text-sm font-medium text-purple-800">
-                  {actionSpells.length} ready
-                </span>
-              )}
-              <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  switchToTab('spellcasting');
-                }}
-                className="cursor-pointer rounded-lg bg-purple-100 px-2 py-1 text-xs font-medium text-purple-700 transition-colors hover:bg-purple-200 hover:text-purple-800"
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    switchToTab('spellcasting');
-                  }
-                }}
-              >
-                Manage
-              </div>
-            </div>
+            actionSpells.length > 0 && (
+              <span className="rounded-full bg-purple-100 px-2 py-1 text-sm font-medium text-purple-800">
+                {actionSpells.length} ready
+              </span>
+            )
+          }
+          extraContent={
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                switchToTab('spellcasting');
+              }}
+              variant="ghost"
+              size="xs"
+              className="bg-purple-100 text-purple-700 hover:bg-purple-200 hover:text-purple-800"
+            >
+              Manage
+            </Button>
           }
         >
           <ErrorBoundary

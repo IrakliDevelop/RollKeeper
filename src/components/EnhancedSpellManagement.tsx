@@ -19,14 +19,15 @@ import {
   SortAsc,
   SortDesc,
   X,
-  Clock,
-  Target,
-  Zap,
-  Book,
-  Sparkles
 } from 'lucide-react';
-import { FancySelect } from '@/components/ui/forms/FancySelect';
+import { Button } from '@/components/ui/forms/button';
+import { Badge } from '@/components/ui/layout/badge';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { Checkbox } from '@/components/ui/forms/checkbox';
+import { Input } from '@/components/ui/forms/input';
+import { Textarea } from '@/components/ui/forms/textarea';
 import { Modal } from '@/components/ui/feedback/Modal';
+import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import DragDropList from '@/components/ui/layout/DragDropList';
 
 // Constants for spell schools and common casting times
@@ -206,12 +207,14 @@ const SpellCard: React.FC<{
   onTogglePrepared: () => void;
   onToggleFavorite: () => void;
 }> = ({ spell, compact, isFavorite, onEdit, onDelete, onView, onTogglePrepared, onToggleFavorite }) => {
+  const isCantrip = spell.level === 0;
+  
   if (compact) {
     return (
-      <div className={`flex items-center justify-between rounded-lg border p-3 transition-all hover:shadow-md ${
+      <div className={`flex items-center justify-between rounded-lg border-2 p-3 transition-all hover:shadow-md ${
         spell.isPrepared
-          ? 'border-green-400 bg-green-50'
-          : 'border-gray-200 bg-gray-50 hover:border-purple-300'
+          ? 'border-green-300 bg-white'
+          : 'border-gray-200 bg-white hover:border-purple-300'
       }`}>
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <button
@@ -224,75 +227,75 @@ const SpellCard: React.FC<{
           </button>
           
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className={`h-2 w-2 rounded-full flex-shrink-0 ${
-              spell.level === 0 ? 'bg-yellow-400' : 'bg-purple-400'
-            }`} />
             <span className="font-bold text-gray-800 truncate">{spell.name}</span>
-            <span className="text-xs text-gray-500 flex-shrink-0">{spell.school}</span>
-            {spell.duration && (
-              <span className="text-xs text-gray-500 flex-shrink-0">• {spell.duration}</span>
-            )}
+            <Badge 
+              variant={isCantrip ? "warning" : "primary"} 
+              size="sm"
+              className={isCantrip ? "bg-yellow-100 text-yellow-800 flex-shrink-0" : "bg-purple-100 text-purple-800 flex-shrink-0"}
+            >
+              {isCantrip ? 'Cantrip' : `Lv${spell.level}`}
+            </Badge>
+            <span className="text-xs text-gray-500 flex-shrink-0 hidden sm:inline">{spell.school}</span>
           </div>
           
           <div className="flex items-center gap-1 flex-shrink-0">
-            {spell.level === 0 && (
-              <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800">Cantrip</span>
-            )}
             {spell.concentration && (
-              <span className="rounded bg-yellow-100 px-1 py-0.5 text-xs text-yellow-800">C</span>
+              <Badge variant="warning" size="sm">C</Badge>
             )}
             {spell.ritual && (
-              <span className="rounded bg-purple-100 px-1 py-0.5 text-xs text-purple-800">R</span>
+              <Badge variant="secondary" size="sm">R</Badge>
             )}
           </div>
         </div>
         
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button
+        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+          <Button
             onClick={onTogglePrepared}
-            className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-              spell.isPrepared
-                ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+            variant={spell.isPrepared ? "success" : "outline"}
+            size="xs"
           >
             {spell.isPrepared ? 'Prepared' : 'Prepare'}
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onView}
-            className="rounded p-1 text-gray-600 hover:bg-gray-200 hover:text-gray-800"
+            variant="ghost"
+            size="xs"
             title="View details"
           >
             <Eye size={14} />
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onEdit}
-            className="rounded p-1 text-blue-600 hover:bg-blue-100 hover:text-blue-800"
+            variant="ghost"
+            size="xs"
             title="Edit spell"
+            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
           >
             <Edit2 size={14} />
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onDelete}
-            className="rounded p-1 text-red-600 hover:bg-red-100 hover:text-red-800"
+            variant="ghost"
+            size="xs"
             title="Delete spell"
+            className="text-red-600 hover:text-red-800 hover:bg-red-50"
           >
             <Trash2 size={14} />
-          </button>
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`rounded-lg border p-4 transition-all hover:shadow-md ${
+    <div className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${
       spell.isPrepared
-        ? 'border-green-400 bg-green-50'
-        : 'border-gray-200 bg-gray-50 hover:border-purple-300'
+        ? 'border-green-300 bg-white'
+        : 'border-gray-200 bg-white hover:border-purple-300'
     }`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="mb-2 flex items-center gap-2">
+          <div className="mb-2 flex items-center gap-2 flex-wrap">
             <button
               onClick={onToggleFavorite}
               className={`transition-colors ${
@@ -302,21 +305,25 @@ const SpellCard: React.FC<{
               <Star size={18} fill={isFavorite ? 'currentColor' : 'none'} />
             </button>
             <h5 className="font-bold text-gray-800">{spell.name}</h5>
-            {spell.level === 0 && (
-              <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800">Cantrip</span>
-            )}
+            <Badge 
+              variant={isCantrip ? "warning" : "primary"} 
+              size="sm"
+              className={isCantrip ? "bg-yellow-100 text-yellow-800" : "bg-purple-100 text-purple-800"}
+            >
+              {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
+            </Badge>
             {spell.concentration && (
-              <span className="rounded bg-yellow-100 px-2 py-1 text-xs text-yellow-800">Concentration</span>
+              <Badge variant="warning" size="sm">Concentration</Badge>
             )}
             {spell.ritual && (
-              <span className="rounded bg-purple-100 px-2 py-1 text-xs text-purple-800">Ritual</span>
+              <Badge variant="secondary" size="sm">Ritual</Badge>
             )}
             {spell.isAlwaysPrepared && (
-              <span className="rounded bg-indigo-100 px-2 py-1 text-xs text-indigo-800">Always Prepared</span>
+              <Badge variant="info" size="sm">Always Prepared</Badge>
             )}
           </div>
           
-          <div className="mb-2 flex items-center gap-4 text-sm text-gray-600">
+          <div className="mb-2 flex items-center gap-4 text-sm text-gray-600 flex-wrap">
             <span><strong>School:</strong> {spell.school}</span>
             <span><strong>Time:</strong> {spell.castingTime}</span>
             <span><strong>Range:</strong> {spell.range}</span>
@@ -336,10 +343,10 @@ const SpellCard: React.FC<{
           </div>
           
           {spell.damage && (
-            <div className="mb-2 text-sm">
-              <span className="rounded bg-red-100 px-2 py-1 text-red-800">
+            <div className="mb-2">
+              <Badge variant="danger" size="sm">
                 {spell.damage} {spell.damageType}
-              </span>
+              </Badge>
             </div>
           )}
           
@@ -347,39 +354,41 @@ const SpellCard: React.FC<{
         </div>
         
         <div className="ml-4 flex flex-col gap-2">
-          <button
+          <Button
             onClick={onTogglePrepared}
-            className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
-              spell.isPrepared
-                ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+            variant={spell.isPrepared ? "success" : "outline"}
+            size="sm"
           >
             {spell.isPrepared ? 'Prepared' : 'Prepare'}
-          </button>
+          </Button>
           
           <div className="flex gap-1">
-            <button
+            <Button
               onClick={onView}
-              className="rounded p-2 text-gray-600 hover:bg-gray-200 hover:text-gray-800"
+              variant="outline"
+              size="sm"
               title="View details"
             >
               <Eye size={16} />
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={onEdit}
-              className="rounded p-2 text-blue-600 hover:bg-blue-100 hover:text-blue-800"
+              variant="outline"
+              size="sm"
               title="Edit spell"
+              className="border-blue-300 text-blue-700 hover:bg-blue-50"
             >
               <Edit2 size={16} />
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={onDelete}
-              className="rounded p-2 text-red-600 hover:bg-red-100 hover:text-red-800"
+              variant="outline"
+              size="sm"
               title="Delete spell"
+              className="border-red-300 text-red-700 hover:bg-red-50"
             >
               <Trash2 size={16} />
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -414,37 +423,47 @@ const LevelSection: React.FC<{
   onToggleFavorite,
   onReorder,
 }) => {
-  const levelName = level === 0 ? 'Cantrips' : `Level ${level}`;
-  const levelColor = level === 0 ? 'text-yellow-600' : 'text-purple-600';
-  const levelBg = level === 0 ? 'bg-yellow-50' : 'bg-purple-50';
+  const isCantrip = level === 0;
+  const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
+  const levelColor = isCantrip ? 'text-yellow-700' : 'text-purple-700';
+  const levelBg = isCantrip ? 'bg-gradient-to-r from-yellow-50 to-amber-50' : 'bg-gradient-to-r from-purple-50 to-violet-50';
+  const borderColor = isCantrip ? 'border-yellow-200' : 'border-purple-200';
   const preparedCount = spells.filter(s => s.isPrepared || s.isAlwaysPrepared).length;
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
+    <div className={`border-2 ${borderColor} rounded-lg overflow-hidden bg-white`}>
       <button
         onClick={onToggle}
-        className={`w-full flex items-center justify-between p-4 ${levelBg} hover:bg-opacity-80 transition-colors`}
+        className={`w-full flex items-center justify-between p-4 ${levelBg} hover:opacity-90 transition-all`}
       >
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-            <span className={`font-bold ${levelColor}`}>{levelName}</span>
+            {isExpanded ? (
+              <ChevronDown size={18} className={levelColor} />
+            ) : (
+              <ChevronRight size={18} className={levelColor} />
+            )}
+            <span className={`font-bold text-base ${levelColor}`}>{levelName}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="rounded-full bg-white px-3 py-1 text-sm font-medium text-gray-600">
-              {spells.length} total
-            </span>
+            <Badge 
+              variant={isCantrip ? "warning" : "primary"}
+              size="sm"
+              className={isCantrip ? "bg-yellow-100 text-yellow-800" : "bg-purple-100 text-purple-800"}
+            >
+              {spells.length} spell{spells.length !== 1 ? 's' : ''}
+            </Badge>
             {preparedCount > 0 && (
-              <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
+              <Badge variant="success" size="sm" className="bg-green-100 text-green-800">
                 {preparedCount} prepared
-              </span>
+              </Badge>
             )}
           </div>
         </div>
       </button>
       
       {isExpanded && (
-        <div className="p-4 bg-white">
+        <div className="p-4 bg-white border-t-2 border-gray-100">
           <DragDropList
             items={spells}
             onReorder={onReorder}
@@ -723,224 +742,212 @@ export const EnhancedSpellManagement: React.FC = () => {
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-xl font-bold text-purple-800">
-            <span className="text-purple-600">📚</span>
+          <h3 className="flex items-center gap-2 text-xl font-bold text-gray-800">
+            <BookOpen className="text-purple-600" size={24} />
             Spells & Cantrips
-            <span className="rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-700">
+            <Badge variant="secondary" size="sm">
               {filteredSpells.length} of {character.spells.length}
-            </span>
+            </Badge>
           </h3>
 
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={() => setCompactView(!compactView)}
-              className={`rounded p-2 transition-colors ${
-                compactView
-                  ? 'bg-purple-100 text-purple-700'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              variant={compactView ? "primary" : "ghost"}
+              size="sm"
               title={compactView ? 'Switch to detailed view' : 'Switch to compact view'}
+              className={compactView ? "bg-purple-600 hover:bg-purple-700" : ""}
             >
               {compactView ? <List size={18} /> : <Grid3X3 size={18} />}
-            </button>
+            </Button>
             
-            <button
+            <Button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 rounded px-3 py-2 transition-colors ${
-                showFilters || activeFilterCount > 0
-                  ? 'bg-purple-100 text-purple-700'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              variant={showFilters || activeFilterCount > 0 ? "primary" : "ghost"}
+              size="sm"
+              leftIcon={<Filter size={16} />}
+              className={showFilters || activeFilterCount > 0 ? "bg-purple-600 hover:bg-purple-700" : ""}
             >
-              <Filter size={16} />
               Filters
               {activeFilterCount > 0 && (
-                <span className="rounded-full bg-purple-600 px-2 py-0.5 text-xs text-white">
+                <Badge variant="danger" size="sm" className="ml-1 bg-red-600 text-white">
                   {activeFilterCount}
-                </span>
+                </Badge>
               )}
-            </button>
+            </Button>
             
-            <button
+            <Button
               onClick={() => setIsFormOpen(true)}
-              className="flex items-center gap-2 rounded-md bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700"
+              variant="primary"
+              size="sm"
+              leftIcon={<Plus size={16} />}
+              className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
             >
-              <Plus size={16} />
               Add Spell
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Search Bar */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search spells by name, school, description, or damage type..."
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <Input
             value={filters.searchQuery}
             onChange={(e) => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
-            className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-10 pr-4 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
+            placeholder="Search spells by name, school, description, or damage type..."
+            className="pl-10"
           />
         </div>
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <div className="rounded-lg border-2 border-gray-200 bg-white p-4 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h4 className="font-semibold text-gray-800">Advanced Filters</h4>
+              <h4 className="font-bold text-gray-800">Advanced Filters</h4>
               <div className="flex items-center gap-2">
                 {activeFilterCount > 0 && (
-                  <button
+                  <Button
                     onClick={clearFilters}
-                    className="flex items-center gap-1 rounded px-2 py-1 text-sm text-gray-600 hover:bg-gray-200"
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<X size={14} />}
                   >
-                    <X size={14} />
                     Clear All
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
                   onClick={() => setShowFilters(false)}
-                  className="rounded p-1 text-gray-600 hover:bg-gray-200"
+                  variant="ghost"
+                  size="sm"
                 >
                   <X size={16} />
-                </button>
+                </Button>
               </div>
             </div>
             
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
               {/* Level Filter */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Level</label>
-                <FancySelect
-                  options={[
-                    { value: 'all', label: 'All Levels' },
-                    { value: 0, label: 'Cantrips' },
-                    ...Array.from({ length: 9 }, (_, i) => ({
-                      value: i + 1,
-                      label: `Level ${i + 1}`,
-                    })),
-                  ]}
-                  value={filters.level}
-                  onChange={value => setFilters(prev => ({ ...prev, level: value as number | 'all' }))}
-                  color="purple"
-                  className="w-full"
-                />
+                <label className="mb-2 block text-sm font-medium text-gray-700">Level</label>
+                <SelectField
+                  value={filters.level.toString()}
+                  onValueChange={value => setFilters(prev => ({ ...prev, level: value === 'all' ? 'all' : parseInt(value) }))}
+                >
+                  <SelectItem value="all">All Levels</SelectItem>
+                  <SelectItem value="0">Cantrips</SelectItem>
+                  {Array.from({ length: 9 }, (_, i) => (
+                    <SelectItem key={i + 1} value={(i + 1).toString()}>
+                      Level {i + 1}
+                    </SelectItem>
+                  ))}
+                </SelectField>
               </div>
 
               {/* School Filter */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">School</label>
-                <FancySelect
-                  options={[
-                    { value: 'all', label: 'All Schools' },
-                    ...SPELL_SCHOOLS.map(school => ({ value: school, label: school })),
-                  ]}
+                <label className="mb-2 block text-sm font-medium text-gray-700">School</label>
+                <SelectField
                   value={filters.school}
-                  onChange={value => setFilters(prev => ({ ...prev, school: value as string }))}
-                  color="purple"
-                  className="w-full"
-                />
+                  onValueChange={value => setFilters(prev => ({ ...prev, school: value }))}
+                >
+                  <SelectItem value="all">All Schools</SelectItem>
+                  {SPELL_SCHOOLS.map(school => (
+                    <SelectItem key={school} value={school}>{school}</SelectItem>
+                  ))}
+                </SelectField>
               </div>
 
               {/* Action Type Filter */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Action Type</label>
-                <FancySelect
-                  options={[
-                    { value: 'all', label: 'All Types' },
-                    ...ACTION_TYPES.map(type => ({ value: type.value, label: type.label })),
-                  ]}
+                <label className="mb-2 block text-sm font-medium text-gray-700">Action Type</label>
+                <SelectField
                   value={filters.actionType}
-                  onChange={value => setFilters(prev => ({ ...prev, actionType: value as string }))}
-                  color="purple"
-                  className="w-full"
-                />
+                  onValueChange={value => setFilters(prev => ({ ...prev, actionType: value }))}
+                >
+                  <SelectItem value="all">All Types</SelectItem>
+                  {ACTION_TYPES.map(type => (
+                    <SelectItem key={type.value || 'none'} value={type.value || 'none'}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectField>
               </div>
 
               {/* Prepared Filter */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Preparation</label>
-                <FancySelect
-                  options={[
-                    { value: 'all', label: 'All Spells' },
-                    { value: 'prepared', label: 'Prepared Only' },
-                    { value: 'unprepared', label: 'Unprepared Only' },
-                  ]}
+                <label className="mb-2 block text-sm font-medium text-gray-700">Preparation</label>
+                <SelectField
                   value={filters.prepared}
-                  onChange={value => setFilters(prev => ({ ...prev, prepared: value as 'all' | 'prepared' | 'unprepared' }))}
-                  color="purple"
-                  className="w-full"
-                />
+                  onValueChange={value => setFilters(prev => ({ ...prev, prepared: value as 'all' | 'prepared' | 'unprepared' }))}
+                >
+                  <SelectItem value="all">All Spells</SelectItem>
+                  <SelectItem value="prepared">Prepared Only</SelectItem>
+                  <SelectItem value="unprepared">Unprepared Only</SelectItem>
+                </SelectField>
               </div>
 
               {/* Concentration Filter */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Concentration</label>
-                <FancySelect
-                  options={[
-                    { value: 'all', label: 'All' },
-                    { value: 'yes', label: 'Concentration' },
-                    { value: 'no', label: 'No Concentration' },
-                  ]}
+                <label className="mb-2 block text-sm font-medium text-gray-700">Concentration</label>
+                <SelectField
                   value={filters.concentration}
-                  onChange={value => setFilters(prev => ({ ...prev, concentration: value as 'all' | 'yes' | 'no' }))}
-                  color="purple"
-                  className="w-full"
-                />
+                  onValueChange={value => setFilters(prev => ({ ...prev, concentration: value as 'all' | 'yes' | 'no' }))}
+                >
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="yes">Concentration</SelectItem>
+                  <SelectItem value="no">No Concentration</SelectItem>
+                </SelectField>
               </div>
 
               {/* Ritual Filter */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Ritual</label>
-                <FancySelect
-                  options={[
-                    { value: 'all', label: 'All' },
-                    { value: 'yes', label: 'Ritual' },
-                    { value: 'no', label: 'No Ritual' },
-                  ]}
+                <label className="mb-2 block text-sm font-medium text-gray-700">Ritual</label>
+                <SelectField
                   value={filters.ritual}
-                  onChange={value => setFilters(prev => ({ ...prev, ritual: value as 'all' | 'yes' | 'no' }))}
-                  color="purple"
-                  className="w-full"
-                />
+                  onValueChange={value => setFilters(prev => ({ ...prev, ritual: value as 'all' | 'yes' | 'no' }))}
+                >
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="yes">Ritual</SelectItem>
+                  <SelectItem value="no">No Ritual</SelectItem>
+                </SelectField>
               </div>
 
               {/* Sort Options */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Sort By</label>
-                <div className="flex gap-1">
-                  <FancySelect
-                    options={[
-                      { value: 'level', label: 'Level' },
-                      { value: 'name', label: 'Name' },
-                      { value: 'school', label: 'School' },
-                    ]}
-                    value={sortBy}
-                    onChange={value => setSortBy(value as 'name' | 'level' | 'school')}
-                    color="purple"
-                    className="flex-1"
-                  />
-                  <button
+                <label className="mb-2 block text-sm font-medium text-gray-700">Sort By</label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <SelectField
+                      value={sortBy}
+                      onValueChange={value => setSortBy(value as 'name' | 'level' | 'school')}
+                    >
+                      <SelectItem value="level">Level</SelectItem>
+                      <SelectItem value="name">Name</SelectItem>
+                      <SelectItem value="school">School</SelectItem>
+                    </SelectField>
+                  </div>
+                  <Button
                     onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="rounded border border-gray-300 p-2 hover:bg-gray-100"
+                    variant="outline"
+                    size="md"
                     title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
                   >
                     {sortOrder === 'asc' ? <SortAsc size={16} /> : <SortDesc size={16} />}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
               {/* Favorites Toggle */}
               <div className="flex items-end">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={filters.favorites}
-                    onChange={(e) => setFilters(prev => ({ ...prev, favorites: e.target.checked }))}
-                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    onCheckedChange={(checked) => setFilters(prev => ({ ...prev, favorites: checked as boolean }))}
                   />
-                  <span className="text-sm font-medium text-gray-700">Favorites Only</span>
-                  <Star size={16} className="text-yellow-500" />
+                  <span className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                    Favorites Only
+                    <Star size={16} className="text-yellow-500" />
+                  </span>
                 </label>
               </div>
             </div>
@@ -966,12 +973,14 @@ export const EnhancedSpellManagement: React.FC = () => {
               Try adjusting your search terms or clearing some filters
             </p>
             {activeFilterCount > 0 && (
-              <button
+              <Button
                 onClick={clearFilters}
-                className="mt-4 rounded bg-purple-600 px-4 py-2 text-white hover:bg-purple-700"
+                variant="primary"
+                size="md"
+                className="mt-4 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
               >
                 Clear All Filters
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -1004,516 +1013,330 @@ export const EnhancedSpellManagement: React.FC = () => {
           size="lg"
           closeOnBackdropClick={true}
         >
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Basic Information */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Spell Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                      required
-                    />
-                  </div>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Section: Basic Information */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+                Basic Information
+              </h4>
+              
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Input
+                  label="Spell Name"
+                  value={formData.name}
+                  onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  required
+                  placeholder="Enter spell name"
+                />
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Level
-                    </label>
-                    <select
-                      value={formData.level}
-                      onChange={e => setFormData(prev => ({ ...prev, level: parseInt(e.target.value) }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    >
-                      <option value={0}>Cantrip</option>
-                      {Array.from({ length: 9 }, (_, i) => (
-                        <option key={i + 1} value={i + 1}>
-                          Level {i + 1}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      School
-                    </label>
-                    <select
-                      value={formData.school}
-                      onChange={e => setFormData(prev => ({ ...prev, school: e.target.value }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    >
-                      {SPELL_SCHOOLS.map(school => (
-                        <option key={school} value={school}>
-                          {school}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Casting Time
-                    </label>
-                    <select
-                      value={formData.castingTime}
-                      onChange={e => setFormData(prev => ({ ...prev, castingTime: e.target.value }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    >
-                      {CASTING_TIMES.map(time => (
-                        <option key={time} value={time}>
-                          {time}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Range
-                    </label>
-                    <select
-                      value={formData.range}
-                      onChange={e => setFormData(prev => ({ ...prev, range: e.target.value }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    >
-                      {RANGES.map(range => (
-                        <option key={range} value={range}>
-                          {range}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Duration
-                    </label>
-                    <select
-                      value={formData.duration}
-                      onChange={e => setFormData(prev => ({ ...prev, duration: e.target.value }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    >
-                      {DURATIONS.map(duration => (
-                        <option key={duration} value={duration}>
-                          {duration}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Components */}
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Components
-                  </label>
-                  <div className="flex flex-wrap gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.components.verbal}
-                        onChange={e => setFormData(prev => ({
-                          ...prev,
-                          components: { ...prev.components, verbal: e.target.checked }
-                        }))}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Verbal (V)</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.components.somatic}
-                        onChange={e => setFormData(prev => ({
-                          ...prev,
-                          components: { ...prev.components, somatic: e.target.checked }
-                        }))}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Somatic (S)</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.components.material}
-                        onChange={e => setFormData(prev => ({
-                          ...prev,
-                          components: { ...prev.components, material: e.target.checked }
-                        }))}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Material (M)</span>
-                    </label>
-                  </div>
-                  {formData.components.material && (
-                    <div className="mt-2">
-                      <input
-                        type="text"
-                        placeholder="Material component description..."
-                        value={formData.components.materialDescription}
-                        onChange={e => setFormData(prev => ({
-                          ...prev,
-                          components: { ...prev.components, materialDescription: e.target.value }
-                        }))}
-                        className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Description *
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    rows={4}
-                    className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    required
-                  />
-                </div>
-
-                {/* Higher Level */}
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    At Higher Levels
-                  </label>
-                  <textarea
-                    value={formData.higherLevel}
-                    onChange={e => setFormData(prev => ({ ...prev, higherLevel: e.target.value }))}
-                    rows={2}
-                    className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    placeholder="Describe what happens when cast at higher levels..."
-                  />
-                </div>
-
-                {/* Action Type and Damage */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Action Type
-                    </label>
-                    <select
-                      value={formData.actionType}
-                      onChange={e => setFormData(prev => ({ ...prev, actionType: e.target.value as SpellActionType | '' }))}
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    >
-                      {ACTION_TYPES.map(type => (
-                        <option key={type.value} value={type.value}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {formData.actionType === 'save' && (
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
-                        Saving Throw
-                      </label>
-                      <select
-                        value={formData.savingThrow}
-                        onChange={e => setFormData(prev => ({ ...prev, savingThrow: e.target.value }))}
-                        className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                      >
-                        <option value="">Select...</option>
-                        {SAVING_THROWS.map(save => (
-                          <option key={save} value={save}>
-                            {save}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-
-                {/* Damage */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Damage Dice
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.damage}
-                      onChange={e => setFormData(prev => ({ ...prev, damage: e.target.value }))}
-                      placeholder="e.g., 1d8, 3d6"
-                      className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                    />
-                  </div>
-
-                  {formData.damage && (
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-gray-700">
-                        Damage Type
-                      </label>
-                      <select
-                        value={formData.damageType}
-                        onChange={e => setFormData(prev => ({ ...prev, damageType: e.target.value }))}
-                        className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                      >
-                        <option value="">Select...</option>
-                        {DAMAGE_TYPES.map(type => (
-                          <option key={type} value={type}>
-                            {type}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-
-                {/* Flags */}
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Spell Properties
-                  </label>
-                  <div className="flex flex-wrap gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.ritual}
-                        onChange={e => setFormData(prev => ({ ...prev, ritual: e.target.checked }))}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Ritual</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.concentration}
-                        onChange={e => setFormData(prev => ({ ...prev, concentration: e.target.checked }))}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Concentration</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.isPrepared}
-                        onChange={e => setFormData(prev => ({ ...prev, isPrepared: e.target.checked }))}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Prepared</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.isAlwaysPrepared}
-                        onChange={e => setFormData(prev => ({ ...prev, isAlwaysPrepared: e.target.checked }))}
-                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm font-medium text-gray-800">Always Prepared</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Source */}
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    Source
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.source}
-                    onChange={e => setFormData(prev => ({ ...prev, source: e.target.value }))}
-                    placeholder="e.g., PHB, XGE, TCE"
-                    className="w-full rounded border border-gray-300 px-3 py-2 focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200"
-                  />
-                </div>
-
-                {/* Form Actions */}
-                <div className="flex justify-end gap-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="rounded border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Level</label>
+                  <SelectField
+                    value={formData.level.toString()}
+                    onValueChange={value => setFormData(prev => ({ ...prev, level: parseInt(value) }))}
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded bg-purple-600 px-4 py-2 text-white hover:bg-purple-700"
-                  >
-                    {editingId ? 'Update Spell' : 'Add Spell'}
-                  </button>
+                    <SelectItem value="0">Cantrip</SelectItem>
+                    {Array.from({ length: 9 }, (_, i) => (
+                      <SelectItem key={i + 1} value={(i + 1).toString()}>
+                        Level {i + 1}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
                 </div>
-              </form>
-        </Modal>
-      )}
+              </div>
 
-      {/* View Spell Modal - Redesigned with Dark Theme */}
-      {viewingSpell && (
-        <Modal
-          isOpen={viewingSpell !== null}
-          onClose={() => setViewingSpell(null)}
-          title=""
-          size="xl"
-          closeOnBackdropClick={true}
-        >
-          <div className="space-y-6">
-            {/* Header with spell name and level */}
-            <div className="rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 p-6">
-              <div className="flex items-start justify-between">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">{viewingSpell.name}</h2>
-                  <div className="mt-2 flex items-center gap-3">
-                    {viewingSpell.level === 0 ? (
-                      <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
-                        Cantrip
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-800">
-                        Level {viewingSpell.level}
-                      </span>
-                    )}
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-800">
-                      {viewingSpell.school}
-                    </span>
-                    {viewingSpell.ritual && (
-                      <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-800">
-                        Ritual
-                      </span>
-                    )}
-                    {viewingSpell.concentration && (
-                      <span className="rounded-full bg-orange-100 px-3 py-1 text-sm font-medium text-orange-800">
-                        Concentration
-                      </span>
-                    )}
-                  </div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">School</label>
+                  <SelectField
+                    value={formData.school}
+                    onValueChange={value => setFormData(prev => ({ ...prev, school: value }))}
+                  >
+                    {SPELL_SCHOOLS.map(school => (
+                      <SelectItem key={school} value={school}>
+                        {school}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
                 </div>
-                <div className="flex gap-2">
-                  {viewingSpell.isPrepared && (
-                    <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
-                      Prepared
-                    </span>
-                  )}
-                  {viewingSpell.isAlwaysPrepared && (
-                    <span className="rounded-full bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-800">
-                      Always Prepared
-                    </span>
-                  )}
+
+                <Input
+                  label="Source"
+                  value={formData.source}
+                  onChange={e => setFormData(prev => ({ ...prev, source: e.target.value }))}
+                  placeholder="e.g., PHB, XGE, TCE"
+                />
+              </div>
+            </div>
+
+            {/* Section: Casting Details */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+                Casting Details
+              </h4>
+              
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Casting Time</label>
+                  <SelectField
+                    value={formData.castingTime}
+                    onValueChange={value => setFormData(prev => ({ ...prev, castingTime: value }))}
+                  >
+                    {CASTING_TIMES.map(time => (
+                      <SelectItem key={time} value={time}>
+                        {time}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Range</label>
+                  <SelectField
+                    value={formData.range}
+                    onValueChange={value => setFormData(prev => ({ ...prev, range: value }))}
+                  >
+                    {RANGES.map(range => (
+                      <SelectItem key={range} value={range}>
+                        {range}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Duration</label>
+                  <SelectField
+                    value={formData.duration}
+                    onValueChange={value => setFormData(prev => ({ ...prev, duration: value }))}
+                  >
+                    {DURATIONS.map(duration => (
+                      <SelectItem key={duration} value={duration}>
+                        {duration}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
                 </div>
               </div>
             </div>
 
-            {/* Spell Details Grid */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {/* Casting Information */}
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-blue-800">
-                  <Clock className="h-5 w-5 text-blue-600" />
-                  Casting Details
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="font-medium text-gray-600">Casting Time:</span>
-                    <span className="text-gray-900">{viewingSpell.castingTime}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium text-gray-600">Range:</span>
-                    <span className="text-gray-900">{viewingSpell.range}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium text-gray-600">Duration:</span>
-                    <span className="text-gray-900">{viewingSpell.duration}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium text-gray-600">Source:</span>
-                    <span className="text-gray-900">{viewingSpell.source || 'Unknown'}</span>
-                  </div>
+            {/* Section: Components */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+                Components
+              </h4>
+              
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.components.verbal}
+                    onCheckedChange={checked => setFormData(prev => ({
+                      ...prev,
+                      components: { ...prev.components, verbal: checked as boolean }
+                    }))}
+                  />
+                  <span className="text-sm font-medium text-gray-800">Verbal (V)</span>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.components.somatic}
+                    onCheckedChange={checked => setFormData(prev => ({
+                      ...prev,
+                      components: { ...prev.components, somatic: checked as boolean }
+                    }))}
+                  />
+                  <span className="text-sm font-medium text-gray-800">Somatic (S)</span>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.components.material}
+                    onCheckedChange={checked => setFormData(prev => ({
+                      ...prev,
+                      components: { ...prev.components, material: checked as boolean }
+                    }))}
+                  />
+                  <span className="text-sm font-medium text-gray-800">Material (M)</span>
+                </label>
+              </div>
+              
+              {formData.components.material && (
+                <Input
+                  label="Material Component Description"
+                  value={formData.components.materialDescription}
+                  onChange={e => setFormData(prev => ({
+                    ...prev,
+                    components: { ...prev.components, materialDescription: e.target.value }
+                  }))}
+                  placeholder="Describe the material components..."
+                />
+              )}
+            </div>
+
+            {/* Section: Spell Properties */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+                Spell Properties
+              </h4>
+              
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.ritual}
+                    onCheckedChange={checked => setFormData(prev => ({ ...prev, ritual: checked as boolean }))}
+                  />
+                  <span className="text-sm font-medium text-gray-800">Ritual</span>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.concentration}
+                    onCheckedChange={checked => setFormData(prev => ({ ...prev, concentration: checked as boolean }))}
+                  />
+                  <span className="text-sm font-medium text-gray-800">Concentration</span>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.isPrepared}
+                    onCheckedChange={checked => setFormData(prev => ({ ...prev, isPrepared: checked as boolean }))}
+                  />
+                  <span className="text-sm font-medium text-gray-800">Prepared</span>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={formData.isAlwaysPrepared}
+                    onCheckedChange={checked => setFormData(prev => ({ ...prev, isAlwaysPrepared: checked as boolean }))}
+                  />
+                  <span className="text-sm font-medium text-gray-800">Always Prepared</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Section: Description */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+                Description
+              </h4>
+              
+              <Textarea
+                label="Spell Description"
+                value={formData.description}
+                onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                rows={4}
+                required
+                placeholder="Describe what the spell does..."
+              />
+
+              <Textarea
+                label="At Higher Levels"
+                value={formData.higherLevel}
+                onChange={e => setFormData(prev => ({ ...prev, higherLevel: e.target.value }))}
+                rows={2}
+                placeholder="Describe what happens when cast at higher levels..."
+              />
+            </div>
+
+            {/* Section: Combat Details */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+                Combat Details
+              </h4>
+              
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">Action Type</label>
+                  <SelectField
+                    value={formData.actionType}
+                    onValueChange={value => setFormData(prev => ({ ...prev, actionType: value as SpellActionType | '' }))}
+                  >
+                    {ACTION_TYPES.map(type => (
+                      <SelectItem key={type.value || 'none'} value={type.value || 'none'}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
                 </div>
+
+                {formData.actionType === 'save' && (
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">Saving Throw</label>
+                    <SelectField
+                      value={formData.savingThrow || '__none__'}
+                      onValueChange={value => setFormData(prev => ({ ...prev, savingThrow: value === '__none__' ? '' : value }))}
+                    >
+                      <SelectItem value="__none__" disabled>Select...</SelectItem>
+                      {SAVING_THROWS.map(save => (
+                        <SelectItem key={save} value={save}>
+                          {save}
+                        </SelectItem>
+                      ))}
+                    </SelectField>
+                  </div>
+                )}
               </div>
 
-              {/* Components */}
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-amber-800">
-                  <Sparkles className="h-5 w-5 text-amber-600" />
-                  Components
-                </h3>
-                <div className="flex items-center gap-2 mb-3">
-                  {viewingSpell.components.verbal && (
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-300 bg-blue-100 text-sm font-semibold text-blue-700">
-                      V
-                    </span>
-                  )}
-                  {viewingSpell.components.somatic && (
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-green-300 bg-green-100 text-sm font-semibold text-green-700">
-                      S
-                    </span>
-                  )}
-                  {viewingSpell.components.material && (
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-purple-300 bg-purple-100 text-sm font-semibold text-purple-700">
-                      M
-                    </span>
-                  )}
-                </div>
-                {viewingSpell.components.material && viewingSpell.components.materialDescription && (
-                  <p className="text-sm text-gray-700 italic">
-                    ({viewingSpell.components.materialDescription})
-                  </p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Input
+                  label="Damage Dice"
+                  value={formData.damage}
+                  onChange={e => setFormData(prev => ({ ...prev, damage: e.target.value }))}
+                  placeholder="e.g., 1d8, 3d6"
+                />
+
+                {formData.damage && (
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">Damage Type</label>
+                    <SelectField
+                      value={formData.damageType || '__none__'}
+                      onValueChange={value => setFormData(prev => ({ ...prev, damageType: value === '__none__' ? '' : value }))}
+                    >
+                      <SelectItem value="__none__" disabled>Select...</SelectItem>
+                      {DAMAGE_TYPES.map(type => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectField>
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Description */}
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-              <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-emerald-800">
-                <Book className="h-5 w-5 text-emerald-600" />
-                Description
-              </h3>
-              <div className="prose max-w-none">
-                <p className="leading-relaxed text-gray-800">{viewingSpell.description}</p>
-              </div>
+            {/* Form Actions */}
+            <div className="flex justify-end gap-3 pt-4 border-t-2 border-gray-200">
+              <Button
+                type="button"
+                onClick={resetForm}
+                variant="outline"
+                size="md"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+              >
+                {editingId ? 'Update Spell' : 'Add Spell'}
+              </Button>
             </div>
-
-            {/* Higher Level */}
-            {viewingSpell.higherLevel && (
-              <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
-                <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-orange-800">
-                  <Zap className="h-5 w-5 text-orange-600" />
-                  At Higher Levels
-                </h3>
-                <p className="leading-relaxed text-gray-800">{viewingSpell.higherLevel}</p>
-              </div>
-            )}
-
-            {/* Combat Information */}
-            {(viewingSpell.actionType === 'attack' || viewingSpell.actionType === 'save' || viewingSpell.damage) && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                <h3 className="mb-3 flex items-center gap-2 text-lg font-semibold text-red-800">
-                  <Target className="h-5 w-5 text-red-600" />
-                  Combat Details
-                </h3>
-                <div className="space-y-2">
-                  {viewingSpell.damage && (
-                    <div>
-                      <span className="font-medium text-gray-600">Damage:</span>{' '}
-                      <span className="text-gray-900 font-semibold">{viewingSpell.damage} {viewingSpell.damageType}</span>
-                    </div>
-                  )}
-                  {viewingSpell.actionType === 'save' && viewingSpell.savingThrow && (
-                    <div>
-                      <span className="font-medium text-gray-600">Saving Throw:</span>{' '}
-                      <span className="text-gray-900 font-semibold">{viewingSpell.savingThrow}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          </form>
         </Modal>
+      )}
+
+      {/* View Spell Modal - Using unified SpellDetailsModal */}
+      {viewingSpell && (
+        <SpellDetailsModal
+          spell={viewingSpell}
+          isOpen={true}
+          onClose={() => setViewingSpell(null)}
+          isFavorite={favoriteSpells.includes(viewingSpell.id)}
+          onToggleFavorite={() => toggleSpellFavorite(viewingSpell.id)}
+        />
       )}
     </div>
   );

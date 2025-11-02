@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { useCharacterStore } from '@/store/characterStore';
 import { SpellcastingAbility } from '@/types/character';
-import { CustomSwitcher, FancySelect } from '@/components/ui';
 import { Edit3, Calculator, Zap, Shield } from 'lucide-react';
 import {
   getClassSpellcastingAbility,
@@ -12,6 +11,11 @@ import {
   getSpellSaveDCString,
   isSpellcaster,
 } from '@/utils/calculations';
+import { Button } from '@/components/ui/forms/button';
+import { Input } from '@/components/ui/forms/input';
+import { Switch } from '@/components/ui/forms/switch';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { Badge } from '@/components/ui/layout/badge';
 
 export const SpellcastingStats: React.FC = () => {
   const { character, updateCharacter } = useCharacterStore();
@@ -22,14 +26,14 @@ export const SpellcastingStats: React.FC = () => {
 
   if (!characterIsSpellcaster) {
     return (
-      <div className="rounded-lg border border-purple-200 bg-white p-4 shadow">
+      <div className="rounded-lg border-2 border-purple-200 bg-white p-6 shadow-sm">
         <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-purple-800">
           <span className="text-purple-600">✨</span>
           Spellcasting
         </h3>
         <div className="py-6 text-center text-gray-500">
           <div className="mb-2 text-4xl">🚫</div>
-          <p className="font-medium">Not a spellcaster</p>
+          <p className="font-semibold text-gray-700">Not a spellcaster</p>
           <p className="mt-1 text-sm">
             Select a spellcasting class to enable this section.
           </p>
@@ -54,11 +58,11 @@ export const SpellcastingStats: React.FC = () => {
     });
   };
 
-  const handleAbilityChange = (ability: SpellcastingAbility) => {
+  const handleAbilityChange = (ability: string) => {
     updateCharacter({
       spellcastingStats: {
         ...character.spellcastingStats,
-        spellcastingAbility: ability,
+        spellcastingAbility: ability as SpellcastingAbility,
       },
     });
   };
@@ -84,40 +88,37 @@ export const SpellcastingStats: React.FC = () => {
   };
 
   return (
-    <div className="rounded-lg border border-purple-200 bg-white p-6 shadow">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="rounded-lg border-2 border-purple-200 bg-white p-6 shadow-sm">
+      {/* Header */}
+      <div className="mb-6 flex items-center justify-between border-b-2 border-gray-200 pb-4">
         <h3 className="flex items-center gap-2 text-lg font-bold text-purple-800">
           <span className="text-purple-600">✨</span>
           Spellcasting Statistics
         </h3>
-        <button
+        <Button
           onClick={() => setShowOverrides(!showOverrides)}
-          className="text-purple-600 transition-colors hover:text-purple-800"
+          variant="ghost"
+          size="sm"
           title="Toggle manual overrides"
         >
           {showOverrides ? <Calculator size={20} /> : <Edit3 size={20} />}
-        </button>
+        </Button>
       </div>
 
+      {/* Content */}
       <div className="space-y-4">
         {/* Spellcasting Ability */}
-        <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
+        <div className="rounded-lg border-2 border-purple-200 bg-purple-50 p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h4 className="flex items-center gap-2 font-semibold text-purple-800">
+            <h4 className="flex items-center gap-2 font-bold text-purple-800">
               <span className="text-purple-600">🧠</span>
               Spellcasting Ability
             </h4>
             {showOverrides && (
-              <CustomSwitcher
-                leftLabel="Auto"
-                rightLabel="Manual"
-                leftValue={false}
-                rightValue={true}
-                currentValue={character.spellcastingStats.isAbilityOverridden}
-                onChange={value =>
-                  handleAbilityOverrideToggle(value as boolean)
-                }
-                color="purple"
+              <Switch
+                checked={character.spellcastingStats.isAbilityOverridden}
+                onCheckedChange={handleAbilityOverrideToggle}
+                label={character.spellcastingStats.isAbilityOverridden ? "Manual" : "Auto"}
                 size="sm"
               />
             )}
@@ -125,45 +126,40 @@ export const SpellcastingStats: React.FC = () => {
 
           <div className="flex items-center gap-4">
             {character.spellcastingStats.isAbilityOverridden ? (
-              <FancySelect
-                options={[
-                  {
-                    value: 'intelligence',
-                    label: 'Intelligence',
-                    description: 'Logic, reasoning, memory',
-                  },
-                  {
-                    value: 'wisdom',
-                    label: 'Wisdom',
-                    description: 'Awareness, insight, intuition',
-                  },
-                  {
-                    value: 'charisma',
-                    label: 'Charisma',
-                    description: 'Force of personality, leadership',
-                  },
-                ]}
-                value={
-                  character.spellcastingStats.spellcastingAbility ||
-                  'intelligence'
-                }
-                onChange={value =>
-                  handleAbilityChange(value as SpellcastingAbility)
-                }
-                color="purple"
-                className="w-48"
-              />
+              <div className="w-full max-w-xs">
+                <SelectField
+                  value={
+                    character.spellcastingStats.spellcastingAbility ||
+                    'intelligence'
+                  }
+                  onValueChange={handleAbilityChange}
+                >
+                  <SelectItem value="intelligence">
+                    Intelligence
+                    <span className="text-xs text-gray-500 block">Logic, reasoning, memory</span>
+                  </SelectItem>
+                  <SelectItem value="wisdom">
+                    Wisdom
+                    <span className="text-xs text-gray-500 block">Awareness, insight, intuition</span>
+                  </SelectItem>
+                  <SelectItem value="charisma">
+                    Charisma
+                    <span className="text-xs text-gray-500 block">Force of personality, leadership</span>
+                  </SelectItem>
+                </SelectField>
+              </div>
             ) : (
-              <div className="rounded-md border border-gray-300 bg-gray-100 px-3 py-2 text-gray-800 capitalize">
-                {classDefaultAbility || 'Unknown'}
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" size="md" className="capitalize">
+                  {classDefaultAbility || 'Unknown'}
+                </Badge>
+                {classDefaultAbility && (
+                  <span className="text-sm text-purple-600">
+                    (from {character.class.name})
+                  </span>
+                )}
               </div>
             )}
-            {!character.spellcastingStats.isAbilityOverridden &&
-              classDefaultAbility && (
-                <span className="text-sm text-purple-600">
-                  (from {character.class.name})
-                </span>
-              )}
           </div>
         </div>
 
@@ -171,13 +167,13 @@ export const SpellcastingStats: React.FC = () => {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* Spell Attack Bonus */}
           <div className="text-center">
-            <div className="rounded-lg border-2 border-red-200 bg-red-50 p-4 transition-colors hover:border-red-400">
-              <div className="mb-1 flex items-center justify-center gap-1 text-xs font-medium text-red-700">
-                <Zap size={12} />
-                SPELL ATTACK
+            <div className="rounded-lg border-2 border-red-200 bg-red-50 p-4 transition-all hover:border-red-300 hover:shadow-sm">
+              <div className="mb-2 flex items-center justify-center gap-1 text-xs font-bold text-red-700 uppercase tracking-wide">
+                <Zap size={14} />
+                Spell Attack
               </div>
-              {showOverrides && (
-                <input
+              {showOverrides ? (
+                <Input
                   type="number"
                   value={
                     character.spellcastingStats.spellAttackBonus?.toString() ||
@@ -185,64 +181,73 @@ export const SpellcastingStats: React.FC = () => {
                   }
                   onChange={e => handleAttackBonusOverride(e.target.value)}
                   placeholder="Auto"
-                  className="mb-1 w-full border-none bg-transparent text-center text-xl font-bold text-red-900 outline-none"
+                  className="mb-2 w-full text-center text-xl font-bold"
+                  size="sm"
                 />
-              )}
-              {!showOverrides && (
-                <div className="mb-1 text-xl font-bold text-red-900">
+              ) : (
+                <div className="mb-2 text-2xl font-bold text-red-900">
                   {getSpellAttackString(character)}
                 </div>
               )}
-              <div className="text-xs text-red-600">
+              <Badge 
+                variant={character.spellcastingStats.spellAttackBonus !== undefined ? "danger" : "neutral"}
+                size="sm"
+              >
                 {character.spellcastingStats.spellAttackBonus !== undefined
                   ? 'manual'
                   : 'auto'}
-              </div>
+              </Badge>
             </div>
           </div>
 
           {/* Spell Save DC */}
           <div className="text-center">
-            <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4 transition-colors hover:border-blue-400">
-              <div className="mb-1 flex items-center justify-center gap-1 text-xs font-medium text-blue-700">
-                <Shield size={12} />
-                SPELL SAVE DC
+            <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4 transition-all hover:border-blue-300 hover:shadow-sm">
+              <div className="mb-2 flex items-center justify-center gap-1 text-xs font-bold text-blue-700 uppercase tracking-wide">
+                <Shield size={14} />
+                Spell Save DC
               </div>
-              {showOverrides && (
-                <input
+              {showOverrides ? (
+                <Input
                   type="number"
                   value={
                     character.spellcastingStats.spellSaveDC?.toString() || ''
                   }
                   onChange={e => handleSaveDCOverride(e.target.value)}
                   placeholder="Auto"
-                  className="mb-1 w-full border-none bg-transparent text-center text-xl font-bold text-blue-900 outline-none"
+                  className="mb-2 w-full text-center text-xl font-bold"
+                  size="sm"
                 />
-              )}
-              {!showOverrides && (
-                <div className="mb-1 text-xl font-bold text-blue-900">
+              ) : (
+                <div className="mb-2 text-2xl font-bold text-blue-900">
                   {getSpellSaveDCString(character)}
                 </div>
               )}
-              <div className="text-xs text-blue-600">
+              <Badge 
+                variant={character.spellcastingStats.spellSaveDC !== undefined ? "success" : "neutral"}
+                size="sm"
+              >
                 {character.spellcastingStats.spellSaveDC !== undefined
                   ? 'manual'
                   : 'auto'}
-              </div>
+              </Badge>
             </div>
           </div>
         </div>
 
         {/* Calculation Info */}
         {!showOverrides && currentSpellcastingAbility && (
-          <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
-            <div className="mb-1 font-medium">Calculations:</div>
-            <div>
-              Spell Attack: {currentSpellcastingAbility} modifier + proficiency
-            </div>
-            <div>
-              Spell Save DC: 8 + {currentSpellcastingAbility} modifier +
-              proficiency
+          <div className="rounded-lg border-2 border-gray-200 bg-gray-50 p-4">
+            <div className="mb-2 font-bold text-gray-800">Calculations:</div>
+            <div className="space-y-1 text-sm text-gray-700">
+              <div className="flex items-center gap-2">
+                <Badge variant="danger" size="sm">Attack</Badge>
+                <span>{currentSpellcastingAbility} modifier + proficiency</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="success" size="sm">Save DC</Badge>
+                <span>8 + {currentSpellcastingAbility} modifier + proficiency</span>
+              </div>
             </div>
           </div>
         )}
