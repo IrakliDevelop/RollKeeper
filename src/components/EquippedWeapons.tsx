@@ -313,20 +313,20 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                 </div>
 
                 {/* Attack and Damage stats */}
-                <div className="mb-3 grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600">🎯 Attack: </span>
+                <div className="mb-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-gray-600">🎯 Attack:</span>
                     <span className="font-bold text-red-600">{attackString}</span>
                   </div>
-                  <div>
-                    <span className="text-gray-600">⚔️ Damage: </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-gray-600">⚔️ Damage:</span>
                     <span className="font-bold text-blue-600">{damageString}</span>
                   </div>
                 </div>
 
                 {versatileDamageString && (
-                  <div className="mb-3 text-sm">
-                    <span className="text-gray-600">🗡️ Versatile: </span>
+                  <div className="mb-3 flex items-center gap-1.5 text-sm">
+                    <span className="text-gray-600">🗡️ Versatile:</span>
                     <span className="font-bold text-purple-600">{versatileDamageString}</span>
                   </div>
                 )}
