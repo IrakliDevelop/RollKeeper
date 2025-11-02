@@ -112,58 +112,54 @@ export function ItemCard({
       )}
 
       {/* Item Details */}
-      <div className={`space-y-2 text-gray-600 ${compact ? 'text-xs' : 'text-sm'}`}>
-        <div className="flex items-center justify-between">
-          <span className="text-gray-500">Category:</span>
-          <span className="font-medium text-gray-800 capitalize">
-            {item.category}
-          </span>
-        </div>
+      <div className={`grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-gray-600 ${compact ? 'text-xs' : 'text-sm'}`}>
+        <span className="text-gray-500">Category:</span>
+        <span className="font-medium text-gray-800 capitalize">
+          {item.category}
+        </span>
 
-        <div className="flex items-center justify-between">
-          <span className="text-gray-500">Quantity:</span>
-          {onQuantityChange ? (
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={() => onQuantityChange(Math.max(1, item.quantity - 1))}
-                variant="ghost"
-                size="xs"
-                disabled={item.quantity <= 1}
-                className="h-6 w-6 p-0 text-red-600 hover:bg-red-50 hover:text-red-800 disabled:opacity-30"
-              >
-                <Minus size={12} />
-              </Button>
-              <span className="min-w-[2rem] text-center font-bold text-gray-800">
-                {item.quantity}
-              </span>
-              <Button
-                onClick={() => onQuantityChange(item.quantity + 1)}
-                variant="ghost"
-                size="xs"
-                className="h-6 w-6 p-0 text-green-600 hover:bg-green-50 hover:text-green-800"
-              >
-                <Plus size={12} />
-              </Button>
-            </div>
-          ) : (
-            <span className="font-bold text-gray-800">{item.quantity}</span>
-          )}
-        </div>
+        <span className="text-gray-500">Quantity:</span>
+        {onQuantityChange ? (
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => onQuantityChange(Math.max(1, item.quantity - 1))}
+              variant="ghost"
+              size="xs"
+              disabled={item.quantity <= 1}
+              className="h-6 w-6 p-0 text-red-600 hover:bg-red-50 hover:text-red-800 disabled:opacity-30"
+            >
+              <Minus size={12} />
+            </Button>
+            <span className="min-w-[2rem] text-center font-bold text-gray-800">
+              {item.quantity}
+            </span>
+            <Button
+              onClick={() => onQuantityChange(item.quantity + 1)}
+              variant="ghost"
+              size="xs"
+              className="h-6 w-6 p-0 text-green-600 hover:bg-green-50 hover:text-green-800"
+            >
+              <Plus size={12} />
+            </Button>
+          </div>
+        ) : (
+          <span className="font-bold text-gray-800">{item.quantity}</span>
+        )}
 
         {totalWeight !== undefined && !compact && (
-          <div className="flex items-center justify-between">
+          <>
             <span className="text-gray-500">Weight:</span>
             <span className="font-medium text-gray-800">{totalWeight} lbs</span>
-          </div>
+          </>
         )}
 
         {totalValue !== undefined && !compact && (
-          <div className="flex items-center justify-between">
+          <>
             <span className="text-gray-500">Value:</span>
             <span className="font-medium text-gray-800">
               {formatCurrencyFromCopper(totalValue)}
             </span>
-          </div>
+          </>
         )}
       </div>
 
