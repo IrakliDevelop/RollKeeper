@@ -8,6 +8,7 @@ import {
   Zap,
   Sparkles,
   Star,
+  Wand2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
@@ -19,6 +20,7 @@ interface SpellDetailsModalProps {
   onClose: () => void;
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
+  onCast?: () => void;
 }
 
 export default function SpellDetailsModal({
@@ -27,6 +29,7 @@ export default function SpellDetailsModal({
   onClose,
   isFavorite = false,
   onToggleFavorite,
+  onCast,
 }: SpellDetailsModalProps) {
   const isCantrip = spell.level === 0;
 
@@ -220,10 +223,26 @@ export default function SpellDetailsModal({
 
       {/* Footer */}
       <div className="border-t-2 border-gray-200 bg-gray-50 p-4 -m-6 mt-6">
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center">
+          {onCast ? (
+            <Button
+              onClick={() => {
+                onCast();
+                onClose();
+              }}
+              variant="primary"
+              size="md"
+              leftIcon={<Wand2 size={16} />}
+              className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+            >
+              Cast Spell
+            </Button>
+          ) : (
+            <div />
+          )}
           <Button
             onClick={onClose}
-            variant="primary"
+            variant="outline"
             size="md"
           >
             Close
