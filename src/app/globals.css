@@ -3,6 +3,69 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  
+  /* Background colors */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f8fafc;
+  --color-bg-tertiary: #f1f5f9;
+  
+  /* Text colors */
+  --color-text-primary: #1e293b;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #64748b;
+  
+  /* Border colors */
+  --color-border-primary: #e2e8f0;
+  --color-border-secondary: #cbd5e1;
+  
+  /* Card colors */
+  --color-card-bg: #ffffff;
+  --color-card-border: #e2e8f0;
+  --color-card-hover: #f8fafc;
+  
+  /* Gradient colors */
+  --gradient-slate-from: #f8fafc;
+  --gradient-slate-to: #f1f5f9;
+  --gradient-blue-from: #eff6ff;
+  --gradient-blue-to: #e0e7ff;
+  --gradient-green-from: #f0fdf4;
+  --gradient-green-to: #d1fae5;
+  --gradient-purple-from: #faf5ff;
+  --gradient-purple-to: #fce7f3;
+}
+
+[data-theme="dark"] {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  
+  /* Background colors */
+  --color-bg-primary: #0f172a;
+  --color-bg-secondary: #1e293b;
+  --color-bg-tertiary: #334155;
+  
+  /* Text colors */
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-tertiary: #94a3b8;
+  
+  /* Border colors */
+  --color-border-primary: #334155;
+  --color-border-secondary: #475569;
+  
+  /* Card colors */
+  --color-card-bg: #1e293b;
+  --color-card-border: #334155;
+  --color-card-hover: #293548;
+  
+  /* Gradient colors - adjusted for dark mode */
+  --gradient-slate-from: #1e293b;
+  --gradient-slate-to: #334155;
+  --gradient-blue-from: #1e3a8a;
+  --gradient-blue-to: #312e81;
+  --gradient-green-from: #065f46;
+  --gradient-green-to: #064e3b;
+  --gradient-purple-from: #581c87;
+  --gradient-purple-to: #831843;
 }
 
 @theme inline {

@@ -97,14 +97,16 @@ export default function CharacterSheetHeader({
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center">
-              <Link
-                href="/player"
-                className="mr-6 flex items-center gap-2 text-slate-600 transition-colors hover:text-slate-800"
-              >
-                <ArrowLeft size={20} />
-                Back to Characters
+              <Link href="/player">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<ArrowLeft size={20} />}
+                >
+                  Back to Characters
+                </Button>
               </Link>
-              <div>
+              <div className="ml-6">
                 <h1 className="text-xl font-bold text-slate-800">
                   {characterName}
                 </h1>
