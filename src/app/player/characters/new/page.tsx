@@ -3,13 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Save, Dice6, Info } from 'lucide-react';
+import { ArrowLeft, Save, Dice6, Info, Shield } from 'lucide-react';
 import { usePlayerStore } from '@/store/playerStore';
 import { COMMON_CLASSES, DEFAULT_CHARACTER_STATE } from '@/utils/constants';
 import { Autocomplete, AutocompleteOption, Button, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogTrigger } from '@/components/ui/feedback/dialog-new';
 import { ProcessedRace } from '@/utils/raceDataLoader';
+import { ProcessedClass } from '@/types/classes';
+import { formatSpellcastingType, formatProficiencyType } from '@/utils/classFilters';
 
 export default function NewCharacterPage() {
   const router = useRouter();
@@ -23,9 +25,14 @@ export default function NewCharacterPage() {
   const [raceOptions, setRaceOptions] = useState<AutocompleteOption[]>([]);
   const [races, setRaces] = useState<ProcessedRace[]>([]);
   const [isLoadingRaces, setIsLoadingRaces] = useState(true);
+  const [classes, setClasses] = useState<ProcessedClass[]>([]);
+  const [isLoadingClasses, setIsLoadingClasses] = useState(true);
 
   // Get selected race details
   const selectedRaceData = races.find(race => race.name === selectedRace);
+  
+  // Get selected class details
+  const selectedClassData = classes.find(cls => cls.name === selectedClass);
 
   // Load races from JSON
   useEffect(() => {
@@ -62,6 +69,25 @@ export default function NewCharacterPage() {
     }
     
     loadRaces();
+  }, []);
+
+  // Load classes from API
+  useEffect(() => {
+    async function loadClasses() {
+      try {
+        const response = await fetch('/api/classes');
+        const data = await response.json();
+        const classesData: ProcessedClass[] = data.classes || [];
+        
+        setClasses(classesData);
+      } catch (error) {
+        console.error('Failed to load classes:', error);
+      } finally {
+        setIsLoadingClasses(false);
+      }
+    }
+    
+    loadClasses();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -409,34 +435,240 @@ export default function NewCharacterPage() {
                 >
                   Class
                 </label>
-                <Select value={selectedClass} onValueChange={setSelectedClass}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a class..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COMMON_CLASSES.map(classData => (
-                      <SelectItem
-                        key={classData.name}
-                        value={classData.name}
-                        description={
-                        classData.spellcaster !== 'none'
-                          ? `${
-                              classData.spellcaster === 'full'
-                                ? 'Full'
-                                : classData.spellcaster === 'half'
-                                  ? 'Half'
-                                  : classData.spellcaster === 'third'
-                                    ? '1/3'
-                                    : 'Pact'
-                            } Caster`
-                            : 'Non-spellcaster'
-                        }
-                      >
-                        {classData.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select value={selectedClass} onValueChange={setSelectedClass}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select a class..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMMON_CLASSES.map(classData => (
+                        <SelectItem
+                          key={classData.name}
+                          value={classData.name}
+                          description={
+                          classData.spellcaster !== 'none'
+                            ? `${
+                                classData.spellcaster === 'full'
+                                  ? 'Full'
+                                  : classData.spellcaster === 'half'
+                                    ? 'Half'
+                                    : classData.spellcaster === 'third'
+                                      ? '1/3'
+                                      : 'Pact'
+                              } Caster`
+                              : 'Non-spellcaster'
+                          }
+                        >
+                          {classData.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedClassData && !isLoadingClasses && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="md"
+                          leftIcon={<Info size={16} />}
+                          className="flex-shrink-0"
+                        >
+                          Details
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent size="lg">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <Shield className="h-5 w-5 text-blue-600" />
+                            {selectedClassData.name}
+                          </DialogTitle>
+                          <DialogDescription>
+                            Class features and proficiencies
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogBody className="max-h-[70vh] overflow-y-auto">
+                          <div className="space-y-4">
+                            {/* Basic Info Grid */}
+                            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                                <span className="text-xs font-medium text-gray-600">Hit Die</span>
+                                <p className="mt-1 text-sm font-semibold text-gray-900">
+                                  {selectedClassData.hitDie}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                                <span className="text-xs font-medium text-gray-600">Spellcasting</span>
+                                <p className="mt-1 text-sm font-semibold text-gray-900">
+                                  {formatSpellcastingType(selectedClassData.spellcasting.type)}
+                                </p>
+                              </div>
+                              {selectedClassData.spellcasting.ability && (
+                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                                  <span className="text-xs font-medium text-gray-600">Spellcasting Ability</span>
+                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                    {selectedClassData.spellcasting.ability.toUpperCase()}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Saving Throw Proficiencies */}
+                            {selectedClassData.proficiencies.savingThrows && selectedClassData.proficiencies.savingThrows.length > 0 && (
+                              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                                <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                                  Saving Throw Proficiencies
+                                </h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {selectedClassData.proficiencies.savingThrows.map((save, idx) => (
+                                    <Badge key={idx} variant="success" size="md">
+                                      {formatProficiencyType(save)}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Armor Proficiencies */}
+                            {selectedClassData.proficiencies.armor && selectedClassData.proficiencies.armor.length > 0 && (
+                              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                                <h4 className="mb-2 text-sm font-semibold text-gray-900">Armor Proficiencies</h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {selectedClassData.proficiencies.armor.map((armor, idx) => (
+                                    <Badge key={idx} variant="info" size="md">
+                                      <span dangerouslySetInnerHTML={{ __html: armor }} />
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Weapon Proficiencies */}
+                            {selectedClassData.proficiencies.weapons && selectedClassData.proficiencies.weapons.length > 0 && (
+                              <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+                                <h4 className="mb-2 text-sm font-semibold text-gray-900">Weapon Proficiencies</h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {selectedClassData.proficiencies.weapons.map((weapon, idx) => (
+                                    <Badge key={idx} variant="primary" size="md">
+                                      <span dangerouslySetInnerHTML={{ __html: weapon }} />
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Skill Choices */}
+                            {selectedClassData.proficiencies.skillChoices && (
+                              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                                <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                                  Skill Proficiencies (Choose {selectedClassData.proficiencies.skillChoices.count})
+                                </h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {selectedClassData.proficiencies.skillChoices.from.map((skill, idx) => (
+                                    <Badge key={idx} variant="warning" size="md">
+                                      {skill}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Multiclassing Requirements */}
+                            {selectedClassData.multiclassing && Object.keys(selectedClassData.multiclassing.requirements).length > 0 && (
+                              <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
+                                <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                                  Multiclassing Requirements
+                                </h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {Object.entries(selectedClassData.multiclassing.requirements).map(([ability, score]) => (
+                                    <Badge key={ability} variant="primary" size="md">
+                                      {ability.toUpperCase()} {score}+
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Starting Equipment */}
+                            {selectedClassData.startingEquipment && selectedClassData.startingEquipment.length > 0 && (
+                              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                <h4 className="mb-2 text-sm font-semibold text-gray-900">Starting Equipment</h4>
+                                <ul className="space-y-1 text-sm text-gray-700">
+                                  {selectedClassData.startingEquipment.slice(0, 5).map((item, idx) => (
+                                    <li key={idx} className="flex items-start gap-2">
+                                      <span className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-gray-400"></span>
+                                      <span dangerouslySetInnerHTML={{ __html: item }} />
+                                    </li>
+                                  ))}
+                                  {selectedClassData.startingEquipment.length > 5 && (
+                                    <li className="text-xs italic text-gray-600">
+                                      ...and {selectedClassData.startingEquipment.length - 5} more items
+                                    </li>
+                                  )}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* Class Features Preview */}
+                            {selectedClassData.features && selectedClassData.features.length > 0 && (
+                              <div className="space-y-3">
+                                <h4 className="text-sm font-semibold text-gray-900">
+                                  Class Features (First 3 Levels)
+                                </h4>
+                                {selectedClassData.features
+                                  .filter(feature => !feature.isSubclassFeature && feature.level <= 3)
+                                  .slice(0, 5)
+                                  .map((feature, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="rounded-lg border border-emerald-200 bg-emerald-50 p-4"
+                                    >
+                                      <div className="mb-1 flex items-center justify-between">
+                                        <h5 className="text-sm font-semibold text-emerald-900">
+                                          {feature.name}
+                                        </h5>
+                                        <Badge variant="success" size="sm">
+                                          Level {feature.level}
+                                        </Badge>
+                                      </div>
+                                      {feature.entries && feature.entries.length > 0 && (
+                                        <div 
+                                          className="text-sm leading-relaxed text-gray-700"
+                                          dangerouslySetInnerHTML={{ 
+                                            __html: feature.entries[0].substring(0, 150) + (feature.entries[0].length > 150 ? '...' : '')
+                                          }}
+                                        />
+                                      )}
+                                    </div>
+                                  ))}
+                              </div>
+                            )}
+
+                            {/* Subclasses Count */}
+                            {selectedClassData.subclasses && selectedClassData.subclasses.length > 0 && (
+                              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                                <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                                  Available Subclasses
+                                </h4>
+                                <p className="text-sm text-gray-700">
+                                  This class has <strong>{selectedClassData.subclasses.length}</strong> subclass{selectedClassData.subclasses.length !== 1 ? 'es' : ''} available.
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Source */}
+                            <div className="border-t border-gray-200 pt-3">
+                              <p className="text-xs text-gray-600">
+                                <span className="font-medium">Source:</span> {selectedClassData.source}
+                                {selectedClassData.page && ` • Page ${selectedClassData.page}`}
+                              </p>
+                            </div>
+                          </div>
+                        </DialogBody>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </div>
               </div>
 
               {/* Player Name */}
