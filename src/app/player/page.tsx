@@ -6,7 +6,6 @@ import {
   Plus,
   User,
   Crown,
-  Calendar,
   Archive,
   Edit3,
   Trash2,
@@ -354,7 +353,7 @@ export default function PlayerDashboardPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
           <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-6 shadow-md">
             <div className="flex items-center">
               <User className="mr-3 h-8 w-8 text-blue-600" />
@@ -363,22 +362,6 @@ export default function PlayerDashboardPage() {
                   {activeCharacters.length}
                 </h3>
                 <p className="text-slate-600">Active Characters</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 p-6 shadow-md">
-            <div className="flex items-center">
-              <Calendar className="mr-3 h-8 w-8 text-green-600" />
-              <div>
-                <h3 className="text-2xl font-bold text-slate-800" suppressHydrationWarning>
-                  {activeCharacters.length > 0
-                    ? new Date(
-                        Math.max(...activeCharacters.map(c => new Date(c.lastPlayed).getTime()))
-                      ).toLocaleDateString()
-                    : 'N/A'}
-                </h3>
-                <p className="text-slate-600">Last Session</p>
               </div>
             </div>
           </div>
