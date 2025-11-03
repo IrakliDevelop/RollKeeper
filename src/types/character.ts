@@ -480,6 +480,7 @@ export interface CharacterState {
   // Basic Information
   name: string;
   race: string;
+  avatar?: string; // Base64 encoded image data
   
   // Multiclass Support (new)
   classes?: MulticlassInfo[]; // Array of classes for multiclass characters
