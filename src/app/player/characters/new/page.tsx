@@ -75,20 +75,34 @@ export default function NewCharacterPage() {
         return;
       }
 
+      // Find the selected class data from COMMON_CLASSES
+      const classData = COMMON_CLASSES.find(c => c.name === selectedClass);
+      
+      if (!classData) {
+        alert('Invalid class selected');
+        setIsCreating(false);
+        return;
+      }
+
       // Create partial character data with the selected options
       const partialCharacterData = {
         ...DEFAULT_CHARACTER_STATE,
-        characterName: characterName.trim(),
+        name: characterName.trim(),
         race: selectedRace,
-        classInfo: {
-          name: selectedClass,
-          hitDie: 'd8',
-          primaryAbility: 'strength',
-          savingThrowProficiencies: [],
-          skillOptions: [],
-          armorProficiencies: [],
-          weaponProficiencies: [],
-          spellcasting: null,
+        class: {
+          name: classData.name,
+          isCustom: false,
+          spellcaster: classData.spellcaster,
+          hitDie: classData.hitDie,
+        },
+        hitDice: `1d${classData.hitDie}`,
+        hitPoints: {
+          current: classData.hitDie,
+          max: classData.hitDie,
+          temporary: 0,
+          calculationMode: 'auto' as const,
+          manualMaxOverride: undefined,
+          deathSaves: undefined,
         },
         playerName: playerName.trim() || 'Player',
         level: 1,

@@ -35,6 +35,7 @@ export default function PlayerDashboardPage() {
 
   const activeCharacters = getActiveCharacters();
   const archivedCharacters = getArchivedCharacters();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Check for migration on component mount
   useEffect(() => {
@@ -315,30 +316,20 @@ export default function PlayerDashboardPage() {
           </div>
           <div className="flex items-center gap-3">
             {/* Import Character */}
-            <label className="cursor-pointer">
-              <Button
-                variant="success"
-                leftIcon={<Upload size={18} />}
-              >
-                Import Character
-              </Button>
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleImportCharacter}
-                className="hidden"
-              />
-            </label>
-
-            {/* Try Migration */}
             <Button
-              onClick={handleTryMigration}
-              variant="warning"
-              leftIcon={<Download size={18} />}
-              title="Try to migrate old character data"
+              variant="success"
+              leftIcon={<Upload size={18} />}
+              onClick={() => fileInputRef.current?.click()}
             >
-              Migrate Old Data
+              Import Character
             </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleImportCharacter}
+              className="hidden"
+            />
 
             {/* New Character */}
             <Link href="/player/characters/new">
@@ -440,8 +431,8 @@ export default function PlayerDashboardPage() {
           <>
             {/* Active Characters */}
             {activeCharacters.length > 0 && (
-              <div className="mb-12">
-                <h2 className="mb-6 flex items-center gap-2 text-2xl font-semibold text-slate-800">
+              <div className="mb-12" suppressHydrationWarning>
+                <h2 className="mb-6 flex items-center gap-2 text-2xl font-semibold text-slate-800" suppressHydrationWarning>
                   <User size={24} />
                   Active Characters ({activeCharacters.length})
                 </h2>
@@ -455,8 +446,8 @@ export default function PlayerDashboardPage() {
 
             {/* Archived Characters */}
             {archivedCharacters.length > 0 && (
-              <div>
-                <h2 className="mb-6 flex items-center gap-2 text-2xl font-semibold text-slate-700">
+              <div suppressHydrationWarning>
+                <h2 className="mb-6 flex items-center gap-2 text-2xl font-semibold text-slate-700" suppressHydrationWarning>
                   <Archive size={24} />
                   Archived Characters ({archivedCharacters.length})
                 </h2>
