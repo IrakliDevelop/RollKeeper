@@ -796,13 +796,11 @@ export default function CharacterSheet() {
                     <TraitTracker<ExtendedFeature>
                       traits={(character.extendedFeatures || []).filter(trait => !trait.isPassive)}
                       characterLevel={totalLevel}
-                      onAddTrait={addExtendedFeature}
                       onUpdateTrait={updateExtendedFeature}
                       onDeleteTrait={deleteExtendedFeature}
                       onUseTrait={useExtendedFeature}
                       onResetTraits={resetExtendedFeatures}
                       readonly={false}
-                      hideAddButton={true}
                       hideControls={true}
                       enableViewModal={true}
                     />

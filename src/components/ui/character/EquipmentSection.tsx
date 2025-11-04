@@ -74,7 +74,6 @@ const CollapsibleSubsection: React.FC<CollapsibleSubsectionProps> = ({
 export default function EquipmentSection({
   character,
 }: EquipmentSectionProps) {
-  const equippedWeapons = character.weapons.filter(weapon => weapon.isEquipped);
   const equippedArmor = character.armorItems.filter(armor => armor.isEquipped);
   const attunedItems = character.magicItems.filter(item => item.isAttuned).length +
     character.weapons.filter(weapon => weapon.isAttuned).length;

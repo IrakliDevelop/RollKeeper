@@ -8,6 +8,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
+import Image from 'next/image';
 import { Upload, X, User } from 'lucide-react';
 import { Button } from '@/components/ui/forms';
 import { cn } from '@/utils/cn';
@@ -153,10 +154,12 @@ export function AvatarUpload({
           onClick={editable ? handleUploadClick : undefined}
         >
           {avatar ? (
-            <img
+            <Image
               src={avatar}
               alt={`${characterName} avatar`}
-              className="h-full w-full object-cover"
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
