@@ -42,7 +42,10 @@ export async function uploadAvatarToS3(
     await s3Client.send(command);
     
     // Construct the public URL
-    const url = `https://${BUCKET_NAME}.s3.${process.env.AWS_S3_REGION}.amazonaws.com/${key}`;
+    // Get the endpoint from the S3 client
+    const endpoint = (await s3Client.config.endpoint()).href.replace(/\/$/, '');
+    // Construct path-style URL: https://{endpoint}/{bucket}/{key}
+    const url = `${endpoint}/${BUCKET_NAME}/${key}`;
     return url;
   } catch (error) {
     console.error('Error uploading to S3:', error);
