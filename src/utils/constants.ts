@@ -158,6 +158,19 @@ export const COMMON_RACES = [
   'Yuan-Ti',
 ];
 
+// Fallback race options for autocomplete when API fails
+export const FALLBACK_RACE_OPTIONS = [
+  { value: 'Human', label: 'Human' },
+  { value: 'Elf', label: 'Elf' },
+  { value: 'Dwarf', label: 'Dwarf' },
+  { value: 'Halfling', label: 'Halfling' },
+  { value: 'Dragonborn', label: 'Dragonborn' },
+  { value: 'Gnome', label: 'Gnome' },
+  { value: 'Half-Elf', label: 'Half-Elf' },
+  { value: 'Half-Orc', label: 'Half-Orc' },
+  { value: 'Tiefling', label: 'Tiefling' },
+];
+
 // Hit dice for each D&D 5e class
 export const CLASS_HIT_DICE: Record<string, number> = {
   Barbarian: 12,
