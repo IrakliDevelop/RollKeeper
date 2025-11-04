@@ -6,12 +6,24 @@ export interface RawRaceData {
   source: string;
   page?: number;
   size?: string[];
-  speed?: number | {
-    walk?: number;
-    fly?: number;
-    swim?: number;
-  };
-  ability?: Array<Record<string, number | { from?: string[]; count?: number; choose?: { from?: string[]; count?: number } }>>;
+  speed?:
+    | number
+    | {
+        walk?: number;
+        fly?: number;
+        swim?: number;
+      };
+  ability?: Array<
+    Record<
+      string,
+      | number
+      | {
+          from?: string[];
+          count?: number;
+          choose?: { from?: string[]; count?: number };
+        }
+    >
+  >;
   age?: {
     mature?: number;
     max?: number;
@@ -59,6 +71,9 @@ export interface ProcessedRace {
   }>;
 }
 
+// Maximum length for feature descriptions before truncation
+const MAX_DESCRIPTION_LENGTH = 200;
+
 // Cache for loaded races to avoid reprocessing
 let cachedRaces: ProcessedRace[] | null = null;
 
@@ -67,15 +82,15 @@ let cachedRaces: ProcessedRace[] | null = null;
  */
 async function loadRacesFile(): Promise<RawRaceData[]> {
   const racesPath = path.join(process.cwd(), 'json', 'races.json');
-  
+
   try {
     const fileContent = await fs.readFile(racesPath, 'utf-8');
     const data = JSON.parse(fileContent);
-    
+
     if (data.race && Array.isArray(data.race)) {
       return data.race;
     }
-    
+
     return [];
   } catch (error) {
     console.error('Error loading races file:', error);
@@ -88,21 +103,21 @@ async function loadRacesFile(): Promise<RawRaceData[]> {
  */
 function formatSource(source: string): string {
   const sourceMap: Record<string, string> = {
-    'PHB': 'Player\'s Handbook',
-    'XPHB': 'Player\'s Handbook 2024',
-    'DMG': 'Dungeon Master\'s Guide',
-    'MM': 'Monster Manual',
-    'MPMM': 'Mordenkainen Presents: Monsters of the Multiverse',
-    'VGTM': 'Volo\'s Guide to Monsters',
-    'MTF': 'Mordenkainen\'s Tome of Foes',
-    'EEPC': 'Elemental Evil Player\'s Companion',
-    'SCAG': 'Sword Coast Adventurer\'s Guide',
-    'EGW': 'Explorer\'s Guide to Wildemount',
-    'TCE': 'Tasha\'s Cauldron of Everything',
-    'FTD': 'Fizban\'s Treasury of Dragons',
-    'SRD': 'System Reference Document',
+    PHB: "Player's Handbook",
+    XPHB: "Player's Handbook 2024",
+    DMG: "Dungeon Master's Guide",
+    MM: 'Monster Manual',
+    MPMM: 'Mordenkainen Presents: Monsters of the Multiverse',
+    VGTM: "Volo's Guide to Monsters",
+    MTF: "Mordenkainen's Tome of Foes",
+    EEPC: "Elemental Evil Player's Companion",
+    SCAG: "Sword Coast Adventurer's Guide",
+    EGW: "Explorer's Guide to Wildemount",
+    TCE: "Tasha's Cauldron of Everything",
+    FTD: "Fizban's Treasury of Dragons",
+    SRD: 'System Reference Document',
   };
-  
+
   return sourceMap[source] || source;
 }
 
@@ -118,9 +133,15 @@ function processRace(rawRace: RawRaceData): ProcessedRace {
         const value = abilityObj[key];
         if (typeof value === 'number' && value > 0) {
           abilityScores.push(`${key.toUpperCase()} +${value}`);
-        } else if (typeof value === 'object' && value !== null && 'from' in value && 'count' in value) {
+        } else if (
+          typeof value === 'object' &&
+          value !== null &&
+          'from' in value &&
+          'count' in value
+        ) {
           // Handle choose options like "choose 2 from STR, DEX, CON, INT, WIS"
-          const fromList = value.from?.map(a => a.toUpperCase()).join(', ') || 'any';
+          const fromList =
+            value.from?.map(a => a.toUpperCase()).join(', ') || 'any';
           abilityScores.push(`Choose +${value.count || 1} from ${fromList}`);
         }
       });
@@ -129,14 +150,17 @@ function processRace(rawRace: RawRaceData): ProcessedRace {
 
   // Get size display
   const sizeMap: Record<string, string> = {
-    'T': 'Tiny',
-    'S': 'Small',
-    'M': 'Medium',
-    'L': 'Large',
-    'H': 'Huge',
-    'G': 'Gargantuan',
+    T: 'Tiny',
+    S: 'Small',
+    M: 'Medium',
+    L: 'Large',
+    H: 'Huge',
+    G: 'Gargantuan',
   };
-  const sizeDisplay = rawRace.size && rawRace.size[0] ? sizeMap[rawRace.size[0]] || rawRace.size[0] : undefined;
+  const sizeDisplay =
+    rawRace.size && rawRace.size[0]
+      ? sizeMap[rawRace.size[0]] || rawRace.size[0]
+      : undefined;
 
   // Parse speed (can be number or object)
   let speed: { walk?: number; fly?: number; swim?: number } | undefined;
@@ -148,7 +172,10 @@ function processRace(rawRace: RawRaceData): ProcessedRace {
 
   // Parse languages
   const languages: string[] = [];
-  if (rawRace.languageProficiencies && Array.isArray(rawRace.languageProficiencies)) {
+  if (
+    rawRace.languageProficiencies &&
+    Array.isArray(rawRace.languageProficiencies)
+  ) {
     rawRace.languageProficiencies.forEach(langObj => {
       Object.keys(langObj).forEach(key => {
         const value = langObj[key];
@@ -189,11 +216,14 @@ function processRace(rawRace: RawRaceData): ProcessedRace {
             .replace(/\{@\w+\s+([^}]+)\}/g, '$1')
             .replace(/\{@\w+\}/g, '')
             .trim();
-          
+
           if (description && description.length > 0) {
             features.push({
               name: entry.name,
-              description: description.length > 200 ? description.substring(0, 200) + '...' : description,
+              description:
+                description.length > MAX_DESCRIPTION_LENGTH
+                  ? description.substring(0, MAX_DESCRIPTION_LENGTH) + '...'
+                  : description,
             });
           }
         }
@@ -227,39 +257,56 @@ export async function loadAllRaces(): Promise<ProcessedRace[]> {
   if (cachedRaces) {
     return cachedRaces;
   }
-  
+
   try {
     const rawRaces = await loadRacesFile();
-    
+
     // Process all races
     const processedRaces = rawRaces.map(processRace);
-    
+
     // Remove duplicates (prioritize PHB2024 > PHB > others)
     const uniqueRaces = new Map<string, ProcessedRace>();
-    
-    const sourceOrder = ['XPHB', 'PHB', 'MPMM', 'VGTM', 'MTF', 'TCE', 'FTD', 'EEPC', 'SCAG', 'EGW', 'SRD', 'DMG', 'MM'];
-    
+
+    const sourceOrder = [
+      'XPHB',
+      'PHB',
+      'MPMM',
+      'VGTM',
+      'MTF',
+      'TCE',
+      'FTD',
+      'EEPC',
+      'SCAG',
+      'EGW',
+      'SRD',
+      'DMG',
+      'MM',
+    ];
+
     for (const race of processedRaces) {
       const existingRace = uniqueRaces.get(race.name);
-      
+
       if (!existingRace) {
         uniqueRaces.set(race.name, race);
       } else {
         // Keep the one with higher priority source
         const existingPriority = sourceOrder.indexOf(existingRace.source);
         const newPriority = sourceOrder.indexOf(race.source);
-        
-        if (newPriority !== -1 && (existingPriority === -1 || newPriority < existingPriority)) {
+
+        if (
+          newPriority !== -1 &&
+          (existingPriority === -1 || newPriority < existingPriority)
+        ) {
           uniqueRaces.set(race.name, race);
         }
       }
     }
-    
+
     // Convert to array and sort alphabetically
     cachedRaces = Array.from(uniqueRaces.values()).sort((a, b) =>
       a.name.localeCompare(b.name)
     );
-    
+
     return cachedRaces;
   } catch (error) {
     console.error('Error loading races:', error);
@@ -274,4 +321,3 @@ export async function getRaceNames(): Promise<string[]> {
   const races = await loadAllRaces();
   return races.map(race => race.name);
 }
-
