@@ -18,6 +18,7 @@ import {
 import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
+import { AvatarUpload } from '@/components/ui/character/AvatarUpload';
 
 export default function PlayerDashboardPage() {
   const {
@@ -158,22 +159,63 @@ export default function PlayerDashboardPage() {
       }`}
     >
       <div className="p-6">
-        <div className="mb-4 flex items-start justify-between">
-          <div className="flex-1">
-            <h3 className="mb-1 text-xl font-semibold text-slate-800">
-              {character.name}
-            </h3>
-            <div className="mb-2 flex items-center space-x-2">
-              <span className="text-slate-600">{character.race}</span>
-              <span className="text-slate-400">•</span>
-              <Badge variant={getClassBadgeVariant(character.class)}>
-                {character.class}
-              </Badge>
-              <span className="text-slate-400">•</span>
-              <span className="text-slate-600">Level {character.level}</span>
+        <div className="mb-4 flex items-start gap-3">
+          {/* Avatar */}
+          <div className="flex-shrink-0">
+            <AvatarUpload
+              avatar={character.avatar}
+              characterId={character.id}
+              characterName={character.name}
+              onAvatarChange={() => {}} // View only on dashboard
+              size="md"
+              editable={false}
+            />
+          </div>
+          
+          {/* Character Info */}
+          <div className="min-w-0 flex-1">
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="mb-1 truncate text-xl font-semibold text-slate-800">
+                  {character.name}
+                </h3>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="text-sm text-slate-600">{character.race}</span>
+                  <span className="text-slate-400">•</span>
+                  <Badge variant={getClassBadgeVariant(character.class)}>
+                    {character.class}
+                  </Badge>
+                  <span className="text-slate-400">•</span>
+                  <span className="text-sm text-slate-600">Level {character.level}</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              {!isArchived && (
+                <div className="flex flex-shrink-0 space-x-1">
+                  <Button
+                    onClick={() => handleDuplicateCharacter(character)}
+                    variant="ghost"
+                    size="sm"
+                    title="Duplicate Character"
+                  >
+                    <Copy size={16} />
+                  </Button>
+                  <Button
+                    onClick={() => handleArchiveCharacter(character.id)}
+                    variant="ghost"
+                    size="sm"
+                    title="Archive Character"
+                  >
+                    <Archive size={16} />
+                  </Button>
+                </div>
+              )}
             </div>
+
+            {/* Tags */}
             {character.tags.length > 0 && (
-              <div className="mb-3 flex flex-wrap gap-1">
+              <div className="mt-2 flex flex-wrap gap-1">
                 {character.tags.map(tag => (
                   <Badge key={tag} variant="neutral" size="sm">
                     {tag}
@@ -182,27 +224,6 @@ export default function PlayerDashboardPage() {
               </div>
             )}
           </div>
-
-          {!isArchived && (
-            <div className="flex space-x-1">
-              <Button
-                onClick={() => handleDuplicateCharacter(character)}
-                variant="ghost"
-                size="sm"
-                title="Duplicate Character"
-              >
-                <Copy size={16} />
-              </Button>
-              <Button
-                onClick={() => handleArchiveCharacter(character.id)}
-                variant="ghost"
-                size="sm"
-                title="Archive Character"
-              >
-                <Archive size={16} />
-              </Button>
-            </div>
-          )}
         </div>
 
         <div className="mb-4 text-sm text-slate-500">

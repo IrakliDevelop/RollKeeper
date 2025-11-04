@@ -15,8 +15,10 @@ import { useCharacterStore } from '@/store/characterStore';
 import { exportCharacterToFile } from '@/utils/fileOperations';
 import { useState, useEffect } from 'react';
 import { Button, Input } from '@/components/ui/forms';
+import { AvatarUpload } from './AvatarUpload';
 
 interface CharacterSheetHeaderProps {
+  characterId: string;
   characterName: string;
   characterRace: string;
   characterClass: string;
@@ -36,6 +38,7 @@ interface CharacterSheetHeaderProps {
 }
 
 export default function CharacterSheetHeader({
+  characterId,
   characterName,
   characterRace,
   characterClass,
@@ -50,6 +53,28 @@ export default function CharacterSheetHeader({
   onAddToast,
 }: CharacterSheetHeaderProps) {
   const { exportCharacter } = useCharacterStore();
+  const { getCharacterById, updateCharacterData } = usePlayerStore();
+  
+  // Get character data for avatar
+  const playerCharacter = getCharacterById(characterId);
+
+  // Handle avatar change
+  const handleAvatarChange = (newAvatar: string | undefined) => {
+    console.log('📸 handleAvatarChange called with:', newAvatar ? `base64 string (${newAvatar.length} chars)` : 'undefined');
+    console.log('👤 playerCharacter:', playerCharacter);
+    console.log('📝 characterData:', playerCharacter?.characterData);
+    
+    if (playerCharacter?.characterData) {
+      console.log('✅ Updating character data...');
+      updateCharacterData(characterId, {
+        ...playerCharacter.characterData,
+        avatar: newAvatar,
+      });
+      console.log('✅ Character data updated!');
+    } else {
+      console.log('❌ No playerCharacter or characterData found!');
+    }
+  };
 
   // Header visibility state
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -220,67 +245,82 @@ export default function CharacterSheetHeader({
       {/* Main Character Header */}
       <header className="relative z-30 mx-auto mb-8 max-w-7xl">
         <div className="rounded-xl border border-slate-200 bg-white/90 p-6 shadow-xl backdrop-blur-sm">
-          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-            <div className="flex-1">
-              <Input
-                type="text"
-                placeholder="Character Name"
-                value={characterName}
-                onChange={e => onUpdateName(e.target.value)}
-                className="w-full border-none bg-transparent text-3xl font-bold text-gray-800 placeholder-gray-400 outline-none"
-                size="lg"
-              />
-              <SaveIndicator
-                status={saveStatus}
-                lastSaved={lastSaved}
-                hasUnsavedChanges={hasUnsavedChanges}
-                className="mt-1"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={onManualSave}
-                disabled={!hasUnsavedChanges}
-                variant="success"
-                size="sm"
-                leftIcon={<Save size={16} />}
-                className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-md"
-              >
-                Save
-              </Button>
-              <Button
-                onClick={onExport}
-                variant="outline"
-                size="sm"
-                leftIcon={<Download size={16} />}
-                className="shadow-sm"
-              >
-                Export
-              </Button>
-
-              <Button
-                asChild
-                variant="secondary"
-                size="sm"
-                className="shadow-sm"
-                title="Try the new Notes module prototype"
-              >
-                <Link href="/prototype" className="flex items-center gap-2">
-                  <FileText size={16} />
-                  Notes Prototype
-                </Link>
-              </Button>
+          <div className="flex items-start gap-4">
+            {/* Avatar */}
+            <AvatarUpload
+              avatar={playerCharacter?.avatar}
+              characterId={characterId}
+              characterName={characterName}
+              onAvatarChange={handleAvatarChange}
+              size="lg"
+              editable={true}
+            />
+            
+            {/* Name Input and Buttons - side by side */}
+            <div className="flex flex-1 items-start justify-between gap-4">
+              <div className="flex-1">
+                <Input
+                  type="text"
+                  placeholder="Character Name"
+                  value={characterName}
+                  onChange={e => onUpdateName(e.target.value)}
+                  className="w-full border-none bg-transparent text-3xl font-bold text-gray-800 placeholder-gray-400 outline-none"
+                  size="lg"
+                />
+                <SaveIndicator
+                  status={saveStatus}
+                  lastSaved={lastSaved}
+                  hasUnsavedChanges={hasUnsavedChanges}
+                  className="mt-1"
+                />
+              </div>
               
-              <Button
-                onClick={onShowResetModal}
-                variant="danger"
-                size="sm"
-                leftIcon={<RotateCcw size={16} />}
-                className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-md"
-                title="Reset character - this will clear all data!"
-              >
-                Reset
-              </Button>
+              {/* Action Buttons */}
+              <div className="flex flex-shrink-0 gap-2">
+                <Button
+                  onClick={onManualSave}
+                  disabled={!hasUnsavedChanges}
+                  variant="success"
+                  size="sm"
+                  leftIcon={<Save size={16} />}
+                  className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-md"
+                >
+                  Save
+                </Button>
+                <Button
+                  onClick={onExport}
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Download size={16} />}
+                  className="shadow-sm"
+                >
+                  Export
+                </Button>
+
+                <Button
+                  asChild
+                  variant="secondary"
+                  size="sm"
+                  className="shadow-sm"
+                  title="Try the new Notes module prototype"
+                >
+                  <Link href="/prototype" className="flex items-center gap-2">
+                    <FileText size={16} />
+                    Notes Prototype
+                  </Link>
+                </Button>
+                
+                <Button
+                  onClick={onShowResetModal}
+                  variant="danger"
+                  size="sm"
+                  leftIcon={<RotateCcw size={16} />}
+                  className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-md"
+                  title="Reset character - this will clear all data!"
+                >
+                  Reset
+                </Button>
+              </div>
             </div>
           </div>
         </div>

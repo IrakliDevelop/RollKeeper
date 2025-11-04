@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/forms';
 import { cn } from '@/utils/cn';
 
 export interface AvatarUploadProps {
-  avatar?: string; // Base64 encoded image
+  avatar?: string; // S3 URL or base64 encoded image (for backwards compatibility)
+  characterId: string; // Required for S3 uploads
   characterName: string;
   onAvatarChange: (avatar: string | undefined) => void;
   size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -37,6 +38,7 @@ const iconSizeClasses = {
 
 export function AvatarUpload({
   avatar,
+  characterId,
   characterName,
   onAvatarChange,
   size = 'md',
@@ -49,41 +51,65 @@ export function AvatarUpload({
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    console.log('🔍 File selected:', file);
+    
+    if (!file) {
+      console.log('❌ No file selected');
+      return;
+    }
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
+      console.log('❌ Invalid file type:', file.type);
       setError('Please select an image file');
       return;
     }
 
-    // Validate file size (max 2MB to keep localStorage reasonable)
-    const maxSize = 2 * 1024 * 1024; // 2MB
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
-      setError('Image must be smaller than 2MB');
+      console.log('❌ File too large:', file.size, 'bytes');
+      setError('Image must be smaller than 5MB');
       return;
     }
 
+    console.log('✅ File validation passed, uploading to S3...');
     setIsLoading(true);
     setError(null);
 
     try {
-      const reader = new FileReader();
+      // Create form data
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('characterId', characterId);
+
+      // Upload to S3 via API route
+      const response = await fetch('/api/avatar/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      const { url } = await response.json();
+      console.log('✅ Upload successful! URL:', url);
       
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string;
-        onAvatarChange(base64);
-        setIsLoading(false);
-      };
+      // Delete old avatar from S3 if it exists and is an S3 URL
+      if (avatar && avatar.includes('s3.amazonaws.com')) {
+        console.log('🗑️ Deleting old avatar from S3...');
+        await fetch(`/api/avatar/delete?url=${encodeURIComponent(avatar)}`, {
+          method: 'DELETE',
+        });
+      }
 
-      reader.onerror = () => {
-        setError('Failed to read image file');
-        setIsLoading(false);
-      };
-
-      reader.readAsDataURL(file);
+      onAvatarChange(url);
+      setIsLoading(false);
     } catch (err) {
-      setError('Failed to process image');
+      console.log('❌ Upload error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to upload avatar');
       setIsLoading(false);
     }
 
@@ -91,7 +117,20 @@ export function AvatarUpload({
     event.target.value = '';
   };
 
-  const handleRemoveAvatar = () => {
+  const handleRemoveAvatar = async () => {
+    // Delete from S3 if it's an S3 URL
+    if (avatar && avatar.includes('s3.amazonaws.com')) {
+      console.log('🗑️ Deleting avatar from S3...');
+      try {
+        await fetch(`/api/avatar/delete?url=${encodeURIComponent(avatar)}`, {
+          method: 'DELETE',
+        });
+        console.log('✅ Avatar deleted from S3');
+      } catch (err) {
+        console.log('⚠️ Failed to delete from S3:', err);
+      }
+    }
+    
     onAvatarChange(undefined);
     setError(null);
   };
@@ -183,7 +222,7 @@ export function AvatarUpload({
       {/* Helper Text */}
       {editable && !error && (
         <p className="text-xs text-gray-500 text-center">
-          Max 2MB • JPG, PNG, GIF
+          Max 5MB • Uploaded to cloud storage
         </p>
       )}
     </div>

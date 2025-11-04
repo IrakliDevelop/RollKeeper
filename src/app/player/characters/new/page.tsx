@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ProcessedRace } from '@/utils/raceDataLoader';
 import { ProcessedClass } from '@/types/classes';
 import { formatSpellcastingType, formatProficiencyType } from '@/utils/classFilters';
+import { AvatarUpload } from '@/components/ui/character/AvatarUpload';
 
 export default function NewCharacterPage() {
   const router = useRouter();
@@ -21,9 +22,13 @@ export default function NewCharacterPage() {
   const [selectedRace, setSelectedRace] = useState('Human');
   const [selectedClass, setSelectedClass] = useState('Fighter');
   const [playerName, setPlayerName] = useState('');
+  const [avatar, setAvatar] = useState<string | undefined>(undefined);
   const [isCreating, setIsCreating] = useState(false);
   const [raceOptions, setRaceOptions] = useState<AutocompleteOption[]>([]);
   const [races, setRaces] = useState<ProcessedRace[]>([]);
+  
+  // Generate a temporary ID for avatar uploads (will be replaced when character is created)
+  const [tempCharacterId] = useState(() => `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   const [isLoadingRaces, setIsLoadingRaces] = useState(true);
   const [classes, setClasses] = useState<ProcessedClass[]>([]);
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
@@ -115,6 +120,7 @@ export default function NewCharacterPage() {
         ...DEFAULT_CHARACTER_STATE,
         name: characterName.trim(),
         race: selectedRace,
+        avatar: avatar, // Add avatar to character data
         class: {
           name: classData.name,
           isCustom: false,
@@ -187,6 +193,18 @@ export default function NewCharacterPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Avatar Upload */}
+            <div className="flex justify-center">
+              <AvatarUpload
+                avatar={avatar}
+                characterId={tempCharacterId}
+                characterName={characterName || 'New Character'}
+                onAvatarChange={setAvatar}
+                size="xl"
+                editable={true}
+              />
+            </div>
+
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {/* Character Name */}
               <div className="md:col-span-2">
@@ -446,16 +464,16 @@ export default function NewCharacterPage() {
                           key={classData.name}
                           value={classData.name}
                           description={
-                          classData.spellcaster !== 'none'
-                            ? `${
-                                classData.spellcaster === 'full'
-                                  ? 'Full'
-                                  : classData.spellcaster === 'half'
-                                    ? 'Half'
-                                    : classData.spellcaster === 'third'
-                                      ? '1/3'
-                                      : 'Pact'
-                              } Caster`
+                        classData.spellcaster !== 'none'
+                          ? `${
+                              classData.spellcaster === 'full'
+                                ? 'Full'
+                                : classData.spellcaster === 'half'
+                                  ? 'Half'
+                                  : classData.spellcaster === 'third'
+                                    ? '1/3'
+                                    : 'Pact'
+                            } Caster`
                               : 'Non-spellcaster'
                           }
                         >
