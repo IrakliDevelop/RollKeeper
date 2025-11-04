@@ -520,6 +520,7 @@ export default function CharacterSheet() {
         <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
           {/* Header */}
           <CharacterSheetHeader
+            characterId={characterId}
             characterName={character.name}
             characterRace={character.race}
             characterClass={character.class?.name || 'Unknown Class'}
@@ -795,13 +796,11 @@ export default function CharacterSheet() {
                     <TraitTracker<ExtendedFeature>
                       traits={(character.extendedFeatures || []).filter(trait => !trait.isPassive)}
                       characterLevel={totalLevel}
-                      onAddTrait={addExtendedFeature}
                       onUpdateTrait={updateExtendedFeature}
                       onDeleteTrait={deleteExtendedFeature}
                       onUseTrait={useExtendedFeature}
                       onResetTraits={resetExtendedFeatures}
                       readonly={false}
-                      hideAddButton={true}
                       hideControls={true}
                       enableViewModal={true}
                     />

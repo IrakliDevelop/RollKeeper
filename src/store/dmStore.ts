@@ -813,7 +813,7 @@ export const useDMStore = create<DMStoreState>()(
       version: 1,
       // Migrate function for future versions
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      migrate: (persistedState: any, version: number) => {
+      migrate: (persistedState: any) => {
         // Handle data migrations here when we update the schema
         return persistedState;
       },

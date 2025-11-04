@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/forms/textarea';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Checkbox } from '@/components/ui/forms/checkbox';
 import { Switch } from '@/components/ui/forms/switch';
-import { RadioGroup, RadioGroupItem, RadioGroupField } from '@/components/ui/forms/radio-group';
+import { RadioGroupItem, RadioGroupField } from '@/components/ui/forms/radio-group';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/layout/card';
 import { Badge } from '@/components/ui/layout/badge';
 import {
@@ -28,6 +28,7 @@ import {
   DialogFooter,
   DialogTrigger,
 } from '@/components/ui/feedback/dialog-new';
+import { Autocomplete, AutocompleteOption } from '@/components/ui/forms/Autocomplete';
 
 export default function DesignSystemShowcase() {
   const [inputValue, setInputValue] = useState('');
@@ -36,6 +37,19 @@ export default function DesignSystemShowcase() {
   const [switchState, setSwitchState] = useState(false);
   const [radioValue, setRadioValue] = useState('option1');
   const [selectValue, setSelectValue] = useState('');
+  const [autocompleteValue, setAutocompleteValue] = useState('');
+
+  const autocompleteOptions: AutocompleteOption[] = [
+    { value: 'human', label: 'Human' },
+    { value: 'elf', label: 'Elf' },
+    { value: 'dwarf', label: 'Dwarf' },
+    { value: 'halfling', label: 'Halfling' },
+    { value: 'dragonborn', label: 'Dragonborn' },
+    { value: 'gnome', label: 'Gnome' },
+    { value: 'half-elf', label: 'Half-Elf' },
+    { value: 'half-orc', label: 'Half-Orc' },
+    { value: 'tiefling', label: 'Tiefling' },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -258,6 +272,51 @@ export default function DesignSystemShowcase() {
                     Download
                   </SelectItem>
                 </SelectField>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* Autocomplete */}
+        <section>
+          <h2 className="mb-6 text-2xl font-semibold text-gray-900">Autocomplete</h2>
+          
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Searchable Dropdowns</CardTitle>
+              <CardDescription>Autocomplete inputs for large option lists</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Choose a race
+                  </label>
+                  <Autocomplete
+                    options={autocompleteOptions}
+                    value={autocompleteValue}
+                    onChange={setAutocompleteValue}
+                    placeholder="Search races..."
+                  />
+                  {autocompleteValue && (
+                    <p className="mt-2 text-sm text-gray-600">
+                      Selected: <span className="font-medium">{autocompleteValue}</span>
+                    </p>
+                  )}
+                </div>
+                
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Disabled State
+                  </label>
+                  <Autocomplete
+                    options={autocompleteOptions}
+                    value=""
+                    onChange={() => {}}
+                    placeholder="This is disabled..."
+                    disabled
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>

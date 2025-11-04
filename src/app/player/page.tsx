@@ -6,7 +6,6 @@ import {
   Plus,
   User,
   Crown,
-  Calendar,
   Archive,
   Edit3,
   Trash2,
@@ -17,6 +16,9 @@ import {
   Download,
 } from 'lucide-react';
 import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
+import { Button } from '@/components/ui/forms';
+import { Badge } from '@/components/ui/layout';
+import { AvatarUpload } from '@/components/ui/character/AvatarUpload';
 
 export default function PlayerDashboardPage() {
   const {
@@ -34,6 +36,7 @@ export default function PlayerDashboardPage() {
 
   const activeCharacters = getActiveCharacters();
   const archivedCharacters = getArchivedCharacters();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Check for migration on component mount
   useEffect(() => {
@@ -123,22 +126,22 @@ export default function PlayerDashboardPage() {
     }
   };
 
-  const getClassColor = (className: string) => {
-    const colors: Record<string, string> = {
-      Fighter: 'bg-red-100 text-red-800',
-      Wizard: 'bg-blue-100 text-blue-800',
-      Rogue: 'bg-gray-100 text-gray-800',
-      Cleric: 'bg-yellow-100 text-yellow-800',
-      Ranger: 'bg-green-100 text-green-800',
-      Paladin: 'bg-purple-100 text-purple-800',
-      Barbarian: 'bg-orange-100 text-orange-800',
-      Bard: 'bg-pink-100 text-pink-800',
-      Druid: 'bg-emerald-100 text-emerald-800',
-      Monk: 'bg-amber-100 text-amber-800',
-      Sorcerer: 'bg-indigo-100 text-indigo-800',
-      Warlock: 'bg-violet-100 text-violet-800',
+  const getClassBadgeVariant = (className: string): 'danger' | 'secondary' | 'neutral' | 'warning' | 'success' | 'primary' | 'info' => {
+    const variants: Record<string, 'danger' | 'secondary' | 'neutral' | 'warning' | 'success' | 'primary' | 'info'> = {
+      Fighter: 'danger',
+      Wizard: 'secondary',
+      Rogue: 'neutral',
+      Cleric: 'warning',
+      Ranger: 'success',
+      Paladin: 'primary',
+      Barbarian: 'danger',
+      Bard: 'info',
+      Druid: 'success',
+      Monk: 'warning',
+      Sorcerer: 'secondary',
+      Warlock: 'primary',
     };
-    return colors[className] || 'bg-slate-100 text-slate-800';
+    return variants[className] || 'neutral';
   };
 
   const CharacterCard = ({
@@ -149,59 +152,78 @@ export default function PlayerDashboardPage() {
     isArchived?: boolean;
   }) => (
     <div
-      className={`rounded-lg border-l-4 bg-white shadow-md transition-shadow hover:shadow-lg ${
-        isArchived ? 'border-gray-400 opacity-75' : 'border-blue-500'
+      className={`rounded-lg border-2 bg-gradient-to-br from-white to-slate-50 shadow-md transition-all hover:shadow-xl ${
+        isArchived 
+          ? 'border-gray-300 opacity-75 hover:from-slate-50 hover:to-gray-100' 
+          : 'border-blue-300 hover:from-slate-50 hover:to-blue-50'
       }`}
     >
       <div className="p-6">
-        <div className="mb-4 flex items-start justify-between">
-          <div className="flex-1">
-            <h3 className="mb-1 text-xl font-semibold text-slate-800">
-              {character.name}
-            </h3>
-            <div className="mb-2 flex items-center space-x-2">
-              <span className="text-slate-600">{character.race}</span>
-              <span className="text-slate-400">•</span>
-              <span
-                className={`rounded px-2 py-1 text-xs font-medium ${getClassColor(character.class)}`}
-              >
-                {character.class}
-              </span>
-              <span className="text-slate-400">•</span>
-              <span className="text-slate-600">Level {character.level}</span>
-            </div>
-            {character.tags.length > 0 && (
-              <div className="mb-3 flex flex-wrap gap-1">
-                {character.tags.map(tag => (
-                  <span
-                    key={tag}
-                    className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600"
+        <div className="mb-4 flex items-start gap-3">
+          {/* Avatar */}
+          <div className="flex-shrink-0">
+            <AvatarUpload
+              avatar={character.avatar}
+              characterId={character.id}
+              characterName={character.name}
+              onAvatarChange={() => {}} // View only on dashboard
+              size="md"
+              editable={false}
+            />
+          </div>
+          
+          {/* Character Info */}
+          <div className="min-w-0 flex-1">
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="mb-1 truncate text-xl font-semibold text-slate-800">
+                  {character.name}
+                </h3>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="text-sm text-slate-600">{character.race}</span>
+                  <span className="text-slate-400">•</span>
+                  <Badge variant={getClassBadgeVariant(character.class)}>
+                    {character.class}
+                  </Badge>
+                  <span className="text-slate-400">•</span>
+                  <span className="text-sm text-slate-600">Level {character.level}</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              {!isArchived && (
+                <div className="flex flex-shrink-0 space-x-1">
+                  <Button
+                    onClick={() => handleDuplicateCharacter(character)}
+                    variant="ghost"
+                    size="sm"
+                    title="Duplicate Character"
                   >
+                    <Copy size={16} />
+                  </Button>
+                  <Button
+                    onClick={() => handleArchiveCharacter(character.id)}
+                    variant="ghost"
+                    size="sm"
+                    title="Archive Character"
+                  >
+                    <Archive size={16} />
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Tags */}
+            {character.tags.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {character.tags.map(tag => (
+                  <Badge key={tag} variant="neutral" size="sm">
                     {tag}
-                  </span>
+                  </Badge>
                 ))}
               </div>
             )}
           </div>
-
-          {!isArchived && (
-            <div className="flex space-x-1">
-              <button
-                onClick={() => handleDuplicateCharacter(character)}
-                className="rounded p-2 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
-                title="Duplicate Character"
-              >
-                <Copy size={16} />
-              </button>
-              <button
-                onClick={() => handleArchiveCharacter(character.id)}
-                className="rounded p-2 text-slate-400 transition-colors hover:bg-yellow-50 hover:text-yellow-600"
-                title="Archive Character"
-              >
-                <Archive size={16} />
-              </button>
-            </div>
-          )}
         </div>
 
         <div className="mb-4 text-sm text-slate-500">
@@ -221,33 +243,42 @@ export default function PlayerDashboardPage() {
               <Link
                 href={`/player/characters/${character.id}`}
                 onClick={() => handlePlayCharacter(character)}
-                className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-center font-medium text-white transition-colors hover:bg-blue-700"
+                className="flex-1"
               >
-                Play Character
+                <Button
+                  variant="secondary"
+                  fullWidth
+                >
+                  Play Character
+                </Button>
               </Link>
-              <Link
-                href={`/player/characters/${character.id}/edit`}
-                className="flex items-center justify-center rounded-md bg-slate-100 px-3 py-2 text-slate-700 transition-colors hover:bg-slate-200"
-                title="Edit Character"
-              >
-                <Edit3 size={16} />
+              <Link href={`/player/characters/${character.id}/edit`}>
+                <Button
+                  variant="ghost"
+                  size="md"
+                  title="Edit Character"
+                >
+                  <Edit3 size={16} />
+                </Button>
               </Link>
             </>
           ) : (
             <>
-              <button
+              <Button
                 onClick={() => restoreCharacter(character.id)}
-                className="flex-1 rounded-md bg-green-600 px-4 py-2 font-medium text-white transition-colors hover:bg-green-700"
+                variant="success"
+                fullWidth
               >
                 Restore
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => handleDeleteCharacter(character.id)}
-                className="flex items-center justify-center rounded-md bg-red-100 px-3 py-2 text-red-700 transition-colors hover:bg-red-200"
+                variant="danger"
+                size="md"
                 title="Delete Permanently"
               >
                 <Trash2 size={16} />
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -258,18 +289,20 @@ export default function PlayerDashboardPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="border-b border-slate-200 bg-white shadow-sm">
+      <header className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50 shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center">
-              <Link
-                href="/"
-                className="mr-6 flex items-center gap-2 text-slate-600 transition-colors hover:text-slate-800"
-              >
-                <ArrowLeft size={20} />
-                Back to Home
+              <Link href="/">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<ArrowLeft size={20} />}
+                >
+                  Back to Home
+                </Button>
               </Link>
-              <div className="flex items-center">
+              <div className="ml-6 flex items-center">
                 <User className="mr-3 h-6 w-6 text-blue-600" />
                 <h1 className="text-xl font-bold text-slate-800">
                   Player Dashboard
@@ -277,12 +310,14 @@ export default function PlayerDashboardPage() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Link
-                href="/dm"
-                className="flex items-center gap-2 text-slate-600 transition-colors hover:text-purple-600"
-              >
-                <Crown size={16} />
-                DM Tools
+              <Link href="/dm">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<Crown size={16} />}
+                >
+                  DM Tools
+                </Button>
               </Link>
             </div>
           </div>
@@ -302,45 +337,40 @@ export default function PlayerDashboardPage() {
           </div>
           <div className="flex items-center gap-3">
             {/* Import Character */}
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-white shadow-md transition-colors hover:bg-green-700">
-              <Upload size={18} />
-              Import Character
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleImportCharacter}
-                className="hidden"
-              />
-            </label>
-
-            {/* Try Migration */}
-            <button
-              onClick={handleTryMigration}
-              className="flex items-center gap-2 rounded-lg bg-yellow-600 px-4 py-2 text-white shadow-md transition-colors hover:bg-yellow-700"
-              title="Try to migrate old character data"
+            <Button
+              variant="success"
+              leftIcon={<Upload size={18} />}
+              onClick={() => fileInputRef.current?.click()}
             >
-              <Download size={18} />
-              Migrate Old Data
-            </button>
+              Import Character
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleImportCharacter}
+              className="hidden"
+            />
 
             {/* New Character */}
-            <Link
-              href="/player/characters/new"
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white shadow-md transition-colors hover:bg-blue-700"
-            >
-              <Plus size={18} />
-              New Character
+            <Link href="/player/characters/new">
+              <Button
+                variant="secondary"
+                leftIcon={<Plus size={18} />}
+              >
+                New Character
+              </Button>
             </Link>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
-          <div className="rounded-lg bg-white p-6 shadow-md">
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-6 shadow-md">
             <div className="flex items-center">
-              <User className="mr-3 h-8 w-8 text-blue-500" />
+              <User className="mr-3 h-8 w-8 text-blue-600" />
               <div>
-                <h3 className="text-2xl font-bold text-slate-800">
+                <h3 className="text-2xl font-bold text-slate-800" suppressHydrationWarning>
                   {activeCharacters.length}
                 </h3>
                 <p className="text-slate-600">Active Characters</p>
@@ -348,23 +378,11 @@ export default function PlayerDashboardPage() {
             </div>
           </div>
 
-          <div className="rounded-lg bg-white p-6 shadow-md">
-            <div className="flex items-center">
-              <Calendar className="mr-3 h-8 w-8 text-green-500" />
-              <div>
-                <h3 className="text-2xl font-bold text-slate-800">
-                  {activeCharacters.reduce((sum, char) => sum + char.level, 0)}
-                </h3>
-                <p className="text-slate-600">Total Levels</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg bg-white p-6 shadow-md">
+          <div className="rounded-lg border-2 border-gray-200 bg-gradient-to-br from-slate-50 to-gray-50 p-6 shadow-md">
             <div className="flex items-center">
               <Archive className="mr-3 h-8 w-8 text-slate-500" />
               <div>
-                <h3 className="text-2xl font-bold text-slate-800">
+                <h3 className="text-2xl font-bold text-slate-800" suppressHydrationWarning>
                   {archivedCharacters.length}
                 </h3>
                 <p className="text-slate-600">Archived</p>
@@ -372,11 +390,11 @@ export default function PlayerDashboardPage() {
             </div>
           </div>
 
-          <div className="rounded-lg bg-white p-6 shadow-md">
+          <div className="rounded-lg border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-6 shadow-md">
             <div className="flex items-center">
-              <ExternalLink className="mr-3 h-8 w-8 text-purple-500" />
+              <ExternalLink className="mr-3 h-8 w-8 text-purple-600" />
               <div>
-                <h3 className="text-2xl font-bold text-slate-800">
+                <h3 className="text-2xl font-bold text-slate-800" suppressHydrationWarning>
                   {characters.length}
                 </h3>
                 <p className="text-slate-600">Total Characters</p>
@@ -387,7 +405,7 @@ export default function PlayerDashboardPage() {
 
         {/* Characters Section */}
         {activeCharacters.length === 0 && archivedCharacters.length === 0 ? (
-          <div className="rounded-lg bg-white p-12 text-center shadow-md">
+          <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-br from-slate-50 to-blue-50 p-12 text-center shadow-md">
             <User size={64} className="mx-auto mb-6 text-gray-400" />
             <h3 className="mb-2 text-xl font-semibold text-slate-800">
               No Characters Yet
@@ -397,17 +415,22 @@ export default function PlayerDashboardPage() {
               from your old character sheet!
             </p>
             <div className="flex flex-wrap justify-center gap-4">
-              <Link
-                href="/player/characters/new"
-                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
-              >
-                <Plus size={20} />
-                Create New Character
+              <Link href="/player/characters/new">
+                <Button
+                  variant="secondary"
+                  leftIcon={<Plus size={20} />}
+                >
+                  Create New Character
+                </Button>
               </Link>
 
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-white transition-colors hover:bg-green-700">
-                <Upload size={20} />
-                Import Character
+              <label className="cursor-pointer">
+                <Button
+                  variant="success"
+                  leftIcon={<Upload size={20} />}
+                >
+                  Import Character
+                </Button>
                 <input
                   type="file"
                   accept=".json"
@@ -416,21 +439,21 @@ export default function PlayerDashboardPage() {
                 />
               </label>
 
-              <button
+              <Button
                 onClick={handleTryMigration}
-                className="inline-flex items-center gap-2 rounded-lg bg-yellow-600 px-6 py-3 text-white transition-colors hover:bg-yellow-700"
+                variant="warning"
+                leftIcon={<Download size={20} />}
               >
-                <Download size={20} />
                 Migrate Old Data
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
           <>
             {/* Active Characters */}
             {activeCharacters.length > 0 && (
-              <div className="mb-12">
-                <h2 className="mb-6 flex items-center gap-2 text-2xl font-semibold text-slate-800">
+              <div className="mb-12" suppressHydrationWarning>
+                <h2 className="mb-6 flex items-center gap-2 text-2xl font-semibold text-slate-800" suppressHydrationWarning>
                   <User size={24} />
                   Active Characters ({activeCharacters.length})
                 </h2>
@@ -444,8 +467,8 @@ export default function PlayerDashboardPage() {
 
             {/* Archived Characters */}
             {archivedCharacters.length > 0 && (
-              <div>
-                <h2 className="mb-6 flex items-center gap-2 text-2xl font-semibold text-slate-700">
+              <div suppressHydrationWarning>
+                <h2 className="mb-6 flex items-center gap-2 text-2xl font-semibold text-slate-700" suppressHydrationWarning>
                   <Archive size={24} />
                   Archived Characters ({archivedCharacters.length})
                 </h2>

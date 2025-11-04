@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Shield, Sparkles, Dice6, Zap, Wand2 } from 'lucide-react';
+import { Sparkles, Dice6, Wand2 } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
 import { Spell } from '@/types/character';
 import {
@@ -146,6 +146,7 @@ export function QuickSpells({
     );
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const showSavingThrow = async (spell: Spell) => {
     if (spellSaveDC === null) {
       alert('Cannot cast spells - no spellcasting ability detected');
@@ -170,6 +171,7 @@ export function QuickSpells({
     );
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const rollSpellDamage = async (spell: Spell) => {
     if (!spell.damage) {
       alert('This spell does not have damage dice specified');

@@ -6,7 +6,6 @@ import {
   CharacterExport,
   ClassInfo,
   SpellSlots,
-  PactMagic,
   RichTextContent,
   CharacterBackground,
   Weapon,

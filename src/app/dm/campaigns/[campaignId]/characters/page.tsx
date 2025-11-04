@@ -92,6 +92,8 @@ export default function CampaignCharactersPage() {
     });
   };
 
+  // Function to remove character (reserved for future use)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const removeCharacter = (characterId: string, characterName: string) => {
     if (
       confirm(

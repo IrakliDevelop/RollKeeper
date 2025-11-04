@@ -392,13 +392,12 @@ function processClass(
   const spellcastingType = determineSpellcastingType(rawClass);
 
   // Process subclasses for this class
+  // Match subclasses by className and classSource to ensure correct version pairing
   const processedSubclasses = subclasses
     .filter(
       sub =>
         sub.className === rawClass.name && sub.classSource === rawClass.source
     )
-    .filter(sub => sub.source !== 'PHB')
-    .filter(sub => !(sub.source !== 'XPHB' && sub.classSource === 'XPHB')) // avoid copies
     .map(sub => processSubclass(sub, fileData))
     .sort((a, b) => {
       // First sort by source priority (PHB2024 > SRD > PHB > others)
@@ -824,40 +823,23 @@ export async function loadAllClasses(): Promise<ProcessedClass[]> {
       }
     }
 
-    // Remove duplicates (same class from different sources)
-    // Priority: PHB2024 (XPHB) > SRD > PHB > others
-    const uniqueClasses = new Map<string, ProcessedClass>();
+    // Sort classes: 2024 versions first, then 2014 versions, then alphabetically by name
+    processedClasses.sort((a, b) => {
+      // First, prioritize 2024 versions
+      const aIs2024 = a.source === 'PHB2024';
+      const bIs2024 = b.source === 'PHB2024';
+      
+      if (aIs2024 && !bIs2024) return -1;
+      if (!aIs2024 && bIs2024) return 1;
+      
+      // Then sort alphabetically by name
+      return a.name.localeCompare(b.name);
+    });
 
-    for (const processedClass of processedClasses) {
-      const key = processedClass.name.toLowerCase();
-      const existingClass = uniqueClasses.get(key);
-
-      if (!existingClass) {
-        // No existing class, add this one
-        uniqueClasses.set(key, processedClass);
-      } else {
-        // Check if we should replace the existing class
-        const shouldReplace =
-          processedClass.source === 'PHB2024' || // Always prefer 2024 version
-          (existingClass.source !== 'PHB2024' && processedClass.isSrd) || // Prefer SRD if no 2024 version
-          (existingClass.source !== 'PHB2024' &&
-            !existingClass.isSrd &&
-            processedClass.source === 'PHB'); // Prefer PHB over others if no 2024/SRD
-
-        if (shouldReplace) {
-          processedClass.subclasses = [
-            ...existingClass.subclasses,
-            ...processedClass.subclasses,
-          ].sort((a, b) => a.name.localeCompare(b.name));
-          uniqueClasses.set(key, processedClass);
-        }
-      }
-    }
-
-    cachedClasses = Array.from(uniqueClasses.values());
+    cachedClasses = processedClasses;
 
     console.log(
-      `Loaded ${cachedClasses.length} unique classes from ${processedClasses.length} total class entries`
+      `Loaded ${cachedClasses.length} classes (including both 2014 and 2024 versions)`
     );
 
     return cachedClasses;

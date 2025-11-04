@@ -44,8 +44,7 @@ export default function CharacterImportPage() {
 
   // Validate character data
   const validateCharacterData = (
-    data: unknown,
-    _fileName?: string
+    data: unknown
   ): { isValid: boolean; errors: string[]; warnings: string[] } => {
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -126,7 +125,7 @@ export default function CharacterImportPage() {
         const content = await file.text();
         const characterData = JSON.parse(content);
 
-        const validation = validateCharacterData(characterData, file.name);
+        const validation = validateCharacterData(characterData);
 
         newImportedCharacters.push({
           id: `import-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,

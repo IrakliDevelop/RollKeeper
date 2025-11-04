@@ -10,7 +10,6 @@ type TraitType = TrackableTrait | ExtendedFeature;
 interface TraitTrackerProps<T extends TraitType = TrackableTrait> {
   traits: T[];
   characterLevel: number;
-  onAddTrait: (trait: Omit<T, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onUpdateTrait: (id: string, updates: Partial<T>) => void;
   onDeleteTrait: (id: string) => void;
   onUseTrait: (id: string) => void;
@@ -18,7 +17,6 @@ interface TraitTrackerProps<T extends TraitType = TrackableTrait> {
   className?: string;
   // Display options
   readonly?: boolean;
-  hideAddButton?: boolean;
   hideControls?: boolean;
   enableViewModal?: boolean; // New prop to enable click-to-view functionality
 }
@@ -26,14 +24,12 @@ interface TraitTrackerProps<T extends TraitType = TrackableTrait> {
 export default function TraitTracker<T extends TraitType = TrackableTrait>({
   traits,
   characterLevel,
-  onAddTrait,
   onUpdateTrait,
   onDeleteTrait,
   onUseTrait,
   onResetTraits,
   className = '',
   readonly = false,
-  hideAddButton = false,
   hideControls = false,
   enableViewModal = false,
 }: TraitTrackerProps<T>) {

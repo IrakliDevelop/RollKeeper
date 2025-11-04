@@ -17,7 +17,7 @@ export interface PlayerCharacter {
   updatedAt: Date;
   lastPlayed: Date;
   characterData: CharacterState;
-  thumbnail?: string; // Future: character portrait
+  avatar?: string; // Base64 encoded image from character data
   tags: string[];
   isArchived: boolean;
 }
@@ -98,6 +98,7 @@ const createPlayerCharacter = (
     updatedAt: now,
     lastPlayed: now,
     characterData: characterDataWithId,
+    avatar: characterData.avatar, // Extract avatar from character data
     tags: [],
     isArchived: false,
   };
@@ -253,6 +254,7 @@ export const usePlayerStore = create<PlayerStoreState>()(
                   race: characterData.race || char.race,
                   class: characterData.class?.name || char.class,
                   level: characterData.totalLevel || characterData.level || char.level,
+                  avatar: characterData.avatar, // Update top-level avatar from characterData
                   updatedAt: new Date(),
                   lastPlayed: new Date(),
                 }
