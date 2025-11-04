@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadAvatarToS3, generateAvatarFileName } from '@/utils/s3Upload';
+import { MAX_AVATAR_SIZE_MB, MAX_AVATAR_SIZE_BYTES } from '@/utils/constants';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,10 +14,7 @@ export async function POST(request: NextRequest) {
     const characterId = formData.get('characterId') as string | null;
 
     if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
     if (!characterId) {
@@ -34,11 +32,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
+    // Validate file size
+    if (file.size > MAX_AVATAR_SIZE_BYTES) {
       return NextResponse.json(
-        { error: 'File size must be less than 5MB' },
+        { error: `File size must be less than ${MAX_AVATAR_SIZE_MB}MB` },
         { status: 400 }
       );
     }
@@ -62,4 +59,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
