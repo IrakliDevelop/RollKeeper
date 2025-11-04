@@ -94,7 +94,12 @@ export async function deleteAvatarFromS3(fileUrl: string): Promise<void> {
  */
 export function generateAvatarFileName(characterId: string, originalName: string): string {
   const timestamp = Date.now();
-  const extension = originalName.split('.').pop() || 'jpg';
+  const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+  let extension = originalName.split('.').pop() || '';
+  extension = extension.toLowerCase();
+  if (!allowedExtensions.includes(extension)) {
+    extension = 'jpg';
+  }
   return `${characterId}-${timestamp}.${extension}`;
 }
 
