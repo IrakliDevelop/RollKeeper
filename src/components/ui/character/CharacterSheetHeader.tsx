@@ -60,19 +60,19 @@ export default function CharacterSheetHeader({
 
   // Handle avatar change
   const handleAvatarChange = (newAvatar: string | undefined) => {
-    console.log('📸 handleAvatarChange called with:', newAvatar ? `base64 string (${newAvatar.length} chars)` : 'undefined');
-    console.log('👤 playerCharacter:', playerCharacter);
-    console.log('📝 characterData:', playerCharacter?.characterData);
+    
+    
+    
     
     if (playerCharacter?.characterData) {
-      console.log('✅ Updating character data...');
+      
       updateCharacterData(characterId, {
         ...playerCharacter.characterData,
         avatar: newAvatar,
       });
-      console.log('✅ Character data updated!');
+      
     } else {
-      console.log('❌ No playerCharacter or characterData found!');
+      
     }
   };
 
