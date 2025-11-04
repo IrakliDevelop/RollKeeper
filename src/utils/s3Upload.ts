@@ -5,17 +5,28 @@
 
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
+// Validate required environment variables before initializing S3 client
+function getRequiredEnvVar(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+const AWS_S3_REGION = getRequiredEnvVar('AWS_S3_REGION');
+const AWS_ACCESS_KEY_ID = getRequiredEnvVar('AWS_ACCESS_KEY_ID');
+const AWS_SECRET_ACCESS_KEY = getRequiredEnvVar('AWS_SECRET_ACCESS_KEY');
+const BUCKET_NAME = getRequiredEnvVar('AWS_S3_BUCKET_NAME');
+
 // Initialize S3 client
 const s3Client = new S3Client({
-  region: process.env.AWS_S3_REGION!,
+  region: AWS_S3_REGION,
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    accessKeyId: AWS_ACCESS_KEY_ID,
+    secretAccessKey: AWS_SECRET_ACCESS_KEY,
   },
 });
-
-const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME!;
-
 /**
  * Upload an avatar image to S3
  * @param file - The image file buffer
