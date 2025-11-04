@@ -592,3 +592,7 @@ export const SPELL_SOURCE_BOOKS: Record<string, string> = {
 export const AUTOSAVE_DELAY = 500; // ms
 export const STORAGE_KEY = 'rollkeeper-character';
 export const APP_VERSION = '1.0.0';
+
+// Avatar upload settings
+export const MAX_AVATAR_SIZE_MB = 5; // Maximum avatar file size in megabytes
+export const MAX_AVATAR_SIZE_BYTES = MAX_AVATAR_SIZE_MB * 1024 * 1024;

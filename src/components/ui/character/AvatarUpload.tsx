@@ -1,6 +1,6 @@
 /**
  * Avatar Upload Component
- * 
+ *
  * Allows users to upload and display character avatars.
  * Images are converted to base64 and stored in character data.
  */
@@ -12,6 +12,7 @@ import Image from 'next/image';
 import { Upload, X, User } from 'lucide-react';
 import { Button } from '@/components/ui/forms';
 import { cn } from '@/utils/cn';
+import { MAX_AVATAR_SIZE_MB, MAX_AVATAR_SIZE_BYTES } from '@/utils/constants';
 
 export interface AvatarUploadProps {
   avatar?: string; // S3 URL or base64 encoded image (for backwards compatibility)
@@ -50,10 +51,12 @@ export function AvatarUpload({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     console.log('🔍 File selected:', file);
-    
+
     if (!file) {
       console.log('❌ No file selected');
       return;
@@ -66,11 +69,10 @@ export function AvatarUpload({
       return;
     }
 
-    // Validate file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
+    // Validate file size
+    if (file.size > MAX_AVATAR_SIZE_BYTES) {
       console.log('❌ File too large:', file.size, 'bytes');
-      setError('Image must be smaller than 5MB');
+      setError(`Image must be smaller than ${MAX_AVATAR_SIZE_MB}MB`);
       return;
     }
 
@@ -97,7 +99,7 @@ export function AvatarUpload({
 
       const { url } = await response.json();
       console.log('✅ Upload successful! URL:', url);
-      
+
       // Delete old avatar from S3 if it exists and is an S3 URL
       if (avatar && avatar.includes('s3.amazonaws.com')) {
         console.log('🗑️ Deleting old avatar from S3...');
@@ -131,7 +133,7 @@ export function AvatarUpload({
         console.log('⚠️ Failed to delete from S3:', err);
       }
     }
-    
+
     onAvatarChange(undefined);
     setError(null);
   };
@@ -148,7 +150,8 @@ export function AvatarUpload({
           className={cn(
             'relative overflow-hidden rounded-full border-2 border-gray-300 bg-gradient-to-br from-slate-100 to-slate-200',
             sizeClasses[size],
-            editable && 'cursor-pointer hover:border-blue-400 transition-colors',
+            editable &&
+              'cursor-pointer transition-colors hover:border-blue-400',
             isLoading && 'opacity-50'
           )}
           onClick={editable ? handleUploadClick : undefined}
@@ -163,13 +166,10 @@ export function AvatarUpload({
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              <User 
-                size={iconSizeClasses[size]} 
-                className="text-slate-400"
-              />
+              <User size={iconSizeClasses[size]} className="text-slate-400" />
             </div>
           )}
-          
+
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/20">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-white border-t-transparent" />
@@ -180,11 +180,11 @@ export function AvatarUpload({
         {/* Remove Button (only show if avatar exists and is editable) */}
         {avatar && editable && !isLoading && (
           <button
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation();
               handleRemoveAvatar();
             }}
-            className="absolute -right-1 -top-1 rounded-full bg-red-500 p-1 text-white shadow-lg hover:bg-red-600 transition-colors"
+            className="absolute -top-1 -right-1 rounded-full bg-red-500 p-1 text-white shadow-lg transition-colors hover:bg-red-600"
             title="Remove avatar"
           >
             <X size={16} />
@@ -202,7 +202,7 @@ export function AvatarUpload({
             onChange={handleFileSelect}
             className="hidden"
           />
-          
+
           <Button
             variant="outline"
             size="sm"
@@ -216,19 +216,14 @@ export function AvatarUpload({
       )}
 
       {/* Error Message */}
-      {error && (
-        <p className="text-xs text-red-600">
-          {error}
-        </p>
-      )}
+      {error && <p className="text-xs text-red-600">{error}</p>}
 
       {/* Helper Text */}
       {editable && !error && (
-        <p className="text-xs text-gray-500 text-center">
-          Max 5MB • Uploaded to cloud storage
+        <p className="text-center text-xs text-gray-500">
+          Max {MAX_AVATAR_SIZE_MB}MB • Uploaded to cloud storage
         </p>
       )}
     </div>
   );
 }
-
