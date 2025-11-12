@@ -3,12 +3,12 @@
 import React, { useState, useMemo } from 'react';
 import { Spell, SpellActionType } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
-import { 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Eye, 
-  BookOpen, 
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Eye,
+  BookOpen,
   Search,
   Filter,
   Star,
@@ -31,6 +31,10 @@ import { Modal } from '@/components/ui/feedback/Modal';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
 import DragDropList from '@/components/ui/layout/DragDropList';
+import { SpellAutocomplete } from '@/components/ui/forms/SpellAutocomplete';
+import { useSpellsData } from '@/hooks/useSpellsData';
+import { convertProcessedSpellToFormData } from '@/utils/spellConversion';
+import { ProcessedSpell } from '@/types/spells';
 
 // Constants for spell schools and common casting times
 const SPELL_SCHOOLS = [
@@ -209,49 +213,75 @@ const SpellCard: React.FC<{
   onTogglePrepared: () => void;
   onToggleFavorite: () => void;
   onCast: () => void;
-}> = ({ spell, compact, isFavorite, onEdit, onDelete, onView, onTogglePrepared, onToggleFavorite, onCast }) => {
+}> = ({
+  spell,
+  compact,
+  isFavorite,
+  onEdit,
+  onDelete,
+  onView,
+  onTogglePrepared,
+  onToggleFavorite,
+  onCast,
+}) => {
   const isCantrip = spell.level === 0;
-  
+
   if (compact) {
     return (
-      <div className={`flex items-center justify-between rounded-lg border-2 p-3 transition-all hover:shadow-md ${
-        spell.isPrepared
-          ? 'border-green-300 bg-white'
-          : 'border-gray-200 bg-white hover:border-purple-300'
-      }`}>
-        <div className="flex items-center gap-3 flex-1 min-w-0">
+      <div
+        className={`flex items-center justify-between rounded-lg border-2 p-3 transition-all hover:shadow-md ${
+          spell.isPrepared
+            ? 'border-green-300 bg-white'
+            : 'border-gray-200 bg-white hover:border-purple-300'
+        }`}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <button
             onClick={onToggleFavorite}
             className={`flex-shrink-0 transition-colors ${
-              isFavorite ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-500'
+              isFavorite
+                ? 'text-yellow-500 hover:text-yellow-600'
+                : 'text-gray-400 hover:text-yellow-500'
             }`}
           >
             <Star size={16} fill={isFavorite ? 'currentColor' : 'none'} />
           </button>
-          
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="font-bold text-gray-800 truncate">{spell.name}</span>
-            <Badge 
-              variant={isCantrip ? "warning" : "primary"} 
+
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="truncate font-bold text-gray-800">
+              {spell.name}
+            </span>
+            <Badge
+              variant={isCantrip ? 'warning' : 'primary'}
               size="sm"
-              className={isCantrip ? "bg-yellow-100 text-yellow-800 flex-shrink-0" : "bg-purple-100 text-purple-800 flex-shrink-0"}
+              className={
+                isCantrip
+                  ? 'flex-shrink-0 bg-yellow-100 text-yellow-800'
+                  : 'flex-shrink-0 bg-purple-100 text-purple-800'
+              }
             >
               {isCantrip ? 'Cantrip' : `Lv${spell.level}`}
             </Badge>
-            <span className="text-xs text-gray-500 flex-shrink-0 hidden sm:inline">{spell.school}</span>
+            <span className="hidden flex-shrink-0 text-xs text-gray-500 sm:inline">
+              {spell.school}
+            </span>
           </div>
-          
-          <div className="flex items-center gap-1 flex-shrink-0">
+
+          <div className="flex flex-shrink-0 items-center gap-1">
             {spell.concentration && (
-              <Badge variant="warning" size="sm">C</Badge>
+              <Badge variant="warning" size="sm">
+                C
+              </Badge>
             )}
             {spell.ritual && (
-              <Badge variant="secondary" size="sm">R</Badge>
+              <Badge variant="secondary" size="sm">
+                R
+              </Badge>
             )}
           </div>
         </div>
-        
-        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+
+        <div className="ml-2 flex flex-shrink-0 items-center gap-1">
           <Button
             onClick={onCast}
             variant="primary"
@@ -263,7 +293,7 @@ const SpellCard: React.FC<{
           </Button>
           <Button
             onClick={onTogglePrepared}
-            variant={spell.isPrepared ? "success" : "outline"}
+            variant={spell.isPrepared ? 'success' : 'outline'}
             size="xs"
           >
             {spell.isPrepared ? 'Prepared' : 'Prepare'}
@@ -281,7 +311,7 @@ const SpellCard: React.FC<{
             variant="ghost"
             size="xs"
             title="Edit spell"
-            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+            className="text-blue-600 hover:bg-blue-50 hover:text-blue-800"
           >
             <Edit2 size={14} />
           </Button>
@@ -290,7 +320,7 @@ const SpellCard: React.FC<{
             variant="ghost"
             size="xs"
             title="Delete spell"
-            className="text-red-600 hover:text-red-800 hover:bg-red-50"
+            className="text-red-600 hover:bg-red-50 hover:text-red-800"
           >
             <Trash2 size={14} />
           </Button>
@@ -300,60 +330,90 @@ const SpellCard: React.FC<{
   }
 
   return (
-    <div className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${
-      spell.isPrepared
-        ? 'border-green-300 bg-white'
-        : 'border-gray-200 bg-white hover:border-purple-300'
-    }`}>
+    <div
+      className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${
+        spell.isPrepared
+          ? 'border-green-300 bg-white'
+          : 'border-gray-200 bg-white hover:border-purple-300'
+      }`}
+    >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="mb-2 flex items-center gap-2 flex-wrap">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             <button
               onClick={onToggleFavorite}
               className={`transition-colors ${
-                isFavorite ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-500'
+                isFavorite
+                  ? 'text-yellow-500 hover:text-yellow-600'
+                  : 'text-gray-400 hover:text-yellow-500'
               }`}
             >
               <Star size={18} fill={isFavorite ? 'currentColor' : 'none'} />
             </button>
             <h5 className="font-bold text-gray-800">{spell.name}</h5>
-            <Badge 
-              variant={isCantrip ? "warning" : "primary"} 
+            <Badge
+              variant={isCantrip ? 'warning' : 'primary'}
               size="sm"
-              className={isCantrip ? "bg-yellow-100 text-yellow-800" : "bg-purple-100 text-purple-800"}
+              className={
+                isCantrip
+                  ? 'bg-yellow-100 text-yellow-800'
+                  : 'bg-purple-100 text-purple-800'
+              }
             >
               {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
             </Badge>
             {spell.concentration && (
-              <Badge variant="warning" size="sm">Concentration</Badge>
+              <Badge variant="warning" size="sm">
+                Concentration
+              </Badge>
             )}
             {spell.ritual && (
-              <Badge variant="secondary" size="sm">Ritual</Badge>
+              <Badge variant="secondary" size="sm">
+                Ritual
+              </Badge>
             )}
             {spell.isAlwaysPrepared && (
-              <Badge variant="info" size="sm">Always Prepared</Badge>
+              <Badge variant="info" size="sm">
+                Always Prepared
+              </Badge>
             )}
           </div>
-          
-          <div className="mb-2 flex items-center gap-4 text-sm text-gray-600 flex-wrap">
-            <span><strong>School:</strong> {spell.school}</span>
-            <span><strong>Time:</strong> {spell.castingTime}</span>
-            <span><strong>Range:</strong> {spell.range}</span>
-            {spell.duration && <span><strong>Duration:</strong> {spell.duration}</span>}
+
+          <div className="mb-2 flex flex-wrap items-center gap-4 text-sm text-gray-600">
+            <span>
+              <strong>School:</strong> {spell.school}
+            </span>
+            <span>
+              <strong>Time:</strong> {spell.castingTime}
+            </span>
+            <span>
+              <strong>Range:</strong> {spell.range}
+            </span>
+            {spell.duration && (
+              <span>
+                <strong>Duration:</strong> {spell.duration}
+              </span>
+            )}
           </div>
-          
+
           <div className="mb-2 text-sm text-gray-600">
             <strong>Components:</strong>{' '}
             {[
               spell.components.verbal && 'V',
               spell.components.somatic && 'S',
-              spell.components.material && 'M'
-            ].filter(Boolean).join(', ')}
-            {spell.components.material && spell.components.materialDescription && (
-              <span className="text-gray-500"> ({spell.components.materialDescription})</span>
-            )}
+              spell.components.material && 'M',
+            ]
+              .filter(Boolean)
+              .join(', ')}
+            {spell.components.material &&
+              spell.components.materialDescription && (
+                <span className="text-gray-500">
+                  {' '}
+                  ({spell.components.materialDescription})
+                </span>
+              )}
           </div>
-          
+
           {spell.damage && (
             <div className="mb-2">
               <Badge variant="danger" size="sm">
@@ -361,10 +421,12 @@ const SpellCard: React.FC<{
               </Badge>
             </div>
           )}
-          
-          <p className="text-sm text-gray-700 line-clamp-2">{spell.description}</p>
+
+          <p className="line-clamp-2 text-sm text-gray-700">
+            {spell.description}
+          </p>
         </div>
-        
+
         <div className="ml-4 flex flex-col gap-2">
           <Button
             onClick={onCast}
@@ -375,15 +437,15 @@ const SpellCard: React.FC<{
           >
             Cast
           </Button>
-          
+
           <Button
             onClick={onTogglePrepared}
-            variant={spell.isPrepared ? "success" : "outline"}
+            variant={spell.isPrepared ? 'success' : 'outline'}
             size="sm"
           >
             {spell.isPrepared ? 'Prepared' : 'Prepare'}
           </Button>
-          
+
           <div className="flex gap-1">
             <Button
               onClick={onView}
@@ -450,15 +512,21 @@ const LevelSection: React.FC<{
   const isCantrip = level === 0;
   const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
   const levelColor = isCantrip ? 'text-yellow-700' : 'text-purple-700';
-  const levelBg = isCantrip ? 'bg-gradient-to-r from-yellow-50 to-amber-50' : 'bg-gradient-to-r from-purple-50 to-violet-50';
+  const levelBg = isCantrip
+    ? 'bg-gradient-to-r from-yellow-50 to-amber-50'
+    : 'bg-gradient-to-r from-purple-50 to-violet-50';
   const borderColor = isCantrip ? 'border-yellow-200' : 'border-purple-200';
-  const preparedCount = spells.filter(s => s.isPrepared || s.isAlwaysPrepared).length;
+  const preparedCount = spells.filter(
+    s => s.isPrepared || s.isAlwaysPrepared
+  ).length;
 
   return (
-    <div className={`border-2 ${borderColor} rounded-lg overflow-hidden bg-white`}>
+    <div
+      className={`border-2 ${borderColor} overflow-hidden rounded-lg bg-white`}
+    >
       <button
         onClick={onToggle}
-        className={`w-full flex items-center justify-between p-4 ${levelBg} hover:opacity-90 transition-all`}
+        className={`flex w-full items-center justify-between p-4 ${levelBg} transition-all hover:opacity-90`}
       >
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
@@ -467,27 +535,37 @@ const LevelSection: React.FC<{
             ) : (
               <ChevronRight size={18} className={levelColor} />
             )}
-            <span className={`font-bold text-base ${levelColor}`}>{levelName}</span>
+            <span className={`text-base font-bold ${levelColor}`}>
+              {levelName}
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge 
-              variant={isCantrip ? "warning" : "primary"}
+            <Badge
+              variant={isCantrip ? 'warning' : 'primary'}
               size="sm"
-              className={isCantrip ? "bg-yellow-100 text-yellow-800" : "bg-purple-100 text-purple-800"}
+              className={
+                isCantrip
+                  ? 'bg-yellow-100 text-yellow-800'
+                  : 'bg-purple-100 text-purple-800'
+              }
             >
               {spells.length} spell{spells.length !== 1 ? 's' : ''}
             </Badge>
             {preparedCount > 0 && (
-              <Badge variant="success" size="sm" className="bg-green-100 text-green-800">
+              <Badge
+                variant="success"
+                size="sm"
+                className="bg-green-100 text-green-800"
+              >
                 {preparedCount} prepared
               </Badge>
             )}
           </div>
         </div>
       </button>
-      
+
       {isExpanded && (
-        <div className="p-4 bg-white border-t-2 border-gray-100">
+        <div className="border-t-2 border-gray-100 bg-white p-4">
           <DragDropList
             items={spells}
             onReorder={onReorder}
@@ -517,7 +595,15 @@ const LevelSection: React.FC<{
 };
 
 export const EnhancedSpellManagement: React.FC = () => {
-  const { character, updateCharacter, reorderSpells, toggleSpellFavorite, updateSpellSlot, startConcentration, stopConcentration } = useCharacterStore();
+  const {
+    character,
+    updateCharacter,
+    reorderSpells,
+    toggleSpellFavorite,
+    updateSpellSlot,
+    startConcentration,
+    stopConcentration,
+  } = useCharacterStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<SpellFormData>(initialFormData);
@@ -529,7 +615,14 @@ export const EnhancedSpellManagement: React.FC = () => {
   const [compactView, setCompactView] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'level' | 'school'>('level');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [expandedLevels, setExpandedLevels] = useState<Set<number>>(new Set([0, 1, 2]));
+  const [expandedLevels, setExpandedLevels] = useState<Set<number>>(
+    new Set([0, 1, 2])
+  );
+  const [justAutoFilled, setJustAutoFilled] = useState(false);
+
+  // Load spells from spellbook for autocomplete
+  const { spells: spellbookSpells, loading: spellbookLoading } =
+    useSpellsData();
 
   // Get favorite spells
   const favoriteSpells = useMemo(() => {
@@ -543,11 +636,12 @@ export const EnhancedSpellManagement: React.FC = () => {
     // Search query
     if (filters.searchQuery.trim()) {
       const query = filters.searchQuery.toLowerCase();
-      filtered = filtered.filter(spell =>
-        spell.name.toLowerCase().includes(query) ||
-        spell.school.toLowerCase().includes(query) ||
-        spell.description.toLowerCase().includes(query) ||
-        spell.damageType?.toLowerCase().includes(query)
+      filtered = filtered.filter(
+        spell =>
+          spell.name.toLowerCase().includes(query) ||
+          spell.school.toLowerCase().includes(query) ||
+          spell.description.toLowerCase().includes(query) ||
+          spell.damageType?.toLowerCase().includes(query)
       );
     }
 
@@ -563,14 +657,20 @@ export const EnhancedSpellManagement: React.FC = () => {
 
     // Action type filter
     if (filters.actionType !== 'all') {
-      filtered = filtered.filter(spell => spell.actionType === filters.actionType);
+      filtered = filtered.filter(
+        spell => spell.actionType === filters.actionType
+      );
     }
 
     // Prepared filter
     if (filters.prepared === 'prepared') {
-      filtered = filtered.filter(spell => spell.isPrepared || spell.isAlwaysPrepared);
+      filtered = filtered.filter(
+        spell => spell.isPrepared || spell.isAlwaysPrepared
+      );
     } else if (filters.prepared === 'unprepared') {
-      filtered = filtered.filter(spell => !spell.isPrepared && !spell.isAlwaysPrepared);
+      filtered = filtered.filter(
+        spell => !spell.isPrepared && !spell.isAlwaysPrepared
+      );
     }
 
     // Concentration filter
@@ -599,7 +699,7 @@ export const EnhancedSpellManagement: React.FC = () => {
   const sortedSpells = useMemo(() => {
     return [...filteredSpells].sort((a, b) => {
       let comparison = 0;
-      
+
       switch (sortBy) {
         case 'name':
           comparison = a.name.localeCompare(b.name);
@@ -617,7 +717,7 @@ export const EnhancedSpellManagement: React.FC = () => {
           }
           break;
       }
-      
+
       return sortOrder === 'asc' ? comparison : -comparison;
     });
   }, [filteredSpells, sortBy, sortOrder]);
@@ -625,7 +725,7 @@ export const EnhancedSpellManagement: React.FC = () => {
   // Group spells by level
   const spellsByLevel = useMemo(() => {
     const grouped: SpellsByLevel = {};
-    
+
     sortedSpells.forEach(spell => {
       if (!grouped[spell.level]) {
         grouped[spell.level] = [];
@@ -635,6 +735,18 @@ export const EnhancedSpellManagement: React.FC = () => {
 
     return grouped;
   }, [sortedSpells]);
+
+  // Handle spell selection from autocomplete
+  const handleSpellSelect = (spell: ProcessedSpell) => {
+    const converted = convertProcessedSpellToFormData(spell);
+    setFormData(converted);
+    setJustAutoFilled(true);
+
+    // Clear the animation flag after 2 seconds
+    setTimeout(() => {
+      setJustAutoFilled(false);
+    }, 2000);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -729,18 +841,23 @@ export const EnhancedSpellManagement: React.FC = () => {
     updateCharacter({ spells: updatedSpells });
   };
 
-  const handleReorderSpellsInLevel = (level: number) => (sourceIndex: number, destinationIndex: number) => {
-    const spellsInLevel = spellsByLevel[level];
-    const sourceSpellId = spellsInLevel[sourceIndex].id;
-    const destinationSpellId = spellsInLevel[destinationIndex].id;
+  const handleReorderSpellsInLevel =
+    (level: number) => (sourceIndex: number, destinationIndex: number) => {
+      const spellsInLevel = spellsByLevel[level];
+      const sourceSpellId = spellsInLevel[sourceIndex].id;
+      const destinationSpellId = spellsInLevel[destinationIndex].id;
 
-    const sourceGlobalIndex = character.spells.findIndex(spell => spell.id === sourceSpellId);
-    const destinationGlobalIndex = character.spells.findIndex(spell => spell.id === destinationSpellId);
+      const sourceGlobalIndex = character.spells.findIndex(
+        spell => spell.id === sourceSpellId
+      );
+      const destinationGlobalIndex = character.spells.findIndex(
+        spell => spell.id === destinationSpellId
+      );
 
-    if (sourceGlobalIndex !== -1 && destinationGlobalIndex !== -1) {
-      reorderSpells(sourceGlobalIndex, destinationGlobalIndex);
-    }
-  };
+      if (sourceGlobalIndex !== -1 && destinationGlobalIndex !== -1) {
+        reorderSpells(sourceGlobalIndex, destinationGlobalIndex);
+      }
+    };
 
   const handleCastSpell = (spell: Spell) => {
     setSelectedSpell(spell);
@@ -760,7 +877,8 @@ export const EnhancedSpellManagement: React.FC = () => {
     if (selectedSpell.level > 0) {
       updateSpellSlot(
         spellLevel as keyof typeof character.spellSlots,
-        character.spellSlots[spellLevel as keyof typeof character.spellSlots].used + 1
+        character.spellSlots[spellLevel as keyof typeof character.spellSlots]
+          .used + 1
       );
     }
 
@@ -788,12 +906,14 @@ export const EnhancedSpellManagement: React.FC = () => {
     return value !== 'all';
   }).length;
 
-  const sortedLevels = Object.keys(spellsByLevel).map(Number).sort((a, b) => a - b);
+  const sortedLevels = Object.keys(spellsByLevel)
+    .map(Number)
+    .sort((a, b) => a - b);
 
   // Calculate total prepared spells (excluding cantrips)
   const preparedSpellsCount = useMemo(() => {
-    return character.spells.filter(spell => 
-      spell.level > 0 && (spell.isPrepared || spell.isAlwaysPrepared)
+    return character.spells.filter(
+      spell => spell.level > 0 && (spell.isPrepared || spell.isAlwaysPrepared)
     ).length;
   }, [character.spells]);
 
@@ -809,7 +929,11 @@ export const EnhancedSpellManagement: React.FC = () => {
               {filteredSpells.length} of {character.spells.length}
             </Badge>
             {preparedSpellsCount > 0 && (
-              <Badge variant="success" size="sm" className="bg-green-100 text-green-800">
+              <Badge
+                variant="success"
+                size="sm"
+                className="bg-green-100 text-green-800"
+              >
                 {preparedSpellsCount} prepared
               </Badge>
             )}
@@ -818,29 +942,43 @@ export const EnhancedSpellManagement: React.FC = () => {
           <div className="flex items-center gap-2">
             <Button
               onClick={() => setCompactView(!compactView)}
-              variant={compactView ? "primary" : "ghost"}
+              variant={compactView ? 'primary' : 'ghost'}
               size="sm"
-              title={compactView ? 'Switch to detailed view' : 'Switch to compact view'}
-              className={compactView ? "bg-purple-600 hover:bg-purple-700" : ""}
+              title={
+                compactView
+                  ? 'Switch to detailed view'
+                  : 'Switch to compact view'
+              }
+              className={compactView ? 'bg-purple-600 hover:bg-purple-700' : ''}
             >
               {compactView ? <List size={18} /> : <Grid3X3 size={18} />}
             </Button>
-            
+
             <Button
               onClick={() => setShowFilters(!showFilters)}
-              variant={showFilters || activeFilterCount > 0 ? "primary" : "ghost"}
+              variant={
+                showFilters || activeFilterCount > 0 ? 'primary' : 'ghost'
+              }
               size="sm"
               leftIcon={<Filter size={16} />}
-              className={showFilters || activeFilterCount > 0 ? "bg-purple-600 hover:bg-purple-700" : ""}
+              className={
+                showFilters || activeFilterCount > 0
+                  ? 'bg-purple-600 hover:bg-purple-700'
+                  : ''
+              }
             >
               Filters
               {activeFilterCount > 0 && (
-                <Badge variant="danger" size="sm" className="ml-1 bg-red-600 text-white">
+                <Badge
+                  variant="danger"
+                  size="sm"
+                  className="ml-1 bg-red-600 text-white"
+                >
                   {activeFilterCount}
                 </Badge>
               )}
             </Button>
-            
+
             <Button
               onClick={() => setIsFormOpen(true)}
               variant="primary"
@@ -855,10 +993,12 @@ export const EnhancedSpellManagement: React.FC = () => {
 
         {/* Search Bar */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input
             value={filters.searchQuery}
-            onChange={(e) => setFilters(prev => ({ ...prev, searchQuery: e.target.value }))}
+            onChange={e =>
+              setFilters(prev => ({ ...prev, searchQuery: e.target.value }))
+            }
             placeholder="Search spells by name, school, description, or damage type..."
             className="pl-10"
           />
@@ -889,14 +1029,21 @@ export const EnhancedSpellManagement: React.FC = () => {
                 </Button>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
               {/* Level Filter */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">Level</label>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Level
+                </label>
                 <SelectField
                   value={filters.level.toString()}
-                  onValueChange={value => setFilters(prev => ({ ...prev, level: value === 'all' ? 'all' : parseInt(value) }))}
+                  onValueChange={value =>
+                    setFilters(prev => ({
+                      ...prev,
+                      level: value === 'all' ? 'all' : parseInt(value),
+                    }))
+                  }
                 >
                   <SelectItem value="all">All Levels</SelectItem>
                   <SelectItem value="0">Cantrips</SelectItem>
@@ -910,28 +1057,41 @@ export const EnhancedSpellManagement: React.FC = () => {
 
               {/* School Filter */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">School</label>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  School
+                </label>
                 <SelectField
                   value={filters.school}
-                  onValueChange={value => setFilters(prev => ({ ...prev, school: value }))}
+                  onValueChange={value =>
+                    setFilters(prev => ({ ...prev, school: value }))
+                  }
                 >
                   <SelectItem value="all">All Schools</SelectItem>
                   {SPELL_SCHOOLS.map(school => (
-                    <SelectItem key={school} value={school}>{school}</SelectItem>
+                    <SelectItem key={school} value={school}>
+                      {school}
+                    </SelectItem>
                   ))}
                 </SelectField>
               </div>
 
               {/* Action Type Filter */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">Action Type</label>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Action Type
+                </label>
                 <SelectField
                   value={filters.actionType}
-                  onValueChange={value => setFilters(prev => ({ ...prev, actionType: value }))}
+                  onValueChange={value =>
+                    setFilters(prev => ({ ...prev, actionType: value }))
+                  }
                 >
                   <SelectItem value="all">All Types</SelectItem>
                   {ACTION_TYPES.map(type => (
-                    <SelectItem key={type.value || 'none'} value={type.value || 'none'}>
+                    <SelectItem
+                      key={type.value || 'none'}
+                      value={type.value || 'none'}
+                    >
                       {type.label}
                     </SelectItem>
                   ))}
@@ -940,10 +1100,17 @@ export const EnhancedSpellManagement: React.FC = () => {
 
               {/* Prepared Filter */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">Preparation</label>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Preparation
+                </label>
                 <SelectField
                   value={filters.prepared}
-                  onValueChange={value => setFilters(prev => ({ ...prev, prepared: value as 'all' | 'prepared' | 'unprepared' }))}
+                  onValueChange={value =>
+                    setFilters(prev => ({
+                      ...prev,
+                      prepared: value as 'all' | 'prepared' | 'unprepared',
+                    }))
+                  }
                 >
                   <SelectItem value="all">All Spells</SelectItem>
                   <SelectItem value="prepared">Prepared Only</SelectItem>
@@ -953,10 +1120,17 @@ export const EnhancedSpellManagement: React.FC = () => {
 
               {/* Concentration Filter */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">Concentration</label>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Concentration
+                </label>
                 <SelectField
                   value={filters.concentration}
-                  onValueChange={value => setFilters(prev => ({ ...prev, concentration: value as 'all' | 'yes' | 'no' }))}
+                  onValueChange={value =>
+                    setFilters(prev => ({
+                      ...prev,
+                      concentration: value as 'all' | 'yes' | 'no',
+                    }))
+                  }
                 >
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="yes">Concentration</SelectItem>
@@ -966,10 +1140,17 @@ export const EnhancedSpellManagement: React.FC = () => {
 
               {/* Ritual Filter */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">Ritual</label>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Ritual
+                </label>
                 <SelectField
                   value={filters.ritual}
-                  onValueChange={value => setFilters(prev => ({ ...prev, ritual: value as 'all' | 'yes' | 'no' }))}
+                  onValueChange={value =>
+                    setFilters(prev => ({
+                      ...prev,
+                      ritual: value as 'all' | 'yes' | 'no',
+                    }))
+                  }
                 >
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="yes">Ritual</SelectItem>
@@ -979,12 +1160,16 @@ export const EnhancedSpellManagement: React.FC = () => {
 
               {/* Sort Options */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">Sort By</label>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Sort By
+                </label>
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <SelectField
                       value={sortBy}
-                      onValueChange={value => setSortBy(value as 'name' | 'level' | 'school')}
+                      onValueChange={value =>
+                        setSortBy(value as 'name' | 'level' | 'school')
+                      }
                     >
                       <SelectItem value="level">Level</SelectItem>
                       <SelectItem value="name">Name</SelectItem>
@@ -992,24 +1177,35 @@ export const EnhancedSpellManagement: React.FC = () => {
                     </SelectField>
                   </div>
                   <Button
-                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                    onClick={() =>
+                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+                    }
                     variant="outline"
                     size="md"
                     title={`Sort ${sortOrder === 'asc' ? 'descending' : 'ascending'}`}
                   >
-                    {sortOrder === 'asc' ? <SortAsc size={16} /> : <SortDesc size={16} />}
+                    {sortOrder === 'asc' ? (
+                      <SortAsc size={16} />
+                    ) : (
+                      <SortDesc size={16} />
+                    )}
                   </Button>
                 </div>
               </div>
 
               {/* Favorites Toggle */}
               <div className="flex items-end">
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex cursor-pointer items-center gap-2">
                   <Checkbox
                     checked={filters.favorites}
-                    onCheckedChange={(checked) => setFilters(prev => ({ ...prev, favorites: checked as boolean }))}
+                    onCheckedChange={checked =>
+                      setFilters(prev => ({
+                        ...prev,
+                        favorites: checked as boolean,
+                      }))
+                    }
                   />
-                  <span className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                  <span className="flex items-center gap-1 text-sm font-medium text-gray-700">
                     Favorites Only
                     <Star size={16} className="text-yellow-500" />
                   </span>
@@ -1080,26 +1276,56 @@ export const EnhancedSpellManagement: React.FC = () => {
           closeOnBackdropClick={true}
         >
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Spell Autocomplete - Only show when adding new spell */}
+            {!editingId && (
+              <div className="rounded-lg border-2 border-purple-200 bg-purple-50/30 p-4">
+                <SpellAutocomplete
+                  spells={spellbookSpells}
+                  onSelect={handleSpellSelect}
+                  loading={spellbookLoading}
+                  placeholder="Search spells from spellbook database..."
+                />
+              </div>
+            )}
+
+            {/* Auto-fill success message */}
+            {justAutoFilled && (
+              <div className="animate-in fade-in slide-in-from-top-2 rounded-lg border-2 border-green-300 bg-green-50 p-3 duration-300">
+                <div className="flex items-center gap-2 text-green-800">
+                  <Wand2 className="h-5 w-5" />
+                  <p className="text-sm font-medium">
+                    ✨ Spell details loaded! Review and adjust as needed.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Section: Basic Information */}
             <div className="space-y-4">
-              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+              <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
                 Basic Information
               </h4>
-              
+
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Input
                   label="Spell Name"
                   value={formData.name}
-                  onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={e =>
+                    setFormData(prev => ({ ...prev, name: e.target.value }))
+                  }
                   required
                   placeholder="Enter spell name"
                 />
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Level</label>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Level
+                  </label>
                   <SelectField
                     value={formData.level.toString()}
-                    onValueChange={value => setFormData(prev => ({ ...prev, level: parseInt(value) }))}
+                    onValueChange={value =>
+                      setFormData(prev => ({ ...prev, level: parseInt(value) }))
+                    }
                   >
                     <SelectItem value="0">Cantrip</SelectItem>
                     {Array.from({ length: 9 }, (_, i) => (
@@ -1113,10 +1339,14 @@ export const EnhancedSpellManagement: React.FC = () => {
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">School</label>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    School
+                  </label>
                   <SelectField
                     value={formData.school}
-                    onValueChange={value => setFormData(prev => ({ ...prev, school: value }))}
+                    onValueChange={value =>
+                      setFormData(prev => ({ ...prev, school: value }))
+                    }
                   >
                     {SPELL_SCHOOLS.map(school => (
                       <SelectItem key={school} value={school}>
@@ -1129,7 +1359,9 @@ export const EnhancedSpellManagement: React.FC = () => {
                 <Input
                   label="Source"
                   value={formData.source}
-                  onChange={e => setFormData(prev => ({ ...prev, source: e.target.value }))}
+                  onChange={e =>
+                    setFormData(prev => ({ ...prev, source: e.target.value }))
+                  }
                   placeholder="e.g., PHB, XGE, TCE"
                 />
               </div>
@@ -1137,16 +1369,20 @@ export const EnhancedSpellManagement: React.FC = () => {
 
             {/* Section: Casting Details */}
             <div className="space-y-4">
-              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+              <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
                 Casting Details
               </h4>
-              
+
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Casting Time</label>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Casting Time
+                  </label>
                   <SelectField
                     value={formData.castingTime}
-                    onValueChange={value => setFormData(prev => ({ ...prev, castingTime: value }))}
+                    onValueChange={value =>
+                      setFormData(prev => ({ ...prev, castingTime: value }))
+                    }
                   >
                     {CASTING_TIMES.map(time => (
                       <SelectItem key={time} value={time}>
@@ -1157,10 +1393,14 @@ export const EnhancedSpellManagement: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Range</label>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Range
+                  </label>
                   <SelectField
                     value={formData.range}
-                    onValueChange={value => setFormData(prev => ({ ...prev, range: value }))}
+                    onValueChange={value =>
+                      setFormData(prev => ({ ...prev, range: value }))
+                    }
                   >
                     {RANGES.map(range => (
                       <SelectItem key={range} value={range}>
@@ -1171,10 +1411,14 @@ export const EnhancedSpellManagement: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Duration</label>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Duration
+                  </label>
                   <SelectField
                     value={formData.duration}
-                    onValueChange={value => setFormData(prev => ({ ...prev, duration: value }))}
+                    onValueChange={value =>
+                      setFormData(prev => ({ ...prev, duration: value }))
+                    }
                   >
                     {DURATIONS.map(duration => (
                       <SelectItem key={duration} value={duration}>
@@ -1188,53 +1432,79 @@ export const EnhancedSpellManagement: React.FC = () => {
 
             {/* Section: Components */}
             <div className="space-y-4">
-              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+              <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
                 Components
               </h4>
-              
+
               <div className="flex flex-wrap gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex cursor-pointer items-center gap-2">
                   <Checkbox
                     checked={formData.components.verbal}
-                    onCheckedChange={checked => setFormData(prev => ({
-                      ...prev,
-                      components: { ...prev.components, verbal: checked as boolean }
-                    }))}
+                    onCheckedChange={checked =>
+                      setFormData(prev => ({
+                        ...prev,
+                        components: {
+                          ...prev.components,
+                          verbal: checked as boolean,
+                        },
+                      }))
+                    }
                   />
-                  <span className="text-sm font-medium text-gray-800">Verbal (V)</span>
+                  <span className="text-sm font-medium text-gray-800">
+                    Verbal (V)
+                  </span>
                 </label>
-                
-                <label className="flex items-center gap-2 cursor-pointer">
+
+                <label className="flex cursor-pointer items-center gap-2">
                   <Checkbox
                     checked={formData.components.somatic}
-                    onCheckedChange={checked => setFormData(prev => ({
-                      ...prev,
-                      components: { ...prev.components, somatic: checked as boolean }
-                    }))}
+                    onCheckedChange={checked =>
+                      setFormData(prev => ({
+                        ...prev,
+                        components: {
+                          ...prev.components,
+                          somatic: checked as boolean,
+                        },
+                      }))
+                    }
                   />
-                  <span className="text-sm font-medium text-gray-800">Somatic (S)</span>
+                  <span className="text-sm font-medium text-gray-800">
+                    Somatic (S)
+                  </span>
                 </label>
-                
-                <label className="flex items-center gap-2 cursor-pointer">
+
+                <label className="flex cursor-pointer items-center gap-2">
                   <Checkbox
                     checked={formData.components.material}
-                    onCheckedChange={checked => setFormData(prev => ({
-                      ...prev,
-                      components: { ...prev.components, material: checked as boolean }
-                    }))}
+                    onCheckedChange={checked =>
+                      setFormData(prev => ({
+                        ...prev,
+                        components: {
+                          ...prev.components,
+                          material: checked as boolean,
+                        },
+                      }))
+                    }
                   />
-                  <span className="text-sm font-medium text-gray-800">Material (M)</span>
+                  <span className="text-sm font-medium text-gray-800">
+                    Material (M)
+                  </span>
                 </label>
               </div>
-              
+
               {formData.components.material && (
                 <Input
                   label="Material Component Description"
                   value={formData.components.materialDescription}
-                  onChange={e => setFormData(prev => ({
-                    ...prev,
-                    components: { ...prev.components, materialDescription: e.target.value }
-                  }))}
+                  onChange={e =>
+                    setFormData(prev => ({
+                      ...prev,
+                      components: {
+                        ...prev.components,
+                        materialDescription: e.target.value,
+                      },
+                    }))
+                  }
                   placeholder="Describe the material components..."
                 />
               )}
@@ -1242,55 +1512,88 @@ export const EnhancedSpellManagement: React.FC = () => {
 
             {/* Section: Spell Properties */}
             <div className="space-y-4">
-              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+              <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
                 Spell Properties
               </h4>
-              
+
               <div className="flex flex-wrap gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex cursor-pointer items-center gap-2">
                   <Checkbox
                     checked={formData.ritual}
-                    onCheckedChange={checked => setFormData(prev => ({ ...prev, ritual: checked as boolean }))}
+                    onCheckedChange={checked =>
+                      setFormData(prev => ({
+                        ...prev,
+                        ritual: checked as boolean,
+                      }))
+                    }
                   />
-                  <span className="text-sm font-medium text-gray-800">Ritual</span>
+                  <span className="text-sm font-medium text-gray-800">
+                    Ritual
+                  </span>
                 </label>
-                
-                <label className="flex items-center gap-2 cursor-pointer">
+
+                <label className="flex cursor-pointer items-center gap-2">
                   <Checkbox
                     checked={formData.concentration}
-                    onCheckedChange={checked => setFormData(prev => ({ ...prev, concentration: checked as boolean }))}
+                    onCheckedChange={checked =>
+                      setFormData(prev => ({
+                        ...prev,
+                        concentration: checked as boolean,
+                      }))
+                    }
                   />
-                  <span className="text-sm font-medium text-gray-800">Concentration</span>
+                  <span className="text-sm font-medium text-gray-800">
+                    Concentration
+                  </span>
                 </label>
-                
-                <label className="flex items-center gap-2 cursor-pointer">
+
+                <label className="flex cursor-pointer items-center gap-2">
                   <Checkbox
                     checked={formData.isPrepared}
-                    onCheckedChange={checked => setFormData(prev => ({ ...prev, isPrepared: checked as boolean }))}
+                    onCheckedChange={checked =>
+                      setFormData(prev => ({
+                        ...prev,
+                        isPrepared: checked as boolean,
+                      }))
+                    }
                   />
-                  <span className="text-sm font-medium text-gray-800">Prepared</span>
+                  <span className="text-sm font-medium text-gray-800">
+                    Prepared
+                  </span>
                 </label>
-                
-                <label className="flex items-center gap-2 cursor-pointer">
+
+                <label className="flex cursor-pointer items-center gap-2">
                   <Checkbox
                     checked={formData.isAlwaysPrepared}
-                    onCheckedChange={checked => setFormData(prev => ({ ...prev, isAlwaysPrepared: checked as boolean }))}
+                    onCheckedChange={checked =>
+                      setFormData(prev => ({
+                        ...prev,
+                        isAlwaysPrepared: checked as boolean,
+                      }))
+                    }
                   />
-                  <span className="text-sm font-medium text-gray-800">Always Prepared</span>
+                  <span className="text-sm font-medium text-gray-800">
+                    Always Prepared
+                  </span>
                 </label>
               </div>
             </div>
 
             {/* Section: Description */}
             <div className="space-y-4">
-              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+              <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
                 Description
               </h4>
-              
+
               <Textarea
                 label="Spell Description"
                 value={formData.description}
-                onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                onChange={e =>
+                  setFormData(prev => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
                 rows={4}
                 required
                 placeholder="Describe what the spell does..."
@@ -1299,7 +1602,12 @@ export const EnhancedSpellManagement: React.FC = () => {
               <Textarea
                 label="At Higher Levels"
                 value={formData.higherLevel}
-                onChange={e => setFormData(prev => ({ ...prev, higherLevel: e.target.value }))}
+                onChange={e =>
+                  setFormData(prev => ({
+                    ...prev,
+                    higherLevel: e.target.value,
+                  }))
+                }
                 rows={2}
                 placeholder="Describe what happens when cast at higher levels..."
               />
@@ -1307,19 +1615,29 @@ export const EnhancedSpellManagement: React.FC = () => {
 
             {/* Section: Combat Details */}
             <div className="space-y-4">
-              <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+              <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
                 Combat Details
               </h4>
-              
+
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">Action Type</label>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Action Type
+                  </label>
                   <SelectField
                     value={formData.actionType}
-                    onValueChange={value => setFormData(prev => ({ ...prev, actionType: value as SpellActionType | '' }))}
+                    onValueChange={value =>
+                      setFormData(prev => ({
+                        ...prev,
+                        actionType: value as SpellActionType | '',
+                      }))
+                    }
                   >
                     {ACTION_TYPES.map(type => (
-                      <SelectItem key={type.value || 'none'} value={type.value || 'none'}>
+                      <SelectItem
+                        key={type.value || 'none'}
+                        value={type.value || 'none'}
+                      >
                         {type.label}
                       </SelectItem>
                     ))}
@@ -1328,12 +1646,21 @@ export const EnhancedSpellManagement: React.FC = () => {
 
                 {formData.actionType === 'save' && (
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">Saving Throw</label>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Saving Throw
+                    </label>
                     <SelectField
                       value={formData.savingThrow || '__none__'}
-                      onValueChange={value => setFormData(prev => ({ ...prev, savingThrow: value === '__none__' ? '' : value }))}
+                      onValueChange={value =>
+                        setFormData(prev => ({
+                          ...prev,
+                          savingThrow: value === '__none__' ? '' : value,
+                        }))
+                      }
                     >
-                      <SelectItem value="__none__" disabled>Select...</SelectItem>
+                      <SelectItem value="__none__" disabled>
+                        Select...
+                      </SelectItem>
                       {SAVING_THROWS.map(save => (
                         <SelectItem key={save} value={save}>
                           {save}
@@ -1348,18 +1675,29 @@ export const EnhancedSpellManagement: React.FC = () => {
                 <Input
                   label="Damage Dice"
                   value={formData.damage}
-                  onChange={e => setFormData(prev => ({ ...prev, damage: e.target.value }))}
+                  onChange={e =>
+                    setFormData(prev => ({ ...prev, damage: e.target.value }))
+                  }
                   placeholder="e.g., 1d8, 3d6"
                 />
 
                 {formData.damage && (
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">Damage Type</label>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Damage Type
+                    </label>
                     <SelectField
                       value={formData.damageType || '__none__'}
-                      onValueChange={value => setFormData(prev => ({ ...prev, damageType: value === '__none__' ? '' : value }))}
+                      onValueChange={value =>
+                        setFormData(prev => ({
+                          ...prev,
+                          damageType: value === '__none__' ? '' : value,
+                        }))
+                      }
                     >
-                      <SelectItem value="__none__" disabled>Select...</SelectItem>
+                      <SelectItem value="__none__" disabled>
+                        Select...
+                      </SelectItem>
                       {DAMAGE_TYPES.map(type => (
                         <SelectItem key={type} value={type}>
                           {type}
@@ -1372,7 +1710,7 @@ export const EnhancedSpellManagement: React.FC = () => {
             </div>
 
             {/* Form Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t-2 border-gray-200">
+            <div className="flex justify-end gap-3 border-t-2 border-gray-200 pt-4">
               <Button
                 type="button"
                 onClick={resetForm}
