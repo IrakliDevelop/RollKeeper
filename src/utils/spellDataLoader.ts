@@ -1459,9 +1459,14 @@ function parseSpellEntries(entries: (string | SpellEntry)[]): string {
 
       // Handle object entries
       if (entry.type === 'list' && entry.items) {
-        // Handle list items like "Audible Alarm" and "Mental Alarm"
+        // Handle list items - they can be either objects or strings
         return entry.items
           .map(item => {
+            // Handle string items in a list
+            if (typeof item === 'string') {
+              return item;
+            }
+            // Handle object items with type 'item'
             if (item.type === 'item' && item.name && item.entries) {
               return `**${item.name}.** ${item.entries.join(' ')}`;
             }
@@ -1472,18 +1477,32 @@ function parseSpellEntries(entries: (string | SpellEntry)[]): string {
       }
 
       if (entry.type === 'entries' && entry.entries) {
-        // Handle nested entries
+        // Handle nested entries - recursively parse them
         let result = '';
         if (entry.name) {
           result += `**${entry.name}**\n\n`;
         }
-        result += entry.entries.join('\n\n');
+        // Recursively parse the nested entries instead of just joining
+        result += parseSpellEntries(entry.entries);
         return result;
+      }
+
+      // Handle table entries
+      if (entry.type === 'table') {
+        let tableResult = '';
+        if (entry.caption) {
+          tableResult += `**${entry.caption}**\n\n`;
+        }
+        // For tables, we'll provide a simple text representation
+        // The actual table rendering would need to be done in the UI
+        tableResult += '_(See table in source material)_';
+        return tableResult;
       }
 
       // For any other object types, try to extract meaningful text
       if (entry.entries) {
-        return entry.entries.join('\n\n');
+        // Recursively parse nested entries
+        return parseSpellEntries(entry.entries);
       }
 
       // Fallback for unknown object types
