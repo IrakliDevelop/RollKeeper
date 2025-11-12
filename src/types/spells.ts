@@ -108,9 +108,13 @@ export interface RawSpellData {
 export interface SpellEntry {
   type: string;
   name?: string;
-  entries?: string[];
+  entries?: (string | SpellEntry)[]; // Can be nested
   style?: string;
-  items?: SpellEntryItem[];
+  items?: (string | SpellEntryItem)[]; // Items can be strings or objects
+  caption?: string; // For table entries
+  colLabels?: string[]; // For table entries
+  colStyles?: string[]; // For table entries
+  rows?: (string | number)[][]; // For table entries
 }
 
 export interface SpellEntryItem {
