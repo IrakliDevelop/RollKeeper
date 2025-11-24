@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Save,
   Download,
   Upload,
   RotateCcw,
@@ -18,7 +17,6 @@ import { exportCharacterToFile } from '@/utils/fileOperations';
 import { useState, useEffect } from 'react';
 import { Button, Input } from '@/components/ui/forms';
 import { AvatarUpload } from './AvatarUpload';
-import { ThemeToggle } from '@/components/ui/theme/ThemeToggle';
 
 interface CharacterSheetHeaderProps {
   characterId: string;
