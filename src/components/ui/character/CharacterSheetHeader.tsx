@@ -7,6 +7,8 @@ import {
   RotateCcw,
   FileText,
   ArrowLeft,
+  Pencil,
+  Eye,
 } from 'lucide-react';
 import Link from 'next/link';
 import { SaveIndicator } from '@/components/ui/feedback/SaveIndicator';
@@ -16,6 +18,7 @@ import { exportCharacterToFile } from '@/utils/fileOperations';
 import { useState, useEffect } from 'react';
 import { Button, Input } from '@/components/ui/forms';
 import { AvatarUpload } from './AvatarUpload';
+import { ThemeToggle } from '@/components/ui/theme/ThemeToggle';
 
 interface CharacterSheetHeaderProps {
   characterId: string;
@@ -54,25 +57,18 @@ export default function CharacterSheetHeader({
 }: CharacterSheetHeaderProps) {
   const { exportCharacter } = useCharacterStore();
   const { getCharacterById, updateCharacterData } = usePlayerStore();
-  
+
   // Get character data for avatar
   const playerCharacter = getCharacterById(characterId);
 
   // Handle avatar change
   const handleAvatarChange = (newAvatar: string | undefined) => {
-    
-    
-    
-    
     if (playerCharacter?.characterData) {
-      
       updateCharacterData(characterId, {
         ...playerCharacter.characterData,
         avatar: newAvatar,
       });
-      
     } else {
-      
     }
   };
 
@@ -80,6 +76,8 @@ export default function CharacterSheetHeader({
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
+
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -174,11 +172,7 @@ export default function CharacterSheetHeader({
                   Export
                 </Button>
 
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                >
+                <Button asChild variant="outline" size="sm">
                   <label className="cursor-pointer">
                     <span className="flex items-center gap-2">
                       <Upload size={16} />
@@ -253,20 +247,26 @@ export default function CharacterSheetHeader({
               characterName={characterName}
               onAvatarChange={handleAvatarChange}
               size="lg"
-              editable={true}
+              editable={isEditMode}
             />
-            
+
             {/* Name Input and Buttons - side by side */}
             <div className="flex flex-1 items-start justify-between gap-4">
               <div className="flex-1">
-                <Input
-                  type="text"
-                  placeholder="Character Name"
-                  value={characterName}
-                  onChange={e => onUpdateName(e.target.value)}
-                  className="w-full border-none bg-transparent text-3xl font-bold text-gray-800 placeholder-gray-400 outline-none"
-                  size="lg"
-                />
+                {isEditMode ? (
+                  <Input
+                    type="text"
+                    placeholder="Character Name"
+                    value={characterName}
+                    onChange={e => onUpdateName(e.target.value)}
+                    className="text-text-primary placeholder-text-tertiary w-full border-none bg-transparent text-3xl font-bold outline-none"
+                    size="lg"
+                  />
+                ) : (
+                  <h2 className="text-text-primary w-full text-3xl font-bold">
+                    {characterName || 'Unnamed Character'}
+                  </h2>
+                )}
                 <SaveIndicator
                   status={saveStatus}
                   lastSaved={lastSaved}
@@ -274,10 +274,30 @@ export default function CharacterSheetHeader({
                   className="mt-1"
                 />
               </div>
-              
+
               {/* Action Buttons */}
               <div className="flex flex-shrink-0 gap-2">
+                {/* Edit/View Mode Toggle */}
                 <Button
+                  onClick={() => setIsEditMode(!isEditMode)}
+                  variant={isEditMode ? 'primary' : 'outline'}
+                  size="sm"
+                  leftIcon={
+                    isEditMode ? <Eye size={16} /> : <Pencil size={16} />
+                  }
+                  className={
+                    isEditMode
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 shadow-md hover:from-blue-700 hover:to-blue-800'
+                      : 'shadow-sm'
+                  }
+                  title={
+                    isEditMode ? 'Switch to view mode' : 'Switch to edit mode'
+                  }
+                >
+                  {isEditMode ? 'View' : 'Edit'}
+                </Button>
+
+                {/* <Button
                   onClick={onManualSave}
                   disabled={!hasUnsavedChanges}
                   variant="success"
@@ -286,7 +306,7 @@ export default function CharacterSheetHeader({
                   className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-md"
                 >
                   Save
-                </Button>
+                </Button> */}
                 <Button
                   onClick={onExport}
                   variant="outline"
@@ -309,13 +329,13 @@ export default function CharacterSheetHeader({
                     Notes Prototype
                   </Link>
                 </Button>
-                
+
                 <Button
                   onClick={onShowResetModal}
                   variant="danger"
                   size="sm"
                   leftIcon={<RotateCcw size={16} />}
-                  className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-md"
+                  className="bg-gradient-to-r from-red-600 to-red-700 shadow-md hover:from-red-700 hover:to-red-800"
                   title="Reset character - this will clear all data!"
                 >
                   Reset
