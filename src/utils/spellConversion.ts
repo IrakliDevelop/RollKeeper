@@ -5,6 +5,7 @@
 
 import { ProcessedSpell } from '@/types/spells';
 import { Spell, SpellActionType } from '@/types/character';
+import { formatSpellDescriptionForEditor } from './referenceParser';
 
 /**
  * Convert ProcessedSpell (from spellbook) to SpellFormData (for character sheet)
@@ -152,6 +153,14 @@ export function convertProcessedSpellToFormData(
     ? savingThrow.charAt(0).toUpperCase() + savingThrow.slice(1)
     : '';
 
+  // Format descriptions for WYSIWYG editor with bold references
+  const formattedDescription = formatSpellDescriptionForEditor(
+    spell.description
+  );
+  const formattedHigherLevel = spell.higherLevelDescription
+    ? formatSpellDescriptionForEditor(spell.higherLevelDescription)
+    : '';
+
   return {
     name: spell.name,
     level: spell.level,
@@ -165,8 +174,8 @@ export function convertProcessedSpellToFormData(
       materialDescription: spell.components.materialComponent || '',
     },
     duration: spell.duration,
-    description: spell.description,
-    higherLevel: spell.higherLevelDescription || '',
+    description: formattedDescription,
+    higherLevel: formattedHigherLevel,
     ritual: spell.isRitual,
     concentration: spell.concentration,
     isPrepared: false, // Default to unprepared

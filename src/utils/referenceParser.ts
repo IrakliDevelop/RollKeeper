@@ -473,3 +473,83 @@ export function hasReferences(content: string): boolean {
 export function getFormattedHtml(content: string): string {
   return parseReferences(content).html;
 }
+
+/**
+ * Format reference as bold HTML for WYSIWYG editor
+ * Used in spell edit modal to make important references stand out
+ */
+function formatReferenceForEditor(reference: ParsedReference): string {
+  // For most references, just bold the display text
+  return `<strong>${reference.displayText}</strong>`;
+}
+
+/**
+ * Parse references and format them for WYSIWYG editor
+ * Converts {@...} tags to bold text for better editing experience
+ */
+export function formatSpellDescriptionForEditor(content: string): string {
+  if (!content) {
+    return '';
+  }
+
+  let formattedHtml = content;
+
+  // Regex to match {@type content} patterns
+  const referenceRegex = /\{@(\w+)\s+([^}]+)\}/g;
+
+  let match;
+  const replacements: Array<{ from: string; to: string }> = [];
+
+  while ((match = referenceRegex.exec(content)) !== null) {
+    const [fullMatch, type, content] = match;
+    const parts = content.split('|');
+
+    const name = parts[0]?.trim() || '';
+    const source = parts[1]?.trim();
+    const extra = parts.slice(2);
+
+    const reference: ParsedReference = {
+      type: normalizeReferenceType(type),
+      name,
+      source,
+      displayText: formatDisplayText(type, name, source, extra),
+      properties: parseExtraProperties(extra),
+      isReference: true,
+    };
+
+    // Replace with bold HTML for editor
+    replacements.push({
+      from: fullMatch,
+      to: formatReferenceForEditor(reference),
+    });
+  }
+
+  // Apply all replacements
+  replacements.forEach(({ from, to }) => {
+    formattedHtml = formattedHtml.replace(from, to);
+  });
+
+  // Clean up any remaining malformed references
+  formattedHtml = formattedHtml.replace(/\{@\w+[^}]*\}/g, match => {
+    // If we couldn't parse it properly, just remove the {@...} wrapper
+    return match.replace(/\{@\w+\s*/, '').replace(/\}$/, '');
+  });
+
+  // Convert newlines to proper paragraph breaks for the editor
+  // Split by double newlines (paragraph breaks)
+  const paragraphs = formattedHtml.split('\n\n');
+
+  // Wrap each paragraph in <p> tags if not already wrapped
+  const wrappedParagraphs = paragraphs
+    .map(para => {
+      const trimmed = para.trim();
+      if (!trimmed) return '';
+      // If it already starts with an HTML tag, leave it as is
+      if (trimmed.startsWith('<')) return trimmed;
+      // Otherwise wrap in <p> tags
+      return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
+    })
+    .filter(Boolean);
+
+  return wrappedParagraphs.join('');
+}
