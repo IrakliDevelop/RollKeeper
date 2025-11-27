@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { CharacterAbilities, AbilityName } from '@/types/character';
 import { ABILITY_ABBREVIATIONS, ABILITY_NAMES } from '@/utils/constants';
 import { calculateModifier, formatModifier } from '@/utils/calculations';
@@ -34,6 +34,10 @@ export function AbilityScoreDisplay({
   onAbilityClick,
   className = '',
 }: AbilityScoreDisplayProps) {
+  const [editingValues, setEditingValues] = useState<
+    Record<AbilityName, string>
+  >({} as Record<AbilityName, string>);
+
   const getAbilityModifier = (ability: AbilityName): number => {
     return calculateModifier(abilities[ability]);
   };
@@ -94,10 +98,46 @@ export function AbilityScoreDisplay({
               ) : (
                 <input
                   type="number"
-                  value={abilities[ability]}
-                  onChange={e =>
-                    onUpdateAbility?.(ability, parseInt(e.target.value) || 10)
-                  }
+                  value={editingValues[ability] ?? abilities[ability]}
+                  onChange={e => {
+                    // Allow any input including empty string
+                    setEditingValues(prev => ({
+                      ...prev,
+                      [ability]: e.target.value,
+                    }));
+                  }}
+                  onFocus={e => {
+                    // Select all on focus for easy replacement
+                    e.target.select();
+                  }}
+                  onBlur={e => {
+                    // On blur, validate and update
+                    const value = e.target.value;
+                    let numValue: number;
+
+                    if (value === '' || isNaN(parseInt(value))) {
+                      numValue = 10; // Default
+                    } else {
+                      numValue = parseInt(value);
+                      // Clamp between 1 and 30
+                      numValue = Math.max(1, Math.min(30, numValue));
+                    }
+
+                    onUpdateAbility?.(ability, numValue);
+
+                    // Clear editing state
+                    setEditingValues(prev => {
+                      const newState = { ...prev };
+                      delete newState[ability];
+                      return newState;
+                    });
+                  }}
+                  onKeyDown={e => {
+                    // Submit on Enter
+                    if (e.key === 'Enter') {
+                      e.currentTarget.blur();
+                    }
+                  }}
                   min="1"
                   max="30"
                   className={`w-full border-none bg-transparent text-center font-bold text-blue-900 outline-none ${compact ? 'text-lg' : 'text-2xl'}`}

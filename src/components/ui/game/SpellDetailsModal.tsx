@@ -2,14 +2,7 @@
 
 import React from 'react';
 import { Spell } from '@/types/character';
-import {
-  Clock,
-  Target,
-  Zap,
-  Sparkles,
-  Star,
-  Wand2,
-} from 'lucide-react';
+import { Clock, Target, Zap, Sparkles, Star, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
 import { Modal } from '@/components/ui/feedback/Modal';
@@ -41,7 +34,7 @@ export default function SpellDetailsModal({
       closeOnBackdropClick={true}
     >
       {/* Header */}
-      <div className="border-b-2 border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50 p-6 -m-6 mb-6">
+      <div className="-m-6 mb-6 border-b-2 border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50 p-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             {/* Spell Name */}
@@ -51,10 +44,14 @@ export default function SpellDetailsModal({
 
             {/* Badges */}
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Badge 
-                variant={isCantrip ? "warning" : "primary"} 
+              <Badge
+                variant={isCantrip ? 'warning' : 'primary'}
                 size="sm"
-                className={isCantrip ? "bg-yellow-100 text-yellow-800" : "bg-purple-100 text-purple-800"}
+                className={
+                  isCantrip
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-purple-100 text-purple-800'
+                }
               >
                 {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
               </Badge>
@@ -87,12 +84,16 @@ export default function SpellDetailsModal({
             {onToggleFavorite && (
               <Button
                 onClick={onToggleFavorite}
-                variant={isFavorite ? "warning" : "ghost"}
+                variant={isFavorite ? 'warning' : 'ghost'}
                 size="sm"
                 leftIcon={
                   <Star size={16} fill={isFavorite ? 'currentColor' : 'none'} />
                 }
-                className={isFavorite ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200" : ""}
+                className={
+                  isFavorite
+                    ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                    : ''
+                }
               >
                 {isFavorite ? 'Favorited' : 'Add to Favorites'}
               </Button>
@@ -118,9 +119,7 @@ export default function SpellDetailsModal({
           <div className="rounded-lg border-2 border-gray-200 bg-white p-4">
             <div className="mb-2 flex items-center gap-2">
               <Target className="h-5 w-5 text-purple-600" />
-              <span className="text-sm font-medium text-gray-600">
-                Range
-              </span>
+              <span className="text-sm font-medium text-gray-600">Range</span>
             </div>
             <p className="font-semibold text-gray-900">{spell.range}</p>
           </div>
@@ -145,13 +144,19 @@ export default function SpellDetailsModal({
           <div className="flex items-center gap-4">
             <div className="flex gap-2">
               {spell.components.verbal && (
-                <Badge variant="info" size="sm">V</Badge>
+                <Badge variant="info" size="sm">
+                  V
+                </Badge>
               )}
               {spell.components.somatic && (
-                <Badge variant="success" size="sm">S</Badge>
+                <Badge variant="success" size="sm">
+                  S
+                </Badge>
               )}
               {spell.components.material && (
-                <Badge variant="primary" size="sm">M</Badge>
+                <Badge variant="primary" size="sm">
+                  M
+                </Badge>
               )}
             </div>
             {spell.components.materialDescription && (
@@ -190,13 +195,12 @@ export default function SpellDetailsModal({
 
         {/* Description */}
         <div className="rounded-lg border-2 border-gray-200 bg-white p-4">
-          <h3 className="mb-3 text-lg font-bold text-gray-900">
-            Description
-          </h3>
+          <h3 className="mb-3 text-lg font-bold text-gray-900">Description</h3>
           <div className="prose prose-gray max-w-none">
-            <p className="whitespace-pre-wrap text-gray-700 leading-relaxed">
-              {spell.description}
-            </p>
+            <div
+              className="leading-relaxed text-gray-700"
+              dangerouslySetInnerHTML={{ __html: spell.description }}
+            />
           </div>
         </div>
 
@@ -206,9 +210,10 @@ export default function SpellDetailsModal({
             <h3 className="mb-3 text-lg font-bold text-amber-900">
               At Higher Levels
             </h3>
-            <p className="whitespace-pre-wrap text-amber-800 leading-relaxed">
-              {spell.higherLevel}
-            </p>
+            <div
+              className="leading-relaxed text-amber-800"
+              dangerouslySetInnerHTML={{ __html: spell.higherLevel }}
+            />
           </div>
         )}
 
@@ -222,8 +227,8 @@ export default function SpellDetailsModal({
       </div>
 
       {/* Footer */}
-      <div className="border-t-2 border-gray-200 bg-gray-50 p-4 -m-6 mt-6">
-        <div className="flex justify-between items-center">
+      <div className="-m-6 mt-6 border-t-2 border-gray-200 bg-gray-50 p-4">
+        <div className="flex items-center justify-between">
           {onCast ? (
             <Button
               onClick={() => {
@@ -240,11 +245,7 @@ export default function SpellDetailsModal({
           ) : (
             <div />
           )}
-          <Button
-            onClick={onClose}
-            variant="outline"
-            size="md"
-          >
+          <Button onClick={onClose} variant="outline" size="md">
             Close
           </Button>
         </div>
@@ -252,5 +253,3 @@ export default function SpellDetailsModal({
     </Modal>
   );
 }
-
-

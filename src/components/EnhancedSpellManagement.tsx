@@ -26,7 +26,6 @@ import { Badge } from '@/components/ui/layout/badge';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Checkbox } from '@/components/ui/forms/checkbox';
 import { Input } from '@/components/ui/forms/input';
-import { Textarea } from '@/components/ui/forms/textarea';
 import { Modal } from '@/components/ui/feedback/Modal';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
@@ -35,6 +34,7 @@ import { SpellAutocomplete } from '@/components/ui/forms/SpellAutocomplete';
 import { useSpellsData } from '@/hooks/useSpellsData';
 import { convertProcessedSpellToFormData } from '@/utils/spellConversion';
 import { ProcessedSpell } from '@/types/spells';
+import RichTextEditor from '@/components/ui/forms/RichTextEditor';
 
 // Constants for spell schools and common casting times
 const SPELL_SCHOOLS = [
@@ -422,9 +422,10 @@ const SpellCard: React.FC<{
             </div>
           )}
 
-          <p className="line-clamp-2 text-sm text-gray-700">
-            {spell.description}
-          </p>
+          <div
+            className="line-clamp-2 text-sm text-gray-700"
+            dangerouslySetInnerHTML={{ __html: spell.description }}
+          />
         </div>
 
         <div className="ml-4 flex flex-col gap-2">
@@ -1585,32 +1586,39 @@ export const EnhancedSpellManagement: React.FC = () => {
                 Description
               </h4>
 
-              <Textarea
-                label="Spell Description"
-                value={formData.description}
-                onChange={e =>
-                  setFormData(prev => ({
-                    ...prev,
-                    description: e.target.value,
-                  }))
-                }
-                rows={4}
-                required
-                placeholder="Describe what the spell does..."
-              />
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Spell Description *
+                </label>
+                <RichTextEditor
+                  content={formData.description}
+                  onChange={content =>
+                    setFormData(prev => ({
+                      ...prev,
+                      description: content,
+                    }))
+                  }
+                  placeholder="Describe what the spell does..."
+                  minHeight="150px"
+                />
+              </div>
 
-              <Textarea
-                label="At Higher Levels"
-                value={formData.higherLevel}
-                onChange={e =>
-                  setFormData(prev => ({
-                    ...prev,
-                    higherLevel: e.target.value,
-                  }))
-                }
-                rows={2}
-                placeholder="Describe what happens when cast at higher levels..."
-              />
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  At Higher Levels
+                </label>
+                <RichTextEditor
+                  content={formData.higherLevel}
+                  onChange={content =>
+                    setFormData(prev => ({
+                      ...prev,
+                      higherLevel: content,
+                    }))
+                  }
+                  placeholder="Describe what happens when cast at higher levels..."
+                  minHeight="100px"
+                />
+              </div>
             </div>
 
             {/* Section: Combat Details */}

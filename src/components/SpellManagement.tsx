@@ -1087,9 +1087,12 @@ export const SpellManagement: React.FC = () => {
                     <span className="font-medium text-gray-800">
                       Description:
                     </span>
-                    <div className="mt-1 whitespace-pre-wrap text-gray-700">
-                      {viewingSpell.description}
-                    </div>
+                    <div
+                      className="mt-1 text-gray-700"
+                      dangerouslySetInnerHTML={{
+                        __html: viewingSpell.description,
+                      }}
+                    />
                   </div>
 
                   {viewingSpell.higherLevel && (
@@ -1097,9 +1100,12 @@ export const SpellManagement: React.FC = () => {
                       <span className="font-medium text-gray-800">
                         At Higher Levels:
                       </span>
-                      <div className="mt-1 whitespace-pre-wrap text-gray-700">
-                        {viewingSpell.higherLevel}
-                      </div>
+                      <div
+                        className="mt-1 text-gray-700"
+                        dangerouslySetInnerHTML={{
+                          __html: viewingSpell.higherLevel,
+                        }}
+                      />
                     </div>
                   )}
 
