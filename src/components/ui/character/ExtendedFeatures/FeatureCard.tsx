@@ -1,23 +1,23 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ExtendedFeature } from '@/types/character';
+import { ExtendedFeature, CharacterState } from '@/types/character';
 import { calculateTraitMaxUses } from '@/utils/calculations';
-import { 
-  Eye, 
-  Edit3, 
-  Trash2, 
-  Zap, 
-  Clock, 
+import {
+  Eye,
+  Edit3,
+  Trash2,
+  Zap,
+  Clock,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
 } from 'lucide-react';
-import FeatureModal from '@/components/ui/character/ExtendedFeatures/FeatureModal';
+import UnifiedFeatureModal from '@/components/ui/character/ExtendedFeatures/UnifiedFeatureModal';
 import { Button } from '@/components/ui/forms';
 
 interface FeatureCardProps {
   feature: ExtendedFeature;
-  characterLevel: number;
+  character: CharacterState;
   onUpdate: (updates: Partial<ExtendedFeature>) => void;
   onDelete: () => void;
   onUse: () => void;
@@ -27,7 +27,7 @@ interface FeatureCardProps {
 
 export default function FeatureCard({
   feature,
-  characterLevel,
+  character,
   onUpdate,
   onDelete,
   onUse,
@@ -35,20 +35,17 @@ export default function FeatureCard({
   isDragging = false,
 }: FeatureCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'view' | 'edit'>('view');
 
-  const maxUses = calculateTraitMaxUses(feature, characterLevel);
+  const maxUses = calculateTraitMaxUses(feature, character.level);
   const usesRemaining = maxUses - feature.usedUses;
   const isExhausted = !feature.isPassive && usesRemaining <= 0;
   const hasUses = !feature.isPassive && maxUses > 0;
 
   const handleViewClick = () => {
-    setModalMode('view');
     setIsModalOpen(true);
   };
 
   const handleEditClick = () => {
-    setModalMode('edit');
     setIsModalOpen(true);
   };
 
@@ -68,25 +65,25 @@ export default function FeatureCard({
   return (
     <>
       <div
-        className={`group flex flex-col h-full min-h-[140px] rounded-lg border-2 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md ${
-          isDragging ? 'opacity-50 scale-95' : ''
+        className={`group flex h-full min-h-[140px] flex-col rounded-lg border-2 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md ${
+          isDragging ? 'scale-95 opacity-50' : ''
         } ${isExhausted ? 'border-red-200 bg-red-50' : 'border-gray-200 hover:border-indigo-300'}`}
       >
         {/* Feature Header */}
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-gray-900 truncate text-sm leading-tight">
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <h4 className="truncate text-sm leading-tight font-semibold text-gray-900">
               {feature.name}
             </h4>
             {feature.sourceDetail && (
-              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded mt-1 inline-block">
+              <span className="mt-1 inline-block rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
                 {feature.sourceDetail}
               </span>
             )}
           </div>
-          
+
           {/* Action Buttons */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             {/* Use Button */}
             {!readonly && hasUses && !isExhausted && (
               <Button
@@ -138,13 +135,14 @@ export default function FeatureCard({
             )}
           </div>
         </div>
-        
+
         {/* Description */}
-        <div className="flex-1 mb-3">
+        <div className="mb-3 flex-1">
           {feature.description && (
-            <p className="text-xs text-gray-600 line-clamp-3">
-              {feature.description}
-            </p>
+            <div
+              className="line-clamp-3 text-xs text-gray-600"
+              dangerouslySetInnerHTML={{ __html: feature.description }}
+            />
           )}
         </div>
 
@@ -167,7 +165,7 @@ export default function FeatureCard({
             {hasUses && (
               <div className="flex items-center gap-1 text-gray-500">
                 <Clock className="h-3 w-3" />
-                <span className="capitalize text-xs">{feature.restType}</span>
+                <span className="text-xs capitalize">{feature.restType}</span>
               </div>
             )}
           </div>
@@ -176,11 +174,14 @@ export default function FeatureCard({
         {/* Usage Progress Bar */}
         {hasUses && maxUses > 1 && (
           <div className="mt-2">
-            <div className="w-full bg-gray-200 rounded-full h-1">
+            <div className="h-1 w-full rounded-full bg-gray-200">
               <div
                 className={`h-1 rounded-full transition-all duration-300 ${
-                  isExhausted ? 'bg-red-500' : 
-                  usesRemaining <= 1 ? 'bg-orange-500' : 'bg-green-500'
+                  isExhausted
+                    ? 'bg-red-500'
+                    : usesRemaining <= 1
+                      ? 'bg-orange-500'
+                      : 'bg-green-500'
                 }`}
                 style={{ width: `${(usesRemaining / maxUses) * 100}%` }}
               />
@@ -190,15 +191,15 @@ export default function FeatureCard({
       </div>
 
       {/* Feature Modal */}
-      <FeatureModal
+      <UnifiedFeatureModal
         feature={feature}
         isOpen={isModalOpen}
-        mode={modalMode}
-        characterLevel={characterLevel}
         onClose={() => setIsModalOpen(false)}
-        onUpdate={onUpdate}
+        onSave={onUpdate}
         onDelete={onDelete}
         onUse={onUse}
+        existingFeatures={[]}
+        character={character}
         readonly={readonly}
       />
     </>

@@ -113,9 +113,12 @@ export function TraitTracker({
         {!compact && (
           <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 py-8 text-center">
             <Zap className="mx-auto mb-2 h-10 w-10 text-gray-400" />
-            <p className="font-medium text-gray-600">No special abilities yet</p>
+            <p className="font-medium text-gray-600">
+              No special abilities yet
+            </p>
             <p className="mt-1 text-sm text-gray-500">
-              Special abilities appear here when added through Active Abilities & Features
+              Special abilities appear here when added through Active Abilities
+              & Features
             </p>
           </div>
         )}
@@ -171,14 +174,14 @@ export function TraitTracker({
         {displayTraits.map(trait => (
           <div
             key={trait.id}
-            className={`rounded-lg border-2 border-indigo-200 bg-white ${compact ? 'p-2' : 'p-3'} hover:shadow-md transition-shadow`}
+            className={`rounded-lg border-2 border-indigo-200 bg-white ${compact ? 'p-2' : 'p-3'} transition-shadow hover:shadow-md`}
           >
             <div>
               <div
                 className={`mb-2 flex items-start justify-between ${compact ? 'mb-1' : ''}`}
               >
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center flex-wrap gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h4
                       className={`font-medium text-gray-900 ${compact ? 'text-sm' : 'text-base'}`}
                     >
@@ -190,16 +193,19 @@ export function TraitTracker({
                       </Badge>
                     )}
                     <Badge
-                      variant={trait.restType === 'short' ? 'info' : 'secondary'}
+                      variant={
+                        trait.restType === 'short' ? 'info' : 'secondary'
+                      }
                       size="sm"
                     >
                       {trait.restType === 'short' ? 'Short Rest' : 'Long Rest'}
                     </Badge>
                   </div>
                   {trait.description && !compact && (
-                    <p className="mt-1 text-sm text-gray-600 line-clamp-2">
-                      {trait.description}
-                    </p>
+                    <div
+                      className="mt-1 line-clamp-2 text-sm text-gray-600"
+                      dangerouslySetInnerHTML={{ __html: trait.description }}
+                    />
                   )}
                 </div>
                 {!readonly && !hideControls && (
@@ -245,17 +251,20 @@ export function TraitTracker({
               </div>
 
               <div className="flex items-center justify-between">
-                <div className="flex items-center flex-wrap gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge
                     variant={
-                      calculateTraitMaxUses(trait, characterLevel) - trait.usedUses > 0
+                      calculateTraitMaxUses(trait, characterLevel) -
+                        trait.usedUses >
+                      0
                         ? 'success'
                         : 'neutral'
                     }
                     size="sm"
                   >
-                    {calculateTraitMaxUses(trait, characterLevel) - trait.usedUses}/
-                    {calculateTraitMaxUses(trait, characterLevel)} Uses
+                    {calculateTraitMaxUses(trait, characterLevel) -
+                      trait.usedUses}
+                    /{calculateTraitMaxUses(trait, characterLevel)} Uses
                     {trait.scaleWithProficiency && ' (Prof.)'}
                   </Badge>
                   {renderUsageCheckboxes(trait)}
