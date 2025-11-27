@@ -1,28 +1,39 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ExtendedFeature, FeatureCategory, groupFeaturesBySource } from '@/types/character';
+import {
+  ExtendedFeature,
+  FeatureCategory,
+  groupFeaturesBySource,
+  CharacterState,
+} from '@/types/character';
 import { ChevronDown, ChevronRight, Plus, Settings } from 'lucide-react';
 import FeatureCategorySection from '@/components/ui/character/ExtendedFeatures/FeatureCategorySection';
-import AddFeatureModal from '@/components/ui/character/ExtendedFeatures/AddFeatureModal';
+import UnifiedFeatureModal from '@/components/ui/character/ExtendedFeatures/UnifiedFeatureModal';
 import { Button } from '@/components/ui/forms';
 
 interface ExtendedFeaturesSectionProps {
   features: ExtendedFeature[];
-  characterLevel: number;
-  onAddFeature: (feature: Omit<ExtendedFeature, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  character: CharacterState;
+  onAddFeature: (
+    feature: Omit<ExtendedFeature, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
   onUpdateFeature: (id: string, updates: Partial<ExtendedFeature>) => void;
   onDeleteFeature: (id: string) => void;
   onUseFeature: (id: string) => void;
   onResetFeatures: (restType: 'short' | 'long') => void;
-  onReorderFeatures: (sourceIndex: number, destinationIndex: number, sourceType?: string) => void;
+  onReorderFeatures: (
+    sourceIndex: number,
+    destinationIndex: number,
+    sourceType?: string
+  ) => void;
   readonly?: boolean;
   className?: string;
 }
 
 export default function ExtendedFeaturesSection({
   features,
-  characterLevel,
+  character,
   onAddFeature,
   onUpdateFeature,
   onDeleteFeature,
@@ -34,7 +45,9 @@ export default function ExtendedFeaturesSection({
 }: ExtendedFeaturesSectionProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
+    new Set()
+  );
 
   // Group features by source type
   const categories: FeatureCategory[] = groupFeaturesBySource(features);
@@ -52,7 +65,9 @@ export default function ExtendedFeaturesSection({
   };
 
   return (
-    <section className={`rounded-xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-6 shadow-lg transition-all duration-300 ${className}`}>
+    <section
+      className={`rounded-xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-6 shadow-lg transition-all duration-300 ${className}`}
+    >
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <button
@@ -108,10 +123,11 @@ export default function ExtendedFeaturesSection({
           {categories.length === 0 ? (
             <div className="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center">
               <div className="text-gray-500">
-                <Settings className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <p className="text-lg font-medium mb-2">No features yet</p>
+                <Settings className="mx-auto mb-4 h-12 w-12 opacity-50" />
+                <p className="mb-2 text-lg font-medium">No features yet</p>
                 <p className="text-sm">
-                  Add class features, racial abilities, feats, and more to organize your character&apos;s capabilities.
+                  Add class features, racial abilities, feats, and more to
+                  organize your character&apos;s capabilities.
                 </p>
                 {!readonly && (
                   <Button
@@ -128,18 +144,27 @@ export default function ExtendedFeaturesSection({
             </div>
           ) : (
             <div className="space-y-3">
-              {categories.map((category) => (
+              {categories.map(category => (
                 <FeatureCategorySection
                   key={category.sourceType}
                   category={category}
-                  characterLevel={characterLevel}
+                  character={character}
                   isCollapsed={collapsedCategories.has(category.sourceType)}
-                  onToggleCollapse={() => toggleCategoryCollapse(category.sourceType)}
+                  onToggleCollapse={() =>
+                    toggleCategoryCollapse(category.sourceType)
+                  }
                   onUpdateFeature={onUpdateFeature}
                   onDeleteFeature={onDeleteFeature}
                   onUseFeature={onUseFeature}
-                  onReorderFeatures={(sourceIndex: number, destinationIndex: number) => 
-                    onReorderFeatures(sourceIndex, destinationIndex, category.sourceType)
+                  onReorderFeatures={(
+                    sourceIndex: number,
+                    destinationIndex: number
+                  ) =>
+                    onReorderFeatures(
+                      sourceIndex,
+                      destinationIndex,
+                      category.sourceType
+                    )
                   }
                   readonly={readonly}
                 />
@@ -149,7 +174,7 @@ export default function ExtendedFeaturesSection({
 
           {/* Reset buttons */}
           {!readonly && features.some(f => f.usedUses > 0) && (
-            <div className="mt-4 flex gap-2 pt-4 border-t border-indigo-200">
+            <div className="mt-4 flex gap-2 border-t border-indigo-200 pt-4">
               <Button
                 onClick={() => onResetFeatures('short')}
                 variant="success"
@@ -171,11 +196,12 @@ export default function ExtendedFeaturesSection({
       )}
 
       {/* Add Feature Modal */}
-      <AddFeatureModal
+      <UnifiedFeatureModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onAdd={onAddFeature}
+        onSave={onAddFeature}
         existingFeatures={features}
+        character={character}
       />
     </section>
   );

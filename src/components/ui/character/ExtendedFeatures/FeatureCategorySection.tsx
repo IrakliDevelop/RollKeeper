@@ -1,17 +1,24 @@
 'use client';
 
 import React from 'react';
-import { ExtendedFeature, FeatureCategory } from '@/types/character';
+import {
+  ExtendedFeature,
+  FeatureCategory,
+  CharacterState,
+} from '@/types/character';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import FeatureCard from './FeatureCard';
 
 interface FeatureCategorySectionProps {
   category: FeatureCategory;
-  characterLevel: number;
+  character: CharacterState;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
-  onUpdateFeature: (id: string, updates: Partial<FeatureCategory['features'][0]>) => void;
+  onUpdateFeature: (
+    id: string,
+    updates: Partial<FeatureCategory['features'][0]>
+  ) => void;
   onDeleteFeature: (id: string) => void;
   onUseFeature: (id: string) => void;
   onReorderFeatures: (sourceIndex: number, destinationIndex: number) => void;
@@ -20,7 +27,7 @@ interface FeatureCategorySectionProps {
 
 export default function FeatureCategorySection({
   category,
-  characterLevel,
+  character,
   isCollapsed,
   onToggleCollapse,
   onUpdateFeature,
@@ -41,7 +48,7 @@ export default function FeatureCategorySection({
       {/* Category Header */}
       <button
         onClick={onToggleCollapse}
-        className="w-full flex items-center justify-between p-4 text-left transition-colors hover:bg-gray-50"
+        className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-gray-50"
       >
         <div className="flex items-center gap-3">
           {isCollapsed ? (
@@ -54,7 +61,7 @@ export default function FeatureCategorySection({
             <p className="text-sm text-gray-500">{description}</p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
             {features.length} feature{features.length !== 1 ? 's' : ''}
@@ -73,15 +80,17 @@ export default function FeatureCategorySection({
           <DragDropList
             items={features}
             onReorder={onReorderFeatures}
-            keyExtractor={(feature) => feature.id}
+            keyExtractor={feature => feature.id}
             disabled={readonly}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
             showDragHandle={!readonly}
             renderItem={(feature, index, isDragging) => (
               <FeatureCard
                 feature={feature}
-                characterLevel={characterLevel}
-                onUpdate={(updates: Partial<ExtendedFeature>) => onUpdateFeature(feature.id, updates)}
+                character={character}
+                onUpdate={(updates: Partial<ExtendedFeature>) =>
+                  onUpdateFeature(feature.id, updates)
+                }
                 onDelete={() => onDeleteFeature(feature.id)}
                 onUse={() => onUseFeature(feature.id)}
                 readonly={readonly}

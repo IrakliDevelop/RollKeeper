@@ -44,7 +44,12 @@ import {
   calculateSkillModifier,
 } from '@/utils/calculations';
 import { exportCharacterToFile } from '@/utils/fileOperations';
-import { AbilityName, SkillName, CharacterState, ExtendedFeature } from '@/types/character';
+import {
+  AbilityName,
+  SkillName,
+  CharacterState,
+  ExtendedFeature,
+} from '@/types/character';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import GroupedTabs, {
   GroupedTabsRef,
@@ -188,9 +193,11 @@ export default function CharacterSheet() {
         lastSyncedCharacterRef.current = playerCharacter.characterData;
 
         // Auto-migrate existing traits to extended features if needed
-        const hasTraits = (playerCharacter.characterData.trackableTraits || []).length > 0;
-        const hasExtended = (playerCharacter.characterData.extendedFeatures || []).length > 0;
-        
+        const hasTraits =
+          (playerCharacter.characterData.trackableTraits || []).length > 0;
+        const hasExtended =
+          (playerCharacter.characterData.extendedFeatures || []).length > 0;
+
         if (hasTraits && !hasExtended) {
           // Small delay to ensure character state is loaded first
           setTimeout(() => {
@@ -206,7 +213,12 @@ export default function CharacterSheet() {
         return () => clearTimeout(timer);
       }
     }
-  }, [playerCharacter, hasHydrated, loadCharacterState, migrateTraitsToExtendedFeatures]);
+  }, [
+    playerCharacter,
+    hasHydrated,
+    loadCharacterState,
+    migrateTraitsToExtendedFeatures,
+  ]);
 
   // Sync character data back to player store when it changes (skip during initial load)
   useEffect(() => {
@@ -636,7 +648,6 @@ export default function CharacterSheet() {
                 <div className="h-px w-full max-w-md bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
               </div>
 
-
               {/* Core D&D Stats Section */}
               <CollapsibleSection
                 title="Character Statistics"
@@ -652,7 +663,8 @@ export default function CharacterSheet() {
                       Level {totalLevel}
                     </span>
                     <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
-                      HP: {character.hitPoints.current}/{character.hitPoints.max}
+                      HP: {character.hitPoints.current}/
+                      {character.hitPoints.max}
                     </span>
                   </div>
                 }
@@ -694,7 +706,6 @@ export default function CharacterSheet() {
                       onUpdateAbilityScore={updateAbilityScore}
                       onRollAbilityCheck={rollAbilityCheck}
                     />
-
 
                     {/* Weapon Proficiencies */}
                     <ErrorBoundary
@@ -755,11 +766,12 @@ export default function CharacterSheet() {
                                     <Badge variant="danger" size="sm">
                                       {condition.name}
                                     </Badge>
-                                    {condition.stackable && condition.count > 1 && (
-                                      <Badge variant="warning" size="sm">
-                                        Level {condition.count}
-                                      </Badge>
-                                    )}
+                                    {condition.stackable &&
+                                      condition.count > 1 && (
+                                        <Badge variant="warning" size="sm">
+                                          Level {condition.count}
+                                        </Badge>
+                                      )}
                                   </div>
                                   <Badge variant="neutral" size="sm">
                                     {condition.source}
@@ -794,7 +806,9 @@ export default function CharacterSheet() {
 
                     {/* Special Abilities - Read-only, only show active abilities from extendedFeatures */}
                     <TraitTracker<ExtendedFeature>
-                      traits={(character.extendedFeatures || []).filter(trait => !trait.isPassive)}
+                      traits={(character.extendedFeatures || []).filter(
+                        trait => !trait.isPassive
+                      )}
                       characterLevel={totalLevel}
                       onUpdateTrait={updateExtendedFeature}
                       onDeleteTrait={deleteExtendedFeature}
@@ -870,7 +884,6 @@ export default function CharacterSheet() {
                       onUpdateToolProficiency={updateToolProficiency}
                       onDeleteToolProficiency={deleteToolProficiency}
                     />
-
                   </div>
 
                   {/* Right Column - Combat Stats & Features */}
@@ -979,7 +992,12 @@ export default function CharacterSheet() {
                     )}
                     {character.extendedFeatures?.some(f => f.usedUses > 0) && (
                       <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">
-                        {character.extendedFeatures?.filter(f => f.usedUses > 0).length} used
+                        {
+                          character.extendedFeatures?.filter(
+                            f => f.usedUses > 0
+                          ).length
+                        }{' '}
+                        used
                       </span>
                     )}
                   </div>
@@ -987,7 +1005,7 @@ export default function CharacterSheet() {
               >
                 <ExtendedFeaturesSection
                   features={character.extendedFeatures || []}
-                  characterLevel={character.level}
+                  character={character}
                   onAddFeature={addExtendedFeature}
                   onUpdateFeature={updateExtendedFeature}
                   onDeleteFeature={deleteExtendedFeature}
