@@ -156,6 +156,7 @@ interface SpellFilters {
   level: number | 'all';
   school: string | 'all';
   actionType: string | 'all';
+  damageType: string | 'all';
   prepared: 'all' | 'prepared' | 'unprepared';
   concentration: 'all' | 'yes' | 'no';
   ritual: 'all' | 'yes' | 'no';
@@ -197,6 +198,7 @@ const initialFilters: SpellFilters = {
   level: 'all',
   school: 'all',
   actionType: 'all',
+  damageType: 'all',
   prepared: 'all',
   concentration: 'all',
   ritual: 'all',
@@ -663,6 +665,14 @@ export const EnhancedSpellManagement: React.FC = () => {
       );
     }
 
+    // Damage type filter
+    if (filters.damageType !== 'all') {
+      filtered = filtered.filter(
+        spell =>
+          spell.damageType?.toLowerCase() === filters.damageType.toLowerCase()
+      );
+    }
+
     // Prepared filter
     if (filters.prepared === 'prepared') {
       filtered = filtered.filter(
@@ -1094,6 +1104,26 @@ export const EnhancedSpellManagement: React.FC = () => {
                       value={type.value || 'none'}
                     >
                       {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectField>
+              </div>
+
+              {/* Damage Type Filter */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Damage Type
+                </label>
+                <SelectField
+                  value={filters.damageType}
+                  onValueChange={value =>
+                    setFilters(prev => ({ ...prev, damageType: value }))
+                  }
+                >
+                  <SelectItem value="all">All Damage Types</SelectItem>
+                  {DAMAGE_TYPES.map(type => (
+                    <SelectItem key={type} value={type}>
+                      {type}
                     </SelectItem>
                   ))}
                 </SelectField>
