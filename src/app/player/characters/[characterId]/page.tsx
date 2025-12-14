@@ -871,18 +871,6 @@ export default function CharacterSheet() {
                         }
                       />
                     )}
-
-                    {/* Languages & Tool Proficiencies */}
-                    <LanguagesAndProficiencies
-                      languages={character.languages || []}
-                      toolProficiencies={character.toolProficiencies || []}
-                      proficiencyBonus={proficiencyBonus}
-                      onAddLanguage={addLanguage}
-                      onDeleteLanguage={deleteLanguage}
-                      onAddToolProficiency={addToolProficiency}
-                      onUpdateToolProficiency={updateToolProficiency}
-                      onDeleteToolProficiency={deleteToolProficiency}
-                    />
                   </div>
 
                   {/* Right Column - Combat Stats & Features */}
@@ -968,6 +956,17 @@ export default function CharacterSheet() {
                         />
                       </ErrorBoundary>
                     </div>
+                    {/* Languages & Tool Proficiencies */}
+                    <LanguagesAndProficiencies
+                      languages={character.languages || []}
+                      toolProficiencies={character.toolProficiencies || []}
+                      proficiencyBonus={proficiencyBonus}
+                      onAddLanguage={addLanguage}
+                      onDeleteLanguage={deleteLanguage}
+                      onAddToolProficiency={addToolProficiency}
+                      onUpdateToolProficiency={updateToolProficiency}
+                      onDeleteToolProficiency={deleteToolProficiency}
+                    />
                   </div>
                 </div>
               </CollapsibleSection>
