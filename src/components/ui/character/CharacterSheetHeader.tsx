@@ -261,7 +261,7 @@ export default function CharacterSheetHeader({
                     size="lg"
                   />
                 ) : (
-                  <h2 className="text-text-primary w-full text-3xl font-bold">
+                  <h2 className="w-full text-3xl font-bold text-gray-900">
                     {characterName || 'Unnamed Character'}
                   </h2>
                 )}
@@ -274,7 +274,7 @@ export default function CharacterSheetHeader({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-shrink-0 gap-2">
+              <div className="flex shrink-0 gap-2">
                 {/* Edit/View Mode Toggle */}
                 <Button
                   onClick={() => setIsEditMode(!isEditMode)}
@@ -285,7 +285,7 @@ export default function CharacterSheetHeader({
                   }
                   className={
                     isEditMode
-                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 shadow-md hover:from-blue-700 hover:to-blue-800'
+                      ? 'bg-linear-to-r from-blue-600 to-blue-700 shadow-md hover:from-blue-700 hover:to-blue-800'
                       : 'shadow-sm'
                   }
                   title={
