@@ -148,7 +148,6 @@ export default function CharacterSheet() {
     updateTempArmorClass,
     toggleJackOfAllTrades,
     toggleShield,
-    resetTempArmorClass,
     updateShieldBonus,
     stopConcentration,
     loadCharacterState,
@@ -901,7 +900,6 @@ export default function CharacterSheet() {
                           updateCharacter({ armorClass: ac })
                         }
                         onUpdateTempArmorClass={updateTempArmorClass}
-                        onResetTempArmorClass={resetTempArmorClass}
                         onToggleShield={toggleShield}
                         onUpdateShieldBonus={updateShieldBonus}
                       />
