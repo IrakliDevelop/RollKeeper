@@ -5,9 +5,11 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
+import Underline from '@tiptap/extension-underline';
 import {
   Bold,
   Italic,
+  Underline as UnderlineIcon,
   Strikethrough,
   List,
   ListOrdered,
@@ -44,7 +46,7 @@ export default function RichTextEditor({
   }, []);
 
   const editor = useEditor({
-    extensions: [StarterKit, TextStyle, Color],
+    extensions: [StarterKit, TextStyle, Color, Underline],
     content,
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
@@ -107,6 +109,18 @@ export default function RichTextEditor({
             title="Italic"
           >
             <Italic size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+            disabled={!editor.can().chain().focus().toggleUnderline().run()}
+            className={`rounded p-2 text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 ${
+              editor.isActive('underline') ? 'bg-blue-200 text-blue-900' : ''
+            }`}
+            title="Underline"
+          >
+            <UnderlineIcon size={16} />
           </button>
 
           <button
@@ -382,6 +396,10 @@ export default function RichTextEditor({
 
         .rich-text-editor-content .ProseMirror s {
           text-decoration: line-through !important;
+        }
+
+        .rich-text-editor-content .ProseMirror u {
+          text-decoration: underline !important;
         }
 
         /* Code */
