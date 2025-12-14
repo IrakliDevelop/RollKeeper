@@ -236,13 +236,10 @@ export default function FeatureModal({
                 <h4 className="mb-4 text-lg font-semibold text-gray-900">
                   Description
                 </h4>
-                <div className="prose prose-sm max-w-none leading-relaxed text-gray-700">
-                  {feature.description.split('\n').map((paragraph, index) => (
-                    <p key={index} className="mb-3 last:mb-0">
-                      {paragraph}
-                    </p>
-                  ))}
-                </div>
+                <div
+                  className="prose prose-sm max-w-none leading-relaxed text-gray-700"
+                  dangerouslySetInnerHTML={{ __html: feature.description }}
+                />
               </div>
             )}
 
