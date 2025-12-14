@@ -54,8 +54,9 @@ export default function ArmorClassManager({
   };
 
   const handleBaseACBlur = () => {
-    const numValue = parseInt(baseACInput) || 10;
-    const clampedValue = Math.max(0, Math.min(30, numValue));
+    const numValue = parseInt(baseACInput);
+    const finalValue = isNaN(numValue) ? 10 : numValue;
+    const clampedValue = Math.max(0, Math.min(30, finalValue));
     setBaseACInput(clampedValue.toString());
     onUpdateArmorClass(clampedValue);
   };
@@ -66,8 +67,9 @@ export default function ArmorClassManager({
   };
 
   const handleTempACBlur = () => {
-    const numValue = parseInt(tempACInput) || 0;
-    const clampedValue = Math.max(0, Math.min(20, numValue));
+    const numValue = parseInt(tempACInput);
+    const finalValue = isNaN(numValue) ? 0 : numValue;
+    const clampedValue = Math.max(0, Math.min(20, finalValue));
     setTempACInput(clampedValue.toString());
     onUpdateTempArmorClass(clampedValue);
   };
@@ -78,8 +80,9 @@ export default function ArmorClassManager({
   };
 
   const handleShieldBonusBlur = () => {
-    const numValue = parseInt(shieldBonusInput) || 2;
-    const clampedValue = Math.max(0, Math.min(5, numValue));
+    const numValue = parseInt(shieldBonusInput);
+    const finalValue = isNaN(numValue) ? 2 : numValue;
+    const clampedValue = Math.max(0, Math.min(5, finalValue));
     setShieldBonusInput(clampedValue.toString());
     onUpdateShieldBonus(clampedValue);
   };
@@ -153,7 +156,7 @@ export default function ArmorClassManager({
                 />
               </div>
               {character.tempArmorClass > 0 && (
-                <div className="mt-2 flex justify-end pr-4">
+                <div className="mt-2 flex justify-end pr-6">
                   <Button
                     onClick={onResetTempArmorClass}
                     variant="ghost"
