@@ -175,34 +175,31 @@ export default function ArmorClassManager({
               }`}
             >
               <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={onToggleShield}
-                  className="flex min-w-[140px] items-center gap-1.5 transition-opacity hover:opacity-80"
-                  title={`${character.isWearingShield ? 'Unequip' : 'Equip'} shield`}
-                >
-                  <div
-                    className={`flex items-center gap-2 text-lg font-bold ${
+                <div className="flex min-w-[140px] items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={onToggleShield}
+                    className={`flex items-center gap-2 text-lg font-bold transition-opacity hover:opacity-80 ${
                       character.isWearingShield
                         ? 'text-blue-700'
                         : 'text-blue-800'
                     }`}
+                    title={`${character.isWearingShield ? 'Unequip' : 'Equip'} shield`}
                   >
                     <span>Shield +</span>
                     {character.isWearingShield && (
                       <span className="text-2xl">🛡️</span>
                     )}
-                  </div>
+                  </button>
                   <Tooltip content="Click to equip/unequip shield. Adjust bonus when equipped.">
                     <button
                       type="button"
-                      onClick={e => e.stopPropagation()}
                       className="text-blue-400 transition-colors hover:text-blue-600"
                     >
                       <Info size={16} />
                     </button>
                   </Tooltip>
-                </button>
+                </div>
                 <Input
                   type="number"
                   value={shieldBonusInput}
