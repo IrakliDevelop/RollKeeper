@@ -1,7 +1,7 @@
 'use client';
 
 import { calculateCharacterArmorClass } from '@/utils/calculations';
-import { Button, Input } from '@/components/ui/forms';
+import { Input } from '@/components/ui/forms';
 import { CharacterState } from '@/types/character';
 import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { Info } from 'lucide-react';
@@ -11,7 +11,6 @@ interface ArmorClassManagerProps {
   character: CharacterState;
   onUpdateArmorClass: (ac: number) => void;
   onUpdateTempArmorClass: (tempAC: number) => void;
-  onResetTempArmorClass: () => void;
   onToggleShield: () => void;
   onUpdateShieldBonus: (bonus: number) => void;
 }
@@ -20,7 +19,6 @@ export default function ArmorClassManager({
   character,
   onUpdateArmorClass,
   onUpdateTempArmorClass,
-  onResetTempArmorClass,
   onToggleShield,
   onUpdateShieldBonus,
 }: ArmorClassManagerProps) {
@@ -34,6 +32,9 @@ export default function ArmorClassManager({
   const [shieldBonusInput, setShieldBonusInput] = useState(
     character.shieldBonus.toString()
   );
+  const [isTempACActive, setIsTempACActive] = useState(
+    character.tempArmorClass > 0
+  );
 
   // Update local state when character data changes externally
   useEffect(() => {
@@ -42,6 +43,7 @@ export default function ArmorClassManager({
 
   useEffect(() => {
     setTempACInput(character.tempArmorClass.toString());
+    setIsTempACActive(character.tempArmorClass > 0);
   }, [character.tempArmorClass]);
 
   useEffect(() => {
@@ -61,6 +63,12 @@ export default function ArmorClassManager({
     onUpdateArmorClass(clampedValue);
   };
 
+  const handleBaseACKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    }
+  };
+
   // Handlers for Temp AC
   const handleTempACChange = (value: string) => {
     setTempACInput(value);
@@ -72,6 +80,32 @@ export default function ArmorClassManager({
     const clampedValue = Math.max(0, Math.min(20, finalValue));
     setTempACInput(clampedValue.toString());
     onUpdateTempArmorClass(clampedValue);
+    if (clampedValue === 0) {
+      setIsTempACActive(false);
+    }
+  };
+
+  const handleTempACKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    }
+  };
+
+  const handleToggleTempAC = () => {
+    if (isTempACActive) {
+      // Deactivating - reset to 0
+      setTempACInput('0');
+      onUpdateTempArmorClass(0);
+      setIsTempACActive(false);
+    } else {
+      // Activating - set to 1 or keep current value
+      const currentValue = parseInt(tempACInput) || 0;
+      if (currentValue === 0) {
+        setTempACInput('1');
+        onUpdateTempArmorClass(1);
+      }
+      setIsTempACActive(true);
+    }
   };
 
   // Handlers for Shield Bonus
@@ -85,6 +119,14 @@ export default function ArmorClassManager({
     const clampedValue = Math.max(0, Math.min(5, finalValue));
     setShieldBonusInput(clampedValue.toString());
     onUpdateShieldBonus(clampedValue);
+  };
+
+  const handleShieldBonusKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    }
   };
 
   return (
@@ -109,12 +151,9 @@ export default function ArmorClassManager({
                 <div className="flex min-w-[140px] items-center gap-1.5">
                   <div className="text-lg font-bold text-red-800">Base AC</div>
                   <Tooltip content="From armor & dexterity modifier">
-                    <button
-                      type="button"
-                      className="text-red-400 transition-colors hover:text-red-600"
-                    >
+                    <span className="cursor-help text-red-400 transition-colors hover:text-red-600">
                       <Info size={16} />
-                    </button>
+                    </span>
                   </Tooltip>
                 </div>
                 <Input
@@ -122,6 +161,7 @@ export default function ArmorClassManager({
                   value={baseACInput}
                   onChange={e => handleBaseACChange(e.target.value)}
                   onBlur={handleBaseACBlur}
+                  onKeyDown={handleBaseACKeyDown}
                   className="h-12 w-20 [appearance:textfield] border-2 border-red-300 bg-red-50 text-center text-2xl font-bold text-red-900 focus:border-red-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   min="0"
                   max="30"
@@ -130,19 +170,33 @@ export default function ArmorClassManager({
             </div>
 
             {/* Temporary AC Row */}
-            <div className="rounded-lg border-2 border-orange-300 bg-white p-4 shadow-sm">
+            <div
+              className={`rounded-lg border-2 bg-white p-4 shadow-sm transition-all duration-200 ${
+                isTempACActive
+                  ? 'border-orange-500 bg-orange-50/50'
+                  : 'border-orange-300 hover:border-orange-400'
+              }`}
+            >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-[140px] items-center gap-1.5">
-                  <div className="text-lg font-bold text-orange-800">
-                    Temp AC
-                  </div>
-                  <Tooltip content="Bonuses from spells & temporary magical effects">
+                  <Tooltip
+                    content={`Click to ${isTempACActive ? 'deactivate and reset' : 'activate'} temporary AC`}
+                  >
                     <button
                       type="button"
-                      className="text-orange-400 transition-colors hover:text-orange-600"
+                      onClick={handleToggleTempAC}
+                      className={`flex items-center gap-2 text-lg font-bold transition-opacity hover:opacity-80 ${
+                        isTempACActive ? 'text-orange-700' : 'text-orange-800'
+                      }`}
                     >
-                      <Info size={16} />
+                      <span>Temp AC</span>
+                      {/* {isTempACActive && <span className="text-xl">✨</span>} */}
                     </button>
+                  </Tooltip>
+                  <Tooltip content="Bonuses from spells & temporary magical effects">
+                    <span className="cursor-help text-orange-400 transition-colors hover:text-orange-600">
+                      <Info size={16} />
+                    </span>
                   </Tooltip>
                 </div>
                 <Input
@@ -150,23 +204,17 @@ export default function ArmorClassManager({
                   value={tempACInput}
                   onChange={e => handleTempACChange(e.target.value)}
                   onBlur={handleTempACBlur}
-                  className="h-12 w-20 [appearance:textfield] border-2 border-orange-300 bg-orange-50 text-center text-2xl font-bold text-orange-900 focus:border-orange-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  onKeyDown={handleTempACKeyDown}
+                  disabled={!isTempACActive}
+                  className={`h-12 w-20 [appearance:textfield] border-2 text-center text-2xl font-bold focus:border-orange-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                    isTempACActive
+                      ? 'border-orange-300 bg-orange-50 text-orange-900'
+                      : 'border-gray-200 bg-gray-50 text-gray-400'
+                  }`}
                   min="0"
                   max="20"
                 />
               </div>
-              {character.tempArmorClass > 0 && (
-                <div className="mt-2 flex justify-end pr-6">
-                  <Button
-                    onClick={onResetTempArmorClass}
-                    variant="ghost"
-                    size="xs"
-                    className="border border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-800"
-                  >
-                    Reset
-                  </Button>
-                </div>
-              )}
             </div>
 
             {/* Shield Row */}
@@ -179,28 +227,28 @@ export default function ArmorClassManager({
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-[140px] items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={onToggleShield}
-                    className={`flex items-center gap-2 text-lg font-bold transition-opacity hover:opacity-80 ${
-                      character.isWearingShield
-                        ? 'text-blue-700'
-                        : 'text-blue-800'
-                    }`}
-                    title={`${character.isWearingShield ? 'Unequip' : 'Equip'} shield`}
+                  <Tooltip
+                    content={`Click to ${character.isWearingShield ? 'unequip' : 'equip'} shield`}
                   >
-                    <span>Shield +</span>
-                    {character.isWearingShield && (
-                      <span className="text-2xl">🛡️</span>
-                    )}
-                  </button>
-                  <Tooltip content="Click to equip/unequip shield. Adjust bonus when equipped.">
                     <button
                       type="button"
-                      className="text-blue-400 transition-colors hover:text-blue-600"
+                      onClick={onToggleShield}
+                      className={`flex items-center gap-2 text-lg font-bold transition-opacity hover:opacity-80 ${
+                        character.isWearingShield
+                          ? 'text-blue-700'
+                          : 'text-blue-800'
+                      }`}
                     >
-                      <Info size={16} />
+                      <span>Shield +</span>
+                      {/* {character.isWearingShield && (
+                        <span className="text-2xl">🛡️</span>
+                      )} */}
                     </button>
+                  </Tooltip>
+                  <Tooltip content="Shield bonus to AC (typically +2, or more for magical shields)">
+                    <span className="cursor-help text-blue-400 transition-colors hover:text-blue-600">
+                      <Info size={16} />
+                    </span>
                   </Tooltip>
                 </div>
                 <Input
@@ -208,6 +256,7 @@ export default function ArmorClassManager({
                   value={shieldBonusInput}
                   onChange={e => handleShieldBonusChange(e.target.value)}
                   onBlur={handleShieldBonusBlur}
+                  onKeyDown={handleShieldBonusKeyDown}
                   disabled={!character.isWearingShield}
                   className={`h-12 w-20 [appearance:textfield] border-2 text-center text-2xl font-bold focus:border-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                     character.isWearingShield
