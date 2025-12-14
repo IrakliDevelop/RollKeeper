@@ -1,6 +1,6 @@
 /**
  * Select Component
- * 
+ *
  * A flexible select component built on Radix UI Select primitive.
  * Supports labels, helper text, error states, icons, and descriptions.
  */
@@ -67,7 +67,7 @@ const SelectContent = React.forwardRef<
         className={cn(
           'p-1',
           position === 'popper' &&
-            'h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]'
+            'max-h-[min(var(--radix-select-content-available-height),20rem)] w-full min-w-(--radix-select-trigger-width)'
         )}
       >
         {children}
@@ -108,7 +108,7 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex w-full cursor-default select-none items-center rounded-md py-2 pl-8 pr-2 text-sm outline-none',
+      'relative flex w-full cursor-default items-center rounded-md py-2 pr-2 pl-8 text-sm outline-none select-none',
       'focus:bg-gray-100 focus:text-gray-900',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className
