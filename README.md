@@ -1,165 +1,69 @@
-# RollKeeper - Complete D&D Companion App
+# RollKeeper
 
-A comprehensive, web-based Dungeons & Dragons companion application built with Next.js, featuring character management, combat tracking, campaign tools, and an intuitive interface designed for both players and Dungeon Masters.
+A web-based D&D companion application built with Next.js, featuring character management, combat tracking, and comprehensive reference tools for players and Dungeon Masters.
 
-## 🎲 What is RollKeeper?
+## Features
 
-RollKeeper is your all-in-one digital companion for Dungeons & Dragons. Whether you're a player managing multiple characters or a DM running campaigns, RollKeeper provides the tools you need to enhance your tabletop experience.
+### Player Tools
+- **Character Sheets** — Create and manage multiple D&D characters with auto-calculating stats, modifiers, and proficiency bonuses
+- **Spell Management** — Track spells, spell slots, and quick-cast with damage rolling
+- **Inventory & Equipment** — Manage weapons, armor, currency, and items
+- **Conditions Tracking** — Monitor active conditions and their effects
+- **3D Dice Rolling** — Integrated dice roller with advantage/disadvantage support
 
-### ✨ Key Features
+### Reference Compendiums
+- **Bestiary** — Searchable monster database with stat blocks and filtering
+- **Spellbook** — Complete spell reference with search and filters
+- **Classes** — Class information and progression details
 
-- **🎭 Character Management**: Create and manage multiple D&D characters with auto-calculating sheets
-- **⚔️ Combat Tracking**: Visual initiative tracker with drag-and-drop functionality
-- **📚 Campaign Tools**: Comprehensive DM toolset for session management and notes
-- **🐉 Monster Bestiary**: Access to creature database and stat blocks
-- **📖 Spell Management**: Complete spell tracking and quick-cast system
-- **🎲 Integrated Dice Rolling**: 3D dice with advantage/disadvantage support
-- **💾 Auto-Save**: Automatic character data persistence with visual feedback
-- **📱 Responsive Design**: Works seamlessly on desktop, tablet, and mobile
+## Tech Stack
 
-## 🚀 Tech Stack
-
-- **Framework**: Next.js 15.4.1 with App Router
+- **Framework**: Next.js 15 (App Router)
 - **Language**: TypeScript 5
 - **Styling**: Tailwind CSS 4
-- **UI Components**: Radix UI (accessible, unstyled components)
-- **State Management**: Zustand
-- **Form Handling**: React Hook Form with Zod validation
-- **Rich Text**: TipTap editor for notes and descriptions
-- **3D Dice**: @3d-dice/dice-box for immersive rolling
-- **Animations**: Framer Motion for smooth interactions
-- **Icons**: Lucide React
+- **State**: Zustand
+- **UI**: Radix UI, Framer Motion
+- **Forms**: React Hook Form + Zod
+- **Rich Text**: TipTap
+- **Dice**: @3d-dice/dice-box
 
-## 📁 Project Structure
-
-```
-src/
-├── app/                    # Next.js App Router
-│   ├── page.tsx           # Landing page
-│   ├── player/            # Player tools and character management
-│   ├── dm/                # DM tools and campaign management
-│   ├── bestiary/          # Monster database
-│   ├── spellbook/         # Spell management
-│   ├── classes/           # Character class information
-│   └── api/               # API routes
-├── components/             # Reusable React components
-│   ├── character/         # Character sheet components
-│   ├── ui/                # Base UI components
-│   ├── layout/            # Layout and navigation
-│   └── dice/              # Dice rolling components
-├── hooks/                  # Custom React hooks
-├── store/                  # Zustand state management
-├── types/                  # TypeScript type definitions
-├── utils/                  # Utility functions and calculations
-└── styles/                 # Global styles and themes
-```
-
-## 🎯 Current Features
-
-### ✅ Implemented
-
-- **Landing Page**: Beautiful, responsive homepage with feature overview
-- **Character Management**: Full character creation and editing system
-- **Auto-Calculations**: Automatic stat calculations, modifiers, and proficiency bonuses
-- **Combat Tracking**: Visual initiative tracker with drag-and-drop
-- **Spell Management**: Complete spell system with damage rolling
-- **Monster Bestiary**: Creature database with search and filtering
-- **Rich Text Editor**: Notes, features, and traits with formatting
-- **3D Dice Rolling**: Immersive dice rolling with advantage/disadvantage
-- **Responsive Design**: Mobile-first design that works on all devices
-- **Auto-Save**: Automatic character data persistence
-- **Export/Import**: JSON-based character data portability
-
-### 🚧 In Development
-
-- **Campaign Management**: Session tracking and story progression
-- **Advanced Combat**: Initiative order management and turn tracking
-- **Spell Components**: Material and somatic component tracking
-- **Inventory System**: Equipment and item management
-- **Multiplayer Support**: Real-time character sharing (future)
-
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
-
-- Node.js 18+ 
-- npm or yarn package manager
+- Node.js 18+
+- npm or yarn
 
 ### Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/rollkeeper.git
-   cd rollkeeper
-   ```
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/rollkeeper.git
+cd rollkeeper
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
+# Install dependencies
+npm install
 
-3. **Start the development server**
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   ```
+# Start development server
+npm run dev
+```
 
-4. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### Available Scripts
+### Scripts
 
 ```bash
-npm run dev          # Start development server with Turbopack
-npm run build        # Build for production
-npm run start        # Start production server
-npm run lint         # Run ESLint
-npm run type-check   # TypeScript type checking
+npm run dev        # Development server (Turbopack)
+npm run build      # Production build
+npm run start      # Production server
+npm run lint       # ESLint
+npm run format     # Prettier + ESLint fix
+npm run type-check # TypeScript checking
 ```
 
-## 🎮 How to Use
+## Data
 
-### For Players
+Game data (monsters, spells, classes, etc.) is stored in the `/json` directory and served via API routes.
 
-1. **Access Player Dashboard**: Click "Player Dashboard" from the main page
-2. **Create Characters**: Build new characters with the intuitive character builder
-3. **Manage Sheets**: Edit character details, stats, and abilities
-4. **Track Resources**: Monitor spells, hit points, and character progression
-5. **Roll Dice**: Use the integrated 3D dice system for all your rolls
+## License
 
-### For Dungeon Masters
-
-1. **Access DM Toolset**: Click "DM Toolset" from the main page
-2. **Manage Campaigns**: Organize sessions, notes, and story progression
-3. **Track Combat**: Use the visual initiative tracker for smooth combat
-4. **Access Bestiary**: Search and reference monster stat blocks
-5. **Import Characters**: Manage player character sheets
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Create a `.env.local` file in the root directory:
-
-```env
-# Optional: Database connection (for future features)
-DATABASE_URL=your_database_url_here
-
-# Optional: Authentication (for future features)
-NEXTAUTH_SECRET=your_secret_here
-NEXTAUTH_URL=http://localhost:3000
-```
-
-### Tailwind CSS
-
-The project uses Tailwind CSS 4 with custom configurations. Styles are automatically processed and optimized.
-
-## 📱 Browser Support
-
-- Chrome 90+
-- Firefox 88+
-- Safari 14+
-- Edge 90+
+MIT
