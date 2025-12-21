@@ -7,3 +7,5 @@ export { ModalPortal } from './ModalPortal';
 export { default as NotHydrated } from './NotHydrated';
 export { SaveIndicator } from './SaveIndicator';
 export { ToastContainer, useToast } from './Toast';
+export { YouDiedOverlay } from './YouDiedOverlay';
+export { LevelUpOverlay } from './LevelUpOverlay';

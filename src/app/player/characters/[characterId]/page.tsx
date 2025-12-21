@@ -20,6 +20,8 @@ import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { WeaponProficiencies } from '@/components/WeaponProficiencies';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
+import { YouDiedOverlay } from '@/components/ui/feedback/YouDiedOverlay';
+import { LevelUpOverlay } from '@/components/ui/feedback/LevelUpOverlay';
 
 import CharacterSheetHeader from '@/components/ui/character/CharacterSheetHeader';
 import CharacterBasicInfo from '@/components/ui/character/CharacterBasicInfo';
@@ -169,6 +171,12 @@ export default function CharacterSheet() {
     addToolProficiency,
     updateToolProficiency,
     deleteToolProficiency,
+    // Easter egg animations
+    showDeathAnimation,
+    clearDeathAnimation,
+    showLevelUpAnimation,
+    levelUpAnimationLevel,
+    clearLevelUpAnimation,
   } = useCharacterStore();
 
   const [showResetModal, setShowResetModal] = useState(false);
@@ -1061,6 +1069,19 @@ export default function CharacterSheet() {
             </main>
 
             <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+            <YouDiedOverlay
+              isVisible={showDeathAnimation}
+              onDismiss={clearDeathAnimation}
+              characterName={character.name}
+            />
+
+            <LevelUpOverlay
+              isVisible={showLevelUpAnimation}
+              onDismiss={clearLevelUpAnimation}
+              newLevel={levelUpAnimationLevel}
+              characterName={character.name}
+            />
 
             {/* Character Reset Confirmation Modal */}
             <ConfirmationModal
