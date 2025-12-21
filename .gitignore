@@ -40,8 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-.cursor
-
 # IDEs and editors
 .vscode/
 .idea/

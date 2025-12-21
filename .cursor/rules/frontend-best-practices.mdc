@@ -1,0 +1,241 @@
+---
+description: Frontend best practices, software principles, and unified design system guidelines for RollKeeper
+globs: ["src/**/*.tsx", "src/**/*.ts", "src/**/*.jsx", "src/**/*.js"]
+alwaysApply: true
+---
+
+# RollKeeper Frontend Guidelines
+
+## Core Software Principles
+
+### Single Responsibility Principle (SRP)
+- Each component, function, or module should have ONE reason to change
+- Components should do one thing well
+- Extract logic into custom hooks when a component handles too much
+- Separate concerns: UI rendering, data fetching, state management, business logic
+
+### DRY (Don't Repeat Yourself)
+- Extract repeated code into reusable functions, hooks, or components
+- Use the unified design system components instead of creating new ones
+- Create utility functions for common operations
+- Use constants for magic numbers and repeated strings
+
+### KISS (Keep It Simple, Stupid)
+- Prefer simple, readable solutions over clever ones
+- Avoid premature optimization
+- Write code that is easy to understand at first glance
+- If a function needs comments to explain what it does, simplify it
+
+### YAGNI (You Aren't Gonna Need It)
+- Don't add functionality until it's actually needed
+- Avoid over-engineering and speculative features
+- Build for current requirements, not hypothetical futures
+
+### Composition Over Inheritance
+- Prefer composing components together over complex inheritance
+- Use React's composition model with children and render props
+- Build complex UIs from simple, focused building blocks
+
+---
+
+## Unified Design System Components
+
+**ALWAYS use the established design system components. Do NOT create custom buttons, inputs, cards, or other UI primitives.**
+
+### Form Components
+Import from `@/components/ui/forms/`:
+
+```typescript
+import { Button } from '@/components/ui/forms/button';
+import { Input } from '@/components/ui/forms/input';
+import { Textarea } from '@/components/ui/forms/textarea';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { Checkbox } from '@/components/ui/forms/checkbox';
+import { Switch } from '@/components/ui/forms/switch';
+import { RadioGroupField, RadioGroupItem } from '@/components/ui/forms/radio-group';
+import { Autocomplete } from '@/components/ui/forms/Autocomplete';
+```
+
+### Layout Components
+Import from `@/components/ui/layout/`:
+
+```typescript
+import { 
+  Card, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription, 
+  CardContent, 
+  CardFooter 
+} from '@/components/ui/layout/card';
+import { Badge } from '@/components/ui/layout/badge';
+```
+
+### Feedback Components
+Import from `@/components/ui/feedback/`:
+
+```typescript
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogBody,
+  DialogFooter,
+  DialogTrigger,
+} from '@/components/ui/feedback/dialog-new';
+```
+
+### Design Tokens
+Import from `@/components/ui/primitives/`:
+
+```typescript
+import { colors, spacing, fontSize, shadows, borderRadius } from '@/components/ui/primitives';
+```
+
+### Component Usage Guidelines
+- Use `Button` with appropriate `variant` (primary, secondary, success, danger, warning, outline, ghost, link)
+- Use `Input` with `label`, `helperText`, and `error` props for form validation
+- Use `Card` for content containers with proper header/content/footer structure
+- Use `Badge` for status indicators and labels
+- Use `Dialog` for modals and overlays (NOT the legacy Modal component)
+
+---
+
+## React & Frontend Architecture
+
+### Component Structure
+1. Keep components small and focused (ideally < 150 lines)
+2. Use this file structure for complex components:
+   - `ComponentName/index.tsx` - main component
+   - `ComponentName/ComponentName.hooks.ts` - custom hooks
+   - `ComponentName/ComponentName.types.ts` - TypeScript types
+   - `ComponentName/ComponentName.utils.ts` - utility functions
+
+### State Management
+- Lift state up only when necessary
+- Use local state for UI-only concerns
+- Use React Query/SWR for server state
+- Avoid prop drilling - use context or composition instead
+
+### Custom Hooks
+- Extract reusable logic into custom hooks
+- Name hooks with `use` prefix: `usePlayerData`, `useFormValidation`
+- Keep hooks focused on a single concern
+- Return objects for multiple values: `{ data, loading, error }`
+
+### Performance
+- Use `React.memo()` for expensive pure components
+- Use `useMemo` for expensive calculations
+- Use `useCallback` for callbacks passed to memoized children
+- Avoid creating objects/arrays inline in render
+- Use dynamic imports for code splitting: `lazy(() => import(...))`
+
+### Props & Types
+- Always define TypeScript interfaces for props
+- Use descriptive prop names
+- Provide sensible defaults where appropriate
+- Document complex props with JSDoc comments
+
+---
+
+## Code Style & Patterns
+
+### Naming Conventions
+- **Components**: PascalCase (`PlayerCard`, `DiceRoller`)
+- **Hooks**: camelCase with `use` prefix (`usePlayer`, `useDiceRoll`)
+- **Utilities**: camelCase (`formatDate`, `calculateModifier`)
+- **Constants**: SCREAMING_SNAKE_CASE (`MAX_LEVEL`, `DEFAULT_HP`)
+- **Types/Interfaces**: PascalCase (`PlayerProps`, `GameState`)
+- **Files**: Match export name (`PlayerCard.tsx`, `usePlayer.ts`)
+
+### Event Handlers
+- Prefix with `handle`: `handleClick`, `handleSubmit`, `handleChange`
+- For props, prefix with `on`: `onClick`, `onSubmit`, `onChange`
+
+### Conditional Rendering
+```typescript
+// ✅ Prefer early returns
+if (!data) return <Loading />;
+if (error) return <Error />;
+return <Content data={data} />;
+
+// ✅ Use ternary for simple conditions
+{isLoading ? <Spinner /> : <Content />}
+
+// ✅ Use && for conditional rendering (but beware of 0/empty string)
+{items.length > 0 && <List items={items} />}
+```
+
+### Error Handling
+- Use Error Boundaries for component errors
+- Handle loading and error states explicitly
+- Provide meaningful error messages
+- Log errors appropriately for debugging
+
+---
+
+## File Organization
+
+### Import Order
+1. React and Next.js imports
+2. Third-party libraries
+3. Design system components (`@/components/ui/...`)
+4. Local components
+5. Hooks
+6. Utils/helpers
+7. Types
+8. Styles/constants
+
+### Example Structure
+```typescript
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+
+import { Button } from '@/components/ui/forms/button';
+import { Card, CardContent } from '@/components/ui/layout/card';
+
+import { PlayerCard } from './PlayerCard';
+import { usePlayerData } from '@/hooks/usePlayerData';
+import { formatDate } from '@/utils/format';
+import type { Player } from '@/types';
+```
+
+---
+
+## Accessibility (a11y)
+
+- All interactive elements must be keyboard accessible
+- Use semantic HTML elements (`button`, `nav`, `main`, `article`)
+- Provide `aria-label` for icon-only buttons
+- Ensure sufficient color contrast (WCAG AA: 4.5:1 for text)
+- Use the design system components - they have accessibility built-in
+- Test with keyboard navigation
+
+---
+
+## Testing Mindset
+
+- Write components that are testable (pure functions, clear inputs/outputs)
+- Keep side effects isolated in hooks
+- Use data-testid attributes for test selectors when semantic selectors aren't available
+- Consider edge cases: empty states, loading, errors, boundary conditions
+
+---
+
+## Anti-Patterns to Avoid
+
+❌ **Don't** create custom buttons, inputs, or form elements - use the design system
+❌ **Don't** use `any` type - define proper TypeScript types
+❌ **Don't** mutate state directly - always use setState or immutable updates
+❌ **Don't** fetch data in useEffect without cleanup
+❌ **Don't** use index as key for dynamic lists
+❌ **Don't** deeply nest components inline - extract them
+❌ **Don't** mix business logic with UI rendering
+❌ **Don't** ignore ESLint warnings - fix or explicitly disable with comment
+❌ **Don't** hardcode colors/spacing - use design tokens
+❌ **Don't** use the legacy `Modal` component - use `Dialog` from dialog-new
