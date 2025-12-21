@@ -165,13 +165,13 @@ export interface TrackableTrait {
 }
 
 // Extended feature source types
-export type FeatureSourceType = 
-  | 'class'        // Class features (e.g., Action Surge, Sneak Attack)
-  | 'race'         // Racial features (e.g., Darkvision, Breath Weapon)
-  | 'feat'         // Feat abilities (e.g., Great Weapon Master, Lucky)
-  | 'background'   // Background features (e.g., Criminal Contact)
-  | 'magic-item'   // Magic item abilities
-  | 'other';       // Custom/miscellaneous features
+export type FeatureSourceType =
+  | 'class' // Class features (e.g., Action Surge, Sneak Attack)
+  | 'race' // Racial features (e.g., Darkvision, Breath Weapon)
+  | 'feat' // Feat abilities (e.g., Great Weapon Master, Lucky)
+  | 'background' // Background features (e.g., Criminal Contact)
+  | 'magic-item' // Magic item abilities
+  | 'other'; // Custom/miscellaneous features
 
 // Extended feature interface that builds upon TrackableTrait
 export interface ExtendedFeature extends TrackableTrait {
@@ -194,7 +194,7 @@ export interface FeatureCategory {
 // Constants for feature source types
 export const FEATURE_SOURCE_LABELS: Record<FeatureSourceType, string> = {
   class: 'Class Features',
-  race: 'Racial Features', 
+  race: 'Racial Features',
   feat: 'Feats',
   background: 'Background Features',
   'magic-item': 'Magic Items',
@@ -203,9 +203,9 @@ export const FEATURE_SOURCE_LABELS: Record<FeatureSourceType, string> = {
 
 export const FEATURE_SOURCE_DESCRIPTIONS: Record<FeatureSourceType, string> = {
   class: 'Abilities gained from your character class and level',
-  race: 'Traits and abilities from your character\'s race and subrace',
+  race: "Traits and abilities from your character's race and subrace",
   feat: 'Special abilities gained from feats',
-  background: 'Features from your character\'s background',
+  background: "Features from your character's background",
   'magic-item': 'Abilities granted by magic items and equipment',
   other: 'Custom or miscellaneous abilities',
 };
@@ -293,7 +293,6 @@ export interface MulticlassValidation {
   errors: string[];
   warnings?: string[];
 }
-
 
 // Weapon and magic item types
 export type WeaponCategory = 'simple' | 'martial' | 'magic' | 'artifact';
@@ -481,16 +480,16 @@ export interface CharacterState {
   name: string;
   race: string;
   avatar?: string; // Base64 encoded image data
-  
+
   // Multiclass Support (new)
   classes?: MulticlassInfo[]; // Array of classes for multiclass characters
   totalLevel?: number; // Sum of all class levels
   hitDicePools?: HitDicePools; // Hit dice pools by die type
-  
+
   // Backwards Compatibility (deprecated but maintained)
   class: ClassInfo; // Single class info (for backwards compatibility)
   level: number; // Total character level (for backwards compatibility)
-  
+
   experience: number;
   background: string;
   alignment: string;
@@ -594,6 +593,8 @@ export interface CharacterState {
   // Languages and Tool Proficiencies
   languages: Language[];
   toolProficiencies: ToolProficiency[];
+
+  daysSpent: number; // Number of in-game days spent in the campaign
 
   // Miscellaneous
 }
@@ -723,7 +724,10 @@ export interface ProcessedStatus {
 }
 
 // Utility functions for extended features
-export function migrateTraitToExtendedFeature(trait: TrackableTrait, index: number): ExtendedFeature {
+export function migrateTraitToExtendedFeature(
+  trait: TrackableTrait,
+  index: number
+): ExtendedFeature {
   return {
     ...trait,
     sourceType: 'other' as const,
@@ -733,14 +737,19 @@ export function migrateTraitToExtendedFeature(trait: TrackableTrait, index: numb
   };
 }
 
-export function groupFeaturesBySource(features: ExtendedFeature[]): FeatureCategory[] {
-  const grouped = features.reduce((acc, feature) => {
-    if (!acc[feature.sourceType]) {
-      acc[feature.sourceType] = [];
-    }
-    acc[feature.sourceType].push(feature);
-    return acc;
-  }, {} as Record<FeatureSourceType, ExtendedFeature[]>);
+export function groupFeaturesBySource(
+  features: ExtendedFeature[]
+): FeatureCategory[] {
+  const grouped = features.reduce(
+    (acc, feature) => {
+      if (!acc[feature.sourceType]) {
+        acc[feature.sourceType] = [];
+      }
+      acc[feature.sourceType].push(feature);
+      return acc;
+    },
+    {} as Record<FeatureSourceType, ExtendedFeature[]>
+  );
 
   return Object.entries(grouped).map(([sourceType, features]) => ({
     sourceType: sourceType as FeatureSourceType,

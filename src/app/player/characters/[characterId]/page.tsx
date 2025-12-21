@@ -27,6 +27,7 @@ import CharacterSheetHeader from '@/components/ui/character/CharacterSheetHeader
 import CharacterBasicInfo from '@/components/ui/character/CharacterBasicInfo';
 import HitDiceTracker from '@/components/ui/character/HitDiceTracker';
 import RestManager from '@/components/ui/character/RestManager';
+import DaysSpentTracker from '@/components/ui/character/DaysSpentTracker';
 import AbilityScores from '@/components/ui/character/AbilityScores';
 import ArmorClassManager from '@/components/ui/character/ArmorClassManager';
 import SavingThrows from '@/components/ui/character/SavingThrows';
@@ -171,6 +172,9 @@ export default function CharacterSheet() {
     addToolProficiency,
     updateToolProficiency,
     deleteToolProficiency,
+    // Campaign tracking
+    updateDaysSpent,
+    incrementDaysSpent,
     // Easter egg animations
     showDeathAnimation,
     clearDeathAnimation,
@@ -629,6 +633,9 @@ export default function CharacterSheet() {
                 contentClassName="px-6 pb-6"
                 badge={
                   <div className="flex items-center gap-2">
+                    <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                      Day {character.daysSpent || 0}
+                    </span>
                     <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
                       Short Rest
                     </span>
@@ -638,12 +645,22 @@ export default function CharacterSheet() {
                   </div>
                 }
               >
-                <RestManager
-                  onShortRest={takeShortRest}
-                  onLongRest={takeLongRest}
-                  onShowShortRestToast={showShortRest}
-                  onShowLongRestToast={showLongRest}
-                />
+                <div className="space-y-6">
+                  {/* Rest Manager */}
+                  <RestManager
+                    onShortRest={takeShortRest}
+                    onLongRest={takeLongRest}
+                    onShowShortRestToast={showShortRest}
+                    onShowLongRestToast={showLongRest}
+                  />
+
+                  {/* Days Spent Tracker - Full Width */}
+                  <DaysSpentTracker
+                    daysSpent={character.daysSpent || 0}
+                    onUpdateDays={updateDaysSpent}
+                    onIncrementDays={incrementDaysSpent}
+                  />
+                </div>
               </CollapsibleSection>
 
               {/* Section Divider */}

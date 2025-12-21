@@ -295,7 +295,26 @@ export const createCharacterSheetTabsConfig = ({
         icon: '📝',
         content: (
           <TabContent>
-            <div className="max-w-none">
+            <div className="max-w-none space-y-4">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-1 font-medium text-amber-800 shadow-sm">
+                  <span className="text-base">📅</span>
+                  Campaign Day {character.daysSpent || 0}
+                </span>
+                <span className="text-gray-400">•</span>
+                <span className="text-gray-500">
+                  {Math.floor((character.daysSpent || 0) / 7) > 0 ? (
+                    <>
+                      Week {Math.floor((character.daysSpent || 0) / 7) + 1}
+                      {(character.daysSpent || 0) % 7 > 0 &&
+                        `, Day ${(character.daysSpent || 0) % 7}`}
+                    </>
+                  ) : (
+                    `Day ${(character.daysSpent || 0) + 1} of the adventure`
+                  )}
+                </span>
+              </div>
+
               <ErrorBoundary
                 fallback={
                   <div className="rounded-lg border border-blue-200 bg-white p-6 shadow-lg">
