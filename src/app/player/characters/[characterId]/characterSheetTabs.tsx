@@ -305,9 +305,8 @@ export const createCharacterSheetTabsConfig = ({
                 <span className="text-gray-500">
                   {Math.floor((character.daysSpent || 0) / 7) > 0 ? (
                     <>
-                      Week {Math.floor((character.daysSpent || 0) / 7) + 1}
-                      {(character.daysSpent || 0) % 7 > 0 &&
-                        `, Day ${(character.daysSpent || 0) % 7}`}
+                      Week {Math.floor((character.daysSpent || 0) / 7) + 1}, Day{' '}
+                      {((character.daysSpent || 0) % 7) + 1}
                     </>
                   ) : (
                     `Day ${(character.daysSpent || 0) + 1} of the adventure`
