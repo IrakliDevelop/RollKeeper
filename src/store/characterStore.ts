@@ -223,6 +223,10 @@ function migrateCharacterData(character: unknown): CharacterState {
       result.conditionsAndDiseases =
         DEFAULT_CHARACTER_STATE.conditionsAndDiseases;
     }
+    // Ensure daysSpent tracking exists
+    if (typeof result.daysSpent !== 'number') {
+      result.daysSpent = DEFAULT_CHARACTER_STATE.daysSpent;
+    }
     return result;
   }
 
@@ -511,6 +515,10 @@ interface CharacterStore {
   // Rest management (centralized)
   takeShortRest: () => void; // Resets all short rest abilities, pact magic, reaction
   takeLongRest: () => void; // Resets everything: all abilities, all spell slots, hit dice, HP, etc.
+
+  // Campaign tracking
+  updateDaysSpent: (days: number) => void; // Set days spent directly
+  incrementDaysSpent: (amount?: number) => void; // Add days (default: 1)
 
   updateCharacterBackground: (updates: Partial<CharacterBackground>) => void;
 
@@ -3044,11 +3052,35 @@ export const useCharacterStore = create<CharacterStore>()(
               hitPoints: resetHitPoints,
               reaction: resetReaction,
               tempArmorClass: resetTempArmorClass,
+              daysSpent: (character.daysSpent || 0) + 1, // Increment days spent on long rest
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
           };
         });
+      },
+
+      // Campaign tracking
+      updateDaysSpent: (days: number) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            daysSpent: Math.max(0, days),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving' as SaveStatus,
+        }));
+      },
+
+      incrementDaysSpent: (amount = 1) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            daysSpent: Math.max(0, (state.character.daysSpent || 0) + amount),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving' as SaveStatus,
+        }));
       },
 
       updateCharacterBackground: updates => {

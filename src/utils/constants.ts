@@ -522,6 +522,9 @@ export const DEFAULT_CHARACTER_STATE = {
   jackOfAllTrades: false, // Bard feature: add half proficiency to non-proficient skills
   languages: [], // Known languages
   toolProficiencies: [], // Tool proficiencies with levels
+
+  // Campaign Tracking
+  daysSpent: 0, // Number of in-game days spent in the campaign
 };
 
 // spell source books and colors mapping, key should be SPELL_SOURCE_BOOKS keys
