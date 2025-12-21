@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Plus,
@@ -14,6 +14,11 @@ import {
   ArrowLeft,
   Upload,
   Download,
+  Settings,
+  Skull,
+  ChevronDown,
+  ChevronUp,
+  TrendingUp,
 } from 'lucide-react';
 import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
 import { Button } from '@/components/ui/forms';
@@ -32,7 +37,11 @@ export default function PlayerDashboardPage() {
     duplicateCharacter,
     migrateFromOldStorage,
     importCharacter,
+    settings,
+    updateSettings,
   } = usePlayerStore();
+
+  const [showSettings, setShowSettings] = useState(false);
 
   const activeCharacters = getActiveCharacters();
   const archivedCharacters = getArchivedCharacters();
@@ -126,8 +135,26 @@ export default function PlayerDashboardPage() {
     }
   };
 
-  const getClassBadgeVariant = (className: string): 'danger' | 'secondary' | 'neutral' | 'warning' | 'success' | 'primary' | 'info' => {
-    const variants: Record<string, 'danger' | 'secondary' | 'neutral' | 'warning' | 'success' | 'primary' | 'info'> = {
+  const getClassBadgeVariant = (
+    className: string
+  ):
+    | 'danger'
+    | 'secondary'
+    | 'neutral'
+    | 'warning'
+    | 'success'
+    | 'primary'
+    | 'info' => {
+    const variants: Record<
+      string,
+      | 'danger'
+      | 'secondary'
+      | 'neutral'
+      | 'warning'
+      | 'success'
+      | 'primary'
+      | 'info'
+    > = {
       Fighter: 'danger',
       Wizard: 'secondary',
       Rogue: 'neutral',
@@ -153,8 +180,8 @@ export default function PlayerDashboardPage() {
   }) => (
     <div
       className={`rounded-lg border-2 bg-gradient-to-br from-white to-slate-50 shadow-md transition-all hover:shadow-xl ${
-        isArchived 
-          ? 'border-gray-300 opacity-75 hover:from-slate-50 hover:to-gray-100' 
+        isArchived
+          ? 'border-gray-300 opacity-75 hover:from-slate-50 hover:to-gray-100'
           : 'border-blue-300 hover:from-slate-50 hover:to-blue-50'
       }`}
     >
@@ -171,7 +198,7 @@ export default function PlayerDashboardPage() {
               editable={false}
             />
           </div>
-          
+
           {/* Character Info */}
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex items-start justify-between gap-2">
@@ -180,13 +207,17 @@ export default function PlayerDashboardPage() {
                   {character.name}
                 </h3>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="text-sm text-slate-600">{character.race}</span>
+                  <span className="text-sm text-slate-600">
+                    {character.race}
+                  </span>
                   <span className="text-slate-400">•</span>
                   <Badge variant={getClassBadgeVariant(character.class)}>
                     {character.class}
                   </Badge>
                   <span className="text-slate-400">•</span>
-                  <span className="text-sm text-slate-600">Level {character.level}</span>
+                  <span className="text-sm text-slate-600">
+                    Level {character.level}
+                  </span>
                 </div>
               </div>
 
@@ -245,19 +276,12 @@ export default function PlayerDashboardPage() {
                 onClick={() => handlePlayCharacter(character)}
                 className="flex-1"
               >
-                <Button
-                  variant="secondary"
-                  fullWidth
-                >
+                <Button variant="secondary" fullWidth>
                   Play Character
                 </Button>
               </Link>
               <Link href={`/player/characters/${character.id}/edit`}>
-                <Button
-                  variant="ghost"
-                  size="md"
-                  title="Edit Character"
-                >
+                <Button variant="ghost" size="md" title="Edit Character">
                   <Edit3 size={16} />
                 </Button>
               </Link>
@@ -354,10 +378,7 @@ export default function PlayerDashboardPage() {
 
             {/* New Character */}
             <Link href="/player/characters/new">
-              <Button
-                variant="secondary"
-                leftIcon={<Plus size={18} />}
-              >
+              <Button variant="secondary" leftIcon={<Plus size={18} />}>
                 New Character
               </Button>
             </Link>
@@ -370,7 +391,10 @@ export default function PlayerDashboardPage() {
             <div className="flex items-center">
               <User className="mr-3 h-8 w-8 text-blue-600" />
               <div>
-                <h3 className="text-2xl font-bold text-slate-800" suppressHydrationWarning>
+                <h3
+                  className="text-2xl font-bold text-slate-800"
+                  suppressHydrationWarning
+                >
                   {activeCharacters.length}
                 </h3>
                 <p className="text-slate-600">Active Characters</p>
@@ -382,7 +406,10 @@ export default function PlayerDashboardPage() {
             <div className="flex items-center">
               <Archive className="mr-3 h-8 w-8 text-slate-500" />
               <div>
-                <h3 className="text-2xl font-bold text-slate-800" suppressHydrationWarning>
+                <h3
+                  className="text-2xl font-bold text-slate-800"
+                  suppressHydrationWarning
+                >
                   {archivedCharacters.length}
                 </h3>
                 <p className="text-slate-600">Archived</p>
@@ -394,7 +421,10 @@ export default function PlayerDashboardPage() {
             <div className="flex items-center">
               <ExternalLink className="mr-3 h-8 w-8 text-purple-600" />
               <div>
-                <h3 className="text-2xl font-bold text-slate-800" suppressHydrationWarning>
+                <h3
+                  className="text-2xl font-bold text-slate-800"
+                  suppressHydrationWarning
+                >
                   {characters.length}
                 </h3>
                 <p className="text-slate-600">Total Characters</p>
@@ -416,19 +446,13 @@ export default function PlayerDashboardPage() {
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link href="/player/characters/new">
-                <Button
-                  variant="secondary"
-                  leftIcon={<Plus size={20} />}
-                >
+                <Button variant="secondary" leftIcon={<Plus size={20} />}>
                   Create New Character
                 </Button>
               </Link>
 
               <label className="cursor-pointer">
-                <Button
-                  variant="success"
-                  leftIcon={<Upload size={20} />}
-                >
+                <Button variant="success" leftIcon={<Upload size={20} />}>
                   Import Character
                 </Button>
                 <input
@@ -453,7 +477,10 @@ export default function PlayerDashboardPage() {
             {/* Active Characters */}
             {activeCharacters.length > 0 && (
               <div className="mb-12" suppressHydrationWarning>
-                <h2 className="mb-6 flex items-center gap-2 text-2xl font-semibold text-slate-800" suppressHydrationWarning>
+                <h2
+                  className="mb-6 flex items-center gap-2 text-2xl font-semibold text-slate-800"
+                  suppressHydrationWarning
+                >
                   <User size={24} />
                   Active Characters ({activeCharacters.length})
                 </h2>
@@ -468,7 +495,10 @@ export default function PlayerDashboardPage() {
             {/* Archived Characters */}
             {archivedCharacters.length > 0 && (
               <div suppressHydrationWarning>
-                <h2 className="mb-6 flex items-center gap-2 text-2xl font-semibold text-slate-700" suppressHydrationWarning>
+                <h2
+                  className="mb-6 flex items-center gap-2 text-2xl font-semibold text-slate-700"
+                  suppressHydrationWarning
+                >
                   <Archive size={24} />
                   Archived Characters ({archivedCharacters.length})
                 </h2>
@@ -485,6 +515,100 @@ export default function PlayerDashboardPage() {
             )}
           </>
         )}
+
+        {/* Settings Section */}
+        <div className="mb-8">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="flex w-full items-center justify-between rounded-lg border-2 border-slate-200 bg-gradient-to-r from-slate-50 to-gray-50 px-6 py-4 text-left shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
+          >
+            <div className="flex items-center gap-3">
+              <Settings className="h-5 w-5 text-slate-600" />
+              <span className="text-lg font-semibold text-slate-700">
+                Settings & Features
+              </span>
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                Easter Eggs
+              </span>
+            </div>
+            {showSettings ? (
+              <ChevronUp className="h-5 w-5 text-slate-500" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-slate-500" />
+            )}
+          </button>
+
+          {showSettings && (
+            <div className="mt-2 rounded-lg border-2 border-slate-200 bg-white p-6 shadow-sm">
+              <div className="space-y-4">
+                {/* Death Animation Toggle */}
+                <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
+                      <Skull className="h-5 w-5 text-red-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-slate-800">
+                        &quot;YOU DIED&quot; Animation
+                      </h4>
+                      <p className="text-sm text-slate-500">
+                        Dark Souls-style death screen when your character dies
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex cursor-pointer items-center">
+                    <input
+                      type="checkbox"
+                      checked={settings?.enableDeathAnimation}
+                      onChange={e =>
+                        updateSettings({
+                          enableDeathAnimation: e.target.checked,
+                        })
+                      }
+                      className="peer sr-only"
+                    />
+                    <div className="peer h-6 w-11 rounded-full bg-slate-300 peer-checked:bg-red-600 peer-focus:ring-2 peer-focus:ring-red-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+                  </label>
+                </div>
+
+                {/* Level Up Animation Toggle */}
+                <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100">
+                      <TrendingUp className="h-5 w-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium text-slate-800">
+                        Level Up Animation
+                      </h4>
+                      <p className="text-sm text-slate-500">
+                        Skyrim-style celebration when your character levels up
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex cursor-pointer items-center">
+                    <input
+                      type="checkbox"
+                      checked={settings?.enableLevelUpAnimation}
+                      onChange={e =>
+                        updateSettings({
+                          enableLevelUpAnimation: e.target.checked,
+                        })
+                      }
+                      className="peer sr-only"
+                    />
+                    <div className="peer h-6 w-11 rounded-full bg-slate-300 peer-checked:bg-amber-500 peer-focus:ring-2 peer-focus:ring-amber-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+                  </label>
+                </div>
+
+                <p className="text-center text-sm text-slate-400">
+                  More features coming soon! 🎲{' '}
+                  <span className="text-amber-500">maybe</span>
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

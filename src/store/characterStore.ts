@@ -39,6 +39,7 @@ import {
   updateSpellSlotsPreservingUsed,
   calculateModifier,
   calculateLevelFromXP,
+  getXPForLevel,
   calculateTraitMaxUses,
 } from '@/utils/calculations';
 import { migrateToMulticlass, calculateHitDicePools } from '@/utils/multiclass';
@@ -50,7 +51,9 @@ import {
   resetDeathSaves,
   calculateMaxHP,
   getClassHitDie,
+  isDead,
 } from '@/utils/hpCalculations';
+import { usePlayerStore } from '@/store/playerStore';
 
 // Function to migrate weapon damage from old format to new array format
 function migrateWeaponDamage(weapon: Record<string, unknown>): Weapon {
@@ -319,6 +322,9 @@ interface CharacterStore {
   lastSaved: Date | string | null; // Can be string when rehydrated from localStorage
   hasUnsavedChanges: boolean;
   hasHydrated: boolean;
+  showDeathAnimation: boolean;
+  showLevelUpAnimation: boolean;
+  levelUpAnimationLevel: number;
 
   // Actions
   updateCharacter: (updates: Partial<CharacterState>) => void;
@@ -370,6 +376,8 @@ interface CharacterStore {
   resetDeathSavingThrows: () => void;
   toggleHPCalculationMode: () => void;
   recalculateMaxHP: () => void;
+  clearDeathAnimation: () => void;
+  clearLevelUpAnimation: () => void;
 
   // Class and spell management
   updateClass: (classInfo: ClassInfo) => void;
@@ -395,7 +403,7 @@ interface CharacterStore {
   // Hit dice management
   useHitDie: (dieType: string, count?: number) => void;
   restoreHitDice: (dieType: string, count?: number) => void;
-  resetAllHitDice: () => void; // Long rest - restore all hit dice (D&D 2024 rules)
+  resetAllHitDice: () => void;
 
   // Concentration management
   startConcentration: (
@@ -470,24 +478,34 @@ interface CharacterStore {
   addExtendedFeature: (
     feature: Omit<ExtendedFeature, 'id' | 'createdAt' | 'updatedAt'>
   ) => void;
-  updateExtendedFeature: (id: string, updates: Partial<ExtendedFeature>) => void;
+  updateExtendedFeature: (
+    id: string,
+    updates: Partial<ExtendedFeature>
+  ) => void;
   deleteExtendedFeature: (id: string) => void;
   useExtendedFeature: (id: string) => void;
   resetExtendedFeatures: (restType: 'short' | 'long') => void;
   reorderExtendedFeatures: (
-    sourceIndex: number, 
-    destinationIndex: number, 
+    sourceIndex: number,
+    destinationIndex: number,
     sourceType?: string
   ) => void;
   migrateTraitsToExtendedFeatures: () => void;
 
   // Language management
-  addLanguage: (language: Omit<Language, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  addLanguage: (
+    language: Omit<Language, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
   deleteLanguage: (id: string) => void;
 
   // Tool proficiency management
-  addToolProficiency: (tool: Omit<ToolProficiency, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  updateToolProficiency: (id: string, updates: Partial<ToolProficiency>) => void;
+  addToolProficiency: (
+    tool: Omit<ToolProficiency, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
+  updateToolProficiency: (
+    id: string,
+    updates: Partial<ToolProficiency>
+  ) => void;
   deleteToolProficiency: (id: string) => void;
 
   // Rest management (centralized)
@@ -595,6 +613,9 @@ export const useCharacterStore = create<CharacterStore>()(
       lastSaved: null,
       hasUnsavedChanges: false,
       hasHydrated: false,
+      showDeathAnimation: false,
+      showLevelUpAnimation: false,
+      levelUpAnimationLevel: 1,
 
       // Character update actions
       updateCharacter: updates => {
@@ -888,14 +909,34 @@ export const useCharacterStore = create<CharacterStore>()(
 
       // HP management actions
       applyDamageToCharacter: damage => {
-        set(state => ({
+        const state = get();
+        const wasDeadBefore = isDead(state.character.hitPoints);
+        const newHitPoints = applyDamage(state.character.hitPoints, damage);
+        const isDeadAfter = isDead(newHitPoints);
+
+        // Check if death animation is enabled in player settings
+        const playerSettings = usePlayerStore.getState().settings;
+        const shouldShowDeathAnimation =
+          playerSettings.enableDeathAnimation && !wasDeadBefore && isDeadAfter;
+
+        set({
           character: {
             ...state.character,
-            hitPoints: applyDamage(state.character.hitPoints, damage),
+            hitPoints: newHitPoints,
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving',
-        }));
+          showDeathAnimation: shouldShowDeathAnimation
+            ? true
+            : state.showDeathAnimation,
+        });
+
+        // Auto-clear the death animation after 8.5 seconds
+        if (shouldShowDeathAnimation) {
+          setTimeout(() => {
+            set({ showDeathAnimation: false });
+          }, 8500);
+        }
       },
 
       applyHealingToCharacter: healing => {
@@ -921,18 +962,37 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       makeDeathSavingThrow: (isSuccess, isCritical = false) => {
-        set(state => ({
+        const state = get();
+        const wasDeadBefore = isDead(state.character.hitPoints);
+        const newHitPoints = makeDeathSave(
+          state.character.hitPoints,
+          isSuccess,
+          isCritical
+        );
+        const isDeadAfter = isDead(newHitPoints);
+
+        // Check if death animation is enabled in player settings
+        const playerSettings = usePlayerStore.getState().settings;
+        const shouldShowDeathAnimation =
+          playerSettings.enableDeathAnimation && !wasDeadBefore && isDeadAfter;
+
+        set({
           character: {
             ...state.character,
-            hitPoints: makeDeathSave(
-              state.character.hitPoints,
-              isSuccess,
-              isCritical
-            ),
+            hitPoints: newHitPoints,
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving',
-        }));
+          showDeathAnimation: shouldShowDeathAnimation
+            ? true
+            : state.showDeathAnimation,
+        });
+
+        if (shouldShowDeathAnimation) {
+          setTimeout(() => {
+            set({ showDeathAnimation: false });
+          }, 8500);
+        }
       },
 
       resetDeathSavingThrows: () => {
@@ -944,6 +1004,14 @@ export const useCharacterStore = create<CharacterStore>()(
           hasUnsavedChanges: true,
           saveStatus: 'saving',
         }));
+      },
+
+      clearDeathAnimation: () => {
+        set({ showDeathAnimation: false });
+      },
+
+      clearLevelUpAnimation: () => {
+        set({ showLevelUpAnimation: false });
       },
 
       toggleHPCalculationMode: () => {
@@ -1021,7 +1089,7 @@ export const useCharacterStore = create<CharacterStore>()(
         set(state => {
           // Ensure character has multiclass structure
           const migratedCharacter = migrateToMulticlass(state.character);
-          
+
           // Update the primary class (first class or create new one)
           const updatedClasses = [...(migratedCharacter.classes || [])];
           if (updatedClasses.length === 0) {
@@ -1078,12 +1146,18 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       updateLevel: level => {
+        const currentState = get();
+        const oldLevel =
+          currentState.character.totalLevel || currentState.character.level;
+        const clampedLevel = Math.max(1, Math.min(20, level));
+
+        // Check if this is a level UP (not down or same)
+        const isLevelUp = clampedLevel > oldLevel;
+
         set(state => {
-          const clampedLevel = Math.max(1, Math.min(20, level));
-          
           // Ensure character has multiclass structure
           const migratedCharacter = migrateToMulticlass(state.character);
-          
+
           // For single class characters, update the primary class level
           // For multiclass characters, this updates the total level by adjusting the primary class
           const updatedClasses = [...(migratedCharacter.classes || [])];
@@ -1095,16 +1169,24 @@ export const useCharacterStore = create<CharacterStore>()(
             };
           } else if (updatedClasses.length > 1) {
             // Multiclass: adjust the primary (highest level) class to reach the target total level
-            const currentTotal = updatedClasses.reduce((sum, cls) => sum + cls.level, 0);
+            const currentTotal = updatedClasses.reduce(
+              (sum, cls) => sum + cls.level,
+              0
+            );
             const levelDifference = clampedLevel - currentTotal;
-            
+
             if (levelDifference !== 0) {
               // Find the primary class (highest level)
-              const primaryIndex = updatedClasses.reduce((maxIndex, cls, index) => 
-                cls.level > updatedClasses[maxIndex].level ? index : maxIndex, 0
+              const primaryIndex = updatedClasses.reduce(
+                (maxIndex, cls, index) =>
+                  cls.level > updatedClasses[maxIndex].level ? index : maxIndex,
+                0
               );
-              
-              const newPrimaryLevel = Math.max(1, updatedClasses[primaryIndex].level + levelDifference);
+
+              const newPrimaryLevel = Math.max(
+                1,
+                updatedClasses[primaryIndex].level + levelDifference
+              );
               updatedClasses[primaryIndex] = {
                 ...updatedClasses[primaryIndex],
                 level: newPrimaryLevel,
@@ -1113,7 +1195,10 @@ export const useCharacterStore = create<CharacterStore>()(
           }
 
           // Recalculate hit dice pools
-          const hitDicePools = calculateHitDicePools(updatedClasses, migratedCharacter.hitDicePools);
+          const hitDicePools = calculateHitDicePools(
+            updatedClasses,
+            migratedCharacter.hitDicePools
+          );
 
           const updatedCharacter = {
             ...migratedCharacter,
@@ -1139,16 +1224,44 @@ export const useCharacterStore = create<CharacterStore>()(
             );
           }
 
+          // Check if level up animation should be shown
+          const playerSettings = usePlayerStore.getState().settings;
+          const enableLevelUp = playerSettings?.enableLevelUpAnimation;
+          const shouldShowLevelUp = isLevelUp && enableLevelUp;
+
+          // Update XP to minimum for the new level (only if current XP is less than required)
+          const minXPForLevel = getXPForLevel(clampedLevel);
+          const currentXP = state.character.experience || 0;
+          const newXP = currentXP < minXPForLevel ? minXPForLevel : currentXP;
+
           return {
             character: {
               ...updatedCharacter,
+              experience: newXP,
               spellSlots: preservedSpellSlots,
               pactMagic,
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
+            showLevelUpAnimation: shouldShowLevelUp
+              ? true
+              : state.showLevelUpAnimation,
+            levelUpAnimationLevel: shouldShowLevelUp
+              ? clampedLevel
+              : state.levelUpAnimationLevel,
           };
         });
+
+        // Auto-clear the level up animation after 6 seconds
+        if (isLevelUp) {
+          const playerSettings = usePlayerStore.getState().settings;
+          const enableLevelUpAnim = playerSettings?.enableLevelUpAnimation;
+          if (enableLevelUpAnim) {
+            setTimeout(() => {
+              set({ showLevelUpAnimation: false });
+            }, 6000);
+          }
+        }
       },
 
       updateSpellSlot: (level, used) => {
@@ -1242,15 +1355,23 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       // Multiclass management
-      addClassLevel: (className, isCustom = false, spellcaster = 'none', hitDie = 8, subclass) => {
+      addClassLevel: (
+        className,
+        isCustom = false,
+        spellcaster = 'none',
+        hitDie = 8,
+        subclass
+      ) => {
         set(state => {
           // Ensure character has multiclass structure
           const migratedCharacter = migrateToMulticlass(state.character);
           const classes = [...(migratedCharacter.classes || [])];
 
           // Find existing class or create new one
-          const existingClassIndex = classes.findIndex(cls => cls.className === className);
-          
+          const existingClassIndex = classes.findIndex(
+            cls => cls.className === className
+          );
+
           if (existingClassIndex >= 0) {
             // Level up existing class
             classes[existingClassIndex] = {
@@ -1273,7 +1394,7 @@ export const useCharacterStore = create<CharacterStore>()(
           const totalLevel = classes.reduce((sum, cls) => sum + cls.level, 0);
 
           // Update backwards compatibility fields
-          const primaryClass = classes.reduce((primary, current) => 
+          const primaryClass = classes.reduce((primary, current) =>
             current.level > primary.level ? current : primary
           );
 
@@ -1285,7 +1406,10 @@ export const useCharacterStore = create<CharacterStore>()(
           };
 
           // Recalculate hit dice pools
-          const hitDicePools = calculateHitDicePools(classes, migratedCharacter.hitDicePools);
+          const hitDicePools = calculateHitDicePools(
+            classes,
+            migratedCharacter.hitDicePools
+          );
 
           const updatedCharacter = {
             ...migratedCharacter,
@@ -1323,12 +1447,14 @@ export const useCharacterStore = create<CharacterStore>()(
         });
       },
 
-      removeClassLevel: (className) => {
+      removeClassLevel: className => {
         set(state => {
           const migratedCharacter = migrateToMulticlass(state.character);
           const classes = [...(migratedCharacter.classes || [])];
 
-          const classIndex = classes.findIndex(cls => cls.className === className);
+          const classIndex = classes.findIndex(
+            cls => cls.className === className
+          );
           if (classIndex === -1) {
             return state; // Class not found
           }
@@ -1352,7 +1478,7 @@ export const useCharacterStore = create<CharacterStore>()(
           const totalLevel = classes.reduce((sum, cls) => sum + cls.level, 0);
 
           // Update backwards compatibility fields
-          const primaryClass = classes.reduce((primary, current) => 
+          const primaryClass = classes.reduce((primary, current) =>
             current.level > primary.level ? current : primary
           );
 
@@ -1364,7 +1490,10 @@ export const useCharacterStore = create<CharacterStore>()(
           };
 
           // Recalculate hit dice pools
-          const hitDicePools = calculateHitDicePools(classes, migratedCharacter.hitDicePools);
+          const hitDicePools = calculateHitDicePools(
+            classes,
+            migratedCharacter.hitDicePools
+          );
 
           const updatedCharacter = {
             ...migratedCharacter,
@@ -1401,7 +1530,9 @@ export const useCharacterStore = create<CharacterStore>()(
           const migratedCharacter = migrateToMulticlass(state.character);
           const classes = [...(migratedCharacter.classes || [])];
 
-          const classIndex = classes.findIndex(cls => cls.className === className);
+          const classIndex = classes.findIndex(
+            cls => cls.className === className
+          );
           if (classIndex === -1) {
             return state; // Class not found
           }
@@ -1415,7 +1546,7 @@ export const useCharacterStore = create<CharacterStore>()(
           const totalLevel = classes.reduce((sum, cls) => sum + cls.level, 0);
 
           // Update backwards compatibility fields
-          const primaryClass = classes.reduce((primary, current) => 
+          const primaryClass = classes.reduce((primary, current) =>
             current.level > primary.level ? current : primary
           );
 
@@ -1427,7 +1558,10 @@ export const useCharacterStore = create<CharacterStore>()(
           };
 
           // Recalculate hit dice pools
-          const hitDicePools = calculateHitDicePools(classes, migratedCharacter.hitDicePools);
+          const hitDicePools = calculateHitDicePools(
+            classes,
+            migratedCharacter.hitDicePools
+          );
 
           const updatedCharacter = {
             ...migratedCharacter,
@@ -1472,7 +1606,7 @@ export const useCharacterStore = create<CharacterStore>()(
 
       getClassDisplayString: () => {
         const { character } = get();
-        
+
         if (!character.classes || character.classes.length === 0) {
           // Fallback to single class format
           return `${character.class?.name || 'Unknown'} ${character.level || 1}`;
@@ -1484,10 +1618,14 @@ export const useCharacterStore = create<CharacterStore>()(
         }
 
         // Sort classes by level (descending) for display
-        const sortedClasses = [...character.classes].sort((a, b) => b.level - a.level);
-        const classStrings = sortedClasses.map(cls => `${cls.className} ${cls.level}`);
+        const sortedClasses = [...character.classes].sort(
+          (a, b) => b.level - a.level
+        );
+        const classStrings = sortedClasses.map(
+          cls => `${cls.className} ${cls.level}`
+        );
         const totalLevel = getCharacterTotalLevel(character);
-        
+
         return `${classStrings.join(' / ')} (Level ${totalLevel})`;
       },
 
@@ -1495,11 +1633,11 @@ export const useCharacterStore = create<CharacterStore>()(
       useHitDie: (dieType, count = 1) => {
         set(state => {
           const hitDicePools = { ...state.character.hitDicePools };
-          
+
           if (hitDicePools[dieType]) {
             const pool = hitDicePools[dieType];
             const actualCount = Math.min(count, pool.max - pool.used);
-            
+
             if (actualCount > 0) {
               hitDicePools[dieType] = {
                 ...pool,
@@ -1522,11 +1660,11 @@ export const useCharacterStore = create<CharacterStore>()(
       restoreHitDice: (dieType, count = 1) => {
         set(state => {
           const hitDicePools = { ...state.character.hitDicePools };
-          
+
           if (hitDicePools[dieType]) {
             const pool = hitDicePools[dieType];
             const actualCount = Math.min(count, pool.used);
-            
+
             if (actualCount > 0) {
               hitDicePools[dieType] = {
                 ...pool,
@@ -1549,7 +1687,7 @@ export const useCharacterStore = create<CharacterStore>()(
       resetAllHitDice: () => {
         set(state => {
           const hitDicePools = { ...state.character.hitDicePools };
-          
+
           // Reset all hit dice pools to 0 used
           Object.keys(hitDicePools).forEach(dieType => {
             hitDicePools[dieType] = {
@@ -1572,12 +1710,12 @@ export const useCharacterStore = create<CharacterStore>()(
       resetHalfHitDice: () => {
         set(state => {
           const hitDicePools = { ...state.character.hitDicePools };
-          
+
           // Restore half of used hit dice (rounded down)
           Object.keys(hitDicePools).forEach(dieType => {
             const pool = hitDicePools[dieType];
             const restoreCount = Math.floor(pool.used / 2);
-            
+
             hitDicePools[dieType] = {
               ...pool,
               used: pool.used - restoreCount,
@@ -1829,13 +1967,29 @@ export const useCharacterStore = create<CharacterStore>()(
 
       // XP management
       addExperience: xpToAdd => {
+        const currentState = get();
+        const oldLevel =
+          currentState.character.totalLevel || currentState.character.level;
+        const newXP = currentState.character.experience + xpToAdd;
+        const newLevel = calculateLevelFromXP(newXP);
+
+        // Check if this is a level UP
+        const isLevelUp = newLevel > oldLevel;
+
+        // Debug logging
+        console.log('addExperience called:', {
+          xpToAdd,
+          oldXP: currentState.character.experience,
+          newXP,
+          oldLevel,
+          newLevel,
+          isLevelUp,
+        });
+
         set(state => {
-          const newXP = state.character.experience + xpToAdd;
-          const newLevel = calculateLevelFromXP(newXP);
-          
           // Ensure character has multiclass structure
           const migratedCharacter = migrateToMulticlass(state.character);
-          
+
           // Update class levels based on new total level
           const updatedClasses = [...(migratedCharacter.classes || [])];
           if (updatedClasses.length === 1) {
@@ -1845,23 +1999,34 @@ export const useCharacterStore = create<CharacterStore>()(
             };
           } else if (updatedClasses.length > 1) {
             // Adjust the primary class to reach the target total level
-            const currentTotal = updatedClasses.reduce((sum, cls) => sum + cls.level, 0);
+            const currentTotal = updatedClasses.reduce(
+              (sum, cls) => sum + cls.level,
+              0
+            );
             const levelDifference = newLevel - currentTotal;
-            
+
             if (levelDifference !== 0) {
-              const primaryIndex = updatedClasses.reduce((maxIndex, cls, index) => 
-                cls.level > updatedClasses[maxIndex].level ? index : maxIndex, 0
+              const primaryIndex = updatedClasses.reduce(
+                (maxIndex, cls, index) =>
+                  cls.level > updatedClasses[maxIndex].level ? index : maxIndex,
+                0
               );
-              
+
               updatedClasses[primaryIndex] = {
                 ...updatedClasses[primaryIndex],
-                level: Math.max(1, updatedClasses[primaryIndex].level + levelDifference),
+                level: Math.max(
+                  1,
+                  updatedClasses[primaryIndex].level + levelDifference
+                ),
               };
             }
           }
 
           // Recalculate hit dice pools
-          const hitDicePools = calculateHitDicePools(updatedClasses, migratedCharacter.hitDicePools);
+          const hitDicePools = calculateHitDicePools(
+            updatedClasses,
+            migratedCharacter.hitDicePools
+          );
 
           const updatedCharacter = {
             ...migratedCharacter,
@@ -1887,6 +2052,18 @@ export const useCharacterStore = create<CharacterStore>()(
             );
           }
 
+          // Check if level up animation should be shown
+          const playerSettings = usePlayerStore.getState().settings;
+          const enableLevelUp = playerSettings?.enableLevelUpAnimation; // Default to true
+          const shouldShowLevelUp = isLevelUp && enableLevelUp;
+
+          console.log('addExperience animation check:', {
+            isLevelUp,
+            enableLevelUpAnimation: enableLevelUp,
+            shouldShowLevelUp,
+            newLevel,
+          });
+
           return {
             character: {
               ...updatedCharacter,
@@ -1896,17 +2073,39 @@ export const useCharacterStore = create<CharacterStore>()(
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
+            showLevelUpAnimation: shouldShowLevelUp
+              ? true
+              : state.showLevelUpAnimation,
+            levelUpAnimationLevel: shouldShowLevelUp
+              ? newLevel
+              : state.levelUpAnimationLevel,
           };
         });
+
+        // Auto-clear the level up animation after 6 seconds
+        const playerSettings = usePlayerStore.getState().settings;
+        const enableLevelUpAnim = playerSettings?.enableLevelUpAnimation;
+        if (isLevelUp && enableLevelUpAnim) {
+          console.log('Setting up auto-clear timeout for level up animation');
+          setTimeout(() => {
+            set({ showLevelUpAnimation: false });
+          }, 6000);
+        }
       },
 
       setExperience: newXP => {
+        const currentState = get();
+        const oldLevel =
+          currentState.character.totalLevel || currentState.character.level;
+        const newLevel = calculateLevelFromXP(newXP);
+
+        // Check if this is a level UP
+        const isLevelUp = newLevel > oldLevel;
+
         set(state => {
-          const newLevel = calculateLevelFromXP(newXP);
-          
           // Ensure character has multiclass structure
           const migratedCharacter = migrateToMulticlass(state.character);
-          
+
           // Update class levels based on new total level
           const updatedClasses = [...(migratedCharacter.classes || [])];
           if (updatedClasses.length === 1) {
@@ -1916,23 +2115,34 @@ export const useCharacterStore = create<CharacterStore>()(
             };
           } else if (updatedClasses.length > 1) {
             // Adjust the primary class to reach the target total level
-            const currentTotal = updatedClasses.reduce((sum, cls) => sum + cls.level, 0);
+            const currentTotal = updatedClasses.reduce(
+              (sum, cls) => sum + cls.level,
+              0
+            );
             const levelDifference = newLevel - currentTotal;
-            
+
             if (levelDifference !== 0) {
-              const primaryIndex = updatedClasses.reduce((maxIndex, cls, index) => 
-                cls.level > updatedClasses[maxIndex].level ? index : maxIndex, 0
+              const primaryIndex = updatedClasses.reduce(
+                (maxIndex, cls, index) =>
+                  cls.level > updatedClasses[maxIndex].level ? index : maxIndex,
+                0
               );
-              
+
               updatedClasses[primaryIndex] = {
                 ...updatedClasses[primaryIndex],
-                level: Math.max(1, updatedClasses[primaryIndex].level + levelDifference),
+                level: Math.max(
+                  1,
+                  updatedClasses[primaryIndex].level + levelDifference
+                ),
               };
             }
           }
 
           // Recalculate hit dice pools
-          const hitDicePools = calculateHitDicePools(updatedClasses, migratedCharacter.hitDicePools);
+          const hitDicePools = calculateHitDicePools(
+            updatedClasses,
+            migratedCharacter.hitDicePools
+          );
 
           const updatedCharacter = {
             ...migratedCharacter,
@@ -1958,6 +2168,11 @@ export const useCharacterStore = create<CharacterStore>()(
             );
           }
 
+          // Check if level up animation should be shown
+          const playerSettings = usePlayerStore.getState().settings;
+          const enableLevelUp = playerSettings?.enableLevelUpAnimation;
+          const shouldShowLevelUp = isLevelUp && enableLevelUp;
+
           return {
             character: {
               ...updatedCharacter,
@@ -1967,8 +2182,23 @@ export const useCharacterStore = create<CharacterStore>()(
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
+            showLevelUpAnimation: shouldShowLevelUp
+              ? true
+              : state.showLevelUpAnimation,
+            levelUpAnimationLevel: shouldShowLevelUp
+              ? newLevel
+              : state.levelUpAnimationLevel,
           };
         });
+
+        // Auto-clear the level up animation after 6 seconds
+        const playerSettings = usePlayerStore.getState().settings;
+        const enableLevelUpAnim = playerSettings?.enableLevelUpAnimation;
+        if (isLevelUp && enableLevelUpAnim) {
+          setTimeout(() => {
+            set({ showLevelUpAnimation: false });
+          }, 6000);
+        }
       },
 
       // Rich text content management
@@ -2194,17 +2424,21 @@ export const useCharacterStore = create<CharacterStore>()(
           );
 
           // Also update corresponding extended feature
-          const updatedExtendedFeatures = (state.character.extendedFeatures || []).map(
-            feature =>
-              feature.id === id
-                ? {
-                    ...feature,
-                    ...updates,
-                    sourceDetail: updates.source || feature.sourceDetail,
-                    isPassive: (updates.maxUses !== undefined ? updates.maxUses : feature.maxUses) === 0,
-                    updatedAt: new Date().toISOString(),
-                  }
-                : feature
+          const updatedExtendedFeatures = (
+            state.character.extendedFeatures || []
+          ).map(feature =>
+            feature.id === id
+              ? {
+                  ...feature,
+                  ...updates,
+                  sourceDetail: updates.source || feature.sourceDetail,
+                  isPassive:
+                    (updates.maxUses !== undefined
+                      ? updates.maxUses
+                      : feature.maxUses) === 0,
+                  updatedAt: new Date().toISOString(),
+                }
+              : feature
           );
 
           return {
@@ -2252,18 +2486,19 @@ export const useCharacterStore = create<CharacterStore>()(
           );
 
           // Also update corresponding extended feature
-          const updatedExtendedFeatures = (state.character.extendedFeatures || []).map(
-            feature =>
-              feature.id === id
-                ? {
-                    ...feature,
-                    usedUses: Math.min(
-                      feature.usedUses + 1,
-                      calculateTraitMaxUses(feature, state.character.level)
-                    ),
-                    updatedAt: new Date().toISOString(),
-                  }
-                : feature
+          const updatedExtendedFeatures = (
+            state.character.extendedFeatures || []
+          ).map(feature =>
+            feature.id === id
+              ? {
+                  ...feature,
+                  usedUses: Math.min(
+                    feature.usedUses + 1,
+                    calculateTraitMaxUses(feature, state.character.level)
+                  ),
+                  updatedAt: new Date().toISOString(),
+                }
+              : feature
           );
 
           return {
@@ -2292,15 +2527,16 @@ export const useCharacterStore = create<CharacterStore>()(
           );
 
           // Also update corresponding extended features
-          const updatedExtendedFeatures = (state.character.extendedFeatures || []).map(
-            feature =>
-              feature.restType === restType || restType === 'long'
-                ? {
-                    ...feature,
-                    usedUses: 0,
-                    updatedAt: new Date().toISOString(),
-                  }
-                : feature
+          const updatedExtendedFeatures = (
+            state.character.extendedFeatures || []
+          ).map(feature =>
+            feature.restType === restType || restType === 'long'
+              ? {
+                  ...feature,
+                  usedUses: 0,
+                  updatedAt: new Date().toISOString(),
+                }
+              : feature
           );
 
           return {
@@ -2378,7 +2614,8 @@ export const useCharacterStore = create<CharacterStore>()(
                 ? {
                     ...trait,
                     ...updates,
-                    source: updates.sourceDetail || updates.source || trait.source,
+                    source:
+                      updates.sourceDetail || updates.source || trait.source,
                     updatedAt: new Date().toISOString(),
                   }
                 : trait
@@ -2495,25 +2732,32 @@ export const useCharacterStore = create<CharacterStore>()(
       reorderExtendedFeatures: (sourceIndex, destinationIndex, sourceType) => {
         set(state => {
           const features = [...(state.character.extendedFeatures || [])];
-          
+
           if (sourceType) {
             // Reorder within a specific source type
-            const filteredFeatures = features.filter(f => f.sourceType === sourceType);
-            const otherFeatures = features.filter(f => f.sourceType !== sourceType);
-            
-            if (sourceIndex >= filteredFeatures.length || destinationIndex >= filteredFeatures.length) {
+            const filteredFeatures = features.filter(
+              f => f.sourceType === sourceType
+            );
+            const otherFeatures = features.filter(
+              f => f.sourceType !== sourceType
+            );
+
+            if (
+              sourceIndex >= filteredFeatures.length ||
+              destinationIndex >= filteredFeatures.length
+            ) {
               return state;
             }
-            
+
             const [movedFeature] = filteredFeatures.splice(sourceIndex, 1);
             filteredFeatures.splice(destinationIndex, 0, movedFeature);
-            
+
             // Update display orders
             filteredFeatures.forEach((feature, index) => {
               feature.displayOrder = index;
               feature.updatedAt = new Date().toISOString();
             });
-            
+
             return {
               character: {
                 ...state.character,
@@ -2524,19 +2768,22 @@ export const useCharacterStore = create<CharacterStore>()(
             };
           } else {
             // Reorder all features
-            if (sourceIndex >= features.length || destinationIndex >= features.length) {
+            if (
+              sourceIndex >= features.length ||
+              destinationIndex >= features.length
+            ) {
               return state;
             }
-            
+
             const [movedFeature] = features.splice(sourceIndex, 1);
             features.splice(destinationIndex, 0, movedFeature);
-            
+
             // Update display orders
             features.forEach((feature, index) => {
               feature.displayOrder = index;
               feature.updatedAt = new Date().toISOString();
             });
-            
+
             return {
               character: {
                 ...state.character,
@@ -2553,20 +2800,22 @@ export const useCharacterStore = create<CharacterStore>()(
         set(state => {
           const existingTraits = state.character.trackableTraits || [];
           const existingExtended = state.character.extendedFeatures || [];
-          
+
           // Only migrate if there are traits and no extended features yet
           if (existingTraits.length === 0 || existingExtended.length > 0) {
             return state;
           }
-          
-          const migratedFeatures: ExtendedFeature[] = existingTraits.map((trait, index) => ({
-            ...trait,
-            sourceType: 'other' as const,
-            sourceDetail: trait.source || undefined,
-            displayOrder: index,
-            isPassive: trait.maxUses === 0,
-          }));
-          
+
+          const migratedFeatures: ExtendedFeature[] = existingTraits.map(
+            (trait, index) => ({
+              ...trait,
+              sourceType: 'other' as const,
+              sourceDetail: trait.source || undefined,
+              displayOrder: index,
+              isPassive: trait.maxUses === 0,
+            })
+          );
+
           return {
             character: {
               ...state.character,
@@ -2579,7 +2828,9 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       // Language management
-      addLanguage: (language: Omit<Language, 'id' | 'createdAt' | 'updatedAt'>) => {
+      addLanguage: (
+        language: Omit<Language, 'id' | 'createdAt' | 'updatedAt'>
+      ) => {
         set(state => {
           const newLanguage: Language = {
             ...language,
@@ -2603,7 +2854,9 @@ export const useCharacterStore = create<CharacterStore>()(
         set(state => ({
           character: {
             ...state.character,
-            languages: (state.character.languages || []).filter(lang => lang.id !== id),
+            languages: (state.character.languages || []).filter(
+              lang => lang.id !== id
+            ),
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving',
@@ -2611,7 +2864,9 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       // Tool proficiency management
-      addToolProficiency: (tool: Omit<ToolProficiency, 'id' | 'createdAt' | 'updatedAt'>) => {
+      addToolProficiency: (
+        tool: Omit<ToolProficiency, 'id' | 'createdAt' | 'updatedAt'>
+      ) => {
         set(state => {
           const newTool: ToolProficiency = {
             ...tool,
@@ -2623,7 +2878,10 @@ export const useCharacterStore = create<CharacterStore>()(
           return {
             character: {
               ...state.character,
-              toolProficiencies: [...(state.character.toolProficiencies || []), newTool],
+              toolProficiencies: [
+                ...(state.character.toolProficiencies || []),
+                newTool,
+              ],
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
@@ -2631,14 +2889,18 @@ export const useCharacterStore = create<CharacterStore>()(
         });
       },
 
-      updateToolProficiency: (id: string, updates: Partial<ToolProficiency>) => {
+      updateToolProficiency: (
+        id: string,
+        updates: Partial<ToolProficiency>
+      ) => {
         set(state => ({
           character: {
             ...state.character,
-            toolProficiencies: (state.character.toolProficiencies || []).map(tool =>
-              tool.id === id
-                ? { ...tool, ...updates, updatedAt: new Date().toISOString() }
-                : tool
+            toolProficiencies: (state.character.toolProficiencies || []).map(
+              tool =>
+                tool.id === id
+                  ? { ...tool, ...updates, updatedAt: new Date().toISOString() }
+                  : tool
             ),
           },
           hasUnsavedChanges: true,
@@ -2650,7 +2912,9 @@ export const useCharacterStore = create<CharacterStore>()(
         set(state => ({
           character: {
             ...state.character,
-            toolProficiencies: (state.character.toolProficiencies || []).filter(tool => tool.id !== id),
+            toolProficiencies: (state.character.toolProficiencies || []).filter(
+              tool => tool.id !== id
+            ),
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving',
@@ -2661,18 +2925,17 @@ export const useCharacterStore = create<CharacterStore>()(
       takeShortRest: () => {
         set(state => {
           const { character } = state;
-          
+
           // Reset short rest abilities (trackableTraits and extendedFeatures)
           const resetTrackableTraits = character.trackableTraits.map(trait =>
-            trait.restType === 'short'
-              ? { ...trait, usedUses: 0 }
-              : trait
+            trait.restType === 'short' ? { ...trait, usedUses: 0 } : trait
           );
 
-          const resetExtendedFeatures = character.extendedFeatures.map(feature =>
-            feature.restType === 'short' && !feature.isPassive
-              ? { ...feature, usedUses: 0 }
-              : feature
+          const resetExtendedFeatures = character.extendedFeatures.map(
+            feature =>
+              feature.restType === 'short' && !feature.isPassive
+                ? { ...feature, usedUses: 0 }
+                : feature
           );
 
           // Reset Pact Magic slots (if Warlock)
@@ -2709,17 +2972,16 @@ export const useCharacterStore = create<CharacterStore>()(
       takeLongRest: () => {
         set(state => {
           const { character } = state;
-          
+
           // Reset ALL abilities (both short and long rest)
           const resetTrackableTraits = character.trackableTraits.map(trait => ({
             ...trait,
             usedUses: 0,
           }));
 
-          const resetExtendedFeatures = character.extendedFeatures.map(feature =>
-            feature.isPassive
-              ? feature
-              : { ...feature, usedUses: 0 }
+          const resetExtendedFeatures = character.extendedFeatures.map(
+            feature =>
+              feature.isPassive ? feature : { ...feature, usedUses: 0 }
           );
 
           // Reset ALL spell slots

@@ -1,28 +1,28 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  
+
   /* Background colors */
   --color-bg-primary: #ffffff;
   --color-bg-secondary: #f8fafc;
   --color-bg-tertiary: #f1f5f9;
-  
+
   /* Text colors */
   --color-text-primary: #1e293b;
   --color-text-secondary: #475569;
   --color-text-tertiary: #64748b;
-  
+
   /* Border colors */
   --color-border-primary: #e2e8f0;
   --color-border-secondary: #cbd5e1;
-  
+
   /* Card colors */
   --color-card-bg: #ffffff;
   --color-card-border: #e2e8f0;
   --color-card-hover: #f8fafc;
-  
+
   /* Gradient colors */
   --gradient-slate-from: #f8fafc;
   --gradient-slate-to: #f1f5f9;
@@ -34,29 +34,29 @@
   --gradient-purple-to: #fce7f3;
 }
 
-[data-theme="dark"] {
+[data-theme='dark'] {
   --background: #0a0a0a;
   --foreground: #ededed;
-  
+
   /* Background colors */
   --color-bg-primary: #0f172a;
   --color-bg-secondary: #1e293b;
   --color-bg-tertiary: #334155;
-  
+
   /* Text colors */
   --color-text-primary: #f1f5f9;
   --color-text-secondary: #cbd5e1;
   --color-text-tertiary: #94a3b8;
-  
+
   /* Border colors */
   --color-border-primary: #334155;
   --color-border-secondary: #475569;
-  
+
   /* Card colors */
   --color-card-bg: #1e293b;
   --color-card-border: #334155;
   --color-card-hover: #293548;
-  
+
   /* Gradient colors - adjusted for dark mode */
   --gradient-slate-from: #1e293b;
   --gradient-slate-to: #334155;
@@ -73,6 +73,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-cinzel: var(--font-cinzel-decorative);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -94,8 +95,8 @@ button {
 }
 
 /* Fix text readability - make text darker without changing backgrounds */
-input, 
-textarea, 
+input,
+textarea,
 select {
   color: #1f2937; /* Dark gray text instead of light gray */
 }
@@ -107,7 +108,6 @@ textarea::placeholder {
   opacity: 1;
 }
 
-
 /* TipTap Editor content - make text darker and more specific */
 .ProseMirror {
   color: #1f2937 !important; /* Dark text for readability */
@@ -115,7 +115,7 @@ textarea::placeholder {
 
 .ProseMirror p,
 .ProseMirror h1,
-.ProseMirror h2, 
+.ProseMirror h2,
 .ProseMirror h3,
 .ProseMirror h4,
 .ProseMirror h5,
@@ -128,16 +128,15 @@ textarea::placeholder {
 }
 
 /* Fix text inputs in editor mode */
-.prose input[type="text"] {
+.prose input[type='text'] {
   color: #1f2937 !important;
 }
 /* but for placeholder text */
-.prose input[type="text"]::placeholder {
+.prose input[type='text']::placeholder {
   color: #9ca3af !important;
 }
 
 /* Fix light gray text on white buttons */
-
 
 /* Make sure all text in forms is readable */
 form input,
@@ -148,28 +147,27 @@ form select {
 
 /* Dark mode adjustments */
 @media (prefers-color-scheme: dark) {
-  
   select {
     color: #9ca3af;
   }
 
-  input, 
+  input,
   textarea {
-    color: #1f2937 ;
+    color: #1f2937;
   }
-  
+
   input::placeholder,
   textarea::placeholder {
     color: #9ca3af;
   }
-  
+
   .ProseMirror {
     color: #f9fafb;
   }
-  
+
   .ProseMirror p,
   .ProseMirror h1,
-  .ProseMirror h2, 
+  .ProseMirror h2,
   .ProseMirror h3,
   .ProseMirror h4,
   .ProseMirror h5,
@@ -200,7 +198,6 @@ form select {
   display: block;
   z-index: 9999 !important;
 }
-
 
 .dot1 {
   animation: pulse 1s infinite;
@@ -234,29 +231,32 @@ form select {
 
 /* Error page animations */
 @keyframes float {
-  0%, 100% { 
-    transform: translateY(0px) rotate(0deg); 
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
   }
-  50% { 
-    transform: translateY(-20px) rotate(180deg); 
+  50% {
+    transform: translateY(-20px) rotate(180deg);
   }
 }
 
 @keyframes float-delayed {
-  0%, 100% { 
-    transform: translateY(0px) rotate(0deg); 
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
   }
-  50% { 
-    transform: translateY(-15px) rotate(-180deg); 
+  50% {
+    transform: translateY(-15px) rotate(-180deg);
   }
 }
 
 @keyframes float-slow {
-  0%, 100% { 
-    transform: translateY(0px) rotate(45deg); 
+  0%,
+  100% {
+    transform: translateY(0px) rotate(45deg);
   }
-  50% { 
-    transform: translateY(-10px) rotate(225deg); 
+  50% {
+    transform: translateY(-10px) rotate(225deg);
   }
 }
 
@@ -271,4 +271,3 @@ form select {
 .animate-float-slow {
   animation: float-slow 8s ease-in-out infinite 1s;
 }
-

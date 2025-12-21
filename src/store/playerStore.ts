@@ -22,11 +22,24 @@ export interface PlayerCharacter {
   isArchived: boolean;
 }
 
+export interface PlayerSettings {
+  enableDeathAnimation: boolean;
+  enableLevelUpAnimation: boolean;
+}
+
+const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
+  enableDeathAnimation: false,
+  enableLevelUpAnimation: false,
+};
+
 // Store state interface
 interface PlayerStoreState {
   // Core data
   characters: PlayerCharacter[];
   activeCharacterId: string | null;
+
+  // Player settings
+  settings: PlayerSettings;
 
   // UI state
   lastSelectedCharacterId: string | null;
@@ -66,6 +79,10 @@ interface PlayerStoreState {
     name?: string
   ) => string;
 
+  // Settings management
+  updateSettings: (updates: Partial<PlayerSettings>) => void;
+  resetSettings: () => void;
+
   // Reset and cleanup
   resetStore: () => void;
 }
@@ -81,13 +98,13 @@ const createPlayerCharacter = (
 ): PlayerCharacter => {
   const now = new Date();
   const playerId = generateId();
-  
+
   // Ensure characterData has the same ID as the PlayerCharacter
   const characterDataWithId: CharacterState = {
     ...characterData,
     id: playerId,
   };
-  
+
   return {
     id: playerId,
     name,
@@ -176,6 +193,7 @@ export const usePlayerStore = create<PlayerStoreState>()(
       // Initial state
       characters: [],
       activeCharacterId: null,
+      settings: { ...DEFAULT_PLAYER_SETTINGS },
       lastSelectedCharacterId: null,
 
       // Computed getters
@@ -188,12 +206,12 @@ export const usePlayerStore = create<PlayerStoreState>()(
 
       getCharacterById: (id: string) => {
         const character = get().characters.find(c => c.id === id) || null;
-        
+
         // Ensure characterData has the correct ID (migration for existing characters)
         if (character && !character.characterData.id) {
           character.characterData.id = character.id;
         }
-        
+
         return character;
       },
 
@@ -253,7 +271,10 @@ export const usePlayerStore = create<PlayerStoreState>()(
                   name: characterData.name || char.name,
                   race: characterData.race || char.race,
                   class: characterData.class?.name || char.class,
-                  level: characterData.totalLevel || characterData.level || char.level,
+                  level:
+                    characterData.totalLevel ||
+                    characterData.level ||
+                    char.level,
                   avatar: characterData.avatar, // Update top-level avatar from characterData
                   updatedAt: new Date(),
                   lastPlayed: new Date(),
@@ -404,10 +425,22 @@ export const usePlayerStore = create<PlayerStoreState>()(
         return playerCharacter.id;
       },
 
+      // Settings management
+      updateSettings: updates => {
+        set(state => ({
+          settings: { ...state.settings, ...updates },
+        }));
+      },
+
+      resetSettings: () => {
+        set({ settings: { ...DEFAULT_PLAYER_SETTINGS } });
+      },
+
       resetStore: () => {
         set({
           characters: [],
           activeCharacterId: null,
+          settings: { ...DEFAULT_PLAYER_SETTINGS },
           lastSelectedCharacterId: null,
         });
       },
