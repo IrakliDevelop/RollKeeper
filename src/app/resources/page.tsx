@@ -88,12 +88,6 @@ export default function ResourcesPage() {
               >
                 Player Dashboard
               </Link>
-              <Link
-                href="/dm"
-                className="font-medium text-slate-600 transition-colors hover:text-indigo-600"
-              >
-                DM Toolset
-              </Link>
             </nav>
           </div>
         </div>
@@ -102,31 +96,34 @@ export default function ResourcesPage() {
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         {/* Hero Section */}
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-slate-900 mb-4">
+        <div className="mb-12 text-center">
+          <h2 className="mb-4 text-4xl font-bold text-slate-900">
             Complete D&D Reference Library
           </h2>
-          <p className="text-lg text-slate-600 max-w-3xl mx-auto">
-            Access comprehensive D&D resources, tools, and databases to enhance your tabletop experience. 
-            From spellbooks to monster manuals, everything you need is right here.
+          <p className="mx-auto max-w-3xl text-lg text-slate-600">
+            Access comprehensive D&D resources, tools, and databases to enhance
+            your tabletop experience. From spellbooks to monster manuals,
+            everything you need is right here.
           </p>
         </div>
 
         {/* Resources Grid */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {resourceItems.map((item) => {
+          {resourceItems.map(item => {
             const IconComponent = item.icon;
-            
+
             if (!item.available) {
               return (
                 <div
                   key={item.title}
-                  className="group relative overflow-hidden rounded-xl border-2 border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 opacity-60"
+                  className="group relative overflow-hidden rounded-xl border-2 border-slate-200 bg-white p-6 opacity-60 shadow-sm transition-all duration-300"
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200"></div>
                   <div className="relative">
                     <div className="mb-4 flex items-center justify-between">
-                      <div className={`rounded-lg bg-gradient-to-br ${item.gradient} p-3 shadow-md grayscale`}>
+                      <div
+                        className={`rounded-lg bg-gradient-to-br ${item.gradient} p-3 shadow-md grayscale`}
+                      >
                         <IconComponent className="h-6 w-6 text-white" />
                       </div>
                       {item.comingSoon && (
@@ -138,9 +135,7 @@ export default function ResourcesPage() {
                     <h3 className="mb-2 text-lg font-semibold text-slate-900">
                       {item.title}
                     </h3>
-                    <p className="text-sm text-slate-600">
-                      {item.description}
-                    </p>
+                    <p className="text-sm text-slate-600">{item.description}</p>
                   </div>
                 </div>
               );
@@ -150,12 +145,16 @@ export default function ResourcesPage() {
               <Link
                 key={item.title}
                 href={item.href}
-                className="group relative overflow-hidden rounded-xl border-2 border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-lg hover:border-indigo-300 hover:-translate-y-1"
+                className="group relative overflow-hidden rounded-xl border-2 border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-lg"
               >
-                <div className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 transition-opacity duration-300 group-hover:opacity-5`}></div>
+                <div
+                  className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 transition-opacity duration-300 group-hover:opacity-5`}
+                ></div>
                 <div className="relative">
                   <div className="mb-4 flex items-center justify-between">
-                    <div className={`rounded-lg bg-gradient-to-br ${item.gradient} p-3 shadow-md transition-all duration-300 group-hover:bg-gradient-to-br group-hover:${item.hoverGradient} group-hover:scale-110`}>
+                    <div
+                      className={`rounded-lg bg-gradient-to-br ${item.gradient} p-3 shadow-md transition-all duration-300 group-hover:bg-gradient-to-br group-hover:${item.hoverGradient} group-hover:scale-110`}
+                    >
                       <IconComponent className="h-6 w-6 text-white" />
                     </div>
                     <div className="flex items-center gap-1 text-indigo-600 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
@@ -166,7 +165,7 @@ export default function ResourcesPage() {
                   <h3 className="mb-2 text-lg font-semibold text-slate-900 transition-colors group-hover:text-indigo-900">
                     {item.title}
                   </h3>
-                  <p className="text-sm text-slate-600 group-hover:text-slate-700 transition-colors">
+                  <p className="text-sm text-slate-600 transition-colors group-hover:text-slate-700">
                     {item.description}
                   </p>
                 </div>
@@ -176,14 +175,15 @@ export default function ResourcesPage() {
         </div>
 
         {/* Additional Info Section */}
-        <div className="mt-16 rounded-xl bg-white/60 border border-slate-200 p-8 shadow-sm backdrop-blur-sm">
+        <div className="mt-16 rounded-xl border border-slate-200 bg-white/60 p-8 shadow-sm backdrop-blur-sm">
           <div className="text-center">
-            <h3 className="text-2xl font-bold text-slate-900 mb-4">
+            <h3 className="mb-4 text-2xl font-bold text-slate-900">
               More Resources Coming Soon
             </h3>
-            <p className="text-slate-600 mb-6">
-              We&apos;re constantly expanding our collection of D&D tools and resources. 
-              Stay tuned for equipment databases, encounter builders, and more!
+            <p className="mb-6 text-slate-600">
+              We&apos;re constantly expanding our collection of D&D tools and
+              resources. Stay tuned for equipment databases, encounter builders,
+              and more!
             </p>
             <div className="flex flex-wrap justify-center gap-4 text-sm">
               <span className="rounded-full bg-slate-100 px-4 py-2 text-slate-700">

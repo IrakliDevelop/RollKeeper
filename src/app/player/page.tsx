@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   Plus,
   User,
-  Crown,
   Archive,
   Edit3,
   Trash2,
@@ -332,17 +331,6 @@ export default function PlayerDashboardPage() {
                   Player Dashboard
                 </h1>
               </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Link href="/dm">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<Crown size={16} />}
-                >
-                  DM Tools
-                </Button>
-              </Link>
             </div>
           </div>
         </div>
