@@ -1,7 +1,0 @@
-{
-  "/api/backgrounds/route": "app/api/backgrounds/route.js",
-  "/api/classes/route": "app/api/classes/route.js",
-  "/api/feats/route": "app/api/feats/route.js",
-  "/api/spells/route": "app/api/spells/route.js",
-  "/player/characters/[characterId]/page": "app/player/characters/[characterId]/page.js"
-}

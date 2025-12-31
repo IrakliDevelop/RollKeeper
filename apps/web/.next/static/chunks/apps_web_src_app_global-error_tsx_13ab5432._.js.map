@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///home/irakli/Projects/RollKeeper/apps/web/src/app/global-error.tsx"],"sourcesContent":["'use client';\r\n\r\nimport ErrorPage from '@/components/ui/feedback/ErrorPage';\r\n\r\ninterface GlobalErrorProps {\r\n  error: Error & { digest?: string };\r\n  reset: () => void;\r\n}\r\n\r\nexport default function GlobalError({ error, reset }: GlobalErrorProps) {\r\n  return (\r\n    <html>\r\n      <body>\r\n        <ErrorPage\r\n          error={error}\r\n          reset={reset}\r\n          title=\"Reality.exe Has Stopped Working!\"\r\n          description={error.message}\r\n        />\r\n      </body>\r\n    </html>\r\n  );\r\n}\r\n"],"names":[],"mappings":";;;;;AAEA;AAFA;;;AASe,SAAS,YAAY,KAAkC;QAAlC,EAAE,KAAK,EAAE,KAAK,EAAoB,GAAlC;IAClC,qBACE,6LAAC;kBACC,cAAA,6LAAC;sBACC,cAAA,6LAAC,8KAAS;gBACR,OAAO;gBACP,OAAO;gBACP,OAAM;gBACN,aAAa,MAAM,OAAO;;;;;;;;;;;;;;;;AAKpC;KAbwB","debugId":null}}]
-}
