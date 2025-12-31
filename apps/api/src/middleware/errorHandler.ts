@@ -17,10 +17,10 @@ export class ApiError extends Error {
   }
 }
 
-export function errorHandler(err: Error, req: Request, res: Response): void {
+export function errorHandler(err: Error, req: Request, res: Response) {
   // Log error in development
   if (process.env.NODE_ENV !== 'production') {
-    console.error('❌ Error:', err);
+    console.error('Error:', err);
   }
 
   // Handle Zod validation errors

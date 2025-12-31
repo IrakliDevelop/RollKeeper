@@ -1,12 +1,15 @@
 {
-  "name": "rollkeeper-backend",
+  "name": "@rollkeeper/api",
   "version": "1.0.0",
+  "private": true,
   "description": "Backend server for RollKeeper DM features",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "lint": "echo 'No linting configured'",
+    "type-check": "tsc --noEmit",
     "migrate": "tsx src/db/migrate.ts"
   },
   "keywords": [
