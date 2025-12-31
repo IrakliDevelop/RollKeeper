@@ -1,0 +1,32 @@
+(globalThis.TURBOPACK_CHUNK_LISTS || (globalThis.TURBOPACK_CHUNK_LISTS = [])).push({
+    script: typeof document === "object" ? document.currentScript : undefined,
+    chunks: [
+  "static/chunks/node_modules_@3d-dice_dice-box_dist_b879e76b._.js",
+  "static/chunks/apps_web_src_utils_108db94c._.js",
+  "static/chunks/apps_web_src_store_a19950ea._.js",
+  "static/chunks/apps_web_src_components_ui_forms_1dccc72e._.js",
+  "static/chunks/apps_web_src_components_ui_layout_d27f6cc6._.js",
+  "static/chunks/apps_web_src_components_ui_character_510f133b._.js",
+  "static/chunks/apps_web_src_components_ui_game_6752fa8b._.js",
+  "static/chunks/apps_web_src_components_ui_feedback_e40bbf56._.js",
+  "static/chunks/apps_web_src_components_ui_3914ab6d._.js",
+  "static/chunks/apps_web_src_components_shared_f89ef63d._.js",
+  "static/chunks/apps_web_src_components_EnhancedSpellManagement_tsx_3e2f4e02._.js",
+  "static/chunks/apps_web_src_components_5bb6bb5d._.js",
+  "static/chunks/apps_web_src_app_player_characters_[characterId]_a4a77090._.js",
+  "static/chunks/apps_web_src_18d0bd89._.js",
+  "static/chunks/node_modules_next_8b54b6cb._.js",
+  "static/chunks/node_modules_lucide-react_dist_esm_icons_ba4a10c4._.js",
+  "static/chunks/node_modules_tailwind-merge_dist_bundle-mjs_mjs_56b6fd65._.js",
+  "static/chunks/node_modules_motion-dom_dist_es_da948acf._.js",
+  "static/chunks/node_modules_framer-motion_dist_es_247c3ff9._.js",
+  "static/chunks/node_modules_prosemirror-view_dist_index_21ada2c5.js",
+  "static/chunks/node_modules_@tiptap_core_dist_f5afb391._.js",
+  "static/chunks/node_modules_@3d-dice_dice-box_dist_dice-box_es_a0389329.js",
+  "static/chunks/node_modules_@radix-ui_879a0402._.js",
+  "static/chunks/node_modules_@floating-ui_1b6e7b6d._.js",
+  "static/chunks/node_modules_@tiptap_389e96f6._.js",
+  "static/chunks/node_modules_7d92449d._.js"
+],
+    source: "dynamic"
+});

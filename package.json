@@ -2,6 +2,7 @@
   "name": "rollkeeper",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@10.9.2",
   "description": "A web-based D&D character sheet application with auto-save functionality and calculated fields",
   "keywords": [
     "dnd",

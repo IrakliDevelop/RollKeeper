@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///home/irakli/Projects/RollKeeper/apps/web/src/app/error.tsx"],"sourcesContent":["'use client';\r\n\r\nimport ErrorPage from '@/components/ui/feedback/ErrorPage';\r\n\r\ninterface ErrorProps {\r\n  error: Error & { digest?: string };\r\n  reset: () => void;\r\n}\r\n\r\nexport default function Error({ error, reset }: ErrorProps) {\r\n  return (\r\n    <ErrorPage\r\n      error={error}\r\n      reset={reset}\r\n      title=\"Page Spell Backfired!\"\r\n      description={error.message}\r\n    />\r\n  );\r\n}\r\n"],"names":[],"mappings":";;;;;AAEA;AAFA;;;AASe,SAAS,MAAM,EAAE,KAAK,EAAE,KAAK,EAAc;IACxD,qBACE,8OAAC,2KAAS;QACR,OAAO;QACP,OAAO;QACP,OAAM;QACN,aAAa,MAAM,OAAO;;;;;;AAGhC","debugId":null}}]
+}
