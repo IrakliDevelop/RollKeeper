@@ -95,3 +95,6 @@ temp/
 # Local development
 .local
 .cache/
+
+*storybook.log
+storybook-static
