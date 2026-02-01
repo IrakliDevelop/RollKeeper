@@ -8,13 +8,16 @@ import {
   RotateCcw,
   Calculator,
   Edit3,
-  Zap,
   Skull,
   Shield,
   HelpCircle,
+  Sparkles,
+  Check,
+  X,
 } from 'lucide-react';
 import { HitPoints, ClassInfo } from '@/types/character';
 import { isDying, isDead, isStabilized } from '@/utils/hpCalculations';
+import { Button } from '@/components/ui/forms';
 
 interface HitPointTrackerProps {
   hitPoints: HitPoints;
@@ -63,7 +66,6 @@ export function HitPointTracker({
   const [damageAmount, setDamageAmount] = useState('');
   const [healingAmount, setHealingAmount] = useState('');
   const [tempHPAmount, setTempHPAmount] = useState('');
-  const [deathSaveResult, setDeathSaveResult] = useState<number | null>(null);
 
   const isCharacterDying = isDying(hitPoints);
   const isCharacterDead = isDead(hitPoints);
@@ -94,14 +96,61 @@ export function HitPointTracker({
     }
   };
 
-  const handleDeathSave = () => {
-    if (deathSaveResult === null || !onMakeDeathSave) return;
+  const handleAddSuccess = () => {
+    if (
+      onMakeDeathSave &&
+      hitPoints.deathSaves &&
+      hitPoints.deathSaves.successes < 3
+    ) {
+      onMakeDeathSave(true, false);
+    }
+  };
 
-    const isSuccess = deathSaveResult >= 10;
-    const isCritical = deathSaveResult === 20;
+  const handleRemoveSuccess = () => {
+    if (
+      onUpdateHitPoints &&
+      hitPoints.deathSaves &&
+      hitPoints.deathSaves.successes > 0
+    ) {
+      onUpdateHitPoints({
+        deathSaves: {
+          ...hitPoints.deathSaves,
+          successes: hitPoints.deathSaves.successes - 1,
+          isStabilized: false, // No longer stabilized if removing a success
+        },
+      });
+    }
+  };
 
-    onMakeDeathSave(isSuccess, isCritical);
-    setDeathSaveResult(null);
+  const handleAddFailure = () => {
+    if (
+      onMakeDeathSave &&
+      hitPoints.deathSaves &&
+      hitPoints.deathSaves.failures < 3
+    ) {
+      onMakeDeathSave(false, false);
+    }
+  };
+
+  const handleRemoveFailure = () => {
+    if (
+      onUpdateHitPoints &&
+      hitPoints.deathSaves &&
+      hitPoints.deathSaves.failures > 0
+    ) {
+      onUpdateHitPoints({
+        deathSaves: {
+          ...hitPoints.deathSaves,
+          failures: hitPoints.deathSaves.failures - 1,
+        },
+      });
+    }
+  };
+
+  const handleCriticalSuccess = () => {
+    if (onMakeDeathSave) {
+      onMakeDeathSave(true, true);
+    }
   };
 
   const getStatusColor = () => {
@@ -372,103 +421,240 @@ export function HitPointTracker({
       {/* Death Saving Throws */}
       {showDeathSaves &&
         (isCharacterDying || isCharacterStabilized || hitPoints.deathSaves) && (
-          <div className="border-t border-gray-200 pt-4">
+          <div className="mt-4 rounded-xl border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-slate-100 p-5 shadow-md">
             <div className="mb-4 flex items-center justify-between">
-              <h4 className="text-md flex items-center gap-2 font-semibold text-gray-800">
-                <Skull size={18} />
-                Death Saving Throws
-              </h4>
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-gradient-to-br from-gray-600 to-gray-700 p-2 shadow-md">
+                  <Skull size={18} className="text-white" />
+                </div>
+                <div>
+                  <h4 className="text-lg font-bold text-gray-900">
+                    Death Saving Throws
+                  </h4>
+                  {isCharacterStabilized && (
+                    <span className="text-xs font-medium text-amber-600">
+                      Stabilized
+                    </span>
+                  )}
+                  {isCharacterDead && (
+                    <span className="text-xs font-medium text-red-600">
+                      Dead
+                    </span>
+                  )}
+                </div>
+              </div>
               {!readonly && onResetDeathSaves && (
-                <button
+                <Button
                   onClick={onResetDeathSaves}
-                  className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800"
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<RotateCcw size={14} />}
                   title="Reset death saves"
                 >
-                  <RotateCcw size={14} />
                   Reset
-                </button>
+                </Button>
               )}
             </div>
 
             {hitPoints.deathSaves && (
-              <div className="space-y-4">
-                {/* Success/Failure Display */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="mb-2 text-sm font-medium text-green-700">
-                      Successes
-                    </div>
-                    <div className="flex gap-1">
-                      {[1, 2, 3].map(i => (
-                        <div
-                          key={i}
-                          className={`h-6 w-6 rounded-full border-2 ${
-                            i <= hitPoints.deathSaves!.successes
-                              ? 'border-green-500 bg-green-500'
-                              : 'border-gray-400 bg-white'
-                          }`}
-                        />
-                      ))}
+              <div className="space-y-3">
+                {/* Success/Failure Interactive Display - Stacked vertically */}
+                <div className="space-y-3">
+                  {/* Successes */}
+                  <div className="rounded-lg border-2 border-green-200 bg-green-50 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex w-24 shrink-0 items-center gap-2">
+                        <Check size={16} className="shrink-0 text-green-600" />
+                        <span className="text-sm font-semibold text-green-700">
+                          Successes
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        {[1, 2, 3].map(i => {
+                          const isFilled = i <= hitPoints.deathSaves!.successes;
+                          const isNextEmpty =
+                            i === hitPoints.deathSaves!.successes + 1;
+                          const isLastFilled =
+                            isFilled && i === hitPoints.deathSaves!.successes;
+                          const canAdd =
+                            !readonly &&
+                            isCharacterDying &&
+                            onMakeDeathSave &&
+                            isNextEmpty;
+                          const canRemove =
+                            !readonly && onUpdateHitPoints && isLastFilled;
+                          const canClick = canAdd || canRemove;
+
+                          return (
+                            <button
+                              key={i}
+                              onClick={
+                                canAdd
+                                  ? handleAddSuccess
+                                  : canRemove
+                                    ? handleRemoveSuccess
+                                    : undefined
+                              }
+                              disabled={!canClick}
+                              className={`relative h-9 w-9 rounded-full border-2 transition-all duration-200 ${
+                                isFilled
+                                  ? 'border-green-500 bg-green-500 shadow-md'
+                                  : 'border-green-300 bg-white'
+                              } ${
+                                canAdd
+                                  ? 'cursor-pointer hover:scale-110 hover:border-green-500 hover:bg-green-100 hover:shadow-lg active:scale-95'
+                                  : canRemove
+                                    ? 'cursor-pointer hover:scale-110 hover:border-green-600 hover:bg-green-600 hover:shadow-lg active:scale-95'
+                                    : 'cursor-default'
+                              } `}
+                              title={
+                                canAdd
+                                  ? 'Click to add success'
+                                  : canRemove
+                                    ? 'Click to undo success'
+                                    : undefined
+                              }
+                            >
+                              {isFilled && (
+                                <Check
+                                  size={18}
+                                  className="absolute inset-0 m-auto text-white"
+                                />
+                              )}
+                              {canAdd && !isFilled && (
+                                <span className="absolute inset-0 m-auto flex h-full w-full items-center justify-center text-green-400 opacity-50">
+                                  <Check size={14} />
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <div className="mb-2 text-sm font-medium text-red-700">
-                      Failures
-                    </div>
-                    <div className="flex gap-1">
-                      {[1, 2, 3].map(i => (
-                        <div
-                          key={i}
-                          className={`h-6 w-6 rounded-full border-2 ${
-                            i <= hitPoints.deathSaves!.failures
-                              ? 'border-red-500 bg-red-500'
-                              : 'border-gray-400 bg-white'
-                          }`}
-                        />
-                      ))}
+
+                  {/* Failures */}
+                  <div className="rounded-lg border-2 border-red-200 bg-red-50 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex w-24 shrink-0 items-center gap-2">
+                        <X size={16} className="shrink-0 text-red-600" />
+                        <span className="text-sm font-semibold text-red-700">
+                          Failures
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        {[1, 2, 3].map(i => {
+                          const isFilled = i <= hitPoints.deathSaves!.failures;
+                          const isNextEmpty =
+                            i === hitPoints.deathSaves!.failures + 1;
+                          const isLastFilled =
+                            isFilled && i === hitPoints.deathSaves!.failures;
+                          const canAdd =
+                            !readonly &&
+                            isCharacterDying &&
+                            onMakeDeathSave &&
+                            isNextEmpty;
+                          const canRemove =
+                            !readonly && onUpdateHitPoints && isLastFilled;
+                          const canClick = canAdd || canRemove;
+
+                          return (
+                            <button
+                              key={i}
+                              onClick={
+                                canAdd
+                                  ? handleAddFailure
+                                  : canRemove
+                                    ? handleRemoveFailure
+                                    : undefined
+                              }
+                              disabled={!canClick}
+                              className={`relative h-9 w-9 rounded-full border-2 transition-all duration-200 ${
+                                isFilled
+                                  ? 'border-red-500 bg-red-500 shadow-md'
+                                  : 'border-red-300 bg-white'
+                              } ${
+                                canAdd
+                                  ? 'cursor-pointer hover:scale-110 hover:border-red-500 hover:bg-red-100 hover:shadow-lg active:scale-95'
+                                  : canRemove
+                                    ? 'cursor-pointer hover:scale-110 hover:border-red-600 hover:bg-red-600 hover:shadow-lg active:scale-95'
+                                    : 'cursor-default'
+                              } `}
+                              title={
+                                canAdd
+                                  ? 'Click to add failure'
+                                  : canRemove
+                                    ? 'Click to undo failure'
+                                    : undefined
+                              }
+                            >
+                              {isFilled && (
+                                <X
+                                  size={18}
+                                  className="absolute inset-0 m-auto text-white"
+                                />
+                              )}
+                              {canAdd && !isFilled && (
+                                <span className="absolute inset-0 m-auto flex h-full w-full items-center justify-center text-red-400 opacity-50">
+                                  <X size={14} />
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Death Save Roll */}
+                {/* Critical Success Button */}
                 {!readonly && isCharacterDying && onMakeDeathSave && (
-                  <div className="space-y-3">
-                    <div className="text-sm font-medium text-gray-700">
-                      Make Death Saving Throw
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="number"
-                        value={deathSaveResult || ''}
-                        onChange={e =>
-                          setDeathSaveResult(parseInt(e.target.value) || null)
-                        }
-                        placeholder="d20 result"
-                        className="w-24 rounded-md border border-gray-300 px-3 py-2 text-gray-800 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
-                        min="1"
-                        max="20"
-                      />
-                      <button
-                        onClick={handleDeathSave}
-                        disabled={
-                          deathSaveResult === null ||
-                          deathSaveResult < 1 ||
-                          deathSaveResult > 20
-                        }
-                        className="flex items-center gap-1 rounded-md bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700 disabled:cursor-not-allowed disabled:bg-gray-400"
-                      >
-                        <Zap size={16} />
-                        Roll Save
-                      </button>
-                    </div>
-                    <div className="space-y-1 text-xs text-gray-600">
-                      <p>• Roll 10 or higher to succeed</p>
-                      <p>• Natural 20: Regain 1 HP and become conscious</p>
-                      <p>• 3 successes: Stabilized but unconscious</p>
-                      <p>• 3 failures: Dead</p>
-                    </div>
+                  <div className="flex justify-center">
+                    <Button
+                      onClick={handleCriticalSuccess}
+                      variant="warning"
+                      size="sm"
+                      leftIcon={<Sparkles size={16} />}
+                      className="bg-gradient-to-r from-amber-500 to-yellow-500 font-semibold text-white shadow-md hover:from-amber-600 hover:to-yellow-600"
+                    >
+                      Natural 20! (Regain 1 HP)
+                    </Button>
                   </div>
                 )}
+
+                {/* Help Info */}
+                <div className="rounded-lg border border-gray-200 bg-white p-3">
+                  <div className="flex items-start gap-2">
+                    <HelpCircle
+                      size={14}
+                      className="mt-0.5 shrink-0 text-gray-400"
+                    />
+                    <div className="space-y-0.5 text-xs text-gray-600">
+                      <p>
+                        <span className="font-medium">Roll d20:</span> 10+ =
+                        Success, 9 or below = Failure
+                      </p>
+                      <p>
+                        <span className="font-medium text-amber-600">
+                          Natural 20:
+                        </span>{' '}
+                        Regain 1 HP and become conscious
+                      </p>
+                      <p>
+                        <span className="font-medium text-green-600">
+                          3 Successes:
+                        </span>{' '}
+                        Stabilized but unconscious
+                      </p>
+                      <p>
+                        <span className="font-medium text-red-600">
+                          3 Failures:
+                        </span>{' '}
+                        Dead
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
