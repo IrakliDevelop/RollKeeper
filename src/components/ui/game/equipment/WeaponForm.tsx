@@ -7,14 +7,27 @@ import {
   DamageType,
   WeaponDamage,
 } from '@/types/character';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Textarea } from '@/components/ui/forms/textarea';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Checkbox } from '@/components/ui/forms/checkbox';
+import RichTextEditor from '@/components/ui/forms/RichTextEditor';
 
-interface WeaponFormData {
+// Form data version of WeaponCharge (without requiring id for new entries)
+export interface WeaponChargeFormData {
+  id?: string;
+  name: string;
+  description?: string;
+  maxCharges: number;
+  usedCharges: number;
+  restType: 'short' | 'long';
+  scaleWithProficiency?: boolean;
+  proficiencyMultiplier?: number;
+}
+
+export interface WeaponFormData {
   name: string;
   category: WeaponCategory;
   weaponType: WeaponType[];
@@ -32,6 +45,8 @@ interface WeaponFormData {
   manualProficiency?: boolean;
   requiresAttunement?: boolean;
   isAttuned?: boolean;
+  // Multiple weapon charges
+  charges?: WeaponChargeFormData[];
 }
 
 interface WeaponFormProps {
@@ -79,6 +94,17 @@ const DAMAGE_TYPES: DamageType[] = [
   'thunder',
 ];
 
+// Helper to create a new charge entry
+const createNewCharge = (): WeaponChargeFormData => ({
+  name: '',
+  description: '',
+  maxCharges: 1,
+  usedCharges: 0,
+  restType: 'long',
+  scaleWithProficiency: false,
+  proficiencyMultiplier: 1,
+});
+
 export function WeaponForm({
   formData,
   setFormData,
@@ -100,11 +126,37 @@ export function WeaponForm({
     onSubmit();
   };
 
+  const addCharge = () => {
+    setFormData(prev => ({
+      ...prev,
+      charges: [...(prev.charges || []), createNewCharge()],
+    }));
+  };
+
+  const removeCharge = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      charges: (prev.charges || []).filter((_, i) => i !== index),
+    }));
+  };
+
+  const updateCharge = (
+    index: number,
+    updates: Partial<WeaponChargeFormData>
+  ) => {
+    setFormData(prev => ({
+      ...prev,
+      charges: (prev.charges || []).map((charge, i) =>
+        i === index ? { ...charge, ...updates } : charge
+      ),
+    }));
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Section: Basic Information */}
       <div className="space-y-4">
-        <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+        <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
           Basic Information
         </h4>
 
@@ -157,7 +209,7 @@ export function WeaponForm({
       {/* Section: Damage */}
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b-2 border-gray-200 pb-2">
-          <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide">
+          <h4 className="text-sm font-bold tracking-wide text-gray-800 uppercase">
             Damage Entries
           </h4>
           <Button
@@ -205,7 +257,7 @@ export function WeaponForm({
                   }}
                   variant="ghost"
                   size="xs"
-                  className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                  className="text-red-600 hover:bg-red-50 hover:text-red-800"
                 >
                   <Trash2 size={16} />
                 </Button>
@@ -299,13 +351,16 @@ export function WeaponForm({
 
       {/* Section: Weapon Types */}
       <div className="space-y-4">
-        <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+        <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
           Weapon Types
         </h4>
 
         <div className="grid grid-cols-3 gap-3">
           {WEAPON_TYPES.map(type => (
-            <label key={type} className="flex items-center gap-2 cursor-pointer">
+            <label
+              key={type}
+              className="flex cursor-pointer items-center gap-2"
+            >
               <Checkbox
                 checked={formData.weaponType.includes(type)}
                 onCheckedChange={() => toggleWeaponType(type)}
@@ -320,7 +375,7 @@ export function WeaponForm({
 
       {/* Section: Description */}
       <div className="space-y-4">
-        <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+        <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
           Description
         </h4>
 
@@ -338,14 +393,167 @@ export function WeaponForm({
         />
       </div>
 
+      {/* Section: Charges */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between border-b-2 border-gray-200 pb-2">
+          <h4 className="flex items-center gap-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+            <Sparkles size={16} className="text-indigo-600" />
+            Charges & Abilities (Optional)
+          </h4>
+          <Button
+            type="button"
+            onClick={addCharge}
+            variant="primary"
+            size="sm"
+            leftIcon={<Plus size={14} />}
+            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+          >
+            Add Charge Ability
+          </Button>
+        </div>
+
+        {!formData.charges || formData.charges.length === 0 ? (
+          <p className="text-sm text-gray-500 italic">
+            No charge abilities configured. Add charge abilities for magic
+            weapons that can cast spells or activate special powers a limited
+            number of times.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {formData.charges.map((charge, index) => (
+              <div
+                key={index}
+                className="rounded-lg border-2 border-indigo-200 bg-indigo-50/50 p-4"
+              >
+                <div className="mb-3 flex items-center justify-between">
+                  <h5 className="flex items-center gap-2 text-sm font-semibold text-indigo-700">
+                    <Sparkles size={14} />
+                    {charge.name || `Charge Ability ${index + 1}`}
+                  </h5>
+                  <Button
+                    type="button"
+                    onClick={() => removeCharge(index)}
+                    variant="ghost"
+                    size="xs"
+                    className="text-red-600 hover:bg-red-50 hover:text-red-800"
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </div>
+
+                {/* Ability Name */}
+                <div className="mb-3">
+                  <Input
+                    label="Ability Name"
+                    value={charge.name}
+                    onChange={e =>
+                      updateCharge(index, { name: e.target.value })
+                    }
+                    placeholder="e.g., Cast Fireball, Divine Smite"
+                    className="text-sm"
+                  />
+                </div>
+
+                {/* Description with WYSIWYG */}
+                <div className="mb-3">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Description (Optional)
+                  </label>
+                  <RichTextEditor
+                    content={charge.description || ''}
+                    onChange={(content: string) =>
+                      updateCharge(index, { description: content })
+                    }
+                    placeholder="Describe what this ability does, spell level, effects, etc."
+                    minHeight="80px"
+                  />
+                </div>
+
+                {/* Max Charges and Rest Type */}
+                <div className="mb-3 grid grid-cols-2 gap-3">
+                  <Input
+                    label="Max Charges"
+                    type="number"
+                    min={1}
+                    value={charge.maxCharges.toString()}
+                    onChange={e =>
+                      updateCharge(index, {
+                        maxCharges: parseInt(e.target.value) || 1,
+                      })
+                    }
+                    helperText="Total charges when fully recharged"
+                  />
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Recharges On
+                    </label>
+                    <SelectField
+                      value={charge.restType}
+                      onValueChange={value =>
+                        updateCharge(index, {
+                          restType: value as 'short' | 'long',
+                        })
+                      }
+                    >
+                      <SelectItem value="short">Short Rest</SelectItem>
+                      <SelectItem value="long">Long Rest</SelectItem>
+                    </SelectField>
+                  </div>
+                </div>
+
+                {/* Proficiency Scaling */}
+                <div className="border-t border-indigo-200 pt-3">
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <Checkbox
+                      checked={charge.scaleWithProficiency || false}
+                      onCheckedChange={checked =>
+                        updateCharge(index, {
+                          scaleWithProficiency: checked as boolean,
+                          proficiencyMultiplier: checked
+                            ? charge.proficiencyMultiplier || 1
+                            : undefined,
+                        })
+                      }
+                    />
+                    <span className="text-sm font-medium text-gray-800">
+                      Scale with proficiency bonus
+                    </span>
+                  </label>
+
+                  {charge.scaleWithProficiency && (
+                    <div className="mt-2 pl-6">
+                      <Input
+                        label="Proficiency Multiplier"
+                        type="number"
+                        min={0.5}
+                        step={0.5}
+                        value={(charge.proficiencyMultiplier || 1).toString()}
+                        onChange={e =>
+                          updateCharge(index, {
+                            proficiencyMultiplier:
+                              parseFloat(e.target.value) || 1,
+                          })
+                        }
+                        helperText="Max charges = proficiency bonus × multiplier"
+                        wrapperClassName="w-48"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Section: Properties */}
       <div className="space-y-4">
-        <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+        <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
           Properties
         </h4>
 
         <div className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex cursor-pointer items-center gap-2">
             <Checkbox
               checked={formData.isEquipped}
               onCheckedChange={checked =>
@@ -360,7 +568,7 @@ export function WeaponForm({
             </span>
           </label>
 
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex cursor-pointer items-center gap-2">
             <Checkbox
               checked={formData.requiresAttunement || false}
               onCheckedChange={checked =>
@@ -377,7 +585,7 @@ export function WeaponForm({
           </label>
 
           {formData.requiresAttunement && (
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex cursor-pointer items-center gap-2">
               <Checkbox
                 checked={formData.isAttuned || false}
                 onCheckedChange={checked =>
@@ -396,7 +604,7 @@ export function WeaponForm({
       </div>
 
       {/* Form Actions */}
-      <div className="flex justify-end gap-3 pt-4 border-t-2 border-gray-200">
+      <div className="flex justify-end gap-3 border-t-2 border-gray-200 pt-4">
         <Button type="button" onClick={onCancel} variant="outline" size="md">
           Cancel
         </Button>
@@ -413,4 +621,3 @@ export function WeaponForm({
     </form>
   );
 }
-

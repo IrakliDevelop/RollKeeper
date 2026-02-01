@@ -8,6 +8,8 @@ import {
   MulticlassInfo,
   HitDicePools,
   Weapon,
+  WeaponCharge,
+  MagicItemCharge,
   SpellcastingAbility,
   TrackableTrait,
 } from '@/types/character';
@@ -782,18 +784,56 @@ export function calculateTraitMaxUses(
   return Math.max(1, Math.floor(proficiencyBonus * multiplier));
 }
 
+/**
+ * Calculate effective max charges for a weapon charge ability
+ * Takes into account proficiency bonus scaling if enabled
+ */
+export function calculateWeaponChargeMax(
+  charge: WeaponCharge,
+  characterLevel: number
+): number {
+  if (!charge.scaleWithProficiency) {
+    return charge.maxCharges;
+  }
+
+  const proficiencyBonus = getProficiencyBonus(characterLevel);
+  const multiplier = charge.proficiencyMultiplier || 1;
+
+  return Math.max(1, Math.floor(proficiencyBonus * multiplier));
+}
+
+/**
+ * Calculate effective max charges for a magic item charge ability
+ * Takes into account proficiency bonus scaling if enabled
+ */
+export function calculateMagicItemChargeMax(
+  charge: MagicItemCharge,
+  characterLevel: number
+): number {
+  if (!charge.scaleWithProficiency) {
+    return charge.maxCharges;
+  }
+
+  const proficiencyBonus = getProficiencyBonus(characterLevel);
+  const multiplier = charge.proficiencyMultiplier || 1;
+
+  return Math.max(1, Math.floor(proficiencyBonus * multiplier));
+}
+
 // ===== MULTICLASS CALCULATION FUNCTIONS =====
 
 /**
  * Calculate spell slots for multiclass characters
  * This is the main function that should be used for all characters (single or multiclass)
  */
-export function calculateCharacterSpellSlots(character: CharacterState): SpellSlots {
+export function calculateCharacterSpellSlots(
+  character: CharacterState
+): SpellSlots {
   // If character has multiclass data, use multiclass calculation
   if (character.classes && character.classes.length > 0) {
     return calculateMulticlassSpellSlots(character.classes);
   }
-  
+
   // Fallback to single class calculation
   return calculateSpellSlots(character.class, character.level);
 }
@@ -801,9 +841,11 @@ export function calculateCharacterSpellSlots(character: CharacterState): SpellSl
 /**
  * Calculate spell slots for multiclass characters based on combined caster levels
  */
-export function calculateMulticlassSpellSlots(classes: MulticlassInfo[]): SpellSlots {
+export function calculateMulticlassSpellSlots(
+  classes: MulticlassInfo[]
+): SpellSlots {
   let casterLevel = 0;
-  
+
   for (const classInfo of classes) {
     switch (classInfo.spellcaster) {
       case 'full':
@@ -842,7 +884,7 @@ export function calculateMulticlassSpellSlots(classes: MulticlassInfo[]): SpellS
 
   // Use full caster progression table for the combined caster level
   const levelSlots = FULL_CASTER_SPELL_SLOTS[casterLevel] || {};
-  
+
   const result: SpellSlots = {
     1: { max: 0, used: 0 },
     2: { max: 0, used: 0 },
@@ -866,28 +908,34 @@ export function calculateMulticlassSpellSlots(classes: MulticlassInfo[]): SpellS
 /**
  * Calculate pact magic for multiclass characters (only considers warlock levels)
  */
-export function calculateCharacterPactMagic(character: CharacterState): PactMagic | undefined {
+export function calculateCharacterPactMagic(
+  character: CharacterState
+): PactMagic | undefined {
   // If character has multiclass data, find warlock levels
   if (character.classes && character.classes.length > 0) {
-    const warlockClass = character.classes.find(cls => cls.spellcaster === 'warlock');
+    const warlockClass = character.classes.find(
+      cls => cls.spellcaster === 'warlock'
+    );
     if (warlockClass) {
       return calculatePactMagic(warlockClass.level);
     }
     return undefined;
   }
-  
+
   // Fallback to single class calculation
   if (character.class.spellcaster === 'warlock') {
     return calculatePactMagic(character.level);
   }
-  
+
   return undefined;
 }
 
 /**
  * Calculate hit dice pools for multiclass characters
  */
-export function calculateCharacterHitDicePools(character: CharacterState): HitDicePools {
+export function calculateCharacterHitDicePools(
+  character: CharacterState
+): HitDicePools {
   // If character has multiclass data, calculate from classes
   if (character.classes && character.classes.length > 0) {
     const hitDicePools: HitDicePools = {};
@@ -902,7 +950,7 @@ export function calculateCharacterHitDicePools(character: CharacterState): HitDi
 
     return hitDicePools;
   }
-  
+
   // Fallback to single class calculation
   const dieType = `d${character.class.hitDie}`;
   return {
@@ -920,11 +968,11 @@ export function getCharacterTotalLevel(character: CharacterState): number {
   if (character.totalLevel !== undefined) {
     return character.totalLevel;
   }
-  
+
   if (character.classes && character.classes.length > 0) {
     return character.classes.reduce((total, cls) => total + cls.level, 0);
   }
-  
+
   return character.level || 1;
 }
 
@@ -933,12 +981,15 @@ export function getCharacterTotalLevel(character: CharacterState): number {
  */
 export function hasSpellcasting(character: CharacterState): boolean {
   if (character.classes && character.classes.length > 0) {
-    return character.classes.some(cls => 
-      cls.spellcaster && cls.spellcaster !== 'none'
+    return character.classes.some(
+      cls => cls.spellcaster && cls.spellcaster !== 'none'
     );
   }
-  
-  return character.class.spellcaster !== 'none' && character.class.spellcaster !== undefined;
+
+  return (
+    character.class.spellcaster !== 'none' &&
+    character.class.spellcaster !== undefined
+  );
 }
 
 /**
@@ -948,6 +999,6 @@ export function hasWarlockLevels(character: CharacterState): boolean {
   if (character.classes && character.classes.length > 0) {
     return character.classes.some(cls => cls.spellcaster === 'warlock');
   }
-  
+
   return character.class.spellcaster === 'warlock';
 }
