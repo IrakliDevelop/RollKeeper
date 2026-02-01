@@ -41,6 +41,8 @@ import {
   calculateLevelFromXP,
   getXPForLevel,
   calculateTraitMaxUses,
+  calculateWeaponChargeMax,
+  calculateMagicItemChargeMax,
 } from '@/utils/calculations';
 import { migrateToMulticlass, calculateHitDicePools } from '@/utils/multiclass';
 import {
@@ -528,6 +530,13 @@ interface CharacterStore {
   deleteWeapon: (id: string) => void;
   equipWeapon: (id: string, equipped: boolean) => void;
   reorderWeapons: (sourceIndex: number, destinationIndex: number) => void;
+  expendWeaponCharge: (weaponId: string, chargeId: string) => void;
+  restoreWeaponCharge: (weaponId: string, chargeId: string) => void;
+  setWeaponChargeUsed: (
+    weaponId: string,
+    chargeId: string,
+    usedCount: number
+  ) => void;
 
   // Magic item management
   addMagicItem: (
@@ -538,6 +547,13 @@ interface CharacterStore {
   attuneMagicItem: (id: string, attuned: boolean) => void;
   updateAttunementSlots: (max: number) => void;
   reorderMagicItems: (sourceIndex: number, destinationIndex: number) => void;
+  expendMagicItemCharge: (itemId: string, chargeId: string) => void;
+  restoreMagicItemCharge: (itemId: string, chargeId: string) => void;
+  setMagicItemChargeUsed: (
+    itemId: string,
+    chargeId: string,
+    usedCount: number
+  ) => void;
 
   // Armor management
   addArmorItem: (
@@ -2946,6 +2962,52 @@ export const useCharacterStore = create<CharacterStore>()(
                 : feature
           );
 
+          // Reset short rest weapon charges
+          const resetWeapons = character.weapons.map(weapon => {
+            if (!weapon.charges || weapon.charges.length === 0) return weapon;
+
+            const resetCharges = weapon.charges.map(charge =>
+              charge.restType === 'short'
+                ? { ...charge, usedCharges: 0 }
+                : charge
+            );
+
+            // Only update weapon if any charges were reset
+            const hasResetCharges = weapon.charges.some(
+              c => c.restType === 'short'
+            );
+            if (!hasResetCharges) return weapon;
+
+            return {
+              ...weapon,
+              charges: resetCharges,
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          // Reset short rest magic item charges
+          const resetMagicItems = character.magicItems.map(item => {
+            if (!item.charges || item.charges.length === 0) return item;
+
+            const resetCharges = item.charges.map(charge =>
+              charge.restType === 'short'
+                ? { ...charge, usedCharges: 0 }
+                : charge
+            );
+
+            // Only update item if any charges were reset
+            const hasResetCharges = item.charges.some(
+              c => c.restType === 'short'
+            );
+            if (!hasResetCharges) return item;
+
+            return {
+              ...item,
+              charges: resetCharges,
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
           // Reset Pact Magic slots (if Warlock)
           let resetPactMagic = character.pactMagic;
           if (resetPactMagic) {
@@ -2968,6 +3030,8 @@ export const useCharacterStore = create<CharacterStore>()(
               ...character,
               trackableTraits: resetTrackableTraits,
               extendedFeatures: resetExtendedFeatures,
+              weapons: resetWeapons,
+              magicItems: resetMagicItems,
               pactMagic: resetPactMagic,
               reaction: resetReaction,
             },
@@ -2991,6 +3055,34 @@ export const useCharacterStore = create<CharacterStore>()(
             feature =>
               feature.isPassive ? feature : { ...feature, usedUses: 0 }
           );
+
+          // Reset ALL weapon charges (both short and long rest)
+          const resetWeapons = character.weapons.map(weapon => {
+            if (!weapon.charges || weapon.charges.length === 0) return weapon;
+
+            return {
+              ...weapon,
+              charges: weapon.charges.map(charge => ({
+                ...charge,
+                usedCharges: 0,
+              })),
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          // Reset ALL magic item charges (short, long, and dawn rest types)
+          const resetMagicItems = character.magicItems.map(item => {
+            if (!item.charges || item.charges.length === 0) return item;
+
+            return {
+              ...item,
+              charges: item.charges.map(charge => ({
+                ...charge,
+                usedCharges: 0,
+              })),
+              updatedAt: new Date().toISOString(),
+            };
+          });
 
           // Reset ALL spell slots
           const resetSpellSlots = { ...character.spellSlots };
@@ -3046,6 +3138,8 @@ export const useCharacterStore = create<CharacterStore>()(
               ...character,
               trackableTraits: resetTrackableTraits,
               extendedFeatures: resetExtendedFeatures,
+              weapons: resetWeapons,
+              magicItems: resetMagicItems,
               spellSlots: resetSpellSlots,
               pactMagic: resetPactMagic,
               hitDicePools: resetHitDicePools,
@@ -3186,6 +3280,124 @@ export const useCharacterStore = create<CharacterStore>()(
         });
       },
 
+      expendWeaponCharge: (weaponId, chargeId) => {
+        set(state => {
+          const updatedWeapons = state.character.weapons.map(weapon => {
+            if (weapon.id !== weaponId || !weapon.charges) return weapon;
+
+            const updatedCharges = weapon.charges.map(charge => {
+              if (charge.id !== chargeId) return charge;
+
+              const maxCharges = calculateWeaponChargeMax(
+                charge,
+                state.character.level
+              );
+              const currentUsed = charge.usedCharges || 0;
+
+              // Don't exceed max charges
+              if (currentUsed >= maxCharges) return charge;
+
+              return {
+                ...charge,
+                usedCharges: currentUsed + 1,
+              };
+            });
+
+            return {
+              ...weapon,
+              charges: updatedCharges,
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          return {
+            character: {
+              ...state.character,
+              weapons: updatedWeapons,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      restoreWeaponCharge: (weaponId, chargeId) => {
+        set(state => {
+          const updatedWeapons = state.character.weapons.map(weapon => {
+            if (weapon.id !== weaponId || !weapon.charges) return weapon;
+
+            const updatedCharges = weapon.charges.map(charge => {
+              if (charge.id !== chargeId) return charge;
+
+              const currentUsed = charge.usedCharges || 0;
+
+              // Don't go below 0
+              if (currentUsed <= 0) return charge;
+
+              return {
+                ...charge,
+                usedCharges: currentUsed - 1,
+              };
+            });
+
+            return {
+              ...weapon,
+              charges: updatedCharges,
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          return {
+            character: {
+              ...state.character,
+              weapons: updatedWeapons,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      setWeaponChargeUsed: (weaponId, chargeId, usedCount) => {
+        set(state => {
+          const updatedWeapons = state.character.weapons.map(weapon => {
+            if (weapon.id !== weaponId || !weapon.charges) return weapon;
+
+            const updatedCharges = weapon.charges.map(charge => {
+              if (charge.id !== chargeId) return charge;
+
+              const maxCharges = calculateWeaponChargeMax(
+                charge,
+                state.character.level
+              );
+
+              // Clamp between 0 and max
+              const clampedUsed = Math.max(0, Math.min(usedCount, maxCharges));
+
+              return {
+                ...charge,
+                usedCharges: clampedUsed,
+              };
+            });
+
+            return {
+              ...weapon,
+              charges: updatedCharges,
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          return {
+            character: {
+              ...state.character,
+              weapons: updatedWeapons,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
       // Magic item management actions
       addMagicItem: item => {
         set(state => {
@@ -3279,6 +3491,124 @@ export const useCharacterStore = create<CharacterStore>()(
             ...item,
             updatedAt: new Date().toISOString(),
           }));
+
+          return {
+            character: {
+              ...state.character,
+              magicItems: updatedMagicItems,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      expendMagicItemCharge: (itemId, chargeId) => {
+        set(state => {
+          const updatedMagicItems = state.character.magicItems.map(item => {
+            if (item.id !== itemId || !item.charges) return item;
+
+            const updatedCharges = item.charges.map(charge => {
+              if (charge.id !== chargeId) return charge;
+
+              const maxCharges = calculateMagicItemChargeMax(
+                charge,
+                state.character.level
+              );
+              const currentUsed = charge.usedCharges || 0;
+
+              // Don't exceed max charges
+              if (currentUsed >= maxCharges) return charge;
+
+              return {
+                ...charge,
+                usedCharges: currentUsed + 1,
+              };
+            });
+
+            return {
+              ...item,
+              charges: updatedCharges,
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          return {
+            character: {
+              ...state.character,
+              magicItems: updatedMagicItems,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      restoreMagicItemCharge: (itemId, chargeId) => {
+        set(state => {
+          const updatedMagicItems = state.character.magicItems.map(item => {
+            if (item.id !== itemId || !item.charges) return item;
+
+            const updatedCharges = item.charges.map(charge => {
+              if (charge.id !== chargeId) return charge;
+
+              const currentUsed = charge.usedCharges || 0;
+
+              // Don't go below 0
+              if (currentUsed <= 0) return charge;
+
+              return {
+                ...charge,
+                usedCharges: currentUsed - 1,
+              };
+            });
+
+            return {
+              ...item,
+              charges: updatedCharges,
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          return {
+            character: {
+              ...state.character,
+              magicItems: updatedMagicItems,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      setMagicItemChargeUsed: (itemId, chargeId, usedCount) => {
+        set(state => {
+          const updatedMagicItems = state.character.magicItems.map(item => {
+            if (item.id !== itemId || !item.charges) return item;
+
+            const updatedCharges = item.charges.map(charge => {
+              if (charge.id !== chargeId) return charge;
+
+              const maxCharges = calculateMagicItemChargeMax(
+                charge,
+                state.character.level
+              );
+
+              // Clamp between 0 and max
+              const clampedUsed = Math.max(0, Math.min(usedCount, maxCharges));
+
+              return {
+                ...charge,
+                usedCharges: clampedUsed,
+              };
+            });
+
+            return {
+              ...item,
+              charges: updatedCharges,
+              updatedAt: new Date().toISOString(),
+            };
+          });
 
           return {
             character: {

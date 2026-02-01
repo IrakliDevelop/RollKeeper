@@ -22,6 +22,8 @@ import {
   WeaponForm,
   MagicItemForm,
 } from './equipment';
+import type { WeaponChargeFormData } from './equipment/WeaponForm';
+import type { MagicItemChargeFormData } from './equipment/MagicItemForm';
 
 interface EquipmentModalProps {
   isOpen: boolean;
@@ -37,11 +39,8 @@ interface MagicItemFormData {
   requiresAttunement: boolean;
   isAttuned: boolean;
   isEquipped?: boolean;
-  charges?: {
-    current: number;
-    max: number;
-    rechargeRule?: string;
-  };
+  // Multiple charges
+  charges?: MagicItemChargeFormData[];
 }
 
 interface WeaponFormData {
@@ -62,6 +61,8 @@ interface WeaponFormData {
   manualProficiency?: boolean;
   requiresAttunement?: boolean;
   isAttuned?: boolean;
+  // Multiple weapon charges
+  charges?: WeaponChargeFormData[];
 }
 
 const initialMagicItemData: MagicItemFormData = {
@@ -73,6 +74,7 @@ const initialMagicItemData: MagicItemFormData = {
   requiresAttunement: false,
   isAttuned: false,
   isEquipped: false,
+  charges: [],
 };
 
 const initialWeaponData: WeaponFormData = {
@@ -98,6 +100,7 @@ const initialWeaponData: WeaponFormData = {
   manualProficiency: undefined,
   requiresAttunement: false,
   isAttuned: false,
+  charges: [],
 };
 
 export default function EquipmentModal({
@@ -111,6 +114,8 @@ export default function EquipmentModal({
     deleteMagicItem,
     attuneMagicItem,
     reorderMagicItems,
+    expendMagicItemCharge,
+    restoreMagicItemCharge,
     addWeapon,
     updateWeapon,
     deleteWeapon,
@@ -141,11 +146,32 @@ export default function EquipmentModal({
   const handleMagicItemSubmit = () => {
     if (!magicItemForm.name.trim()) return;
 
+    // Convert charges form data to MagicItemCharge[] with IDs
+    const chargesWithIds = (magicItemForm.charges || [])
+      .filter(charge => charge.name.trim()) // Only include charges with names
+      .map(charge => ({
+        id:
+          charge.id ||
+          `charge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: charge.name,
+        description: charge.description,
+        maxCharges: charge.maxCharges,
+        usedCharges: charge.usedCharges,
+        restType: charge.restType,
+        scaleWithProficiency: charge.scaleWithProficiency,
+        proficiencyMultiplier: charge.proficiencyMultiplier,
+      }));
+
+    const magicItemData = {
+      ...magicItemForm,
+      charges: chargesWithIds.length > 0 ? chargesWithIds : undefined,
+    };
+
     if (editingMagicItem) {
-      updateMagicItem(editingMagicItem.id, magicItemForm);
+      updateMagicItem(editingMagicItem.id, magicItemData);
       setEditingMagicItem(null);
     } else {
-      addMagicItem(magicItemForm);
+      addMagicItem(magicItemData);
     }
 
     setMagicItemForm(initialMagicItemData);
@@ -154,6 +180,22 @@ export default function EquipmentModal({
 
   const handleWeaponSubmit = () => {
     if (!weaponForm.name.trim()) return;
+
+    // Convert charges form data to WeaponCharge[] with IDs
+    const chargesWithIds = (weaponForm.charges || [])
+      .filter(charge => charge.name.trim()) // Only include charges with names
+      .map(charge => ({
+        id:
+          charge.id ||
+          `charge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: charge.name,
+        description: charge.description,
+        maxCharges: charge.maxCharges,
+        usedCharges: charge.usedCharges,
+        restType: charge.restType,
+        scaleWithProficiency: charge.scaleWithProficiency,
+        proficiencyMultiplier: charge.proficiencyMultiplier,
+      }));
 
     const weaponData = {
       ...weaponForm,
@@ -164,6 +206,7 @@ export default function EquipmentModal({
             long: weaponForm.range.long,
           }
         : undefined,
+      charges: chargesWithIds.length > 0 ? chargesWithIds : undefined,
     };
 
     if (editingWeapon) {
@@ -178,6 +221,20 @@ export default function EquipmentModal({
   };
 
   const handleEditMagicItem = (item: MagicItem) => {
+    // Convert MagicItemCharge[] to MagicItemChargeFormData[]
+    const chargesFormData: MagicItemChargeFormData[] = (item.charges || []).map(
+      charge => ({
+        id: charge.id,
+        name: charge.name,
+        description: charge.description,
+        maxCharges: charge.maxCharges,
+        usedCharges: charge.usedCharges,
+        restType: charge.restType,
+        scaleWithProficiency: charge.scaleWithProficiency,
+        proficiencyMultiplier: charge.proficiencyMultiplier,
+      })
+    );
+
     setMagicItemForm({
       name: item.name,
       category: item.category,
@@ -187,7 +244,7 @@ export default function EquipmentModal({
       requiresAttunement: item.requiresAttunement,
       isAttuned: item.isAttuned,
       isEquipped: item.isEquipped,
-      charges: item.charges,
+      charges: chargesFormData,
     });
     setEditingMagicItem(item);
     setShowMagicItemForm(true);
@@ -219,6 +276,20 @@ export default function EquipmentModal({
       ];
     }
 
+    // Convert WeaponCharge[] to WeaponChargeFormData[]
+    const chargesFormData: WeaponChargeFormData[] = (weapon.charges || []).map(
+      charge => ({
+        id: charge.id,
+        name: charge.name,
+        description: charge.description,
+        maxCharges: charge.maxCharges,
+        usedCharges: charge.usedCharges,
+        restType: charge.restType,
+        scaleWithProficiency: charge.scaleWithProficiency,
+        proficiencyMultiplier: charge.proficiencyMultiplier,
+      })
+    );
+
     setWeaponForm({
       name: weapon.name,
       category: weapon.category,
@@ -234,6 +305,7 @@ export default function EquipmentModal({
       manualProficiency: weapon.manualProficiency,
       requiresAttunement: weapon.requiresAttunement || false,
       isAttuned: weapon.isAttuned || false,
+      charges: chargesFormData,
     });
     setEditingWeapon(weapon);
     setShowWeaponForm(true);
@@ -389,9 +461,12 @@ export default function EquipmentModal({
                   renderItem={item => (
                     <MagicItemCard
                       item={item}
+                      characterLevel={character.level}
                       onEdit={handleEditMagicItem}
                       onDelete={deleteMagicItem}
                       onToggleAttunement={handleAttunement}
+                      onExpendCharge={expendMagicItemCharge}
+                      onRestoreCharge={restoreMagicItemCharge}
                     />
                   )}
                 />
