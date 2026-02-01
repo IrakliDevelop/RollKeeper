@@ -331,6 +331,18 @@ export interface WeaponDamage {
   label?: string; // Optional label like "Cold Damage", "Fire Damage", etc.
 }
 
+// Individual charge/ability for a weapon (e.g., "Cast Fireball", "Smite Evil")
+export interface WeaponCharge {
+  id: string; // Unique identifier for this charge type
+  name: string; // Name of the ability (e.g., "Cast Fireball", "Divine Smite")
+  description?: string; // Description of what this charge does
+  maxCharges: number; // Maximum number of charges
+  usedCharges: number; // Number of charges already used
+  restType: 'short' | 'long'; // When this charge recharges
+  scaleWithProficiency?: boolean; // If true, maxCharges scales with proficiency bonus
+  proficiencyMultiplier?: number; // Multiplier for proficiency bonus (default 1)
+}
+
 // Individual weapon/magic item
 export interface Weapon {
   id: string;
@@ -358,6 +370,8 @@ export interface Weapon {
   manualProficiency?: boolean; // Manual override for proficiency (undefined = use auto calculation)
   requiresAttunement?: boolean; // Whether this weapon requires attunement
   isAttuned?: boolean; // Whether character is attuned to this item
+  // Weapon charges - multiple charge types per weapon
+  charges?: WeaponCharge[]; // Array of different charge abilities
   createdAt: string;
   updatedAt: string;
 }
@@ -383,6 +397,18 @@ export type MagicItemRarity =
   | 'legendary'
   | 'artifact';
 
+// Individual charge/ability for a magic item (e.g., "Cast Fireball", "Teleport")
+export interface MagicItemCharge {
+  id: string; // Unique identifier for this charge type
+  name: string; // Name of the ability (e.g., "Cast Fireball", "Teleport")
+  description?: string; // Description of what this charge does
+  maxCharges: number; // Maximum number of charges
+  usedCharges: number; // Number of charges already used
+  restType: 'short' | 'long' | 'dawn'; // When this charge recharges (dawn for "at dawn" items)
+  scaleWithProficiency?: boolean; // If true, maxCharges scales with proficiency bonus
+  proficiencyMultiplier?: number; // Multiplier for proficiency bonus (default 1)
+}
+
 // Magic item interface
 export interface MagicItem {
   id: string;
@@ -394,10 +420,13 @@ export interface MagicItem {
   requiresAttunement: boolean;
   isAttuned: boolean;
   isEquipped?: boolean; // For wearable items
-  charges?: {
+  // Multiple charge types per magic item
+  charges?: MagicItemCharge[]; // Array of different charge abilities
+  // Legacy charges format for backward compatibility
+  legacyCharges?: {
     current: number;
     max: number;
-    rechargeRule?: string; // e.g., "1d6+1 at dawn", "all at dawn"
+    rechargeRule?: string;
   };
   createdAt: string;
   updatedAt: string;
