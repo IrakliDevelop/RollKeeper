@@ -15,7 +15,7 @@ function ThemeWrapper({
     document.documentElement.setAttribute('data-theme', theme);
     // Also set background color for the story container
     document.body.style.backgroundColor =
-      theme === 'dark' ? '#0f172a' : '#ffffff';
+      theme === 'dark' ? '#0f172a' : '#f8fafc';
     document.body.style.color = theme === 'dark' ? '#f1f5f9' : '#1e293b';
   }, [theme]);
 
@@ -25,7 +25,7 @@ function ThemeWrapper({
       style={{
         padding: '1rem',
         minHeight: '100vh',
-        backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff',
+        backgroundColor: theme === 'dark' ? '#0f172a' : '#f8fafc',
         color: theme === 'dark' ? '#f1f5f9' : '#1e293b',
       }}
     >

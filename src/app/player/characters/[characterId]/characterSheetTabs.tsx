@@ -72,11 +72,11 @@ export const createCharacterSheetTabsConfig = ({
               {/* Spellcasting Statistics - Full Width at Top */}
               <ErrorBoundary
                 fallback={
-                  <div className="rounded-lg border border-purple-200 bg-white p-4 shadow">
-                    <h3 className="mb-4 text-lg font-bold text-purple-800">
+                  <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
+                    <h3 className="text-accent-purple-text mb-4 text-lg font-bold">
                       Spellcasting Stats
                     </h3>
-                    <p className="text-gray-500">
+                    <p className="text-muted">
                       Unable to load spellcasting statistics
                     </p>
                   </div>
@@ -88,11 +88,11 @@ export const createCharacterSheetTabsConfig = ({
               {/* Enhanced Spell Management - Full Width */}
               <ErrorBoundary
                 fallback={
-                  <div className="rounded-lg border border-purple-200 bg-white p-4 shadow">
-                    <h3 className="mb-4 text-lg font-bold text-purple-800">
+                  <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
+                    <h3 className="text-accent-purple-text mb-4 text-lg font-bold">
                       Spells & Cantrips
                     </h3>
-                    <p className="text-gray-500">
+                    <p className="text-muted">
                       Unable to load spell management
                     </p>
                   </div>
@@ -122,11 +122,11 @@ export const createCharacterSheetTabsConfig = ({
           <TabContent>
             <ErrorBoundary
               fallback={
-                <div className="rounded-lg border border-red-200 bg-white p-6 shadow-lg">
-                  <h3 className="mb-4 text-lg font-bold text-red-800">
+                <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                  <h3 className="text-accent-red-text mb-4 text-lg font-bold">
                     Conditions & Diseases
                   </h3>
-                  <p className="text-gray-500">
+                  <p className="text-muted">
                     Unable to load conditions and diseases manager
                   </p>
                 </div>
@@ -135,10 +135,10 @@ export const createCharacterSheetTabsConfig = ({
               {hasHydrated ? (
                 <ConditionsDiseasesManager />
               ) : (
-                <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-lg">
+                <div className="border-divider bg-surface-raised rounded-lg border p-6 shadow-lg">
                   <div className="py-4 text-center">
-                    <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600"></div>
-                    <p className="mt-2 text-gray-600">
+                    <div className="border-accent-blue-text-muted mx-auto h-8 w-8 animate-spin rounded-full border-b-2"></div>
+                    <p className="text-body mt-2">
                       Loading conditions and diseases...
                     </p>
                   </div>
@@ -165,11 +165,11 @@ export const createCharacterSheetTabsConfig = ({
             <div className="max-w-none">
               <ErrorBoundary
                 fallback={
-                  <div className="rounded-lg border border-purple-200 bg-white p-6 shadow-lg">
-                    <h3 className="mb-4 text-lg font-bold text-purple-800">
+                  <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                    <h3 className="text-accent-purple-text mb-4 text-lg font-bold">
                       Inventory
                     </h3>
-                    <p className="text-gray-500">
+                    <p className="text-muted">
                       Unable to load inventory management
                     </p>
                   </div>
@@ -190,11 +190,11 @@ export const createCharacterSheetTabsConfig = ({
             <div className="mx-auto max-w-4xl">
               <ErrorBoundary
                 fallback={
-                  <div className="rounded-lg border border-yellow-200 bg-white p-6 shadow-lg">
-                    <h3 className="mb-4 text-lg font-bold text-amber-800">
+                  <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                    <h3 className="text-accent-amber-text mb-4 text-lg font-bold">
                       Currency
                     </h3>
-                    <p className="text-gray-500">
+                    <p className="text-muted">
                       Unable to load currency management
                     </p>
                   </div>
@@ -224,13 +224,11 @@ export const createCharacterSheetTabsConfig = ({
               {/* Features */}
               <ErrorBoundary
                 fallback={
-                  <div className="rounded-lg border border-amber-200 bg-white p-6 shadow-lg">
-                    <h3 className="mb-4 text-lg font-bold text-amber-800">
+                  <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                    <h3 className="text-accent-amber-text mb-4 text-lg font-bold">
                       Features
                     </h3>
-                    <p className="text-gray-500">
-                      Unable to load features editor
-                    </p>
+                    <p className="text-muted">Unable to load features editor</p>
                   </div>
                 }
               >
@@ -246,13 +244,11 @@ export const createCharacterSheetTabsConfig = ({
               {/* Traits */}
               <ErrorBoundary
                 fallback={
-                  <div className="rounded-lg border border-emerald-200 bg-white p-6 shadow-lg">
-                    <h3 className="mb-4 text-lg font-bold text-emerald-800">
+                  <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                    <h3 className="text-accent-emerald-text mb-4 text-lg font-bold">
                       Traits
                     </h3>
-                    <p className="text-gray-500">
-                      Unable to load traits editor
-                    </p>
+                    <p className="text-muted">Unable to load traits editor</p>
                   </div>
                 }
               >
@@ -269,11 +265,11 @@ export const createCharacterSheetTabsConfig = ({
               <div className="lg:col-span-2">
                 <ErrorBoundary
                   fallback={
-                    <div className="rounded-lg border border-emerald-200 bg-white p-6 shadow-lg">
-                      <h3 className="mb-4 text-lg font-bold text-emerald-800">
+                    <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                      <h3 className="text-accent-emerald-text mb-4 text-lg font-bold">
                         Character Background
                       </h3>
-                      <p className="text-gray-500">
+                      <p className="text-muted">
                         Unable to load background editor
                       </p>
                     </div>
@@ -296,13 +292,13 @@ export const createCharacterSheetTabsConfig = ({
         content: (
           <TabContent>
             <div className="max-w-none space-y-4">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-1 font-medium text-amber-800 shadow-sm">
+              <div className="text-body flex items-center gap-2 text-sm">
+                <span className="border-accent-amber-border text-accent-amber-text inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] px-3 py-1 font-medium shadow-sm">
                   <span className="text-base">📅</span>
                   Campaign Day {character.daysSpent || 0}
                 </span>
-                <span className="text-gray-400">•</span>
-                <span className="text-gray-500">
+                <span className="text-faint">•</span>
+                <span className="text-muted">
                   {Math.floor((character.daysSpent || 0) / 7) > 0 ? (
                     <>
                       Week {Math.floor((character.daysSpent || 0) / 7) + 1}, Day{' '}
@@ -316,11 +312,11 @@ export const createCharacterSheetTabsConfig = ({
 
               <ErrorBoundary
                 fallback={
-                  <div className="rounded-lg border border-blue-200 bg-white p-6 shadow-lg">
-                    <h3 className="mb-4 text-lg font-bold text-blue-800">
+                  <div className="border-accent-blue-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                    <h3 className="text-accent-blue-text mb-4 text-lg font-bold">
                       Notes
                     </h3>
-                    <p className="text-gray-500">Unable to load notes editor</p>
+                    <p className="text-muted">Unable to load notes editor</p>
                   </div>
                 }
               >

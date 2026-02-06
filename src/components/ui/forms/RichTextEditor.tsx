@@ -69,10 +69,10 @@ export default function RichTextEditor({
   if (!isMounted || !editor) {
     return (
       <div
-        className={`rounded-lg border border-gray-300 bg-gray-50 ${className}`}
+        className={`border-divider bg-surface-secondary rounded-lg border ${className}`}
         style={{ minHeight }}
       >
-        <div className="flex h-full items-center justify-center text-gray-500">
+        <div className="text-muted flex h-full items-center justify-center">
           Loading editor...
         </div>
       </div>
@@ -81,18 +81,20 @@ export default function RichTextEditor({
 
   return (
     <div
-      className={`overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm ${className}`}
+      className={`border-divider bg-surface-raised overflow-hidden rounded-lg border shadow-sm ${className}`}
     >
       {/* Fixed Toolbar */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50 p-3">
+      <div className="border-divider bg-surface-secondary flex flex-wrap items-center gap-1 border-b p-3">
         {/* Text Formatting */}
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => editor.chain().focus().toggleBold().run()}
             disabled={!editor.can().chain().focus().toggleBold().run()}
-            className={`rounded p-2 text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 ${
-              editor.isActive('bold') ? 'bg-blue-200 text-blue-900' : ''
+            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              editor.isActive('bold')
+                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
+                : ''
             }`}
             title="Bold"
           >
@@ -103,8 +105,10 @@ export default function RichTextEditor({
             type="button"
             onClick={() => editor.chain().focus().toggleItalic().run()}
             disabled={!editor.can().chain().focus().toggleItalic().run()}
-            className={`rounded p-2 text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 ${
-              editor.isActive('italic') ? 'bg-blue-200 text-blue-900' : ''
+            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              editor.isActive('italic')
+                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
+                : ''
             }`}
             title="Italic"
           >
@@ -115,8 +119,10 @@ export default function RichTextEditor({
             type="button"
             onClick={() => editor.chain().focus().toggleUnderline().run()}
             disabled={!editor.can().chain().focus().toggleUnderline().run()}
-            className={`rounded p-2 text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 ${
-              editor.isActive('underline') ? 'bg-blue-200 text-blue-900' : ''
+            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              editor.isActive('underline')
+                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
+                : ''
             }`}
             title="Underline"
           >
@@ -127,8 +133,10 @@ export default function RichTextEditor({
             type="button"
             onClick={() => editor.chain().focus().toggleStrike().run()}
             disabled={!editor.can().chain().focus().toggleStrike().run()}
-            className={`rounded p-2 text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 ${
-              editor.isActive('strike') ? 'bg-blue-200 text-blue-900' : ''
+            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              editor.isActive('strike')
+                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
+                : ''
             }`}
             title="Strikethrough"
           >
@@ -139,8 +147,10 @@ export default function RichTextEditor({
             type="button"
             onClick={() => editor.chain().focus().toggleCode().run()}
             disabled={!editor.can().chain().focus().toggleCode().run()}
-            className={`rounded p-2 text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 ${
-              editor.isActive('code') ? 'bg-blue-200 text-blue-900' : ''
+            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              editor.isActive('code')
+                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
+                : ''
             }`}
             title="Inline Code"
           >
@@ -148,7 +158,7 @@ export default function RichTextEditor({
           </button>
         </div>
 
-        <div className="mx-2 h-6 w-px bg-gray-300" />
+        <div className="bg-divider mx-2 h-6 w-px" />
 
         {/* Headings */}
         <div className="flex items-center gap-1">
@@ -157,9 +167,9 @@ export default function RichTextEditor({
             onClick={() =>
               editor.chain().focus().toggleHeading({ level: 1 }).run()
             }
-            className={`rounded p-2 text-gray-600 transition-colors hover:bg-gray-200 ${
+            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors ${
               editor.isActive('heading', { level: 1 })
-                ? 'bg-blue-200 text-blue-900'
+                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
                 : ''
             }`}
             title="Heading 1"
@@ -172,9 +182,9 @@ export default function RichTextEditor({
             onClick={() =>
               editor.chain().focus().toggleHeading({ level: 2 }).run()
             }
-            className={`rounded p-2 text-gray-600 transition-colors hover:bg-gray-200 ${
+            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors ${
               editor.isActive('heading', { level: 2 })
-                ? 'bg-blue-200 text-blue-900'
+                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
                 : ''
             }`}
             title="Heading 2"
@@ -187,9 +197,9 @@ export default function RichTextEditor({
             onClick={() =>
               editor.chain().focus().toggleHeading({ level: 3 }).run()
             }
-            className={`rounded p-2 text-gray-600 transition-colors hover:bg-gray-200 ${
+            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors ${
               editor.isActive('heading', { level: 3 })
-                ? 'bg-blue-200 text-blue-900'
+                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
                 : ''
             }`}
             title="Heading 3"
@@ -198,15 +208,17 @@ export default function RichTextEditor({
           </button>
         </div>
 
-        <div className="mx-2 h-6 w-px bg-gray-300" />
+        <div className="bg-divider mx-2 h-6 w-px" />
 
         {/* Lists and Blocks */}
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => editor.chain().focus().toggleBulletList().run()}
-            className={`rounded p-2 text-gray-600 transition-colors hover:bg-gray-200 ${
-              editor.isActive('bulletList') ? 'bg-blue-200 text-blue-900' : ''
+            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors ${
+              editor.isActive('bulletList')
+                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
+                : ''
             }`}
             title="Bullet List"
           >
@@ -216,8 +228,10 @@ export default function RichTextEditor({
           <button
             type="button"
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            className={`rounded p-2 text-gray-600 transition-colors hover:bg-gray-200 ${
-              editor.isActive('orderedList') ? 'bg-blue-200 text-blue-900' : ''
+            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors ${
+              editor.isActive('orderedList')
+                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
+                : ''
             }`}
             title="Numbered List"
           >
@@ -227,8 +241,10 @@ export default function RichTextEditor({
           <button
             type="button"
             onClick={() => editor.chain().focus().toggleBlockquote().run()}
-            className={`rounded p-2 text-gray-600 transition-colors hover:bg-gray-200 ${
-              editor.isActive('blockquote') ? 'bg-blue-200 text-blue-900' : ''
+            className={`text-body hover:bg-surface-hover rounded p-2 transition-colors ${
+              editor.isActive('blockquote')
+                ? 'bg-accent-blue-bg-strong text-accent-blue-text'
+                : ''
             }`}
             title="Blockquote"
           >
@@ -238,14 +254,14 @@ export default function RichTextEditor({
           <button
             type="button"
             onClick={() => editor.chain().focus().setHorizontalRule().run()}
-            className="rounded p-2 text-gray-600 transition-colors hover:bg-gray-200"
+            className="text-body hover:bg-surface-hover rounded p-2 transition-colors"
             title="Horizontal Rule"
           >
             <Minus size={16} />
           </button>
         </div>
 
-        <div className="mx-2 h-6 w-px bg-gray-300" />
+        <div className="bg-divider mx-2 h-6 w-px" />
 
         {/* Utility */}
         <div className="flex items-center gap-1">
@@ -254,7 +270,7 @@ export default function RichTextEditor({
             onClick={() =>
               editor.chain().focus().clearNodes().unsetAllMarks().run()
             }
-            className="rounded p-2 text-gray-600 transition-colors hover:bg-gray-200"
+            className="text-body hover:bg-surface-hover rounded p-2 transition-colors"
             title="Clear Formatting"
           >
             <Type size={16} />
@@ -269,7 +285,7 @@ export default function RichTextEditor({
             type="button"
             onClick={() => editor.chain().focus().undo().run()}
             disabled={!editor.can().chain().focus().undo().run()}
-            className="rounded p-2 text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+            className="text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             title="Undo"
           >
             <Undo size={16} />
@@ -279,7 +295,7 @@ export default function RichTextEditor({
             type="button"
             onClick={() => editor.chain().focus().redo().run()}
             disabled={!editor.can().chain().focus().redo().run()}
-            className="rounded p-2 text-gray-600 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+            className="text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             title="Redo"
           >
             <Redo size={16} />
@@ -288,12 +304,12 @@ export default function RichTextEditor({
       </div>
 
       {/* Editor Container */}
-      <div className="relative bg-white" style={{ minHeight }}>
+      <div className="bg-surface-raised relative" style={{ minHeight }}>
         <EditorContent editor={editor} className="rich-text-editor-content" />
 
         {/* Placeholder when empty */}
         {editor.isEmpty && (
-          <div className="pointer-events-none absolute top-4 left-4 text-gray-400">
+          <div className="text-faint pointer-events-none absolute top-4 left-4">
             {placeholder}
           </div>
         )}
@@ -303,17 +319,17 @@ export default function RichTextEditor({
       <style jsx global>{`
         .rich-text-editor-content .ProseMirror {
           outline: none !important;
-          color: #1f2937;
+          color: var(--heading);
           font-family:
             -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background-color: white !important;
+          background-color: var(--surface-raised, white) !important;
           min-height: inherit !important;
           height: 100% !important;
         }
 
         /* Ensure editor content container fills available space */
         .rich-text-editor-content {
-          background-color: white !important;
+          background-color: var(--surface-raised, white) !important;
           min-height: inherit !important;
           height: 100% !important;
         }
@@ -329,7 +345,7 @@ export default function RichTextEditor({
           font-weight: 800 !important;
           line-height: 1.2 !important;
           margin: 2rem 0 1rem 0 !important;
-          color: #111827 !important;
+          color: var(--heading) !important;
           display: block !important;
         }
 
@@ -338,7 +354,7 @@ export default function RichTextEditor({
           font-weight: 700 !important;
           line-height: 1.3 !important;
           margin: 1.5rem 0 0.75rem 0 !important;
-          color: #111827 !important;
+          color: var(--heading) !important;
           display: block !important;
         }
 
@@ -347,7 +363,7 @@ export default function RichTextEditor({
           font-weight: 600 !important;
           line-height: 1.4 !important;
           margin: 1.25rem 0 0.5rem 0 !important;
-          color: #111827 !important;
+          color: var(--heading) !important;
           display: block !important;
         }
 
@@ -404,15 +420,15 @@ export default function RichTextEditor({
 
         /* Code */
         .rich-text-editor-content .ProseMirror code {
-          background-color: #f3f4f6 !important;
-          color: #dc2626 !important;
+          background-color: var(--surface-secondary) !important;
+          color: var(--accent-red-text) !important;
           padding: 0.25rem 0.375rem !important;
           border-radius: 0.25rem !important;
           font-size: 0.875em !important;
           font-family:
             'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New',
             monospace !important;
-          border: 1px solid #e5e7eb !important;
+          border: 1px solid var(--divider) !important;
         }
 
         .rich-text-editor-content .ProseMirror pre {
@@ -439,19 +455,19 @@ export default function RichTextEditor({
         /* Blockquote */
         .rich-text-editor-content .ProseMirror blockquote {
           padding: 1rem !important;
-          border-left: 4px solid #3b82f6 !important;
+          border-left: 4px solid var(--accent-blue-border-strong) !important;
           margin: 1rem 0 !important;
           font-style: italic !important;
-          color: #6b7280 !important;
+          color: var(--muted) !important;
           display: block !important;
-          background-color: #f8fafc !important;
+          background-color: var(--surface-secondary) !important;
           border-radius: 0.5rem !important;
         }
 
         /* Horizontal Rule */
         .rich-text-editor-content .ProseMirror hr {
           border: none !important;
-          border-top: 2px solid #e5e7eb !important;
+          border-top: 2px solid var(--divider) !important;
           margin: 2rem 0 !important;
           display: block !important;
           width: 100% !important;

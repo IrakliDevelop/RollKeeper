@@ -31,21 +31,24 @@ export default function RestManager({
 
   return (
     <div className={className}>
-      <p className="mb-4 text-sm text-gray-600">
-        Take a rest to restore your character&apos;s resources, abilities, and hit points.
+      <p className="text-body mb-4 text-sm">
+        Take a rest to restore your character&apos;s resources, abilities, and
+        hit points.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Short Rest */}
-        <div className="flex flex-col rounded-lg border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 p-4 shadow-sm">
+        <div className="border-accent-blue-border flex flex-col rounded-lg border-2 bg-gradient-to-br from-[var(--gradient-blue-from)] to-[var(--gradient-blue-to)] p-4 shadow-sm">
           <div className="mb-3 flex items-center gap-2">
             <div className="rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600 p-2 shadow-md">
               <Sun size={20} className="text-white" />
             </div>
-            <h4 className="text-lg font-semibold text-blue-900">Short Rest</h4>
+            <h4 className="text-accent-blue-text text-lg font-semibold">
+              Short Rest
+            </h4>
           </div>
-          
-          <div className="mb-4 flex-1 space-y-1 text-xs text-blue-800">
+
+          <div className="text-accent-blue-text mb-4 flex-1 space-y-1 text-xs">
             <p>• Restores short rest abilities</p>
             <p>• Restores Pact Magic slots (Warlock)</p>
             <p>• Resets reaction usage</p>
@@ -65,15 +68,17 @@ export default function RestManager({
         </div>
 
         {/* Long Rest */}
-        <div className="flex flex-col rounded-lg border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-sm">
+        <div className="border-accent-indigo-border flex flex-col rounded-lg border-2 bg-gradient-to-br from-[var(--gradient-indigo-from)] to-[var(--gradient-purple-to)] p-4 shadow-sm">
           <div className="mb-3 flex items-center gap-2">
             <div className="rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 p-2 shadow-md">
               <Moon size={20} className="text-white" />
             </div>
-            <h4 className="text-lg font-semibold text-indigo-900">Long Rest</h4>
+            <h4 className="text-accent-indigo-text text-lg font-semibold">
+              Long Rest
+            </h4>
           </div>
-          
-          <div className="mb-4 flex-1 space-y-1 text-xs text-indigo-800">
+
+          <div className="text-accent-indigo-text mb-4 flex-1 space-y-1 text-xs">
             <p>• Restores ALL abilities</p>
             <p>• Restores ALL spell slots</p>
             <p>• Restores ALL hit dice</p>
@@ -95,12 +100,12 @@ export default function RestManager({
         </div>
       </div>
 
-      <div className="mt-4 rounded-lg bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 p-3">
-        <p className="text-xs text-amber-900">
-          <strong>Note:</strong> Individual reset buttons in each section still work independently if you need fine-grained control.
+      <div className="border-accent-amber-border mt-4 rounded-lg border bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] p-3">
+        <p className="text-accent-amber-text text-xs">
+          <strong>Note:</strong> Individual reset buttons in each section still
+          work independently if you need fine-grained control.
         </p>
       </div>
     </div>
   );
 }
-

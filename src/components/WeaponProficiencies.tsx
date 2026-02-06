@@ -59,9 +59,9 @@ export const WeaponProficiencies: React.FC = () => {
   };
 
   return (
-    <div className="rounded-lg border border-amber-200 bg-white p-4 shadow-lg">
-      <h2 className="mb-3 flex items-center gap-2 border-b border-gray-200 pb-2 text-lg font-bold text-gray-800">
-        <Shield className="text-blue-600" size={20} />
+    <div className="border-divider bg-surface-raised rounded-lg border p-4 shadow-lg">
+      <h2 className="border-divider text-heading mb-3 flex items-center gap-2 border-b pb-2 text-lg font-bold">
+        <Shield className="text-accent-blue-text-muted" size={20} />
         Weapon Proficiencies
       </h2>
 
@@ -74,7 +74,7 @@ export const WeaponProficiencies: React.FC = () => {
             label="Simple Weapons"
             size="sm"
             variant="primary"
-            className="rounded-lg p-2 transition-colors hover:bg-blue-50"
+            className="hover:bg-surface-hover rounded-lg p-2 transition-colors"
           />
 
           <Checkbox
@@ -83,13 +83,13 @@ export const WeaponProficiencies: React.FC = () => {
             label="Martial Weapons"
             size="sm"
             variant="primary"
-            className="rounded-lg p-2 transition-colors hover:bg-blue-50"
+            className="hover:bg-surface-hover rounded-lg p-2 transition-colors"
           />
         </div>
 
         {/* Specific Weapons */}
         <div className="mt-4">
-          <h4 className="mb-2 text-sm font-semibold text-gray-700">
+          <h4 className="text-body mb-2 text-sm font-semibold">
             Specific Weapons
           </h4>
 
@@ -120,14 +120,14 @@ export const WeaponProficiencies: React.FC = () => {
               (weapon, index) => (
                 <span
                   key={index}
-                  className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800"
+                  className="bg-accent-green-bg text-accent-green-text inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium"
                 >
                   {weapon}
                   <Button
                     onClick={() => removeSpecificWeapon(weapon)}
                     variant="ghost"
                     size="xs"
-                    className="ml-1 h-auto p-0 text-green-600 hover:bg-transparent hover:text-green-800"
+                    className="text-accent-green-text hover:text-accent-green-text ml-1 h-auto p-0 hover:bg-transparent"
                   >
                     <X size={12} />
                   </Button>
@@ -137,7 +137,7 @@ export const WeaponProficiencies: React.FC = () => {
           </div>
 
           {character.weaponProficiencies.specificWeapons.length === 0 && (
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="text-muted mt-1 text-xs">
               No specific weapon proficiencies
             </p>
           )}

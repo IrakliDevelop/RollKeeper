@@ -61,28 +61,28 @@ export default function FeaturesNavigationSection() {
 
   return (
     <section className="mx-auto mb-8 max-w-7xl">
-      <div className="relative overflow-hidden rounded-xl border-2 border-slate-300 bg-gradient-to-r from-slate-50 to-slate-100 shadow-lg backdrop-blur-sm">
+      <div className="border-divider-strong from-surface-secondary to-surface-inset relative overflow-hidden rounded-xl border-2 bg-gradient-to-r shadow-lg backdrop-blur-sm">
         {/* Background decoration */}
-        <div className="absolute top-0 right-0 h-32 w-32 rounded-full bg-gradient-to-br from-slate-400/10 to-slate-500/10 blur-2xl"></div>
-        <div className="absolute bottom-0 left-0 h-24 w-24 rounded-full bg-gradient-to-tr from-slate-300/10 to-slate-400/10 blur-xl"></div>
+        <div className="from-surface-secondary/10 to-surface-inset/10 absolute top-0 right-0 h-32 w-32 rounded-full bg-gradient-to-br blur-2xl"></div>
+        <div className="from-surface-secondary/10 to-surface-inset/10 absolute bottom-0 left-0 h-24 w-24 rounded-full bg-gradient-to-tr blur-xl"></div>
 
         <div className="relative">
           {/* Collapsible Header */}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="w-full rounded-t-xl p-6 text-left transition-colors hover:bg-slate-200/50"
+            className="hover:bg-surface-hover w-full rounded-t-xl p-6 text-left transition-colors"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-gradient-to-br from-slate-600 to-slate-700 p-2 shadow-md">
-                  <Book className="h-5 w-5 text-white" />
+                <div className="from-surface-secondary to-surface-inset rounded-lg bg-gradient-to-br p-2 shadow-md">
+                  <Book className="text-inverse h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="flex items-center gap-2 text-2xl font-bold text-slate-800">
+                  <h2 className="text-heading flex items-center gap-2 text-2xl font-bold">
                     🎯 D&D Resources & Tools
                   </h2>
                   {!isExpanded && (
-                    <p className="mt-1 text-sm text-slate-600">
+                    <p className="text-muted mt-1 text-sm">
                       Spellbook, Classes, and more D&D content...
                     </p>
                   )}
@@ -92,7 +92,7 @@ export default function FeaturesNavigationSection() {
                 className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
               >
                 <svg
-                  className="h-5 w-5 text-slate-600"
+                  className="text-muted h-5 w-5"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -117,10 +117,10 @@ export default function FeaturesNavigationSection() {
             }`}
           >
             <div className="px-6 pb-6">
-              <div className="border-t border-slate-300/50 pt-6">
+              <div className="border-divider/50 border-t pt-6">
                 {/* Description */}
                 <div className="mb-6 text-center">
-                  <p className="text-slate-600">
+                  <p className="text-muted">
                     Explore comprehensive D&D content and tools to enhance your
                     gameplay
                   </p>
@@ -135,7 +135,7 @@ export default function FeaturesNavigationSection() {
                       return (
                         <div
                           key={item.title}
-                          className="relative rounded-lg border-2 border-slate-200 bg-white p-4 opacity-60 shadow-sm"
+                          className="border-divider bg-surface-raised relative rounded-lg border-2 p-4 opacity-60 shadow-sm"
                         >
                           {/* Coming Soon Badge */}
                           {item.comingSoon && (
@@ -150,16 +150,16 @@ export default function FeaturesNavigationSection() {
                             >
                               <IconComponent className="h-5 w-5 text-white" />
                             </div>
-                            <h3 className="font-semibold text-slate-800">
+                            <h3 className="text-heading font-semibold">
                               {item.title}
                             </h3>
                           </div>
 
-                          <p className="mb-3 text-sm text-slate-500">
+                          <p className="text-muted mb-3 text-sm">
                             {item.description}
                           </p>
 
-                          <div className="text-xs font-medium text-slate-400">
+                          <div className="text-faint text-xs font-medium">
                             Coming Soon...
                           </div>
                         </div>
@@ -170,7 +170,7 @@ export default function FeaturesNavigationSection() {
                       <Link
                         key={item.title}
                         href={item.href}
-                        className="group relative rounded-lg border-2 border-slate-200 bg-white p-4 shadow-sm transition-all hover:scale-105 hover:border-slate-300 hover:shadow-lg"
+                        className="group border-divider bg-surface-raised hover:border-divider-strong relative rounded-lg border-2 p-4 shadow-sm transition-all hover:scale-105 hover:shadow-lg"
                       >
                         <div className="mb-3 flex items-center gap-3">
                           <div
@@ -178,20 +178,20 @@ export default function FeaturesNavigationSection() {
                           >
                             <IconComponent className="h-5 w-5 text-white" />
                           </div>
-                          <h3 className="font-semibold text-slate-800 transition-colors group-hover:text-slate-900">
+                          <h3 className="text-heading font-semibold transition-colors">
                             {item.title}
                           </h3>
                         </div>
 
-                        <p className="mb-3 text-sm text-slate-600 transition-colors group-hover:text-slate-700">
+                        <p className="text-muted group-hover:text-body mb-3 text-sm transition-colors">
                           {item.description}
                         </p>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-slate-500">
+                          <span className="text-muted text-xs font-medium">
                             Click to explore
                           </span>
-                          <div className="text-slate-400 transition-colors group-hover:text-slate-600">
+                          <div className="text-faint group-hover:text-muted transition-colors">
                             →
                           </div>
                         </div>
@@ -201,8 +201,8 @@ export default function FeaturesNavigationSection() {
                 </div>
 
                 {/* Bottom accent line */}
-                <div className="mt-6 border-t border-slate-300 pt-4">
-                  <p className="text-center text-xs text-slate-500">
+                <div className="border-divider mt-6 border-t pt-4">
+                  <p className="text-muted text-center text-xs">
                     More tools and resources coming soon to enhance your D&D
                     experience!
                   </p>

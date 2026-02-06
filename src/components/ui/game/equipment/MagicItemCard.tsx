@@ -79,14 +79,14 @@ export function MagicItemCard({
       <div
         className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${
           item.isEquipped
-            ? 'border-purple-300 bg-white'
-            : 'border-gray-200 bg-white hover:border-gray-300'
+            ? 'border-accent-purple-border-strong bg-surface-raised'
+            : 'border-divider bg-surface-raised hover:border-divider-strong'
         }`}
       >
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="mb-2 flex flex-wrap items-center gap-2">
-              <h4 className="font-bold text-gray-800">{item.name}</h4>
+              <h4 className="text-heading font-bold">{item.name}</h4>
               <Badge variant={getRarityVariant(item.rarity)} size="sm">
                 {item.rarity}
               </Badge>
@@ -100,11 +100,11 @@ export function MagicItemCard({
               )}
             </div>
 
-            <div className="mb-2 text-sm text-gray-600 capitalize">
+            <div className="text-muted mb-2 text-sm capitalize">
               {item.category}
             </div>
 
-            <p className="mb-2 text-sm text-gray-700">{item.description}</p>
+            <p className="text-body mb-2 text-sm">{item.description}</p>
 
             {/* Charges display - compact with +/- controls */}
             {hasCharges && (
@@ -124,8 +124,8 @@ export function MagicItemCard({
                       key={charge.id}
                       className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 ${
                         isExhausted
-                          ? 'border-red-200 bg-red-50'
-                          : 'border-purple-200 bg-purple-50'
+                          ? 'border-accent-red-border bg-accent-red-bg'
+                          : 'border-accent-purple-border bg-accent-purple-bg'
                       }`}
                     >
                       {/* Clickable name to open details */}
@@ -137,10 +137,12 @@ export function MagicItemCard({
                         <Sparkles
                           size={12}
                           className={
-                            isExhausted ? 'text-red-500' : 'text-purple-600'
+                            isExhausted
+                              ? 'text-accent-red-text-muted'
+                              : 'text-accent-purple-text-muted'
                           }
                         />
-                        <span className="max-w-[120px] truncate text-xs font-medium text-gray-800">
+                        <span className="text-heading max-w-[120px] truncate text-xs font-medium">
                           {charge.name || 'Ability'}
                         </span>
                       </button>
@@ -155,8 +157,8 @@ export function MagicItemCard({
                           disabled={isFull}
                           className={`rounded p-0.5 ${
                             isFull
-                              ? 'cursor-not-allowed text-gray-300'
-                              : 'text-green-600 hover:bg-green-100'
+                              ? 'text-faint cursor-not-allowed'
+                              : 'text-accent-green-text-muted hover:bg-accent-green-bg'
                           }`}
                           title="Restore charge"
                         >
@@ -165,10 +167,10 @@ export function MagicItemCard({
                         <span
                           className={`min-w-[28px] text-center text-xs font-bold ${
                             isExhausted
-                              ? 'text-red-600'
+                              ? 'text-accent-red-text-muted'
                               : chargesRemaining <= 1
-                                ? 'text-orange-600'
-                                : 'text-purple-600'
+                                ? 'text-accent-orange-text-muted'
+                                : 'text-accent-purple-text-muted'
                           }`}
                         >
                           {chargesRemaining}/{maxCharges}
@@ -181,8 +183,8 @@ export function MagicItemCard({
                           disabled={isExhausted}
                           className={`rounded p-0.5 ${
                             isExhausted
-                              ? 'cursor-not-allowed text-gray-300'
-                              : 'text-red-600 hover:bg-red-100'
+                              ? 'text-faint cursor-not-allowed'
+                              : 'text-accent-red-text-muted hover:bg-accent-red-bg'
                           }`}
                           title="Use charge"
                         >
@@ -191,7 +193,7 @@ export function MagicItemCard({
                       </div>
 
                       {/* Rest type indicator */}
-                      <div className="ml-1 flex items-center gap-0.5 text-[10px] text-gray-500">
+                      <div className="text-muted ml-1 flex items-center gap-0.5 text-[10px]">
                         {getRestTypeIcon(charge.restType)}
                         <span>{getRestTypeLabel(charge.restType)}</span>
                       </div>
@@ -216,7 +218,7 @@ export function MagicItemCard({
                 variant="ghost"
                 size="xs"
                 title="Edit item"
-                className="text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+                className="text-accent-blue-text-muted hover:bg-surface-hover hover:text-accent-blue-text"
               >
                 <Edit2 size={16} />
               </Button>
@@ -225,7 +227,7 @@ export function MagicItemCard({
                 variant="ghost"
                 size="xs"
                 title="Delete item"
-                className="text-red-600 hover:bg-red-50 hover:text-red-800"
+                className="text-accent-red-text-muted hover:bg-surface-hover hover:text-accent-red-text"
               >
                 <Trash2 size={16} />
               </Button>
@@ -237,8 +239,8 @@ export function MagicItemCard({
                 size="sm"
                 className={
                   item.isAttuned
-                    ? 'bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'
-                    : 'hover:border-purple-300 hover:bg-purple-50'
+                    ? 'bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'
+                    : 'hover:border-accent-purple-border hover:bg-surface-hover'
                 }
               >
                 {item.isAttuned ? 'Unattune' : 'Attune'}
@@ -258,34 +260,31 @@ export function MagicItemCard({
         >
           <div className="space-y-4">
             {/* Item name */}
-            <div className="text-sm text-gray-500">
-              From:{' '}
-              <span className="font-medium text-gray-700">{item.name}</span>
+            <div className="text-muted text-sm">
+              From: <span className="text-body font-medium">{item.name}</span>
             </div>
 
             {/* Description */}
             {selectedCharge.description ? (
-              <div className="prose prose-sm max-w-none">
+              <div className="prose prose-sm dark:prose-invert max-w-none">
                 <div
                   dangerouslySetInnerHTML={{
                     __html: selectedCharge.description,
                   }}
-                  className="text-gray-700"
+                  className="text-body"
                 />
               </div>
             ) : (
-              <p className="text-sm text-gray-500 italic">
+              <p className="text-muted text-sm italic">
                 No description provided.
               </p>
             )}
 
             {/* Charges info */}
-            <div className="rounded-lg border border-purple-200 bg-purple-50 p-3">
+            <div className="border-accent-purple-border bg-accent-purple-bg rounded-lg border p-3">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">
-                  Charges
-                </span>
-                <div className="flex items-center gap-1 text-xs text-gray-500">
+                <span className="text-body text-sm font-medium">Charges</span>
+                <div className="text-muted flex items-center gap-1 text-xs">
                   {getRestTypeIcon(selectedCharge.restType)}
                   <span className="capitalize">
                     Recharges{' '}
@@ -329,7 +328,7 @@ export function MagicItemCard({
                       size="sm"
                       disabled={isFull}
                       leftIcon={<Plus size={14} />}
-                      className="border-green-300 text-green-600 hover:bg-green-50"
+                      className="border-accent-green-border text-accent-green-text-muted hover:bg-accent-green-bg"
                     >
                       Restore
                     </Button>
@@ -338,17 +337,15 @@ export function MagicItemCard({
                       <span
                         className={`text-2xl font-bold ${
                           isExhausted
-                            ? 'text-red-600'
+                            ? 'text-accent-red-text-muted'
                             : chargesRemaining <= 1
-                              ? 'text-orange-600'
-                              : 'text-purple-600'
+                              ? 'text-accent-orange-text-muted'
+                              : 'text-accent-purple-text-muted'
                         }`}
                       >
                         {chargesRemaining}
                       </span>
-                      <span className="text-lg text-gray-500">
-                        /{maxCharges}
-                      </span>
+                      <span className="text-muted text-lg">/{maxCharges}</span>
                     </div>
 
                     <Button
@@ -375,7 +372,7 @@ export function MagicItemCard({
                       size="sm"
                       disabled={isExhausted}
                       leftIcon={<Minus size={14} />}
-                      className="border-red-300 text-red-600 hover:bg-red-50"
+                      className="border-accent-red-border text-accent-red-text-muted hover:bg-accent-red-bg"
                     >
                       Use
                     </Button>
@@ -394,14 +391,14 @@ export function MagicItemCard({
                 const isExhausted = chargesRemaining <= 0;
 
                 return maxCharges > 1 ? (
-                  <div className="mt-3 h-2 w-full rounded-full bg-gray-200">
+                  <div className="bg-surface-hover mt-3 h-2 w-full rounded-full">
                     <div
                       className={`h-2 rounded-full transition-all duration-300 ${
                         isExhausted
-                          ? 'bg-red-500'
+                          ? 'bg-accent-red-bg-strong'
                           : chargesRemaining <= 1
-                            ? 'bg-orange-500'
-                            : 'bg-purple-500'
+                            ? 'bg-accent-orange-bg-strong'
+                            : 'bg-accent-purple-bg-strong'
                       }`}
                       style={{
                         width: `${(chargesRemaining / maxCharges) * 100}%`,
@@ -414,7 +411,7 @@ export function MagicItemCard({
 
             {/* Proficiency scaling info */}
             {selectedCharge.scaleWithProficiency && (
-              <p className="text-xs text-gray-500">
+              <p className="text-muted text-xs">
                 <Info size={12} className="mr-1 inline" />
                 Scales with proficiency bonus (×
                 {selectedCharge.proficiencyMultiplier || 1})

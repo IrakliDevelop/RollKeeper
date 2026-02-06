@@ -1,6 +1,6 @@
 /**
  * RadioGroup Component
- * 
+ *
  * A radio button group component built on Radix UI RadioGroup primitive.
  * Supports labels, descriptions, icons, and card-style layout.
  */
@@ -100,7 +100,7 @@ const RadioGroupItem = React.forwardRef<
         ref={ref}
         className={cn(
           sizeStyle.radio,
-          'aspect-square shrink-0 rounded-full border-2 border-gray-400 text-white ring-offset-white transition-colors',
+          'border-divider-strong ring-offset-surface aspect-square shrink-0 rounded-full border-2 text-white transition-colors',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
           'disabled:cursor-not-allowed disabled:opacity-50',
           'data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600',
@@ -129,10 +129,7 @@ const RadioGroupItem = React.forwardRef<
           {(label || icon) && (
             <div className="flex items-center gap-2">
               {icon && (
-                <span
-                  className="flex-shrink-0 text-gray-500"
-                  aria-hidden="true"
-                >
+                <span className="text-muted flex-shrink-0" aria-hidden="true">
                   {icon}
                 </span>
               )}
@@ -140,7 +137,7 @@ const RadioGroupItem = React.forwardRef<
                 <span
                   className={cn(
                     sizeStyle.text,
-                    'font-medium text-gray-900 transition-colors group-hover:text-gray-700'
+                    'text-heading group-hover:text-body font-medium transition-colors'
                   )}
                 >
                   {label}
@@ -149,7 +146,7 @@ const RadioGroupItem = React.forwardRef<
             </div>
           )}
           {description && (
-            <span className="mt-1 text-xs text-gray-600">{description}</span>
+            <span className="text-body mt-1 text-xs">{description}</span>
           )}
         </div>
       </>
@@ -159,9 +156,9 @@ const RadioGroupItem = React.forwardRef<
       return (
         <label
           className={cn(
-            'group flex items-start rounded-lg border-2 border-gray-200 bg-white p-4 transition-all',
-            'hover:border-gray-300 hover:shadow-sm',
-            'has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50',
+            'group border-divider bg-surface-raised flex items-start rounded-lg border-2 p-4 transition-all',
+            'hover:border-divider-strong hover:shadow-sm',
+            'has-[:checked]:bg-accent-emerald-bg has-[:checked]:border-emerald-500',
             disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
             sizeStyle.gap,
             wrapperClassName
@@ -232,7 +229,7 @@ const RadioGroupField = React.forwardRef<
     return (
       <div className={cn('w-full', wrapperClassName)}>
         {label && (
-          <div className="mb-2 block text-sm font-medium text-gray-800">
+          <div className="text-heading mb-2 block text-sm font-medium">
             {label}
             {required && (
               <span className="ml-1 text-red-500" aria-label="required">
@@ -250,7 +247,7 @@ const RadioGroupField = React.forwardRef<
           <p
             className={cn(
               'mt-2 text-sm',
-              error ? 'text-red-600' : 'text-gray-600'
+              error ? 'text-red-600 dark:text-red-400' : 'text-body'
             )}
           >
             {error || helperText}
@@ -264,4 +261,3 @@ const RadioGroupField = React.forwardRef<
 RadioGroupField.displayName = 'RadioGroupField';
 
 export { RadioGroup, RadioGroupItem, RadioGroupField };
-

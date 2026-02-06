@@ -41,32 +41,34 @@ export default function FeaturesTraitsManager({
   const styles =
     category === 'feature'
       ? {
-          containerBorder: 'border-amber-200',
-          headerText: 'text-amber-800',
-          addButton: 'bg-amber-600 hover:bg-amber-700',
-          formContainer: 'bg-amber-50 border-amber-200',
-          saveButton: 'bg-amber-600 hover:bg-amber-700',
-          itemBorder: 'border-amber-200',
-          itemTitle: 'text-amber-900',
+          containerBorder: 'border-accent-amber-border',
+          headerText: 'text-accent-amber-text',
+          addButton: 'bg-accent-amber-text-muted hover:bg-accent-amber-text',
+          formContainer: 'bg-accent-amber-bg border-accent-amber-border',
+          saveButton: 'bg-accent-amber-text-muted hover:bg-accent-amber-text',
+          itemBorder: 'border-accent-amber-border',
+          itemTitle: 'text-accent-amber-text',
         }
       : category === 'trait'
         ? {
-            containerBorder: 'border-emerald-200',
-            headerText: 'text-emerald-800',
-            addButton: 'bg-emerald-600 hover:bg-emerald-700',
-            formContainer: 'bg-emerald-50 border-emerald-200',
-            saveButton: 'bg-emerald-600 hover:bg-emerald-700',
-            itemBorder: 'border-emerald-200',
-            itemTitle: 'text-emerald-900',
+            containerBorder: 'border-accent-emerald-border',
+            headerText: 'text-accent-emerald-text',
+            addButton:
+              'bg-accent-emerald-text-muted hover:bg-accent-emerald-text',
+            formContainer: 'bg-accent-emerald-bg border-accent-emerald-border',
+            saveButton:
+              'bg-accent-emerald-text-muted hover:bg-accent-emerald-text',
+            itemBorder: 'border-accent-emerald-border',
+            itemTitle: 'text-accent-emerald-text',
           }
         : {
-            containerBorder: 'border-blue-200',
-            headerText: 'text-blue-800',
-            addButton: 'bg-blue-600 hover:bg-blue-700',
-            formContainer: 'bg-blue-50 border-blue-200',
-            saveButton: 'bg-blue-600 hover:bg-blue-700',
-            itemBorder: 'border-blue-200',
-            itemTitle: 'text-blue-900',
+            containerBorder: 'border-accent-blue-border',
+            headerText: 'text-accent-blue-text',
+            addButton: 'bg-accent-blue-text-muted hover:bg-accent-blue-text',
+            formContainer: 'bg-accent-blue-bg border-accent-blue-border',
+            saveButton: 'bg-accent-blue-text-muted hover:bg-accent-blue-text',
+            itemBorder: 'border-accent-blue-border',
+            itemTitle: 'text-accent-blue-text',
           };
 
   const handleAdd = () => {
@@ -100,11 +102,11 @@ export default function FeaturesTraitsManager({
 
   return (
     <div
-      className={`rounded-lg border bg-white shadow-lg ${styles.containerBorder} p-6 ${className}`}
+      className={`bg-surface rounded-lg border shadow-lg ${styles.containerBorder} p-6 ${className}`}
     >
       <div className="mb-4 flex items-center justify-between">
         <h2
-          className={`text-lg font-bold ${styles.headerText} border-b border-gray-200 pb-2`}
+          className={`text-lg font-bold ${styles.headerText} border-divider border-b pb-2`}
         >
           {categoryName}
         </h2>
@@ -130,7 +132,7 @@ export default function FeaturesTraitsManager({
         <div className={`mb-4 border-2 p-4 ${styles.formContainer} rounded-lg`}>
           <div className="space-y-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="text-body mb-1 block text-sm font-medium">
                 {category === 'feature'
                   ? 'Feature'
                   : category === 'trait'
@@ -145,12 +147,12 @@ export default function FeaturesTraitsManager({
                   setNewItem({ ...newItem, title: e.target.value })
                 }
                 placeholder={`Enter ${category} name...`}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-800 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+                className="border-input-border bg-input-bg text-input-text focus:border-accent-blue-border-strong focus:ring-accent-blue-bg-strong w-full rounded-md border px-3 py-2 focus:outline-none"
                 autoFocus
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="text-body mb-1 block text-sm font-medium">
                 Description
               </label>
               <RichTextEditor
@@ -171,7 +173,7 @@ export default function FeaturesTraitsManager({
               </button>
               <button
                 onClick={handleCancelAdd}
-                className="flex items-center space-x-1 rounded-md bg-gray-500 px-3 py-2 text-sm text-white transition-colors hover:bg-gray-600"
+                className="bg-divider-strong text-body hover:bg-divider flex items-center space-x-1 rounded-md px-3 py-2 text-sm transition-colors"
               >
                 <X size={14} />
                 <span>Cancel</span>
@@ -184,7 +186,7 @@ export default function FeaturesTraitsManager({
       {/* Items List */}
       <div className="space-y-3">
         {safeItems.length === 0 && !isAdding && (
-          <div className="py-8 text-center text-gray-500">
+          <div className="text-muted py-8 text-center">
             <p>
               No{' '}
               {category === 'feature'
@@ -271,7 +273,7 @@ function EditItemForm({
   return (
     <div className="space-y-3">
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="text-body mb-1 block text-sm font-medium">
           {category === 'feature'
             ? 'Feature'
             : category === 'trait'
@@ -283,11 +285,11 @@ function EditItemForm({
           type="text"
           value={title}
           onChange={e => setTitle(e.target.value)}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-800 focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+          className="border-input-border bg-input-bg text-input-text focus:border-accent-blue-border-strong focus:ring-accent-blue-bg-strong w-full rounded-md border px-3 py-2 focus:outline-none"
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="text-body mb-1 block text-sm font-medium">
           Description
         </label>
         <RichTextEditor
@@ -307,7 +309,7 @@ function EditItemForm({
         </button>
         <button
           onClick={onCancel}
-          className="flex items-center space-x-1 rounded-md bg-gray-500 px-3 py-2 text-sm text-white transition-colors hover:bg-gray-600"
+          className="bg-divider-strong text-body hover:bg-divider flex items-center space-x-1 rounded-md px-3 py-2 text-sm transition-colors"
         >
           <X size={14} />
           <span>Cancel</span>
@@ -332,14 +334,14 @@ function ViewItem({ item, styles, onEdit, onDelete }: ViewItemProps) {
         <div className="flex items-center space-x-1">
           <button
             onClick={onEdit}
-            className="p-1 text-gray-500 transition-colors hover:text-blue-600"
+            className="text-muted hover:text-accent-blue-text-muted p-1 transition-colors"
             title="Edit"
           >
             <Edit3 size={14} />
           </button>
           <button
             onClick={onDelete}
-            className="p-1 text-gray-500 transition-colors hover:text-red-600"
+            className="text-muted hover:text-accent-red-text-muted p-1 transition-colors"
             title="Delete"
           >
             <Trash2 size={14} />
@@ -347,11 +349,11 @@ function ViewItem({ item, styles, onEdit, onDelete }: ViewItemProps) {
         </div>
       </div>
       <div
-        className="rich-content text-sm text-gray-700"
+        className="rich-content text-body text-sm"
         dangerouslySetInnerHTML={{
           __html:
             item.content ||
-            '<p class="text-gray-500 italic">No description provided.</p>',
+            '<p class="text-muted italic">No description provided.</p>',
         }}
       />
 
@@ -362,14 +364,14 @@ function ViewItem({ item, styles, onEdit, onDelete }: ViewItemProps) {
           font-weight: 700;
           line-height: 1.3;
           margin: 0.75rem 0 0.5rem 0;
-          color: #1f2937;
+          color: var(--heading);
         }
         .rich-content :global(h2) {
           font-size: 1rem;
           font-weight: 600;
           line-height: 1.4;
           margin: 0.5rem 0 0.25rem 0;
-          color: #374151;
+          color: var(--heading);
         }
         .rich-content :global(p) {
           margin: 0.25rem 0;

@@ -50,10 +50,10 @@ export default function FeatureCard({
   };
 
   const getUsageColor = () => {
-    if (feature.isPassive) return 'text-blue-600';
-    if (isExhausted) return 'text-red-600';
-    if (usesRemaining <= 1) return 'text-orange-600';
-    return 'text-green-600';
+    if (feature.isPassive) return 'text-accent-blue-text-muted';
+    if (isExhausted) return 'text-accent-red-text-muted';
+    if (usesRemaining <= 1) return 'text-accent-orange-text-muted';
+    return 'text-accent-green-text-muted';
   };
 
   const getUsageIcon = () => {
@@ -65,18 +65,18 @@ export default function FeatureCard({
   return (
     <>
       <div
-        className={`group flex h-full min-h-[140px] flex-col rounded-lg border-2 bg-white p-4 shadow-sm transition-all duration-200 hover:shadow-md ${
+        className={`group bg-surface-raised flex h-full min-h-[140px] flex-col rounded-lg border-2 p-4 shadow-sm transition-all duration-200 hover:shadow-md ${
           isDragging ? 'scale-95 opacity-50' : ''
-        } ${isExhausted ? 'border-red-200 bg-red-50' : 'border-gray-200 hover:border-indigo-300'}`}
+        } ${isExhausted ? 'border-accent-red-border bg-accent-red-bg' : 'border-divider-strong hover:border-accent-indigo-border-strong'}`}
       >
         {/* Feature Header */}
         <div className="mb-3 flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <h4 className="truncate text-sm leading-tight font-semibold text-gray-900">
+            <h4 className="text-heading truncate text-sm leading-tight font-semibold">
               {feature.name}
             </h4>
             {feature.sourceDetail && (
-              <span className="mt-1 inline-block rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+              <span className="bg-surface-inset text-muted mt-1 inline-block rounded px-2 py-0.5 text-xs">
                 {feature.sourceDetail}
               </span>
             )}
@@ -90,7 +90,7 @@ export default function FeatureCard({
                 onClick={onUse}
                 variant="ghost"
                 size="xs"
-                className="text-indigo-600 hover:bg-indigo-100"
+                className="text-accent-indigo-text-muted hover:bg-accent-indigo-bg-strong"
                 title="Use feature"
               >
                 <Zap className="h-5 w-5" />
@@ -102,7 +102,7 @@ export default function FeatureCard({
               onClick={handleViewClick}
               variant="ghost"
               size="xs"
-              className="text-gray-600 hover:bg-gray-100"
+              className="text-muted hover:bg-surface-hover"
               title="View details"
             >
               <Eye className="h-5 w-5" />
@@ -114,7 +114,7 @@ export default function FeatureCard({
                 onClick={handleEditClick}
                 variant="ghost"
                 size="xs"
-                className="text-blue-600 hover:bg-blue-100"
+                className="text-accent-blue-text-muted hover:bg-accent-blue-bg-strong"
                 title="Edit feature"
               >
                 <Edit3 className="h-5 w-5" />
@@ -127,7 +127,7 @@ export default function FeatureCard({
                 onClick={onDelete}
                 variant="ghost"
                 size="xs"
-                className="text-red-600 hover:bg-red-100"
+                className="text-accent-red-text-muted hover:bg-accent-red-bg-strong"
                 title="Delete feature"
               >
                 <Trash2 className="h-5 w-5" />
@@ -140,7 +140,7 @@ export default function FeatureCard({
         <div className="mb-3 flex-1">
           {feature.description && (
             <div
-              className="line-clamp-3 text-xs text-gray-600"
+              className="text-muted line-clamp-3 text-xs"
               dangerouslySetInnerHTML={{ __html: feature.description }}
             />
           )}
@@ -163,7 +163,7 @@ export default function FeatureCard({
             </div>
 
             {hasUses && (
-              <div className="flex items-center gap-1 text-gray-500">
+              <div className="text-muted flex items-center gap-1">
                 <Clock className="h-3 w-3" />
                 <span className="text-xs capitalize">{feature.restType}</span>
               </div>
@@ -174,7 +174,7 @@ export default function FeatureCard({
         {/* Usage Progress Bar */}
         {hasUses && maxUses > 1 && (
           <div className="mt-2">
-            <div className="h-1 w-full rounded-full bg-gray-200">
+            <div className="bg-bg-tertiary h-1 w-full rounded-full">
               <div
                 className={`h-1 rounded-full transition-all duration-300 ${
                   isExhausted

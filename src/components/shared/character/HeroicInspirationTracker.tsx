@@ -85,10 +85,10 @@ export function HeroicInspirationTracker({
                 isActive
                   ? 'scale-110 transform border-yellow-600 bg-gradient-to-br from-yellow-400 to-yellow-600 text-white shadow-lg hover:shadow-xl'
                   : isOverMax
-                    ? 'cursor-not-allowed border-gray-300 bg-gray-100 text-gray-400'
+                    ? 'border-border-secondary bg-bg-tertiary text-muted cursor-not-allowed'
                     : readonly
-                      ? 'border-yellow-300 bg-white text-yellow-600'
-                      : 'cursor-pointer border-yellow-300 bg-white text-yellow-600 hover:border-yellow-500 hover:bg-yellow-50'
+                      ? 'bg-surface-raised border-yellow-300 text-yellow-600 dark:border-yellow-600 dark:text-yellow-400'
+                      : 'bg-surface-raised cursor-pointer border-yellow-300 text-yellow-600 hover:border-yellow-500 hover:bg-yellow-50 dark:border-yellow-600 dark:text-yellow-400 dark:hover:bg-yellow-900/20'
               } `}
               title={
                 isActive
@@ -114,8 +114,8 @@ export function HeroicInspirationTracker({
   };
 
   const containerClasses = compact
-    ? `bg-gradient-to-br from-yellow-50 to-amber-50 rounded-lg border-2 border-yellow-300 p-3 ${className}`
-    : `bg-gradient-to-br from-yellow-50 to-amber-50 rounded-lg border-2 border-yellow-300 p-4 ${className}`;
+    ? `bg-gradient-to-br from-accent-amber-bg to-accent-amber-bg-strong rounded-lg border-2 border-accent-amber-border-strong p-3 ${className}`
+    : `bg-gradient-to-br from-accent-amber-bg to-accent-amber-bg-strong rounded-lg border-2 border-accent-amber-border-strong p-4 ${className}`;
 
   return (
     <div className={containerClasses}>
@@ -123,7 +123,7 @@ export function HeroicInspirationTracker({
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Star className="h-5 w-5 fill-current text-yellow-600" />
-            <h3 className="text-lg font-bold text-yellow-800">
+            <h3 className="text-accent-amber-text text-lg font-bold">
               Heroic Inspiration
             </h3>
           </div>
@@ -134,7 +134,7 @@ export function HeroicInspirationTracker({
                 onClick={() => setShowSettings(!showSettings)}
                 variant="ghost"
                 size="xs"
-                className="text-yellow-600 hover:bg-yellow-100"
+                className="text-accent-amber-text-muted hover:bg-accent-amber-bg-strong"
                 title="Settings"
               >
                 <Settings size={16} />
@@ -144,7 +144,7 @@ export function HeroicInspirationTracker({
                   onClick={onResetInspiration}
                   variant="ghost"
                   size="xs"
-                  className="text-yellow-600 hover:bg-yellow-100"
+                  className="text-accent-amber-text-muted hover:bg-accent-amber-bg-strong"
                   title="Reset to 0"
                 >
                   <RotateCcw size={16} />
@@ -157,9 +157,9 @@ export function HeroicInspirationTracker({
 
       {/* Settings Panel */}
       {!readonly && showSettings && !hideSettings && (
-        <div className="mb-4 rounded-lg border border-yellow-200 bg-white p-3">
+        <div className="border-accent-amber-border bg-surface-raised mb-4 rounded-lg border p-3">
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-body text-sm font-medium">
               Max Inspiration:
             </label>
             <Input
@@ -175,7 +175,7 @@ export function HeroicInspirationTracker({
               onClick={handleMaxCountChange}
               variant="warning"
               size="sm"
-              className="bg-yellow-600 hover:bg-yellow-700"
+              className="bg-accent-amber-text-muted hover:bg-accent-amber-text"
             >
               Set
             </Button>
@@ -193,19 +193,19 @@ export function HeroicInspirationTracker({
       {/* Current Count Display */}
       <div className="mb-4 text-center">
         <div
-          className={`font-bold text-yellow-800 ${compact ? 'text-xl' : 'text-3xl'}`}
+          className={`text-accent-amber-text font-bold ${compact ? 'text-xl' : 'text-3xl'}`}
         >
           {inspiration.count}
           {inspiration.maxCount && (
             <span
-              className={`ml-1 text-yellow-600 ${compact ? 'text-sm' : 'text-lg'}`}
+              className={`text-accent-amber-text-muted ml-1 ${compact ? 'text-sm' : 'text-lg'}`}
             >
               / {inspiration.maxCount}
             </span>
           )}
         </div>
         {!compact && (
-          <div className="text-sm text-yellow-700">
+          <div className="text-accent-amber-text-muted text-sm">
             {inspiration.count === 0
               ? 'No inspiration available'
               : inspiration.count === 1
@@ -252,7 +252,7 @@ export function HeroicInspirationTracker({
 
       {/* Helper Text */}
       {!hideHelperText && !compact && (
-        <div className="mt-3 rounded bg-yellow-100 p-2 text-center text-xs text-yellow-700">
+        <div className="bg-accent-amber-bg-strong text-accent-amber-text-muted mt-3 rounded p-2 text-center text-xs">
           <p>
             <strong>Heroic Inspiration:</strong> Reroll a d20 die and use the
             new roll.

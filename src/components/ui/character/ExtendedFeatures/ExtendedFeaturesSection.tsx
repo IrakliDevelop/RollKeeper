@@ -66,13 +66,13 @@ export default function ExtendedFeaturesSection({
 
   return (
     <section
-      className={`rounded-xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-6 shadow-lg transition-all duration-300 ${className}`}
+      className={`border-accent-indigo-border from-accent-indigo-bg to-accent-purple-bg rounded-xl border-2 bg-gradient-to-br p-6 shadow-lg transition-all duration-300 ${className}`}
     >
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="flex items-center gap-2 text-xl font-bold text-indigo-900 transition-colors hover:text-indigo-700"
+          className="text-heading hover:text-body flex items-center gap-2 text-xl font-bold transition-colors"
         >
           {isCollapsed ? (
             <ChevronRight className="h-6 w-6" />
@@ -81,7 +81,7 @@ export default function ExtendedFeaturesSection({
           )}
           Character Features
           {totalFeatures > 0 && (
-            <span className="rounded-full bg-indigo-200 px-2 py-1 text-sm font-medium text-indigo-800">
+            <span className="bg-accent-indigo-bg-strong text-accent-indigo-text rounded-full px-2 py-1 text-sm font-medium">
               {totalFeatures}
             </span>
           )}
@@ -90,9 +90,9 @@ export default function ExtendedFeaturesSection({
         <div className="flex items-center gap-2">
           {/* Usage summary */}
           {totalFeatures > 0 && !isCollapsed && (
-            <div className="text-sm text-indigo-600">
+            <div className="text-accent-indigo-text-muted text-sm">
               {usedFeatures > 0 && (
-                <span className="rounded bg-orange-100 px-2 py-1 text-orange-700">
+                <span className="bg-accent-orange-bg text-accent-orange-text-muted rounded px-2 py-1">
                   {usedFeatures} used
                 </span>
               )}
@@ -107,7 +107,7 @@ export default function ExtendedFeaturesSection({
                 variant="primary"
                 size="sm"
                 leftIcon={<Plus className="h-4 w-4" />}
-                className="bg-indigo-600 hover:bg-indigo-700"
+                className="bg-accent-indigo-text hover:bg-accent-indigo-text-muted"
                 title="Add new feature"
               >
                 Add Feature
@@ -121,8 +121,8 @@ export default function ExtendedFeaturesSection({
       {!isCollapsed && (
         <div className="space-y-4">
           {categories.length === 0 ? (
-            <div className="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center">
-              <div className="text-gray-500">
+            <div className="border-divider-strong rounded-lg border-2 border-dashed p-8 text-center">
+              <div className="text-muted">
                 <Settings className="mx-auto mb-4 h-12 w-12 opacity-50" />
                 <p className="mb-2 text-lg font-medium">No features yet</p>
                 <p className="text-sm">
@@ -135,7 +135,7 @@ export default function ExtendedFeaturesSection({
                     variant="primary"
                     size="sm"
                     leftIcon={<Plus className="h-4 w-4" />}
-                    className="mt-4 bg-indigo-600 hover:bg-indigo-700"
+                    className="bg-accent-indigo-text hover:bg-accent-indigo-text-muted mt-4"
                   >
                     Add Your First Feature
                   </Button>
@@ -174,7 +174,7 @@ export default function ExtendedFeaturesSection({
 
           {/* Reset buttons */}
           {!readonly && features.some(f => f.usedUses > 0) && (
-            <div className="mt-4 flex gap-2 border-t border-indigo-200 pt-4">
+            <div className="border-divider-strong mt-4 flex gap-2 border-t pt-4">
               <Button
                 onClick={() => onResetFeatures('short')}
                 variant="success"
@@ -186,7 +186,7 @@ export default function ExtendedFeaturesSection({
                 onClick={() => onResetFeatures('long')}
                 variant="primary"
                 size="sm"
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-accent-blue-text hover:bg-accent-blue-text-muted"
               >
                 Long Rest Reset
               </Button>

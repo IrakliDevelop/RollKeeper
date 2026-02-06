@@ -291,7 +291,7 @@ export const SpellManagement: React.FC = () => {
     };
 
   return (
-    <div className="rounded-lg border border-purple-200 bg-white p-6 shadow">
+    <div className="bg-surface-raised rounded-lg border border-purple-200 p-6 shadow">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h3 className="flex items-center gap-2 text-lg font-bold text-purple-800">
@@ -499,7 +499,7 @@ export const SpellManagement: React.FC = () => {
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Basic Information */}
-                <div className="rounded-lg border border-purple-200 bg-white p-4 shadow-sm">
+                <div className="bg-surface-raised rounded-lg border border-purple-200 p-4 shadow-sm">
                   <h4 className="mb-3 flex items-center gap-2 text-lg font-semibold text-purple-800">
                     <span className="text-purple-600">📖</span>
                     Basic Information
@@ -577,7 +577,7 @@ export const SpellManagement: React.FC = () => {
                 </div>
 
                 {/* Casting Details */}
-                <div className="rounded-lg border border-purple-200 bg-white p-4 shadow-sm">
+                <div className="bg-surface-raised rounded-lg border border-purple-200 p-4 shadow-sm">
                   <h4 className="mb-3 flex items-center gap-2 text-lg font-semibold text-purple-800">
                     <span className="text-purple-600">⏱️</span>
                     Casting Details
@@ -652,7 +652,7 @@ export const SpellManagement: React.FC = () => {
                 </div>
 
                 {/* Components */}
-                <div className="rounded-lg border border-purple-200 bg-white p-4 shadow-sm">
+                <div className="bg-surface-raised rounded-lg border border-purple-200 p-4 shadow-sm">
                   <h4 className="mb-3 flex items-center gap-2 text-lg font-semibold text-purple-800">
                     <span className="text-purple-600">🔮</span>
                     Components
@@ -738,7 +738,7 @@ export const SpellManagement: React.FC = () => {
                 </div>
 
                 {/* Description */}
-                <div className="rounded-lg border border-purple-200 bg-white p-4 shadow-sm">
+                <div className="bg-surface-raised rounded-lg border border-purple-200 p-4 shadow-sm">
                   <h4 className="mb-3 flex items-center gap-2 text-lg font-semibold text-purple-800">
                     <span className="text-purple-600">📜</span>
                     Description
@@ -782,7 +782,7 @@ export const SpellManagement: React.FC = () => {
                 </div>
 
                 {/* Combat Properties */}
-                <div className="rounded-lg border border-purple-200 bg-white p-4 shadow-sm">
+                <div className="bg-surface-raised rounded-lg border border-purple-200 p-4 shadow-sm">
                   <h4 className="mb-3 flex items-center gap-2 text-lg font-semibold text-purple-800">
                     <span className="text-red-600">⚔️</span>
                     Combat Properties
@@ -884,7 +884,7 @@ export const SpellManagement: React.FC = () => {
                 </div>
 
                 {/* Special Properties */}
-                <div className="rounded-lg border border-purple-200 bg-white p-4 shadow-sm">
+                <div className="bg-surface-raised rounded-lg border border-purple-200 p-4 shadow-sm">
                   <h4 className="mb-3 flex items-center gap-2 text-lg font-semibold text-purple-800">
                     <span className="text-purple-600">⭐</span>
                     Special Properties

@@ -38,11 +38,14 @@ const SOURCE_ICONS: Record<FeatureSourceFilter, React.ReactElement> = {
 
 // Source type colors
 const SOURCE_COLORS: Record<FeatureSourceFilter, string> = {
-  class: 'text-blue-600 bg-blue-50 border-blue-300',
-  subclass: 'text-purple-600 bg-purple-50 border-purple-300',
-  background: 'text-green-600 bg-green-50 border-green-300',
-  feat: 'text-orange-600 bg-orange-50 border-orange-300',
-  all: 'text-gray-600 bg-gray-50 border-gray-300',
+  class:
+    'text-accent-blue-text-muted bg-accent-blue-bg border-accent-blue-border-strong',
+  subclass:
+    'text-accent-purple-text-muted bg-accent-purple-bg border-accent-purple-border-strong',
+  background:
+    'text-accent-green-text-muted bg-accent-green-bg border-accent-green-border-strong',
+  feat: 'text-accent-orange-text-muted bg-accent-orange-bg border-accent-orange-border-strong',
+  all: 'text-muted bg-surface-inset border-divider-strong',
 };
 
 export function FeatureAutocomplete({
@@ -200,12 +203,12 @@ export function FeatureAutocomplete({
     <div className={`relative ${className}`}>
       {/* Header with icon */}
       <div className="mb-2 flex items-center gap-2">
-        <Sparkles className="h-5 w-5 text-indigo-500" />
-        <h4 className="text-sm font-semibold text-gray-700">
+        <Sparkles className="text-accent-indigo-text-muted h-5 w-5" />
+        <h4 className="text-body text-sm font-semibold">
           Search Feature Database
         </h4>
         {loading && (
-          <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
+          <Loader2 className="text-accent-indigo-text-muted h-4 w-4 animate-spin" />
         )}
       </div>
 
@@ -245,7 +248,7 @@ export function FeatureAutocomplete({
       {/* Search input */}
       <div className="relative">
         <div className="relative">
-          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="text-muted absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <input
             ref={inputRef}
             type="text"
@@ -255,12 +258,12 @@ export function FeatureAutocomplete({
             onFocus={() => query && setIsOpen(true)}
             placeholder={placeholder}
             disabled={disabled || loading}
-            className="w-full rounded-lg border border-gray-300 py-2 pr-10 pl-10 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100"
+            className="border-divider-strong bg-surface-raised text-heading focus:border-accent-indigo-border-strong focus:ring-accent-indigo-bg disabled:bg-surface-inset w-full rounded-lg border py-2 pr-10 pl-10 text-sm focus:ring-2 focus:outline-none disabled:cursor-not-allowed"
           />
           {query && (
             <button
               onClick={handleClear}
-              className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="text-muted hover:text-body absolute top-1/2 right-3 -translate-y-1/2"
               type="button"
             >
               <X className="h-4 w-4" />
@@ -272,7 +275,7 @@ export function FeatureAutocomplete({
         {isOpen && query && (
           <div
             ref={dropdownRef}
-            className="absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+            className="border-divider bg-surface-raised absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-lg border shadow-lg"
           >
             {filteredFeatures.length > 0 ? (
               <ul className="py-1">
@@ -283,8 +286,8 @@ export function FeatureAutocomplete({
                       onClick={() => handleSelect(feature)}
                       className={`w-full px-4 py-2 text-left transition-colors ${
                         index === selectedIndex
-                          ? 'bg-indigo-100'
-                          : 'hover:bg-gray-100'
+                          ? 'bg-accent-indigo-bg-strong'
+                          : 'hover:bg-surface-hover'
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -292,10 +295,10 @@ export function FeatureAutocomplete({
                           {SOURCE_ICONS[feature.sourceType]}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-gray-900">
+                          <p className="text-heading truncate font-medium">
                             {feature.name}
                           </p>
-                          <p className="text-xs text-gray-600">
+                          <p className="text-muted text-xs">
                             <span
                               className={`capitalize ${getSourceColor(feature.sourceType).split(' ')[0]}`}
                             >
@@ -308,9 +311,7 @@ export function FeatureAutocomplete({
                             {feature.metadata.level &&
                               ` (Level ${feature.metadata.level})`}
                             {' • '}
-                            <span className="text-gray-500">
-                              {feature.source}
-                            </span>
+                            <span className="text-faint">{feature.source}</span>
                           </p>
                           {feature.metadata.prerequisites &&
                             feature.metadata.prerequisites.length > 0 && (
@@ -326,7 +327,7 @@ export function FeatureAutocomplete({
                 ))}
               </ul>
             ) : (
-              <div className="px-4 py-8 text-center text-sm text-gray-500">
+              <div className="text-muted px-4 py-8 text-center text-sm">
                 <p>No features found</p>
                 <p className="mt-1 text-xs">Try a different search term</p>
               </div>
@@ -336,7 +337,7 @@ export function FeatureAutocomplete({
       </div>
 
       {/* Helper text */}
-      <p className="mt-2 text-xs text-gray-500">
+      <p className="text-muted mt-2 text-xs">
         {selectedFeature
           ? 'Feature details loaded. You can edit any field below.'
           : 'Search and select a feature to auto-fill the form, or fill manually.'}

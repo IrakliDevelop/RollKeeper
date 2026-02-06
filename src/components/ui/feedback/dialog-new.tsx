@@ -1,6 +1,6 @@
 /**
  * Dialog Component
- * 
+ *
  * A unified dialog/modal component built on Radix UI Dialog primitive.
  * Consolidates the best features from Modal.tsx and dialog.tsx.
  * Supports multiple sizes, variants, and accessibility features.
@@ -71,7 +71,7 @@ const DialogContent = React.forwardRef<
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          'fixed top-[50%] left-[50%] z-50 flex max-h-[90vh] w-full translate-x-[-50%] translate-y-[-50%] flex-col gap-4 rounded-xl border-2 border-gray-200 bg-white p-6 shadow-2xl',
+          'border-divider bg-surface-raised fixed top-[50%] left-[50%] z-50 flex max-h-[90vh] w-full translate-x-[-50%] translate-y-[-50%] flex-col gap-4 rounded-xl border-2 p-6 shadow-2xl',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',
           'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
           'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -86,7 +86,7 @@ const DialogContent = React.forwardRef<
       >
         {children}
         {showCloseButton && (
-          <DialogPrimitive.Close className="absolute top-4 right-4 rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:outline-none disabled:pointer-events-none">
+          <DialogPrimitive.Close className="text-muted hover:bg-surface-hover hover:text-heading absolute top-4 right-4 rounded-lg p-2 transition-colors focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:outline-none disabled:pointer-events-none">
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
@@ -102,10 +102,7 @@ const DialogHeader = ({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn(
-      'flex flex-col space-y-2 text-left',
-      className
-    )}
+    className={cn('flex flex-col space-y-2 text-left', className)}
     {...props}
   />
 );
@@ -132,7 +129,7 @@ const DialogTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     className={cn(
-      'text-xl font-semibold leading-none tracking-tight text-gray-900',
+      'text-heading text-xl leading-none font-semibold tracking-tight',
       className
     )}
     {...props}
@@ -146,7 +143,7 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn('text-sm text-gray-600', className)}
+    className={cn('text-body text-sm', className)}
     {...props}
   />
 ));
@@ -177,4 +174,3 @@ export {
   DialogDescription,
   DialogBody,
 };
-

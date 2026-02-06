@@ -1,6 +1,6 @@
 /**
  * Checkbox Component
- * 
+ *
  * A flexible checkbox component built on Radix UI Checkbox primitive.
  * Supports labels, descriptions, sizes, variants, and indeterminate state.
  */
@@ -75,31 +75,31 @@ const sizeClasses = {
 
 const variantClasses = {
   default: {
-    unchecked: 'border-gray-400 bg-white',
+    unchecked: 'border-divider-strong bg-surface-raised',
     checked: 'border-gray-500 bg-gray-500',
     hover: 'hover:border-gray-500',
     checkIcon: 'text-white',
   },
   primary: {
-    unchecked: 'border-gray-400 bg-white',
+    unchecked: 'border-divider-strong bg-surface-raised',
     checked: 'border-emerald-600 bg-emerald-600',
     hover: 'hover:border-emerald-500',
     checkIcon: 'text-white',
   },
   success: {
-    unchecked: 'border-gray-400 bg-white',
+    unchecked: 'border-divider-strong bg-surface-raised',
     checked: 'border-green-600 bg-green-600',
     hover: 'hover:border-green-500',
     checkIcon: 'text-white',
   },
   danger: {
-    unchecked: 'border-gray-400 bg-white',
+    unchecked: 'border-divider-strong bg-surface-raised',
     checked: 'border-red-600 bg-red-600',
     hover: 'hover:border-red-500',
     checkIcon: 'text-white',
   },
   warning: {
-    unchecked: 'border-gray-400 bg-white',
+    unchecked: 'border-divider-strong bg-surface-raised',
     checked: 'border-amber-600 bg-amber-600',
     hover: 'hover:border-amber-500',
     checkIcon: 'text-white',
@@ -134,12 +134,12 @@ const Checkbox = React.forwardRef<
     return (
       <div
         className={cn(
-          'flex items-start group',
+          'group flex items-start',
           sizeStyle.gap,
           disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           wrapperClassName
         )}
-        onClick={(e) => {
+        onClick={e => {
           // Only trigger when clicking label text, not the checkbox itself
           if (e.target !== e.currentTarget || disabled) {
             return;
@@ -154,7 +154,7 @@ const Checkbox = React.forwardRef<
           className={cn(
             sizeStyle.checkbox,
             'relative flex shrink-0 items-center justify-center overflow-hidden rounded border-2 transition-all duration-200',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+            'focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:outline-none',
             isCheckedOrIndeterminate
               ? variantStyle.checked
               : variantStyle.unchecked,
@@ -186,7 +186,11 @@ const Checkbox = React.forwardRef<
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0, opacity: 0 }}
                   transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className={cn(sizeStyle.icon, variantStyle.checkIcon, 'relative z-10')}
+                  className={cn(
+                    sizeStyle.icon,
+                    variantStyle.checkIcon,
+                    'relative z-10'
+                  )}
                 >
                   {checked === 'indeterminate' ? (
                     <Minus className={sizeStyle.icon} strokeWidth={3} />
@@ -207,7 +211,7 @@ const Checkbox = React.forwardRef<
                 {icon && (
                   <span
                     className={cn(
-                      'flex-shrink-0 text-gray-500 transition-colors',
+                      'text-muted flex-shrink-0 transition-colors',
                       !disabled && checked && 'text-emerald-500'
                     )}
                   >
@@ -218,8 +222,8 @@ const Checkbox = React.forwardRef<
                   <span
                     className={cn(
                       sizeStyle.text,
-                      'font-medium text-gray-900 transition-colors',
-                      !disabled && 'group-hover:text-gray-700'
+                      'text-heading font-medium transition-colors',
+                      !disabled && 'group-hover:text-body'
                     )}
                   >
                     {label}
@@ -230,8 +234,8 @@ const Checkbox = React.forwardRef<
             {description && (
               <p
                 className={cn(
-                  'mt-1 text-xs text-gray-600 transition-colors',
-                  !disabled && 'group-hover:text-gray-500'
+                  'text-body mt-1 text-xs transition-colors',
+                  !disabled && 'group-hover:text-muted'
                 )}
               >
                 {description}
@@ -247,4 +251,3 @@ const Checkbox = React.forwardRef<
 Checkbox.displayName = CheckboxPrimitive.Root.displayName;
 
 export { Checkbox };
-

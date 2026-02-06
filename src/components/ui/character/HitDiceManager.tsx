@@ -81,20 +81,20 @@ export default function HitDiceManager({
 
   return (
     <div
-      className={`rounded-lg border border-purple-200 bg-white p-4 shadow ${className}`}
+      className={`border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow ${className}`}
     >
       <div className="mb-3 flex items-center gap-2">
-        <Dice6 size={18} className="text-purple-600" />
-        <h3 className="text-sm font-medium text-gray-700">Hit Dice</h3>
+        <Dice6 size={18} className="text-accent-purple-text-muted" />
+        <h3 className="text-body text-sm font-medium">Hit Dice</h3>
       </div>
 
       {/* Hit Dice Display */}
       <div className="mb-4 text-center">
-        <div className="rounded-lg border-2 border-purple-200 bg-purple-50 p-4">
-          <div className="text-2xl font-bold text-purple-800">
+        <div className="border-accent-purple-border bg-accent-purple-bg rounded-lg border-2 p-4">
+          <div className="text-accent-purple-text text-2xl font-bold">
             {getDisplayHitDice()}
           </div>
-          <div className="mt-1 text-xs text-purple-600">
+          <div className="text-accent-purple-text-muted mt-1 text-xs">
             Level {level} • d{getCurrentHitDie()} hit die
           </div>
         </div>
@@ -103,7 +103,7 @@ export default function HitDiceManager({
       {/* Custom Class Hit Die Selection */}
       {classInfo.isCustom && (
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="text-body block text-sm font-medium">
             Select Hit Die for Custom Class
           </label>
           <FancySelect
@@ -129,7 +129,7 @@ export default function HitDiceManager({
       {/* Standard Class Info */}
       {!classInfo.isCustom && classInfo.name && (
         <div className="text-center">
-          <div className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-3 py-1 text-xs text-purple-700">
+          <div className="bg-accent-purple-bg-strong text-accent-purple-text-muted inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs">
             <Info size={12} />
             <span>Auto-set for {classInfo.name}</span>
           </div>
@@ -137,7 +137,7 @@ export default function HitDiceManager({
       )}
 
       {/* Help Text */}
-      <div className="mt-3 text-center text-xs text-gray-500">
+      <div className="text-muted mt-3 text-center text-xs">
         <p>Hit dice are used for healing during short rests</p>
         <p>Roll your hit die + CON modifier to regain HP</p>
       </div>

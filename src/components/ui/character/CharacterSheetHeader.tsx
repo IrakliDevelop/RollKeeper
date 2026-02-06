@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { SaveIndicator } from '@/components/ui/feedback/SaveIndicator';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
 import { exportCharacterToFile } from '@/utils/fileOperations';
@@ -109,7 +110,7 @@ export default function CharacterSheetHeader({
       )}
 
       <header
-        className={`sticky top-0 z-50 border-b border-slate-200 bg-white shadow-lg transition-transform duration-300 ease-in-out ${
+        className={`border-divider bg-surface-raised sticky top-0 z-50 border-b shadow-lg transition-transform duration-300 ease-in-out ${
           isHeaderVisible ? 'translate-y-0' : '-translate-y-full'
         }`}
         onMouseEnter={() => setIsHovering(true)}
@@ -128,10 +129,10 @@ export default function CharacterSheetHeader({
                 </Button>
               </Link>
               <div className="ml-6">
-                <h1 className="text-xl font-bold text-slate-800">
+                <h1 className="text-heading text-xl font-bold">
                   {characterName}
                 </h1>
-                <p className="text-sm text-slate-600">
+                <p className="text-body text-sm">
                   {characterRace} {characterClass || 'Unknown Class'} • Level{' '}
                   {characterLevel}
                 </p>
@@ -140,6 +141,8 @@ export default function CharacterSheetHeader({
 
             <div className="flex items-center space-x-4">
               <SaveIndicator lastSaved={lastSaved} status={saveStatus} />
+
+              <ThemeToggle />
 
               {/* File Operations */}
               <div className="flex items-center space-x-2">
@@ -236,7 +239,7 @@ export default function CharacterSheetHeader({
 
       {/* Main Character Header */}
       <header className="relative z-30 mx-auto mb-8 max-w-7xl">
-        <div className="rounded-xl border border-slate-200 bg-white/90 p-6 shadow-xl backdrop-blur-sm">
+        <div className="border-divider bg-surface-raised/90 rounded-xl border p-6 shadow-xl backdrop-blur-sm">
           <div className="flex items-start gap-4">
             {/* Avatar */}
             <AvatarUpload
@@ -261,7 +264,7 @@ export default function CharacterSheetHeader({
                     size="lg"
                   />
                 ) : (
-                  <h2 className="w-full text-3xl font-bold text-gray-900">
+                  <h2 className="text-heading w-full text-3xl font-bold">
                     {characterName || 'Unnamed Character'}
                   </h2>
                 )}

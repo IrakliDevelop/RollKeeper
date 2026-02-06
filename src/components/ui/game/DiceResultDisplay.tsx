@@ -22,11 +22,11 @@ export function DiceResultDisplay({
 
   if (recentRolls.length === 0) {
     return (
-      <div className="rounded-lg border bg-white p-4 shadow">
-        <h3 className="mb-2 text-lg font-bold text-gray-900">
+      <div className="border-divider bg-surface-raised rounded-lg border p-4 shadow">
+        <h3 className="text-heading mb-2 text-lg font-bold">
           Dice Roll Results
         </h3>
-        <p className="text-sm text-gray-500 italic">
+        <p className="text-muted text-sm italic">
           No rolls yet. Start rolling some dice!
         </p>
       </div>
@@ -34,9 +34,9 @@ export function DiceResultDisplay({
   }
 
   return (
-    <div className="rounded-lg border bg-white p-4 shadow">
+    <div className="border-divider bg-surface-raised rounded-lg border p-4 shadow">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-bold text-gray-900">Dice Roll Results</h3>
+        <h3 className="text-heading text-lg font-bold">Dice Roll Results</h3>
         <button
           onClick={onClearHistory}
           className="rounded bg-gray-500 px-3 py-1 text-sm text-white transition-colors hover:bg-gray-600"

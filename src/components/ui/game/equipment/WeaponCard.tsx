@@ -23,14 +23,14 @@ export function WeaponCard({
     <div
       className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${
         weapon.isEquipped
-          ? 'border-blue-300 bg-white'
-          : 'border-gray-200 bg-white hover:border-gray-300'
+          ? 'border-accent-blue-border-strong bg-surface-raised'
+          : 'border-divider bg-surface-raised hover:border-divider-strong'
       }`}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="mb-2 flex items-center gap-2 flex-wrap">
-            <h4 className="font-bold text-gray-800">{weapon.name}</h4>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <h4 className="text-heading font-bold">{weapon.name}</h4>
             {weapon.enhancementBonus > 0 && (
               <Badge variant="warning" size="sm">
                 +{weapon.enhancementBonus}
@@ -46,14 +46,14 @@ export function WeaponCard({
             )}
           </div>
 
-          <div className="mb-2 text-sm text-gray-600">
+          <div className="text-muted mb-2 text-sm">
             {(() => {
               if (Array.isArray(weapon.damage)) {
                 // New format: array of damage entries
                 return weapon.damage.length > 0
                   ? weapon.damage.map((dmg, idx) => (
                       <span key={idx}>
-                        <span className="font-semibold text-gray-800">
+                        <span className="text-heading font-semibold">
                           {dmg.dice}
                         </span>{' '}
                         {dmg.type}
@@ -80,7 +80,7 @@ export function WeaponCard({
           </div>
 
           {weapon.description && (
-            <p className="text-sm text-gray-700 mt-2">{weapon.description}</p>
+            <p className="text-body mt-2 text-sm">{weapon.description}</p>
           )}
         </div>
 
@@ -91,7 +91,7 @@ export function WeaponCard({
               variant="ghost"
               size="xs"
               title="Edit weapon"
-              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+              className="text-accent-blue-text-muted hover:text-accent-blue-text hover:bg-surface-hover"
             >
               <Edit2 size={16} />
             </Button>
@@ -100,7 +100,7 @@ export function WeaponCard({
               variant="ghost"
               size="xs"
               title="Delete weapon"
-              className="text-red-600 hover:text-red-800 hover:bg-red-50"
+              className="text-accent-red-text-muted hover:text-accent-red-text hover:bg-surface-hover"
             >
               <Trash2 size={16} />
             </Button>
@@ -110,7 +110,9 @@ export function WeaponCard({
             variant={weapon.isEquipped ? 'success' : 'outline'}
             size="sm"
             className={
-              weapon.isEquipped ? '' : 'hover:bg-blue-50 hover:border-blue-300'
+              weapon.isEquipped
+                ? ''
+                : 'hover:bg-surface-hover hover:border-accent-blue-border'
             }
           >
             {weapon.isEquipped ? 'Equipped' : 'Equip'}
@@ -120,4 +122,3 @@ export function WeaponCard({
     </div>
   );
 }
-

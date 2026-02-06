@@ -45,8 +45,8 @@ export default function AbilityScores({
   };
 
   return (
-    <div className="rounded-lg border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-6 shadow-sm">
-      <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-emerald-800">
+    <div className="border-accent-emerald-border rounded-lg border-2 bg-gradient-to-br from-[var(--gradient-emerald-from)] to-[var(--gradient-emerald-to)] p-6 shadow-sm">
+      <h2 className="text-accent-emerald-text mb-4 flex items-center gap-2 text-lg font-bold">
         <Dices className="h-5 w-5" />
         Ability Scores
       </h2>
@@ -55,8 +55,8 @@ export default function AbilityScores({
           const modifier = getAbilityModifier(ability);
           return (
             <div key={ability} className="text-center">
-              <div className="rounded-lg border-2 border-emerald-300 bg-white p-4 transition-all hover:border-emerald-400 hover:shadow-md">
-                <div className="mb-2 text-sm font-bold tracking-wide text-emerald-700 uppercase">
+              <div className="border-accent-emerald-border-strong bg-surface-raised hover:border-accent-emerald-text-muted rounded-lg border-2 p-4 transition-all hover:shadow-md">
+                <div className="text-accent-emerald-text-muted mb-2 text-sm font-bold tracking-wide uppercase">
                   {ABILITY_ABBREVIATIONS[ability]}
                 </div>
                 <Input
@@ -106,7 +106,7 @@ export default function AbilityScores({
                   min="1"
                   max="30"
                   size="lg"
-                  className="[appearance:textfield] border-none bg-transparent text-center text-3xl font-bold text-gray-900 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="text-heading [appearance:textfield] border-none bg-transparent text-center text-3xl font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 />
                 <Badge
                   variant={getModifierVariant(modifier)}
@@ -115,12 +115,12 @@ export default function AbilityScores({
                 >
                   {formatModifier(modifier)}
                 </Badge>
-                <div className="mt-1 text-xs text-gray-500">modifier</div>
+                <div className="text-muted mt-1 text-xs">modifier</div>
                 <Button
                   onClick={() => onRollAbilityCheck(ability)}
                   variant="ghost"
                   size="xs"
-                  className="mt-2 w-full text-emerald-600 hover:bg-emerald-100"
+                  className="text-accent-emerald-text-muted hover:bg-accent-emerald-bg-strong mt-2 w-full"
                   leftIcon={<Dices className="h-3 w-3" />}
                   title={`Roll ${ABILITY_NAMES[ability]} check (d20 + ${formatModifier(modifier)})`}
                 >
@@ -131,9 +131,9 @@ export default function AbilityScores({
           );
         })}
       </div>
-      <div className="mt-4 rounded-lg border-2 border-indigo-300 bg-gradient-to-r from-indigo-100 to-purple-100 p-4 shadow-sm">
+      <div className="border-accent-indigo-border-strong mt-4 rounded-lg border-2 bg-gradient-to-r from-[var(--gradient-indigo-from)] to-[var(--gradient-purple-to)] p-4 shadow-sm">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold text-indigo-900">
+          <span className="text-accent-indigo-text text-sm font-semibold">
             Proficiency Bonus:
           </span>
           <Badge variant="secondary" size="lg" className="text-base font-bold">

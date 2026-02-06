@@ -23,6 +23,7 @@ import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
 import { AvatarUpload } from '@/components/ui/character/AvatarUpload';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 export default function PlayerDashboardPage() {
   const {
@@ -178,10 +179,10 @@ export default function PlayerDashboardPage() {
     isArchived?: boolean;
   }) => (
     <div
-      className={`rounded-lg border-2 bg-gradient-to-br from-white to-slate-50 shadow-md transition-all hover:shadow-xl ${
+      className={`bg-surface-raised rounded-lg border-2 shadow-md transition-all hover:shadow-xl ${
         isArchived
-          ? 'border-gray-300 opacity-75 hover:from-slate-50 hover:to-gray-100'
-          : 'border-blue-300 hover:from-slate-50 hover:to-blue-50'
+          ? 'border-divider hover:bg-surface-hover opacity-75'
+          : 'border-accent-blue-border hover:bg-surface-secondary'
       }`}
     >
       <div className="p-6">
@@ -202,19 +203,17 @@ export default function PlayerDashboardPage() {
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <h3 className="mb-1 truncate text-xl font-semibold text-slate-800">
+                <h3 className="text-heading mb-1 truncate text-xl font-semibold">
                   {character.name}
                 </h3>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="text-sm text-slate-600">
-                    {character.race}
-                  </span>
-                  <span className="text-slate-400">•</span>
+                  <span className="text-body text-sm">{character.race}</span>
+                  <span className="text-faint">•</span>
                   <Badge variant={getClassBadgeVariant(character.class)}>
                     {character.class}
                   </Badge>
-                  <span className="text-slate-400">•</span>
-                  <span className="text-sm text-slate-600">
+                  <span className="text-faint">•</span>
+                  <span className="text-body text-sm">
                     Level {character.level}
                   </span>
                 </div>
@@ -256,7 +255,7 @@ export default function PlayerDashboardPage() {
           </div>
         </div>
 
-        <div className="mb-4 text-sm text-slate-500">
+        <div className="text-muted mb-4 text-sm">
           <div className="flex justify-between">
             <span>
               Created: {new Date(character.createdAt).toLocaleDateString()}
@@ -310,9 +309,9 @@ export default function PlayerDashboardPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="bg-surface min-h-screen">
       {/* Header */}
-      <header className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50 shadow-sm">
+      <header className="border-divider bg-surface-secondary border-b shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center">
@@ -326,12 +325,13 @@ export default function PlayerDashboardPage() {
                 </Button>
               </Link>
               <div className="ml-6 flex items-center">
-                <User className="mr-3 h-6 w-6 text-blue-600" />
-                <h1 className="text-xl font-bold text-slate-800">
+                <User className="mr-3 h-6 w-6 text-blue-600 dark:text-blue-400" />
+                <h1 className="text-heading text-xl font-bold">
                   Player Dashboard
                 </h1>
               </div>
             </div>
+            <ThemeToggle showSystemOption />
           </div>
         </div>
       </header>
@@ -340,10 +340,10 @@ export default function PlayerDashboardPage() {
         {/* Dashboard Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="mb-2 text-3xl font-bold text-slate-800">
+            <h1 className="text-heading mb-2 text-3xl font-bold">
               Your Characters
             </h1>
-            <p className="text-slate-600">
+            <p className="text-body">
               Manage your D&D characters and jump into your adventures
             </p>
           </div>
@@ -375,47 +375,47 @@ export default function PlayerDashboardPage() {
 
         {/* Stats Cards */}
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-6 shadow-md">
+          <div className="border-accent-blue-border bg-accent-blue-bg rounded-lg border-2 p-6 shadow-md">
             <div className="flex items-center">
-              <User className="mr-3 h-8 w-8 text-blue-600" />
+              <User className="text-accent-blue-text-muted mr-3 h-8 w-8" />
               <div>
                 <h3
-                  className="text-2xl font-bold text-slate-800"
+                  className="text-heading text-2xl font-bold"
                   suppressHydrationWarning
                 >
                   {activeCharacters.length}
                 </h3>
-                <p className="text-slate-600">Active Characters</p>
+                <p className="text-body">Active Characters</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-lg border-2 border-gray-200 bg-gradient-to-br from-slate-50 to-gray-50 p-6 shadow-md">
+          <div className="border-divider bg-surface-secondary rounded-lg border-2 p-6 shadow-md">
             <div className="flex items-center">
-              <Archive className="mr-3 h-8 w-8 text-slate-500" />
+              <Archive className="text-muted mr-3 h-8 w-8" />
               <div>
                 <h3
-                  className="text-2xl font-bold text-slate-800"
+                  className="text-heading text-2xl font-bold"
                   suppressHydrationWarning
                 >
                   {archivedCharacters.length}
                 </h3>
-                <p className="text-slate-600">Archived</p>
+                <p className="text-body">Archived</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-lg border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-6 shadow-md">
+          <div className="border-accent-purple-border bg-accent-purple-bg rounded-lg border-2 p-6 shadow-md">
             <div className="flex items-center">
-              <ExternalLink className="mr-3 h-8 w-8 text-purple-600" />
+              <ExternalLink className="text-accent-purple-text-muted mr-3 h-8 w-8" />
               <div>
                 <h3
-                  className="text-2xl font-bold text-slate-800"
+                  className="text-heading text-2xl font-bold"
                   suppressHydrationWarning
                 >
                   {characters.length}
                 </h3>
-                <p className="text-slate-600">Total Characters</p>
+                <p className="text-body">Total Characters</p>
               </div>
             </div>
           </div>
@@ -423,12 +423,12 @@ export default function PlayerDashboardPage() {
 
         {/* Characters Section */}
         {activeCharacters.length === 0 && archivedCharacters.length === 0 ? (
-          <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-br from-slate-50 to-blue-50 p-12 text-center shadow-md">
-            <User size={64} className="mx-auto mb-6 text-gray-400" />
-            <h3 className="mb-2 text-xl font-semibold text-slate-800">
+          <div className="border-accent-blue-border bg-accent-blue-bg rounded-lg border-2 p-12 text-center shadow-md">
+            <User size={64} className="text-faint mx-auto mb-6" />
+            <h3 className="text-heading mb-2 text-xl font-semibold">
               No Characters Yet
             </h3>
-            <p className="mb-6 text-slate-600">
+            <p className="text-body mb-6">
               Create your first character, import an existing one, or migrate
               from your old character sheet!
             </p>
@@ -466,7 +466,7 @@ export default function PlayerDashboardPage() {
             {activeCharacters.length > 0 && (
               <div className="mb-12" suppressHydrationWarning>
                 <h2
-                  className="mb-6 flex items-center gap-2 text-2xl font-semibold text-slate-800"
+                  className="text-heading mb-6 flex items-center gap-2 text-2xl font-semibold"
                   suppressHydrationWarning
                 >
                   <User size={24} />
@@ -484,7 +484,7 @@ export default function PlayerDashboardPage() {
             {archivedCharacters.length > 0 && (
               <div suppressHydrationWarning>
                 <h2
-                  className="mb-6 flex items-center gap-2 text-2xl font-semibold text-slate-700"
+                  className="text-body mb-6 flex items-center gap-2 text-2xl font-semibold"
                   suppressHydrationWarning
                 >
                   <Archive size={24} />
@@ -508,38 +508,38 @@ export default function PlayerDashboardPage() {
         <div className="mb-8">
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className="flex w-full items-center justify-between rounded-lg border-2 border-slate-200 bg-gradient-to-r from-slate-50 to-gray-50 px-6 py-4 text-left shadow-sm transition-all hover:border-slate-300 hover:shadow-md"
+            className="border-divider bg-surface-secondary hover:border-divider-strong flex w-full items-center justify-between rounded-lg border-2 px-6 py-4 text-left shadow-sm transition-all hover:shadow-md"
           >
             <div className="flex items-center gap-3">
-              <Settings className="h-5 w-5 text-slate-600" />
-              <span className="text-lg font-semibold text-slate-700">
+              <Settings className="text-body h-5 w-5" />
+              <span className="text-body text-lg font-semibold">
                 Settings & Features
               </span>
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+              <span className="bg-accent-amber-bg text-accent-amber-text rounded-full px-2 py-0.5 text-xs font-medium">
                 Easter Eggs
               </span>
             </div>
             {showSettings ? (
-              <ChevronUp className="h-5 w-5 text-slate-500" />
+              <ChevronUp className="text-muted h-5 w-5" />
             ) : (
-              <ChevronDown className="h-5 w-5 text-slate-500" />
+              <ChevronDown className="text-muted h-5 w-5" />
             )}
           </button>
 
           {showSettings && (
-            <div className="mt-2 rounded-lg border-2 border-slate-200 bg-white p-6 shadow-sm">
+            <div className="border-divider bg-surface-raised mt-2 rounded-lg border-2 p-6 shadow-sm">
               <div className="space-y-4">
                 {/* Death Animation Toggle */}
-                <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="border-divider bg-surface-secondary flex items-center justify-between rounded-lg border p-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
-                      <Skull className="h-5 w-5 text-red-600" />
+                    <div className="bg-accent-red-bg flex h-10 w-10 items-center justify-center rounded-lg">
+                      <Skull className="text-accent-red-text-muted h-5 w-5" />
                     </div>
                     <div>
-                      <h4 className="font-medium text-slate-800">
+                      <h4 className="text-heading font-medium">
                         &quot;YOU DIED&quot; Animation
                       </h4>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-muted text-sm">
                         Dark Souls-style death screen when your character dies
                       </p>
                     </div>
@@ -555,21 +555,21 @@ export default function PlayerDashboardPage() {
                       }
                       className="peer sr-only"
                     />
-                    <div className="peer h-6 w-11 rounded-full bg-slate-300 peer-checked:bg-red-600 peer-focus:ring-2 peer-focus:ring-red-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+                    <div className="peer bg-divider-strong after:border-divider-strong dark:after:bg-surface-raised h-6 w-11 rounded-full peer-checked:bg-red-600 peer-focus:ring-2 peer-focus:ring-red-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
                   </label>
                 </div>
 
                 {/* Level Up Animation Toggle */}
-                <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="border-divider bg-surface-secondary flex items-center justify-between rounded-lg border p-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100">
-                      <TrendingUp className="h-5 w-5 text-amber-600" />
+                    <div className="bg-accent-amber-bg flex h-10 w-10 items-center justify-center rounded-lg">
+                      <TrendingUp className="text-accent-amber-text-muted h-5 w-5" />
                     </div>
                     <div>
-                      <h4 className="font-medium text-slate-800">
+                      <h4 className="text-heading font-medium">
                         Level Up Animation
                       </h4>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-muted text-sm">
                         Skyrim-style celebration when your character levels up
                       </p>
                     </div>
@@ -585,11 +585,11 @@ export default function PlayerDashboardPage() {
                       }
                       className="peer sr-only"
                     />
-                    <div className="peer h-6 w-11 rounded-full bg-slate-300 peer-checked:bg-amber-500 peer-focus:ring-2 peer-focus:ring-amber-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+                    <div className="peer bg-divider-strong after:border-divider-strong dark:after:bg-surface-raised h-6 w-11 rounded-full peer-checked:bg-amber-500 peer-focus:ring-2 peer-focus:ring-amber-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
                   </label>
                 </div>
 
-                <p className="text-center text-sm text-slate-400">
+                <p className="text-faint text-center text-sm">
                   More features coming soon! 🎲{' '}
                   <span className="text-amber-500">maybe</span>
                 </p>
