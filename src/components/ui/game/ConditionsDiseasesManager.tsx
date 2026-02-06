@@ -378,7 +378,7 @@ export default function ConditionsDiseasesManager() {
                   className={
                     showAddPanel
                       ? ''
-                      : 'from-accent-red-bg-strong to-accent-orange-bg-strong hover:from-accent-red-border-strong hover:to-accent-orange-border-strong bg-linear-to-r'
+                      : 'bg-linear-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600'
                   }
                 >
                   {showAddPanel ? 'Cancel' : 'Add Condition'}
@@ -488,7 +488,7 @@ export default function ConditionsDiseasesManager() {
                   className={
                     showAddPanel
                       ? ''
-                      : 'from-accent-purple-bg-strong to-accent-violet-bg-strong hover:from-accent-purple-border-strong hover:to-accent-violet-border-strong bg-linear-to-r'
+                      : 'bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'
                   }
                 >
                   {showAddPanel ? 'Cancel' : 'Add Disease'}

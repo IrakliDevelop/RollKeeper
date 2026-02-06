@@ -373,7 +373,7 @@ export function ItemForm({
               onClick={addTag}
               variant="primary"
               size="md"
-              className="from-accent-purple-bg-strong to-accent-violet-bg-strong hover:from-accent-purple-border-strong hover:to-accent-violet-border-strong bg-linear-to-r"
+              className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
             >
               Add
             </Button>
@@ -412,7 +412,7 @@ export function ItemForm({
             variant="primary"
             size="md"
             disabled={!formData.name.trim()}
-            className="from-accent-purple-bg-strong to-accent-violet-bg-strong hover:from-accent-purple-border-strong hover:to-accent-violet-border-strong bg-linear-to-r"
+            className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
           >
             {isEditing ? 'Update' : 'Add'} Item
           </Button>

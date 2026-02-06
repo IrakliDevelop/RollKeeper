@@ -168,15 +168,17 @@ export function HitPointTracker({
 
   const getCurrentHPBoxColor = () => {
     if (isCharacterDead) return 'bg-gray-800 border-gray-900';
-    if (isCharacterDying) return 'bg-accent-red-bg border-accent-red-border';
+    if (isCharacterDying)
+      return 'bg-accent-red-bg-strong border-accent-red-border';
     if (isCharacterStabilized)
-      return 'bg-accent-amber-bg border-accent-amber-border';
-    if (isUnconscious) return 'bg-accent-orange-bg border-accent-orange-border';
+      return 'bg-accent-amber-bg-strong border-accent-amber-border';
+    if (isUnconscious)
+      return 'bg-accent-orange-bg-strong border-accent-orange-border';
     if (hitPoints.current <= hitPoints.max * 0.25)
-      return 'bg-accent-red-bg border-accent-red-border';
+      return 'bg-accent-red-bg-strong border-accent-red-border';
     if (hitPoints.current <= hitPoints.max * 0.5)
-      return 'bg-accent-amber-bg border-accent-amber-border';
-    return 'bg-accent-green-bg border-accent-green-border';
+      return 'bg-accent-amber-bg-strong border-accent-amber-border';
+    return 'bg-accent-green-bg-strong border-accent-green-border';
   };
 
   const getCurrentHPTextColor = () => {
@@ -252,7 +254,7 @@ export function HitPointTracker({
                     current: parseInt(e.target.value) || 0,
                   })
                 }
-                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} w-full border-none bg-transparent text-center font-bold outline-none ${getCurrentHPTextColor()} leading-tight`}
+                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} w-full rounded-lg border-none bg-transparent text-center font-bold outline-none ${getCurrentHPTextColor()} leading-tight`}
                 min="0"
                 max={hitPoints.max}
                 style={{ maxWidth: '100%' }}
@@ -263,7 +265,7 @@ export function HitPointTracker({
 
         <div className="text-center">
           <div
-            className={`border-accent-red-border bg-accent-red-bg rounded-lg border-2 p-2 ${compact ? 'sm:p-2' : 'sm:p-3'} relative ${minHeightClasses} flex flex-col justify-center`}
+            className={`border-accent-red-border bg-accent-red-bg-strong rounded-lg border-2 p-2 ${compact ? 'sm:p-2' : 'sm:p-3'} relative ${minHeightClasses} flex flex-col justify-center`}
           >
             <div className="text-accent-red-text mb-1 flex items-center justify-center gap-1 text-xs font-medium">
               <span className="hidden sm:inline">MAXIMUM</span>
@@ -295,7 +297,7 @@ export function HitPointTracker({
                 onChange={e =>
                   onUpdateHitPoints?.({ max: parseInt(e.target.value) || 0 })
                 }
-                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-red-text w-full border-none bg-transparent text-center leading-tight font-bold outline-none`}
+                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-red-text w-full rounded-lg border-none bg-transparent text-center leading-tight font-bold outline-none`}
                 disabled={hitPoints.calculationMode === 'auto'}
                 min="1"
                 style={{ maxWidth: '100%' }}
@@ -313,7 +315,7 @@ export function HitPointTracker({
 
         <div className="text-center">
           <div
-            className={`border-accent-blue-border bg-accent-blue-bg rounded-lg border-2 p-2 ${compact ? 'sm:p-2' : 'sm:p-3'} ${minHeightClasses} flex flex-col justify-center`}
+            className={`border-accent-blue-border bg-accent-blue-bg-strong rounded-lg border-2 p-2 ${compact ? 'sm:p-2' : 'sm:p-3'} ${minHeightClasses} flex flex-col justify-center`}
           >
             <div className="text-accent-blue-text mb-1 text-xs font-medium">
               <span>TEMP</span>
@@ -333,7 +335,7 @@ export function HitPointTracker({
                     temporary: parseInt(e.target.value) || 0,
                   })
                 }
-                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-blue-text w-full border-none bg-transparent text-center leading-tight font-bold outline-none`}
+                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-blue-text w-full rounded-lg border-none bg-transparent text-center leading-tight font-bold outline-none`}
                 min="0"
                 style={{ maxWidth: '100%' }}
               />

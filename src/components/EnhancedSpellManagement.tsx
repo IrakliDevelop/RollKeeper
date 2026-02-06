@@ -288,7 +288,7 @@ const SpellCard: React.FC<{
             onClick={onCast}
             variant="primary"
             size="xs"
-            className="bg-accent-purple-bg-strong hover:bg-accent-purple-border-strong"
+            className="bg-purple-600 hover:bg-purple-700"
             title="Cast spell"
           >
             <Wand2 size={12} />
@@ -436,7 +436,7 @@ const SpellCard: React.FC<{
             variant="primary"
             size="sm"
             leftIcon={<Wand2 size={14} />}
-            className="from-accent-purple-bg-strong to-accent-violet-bg-strong hover:from-accent-purple-border-strong hover:to-accent-violet-border-strong bg-linear-to-r"
+            className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
           >
             Cast
           </Button>
@@ -964,11 +964,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                   ? 'Switch to detailed view'
                   : 'Switch to compact view'
               }
-              className={
-                compactView
-                  ? 'bg-accent-purple-bg-strong hover:bg-accent-purple-border-strong'
-                  : ''
-              }
+              className={compactView ? 'bg-purple-600 hover:bg-purple-700' : ''}
             >
               {compactView ? <List size={18} /> : <Grid3X3 size={18} />}
             </Button>
@@ -982,7 +978,7 @@ export const EnhancedSpellManagement: React.FC = () => {
               leftIcon={<Filter size={16} />}
               className={
                 showFilters || activeFilterCount > 0
-                  ? 'bg-accent-purple-bg-strong hover:bg-accent-purple-border-strong'
+                  ? 'bg-purple-600 hover:bg-purple-700'
                   : ''
               }
             >
@@ -991,7 +987,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                 <Badge
                   variant="danger"
                   size="sm"
-                  className="bg-accent-red-bg-strong text-inverse ml-1"
+                  className="text-inverse ml-1 bg-red-500"
                 >
                   {activeFilterCount}
                 </Badge>
@@ -1003,7 +999,7 @@ export const EnhancedSpellManagement: React.FC = () => {
               variant="primary"
               size="sm"
               leftIcon={<Plus size={16} />}
-              className="from-accent-purple-bg-strong to-accent-violet-bg-strong hover:from-accent-purple-border-strong hover:to-accent-violet-border-strong bg-linear-to-r"
+              className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
             >
               Add Spell
             </Button>
@@ -1277,7 +1273,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                 onClick={clearFilters}
                 variant="primary"
                 size="md"
-                className="from-accent-purple-bg-strong to-accent-violet-bg-strong hover:from-accent-purple-border-strong hover:to-accent-violet-border-strong mt-4 bg-linear-to-r"
+                className="mt-4 bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
               >
                 Clear All Filters
               </Button>
@@ -1769,7 +1765,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                 type="submit"
                 variant="primary"
                 size="md"
-                className="from-accent-purple-bg-strong to-accent-violet-bg-strong hover:from-accent-purple-border-strong hover:to-accent-violet-border-strong bg-linear-to-r"
+                className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
               >
                 {editingId ? 'Update Spell' : 'Add Spell'}
               </Button>

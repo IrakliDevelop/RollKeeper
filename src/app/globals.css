@@ -10,13 +10,13 @@
 
 :root {
   /* --- Core backgrounds --- */
-  --background: #ffffff;
+  --background: #f8fafc; /* slate-50 — off-white base reduces glare */
   --foreground: #171717;
-  --surface: #ffffff;
-  --surface-secondary: #f8fafc; /* slate-50 */
-  --surface-raised: #ffffff;
-  --surface-inset: #f1f5f9; /* slate-100 */
-  --surface-hover: #f1f5f9; /* slate-100 */
+  --surface: #f8fafc; /* slate-50 — matches base background */
+  --surface-secondary: #f1f5f9; /* slate-100 — stronger alternate surface */
+  --surface-raised: #ffffff; /* pure white — cards float above off-white bg */
+  --surface-inset: #e2e8f0; /* slate-200 — deeper recessed areas */
+  --surface-hover: #e2e8f0; /* slate-200 — more visible hover feedback */
   --surface-overlay: rgba(0, 0, 0, 0.5);
 
   /* --- Text --- */
@@ -27,8 +27,8 @@
   --inverse: #ffffff;
 
   /* --- Borders / Dividers --- */
-  --divider: #e2e8f0; /* slate-200 */
-  --divider-strong: #cbd5e1; /* slate-300 */
+  --divider: #cbd5e1; /* slate-300 — slightly stronger borders */
+  --divider-strong: #94a3b8; /* slate-400 — more definition for strong borders */
   --ring: #3b82f6; /* blue-500 */
 
   /* --- Accent surfaces (emerald) --- */
@@ -77,6 +77,7 @@
   --accent-indigo-border: #c7d2fe; /* indigo-200 */
   --accent-indigo-border-strong: #a5b4fc; /* indigo-300 */
   --accent-indigo-text: #3730a3; /* indigo-800 */
+  --accent-indigo-text-muted: #4f46e5; /* indigo-600 */
 
   /* --- Accent surfaces (green) --- */
   --accent-green-bg: #f0fdf4; /* green-50 */
@@ -84,12 +85,31 @@
   --accent-green-border: #bbf7d0; /* green-200 */
   --accent-green-border-strong: #86efac; /* green-300 */
   --accent-green-text: #166534; /* green-800 */
+  --accent-green-text-muted: #15803d; /* green-700 */
 
   /* --- Accent surfaces (orange) --- */
   --accent-orange-bg: #fff7ed; /* orange-50 */
   --accent-orange-bg-strong: #ffedd5; /* orange-100 */
   --accent-orange-border: #fed7aa; /* orange-200 */
+  --accent-orange-border-strong: #fb923c; /* orange-400 */
   --accent-orange-text: #9a3412; /* orange-800 */
+  --accent-orange-text-muted: #c2410c; /* orange-700 */
+
+  /* --- Accent surfaces (yellow) --- */
+  --accent-yellow-bg: #fefce8; /* yellow-50 */
+  --accent-yellow-bg-strong: #fef9c3; /* yellow-100 */
+  --accent-yellow-border: #fde047; /* yellow-300 */
+  --accent-yellow-border-strong: #facc15; /* yellow-400 */
+  --accent-yellow-text: #854d0e; /* yellow-800 */
+  --accent-yellow-text-muted: #a16207; /* yellow-700 */
+
+  /* --- Accent surfaces (violet) --- */
+  --accent-violet-bg: #f5f3ff; /* violet-50 */
+  --accent-violet-bg-strong: #ede9fe; /* violet-100 */
+  --accent-violet-border: #c4b5fd; /* violet-300 */
+  --accent-violet-border-strong: #a78bfa; /* violet-400 */
+  --accent-violet-text: #5b21b6; /* violet-800 */
+  --accent-violet-text-muted: #6d28d9; /* violet-700 */
 
   /* --- Gradient endpoints --- */
   --gradient-slate-from: #f8fafc;
@@ -108,15 +128,15 @@
   --gradient-red-to: #fce7f3;
   --gradient-indigo-from: #eef2ff;
   --gradient-indigo-to: #e0e7ff;
-  --gradient-page-from: #f8fafc;
-  --gradient-page-via: #eff6ff;
-  --gradient-page-to: #eef2ff;
+  --gradient-page-from: #f1f5f9; /* deeper gradient start */
+  --gradient-page-via: #e8f0fe; /* more visible mid-gradient */
+  --gradient-page-to: #e0e7ff; /* deeper gradient end */
 
   /* --- Input-specific --- */
-  --input-bg: #ffffff;
+  --input-bg: #f1f5f9; /* slate-100 — softer than white, gentle inset look */
   --input-text: #111827; /* gray-900 */
   --input-placeholder: #6b7280; /* gray-500 */
-  --input-border: #d1d5db; /* gray-300 */
+  --input-border: #cbd5e1; /* slate-300 — matches divider for consistency */
   --input-border-focus: #10b981; /* emerald-500 */
 }
 
@@ -189,6 +209,7 @@
   --accent-indigo-border: #312e81; /* indigo-900 */
   --accent-indigo-border-strong: #4f46e5; /* indigo-700 */
   --accent-indigo-text: #a5b4fc; /* indigo-300 */
+  --accent-indigo-text-muted: #818cf8; /* indigo-400 */
 
   /* --- Accent surfaces (green) --- */
   --accent-green-bg: rgba(22, 101, 52, 0.25);
@@ -196,12 +217,31 @@
   --accent-green-border: #14532d; /* green-900 */
   --accent-green-border-strong: #15803d; /* green-700 */
   --accent-green-text: #86efac; /* green-300 */
+  --accent-green-text-muted: #4ade80; /* green-400 */
 
   /* --- Accent surfaces (orange) --- */
   --accent-orange-bg: rgba(154, 52, 18, 0.25);
   --accent-orange-bg-strong: rgba(154, 52, 18, 0.4);
   --accent-orange-border: #7c2d12; /* orange-900 */
+  --accent-orange-border-strong: #c2410c; /* orange-700 */
   --accent-orange-text: #fdba74; /* orange-300 */
+  --accent-orange-text-muted: #fb923c; /* orange-400 */
+
+  /* --- Accent surfaces (yellow) --- */
+  --accent-yellow-bg: rgba(113, 63, 18, 0.25);
+  --accent-yellow-bg-strong: rgba(113, 63, 18, 0.4);
+  --accent-yellow-border: #713f12; /* yellow-900 */
+  --accent-yellow-border-strong: #a16207; /* yellow-700 */
+  --accent-yellow-text: #fde047; /* yellow-300 */
+  --accent-yellow-text-muted: #facc15; /* yellow-400 */
+
+  /* --- Accent surfaces (violet) --- */
+  --accent-violet-bg: rgba(91, 33, 182, 0.25);
+  --accent-violet-bg-strong: rgba(91, 33, 182, 0.4);
+  --accent-violet-border: #4c1d95; /* violet-900 */
+  --accent-violet-border-strong: #6d28d9; /* violet-700 */
+  --accent-violet-text: #c4b5fd; /* violet-300 */
+  --accent-violet-text-muted: #a78bfa; /* violet-400 */
 
   /* --- Gradient endpoints (dark) --- */
   --gradient-slate-from: #1e293b;
@@ -307,6 +347,7 @@
   --color-accent-indigo-border: var(--accent-indigo-border);
   --color-accent-indigo-border-strong: var(--accent-indigo-border-strong);
   --color-accent-indigo-text: var(--accent-indigo-text);
+  --color-accent-indigo-text-muted: var(--accent-indigo-text-muted);
 
   /* Accent green */
   --color-accent-green-bg: var(--accent-green-bg);
@@ -314,12 +355,31 @@
   --color-accent-green-border: var(--accent-green-border);
   --color-accent-green-border-strong: var(--accent-green-border-strong);
   --color-accent-green-text: var(--accent-green-text);
+  --color-accent-green-text-muted: var(--accent-green-text-muted);
 
   /* Accent orange */
   --color-accent-orange-bg: var(--accent-orange-bg);
   --color-accent-orange-bg-strong: var(--accent-orange-bg-strong);
   --color-accent-orange-border: var(--accent-orange-border);
+  --color-accent-orange-border-strong: var(--accent-orange-border-strong);
   --color-accent-orange-text: var(--accent-orange-text);
+  --color-accent-orange-text-muted: var(--accent-orange-text-muted);
+
+  /* Accent yellow */
+  --color-accent-yellow-bg: var(--accent-yellow-bg);
+  --color-accent-yellow-bg-strong: var(--accent-yellow-bg-strong);
+  --color-accent-yellow-border: var(--accent-yellow-border);
+  --color-accent-yellow-border-strong: var(--accent-yellow-border-strong);
+  --color-accent-yellow-text: var(--accent-yellow-text);
+  --color-accent-yellow-text-muted: var(--accent-yellow-text-muted);
+
+  /* Accent violet */
+  --color-accent-violet-bg: var(--accent-violet-bg);
+  --color-accent-violet-bg-strong: var(--accent-violet-bg-strong);
+  --color-accent-violet-border: var(--accent-violet-border);
+  --color-accent-violet-border-strong: var(--accent-violet-border-strong);
+  --color-accent-violet-text: var(--accent-violet-text);
+  --color-accent-violet-text-muted: var(--accent-violet-text-muted);
 
   /* Input */
   --color-input-bg: var(--input-bg);
@@ -350,17 +410,21 @@ button {
 }
 
 /* Form input text colors — uses semantic tokens */
-input,
-textarea,
-select {
-  color: var(--input-text);
-  background-color: var(--input-bg);
-}
+/* Wrapped in @layer base so Tailwind utilities (e.g. bg-transparent) can override */
+@layer base {
+  input,
+  textarea,
+  select {
+    color: var(--input-text);
+    background-color: var(--input-bg);
+    border-radius: 0.5rem; /* rounded-lg default for all inputs */
+  }
 
-input::placeholder,
-textarea::placeholder {
-  color: var(--input-placeholder);
-  opacity: 1;
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--input-placeholder);
+    opacity: 1;
+  }
 }
 
 /* TipTap Editor content */

@@ -43,11 +43,9 @@ export default function FeaturesTraitsManager({
       ? {
           containerBorder: 'border-accent-amber-border',
           headerText: 'text-accent-amber-text',
-          addButton:
-            'bg-accent-amber-bg-strong hover:bg-accent-amber-border-strong',
+          addButton: 'bg-accent-amber-text-muted hover:bg-accent-amber-text',
           formContainer: 'bg-accent-amber-bg border-accent-amber-border',
-          saveButton:
-            'bg-accent-amber-bg-strong hover:bg-accent-amber-border-strong',
+          saveButton: 'bg-accent-amber-text-muted hover:bg-accent-amber-text',
           itemBorder: 'border-accent-amber-border',
           itemTitle: 'text-accent-amber-text',
         }
@@ -56,21 +54,19 @@ export default function FeaturesTraitsManager({
             containerBorder: 'border-accent-emerald-border',
             headerText: 'text-accent-emerald-text',
             addButton:
-              'bg-accent-emerald-bg-strong hover:bg-accent-emerald-border-strong',
+              'bg-accent-emerald-text-muted hover:bg-accent-emerald-text',
             formContainer: 'bg-accent-emerald-bg border-accent-emerald-border',
             saveButton:
-              'bg-accent-emerald-bg-strong hover:bg-accent-emerald-border-strong',
+              'bg-accent-emerald-text-muted hover:bg-accent-emerald-text',
             itemBorder: 'border-accent-emerald-border',
             itemTitle: 'text-accent-emerald-text',
           }
         : {
             containerBorder: 'border-accent-blue-border',
             headerText: 'text-accent-blue-text',
-            addButton:
-              'bg-accent-blue-bg-strong hover:bg-accent-blue-border-strong',
+            addButton: 'bg-accent-blue-text-muted hover:bg-accent-blue-text',
             formContainer: 'bg-accent-blue-bg border-accent-blue-border',
-            saveButton:
-              'bg-accent-blue-bg-strong hover:bg-accent-blue-border-strong',
+            saveButton: 'bg-accent-blue-text-muted hover:bg-accent-blue-text',
             itemBorder: 'border-accent-blue-border',
             itemTitle: 'text-accent-blue-text',
           };
