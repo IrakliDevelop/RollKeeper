@@ -173,9 +173,9 @@ export default function NewCharacterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="bg-background min-h-screen">
       {/* Header */}
-      <header className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50 shadow-sm">
+      <header className="border-divider from-background to-accent-blue-bg border-b bg-linear-to-r shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center">
@@ -188,7 +188,7 @@ export default function NewCharacterPage() {
                   Back to Characters
                 </Button>
               </Link>
-              <h1 className="ml-6 text-xl font-bold text-slate-800">
+              <h1 className="text-heading ml-6 text-xl font-bold">
                 Create New Character
               </h1>
             </div>
@@ -197,13 +197,13 @@ export default function NewCharacterPage() {
       </header>
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-br from-white to-slate-50 p-8 shadow-lg">
+        <div className="border-accent-blue-border from-surface-raised to-surface-secondary rounded-lg border-2 bg-linear-to-br p-8 shadow-lg">
           <div className="mb-8 text-center">
-            <Dice6 className="mx-auto mb-4 h-16 w-16 text-blue-600" />
-            <h1 className="mb-2 text-3xl font-bold text-slate-800">
+            <Dice6 className="text-accent-blue-text mx-auto mb-4 h-16 w-16" />
+            <h1 className="text-heading mb-2 text-3xl font-bold">
               Create Your Character
             </h1>
-            <p className="text-slate-600">
+            <p className="text-body">
               Fill in the basic information to get started. You can customize
               everything else in the character sheet.
             </p>
@@ -227,7 +227,7 @@ export default function NewCharacterPage() {
               <div className="md:col-span-2">
                 <label
                   htmlFor="characterName"
-                  className="mb-2 block text-sm font-medium text-slate-700"
+                  className="text-heading mb-2 block text-sm font-medium"
                 >
                   Character Name *
                 </label>
@@ -245,7 +245,7 @@ export default function NewCharacterPage() {
               <div>
                 <label
                   htmlFor="race"
-                  className="mb-2 block text-sm font-medium text-slate-700"
+                  className="text-heading mb-2 block text-sm font-medium"
                 >
                   Race
                 </label>
@@ -268,7 +268,7 @@ export default function NewCharacterPage() {
                           variant="outline"
                           size="md"
                           leftIcon={<Info size={16} />}
-                          className="flex-shrink-0"
+                          className="shrink-0"
                         >
                           Details
                         </Button>
@@ -276,7 +276,7 @@ export default function NewCharacterPage() {
                       <DialogContent size="lg">
                         <DialogHeader>
                           <DialogTitle className="flex items-center gap-2">
-                            <Dice6 className="h-5 w-5 text-blue-600" />
+                            <Dice6 className="text-accent-blue-text h-5 w-5" />
                             {selectedRaceData.name}
                           </DialogTitle>
                           <DialogDescription>
@@ -288,31 +288,31 @@ export default function NewCharacterPage() {
                             {/* Basic Info Grid */}
                             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                               {selectedRaceData.size && (
-                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                                  <span className="text-xs font-medium text-gray-600">
+                                <div className="border-divider bg-surface-secondary rounded-lg border p-3">
+                                  <span className="text-muted text-xs font-medium">
                                     Size
                                   </span>
-                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                  <p className="text-heading mt-1 text-sm font-semibold">
                                     {selectedRaceData.size}
                                   </p>
                                 </div>
                               )}
                               {selectedRaceData.darkvision && (
-                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                                  <span className="text-xs font-medium text-gray-600">
+                                <div className="border-divider bg-surface-secondary rounded-lg border p-3">
+                                  <span className="text-muted text-xs font-medium">
                                     Darkvision
                                   </span>
-                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                  <p className="text-heading mt-1 text-sm font-semibold">
                                     {selectedRaceData.darkvision} ft.
                                   </p>
                                 </div>
                               )}
                               {selectedRaceData.age && (
-                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                                  <span className="text-xs font-medium text-gray-600">
+                                <div className="border-divider bg-surface-secondary rounded-lg border p-3">
+                                  <span className="text-muted text-xs font-medium">
                                     Lifespan
                                   </span>
-                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                  <p className="text-heading mt-1 text-sm font-semibold">
                                     {selectedRaceData.age.max
                                       ? `Up to ${selectedRaceData.age.max} years`
                                       : selectedRaceData.age.mature
@@ -325,8 +325,8 @@ export default function NewCharacterPage() {
 
                             {/* Speed */}
                             {selectedRaceData.speed && (
-                              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                                <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                              <div className="border-accent-blue-border bg-accent-blue-bg rounded-lg border p-4">
+                                <h4 className="text-heading mb-2 text-sm font-semibold">
                                   Speed
                                 </h4>
                                 <div className="flex flex-wrap gap-2">
@@ -352,8 +352,8 @@ export default function NewCharacterPage() {
                             {/* Ability Score Increases */}
                             {selectedRaceData.abilityScores &&
                               selectedRaceData.abilityScores.length > 0 && (
-                                <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                                  <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                                <div className="border-accent-green-border bg-accent-green-bg rounded-lg border p-4">
+                                  <h4 className="text-heading mb-2 text-sm font-semibold">
                                     Ability Score Increase
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
@@ -375,8 +375,8 @@ export default function NewCharacterPage() {
                             {/* Languages */}
                             {selectedRaceData.languages &&
                               selectedRaceData.languages.length > 0 && (
-                                <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-                                  <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                                <div className="border-accent-indigo-border bg-accent-indigo-bg rounded-lg border p-4">
+                                  <h4 className="text-heading mb-2 text-sm font-semibold">
                                     Languages
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
@@ -399,8 +399,8 @@ export default function NewCharacterPage() {
                             {selectedRaceData.skillProficiencies &&
                               selectedRaceData.skillProficiencies.length >
                                 0 && (
-                                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                                  <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                                <div className="border-accent-amber-border bg-accent-amber-bg rounded-lg border p-4">
+                                  <h4 className="text-heading mb-2 text-sm font-semibold">
                                     Skill Proficiencies
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
@@ -424,15 +424,15 @@ export default function NewCharacterPage() {
                               selectedRaceData.resistances.length > 0) ||
                               (selectedRaceData.immunities &&
                                 selectedRaceData.immunities.length > 0)) && (
-                              <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-                                <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                              <div className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4">
+                                <h4 className="text-heading mb-2 text-sm font-semibold">
                                   Defenses
                                 </h4>
                                 <div className="space-y-2">
                                   {selectedRaceData.resistances &&
                                     selectedRaceData.resistances.length > 0 && (
                                       <div>
-                                        <span className="text-xs font-medium text-gray-700">
+                                        <span className="text-body text-xs font-medium">
                                           Resistances:
                                         </span>
                                         <div className="mt-1 flex flex-wrap gap-1">
@@ -453,7 +453,7 @@ export default function NewCharacterPage() {
                                   {selectedRaceData.immunities &&
                                     selectedRaceData.immunities.length > 0 && (
                                       <div>
-                                        <span className="text-xs font-medium text-gray-700">
+                                        <span className="text-body text-xs font-medium">
                                           Immunities:
                                         </span>
                                         <div className="mt-1 flex flex-wrap gap-1">
@@ -479,19 +479,19 @@ export default function NewCharacterPage() {
                             {selectedRaceData.features &&
                               selectedRaceData.features.length > 0 && (
                                 <div className="space-y-3">
-                                  <h4 className="text-sm font-semibold text-gray-900">
+                                  <h4 className="text-heading text-sm font-semibold">
                                     Racial Features
                                   </h4>
                                   {selectedRaceData.features.map(
                                     (feature, idx) => (
                                       <div
                                         key={idx}
-                                        className="rounded-lg border border-purple-200 bg-purple-50 p-4"
+                                        className="border-accent-purple-border bg-accent-purple-bg rounded-lg border p-4"
                                       >
-                                        <h5 className="mb-2 text-sm font-semibold text-purple-900">
+                                        <h5 className="text-accent-purple-text mb-2 text-sm font-semibold">
                                           {feature.name}
                                         </h5>
-                                        <p className="text-sm leading-relaxed text-gray-700">
+                                        <p className="text-body text-sm leading-relaxed">
                                           {feature.description}
                                         </p>
                                       </div>
@@ -503,8 +503,8 @@ export default function NewCharacterPage() {
                             {/* Trait Tags */}
                             {selectedRaceData.traits &&
                               selectedRaceData.traits.length > 0 && (
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                                  <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                                <div className="border-divider bg-surface-secondary rounded-lg border p-4">
+                                  <h4 className="text-heading mb-2 text-sm font-semibold">
                                     Tags
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
@@ -524,8 +524,8 @@ export default function NewCharacterPage() {
                               )}
 
                             {/* Source */}
-                            <div className="border-t border-gray-200 pt-3">
-                              <p className="text-xs text-gray-600">
+                            <div className="border-divider border-t pt-3">
+                              <p className="text-muted text-xs">
                                 <span className="font-medium">Source:</span>{' '}
                                 {selectedRaceData.source}
                               </p>
@@ -542,7 +542,7 @@ export default function NewCharacterPage() {
               <div>
                 <label
                   htmlFor="class"
-                  className="mb-2 block text-sm font-medium text-slate-700"
+                  className="text-heading mb-2 block text-sm font-medium"
                 >
                   Class
                 </label>
@@ -586,7 +586,7 @@ export default function NewCharacterPage() {
                           variant="outline"
                           size="md"
                           leftIcon={<Info size={16} />}
-                          className="flex-shrink-0"
+                          className="shrink-0"
                         >
                           Details
                         </Button>
@@ -594,7 +594,7 @@ export default function NewCharacterPage() {
                       <DialogContent size="lg">
                         <DialogHeader>
                           <DialogTitle className="flex items-center gap-2">
-                            <Shield className="h-5 w-5 text-blue-600" />
+                            <Shield className="text-accent-blue-text h-5 w-5" />
                             {selectedClassData.name}
                           </DialogTitle>
                           <DialogDescription>
@@ -605,30 +605,30 @@ export default function NewCharacterPage() {
                           <div className="space-y-4">
                             {/* Basic Info Grid */}
                             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                                <span className="text-xs font-medium text-gray-600">
+                              <div className="border-divider bg-surface-secondary rounded-lg border p-3">
+                                <span className="text-muted text-xs font-medium">
                                   Hit Die
                                 </span>
-                                <p className="mt-1 text-sm font-semibold text-gray-900">
+                                <p className="text-heading mt-1 text-sm font-semibold">
                                   {selectedClassData.hitDie}
                                 </p>
                               </div>
-                              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                                <span className="text-xs font-medium text-gray-600">
+                              <div className="border-divider bg-surface-secondary rounded-lg border p-3">
+                                <span className="text-muted text-xs font-medium">
                                   Spellcasting
                                 </span>
-                                <p className="mt-1 text-sm font-semibold text-gray-900">
+                                <p className="text-heading mt-1 text-sm font-semibold">
                                   {formatSpellcastingType(
                                     selectedClassData.spellcasting.type
                                   )}
                                 </p>
                               </div>
                               {selectedClassData.spellcasting.ability && (
-                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                                  <span className="text-xs font-medium text-gray-600">
+                                <div className="border-divider bg-surface-secondary rounded-lg border p-3">
+                                  <span className="text-muted text-xs font-medium">
                                     Spellcasting Ability
                                   </span>
-                                  <p className="mt-1 text-sm font-semibold text-gray-900">
+                                  <p className="text-heading mt-1 text-sm font-semibold">
                                     {selectedClassData.spellcasting.ability.toUpperCase()}
                                   </p>
                                 </div>
@@ -639,8 +639,8 @@ export default function NewCharacterPage() {
                             {selectedClassData.proficiencies.savingThrows &&
                               selectedClassData.proficiencies.savingThrows
                                 .length > 0 && (
-                                <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                                  <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                                <div className="border-accent-green-border bg-accent-green-bg rounded-lg border p-4">
+                                  <h4 className="text-heading mb-2 text-sm font-semibold">
                                     Saving Throw Proficiencies
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
@@ -663,8 +663,8 @@ export default function NewCharacterPage() {
                             {selectedClassData.proficiencies.armor &&
                               selectedClassData.proficiencies.armor.length >
                                 0 && (
-                                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-                                  <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                                <div className="border-accent-blue-border bg-accent-blue-bg rounded-lg border p-4">
+                                  <h4 className="text-heading mb-2 text-sm font-semibold">
                                     Armor Proficiencies
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
@@ -691,8 +691,8 @@ export default function NewCharacterPage() {
                             {selectedClassData.proficiencies.weapons &&
                               selectedClassData.proficiencies.weapons.length >
                                 0 && (
-                                <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-                                  <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                                <div className="border-accent-indigo-border bg-accent-indigo-bg rounded-lg border p-4">
+                                  <h4 className="text-heading mb-2 text-sm font-semibold">
                                     Weapon Proficiencies
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
@@ -717,8 +717,8 @@ export default function NewCharacterPage() {
 
                             {/* Skill Choices */}
                             {selectedClassData.proficiencies.skillChoices && (
-                              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                                <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                              <div className="border-accent-amber-border bg-accent-amber-bg rounded-lg border p-4">
+                                <h4 className="text-heading mb-2 text-sm font-semibold">
                                   Skill Proficiencies (Choose{' '}
                                   {
                                     selectedClassData.proficiencies.skillChoices
@@ -747,8 +747,8 @@ export default function NewCharacterPage() {
                               Object.keys(
                                 selectedClassData.multiclassing.requirements
                               ).length > 0 && (
-                                <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
-                                  <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                                <div className="border-accent-purple-border bg-accent-purple-bg rounded-lg border p-4">
+                                  <h4 className="text-heading mb-2 text-sm font-semibold">
                                     Multiclassing Requirements
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
@@ -772,11 +772,11 @@ export default function NewCharacterPage() {
                             {selectedClassData.startingEquipment &&
                               selectedClassData.startingEquipment.length >
                                 0 && (
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                                  <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                                <div className="border-divider bg-surface-secondary rounded-lg border p-4">
+                                  <h4 className="text-heading mb-2 text-sm font-semibold">
                                     Starting Equipment
                                   </h4>
-                                  <ul className="space-y-1 text-sm text-gray-700">
+                                  <ul className="text-body space-y-1 text-sm">
                                     {selectedClassData.startingEquipment
                                       .slice(0, 5)
                                       .map((item, idx) => (
@@ -784,7 +784,7 @@ export default function NewCharacterPage() {
                                           key={idx}
                                           className="flex items-start gap-2"
                                         >
-                                          <span className="mt-1.5 h-1 w-1 flex-shrink-0 rounded-full bg-gray-400"></span>
+                                          <span className="bg-faint mt-1.5 h-1 w-1 shrink-0 rounded-full"></span>
                                           <span
                                             dangerouslySetInnerHTML={{
                                               __html: item,
@@ -794,7 +794,7 @@ export default function NewCharacterPage() {
                                       ))}
                                     {selectedClassData.startingEquipment
                                       .length > 5 && (
-                                      <li className="text-xs text-gray-600 italic">
+                                      <li className="text-muted text-xs italic">
                                         ...and{' '}
                                         {selectedClassData.startingEquipment
                                           .length - 5}{' '}
@@ -809,7 +809,7 @@ export default function NewCharacterPage() {
                             {selectedClassData.features &&
                               selectedClassData.features.length > 0 && (
                                 <div className="space-y-3">
-                                  <h4 className="text-sm font-semibold text-gray-900">
+                                  <h4 className="text-heading text-sm font-semibold">
                                     Class Features (First 3 Levels)
                                   </h4>
                                   {selectedClassData.features
@@ -822,10 +822,10 @@ export default function NewCharacterPage() {
                                     .map((feature, idx) => (
                                       <div
                                         key={idx}
-                                        className="rounded-lg border border-emerald-200 bg-emerald-50 p-4"
+                                        className="border-accent-emerald-border bg-accent-emerald-bg rounded-lg border p-4"
                                       >
                                         <div className="mb-1 flex items-center justify-between">
-                                          <h5 className="text-sm font-semibold text-emerald-900">
+                                          <h5 className="text-accent-emerald-text text-sm font-semibold">
                                             {feature.name}
                                           </h5>
                                           <Badge variant="success" size="sm">
@@ -835,7 +835,7 @@ export default function NewCharacterPage() {
                                         {feature.entries &&
                                           feature.entries.length > 0 && (
                                             <div
-                                              className="text-sm leading-relaxed text-gray-700"
+                                              className="text-body text-sm leading-relaxed"
                                               dangerouslySetInnerHTML={{
                                                 __html:
                                                   feature.entries[0].substring(
@@ -857,11 +857,11 @@ export default function NewCharacterPage() {
                             {/* Subclasses Count */}
                             {selectedClassData.subclasses &&
                               selectedClassData.subclasses.length > 0 && (
-                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                                  <h4 className="mb-2 text-sm font-semibold text-gray-900">
+                                <div className="border-divider bg-surface-secondary rounded-lg border p-4">
+                                  <h4 className="text-heading mb-2 text-sm font-semibold">
                                     Available Subclasses
                                   </h4>
-                                  <p className="text-sm text-gray-700">
+                                  <p className="text-body text-sm">
                                     This class has{' '}
                                     <strong>
                                       {selectedClassData.subclasses.length}
@@ -876,8 +876,8 @@ export default function NewCharacterPage() {
                               )}
 
                             {/* Source */}
-                            <div className="border-t border-gray-200 pt-3">
-                              <p className="text-xs text-gray-600">
+                            <div className="border-divider border-t pt-3">
+                              <p className="text-muted text-xs">
                                 <span className="font-medium">Source:</span>{' '}
                                 {selectedClassData.source}
                                 {selectedClassData.page &&
@@ -896,7 +896,7 @@ export default function NewCharacterPage() {
               <div className="md:col-span-2">
                 <label
                   htmlFor="playerName"
-                  className="mb-2 block text-sm font-medium text-slate-700"
+                  className="text-heading mb-2 block text-sm font-medium"
                 >
                   Player Name
                 </label>
@@ -911,34 +911,34 @@ export default function NewCharacterPage() {
             </div>
 
             {/* Character Preview */}
-            <div className="rounded-lg border-2 border-slate-200 bg-slate-50 p-6">
-              <h3 className="mb-4 text-lg font-medium text-slate-800">
+            <div className="border-divider bg-surface-secondary rounded-lg border-2 p-6">
+              <h3 className="text-heading mb-4 text-lg font-medium">
                 Character Preview
               </h3>
               <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
                 <div>
-                  <span className="text-slate-500">Name:</span>
-                  <p className="font-medium text-slate-800">
+                  <span className="text-muted">Name:</span>
+                  <p className="text-heading font-medium">
                     {characterName || 'Character Name'}
                   </p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Race:</span>
-                  <p className="font-medium text-slate-800">{selectedRace}</p>
+                  <span className="text-muted">Race:</span>
+                  <p className="text-heading font-medium">{selectedRace}</p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Class:</span>
-                  <p className="font-medium text-slate-800">{selectedClass}</p>
+                  <span className="text-muted">Class:</span>
+                  <p className="text-heading font-medium">{selectedClass}</p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Level:</span>
-                  <p className="font-medium text-slate-800">1</p>
+                  <span className="text-muted">Level:</span>
+                  <p className="text-heading font-medium">1</p>
                 </div>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-4 border-t border-slate-200 pt-6">
+            <div className="border-divider flex items-center justify-end gap-4 border-t pt-6">
               <Link href="/player">
                 <Button variant="ghost">Cancel</Button>
               </Link>
