@@ -154,37 +154,41 @@ export function HitPointTracker({
   };
 
   const getStatusColor = () => {
-    if (isCharacterDead) return 'text-black bg-gray-800';
-    if (isCharacterDying) return 'text-red-800 bg-red-100';
-    if (isCharacterStabilized) return 'text-yellow-800 bg-yellow-100';
-    if (isUnconscious) return 'text-orange-800 bg-orange-100';
+    if (isCharacterDead) return 'text-inverse bg-gray-800';
+    if (isCharacterDying) return 'text-accent-red-text bg-accent-red-bg';
+    if (isCharacterStabilized)
+      return 'text-accent-amber-text bg-accent-amber-bg';
+    if (isUnconscious) return 'text-accent-orange-text bg-accent-orange-bg';
     if (hitPoints.current <= hitPoints.max * 0.25)
-      return 'text-red-700 bg-red-50';
+      return 'text-accent-red-text bg-accent-red-bg';
     if (hitPoints.current <= hitPoints.max * 0.5)
-      return 'text-yellow-700 bg-yellow-50';
-    return 'text-green-700 bg-green-50';
+      return 'text-accent-amber-text bg-accent-amber-bg';
+    return 'text-accent-green-text bg-accent-green-bg';
   };
 
   const getCurrentHPBoxColor = () => {
     if (isCharacterDead) return 'bg-gray-800 border-gray-900';
-    if (isCharacterDying) return 'bg-red-100 border-red-300';
-    if (isCharacterStabilized) return 'bg-yellow-50 border-yellow-300';
-    if (isUnconscious) return 'bg-orange-50 border-orange-300';
+    if (isCharacterDying) return 'bg-accent-red-bg border-accent-red-border';
+    if (isCharacterStabilized)
+      return 'bg-accent-amber-bg border-accent-amber-border';
+    if (isUnconscious) return 'bg-accent-orange-bg border-accent-orange-border';
     if (hitPoints.current <= hitPoints.max * 0.25)
-      return 'bg-red-50 border-red-200';
+      return 'bg-accent-red-bg border-accent-red-border';
     if (hitPoints.current <= hitPoints.max * 0.5)
-      return 'bg-yellow-50 border-yellow-200';
-    return 'bg-green-50 border-green-200';
+      return 'bg-accent-amber-bg border-accent-amber-border';
+    return 'bg-accent-green-bg border-accent-green-border';
   };
 
   const getCurrentHPTextColor = () => {
-    if (isCharacterDead) return 'text-white';
-    if (isCharacterDying) return 'text-red-800';
-    if (isCharacterStabilized) return 'text-yellow-800';
-    if (isUnconscious) return 'text-orange-800';
-    if (hitPoints.current <= hitPoints.max * 0.25) return 'text-red-800';
-    if (hitPoints.current <= hitPoints.max * 0.5) return 'text-yellow-800';
-    return 'text-green-800';
+    if (isCharacterDead) return 'text-inverse';
+    if (isCharacterDying) return 'text-accent-red-text';
+    if (isCharacterStabilized) return 'text-accent-amber-text';
+    if (isUnconscious) return 'text-accent-orange-text';
+    if (hitPoints.current <= hitPoints.max * 0.25)
+      return 'text-accent-red-text';
+    if (hitPoints.current <= hitPoints.max * 0.5)
+      return 'text-accent-amber-text';
+    return 'text-accent-green-text';
   };
 
   const getStatusText = () => {
@@ -196,8 +200,8 @@ export function HitPointTracker({
   };
 
   const containerClasses = compact
-    ? `bg-white rounded-lg shadow border border-red-200 p-3 space-y-3 ${className}`
-    : `bg-white rounded-lg shadow-lg border border-red-200 p-6 space-y-6 ${className}`;
+    ? `bg-surface-raised rounded-lg shadow border border-accent-red-border p-3 space-y-3 ${className}`
+    : `bg-surface-raised rounded-lg shadow-lg border border-accent-red-border p-6 space-y-6 ${className}`;
 
   const gridSizeClasses = compact ? 'gap-1 sm:gap-2' : 'gap-2 sm:gap-4';
   const minHeightClasses = compact
@@ -209,7 +213,7 @@ export function HitPointTracker({
       {!hideLabels && (
         <div className="flex items-center justify-between">
           <h3
-            className={`${compact ? 'text-base' : 'text-lg'} flex items-center gap-2 font-semibold text-red-800`}
+            className={`${compact ? 'text-base' : 'text-lg'} text-accent-red-text flex items-center gap-2 font-semibold`}
           >
             <Heart size={compact ? 16 : 20} />
             Hit Points
@@ -259,15 +263,15 @@ export function HitPointTracker({
 
         <div className="text-center">
           <div
-            className={`rounded-lg border-2 border-red-300 bg-red-100 p-2 ${compact ? 'sm:p-2' : 'sm:p-3'} relative ${minHeightClasses} flex flex-col justify-center`}
+            className={`border-accent-red-border bg-accent-red-bg rounded-lg border-2 p-2 ${compact ? 'sm:p-2' : 'sm:p-3'} relative ${minHeightClasses} flex flex-col justify-center`}
           >
-            <div className="mb-1 flex items-center justify-center gap-1 text-xs font-medium text-red-800">
+            <div className="text-accent-red-text mb-1 flex items-center justify-center gap-1 text-xs font-medium">
               <span className="hidden sm:inline">MAXIMUM</span>
               <span className="sm:hidden">MAX</span>
               {!readonly && onToggleCalculationMode && (
                 <button
                   onClick={onToggleCalculationMode}
-                  className="text-red-600 transition-colors hover:text-red-800"
+                  className="text-accent-red-text-muted hover:text-accent-red-text transition-colors"
                   title={`Switch to ${hitPoints.calculationMode === 'auto' ? 'manual' : 'auto'} calculation`}
                 >
                   {hitPoints.calculationMode === 'auto' ? (
@@ -280,7 +284,7 @@ export function HitPointTracker({
             </div>
             {readonly ? (
               <div
-                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} font-bold text-red-900`}
+                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-red-text font-bold`}
               >
                 {hitPoints.max}
               </div>
@@ -291,7 +295,7 @@ export function HitPointTracker({
                 onChange={e =>
                   onUpdateHitPoints?.({ max: parseInt(e.target.value) || 0 })
                 }
-                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} w-full border-none bg-transparent text-center leading-tight font-bold text-red-900 outline-none`}
+                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-red-text w-full border-none bg-transparent text-center leading-tight font-bold outline-none`}
                 disabled={hitPoints.calculationMode === 'auto'}
                 min="1"
                 style={{ maxWidth: '100%' }}
@@ -309,14 +313,14 @@ export function HitPointTracker({
 
         <div className="text-center">
           <div
-            className={`rounded-lg border-2 border-blue-200 bg-blue-50 p-2 ${compact ? 'sm:p-2' : 'sm:p-3'} ${minHeightClasses} flex flex-col justify-center`}
+            className={`border-accent-blue-border bg-accent-blue-bg rounded-lg border-2 p-2 ${compact ? 'sm:p-2' : 'sm:p-3'} ${minHeightClasses} flex flex-col justify-center`}
           >
-            <div className="mb-1 text-xs font-medium text-blue-700">
+            <div className="text-accent-blue-text mb-1 text-xs font-medium">
               <span>TEMP</span>
             </div>
             {readonly ? (
               <div
-                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} font-bold text-blue-800`}
+                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-blue-text font-bold`}
               >
                 {hitPoints.temporary}
               </div>
@@ -329,7 +333,7 @@ export function HitPointTracker({
                     temporary: parseInt(e.target.value) || 0,
                   })
                 }
-                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} w-full border-none bg-transparent text-center leading-tight font-bold text-blue-800 outline-none`}
+                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-blue-text w-full border-none bg-transparent text-center leading-tight font-bold outline-none`}
                 min="0"
                 style={{ maxWidth: '100%' }}
               />
@@ -343,7 +347,7 @@ export function HitPointTracker({
         <div className="space-y-3">
           {/* Damage */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-red-700">
+            <label className="text-accent-red-text-muted block text-sm font-medium">
               Apply Damage
             </label>
             <div className="flex gap-2">
@@ -352,13 +356,13 @@ export function HitPointTracker({
                 value={damageAmount}
                 onChange={e => setDamageAmount(e.target.value)}
                 placeholder="Amount"
-                className="w-24 rounded-md border border-red-300 px-3 py-2 text-center text-gray-800 focus:border-red-500 focus:ring-2 focus:ring-red-500"
+                className="border-accent-red-border bg-surface-raised text-heading focus:border-accent-red-border-strong focus:ring-accent-red-bg-strong w-24 rounded-md border px-3 py-2 text-center focus:ring-2"
                 min="1"
               />
               <button
                 onClick={handleDamage}
                 disabled={!damageAmount || parseInt(damageAmount) <= 0}
-                className="flex flex-1 items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                className="disabled:bg-surface-hover disabled:text-muted flex flex-1 items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed"
               >
                 <Minus size={16} />
                 Apply Damage
@@ -368,7 +372,7 @@ export function HitPointTracker({
 
           {/* Healing */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-green-700">
+            <label className="text-accent-green-text block text-sm font-medium">
               Apply Healing
             </label>
             <div className="flex gap-2">
@@ -377,13 +381,13 @@ export function HitPointTracker({
                 value={healingAmount}
                 onChange={e => setHealingAmount(e.target.value)}
                 placeholder="Amount"
-                className="w-24 rounded-md border border-green-300 px-3 py-2 text-center text-gray-800 focus:border-green-500 focus:ring-2 focus:ring-green-500"
+                className="border-accent-green-border bg-surface-raised text-heading focus:border-accent-green-border-strong focus:ring-accent-green-bg-strong w-24 rounded-md border px-3 py-2 text-center focus:ring-2"
                 min="1"
               />
               <button
                 onClick={handleHealing}
                 disabled={!healingAmount || parseInt(healingAmount) <= 0}
-                className="flex flex-1 items-center justify-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                className="disabled:bg-surface-hover disabled:text-muted flex flex-1 items-center justify-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed"
               >
                 <Plus size={16} />
                 Apply Healing
@@ -393,7 +397,7 @@ export function HitPointTracker({
 
           {/* Temporary HP */}
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-blue-700">
+            <label className="text-accent-blue-text-muted block text-sm font-medium">
               Add Temporary HP
             </label>
             <div className="flex gap-2">
@@ -402,13 +406,13 @@ export function HitPointTracker({
                 value={tempHPAmount}
                 onChange={e => setTempHPAmount(e.target.value)}
                 placeholder="Amount"
-                className="w-24 rounded-md border border-blue-300 px-3 py-2 text-center text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                className="border-accent-blue-border bg-surface-raised text-heading focus:border-accent-blue-border-strong focus:ring-accent-blue-bg-strong w-24 rounded-md border px-3 py-2 text-center focus:ring-2"
                 min="1"
               />
               <button
                 onClick={handleTempHP}
                 disabled={!tempHPAmount || parseInt(tempHPAmount) <= 0}
-                className="flex flex-1 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                className="disabled:bg-surface-hover disabled:text-muted flex flex-1 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed"
               >
                 <Shield size={16} />
                 Add Temp HP
@@ -421,23 +425,23 @@ export function HitPointTracker({
       {/* Death Saving Throws */}
       {showDeathSaves &&
         (isCharacterDying || isCharacterStabilized || hitPoints.deathSaves) && (
-          <div className="mt-4 rounded-xl border-2 border-gray-200 bg-gradient-to-br from-gray-50 to-slate-100 p-5 shadow-md">
+          <div className="border-divider from-surface-raised to-surface-secondary mt-4 rounded-xl border-2 bg-gradient-to-br p-5 shadow-md">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-gradient-to-br from-gray-600 to-gray-700 p-2 shadow-md">
                   <Skull size={18} className="text-white" />
                 </div>
                 <div>
-                  <h4 className="text-lg font-bold text-gray-900">
+                  <h4 className="text-heading text-lg font-bold">
                     Death Saving Throws
                   </h4>
                   {isCharacterStabilized && (
-                    <span className="text-xs font-medium text-amber-600">
+                    <span className="text-accent-amber-text text-xs font-medium">
                       Stabilized
                     </span>
                   )}
                   {isCharacterDead && (
-                    <span className="text-xs font-medium text-red-600">
+                    <span className="text-accent-red-text-muted text-xs font-medium">
                       Dead
                     </span>
                   )}
@@ -461,11 +465,14 @@ export function HitPointTracker({
                 {/* Success/Failure Interactive Display - Stacked vertically */}
                 <div className="space-y-3">
                   {/* Successes */}
-                  <div className="rounded-lg border-2 border-green-200 bg-green-50 p-3">
+                  <div className="border-accent-green-border bg-accent-green-bg rounded-lg border-2 p-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex w-24 shrink-0 items-center gap-2">
-                        <Check size={16} className="shrink-0 text-green-600" />
-                        <span className="text-sm font-semibold text-green-700">
+                        <Check
+                          size={16}
+                          className="text-accent-green-text shrink-0"
+                        />
+                        <span className="text-accent-green-text text-sm font-semibold">
                           Successes
                         </span>
                       </div>
@@ -499,10 +506,10 @@ export function HitPointTracker({
                               className={`relative h-9 w-9 rounded-full border-2 transition-all duration-200 ${
                                 isFilled
                                   ? 'border-green-500 bg-green-500 shadow-md'
-                                  : 'border-green-300 bg-white'
+                                  : 'border-accent-green-border-strong bg-surface-raised'
                               } ${
                                 canAdd
-                                  ? 'cursor-pointer hover:scale-110 hover:border-green-500 hover:bg-green-100 hover:shadow-lg active:scale-95'
+                                  ? 'hover:bg-accent-green-bg-strong cursor-pointer hover:scale-110 hover:border-green-500 hover:shadow-lg active:scale-95'
                                   : canRemove
                                     ? 'cursor-pointer hover:scale-110 hover:border-green-600 hover:bg-green-600 hover:shadow-lg active:scale-95'
                                     : 'cursor-default'
@@ -522,7 +529,7 @@ export function HitPointTracker({
                                 />
                               )}
                               {canAdd && !isFilled && (
-                                <span className="absolute inset-0 m-auto flex h-full w-full items-center justify-center text-green-400 opacity-50">
+                                <span className="text-accent-green-text absolute inset-0 m-auto flex h-full w-full items-center justify-center opacity-50">
                                   <Check size={14} />
                                 </span>
                               )}
@@ -534,11 +541,14 @@ export function HitPointTracker({
                   </div>
 
                   {/* Failures */}
-                  <div className="rounded-lg border-2 border-red-200 bg-red-50 p-3">
+                  <div className="border-accent-red-border bg-accent-red-bg rounded-lg border-2 p-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex w-24 shrink-0 items-center gap-2">
-                        <X size={16} className="shrink-0 text-red-600" />
-                        <span className="text-sm font-semibold text-red-700">
+                        <X
+                          size={16}
+                          className="text-accent-red-text-muted shrink-0"
+                        />
+                        <span className="text-accent-red-text-muted text-sm font-semibold">
                           Failures
                         </span>
                       </div>
@@ -572,10 +582,10 @@ export function HitPointTracker({
                               className={`relative h-9 w-9 rounded-full border-2 transition-all duration-200 ${
                                 isFilled
                                   ? 'border-red-500 bg-red-500 shadow-md'
-                                  : 'border-red-300 bg-white'
+                                  : 'border-accent-red-border-strong bg-surface-raised'
                               } ${
                                 canAdd
-                                  ? 'cursor-pointer hover:scale-110 hover:border-red-500 hover:bg-red-100 hover:shadow-lg active:scale-95'
+                                  ? 'hover:bg-accent-red-bg-strong cursor-pointer hover:scale-110 hover:border-red-500 hover:shadow-lg active:scale-95'
                                   : canRemove
                                     ? 'cursor-pointer hover:scale-110 hover:border-red-600 hover:bg-red-600 hover:shadow-lg active:scale-95'
                                     : 'cursor-default'
@@ -595,7 +605,7 @@ export function HitPointTracker({
                                 />
                               )}
                               {canAdd && !isFilled && (
-                                <span className="absolute inset-0 m-auto flex h-full w-full items-center justify-center text-red-400 opacity-50">
+                                <span className="text-accent-red-text-muted absolute inset-0 m-auto flex h-full w-full items-center justify-center opacity-50">
                                   <X size={14} />
                                 </span>
                               )}
@@ -623,31 +633,31 @@ export function HitPointTracker({
                 )}
 
                 {/* Help Info */}
-                <div className="rounded-lg border border-gray-200 bg-white p-3">
+                <div className="border-divider bg-surface-raised rounded-lg border p-3">
                   <div className="flex items-start gap-2">
                     <HelpCircle
                       size={14}
-                      className="mt-0.5 shrink-0 text-gray-400"
+                      className="text-faint mt-0.5 shrink-0"
                     />
-                    <div className="space-y-0.5 text-xs text-gray-600">
+                    <div className="text-muted space-y-0.5 text-xs">
                       <p>
                         <span className="font-medium">Roll d20:</span> 10+ =
                         Success, 9 or below = Failure
                       </p>
                       <p>
-                        <span className="font-medium text-amber-600">
+                        <span className="text-accent-amber-text font-medium">
                           Natural 20:
                         </span>{' '}
                         Regain 1 HP and become conscious
                       </p>
                       <p>
-                        <span className="font-medium text-green-600">
+                        <span className="text-accent-green-text font-medium">
                           3 Successes:
                         </span>{' '}
                         Stabilized but unconscious
                       </p>
                       <p>
-                        <span className="font-medium text-red-600">
+                        <span className="text-accent-red-text-muted font-medium">
                           3 Failures:
                         </span>{' '}
                         Dead
@@ -662,10 +672,10 @@ export function HitPointTracker({
 
       {/* HP Calculation Mode Info */}
       {showCalculationInfo && classInfo && level && !compact && (
-        <div className="border-t border-gray-200 pt-4">
+        <div className="border-divider border-t pt-4">
           <div className="flex items-start gap-3">
-            <HelpCircle size={16} className="mt-0.5 text-gray-500" />
-            <div className="space-y-1 text-xs text-gray-600">
+            <HelpCircle size={16} className="text-muted mt-0.5" />
+            <div className="text-muted space-y-1 text-xs">
               <p>
                 <strong>Auto Mode:</strong> Max HP calculated using D&D 5e rules
                 (Level 1: full hit die + CON, subsequent levels: average hit die
@@ -675,7 +685,7 @@ export function HitPointTracker({
                 <strong>Manual Mode:</strong> Set your own maximum HP value
               </p>
               {hitPoints.calculationMode === 'auto' && (
-                <p className="text-blue-600">
+                <p className="text-accent-blue-text-muted">
                   Current calculation: Level {level} {classInfo.name} ={' '}
                   {hitPoints.max} HP
                 </p>

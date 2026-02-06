@@ -304,13 +304,13 @@ export default function UnifiedFeatureModal({
       <div className="space-y-6">
         {/* View Mode - Header with Actions */}
         {isEditMode && mode === 'view' && (
-          <div className="flex items-center justify-between border-b border-gray-200 pb-4">
+          <div className="border-divider flex items-center justify-between border-b pb-4">
             <div className="flex items-center gap-3">
-              <span className="rounded-lg bg-indigo-100 px-3 py-1.5 text-sm font-semibold text-indigo-800">
+              <span className="bg-accent-indigo-bg-strong text-accent-indigo-text rounded-lg px-3 py-1.5 text-sm font-semibold">
                 {FEATURE_SOURCE_LABELS[existingFeature!.sourceType]}
               </span>
               {existingFeature!.sourceDetail && (
-                <span className="rounded bg-gray-100 px-2 py-1 text-sm font-medium text-gray-600">
+                <span className="bg-surface-inset text-muted rounded px-2 py-1 text-sm font-medium">
                   {existingFeature!.sourceDetail}
                 </span>
               )}
@@ -321,7 +321,7 @@ export default function UnifiedFeatureModal({
                 {hasUses && !isExhausted && onUse && (
                   <button
                     onClick={onUse}
-                    className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
+                    className="bg-accent-indigo-text text-inverse hover:bg-accent-indigo-text-muted flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
                   >
                     <Zap className="h-4 w-4" />
                     Use Feature
@@ -329,7 +329,7 @@ export default function UnifiedFeatureModal({
                 )}
                 <button
                   onClick={() => setMode('edit')}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+                  className="bg-accent-blue-text text-inverse hover:bg-accent-blue-text-muted flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
                 >
                   <Edit3 className="h-4 w-4" />
                   Edit
@@ -337,7 +337,7 @@ export default function UnifiedFeatureModal({
                 {onDelete && (
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-700"
+                    className="bg-accent-red-text text-inverse hover:bg-accent-red-text-muted flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
                     Delete
@@ -352,16 +352,16 @@ export default function UnifiedFeatureModal({
         {isEditMode && mode === 'view' && existingFeature && (
           <div className="space-y-6">
             {/* Usage Info */}
-            <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+            <div className="border-accent-blue-border from-accent-blue-bg to-accent-indigo-bg rounded-xl border bg-gradient-to-br p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="mb-2 text-lg font-semibold text-gray-900">
+                  <h4 className="text-heading mb-2 text-lg font-semibold">
                     Usage Information
                   </h4>
                   {existingFeature.isPassive ? (
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-                      <p className="text-sm font-medium text-blue-700">
+                      <p className="text-accent-blue-text-muted text-sm font-medium">
                         Passive ability - always active
                       </p>
                     </div>
@@ -370,9 +370,9 @@ export default function UnifiedFeatureModal({
                       <div
                         className={`h-2 w-2 rounded-full ${isExhausted ? 'bg-red-500' : usesRemaining <= 1 ? 'bg-orange-500' : 'bg-green-500'}`}
                       ></div>
-                      <p className="text-sm font-medium text-gray-700">
+                      <p className="text-body text-sm font-medium">
                         <span
-                          className={`${isExhausted ? 'text-red-600' : usesRemaining <= 1 ? 'text-orange-600' : 'text-green-600'}`}
+                          className={`${isExhausted ? 'text-accent-red-text-muted' : usesRemaining <= 1 ? 'text-accent-orange-text-muted' : 'text-accent-green-text-muted'}`}
                         >
                           {usesRemaining}
                         </span>{' '}
@@ -382,14 +382,14 @@ export default function UnifiedFeatureModal({
                   ) : (
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                      <p className="text-sm font-medium text-green-700">
+                      <p className="text-accent-green-text-muted text-sm font-medium">
                         Unlimited uses
                       </p>
                     </div>
                   )}
                 </div>
                 {hasUses && (
-                  <div className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm font-medium text-gray-600">
+                  <div className="border-divider bg-surface-raised text-muted flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium">
                     <Clock className="h-4 w-4" />
                     <span className="capitalize">
                       {existingFeature.restType} rest
@@ -401,12 +401,12 @@ export default function UnifiedFeatureModal({
 
             {/* Description */}
             {existingFeature.description && (
-              <div className="rounded-lg border border-gray-200 bg-white p-6">
-                <h4 className="mb-4 text-lg font-semibold text-gray-900">
+              <div className="border-divider bg-surface-raised rounded-lg border p-6">
+                <h4 className="text-heading mb-4 text-lg font-semibold">
                   Description
                 </h4>
                 <div
-                  className="prose prose-sm max-w-none leading-relaxed text-gray-700"
+                  className="prose prose-sm text-body max-w-none leading-relaxed"
                   dangerouslySetInnerHTML={{
                     __html: existingFeature.description,
                   }}
@@ -417,19 +417,19 @@ export default function UnifiedFeatureModal({
             {/* Additional Info */}
             {(existingFeature.scaleWithProficiency ||
               existingFeature.category) && (
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-6">
-                <h4 className="mb-4 text-lg font-semibold text-gray-900">
+              <div className="border-divider bg-surface-inset rounded-lg border p-6">
+                <h4 className="text-heading mb-4 text-lg font-semibold">
                   Additional Details
                 </h4>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {existingFeature.scaleWithProficiency && (
-                    <div className="flex items-center gap-3 rounded-lg border bg-white p-3">
-                      <div className="h-2 w-2 shrink-0 rounded-full bg-purple-500"></div>
+                    <div className="border-divider bg-surface-raised flex items-center gap-3 rounded-lg border p-3">
+                      <div className="bg-accent-purple-text-muted h-2 w-2 shrink-0 rounded-full"></div>
                       <div>
-                        <span className="text-sm font-medium text-gray-700">
+                        <span className="text-body text-sm font-medium">
                           Scaling:
                         </span>
-                        <span className="ml-2 text-sm text-gray-600">
+                        <span className="text-muted ml-2 text-sm">
                           Proficiency ×{' '}
                           {existingFeature.proficiencyMultiplier || 1}
                         </span>
@@ -437,13 +437,13 @@ export default function UnifiedFeatureModal({
                     </div>
                   )}
                   {existingFeature.category && (
-                    <div className="flex items-center gap-3 rounded-lg border bg-white p-3">
-                      <div className="h-2 w-2 shrink-0 rounded-full bg-green-500"></div>
+                    <div className="border-divider bg-surface-raised flex items-center gap-3 rounded-lg border p-3">
+                      <div className="bg-accent-green-text-muted h-2 w-2 shrink-0 rounded-full"></div>
                       <div>
-                        <span className="text-sm font-medium text-gray-700">
+                        <span className="text-body text-sm font-medium">
                           Category:
                         </span>
-                        <span className="ml-2 text-sm text-gray-600">
+                        <span className="text-muted ml-2 text-sm">
                           {existingFeature.category}
                         </span>
                       </div>
@@ -460,8 +460,8 @@ export default function UnifiedFeatureModal({
           <div className="space-y-6">
             {/* Autocomplete Section - Only show for new features */}
             {!isEditMode && (
-              <div className="rounded-lg border-2 border-indigo-200 bg-indigo-50 p-6">
-                <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-indigo-900">
+              <div className="border-accent-indigo-border bg-accent-indigo-bg rounded-lg border-2 p-6">
+                <h3 className="text-heading mb-4 flex items-center gap-2 text-lg font-semibold">
                   <Filter className="h-5 w-5" />
                   Search Feature Database
                 </h3>
@@ -540,8 +540,8 @@ export default function UnifiedFeatureModal({
             {/* Form Fields */}
             <div className="space-y-6">
               {/* Basic Information */}
-              <div className="rounded-lg border border-gray-200 bg-white p-6">
-                <h4 className="mb-4 text-lg font-semibold text-gray-900">
+              <div className="border-divider bg-surface-raised rounded-lg border p-6">
+                <h4 className="text-heading mb-4 text-lg font-semibold">
                   Basic Information
                 </h4>
 
@@ -600,7 +600,7 @@ export default function UnifiedFeatureModal({
                   />
 
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                    <label className="text-body mb-1 block text-sm font-medium">
                       Description
                     </label>
                     <RichTextEditor
@@ -616,8 +616,8 @@ export default function UnifiedFeatureModal({
               </div>
 
               {/* Usage Configuration */}
-              <div className="rounded-lg border border-gray-200 p-4">
-                <h4 className="mb-3 flex items-center gap-2 font-medium text-gray-900">
+              <div className="border-divider rounded-lg border p-4">
+                <h4 className="text-heading mb-3 flex items-center gap-2 font-medium">
                   <Settings className="h-4 w-4" />
                   Usage Configuration
                 </h4>
@@ -633,15 +633,15 @@ export default function UnifiedFeatureModal({
                           isPassive: e.target.checked,
                         })
                       }
-                      className="rounded border-gray-300"
+                      className="border-divider-strong rounded"
                     />
-                    <span className="text-sm text-gray-700">
+                    <span className="text-body text-sm">
                       Passive ability (always active, no usage tracking)
                     </span>
                   </label>
 
                   {!formData.isPassive && (
-                    <div className="space-y-3 border-l-2 border-gray-200 pl-6">
+                    <div className="border-divider space-y-3 border-l-2 pl-6">
                       <div className="grid grid-cols-2 gap-4">
                         <Input
                           label="Maximum Uses"
@@ -683,9 +683,9 @@ export default function UnifiedFeatureModal({
                                 scaleWithProficiency: e.target.checked,
                               })
                             }
-                            className="rounded border-gray-300"
+                            className="border-divider-strong rounded"
                           />
-                          <span className="text-sm text-gray-700">
+                          <span className="text-body text-sm">
                             Scale uses with proficiency bonus
                           </span>
                         </label>
@@ -721,11 +721,11 @@ export default function UnifiedFeatureModal({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
+            <div className="border-divider flex justify-end gap-3 border-t pt-4">
               <button
                 type="button"
                 onClick={handleCancel}
-                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="border-divider-strong bg-surface-raised text-body hover:bg-surface-hover rounded-lg border px-4 py-2 text-sm font-medium"
               >
                 Cancel
               </button>
@@ -733,7 +733,7 @@ export default function UnifiedFeatureModal({
                 type="button"
                 onClick={handleSave}
                 disabled={!formData.name.trim()}
-                className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="bg-accent-indigo-text text-inverse hover:bg-accent-indigo-text-muted flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isEditMode ? (
                   <>
@@ -753,16 +753,16 @@ export default function UnifiedFeatureModal({
 
         {/* Delete Confirmation */}
         {showDeleteConfirm && (
-          <div className="rounded-lg border-2 border-red-200 bg-red-50 p-6">
+          <div className="border-accent-red-border bg-accent-red-bg rounded-lg border-2 p-6">
             <div className="flex items-start gap-4">
               <div className="shrink-0">
-                <AlertTriangle className="h-6 w-6 text-red-600" />
+                <AlertTriangle className="text-accent-red-text-muted h-6 w-6" />
               </div>
               <div className="flex-1">
-                <h4 className="mb-2 text-lg font-semibold text-red-900">
+                <h4 className="text-heading mb-2 text-lg font-semibold">
                   Delete this feature?
                 </h4>
-                <p className="mb-4 text-sm text-red-700">
+                <p className="text-body mb-4 text-sm">
                   This action cannot be undone. The feature &quot;
                   {existingFeature?.name}
                   &quot; will be permanently removed.
@@ -770,14 +770,14 @@ export default function UnifiedFeatureModal({
                 <div className="flex gap-3">
                   <button
                     onClick={handleDelete}
-                    className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-red-700"
+                    className="bg-accent-red-text text-inverse hover:bg-accent-red-text-muted flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
                     Delete Feature
                   </button>
                   <button
                     onClick={() => setShowDeleteConfirm(false)}
-                    className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+                    className="border-divider-strong bg-surface-raised text-body hover:bg-surface-hover rounded-lg border px-4 py-2 text-sm font-medium shadow-sm transition-colors"
                   >
                     Cancel
                   </button>

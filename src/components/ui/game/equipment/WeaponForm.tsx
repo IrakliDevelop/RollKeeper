@@ -156,7 +156,7 @@ export function WeaponForm({
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Section: Basic Information */}
       <div className="space-y-4">
-        <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
           Basic Information
         </h4>
 
@@ -170,7 +170,7 @@ export function WeaponForm({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
+            <label className="text-body mb-2 block text-sm font-medium">
               Category
             </label>
             <SelectField
@@ -208,8 +208,8 @@ export function WeaponForm({
 
       {/* Section: Damage */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between border-b-2 border-gray-200 pb-2">
-          <h4 className="text-sm font-bold tracking-wide text-gray-800 uppercase">
+        <div className="border-divider flex items-center justify-between border-b-2 pb-2">
+          <h4 className="text-heading text-sm font-bold tracking-wide uppercase">
             Damage Entries
           </h4>
           <Button
@@ -228,7 +228,7 @@ export function WeaponForm({
             variant="primary"
             size="sm"
             leftIcon={<Plus size={14} />}
-            className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+            className="bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
           >
             Add Damage Type
           </Button>
@@ -237,10 +237,10 @@ export function WeaponForm({
         {formData.damage.map((damage, index) => (
           <div
             key={index}
-            className="rounded-lg border-2 border-gray-200 bg-white p-4"
+            className="border-divider bg-surface-raised rounded-lg border-2 p-4"
           >
             <div className="mb-3 flex items-center justify-between">
-              <h5 className="text-sm font-semibold text-gray-700">
+              <h5 className="text-body text-sm font-semibold">
                 {damage.label || `Damage ${index + 1}`}
               </h5>
               {formData.damage.length > 1 && (
@@ -257,7 +257,7 @@ export function WeaponForm({
                   }}
                   variant="ghost"
                   size="xs"
-                  className="text-red-600 hover:bg-red-50 hover:text-red-800"
+                  className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text"
                 >
                   <Trash2 size={16} />
                 </Button>
@@ -302,7 +302,7 @@ export function WeaponForm({
               />
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="text-body mb-2 block text-sm font-medium">
                   Type
                 </label>
                 <SelectField
@@ -351,7 +351,7 @@ export function WeaponForm({
 
       {/* Section: Weapon Types */}
       <div className="space-y-4">
-        <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
           Weapon Types
         </h4>
 
@@ -365,7 +365,7 @@ export function WeaponForm({
                 checked={formData.weaponType.includes(type)}
                 onCheckedChange={() => toggleWeaponType(type)}
               />
-              <span className="text-sm font-medium text-gray-800 capitalize">
+              <span className="text-heading text-sm font-medium capitalize">
                 {type}
               </span>
             </label>
@@ -375,7 +375,7 @@ export function WeaponForm({
 
       {/* Section: Description */}
       <div className="space-y-4">
-        <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
           Description
         </h4>
 
@@ -395,9 +395,9 @@ export function WeaponForm({
 
       {/* Section: Charges */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between border-b-2 border-gray-200 pb-2">
-          <h4 className="flex items-center gap-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
-            <Sparkles size={16} className="text-indigo-600" />
+        <div className="border-divider flex items-center justify-between border-b-2 pb-2">
+          <h4 className="text-heading flex items-center gap-2 text-sm font-bold tracking-wide uppercase">
+            <Sparkles size={16} className="text-accent-indigo-text-muted" />
             Charges & Abilities (Optional)
           </h4>
           <Button
@@ -406,14 +406,14 @@ export function WeaponForm({
             variant="primary"
             size="sm"
             leftIcon={<Plus size={14} />}
-            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+            className="bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
           >
             Add Charge Ability
           </Button>
         </div>
 
         {!formData.charges || formData.charges.length === 0 ? (
-          <p className="text-sm text-gray-500 italic">
+          <p className="text-muted text-sm italic">
             No charge abilities configured. Add charge abilities for magic
             weapons that can cast spells or activate special powers a limited
             number of times.
@@ -423,10 +423,10 @@ export function WeaponForm({
             {formData.charges.map((charge, index) => (
               <div
                 key={index}
-                className="rounded-lg border-2 border-indigo-200 bg-indigo-50/50 p-4"
+                className="border-accent-indigo-border bg-accent-indigo-bg rounded-lg border-2 p-4"
               >
                 <div className="mb-3 flex items-center justify-between">
-                  <h5 className="flex items-center gap-2 text-sm font-semibold text-indigo-700">
+                  <h5 className="text-accent-indigo-text-muted flex items-center gap-2 text-sm font-semibold">
                     <Sparkles size={14} />
                     {charge.name || `Charge Ability ${index + 1}`}
                   </h5>
@@ -435,7 +435,7 @@ export function WeaponForm({
                     onClick={() => removeCharge(index)}
                     variant="ghost"
                     size="xs"
-                    className="text-red-600 hover:bg-red-50 hover:text-red-800"
+                    className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text"
                   >
                     <Trash2 size={16} />
                   </Button>
@@ -456,7 +456,7 @@ export function WeaponForm({
 
                 {/* Description with WYSIWYG */}
                 <div className="mb-3">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                  <label className="text-body mb-1 block text-sm font-medium">
                     Description (Optional)
                   </label>
                   <RichTextEditor
@@ -484,7 +484,7 @@ export function WeaponForm({
                     helperText="Total charges when fully recharged"
                   />
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <label className="text-body mb-2 block text-sm font-medium">
                       Recharges On
                     </label>
                     <SelectField
@@ -502,7 +502,7 @@ export function WeaponForm({
                 </div>
 
                 {/* Proficiency Scaling */}
-                <div className="border-t border-indigo-200 pt-3">
+                <div className="border-accent-indigo-border border-t pt-3">
                   <label className="flex cursor-pointer items-center gap-2">
                     <Checkbox
                       checked={charge.scaleWithProficiency || false}
@@ -515,7 +515,7 @@ export function WeaponForm({
                         })
                       }
                     />
-                    <span className="text-sm font-medium text-gray-800">
+                    <span className="text-heading text-sm font-medium">
                       Scale with proficiency bonus
                     </span>
                   </label>
@@ -548,7 +548,7 @@ export function WeaponForm({
 
       {/* Section: Properties */}
       <div className="space-y-4">
-        <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
           Properties
         </h4>
 
@@ -563,7 +563,7 @@ export function WeaponForm({
                 })
               }
             />
-            <span className="text-sm font-medium text-gray-800">
+            <span className="text-heading text-sm font-medium">
               Currently Equipped
             </span>
           </label>
@@ -579,7 +579,7 @@ export function WeaponForm({
                 })
               }
             />
-            <span className="text-sm font-medium text-gray-800">
+            <span className="text-heading text-sm font-medium">
               Requires Attunement
             </span>
           </label>
@@ -595,7 +595,7 @@ export function WeaponForm({
                   })
                 }
               />
-              <span className="text-sm font-medium text-gray-800">
+              <span className="text-heading text-sm font-medium">
                 Currently Attuned
               </span>
             </label>
@@ -604,7 +604,7 @@ export function WeaponForm({
       </div>
 
       {/* Form Actions */}
-      <div className="flex justify-end gap-3 border-t-2 border-gray-200 pt-4">
+      <div className="border-divider flex justify-end gap-3 border-t-2 pt-4">
         <Button type="button" onClick={onCancel} variant="outline" size="md">
           Cancel
         </Button>
@@ -613,7 +613,7 @@ export function WeaponForm({
           variant="primary"
           size="md"
           disabled={!formData.name.trim()}
-          className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+          className="bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
         >
           {isEditing ? 'Update' : 'Add'} Weapon
         </Button>

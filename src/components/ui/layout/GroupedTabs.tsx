@@ -127,11 +127,9 @@ const GroupedTabs = forwardRef<GroupedTabsRef, GroupedTabsProps>(
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* Sidebar Navigation */}
           <div className="lg:col-span-3">
-            <div className="sticky top-6 rounded-lg border border-gray-200 bg-white shadow-lg">
-              <div className="border-b border-gray-200 p-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Sections
-                </h3>
+            <div className="border-divider bg-surface-raised sticky top-6 rounded-lg border shadow-lg">
+              <div className="border-divider border-b p-4">
+                <h3 className="text-heading text-lg font-semibold">Sections</h3>
               </div>
 
               <nav className="p-2">
@@ -140,7 +138,7 @@ const GroupedTabs = forwardRef<GroupedTabsRef, GroupedTabsProps>(
                     {/* Group Header */}
                     <button
                       onClick={() => toggleGroup(group.id)}
-                      className="flex w-full items-center justify-between rounded-lg p-3 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                      className="text-body hover:bg-surface-hover flex w-full items-center justify-between rounded-lg p-3 text-left text-sm font-medium transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         {group.icon && (
@@ -173,10 +171,10 @@ const GroupedTabs = forwardRef<GroupedTabsRef, GroupedTabsProps>(
                             disabled={tab.disabled}
                             className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-all duration-200 ${
                               activeTab === tab.id
-                                ? 'border-l-2 border-blue-500 bg-blue-50 font-medium text-blue-700'
+                                ? 'bg-accent-blue-bg text-accent-blue-text border-l-2 border-blue-500 font-medium dark:border-blue-400'
                                 : tab.disabled
-                                  ? 'cursor-not-allowed text-gray-400'
-                                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                  ? 'text-faint cursor-not-allowed'
+                                  : 'text-body hover:bg-surface-hover hover:text-heading'
                             } `}
                           >
                             {tab.icon && (
@@ -201,9 +199,9 @@ const GroupedTabs = forwardRef<GroupedTabsRef, GroupedTabsProps>(
 
           {/* Main Content */}
           <div className="lg:col-span-9">
-            <div className="rounded-lg border border-gray-200 bg-white shadow-lg">
+            <div className="border-divider bg-surface-raised rounded-lg border shadow-lg">
               {/* Content Header */}
-              <div className="border-b border-gray-200 p-6">
+              <div className="border-divider border-b p-6">
                 {(() => {
                   const currentTab = groups
                     .flatMap(g => g.tabs)
@@ -224,10 +222,10 @@ const GroupedTabs = forwardRef<GroupedTabsRef, GroupedTabsProps>(
                         </span>
                       )}
                       <div>
-                        <h2 className="text-xl font-bold text-gray-900">
+                        <h2 className="text-heading text-xl font-bold">
                           {currentTab?.label}
                         </h2>
-                        <p className="mt-1 text-sm text-gray-600">
+                        <p className="text-body mt-1 text-sm">
                           {currentGroup?.label}
                         </p>
                       </div>
@@ -242,7 +240,7 @@ const GroupedTabs = forwardRef<GroupedTabsRef, GroupedTabsProps>(
                   {/* Show loading state until mounted, then show content */}
                   {!isMounted ? (
                     <div className="flex items-center justify-center py-12">
-                      <div className="text-gray-500">Loading...</div>
+                      <div className="text-muted">Loading...</div>
                     </div>
                   ) : (
                     activeTabContent

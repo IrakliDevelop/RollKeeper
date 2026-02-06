@@ -34,25 +34,17 @@ export default function SpellDetailsModal({
       closeOnBackdropClick={true}
     >
       {/* Header */}
-      <div className="-m-6 mb-6 border-b-2 border-gray-200 bg-gradient-to-r from-purple-50 to-blue-50 p-6">
+      <div className="border-accent-purple-border from-accent-purple-bg to-accent-blue-bg -m-6 mb-6 border-b-2 bg-linear-to-r p-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             {/* Spell Name */}
-            <h1 className="mb-3 text-3xl font-bold text-gray-900">
+            <h1 className="text-heading mb-3 text-3xl font-bold">
               {spell.name}
             </h1>
 
             {/* Badges */}
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Badge
-                variant={isCantrip ? 'warning' : 'primary'}
-                size="sm"
-                className={
-                  isCantrip
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-purple-100 text-purple-800'
-                }
-              >
+              <Badge variant={isCantrip ? 'warning' : 'primary'} size="sm">
                 {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
               </Badge>
               <Badge variant="secondary" size="sm">
@@ -91,7 +83,7 @@ export default function SpellDetailsModal({
                 }
                 className={
                   isFavorite
-                    ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                    ? 'bg-accent-yellow-bg text-accent-yellow-text hover:bg-accent-yellow-bg-strong'
                     : ''
                 }
               >
@@ -106,39 +98,37 @@ export default function SpellDetailsModal({
       <div className="space-y-4">
         {/* Quick Stats */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="rounded-lg border-2 border-gray-200 bg-white p-4">
+          <div className="border-divider bg-surface-raised rounded-lg border-2 p-4">
             <div className="mb-2 flex items-center gap-2">
-              <Clock className="h-5 w-5 text-purple-600" />
-              <span className="text-sm font-medium text-gray-600">
+              <Clock className="text-accent-purple-text-muted h-5 w-5" />
+              <span className="text-muted text-sm font-medium">
                 Casting Time
               </span>
             </div>
-            <p className="font-semibold text-gray-900">{spell.castingTime}</p>
+            <p className="text-heading font-semibold">{spell.castingTime}</p>
           </div>
 
-          <div className="rounded-lg border-2 border-gray-200 bg-white p-4">
+          <div className="border-divider bg-surface-raised rounded-lg border-2 p-4">
             <div className="mb-2 flex items-center gap-2">
-              <Target className="h-5 w-5 text-purple-600" />
-              <span className="text-sm font-medium text-gray-600">Range</span>
+              <Target className="text-accent-purple-text-muted h-5 w-5" />
+              <span className="text-muted text-sm font-medium">Range</span>
             </div>
-            <p className="font-semibold text-gray-900">{spell.range}</p>
+            <p className="text-heading font-semibold">{spell.range}</p>
           </div>
 
-          <div className="rounded-lg border-2 border-gray-200 bg-white p-4">
+          <div className="border-divider bg-surface-raised rounded-lg border-2 p-4">
             <div className="mb-2 flex items-center gap-2">
-              <Zap className="h-5 w-5 text-purple-600" />
-              <span className="text-sm font-medium text-gray-600">
-                Duration
-              </span>
+              <Zap className="text-accent-purple-text-muted h-5 w-5" />
+              <span className="text-muted text-sm font-medium">Duration</span>
             </div>
-            <p className="font-semibold text-gray-900">{spell.duration}</p>
+            <p className="text-heading font-semibold">{spell.duration}</p>
           </div>
         </div>
 
         {/* Components */}
-        <div className="rounded-lg border-2 border-gray-200 bg-white p-4">
-          <h3 className="mb-3 flex items-center gap-2 text-lg font-bold text-gray-900">
-            <Sparkles className="h-5 w-5 text-purple-600" />
+        <div className="border-divider bg-surface-raised rounded-lg border-2 p-4">
+          <h3 className="text-heading mb-3 flex items-center gap-2 text-lg font-bold">
+            <Sparkles className="text-accent-purple-text-muted h-5 w-5" />
             Components
           </h3>
           <div className="flex items-center gap-4">
@@ -160,7 +150,7 @@ export default function SpellDetailsModal({
               )}
             </div>
             {spell.components.materialDescription && (
-              <p className="text-sm text-gray-600 italic">
+              <p className="text-muted text-sm italic">
                 ({spell.components.materialDescription})
               </p>
             )}
@@ -169,8 +159,8 @@ export default function SpellDetailsModal({
 
         {/* Combat Info */}
         {(spell.actionType || spell.damage) && (
-          <div className="rounded-lg border-2 border-gray-200 bg-white p-4">
-            <h3 className="mb-3 text-lg font-bold text-gray-900">
+          <div className="border-divider bg-surface-raised rounded-lg border-2 p-4">
+            <h3 className="text-heading mb-3 text-lg font-bold">
               Combat Details
             </h3>
             <div className="flex flex-wrap gap-2">
@@ -194,11 +184,11 @@ export default function SpellDetailsModal({
         )}
 
         {/* Description */}
-        <div className="rounded-lg border-2 border-gray-200 bg-white p-4">
-          <h3 className="mb-3 text-lg font-bold text-gray-900">Description</h3>
-          <div className="prose prose-gray max-w-none">
+        <div className="border-divider bg-surface-raised rounded-lg border-2 p-4">
+          <h3 className="text-heading mb-3 text-lg font-bold">Description</h3>
+          <div className="prose prose-gray dark:prose-invert max-w-none">
             <div
-              className="leading-relaxed text-gray-700"
+              className="text-body leading-relaxed"
               dangerouslySetInnerHTML={{ __html: spell.description }}
             />
           </div>
@@ -206,12 +196,12 @@ export default function SpellDetailsModal({
 
         {/* Higher Level */}
         {spell.higherLevel && (
-          <div className="rounded-lg border-2 border-amber-200 bg-amber-50 p-4">
-            <h3 className="mb-3 text-lg font-bold text-amber-900">
+          <div className="border-accent-amber-border bg-accent-amber-bg rounded-lg border-2 p-4">
+            <h3 className="text-accent-amber-text mb-3 text-lg font-bold">
               At Higher Levels
             </h3>
             <div
-              className="leading-relaxed text-amber-800"
+              className="text-accent-amber-text leading-relaxed"
               dangerouslySetInnerHTML={{ __html: spell.higherLevel }}
             />
           </div>
@@ -219,15 +209,15 @@ export default function SpellDetailsModal({
 
         {/* Source */}
         {spell.source && (
-          <div className="rounded-lg border-2 border-gray-200 bg-gray-50 p-4">
-            <h3 className="mb-2 text-sm font-bold text-gray-900">Source</h3>
-            <p className="text-gray-700">{spell.source}</p>
+          <div className="border-divider bg-surface-secondary rounded-lg border-2 p-4">
+            <h3 className="text-heading mb-2 text-sm font-bold">Source</h3>
+            <p className="text-body">{spell.source}</p>
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <div className="-m-6 mt-6 border-t-2 border-gray-200 bg-gray-50 p-4">
+      <div className="border-divider bg-surface-secondary -m-6 mt-6 border-t-2 p-4">
         <div className="flex items-center justify-between">
           {onCast ? (
             <Button
@@ -238,7 +228,7 @@ export default function SpellDetailsModal({
               variant="primary"
               size="md"
               leftIcon={<Wand2 size={16} />}
-              className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+              className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
             >
               Cast Spell
             </Button>

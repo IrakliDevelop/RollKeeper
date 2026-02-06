@@ -46,27 +46,27 @@ export default function ConditionDetailsModal({
       <div
         className={`-m-6 mb-6 border-b-2 p-6 ${
           isCondition
-            ? 'border-red-200 bg-gradient-to-r from-red-50 to-orange-50'
-            : 'border-purple-200 bg-gradient-to-r from-purple-50 to-violet-50'
+            ? 'border-accent-red-border from-accent-red-bg to-accent-orange-bg bg-linear-to-r'
+            : 'border-accent-purple-border from-accent-purple-bg to-accent-purple-bg-strong bg-linear-to-r'
         }`}
       >
         <div className="mb-4 flex items-center gap-3">
           <div
             className={`flex h-12 w-12 items-center justify-center rounded-lg ${
-              isCondition ? 'bg-red-100' : 'bg-purple-100'
+              isCondition ? 'bg-accent-red-bg' : 'bg-accent-purple-bg'
             }`}
           >
             {isCondition ? (
-              <AlertTriangle className="h-6 w-6 text-red-600" />
+              <AlertTriangle className="text-accent-red-text-muted h-6 w-6" />
             ) : (
-              <Shield className="h-6 w-6 text-purple-600" />
+              <Shield className="text-accent-purple-text-muted h-6 w-6" />
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge
               variant={isCondition ? 'danger' : 'primary'}
               size="md"
-              className="uppercase tracking-wide"
+              className="tracking-wide uppercase"
             >
               {isCondition ? 'Condition' : 'Disease'}
             </Badge>
@@ -78,20 +78,20 @@ export default function ConditionDetailsModal({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-700">
+        <div className="text-body flex flex-wrap items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
-            <Book className="h-4 w-4 text-gray-500" />
+            <Book className="text-muted h-4 w-4" />
             <span className="font-semibold">{fullSourceName}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-gray-500" />
+            <Calendar className="text-muted h-4 w-4" />
             <span>
               Applied: {new Date(item!.appliedAt).toLocaleDateString()}
             </span>
           </div>
           {disease?.onsetTime && (
             <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-gray-500" />
+              <FileText className="text-muted h-4 w-4" />
               <span>
                 Onset: {new Date(disease.onsetTime).toLocaleDateString()}
               </span>
@@ -103,12 +103,12 @@ export default function ConditionDetailsModal({
       <div className="space-y-6">
         {/* Description */}
         <div>
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-800 border-b-2 border-gray-200 pb-2">
+          <h3 className="text-heading border-divider mb-3 border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
             Description
           </h3>
-          <div className="rounded-lg border-2 border-gray-200 bg-white p-4">
+          <div className="border-divider bg-surface-raised rounded-lg border-2 p-4">
             <div
-              className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800"
+              className="text-body text-sm leading-relaxed whitespace-pre-wrap"
               dangerouslySetInnerHTML={createSafeHtml(item!.description)}
             />
           </div>
@@ -117,7 +117,7 @@ export default function ConditionDetailsModal({
         {/* Disease-specific fields */}
         {disease && (
           <div>
-            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-800 border-b-2 border-gray-200 pb-2">
+            <h3 className="text-heading border-divider mb-3 border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
               Onset Time
             </h3>
             <Input
@@ -131,7 +131,7 @@ export default function ConditionDetailsModal({
 
         {/* Notes Section */}
         <div>
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-800 border-b-2 border-gray-200 pb-2">
+          <h3 className="text-heading border-divider mb-3 border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
             Personal Notes
           </h3>
           <Textarea

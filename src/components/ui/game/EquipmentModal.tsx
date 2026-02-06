@@ -344,7 +344,7 @@ export default function EquipmentModal({
       {/* Show forms if active, otherwise show main content */}
       {showWeaponForm ? (
         <div className="space-y-4">
-          <h3 className="text-xl font-bold text-gray-800">
+          <h3 className="text-heading text-xl font-bold">
             {editingWeapon ? 'Edit Weapon' : 'Add Weapon'}
           </h3>
 
@@ -362,7 +362,7 @@ export default function EquipmentModal({
         </div>
       ) : showMagicItemForm ? (
         <div className="space-y-4">
-          <h3 className="text-xl font-bold text-gray-800">
+          <h3 className="text-heading text-xl font-bold">
             {editingMagicItem ? 'Edit Magic Item' : 'Add Magic Item'}
           </h3>
 
@@ -384,7 +384,7 @@ export default function EquipmentModal({
           {/* Weapons Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="flex items-center gap-2 text-xl font-bold text-gray-800">
+              <h3 className="text-heading flex items-center gap-2 text-xl font-bold">
                 <Sword className="h-5 w-5" />
                 Weapons ({character.weapons.length})
               </h3>
@@ -393,7 +393,7 @@ export default function EquipmentModal({
                 variant="primary"
                 size="md"
                 leftIcon={<Plus size={16} />}
-                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                className="bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
               >
                 Add Weapon
               </Button>
@@ -401,8 +401,8 @@ export default function EquipmentModal({
 
             <div className="space-y-3">
               {character.weapons.length === 0 ? (
-                <div className="py-8 text-center text-gray-500">
-                  <Sword className="mx-auto mb-2 h-12 w-12 text-gray-300" />
+                <div className="text-muted py-8 text-center">
+                  <Sword className="text-faint mx-auto mb-2 h-12 w-12" />
                   <p>No weapons added yet</p>
                 </div>
               ) : (
@@ -429,7 +429,7 @@ export default function EquipmentModal({
           {/* Magic Items Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="flex items-center gap-2 text-xl font-bold text-gray-800">
+              <h3 className="text-heading flex items-center gap-2 text-xl font-bold">
                 <Wand2 className="h-5 w-5" />
                 Magic Items ({character.magicItems.length})
               </h3>
@@ -438,7 +438,7 @@ export default function EquipmentModal({
                 variant="primary"
                 size="md"
                 leftIcon={<Plus size={16} />}
-                className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+                className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
               >
                 Add Magic Item
               </Button>
@@ -446,8 +446,8 @@ export default function EquipmentModal({
 
             <div className="space-y-3">
               {character.magicItems.length === 0 ? (
-                <div className="py-8 text-center text-gray-500">
-                  <Wand2 className="mx-auto mb-2 h-12 w-12 text-gray-300" />
+                <div className="text-muted py-8 text-center">
+                  <Wand2 className="text-faint mx-auto mb-2 h-12 w-12" />
                   <p>No magic items added yet</p>
                 </div>
               ) : (

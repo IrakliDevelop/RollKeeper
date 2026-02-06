@@ -70,7 +70,7 @@ export default function DaysSpentTracker({
 
   return (
     <div
-      className={`rounded-xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 via-orange-50 to-yellow-50 p-4 shadow-md ${className}`}
+      className={`border-accent-amber-border from-accent-amber-bg via-accent-orange-bg to-accent-amber-bg-strong rounded-xl border-2 bg-gradient-to-r p-4 shadow-md ${className}`}
     >
       {/* Main horizontal layout */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -82,10 +82,10 @@ export default function DaysSpentTracker({
 
           <div className="flex items-center gap-4">
             <div>
-              <h3 className="text-sm font-semibold text-amber-800">
+              <h3 className="text-accent-amber-text text-sm font-semibold">
                 Campaign Days
               </h3>
-              <p className="text-xs text-amber-600">
+              <p className="text-accent-amber-text-muted text-xs">
                 {weeks > 0 ? (
                   <span>
                     {weeks} {weeks === 1 ? 'week' : 'weeks'}
@@ -130,8 +130,8 @@ export default function DaysSpentTracker({
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center gap-2 rounded-lg border-2 border-amber-300 bg-white px-4 py-2 shadow-inner">
-                <span className="text-3xl font-bold text-amber-800">
+              <div className="border-accent-amber-border-strong bg-surface-raised flex items-center gap-2 rounded-lg border-2 px-4 py-2 shadow-inner">
+                <span className="text-accent-amber-text text-3xl font-bold">
                   {daysSpent}
                 </span>
                 <Button
@@ -139,7 +139,7 @@ export default function DaysSpentTracker({
                   variant="ghost"
                   size="xs"
                   title="Edit days manually"
-                  className="text-amber-600 hover:bg-amber-100"
+                  className="text-accent-amber-text-muted hover:bg-accent-amber-bg-strong"
                 >
                   <Edit2 size={14} />
                 </Button>
@@ -155,7 +155,7 @@ export default function DaysSpentTracker({
             disabled={daysSpent === 0}
             variant="outline"
             size="sm"
-            className="border-amber-300 bg-white text-amber-700 hover:bg-amber-50"
+            className="border-accent-amber-border-strong bg-surface-raised text-accent-amber-text-muted hover:bg-accent-amber-bg"
             title="Subtract 1 day"
           >
             <Minus size={16} />
@@ -166,7 +166,7 @@ export default function DaysSpentTracker({
             variant="secondary"
             size="sm"
             leftIcon={<Plus size={14} />}
-            className="bg-gradient-to-r from-amber-500 to-orange-600 text-white hover:from-amber-600 hover:to-orange-700"
+            className="from-accent-amber-text-muted to-accent-orange-text-muted text-inverse hover:from-accent-amber-text hover:to-accent-orange-text bg-gradient-to-r"
             title="Add 1 day"
           >
             +1 Day
@@ -177,7 +177,7 @@ export default function DaysSpentTracker({
               onClick={() => setShowQuickAdd(!showQuickAdd)}
               variant="outline"
               size="sm"
-              className="border-amber-300 bg-white text-amber-700 hover:bg-amber-50"
+              className="border-accent-amber-border-strong bg-surface-raised text-accent-amber-text-muted hover:bg-accent-amber-bg"
               title="Quick add multiple days"
             >
               <Plus size={14} />
@@ -186,8 +186,8 @@ export default function DaysSpentTracker({
 
             {/* Quick add dropdown - opens upward */}
             {showQuickAdd && (
-              <div className="absolute bottom-full left-0 z-10 mb-1 w-48 rounded-lg border border-amber-200 bg-white p-2 shadow-lg">
-                <p className="mb-2 text-center text-xs font-medium text-amber-800">
+              <div className="border-accent-amber-border bg-surface-raised absolute bottom-full left-0 z-10 mb-1 w-48 rounded-lg border p-2 shadow-lg">
+                <p className="text-accent-amber-text mb-2 text-center text-xs font-medium">
                   Quick Add
                 </p>
                 <div className="grid grid-cols-2 gap-1">
@@ -202,7 +202,7 @@ export default function DaysSpentTracker({
                       onClick={() => handleQuickAdd(amount)}
                       variant="ghost"
                       size="xs"
-                      className="justify-center text-amber-700 hover:bg-amber-100"
+                      className="text-accent-amber-text-muted hover:bg-accent-amber-bg-strong justify-center"
                     >
                       {label}
                     </Button>
@@ -214,10 +214,16 @@ export default function DaysSpentTracker({
         </div>
 
         {/* Right: Info */}
-        <div className="flex items-center gap-2 rounded-lg bg-amber-100/50 px-3 py-2">
-          <Info size={14} className="flex-shrink-0 text-amber-600" />
-          <p className="text-xs text-amber-700">
-            <Moon size={10} className="mr-1 inline text-indigo-500" />
+        <div className="bg-accent-amber-bg-strong/50 flex items-center gap-2 rounded-lg px-3 py-2">
+          <Info
+            size={14}
+            className="text-accent-amber-text-muted flex-shrink-0"
+          />
+          <p className="text-accent-amber-text-muted text-xs">
+            <Moon
+              size={10}
+              className="text-accent-indigo-text-muted mr-1 inline"
+            />
             Auto +1 on Long Rest
           </p>
         </div>

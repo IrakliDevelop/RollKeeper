@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono, Cinzel_Decorative } from 'next/font/google';
 import './globals.css';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
+import { ThemeProviderWrapper } from './ThemeProviderWrapper';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -29,18 +30,43 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Inline script that runs BEFORE React hydrates to prevent
+ * a flash of wrong theme (FOUC). It reads localStorage or
+ * the system preference and sets data-theme on <html>.
+ */
+const themeScript = `
+(function() {
+  try {
+    var stored = localStorage.getItem('rollkeeper-theme');
+    var theme = stored === 'dark' || stored === 'light' ? stored : null;
+    if (!theme) {
+      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    if (theme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${cinzelDecorative.variable} antialiased`}
         suppressHydrationWarning={true}
       >
-        <ErrorBoundary>{children}</ErrorBoundary>
+        <ThemeProviderWrapper>
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </ThemeProviderWrapper>
       </body>
     </html>
   );

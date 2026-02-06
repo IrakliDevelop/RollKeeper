@@ -148,10 +148,10 @@ export function AvatarUpload({
         {/* Avatar Display */}
         <div
           className={cn(
-            'relative overflow-hidden rounded-full border-2 border-gray-300 bg-gradient-to-br from-slate-100 to-slate-200',
+            'border-border-secondary from-surface-secondary to-surface-inset relative overflow-hidden rounded-full border-2 bg-gradient-to-br',
             sizeClasses[size],
             editable &&
-              'cursor-pointer transition-colors hover:border-blue-400',
+              'hover:border-accent-blue-border-strong cursor-pointer transition-colors',
             isLoading && 'opacity-50'
           )}
           onClick={editable ? handleUploadClick : undefined}
@@ -166,7 +166,7 @@ export function AvatarUpload({
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              <User size={iconSizeClasses[size]} className="text-slate-400" />
+              <User size={iconSizeClasses[size]} className="text-muted" />
             </div>
           )}
 
@@ -220,7 +220,7 @@ export function AvatarUpload({
 
       {/* Helper Text */}
       {editable && !error && (
-        <p className="text-center text-xs text-gray-500">
+        <p className="text-muted text-center text-xs">
           Max {MAX_AVATAR_SIZE_MB}MB • Uploaded to cloud storage
         </p>
       )}

@@ -36,7 +36,10 @@ export default function NoteModal({
     if (note && isOpen) {
       // Only reset if it's a different note or the modal is opening for the first time
       // Don't reset if we're currently saving to prevent overwriting user changes
-      if ((!initialNoteId || initialNoteId !== note.id) && !isSavingRef.current) {
+      if (
+        (!initialNoteId || initialNoteId !== note.id) &&
+        !isSavingRef.current
+      ) {
         setEditTitle(note.title);
         setEditContent(note.content);
         setIsEditing(false);
@@ -61,13 +64,13 @@ export default function NoteModal({
 
     // Set saving flag to prevent useEffect from resetting our changes
     isSavingRef.current = true;
-    
+
     onUpdate(note.id, {
       title: trimmedTitle,
       content: editContent,
     });
     setIsEditing(false);
-    
+
     // Show success toast
     if (onAddToast) {
       onAddToast({
@@ -77,7 +80,7 @@ export default function NoteModal({
         duration: 3000,
       });
     }
-    
+
     // Close the modal after saving
     onClose();
   };
@@ -118,14 +121,14 @@ export default function NoteModal({
               value={editTitle}
               onChange={e => setEditTitle(e.target.value)}
               placeholder="Note title..."
-              className="border-b-2 border-blue-300 text-xl font-semibold text-blue-900"
+              className="border-accent-blue-border-strong text-accent-blue-text border-b-2 text-xl font-semibold"
               autoFocus
             />
           </div>
         )}
 
         {/* Action Buttons */}
-        <div className="mb-6 flex items-center justify-end space-x-2 border-b border-gray-200 pb-4">
+        <div className="border-divider mb-6 flex items-center justify-end space-x-2 border-b pb-4">
           {isEditing ? (
             <>
               <Button
@@ -153,7 +156,7 @@ export default function NoteModal({
                 variant="ghost"
                 size="sm"
                 leftIcon={<Edit3 className="h-4 w-4" />}
-                className="text-blue-600 hover:bg-blue-100"
+                className="text-accent-blue-text-muted hover:bg-accent-blue-bg"
               >
                 Edit
               </Button>
@@ -162,7 +165,7 @@ export default function NoteModal({
                 variant="ghost"
                 size="sm"
                 leftIcon={<Trash2 className="h-4 w-4" />}
-                className="text-red-600 hover:bg-red-100"
+                className="text-accent-red-text-muted hover:bg-accent-red-bg"
               >
                 Delete
               </Button>
@@ -175,7 +178,7 @@ export default function NoteModal({
           {isEditing ? (
             <div className="space-y-4">
               <div>
-                <label className="mb-2 block text-sm font-medium text-blue-800">
+                <label className="text-accent-blue-text mb-2 block text-sm font-medium">
                   Note Content
                 </label>
                 <RichTextEditor
@@ -191,8 +194,8 @@ export default function NoteModal({
               {note.content ? (
                 <RichTextRenderer content={note.content} />
               ) : (
-                <div className="py-12 text-center text-gray-500">
-                  <Eye className="mx-auto mb-4 h-12 w-12 text-gray-400" />
+                <div className="text-muted py-12 text-center">
+                  <Eye className="text-faint mx-auto mb-4 h-12 w-12" />
                   <p className="mb-2 text-lg font-medium">No content yet</p>
                   <p className="text-sm">
                     Click Edit to add content to this note.
@@ -205,8 +208,8 @@ export default function NoteModal({
 
         {/* Footer */}
         {note.updatedAt && !isEditing && (
-          <div className="mt-6 border-t border-gray-200 pt-4">
-            <p className="text-sm text-gray-600">
+          <div className="border-divider mt-6 border-t pt-4">
+            <p className="text-muted text-sm">
               Last updated: {new Date(note.updatedAt).toLocaleDateString()} at{' '}
               {new Date(note.updatedAt).toLocaleTimeString()}
             </p>

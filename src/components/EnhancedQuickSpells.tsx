@@ -76,30 +76,41 @@ const SpellCard: React.FC<{
   spellSaveDC: number | null;
   onAction: (action: string) => void;
   onToggleFavorite: () => void;
-}> = ({ spell, compact, isFavorite, spellSaveDC, onAction, onToggleFavorite }) => {
+}> = ({
+  spell,
+  compact,
+  isFavorite,
+  spellSaveDC,
+  onAction,
+  onToggleFavorite,
+}) => {
   const isCantrip = spell.level === 0;
-  
+
   if (compact) {
     return (
-      <div className="group flex items-center justify-between rounded-lg border-2 border-gray-200 bg-white p-2.5 hover:shadow-md hover:border-gray-300 transition-all">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+      <div className="group border-divider bg-surface-raised hover:border-divider-strong flex items-center justify-between rounded-lg border-2 p-2.5 transition-all hover:shadow-md">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
             onClick={onToggleFavorite}
             className={`flex-shrink-0 transition-colors ${
-              isFavorite ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-500'
+              isFavorite
+                ? 'text-accent-amber-text hover:text-accent-amber-text-muted'
+                : 'text-faint hover:text-accent-amber-text'
             }`}
             title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
           >
             <Star size={14} fill={isFavorite ? 'currentColor' : 'none'} />
           </button>
-          <span className="font-medium text-gray-900 truncate text-sm">
+          <span className="text-heading truncate text-sm font-medium">
             {spell.name}
           </span>
           {spell.concentration && (
-            <Badge variant="warning" size="sm" className="flex-shrink-0">⏱</Badge>
+            <Badge variant="warning" size="sm" className="flex-shrink-0">
+              ⏱
+            </Badge>
           )}
         </div>
-        <div className="flex gap-1.5 flex-shrink-0">
+        <div className="flex flex-shrink-0 gap-1.5">
           <Button
             onClick={() => onAction('cast')}
             variant="primary"
@@ -133,33 +144,33 @@ const SpellCard: React.FC<{
   }
 
   return (
-    <div className="rounded-lg border-2 border-gray-200 bg-white p-4 hover:shadow-md hover:border-gray-300 transition-all">
+    <div className="border-divider bg-surface-raised hover:border-divider-strong rounded-lg border-2 p-4 transition-all hover:shadow-md">
       <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={onToggleFavorite}
             className={`transition-colors ${
-              isFavorite ? 'text-yellow-500 hover:text-yellow-600' : 'text-gray-400 hover:text-yellow-500'
+              isFavorite
+                ? 'text-accent-amber-text hover:text-accent-amber-text-muted'
+                : 'text-faint hover:text-accent-amber-text'
             }`}
             title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
           >
             <Star size={16} fill={isFavorite ? 'currentColor' : 'none'} />
           </button>
-          <span className="font-bold text-gray-900">{spell.name}</span>
-          <Badge 
-            variant={isCantrip ? "warning" : "primary"} 
-            size="sm"
-            className={isCantrip ? "bg-yellow-100 text-yellow-800" : "bg-purple-100 text-purple-800"}
-          >
+          <span className="text-heading font-bold">{spell.name}</span>
+          <Badge variant={isCantrip ? 'warning' : 'primary'} size="sm">
             {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
           </Badge>
           {spell.concentration && (
-            <Badge variant="warning" size="sm">⏱ Concentration</Badge>
+            <Badge variant="warning" size="sm">
+              ⏱ Concentration
+            </Badge>
           )}
         </div>
       </div>
 
-      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+      <div className="text-muted mb-3 flex flex-wrap items-center gap-2 text-xs">
         <span>{spell.castingTime}</span>
         <span>•</span>
         <span>{spell.range}</span>
@@ -231,15 +242,23 @@ const LevelSection: React.FC<LevelSectionProps> = ({
 }) => {
   const isCantrip = level === 0;
   const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
-  const levelColor = isCantrip ? 'text-yellow-700' : 'text-purple-700';
-  const levelBg = isCantrip ? 'bg-gradient-to-r from-yellow-50 to-amber-50' : 'bg-gradient-to-r from-purple-50 to-violet-50';
-  const borderColor = isCantrip ? 'border-yellow-200' : 'border-purple-200';
+  const levelColor = isCantrip
+    ? 'text-accent-amber-text'
+    : 'text-accent-purple-text';
+  const levelBg = isCantrip
+    ? 'bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)]'
+    : 'bg-gradient-to-r from-[var(--gradient-purple-from)] to-[var(--gradient-purple-to)]';
+  const borderColor = isCantrip
+    ? 'border-accent-amber-border'
+    : 'border-accent-purple-border';
 
   return (
-    <div className={`border-2 ${borderColor} rounded-lg overflow-hidden bg-white`}>
+    <div
+      className={`border-2 ${borderColor} bg-surface-raised overflow-hidden rounded-lg`}
+    >
       <button
         onClick={onToggle}
-        className={`w-full flex items-center justify-between p-4 ${levelBg} hover:opacity-90 transition-all`}
+        className={`flex w-full items-center justify-between p-4 ${levelBg} transition-all hover:opacity-90`}
       >
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
@@ -248,20 +267,18 @@ const LevelSection: React.FC<LevelSectionProps> = ({
             ) : (
               <ChevronRight size={18} className={levelColor} />
             )}
-            <span className={`font-bold text-base ${levelColor}`}>{levelName}</span>
+            <span className={`text-base font-bold ${levelColor}`}>
+              {levelName}
+            </span>
           </div>
-          <Badge 
-            variant={isCantrip ? "warning" : "primary"}
-            size="sm"
-            className={isCantrip ? "bg-yellow-100 text-yellow-800" : "bg-purple-100 text-purple-800"}
-          >
+          <Badge variant={isCantrip ? 'warning' : 'primary'} size="sm">
             {spells.length} spell{spells.length !== 1 ? 's' : ''}
           </Badge>
         </div>
       </button>
-      
+
       {isExpanded && (
-        <div className="p-4 bg-white border-t-2 border-gray-100">
+        <div className="bg-surface-raised border-divider border-t-2 p-4">
           <div className={compactView ? 'space-y-2' : 'space-y-3'}>
             {spells.map(spell => (
               <SpellCard
@@ -270,7 +287,7 @@ const LevelSection: React.FC<LevelSectionProps> = ({
                 compact={compactView}
                 isFavorite={favoriteSpells.includes(spell.id)}
                 spellSaveDC={spellSaveDC}
-                onAction={(action) => onSpellAction(spell, action)}
+                onAction={action => onSpellAction(spell, action)}
                 onToggleFavorite={() => onToggleFavorite(spell.id)}
               />
             ))}
@@ -301,7 +318,9 @@ export function EnhancedQuickSpells({
   const [viewingSpell, setViewingSpell] = useState<Spell | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [compactView, setCompactView] = useState(false);
-  const [expandedLevels, setExpandedLevels] = useState<Set<number>>(new Set([0, 1, 2])); // Default: cantrips and levels 1-2 expanded
+  const [expandedLevels, setExpandedLevels] = useState<Set<number>>(
+    new Set([0, 1, 2])
+  ); // Default: cantrips and levels 1-2 expanded
 
   // Get spellcasting stats
   const spellcastingAbility = getCharacterSpellcastingAbility(character);
@@ -322,19 +341,20 @@ export function EnhancedQuickSpells({
   // Filter by search query
   const filteredSpells = useMemo(() => {
     if (!searchQuery.trim()) return actionSpells;
-    
+
     const query = searchQuery.toLowerCase();
-    return actionSpells.filter(spell =>
-      spell.name.toLowerCase().includes(query) ||
-      spell.school.toLowerCase().includes(query) ||
-      spell.damageType?.toLowerCase().includes(query)
+    return actionSpells.filter(
+      spell =>
+        spell.name.toLowerCase().includes(query) ||
+        spell.school.toLowerCase().includes(query) ||
+        spell.damageType?.toLowerCase().includes(query)
     );
   }, [actionSpells, searchQuery]);
 
   // Organize spells by level
   const spellsByLevel = useMemo(() => {
     const organized: SpellsByLevel = {};
-    
+
     filteredSpells.forEach(spell => {
       if (!organized[spell.level]) {
         organized[spell.level] = [];
@@ -354,7 +374,7 @@ export function EnhancedQuickSpells({
   const favoriteSpells = useMemo(() => {
     return character.spellbook?.favoriteSpells || [];
   }, [character.spellbook?.favoriteSpells]);
-  
+
   const favoriteActionSpells = useMemo(() => {
     return actionSpells.filter(spell => favoriteSpells.includes(spell.id));
   }, [actionSpells, favoriteSpells]);
@@ -369,21 +389,42 @@ export function EnhancedQuickSpells({
     if (animateRoll) {
       try {
         const rollResult = await animateRoll('1d20');
-        if (rollResult && typeof rollResult === 'object' && 'individualValues' in rollResult) {
+        if (
+          rollResult &&
+          typeof rollResult === 'object' &&
+          'individualValues' in rollResult
+        ) {
           const summary = rollResult as RollSummary;
           const roll = summary.individualValues[0] || 1;
           const isCrit = roll === 20;
-          showAttackToast(spell.name, roll, spellAttackBonus, isCrit, spell.damage, spell.damageType);
+          showAttackToast(
+            spell.name,
+            roll,
+            spellAttackBonus,
+            isCrit,
+            spell.damage,
+            spell.damageType
+          );
           return;
         }
       } catch (error) {
-        console.warn('Dice animation failed, falling back to random roll:', error);
+        console.warn(
+          'Dice animation failed, falling back to random roll:',
+          error
+        );
       }
     }
 
     const roll = Math.floor(Math.random() * 20) + 1;
     const isCrit = roll === 20;
-    showAttackToast(spell.name, roll, spellAttackBonus, isCrit, spell.damage, spell.damageType);
+    showAttackToast(
+      spell.name,
+      roll,
+      spellAttackBonus,
+      isCrit,
+      spell.damage,
+      spell.damageType
+    );
   };
 
   const showSavingThrow = async (spell: Spell) => {
@@ -391,7 +432,13 @@ export function EnhancedQuickSpells({
       alert('Cannot cast spells - no spellcasting ability detected');
       return;
     }
-    showSaveToast(spell.name, spellSaveDC, spell.savingThrow, spell.damage, spell.damageType);
+    showSaveToast(
+      spell.name,
+      spellSaveDC,
+      spell.savingThrow,
+      spell.damage,
+      spell.damageType
+    );
   };
 
   const rollSpellDamage = async (spell: Spell) => {
@@ -403,14 +450,21 @@ export function EnhancedQuickSpells({
     if (animateRoll) {
       try {
         const rollResult = await animateRoll(spell.damage);
-        if (rollResult && typeof rollResult === 'object' && 'finalTotal' in rollResult) {
+        if (
+          rollResult &&
+          typeof rollResult === 'object' &&
+          'finalTotal' in rollResult
+        ) {
           const summary = rollResult as RollSummary;
           const damageResult = `${summary.finalTotal}`;
           showDamageRoll(spell.name, damageResult, spell.damageType);
           return;
         }
       } catch (error) {
-        console.warn('Dice animation failed, falling back to calculated roll:', error);
+        console.warn(
+          'Dice animation failed, falling back to calculated roll:',
+          error
+        );
       }
     }
 
@@ -456,7 +510,8 @@ export function EnhancedQuickSpells({
     if (selectedSpell.level > 0) {
       updateSpellSlot(
         spellLevel as keyof typeof character.spellSlots,
-        character.spellSlots[spellLevel as keyof typeof character.spellSlots].used + 1
+        character.spellSlots[spellLevel as keyof typeof character.spellSlots]
+          .used + 1
       );
     }
 
@@ -480,10 +535,10 @@ export function EnhancedQuickSpells({
 
   if (actionSpells.length === 0) {
     return (
-      <div className="rounded-lg border-2 border-gray-200 bg-white p-8 text-center">
+      <div className="border-divider bg-surface-raised rounded-lg border-2 p-8 text-center">
         <div className="mb-3 text-5xl">🔮</div>
-        <p className="font-semibold text-gray-700 text-lg">No spells prepared</p>
-        <p className="mt-2 text-sm text-gray-500">
+        <p className="text-heading text-lg font-semibold">No spells prepared</p>
+        <p className="text-muted mt-2 text-sm">
           Prepare spells in the Spellcasting tab to see them here.
         </p>
       </div>
@@ -502,31 +557,38 @@ export function EnhancedQuickSpells({
       <div className="space-y-4">
         {/* Header with stats and controls */}
         <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 text-sm">
-                <Sparkles size={16} className="text-purple-600" />
-                <Badge variant="primary" size="sm" className="bg-blue-100 text-blue-800">
+                <Sparkles size={16} className="text-accent-purple-text-muted" />
+                <Badge variant="primary" size="sm">
                   Attack: +{spellAttackBonus ?? 0}
                 </Badge>
-                <Badge variant="primary" size="sm" className="bg-indigo-100 text-indigo-800">
+                <Badge variant="primary" size="sm">
                   Save DC: {spellSaveDC ?? 8}
                 </Badge>
                 {spellcastingAbility && (
                   <Badge variant="secondary" size="sm">
-                    {spellcastingAbility.charAt(0).toUpperCase() + spellcastingAbility.slice(1)}
+                    {spellcastingAbility.charAt(0).toUpperCase() +
+                      spellcastingAbility.slice(1)}
                   </Badge>
                 )}
               </div>
             </div>
-            
+
             <Button
               onClick={() => setCompactView(!compactView)}
-              variant={compactView ? "primary" : "ghost"}
+              variant={compactView ? 'primary' : 'ghost'}
               size="sm"
-              leftIcon={compactView ? <List size={16} /> : <Grid3X3 size={16} />}
-              title={compactView ? 'Switch to detailed view' : 'Switch to compact view'}
-              className={compactView ? "bg-purple-600 hover:bg-purple-700" : ""}
+              leftIcon={
+                compactView ? <List size={16} /> : <Grid3X3 size={16} />
+              }
+              title={
+                compactView
+                  ? 'Switch to detailed view'
+                  : 'Switch to compact view'
+              }
+              className={compactView ? 'bg-purple-600 hover:bg-purple-700' : ''}
             >
               {compactView ? 'Detailed' : 'Compact'}
             </Button>
@@ -534,24 +596,30 @@ export function EnhancedQuickSpells({
 
           {/* Search bar */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Search className="text-faint absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search spells..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border-2 border-gray-300 bg-white py-2.5 pl-10 pr-4 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-200 transition-all"
+              onChange={e => setSearchQuery(e.target.value)}
+              className="border-divider-strong bg-surface-raised text-heading placeholder:text-faint focus:border-accent-purple-border-strong focus:ring-accent-purple-bg-strong w-full rounded-lg border-2 py-2.5 pr-4 pl-10 text-sm transition-all focus:ring-2 focus:outline-none"
             />
           </div>
         </div>
 
         {/* Favorites section */}
         {favoriteActionSpells.length > 0 && (
-          <div className="rounded-lg border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50 p-4 shadow-sm">
+          <div className="border-accent-amber-border rounded-lg border-2 bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] p-4 shadow-sm">
             <div className="mb-3 flex items-center gap-3">
-              <Heart className="text-yellow-600" size={18} fill="currentColor" />
-              <span className="font-bold text-yellow-800">Favorite Spells</span>
-              <Badge variant="warning" size="sm" className="bg-yellow-100 text-yellow-800">
+              <Heart
+                className="text-accent-amber-text"
+                size={18}
+                fill="currentColor"
+              />
+              <span className="text-accent-amber-text font-bold">
+                Favorite Spells
+              </span>
+              <Badge variant="warning" size="sm">
                 {favoriteActionSpells.length}
               </Badge>
             </div>
@@ -563,7 +631,7 @@ export function EnhancedQuickSpells({
                   compact={compactView}
                   isFavorite={true}
                   spellSaveDC={spellSaveDC}
-                  onAction={(action) => handleSpellAction(spell, action)}
+                  onAction={action => handleSpellAction(spell, action)}
                   onToggleFavorite={() => toggleSpellFavorite(spell.id)}
                 />
               ))}
@@ -609,10 +677,10 @@ export function EnhancedQuickSpells({
 
         {/* No results message */}
         {searchQuery && sortedLevels.length === 0 && (
-          <div className="rounded-lg border-2 border-gray-200 bg-white p-8 text-center">
+          <div className="border-divider bg-surface-raised rounded-lg border-2 p-8 text-center">
             <div className="mb-2 text-4xl">🔍</div>
-            <p className="font-semibold text-gray-700">No spells found</p>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="text-heading font-semibold">No spells found</p>
+            <p className="text-muted mt-1 text-sm">
               Try adjusting your search terms or check your prepared spells.
             </p>
           </div>

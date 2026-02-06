@@ -18,7 +18,12 @@ import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
-import { ItemCard, ItemForm, initialInventoryFormData, type InventoryFormData } from '../../ui/game/inventory';
+import {
+  ItemCard,
+  ItemForm,
+  initialInventoryFormData,
+  type InventoryFormData,
+} from '../../ui/game/inventory';
 
 const ITEM_CATEGORIES = [
   'weapon',
@@ -81,19 +86,25 @@ export function InventoryManager({
 }: InventoryManagerProps) {
   const [showItemForm, setShowItemForm] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
-  const [formData, setFormData] = useState<InventoryFormData>(initialInventoryFormData);
+  const [formData, setFormData] = useState<InventoryFormData>(
+    initialInventoryFormData
+  );
   const [filterLocation, setFilterLocation] = useState<string>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [collapsedLocations, setCollapsedLocations] = useState<Set<string>>(new Set());
+  const [collapsedLocations, setCollapsedLocations] = useState<Set<string>>(
+    new Set()
+  );
 
   // Get all unique locations from items
   const allLocations = useMemo(() => {
     return [
       ...new Set([
         ...DEFAULT_LOCATIONS,
-        ...items.map(item => item.location).filter((loc): loc is string => Boolean(loc)),
+        ...items
+          .map(item => item.location)
+          .filter((loc): loc is string => Boolean(loc)),
       ]),
     ].sort();
   }, [items]);
@@ -123,7 +134,9 @@ export function InventoryManager({
           !searchQuery ||
           item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+          item.tags.some(tag =>
+            tag.toLowerCase().includes(searchQuery.toLowerCase())
+          );
 
         return locationMatch && categoryMatch && searchMatch;
       });
@@ -134,12 +147,19 @@ export function InventoryManager({
     }
 
     return result;
-  }, [items, filterLocation, filterCategory, searchQuery, showOnlyLocation, maxItemsToShow]);
+  }, [
+    items,
+    filterLocation,
+    filterCategory,
+    searchQuery,
+    showOnlyLocation,
+    maxItemsToShow,
+  ]);
 
   // Group items by location
   const itemsByLocation = useMemo(() => {
     const grouped: Record<string, InventoryItem[]> = {};
-    
+
     filteredItems.forEach(item => {
       const location = item.location || 'Unassigned';
       if (!grouped[location]) {
@@ -153,7 +173,10 @@ export function InventoryManager({
 
   // Calculate statistics
   const stats = useMemo(() => {
-    const totalItems = filteredItems.reduce((sum, item) => sum + item.quantity, 0);
+    const totalItems = filteredItems.reduce(
+      (sum, item) => sum + item.quantity,
+      0
+    );
     const totalWeight = filteredItems.reduce(
       (sum, item) => sum + (item.weight || 0) * item.quantity,
       0
@@ -217,11 +240,13 @@ export function InventoryManager({
   ].reduce((a, b) => a + b, 0);
 
   return (
-    <div className={`rounded-lg border-2 border-gray-200 bg-white shadow-sm ${className}`}>
+    <div
+      className={`border-divider bg-surface-raised rounded-lg border-2 shadow-sm ${className}`}
+    >
       {/* Header */}
-      <div className="border-b-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="flex items-center gap-2 text-xl font-bold text-gray-800">
+      <div className="border-divider from-surface-secondary to-surface-inset border-b-2 bg-gradient-to-r p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-heading flex items-center gap-2 text-xl font-bold">
             <Package className="h-6 w-6 text-purple-600" />
             {compact ? 'Inventory' : 'Inventory & Equipment'}
           </h2>
@@ -245,32 +270,38 @@ export function InventoryManager({
 
         {/* Statistics */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-lg border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-violet-50 p-3 text-center">
-            <div className="text-2xl font-bold text-purple-800">
+          <div className="border-accent-purple-border from-accent-purple-bg to-accent-purple-bg-strong rounded-lg border-2 bg-gradient-to-r p-3 text-center">
+            <div className="text-accent-purple-text text-2xl font-bold">
               {stats.totalItems}
             </div>
-            <div className="text-xs font-medium text-purple-600">Total Items</div>
+            <div className="text-accent-purple-text-muted text-xs font-medium">
+              Total Items
+            </div>
           </div>
-          <div className="rounded-lg border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-cyan-50 p-3 text-center">
-            <div className="text-2xl font-bold text-blue-800">
+          <div className="border-accent-blue-border from-accent-blue-bg to-accent-indigo-bg rounded-lg border-2 bg-gradient-to-r p-3 text-center">
+            <div className="text-accent-blue-text text-2xl font-bold">
               {stats.totalWeight.toFixed(1)}
             </div>
-            <div className="text-xs font-medium text-blue-600">lbs</div>
+            <div className="text-accent-blue-text-muted text-xs font-medium">
+              lbs
+            </div>
           </div>
-          <div className="rounded-lg border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-amber-50 p-3 text-center">
-            <div className="text-xl font-bold text-yellow-800">
+          <div className="border-accent-amber-border from-accent-amber-bg to-accent-amber-bg-strong rounded-lg border-2 bg-gradient-to-r p-3 text-center">
+            <div className="text-accent-amber-text text-xl font-bold">
               {formatCurrencyFromCopper(stats.totalValue)}
             </div>
-            <div className="text-xs font-medium text-yellow-600">Total Value</div>
+            <div className="text-accent-amber-text-muted text-xs font-medium">
+              Total Value
+            </div>
           </div>
         </div>
       </div>
 
       {/* Filters */}
       {!hideFilters && !showOnlyLocation && (
-        <div className="border-b-2 border-gray-200 bg-gray-50 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="flex items-center gap-2 text-sm font-bold text-gray-800 uppercase tracking-wide">
+        <div className="border-divider bg-surface-secondary border-b-2 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-heading flex items-center gap-2 text-sm font-bold tracking-wide uppercase">
               <Filter className="h-4 w-4" />
               Filters
               {activeFilterCount > 0 && (
@@ -291,7 +322,7 @@ export function InventoryManager({
           {showFilters && (
             <>
               <div className="mb-3">
-                <label className="mb-2 flex items-center gap-1 text-sm font-medium text-gray-700">
+                <label className="text-body mb-2 flex items-center gap-1 text-sm font-medium">
                   <Search className="h-3 w-3" />
                   Search Items
                 </label>
@@ -306,7 +337,7 @@ export function InventoryManager({
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-2 flex items-center gap-1 text-sm font-medium text-gray-700">
+                  <label className="text-body mb-2 flex items-center gap-1 text-sm font-medium">
                     <MapPin className="h-3 w-3" />
                     Location
                   </label>
@@ -325,7 +356,7 @@ export function InventoryManager({
                 </div>
 
                 <div>
-                  <label className="mb-2 flex items-center gap-1 text-sm font-medium text-gray-700">
+                  <label className="text-body mb-2 flex items-center gap-1 text-sm font-medium">
                     <Package className="h-3 w-3" />
                     Category
                   </label>
@@ -378,14 +409,19 @@ export function InventoryManager({
               renderItem={item => (
                 <ItemCard
                   item={item}
-                  onEdit={readonly || !onUpdateItem ? undefined : handleEditItem}
+                  onEdit={
+                    readonly || !onUpdateItem ? undefined : handleEditItem
+                  }
                   onDelete={
-                    readonly || !onDeleteItem ? undefined : () => onDeleteItem(item.id)
+                    readonly || !onDeleteItem
+                      ? undefined
+                      : () => onDeleteItem(item.id)
                   }
                   onQuantityChange={
                     readonly || !onQuantityChange
                       ? undefined
-                      : (quantity: number) => onQuantityChange(item.id, quantity)
+                      : (quantity: number) =>
+                          onQuantityChange(item.id, quantity)
                   }
                   compact={compact}
                 />
@@ -394,64 +430,76 @@ export function InventoryManager({
           ) : (
             // Grouped by location
             <div className="space-y-4">
-              {Object.entries(itemsByLocation).map(([location, locationItems]) => {
-                const isCollapsed = collapsedLocations.has(location);
-                
-                return (
-                  <div key={location} className="rounded-lg border-2 border-gray-200 bg-white">
-                    <button
-                      onClick={() => toggleLocationCollapse(location)}
-                      className="w-full flex items-center justify-between p-4 text-left transition-colors hover:bg-gray-50"
+              {Object.entries(itemsByLocation).map(
+                ([location, locationItems]) => {
+                  const isCollapsed = collapsedLocations.has(location);
+
+                  return (
+                    <div
+                      key={location}
+                      className="border-divider bg-surface-raised rounded-lg border-2"
                     >
-                      <div className="flex items-center gap-2">
-                        {isCollapsed ? (
-                          <ChevronRight className="h-4 w-4 text-purple-600" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 text-purple-600" />
-                        )}
-                        <MapPin className="h-4 w-4 text-purple-600" />
-                        <h4 className="font-bold text-gray-800">{location}</h4>
-                        <Badge variant="secondary" size="sm">
-                          {locationItems.length}
-                        </Badge>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {isCollapsed ? 'Click to expand' : 'Click to collapse'}
-                      </div>
-                    </button>
-                    
-                    {!isCollapsed && (
-                      <div className="space-y-3 p-4 pt-0">
-                        {locationItems.map(item => (
-                          <ItemCard
-                            key={item.id}
-                            item={item}
-                            onEdit={readonly || !onUpdateItem ? undefined : handleEditItem}
-                            onDelete={
-                              readonly || !onDeleteItem
-                                ? undefined
-                                : () => onDeleteItem(item.id)
-                            }
-                            onQuantityChange={
-                              readonly || !onQuantityChange
-                                ? undefined
-                                : (quantity: number) => onQuantityChange(item.id, quantity)
-                            }
-                            compact={compact}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                      <button
+                        onClick={() => toggleLocationCollapse(location)}
+                        className="hover:bg-surface-hover flex w-full items-center justify-between p-4 text-left transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          {isCollapsed ? (
+                            <ChevronRight className="h-4 w-4 text-purple-600" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-purple-600" />
+                          )}
+                          <MapPin className="h-4 w-4 text-purple-600" />
+                          <h4 className="text-heading font-bold">{location}</h4>
+                          <Badge variant="secondary" size="sm">
+                            {locationItems.length}
+                          </Badge>
+                        </div>
+                        <div className="text-muted text-xs">
+                          {isCollapsed
+                            ? 'Click to expand'
+                            : 'Click to collapse'}
+                        </div>
+                      </button>
+
+                      {!isCollapsed && (
+                        <div className="space-y-3 p-4 pt-0">
+                          {locationItems.map(item => (
+                            <ItemCard
+                              key={item.id}
+                              item={item}
+                              onEdit={
+                                readonly || !onUpdateItem
+                                  ? undefined
+                                  : handleEditItem
+                              }
+                              onDelete={
+                                readonly || !onDeleteItem
+                                  ? undefined
+                                  : () => onDeleteItem(item.id)
+                              }
+                              onQuantityChange={
+                                readonly || !onQuantityChange
+                                  ? undefined
+                                  : (quantity: number) =>
+                                      onQuantityChange(item.id, quantity)
+                              }
+                              compact={compact}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+              )}
             </div>
           )
         ) : (
-          <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 py-12 text-center">
-            <Package className="mx-auto mb-3 h-12 w-12 text-gray-300" />
-            <p className="font-medium text-gray-600">No items found</p>
-            <p className="mt-1 text-sm text-gray-500">
+          <div className="border-border-secondary bg-surface-inset rounded-lg border-2 border-dashed py-12 text-center">
+            <Package className="text-muted mx-auto mb-3 h-12 w-12" />
+            <p className="text-body font-medium">No items found</p>
+            <p className="text-muted mt-1 text-sm">
               {activeFilterCount > 0
                 ? 'Try adjusting your filters or add new items'
                 : 'Add items to track your equipment and supplies'}

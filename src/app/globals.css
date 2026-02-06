@@ -1,29 +1,97 @@
 @import 'tailwindcss';
 
+/* ============================================================
+   SEMANTIC DESIGN TOKENS
+   All theme-aware colors are defined here as CSS custom properties.
+   Components should use the Tailwind utilities generated from these
+   (e.g. bg-surface, text-heading, border-divider) instead of
+   hardcoded color classes like bg-white or text-gray-800.
+   ============================================================ */
+
 :root {
+  /* --- Core backgrounds --- */
   --background: #ffffff;
   --foreground: #171717;
+  --surface: #ffffff;
+  --surface-secondary: #f8fafc; /* slate-50 */
+  --surface-raised: #ffffff;
+  --surface-inset: #f1f5f9; /* slate-100 */
+  --surface-hover: #f1f5f9; /* slate-100 */
+  --surface-overlay: rgba(0, 0, 0, 0.5);
 
-  /* Background colors */
-  --color-bg-primary: #ffffff;
-  --color-bg-secondary: #f8fafc;
-  --color-bg-tertiary: #f1f5f9;
+  /* --- Text --- */
+  --heading: #1e293b; /* slate-800 */
+  --body: #475569; /* slate-600 */
+  --muted: #64748b; /* slate-500 */
+  --faint: #94a3b8; /* slate-400 */
+  --inverse: #ffffff;
 
-  /* Text colors */
-  --color-text-primary: #1e293b;
-  --color-text-secondary: #475569;
-  --color-text-tertiary: #64748b;
+  /* --- Borders / Dividers --- */
+  --divider: #e2e8f0; /* slate-200 */
+  --divider-strong: #cbd5e1; /* slate-300 */
+  --ring: #3b82f6; /* blue-500 */
 
-  /* Border colors */
-  --color-border-primary: #e2e8f0;
-  --color-border-secondary: #cbd5e1;
+  /* --- Accent surfaces (emerald) --- */
+  --accent-emerald-bg: #ecfdf5; /* emerald-50 */
+  --accent-emerald-bg-strong: #d1fae5; /* emerald-100 */
+  --accent-emerald-border: #a7f3d0; /* emerald-200 */
+  --accent-emerald-border-strong: #6ee7b7; /* emerald-300 */
+  --accent-emerald-text: #065f46; /* emerald-800 */
+  --accent-emerald-text-muted: #047857; /* emerald-700 */
 
-  /* Card colors */
-  --color-card-bg: #ffffff;
-  --color-card-border: #e2e8f0;
-  --color-card-hover: #f8fafc;
+  /* --- Accent surfaces (blue) --- */
+  --accent-blue-bg: #eff6ff; /* blue-50 */
+  --accent-blue-bg-strong: #dbeafe; /* blue-100 */
+  --accent-blue-border: #bfdbfe; /* blue-200 */
+  --accent-blue-border-strong: #93c5fd; /* blue-300 */
+  --accent-blue-text: #1e40af; /* blue-800 */
+  --accent-blue-text-muted: #1d4ed8; /* blue-700 */
 
-  /* Gradient colors */
+  /* --- Accent surfaces (amber) --- */
+  --accent-amber-bg: #fffbeb; /* amber-50 */
+  --accent-amber-bg-strong: #fef3c7; /* amber-100 */
+  --accent-amber-border: #fde68a; /* amber-200 */
+  --accent-amber-border-strong: #fcd34d; /* amber-300 */
+  --accent-amber-text: #92400e; /* amber-800 */
+  --accent-amber-text-muted: #b45309; /* amber-700 */
+
+  /* --- Accent surfaces (red) --- */
+  --accent-red-bg: #fef2f2; /* red-50 */
+  --accent-red-bg-strong: #fee2e2; /* red-100 */
+  --accent-red-border: #fecaca; /* red-200 */
+  --accent-red-border-strong: #fca5a5; /* red-300 */
+  --accent-red-text: #991b1b; /* red-800 */
+  --accent-red-text-muted: #b91c1c; /* red-700 */
+
+  /* --- Accent surfaces (purple) --- */
+  --accent-purple-bg: #faf5ff; /* purple-50 */
+  --accent-purple-bg-strong: #f3e8ff; /* purple-100 */
+  --accent-purple-border: #e9d5ff; /* purple-200 */
+  --accent-purple-border-strong: #d8b4fe; /* purple-300 */
+  --accent-purple-text: #6b21a8; /* purple-800 */
+  --accent-purple-text-muted: #7c3aed; /* purple-700 */
+
+  /* --- Accent surfaces (indigo) --- */
+  --accent-indigo-bg: #eef2ff; /* indigo-50 */
+  --accent-indigo-bg-strong: #e0e7ff; /* indigo-100 */
+  --accent-indigo-border: #c7d2fe; /* indigo-200 */
+  --accent-indigo-border-strong: #a5b4fc; /* indigo-300 */
+  --accent-indigo-text: #3730a3; /* indigo-800 */
+
+  /* --- Accent surfaces (green) --- */
+  --accent-green-bg: #f0fdf4; /* green-50 */
+  --accent-green-bg-strong: #dcfce7; /* green-100 */
+  --accent-green-border: #bbf7d0; /* green-200 */
+  --accent-green-border-strong: #86efac; /* green-300 */
+  --accent-green-text: #166534; /* green-800 */
+
+  /* --- Accent surfaces (orange) --- */
+  --accent-orange-bg: #fff7ed; /* orange-50 */
+  --accent-orange-bg-strong: #ffedd5; /* orange-100 */
+  --accent-orange-border: #fed7aa; /* orange-200 */
+  --accent-orange-text: #9a3412; /* orange-800 */
+
+  /* --- Gradient endpoints --- */
   --gradient-slate-from: #f8fafc;
   --gradient-slate-to: #f1f5f9;
   --gradient-blue-from: #eff6ff;
@@ -32,56 +100,243 @@
   --gradient-green-to: #d1fae5;
   --gradient-purple-from: #faf5ff;
   --gradient-purple-to: #fce7f3;
+  --gradient-emerald-from: #ecfdf5;
+  --gradient-emerald-to: #ccfbf1;
+  --gradient-amber-from: #fffbeb;
+  --gradient-amber-to: #fef9c3;
+  --gradient-red-from: #fef2f2;
+  --gradient-red-to: #fce7f3;
+  --gradient-indigo-from: #eef2ff;
+  --gradient-indigo-to: #e0e7ff;
+  --gradient-page-from: #f8fafc;
+  --gradient-page-via: #eff6ff;
+  --gradient-page-to: #eef2ff;
+
+  /* --- Input-specific --- */
+  --input-bg: #ffffff;
+  --input-text: #111827; /* gray-900 */
+  --input-placeholder: #6b7280; /* gray-500 */
+  --input-border: #d1d5db; /* gray-300 */
+  --input-border-focus: #10b981; /* emerald-500 */
 }
 
 [data-theme='dark'] {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  /* --- Core backgrounds --- */
+  --background: #0f172a; /* slate-900 */
+  --foreground: #e2e8f0; /* slate-200 */
+  --surface: #0f172a; /* slate-900 */
+  --surface-secondary: #1e293b; /* slate-800 */
+  --surface-raised: #1e293b; /* slate-800 */
+  --surface-inset: #020617; /* slate-950 */
+  --surface-hover: #334155; /* slate-700 */
+  --surface-overlay: rgba(0, 0, 0, 0.7);
 
-  /* Background colors */
-  --color-bg-primary: #0f172a;
-  --color-bg-secondary: #1e293b;
-  --color-bg-tertiary: #334155;
+  /* --- Text --- */
+  --heading: #f1f5f9; /* slate-100 */
+  --body: #cbd5e1; /* slate-300 */
+  --muted: #94a3b8; /* slate-400 */
+  --faint: #64748b; /* slate-500 */
+  --inverse: #0f172a; /* slate-900 */
 
-  /* Text colors */
-  --color-text-primary: #f1f5f9;
-  --color-text-secondary: #cbd5e1;
-  --color-text-tertiary: #94a3b8;
+  /* --- Borders / Dividers --- */
+  --divider: #334155; /* slate-700 */
+  --divider-strong: #475569; /* slate-600 */
+  --ring: #60a5fa; /* blue-400 */
 
-  /* Border colors */
-  --color-border-primary: #334155;
-  --color-border-secondary: #475569;
+  /* --- Accent surfaces (emerald) --- */
+  --accent-emerald-bg: rgba(6, 78, 59, 0.25);
+  --accent-emerald-bg-strong: rgba(6, 78, 59, 0.4);
+  --accent-emerald-border: #065f46; /* emerald-800 */
+  --accent-emerald-border-strong: #047857; /* emerald-700 */
+  --accent-emerald-text: #6ee7b7; /* emerald-300 */
+  --accent-emerald-text-muted: #34d399; /* emerald-400 */
 
-  /* Card colors */
-  --color-card-bg: #1e293b;
-  --color-card-border: #334155;
-  --color-card-hover: #293548;
+  /* --- Accent surfaces (blue) --- */
+  --accent-blue-bg: rgba(30, 58, 138, 0.25);
+  --accent-blue-bg-strong: rgba(30, 58, 138, 0.4);
+  --accent-blue-border: #1e3a8a; /* blue-900 */
+  --accent-blue-border-strong: #1d4ed8; /* blue-700 */
+  --accent-blue-text: #93c5fd; /* blue-300 */
+  --accent-blue-text-muted: #60a5fa; /* blue-400 */
 
-  /* Gradient colors - adjusted for dark mode */
+  /* --- Accent surfaces (amber) --- */
+  --accent-amber-bg: rgba(120, 53, 15, 0.25);
+  --accent-amber-bg-strong: rgba(120, 53, 15, 0.4);
+  --accent-amber-border: #78350f; /* amber-900 */
+  --accent-amber-border-strong: #b45309; /* amber-700 */
+  --accent-amber-text: #fcd34d; /* amber-300 */
+  --accent-amber-text-muted: #fbbf24; /* amber-400 */
+
+  /* --- Accent surfaces (red) --- */
+  --accent-red-bg: rgba(127, 29, 29, 0.25);
+  --accent-red-bg-strong: rgba(127, 29, 29, 0.4);
+  --accent-red-border: #7f1d1d; /* red-900 */
+  --accent-red-border-strong: #b91c1c; /* red-700 */
+  --accent-red-text: #fca5a5; /* red-300 */
+  --accent-red-text-muted: #f87171; /* red-400 */
+
+  /* --- Accent surfaces (purple) --- */
+  --accent-purple-bg: rgba(88, 28, 135, 0.25);
+  --accent-purple-bg-strong: rgba(88, 28, 135, 0.4);
+  --accent-purple-border: #581c87; /* purple-900 */
+  --accent-purple-border-strong: #7c3aed; /* purple-700 */
+  --accent-purple-text: #d8b4fe; /* purple-300 */
+  --accent-purple-text-muted: #c084fc; /* purple-400 */
+
+  /* --- Accent surfaces (indigo) --- */
+  --accent-indigo-bg: rgba(55, 48, 163, 0.25);
+  --accent-indigo-bg-strong: rgba(55, 48, 163, 0.4);
+  --accent-indigo-border: #312e81; /* indigo-900 */
+  --accent-indigo-border-strong: #4f46e5; /* indigo-700 */
+  --accent-indigo-text: #a5b4fc; /* indigo-300 */
+
+  /* --- Accent surfaces (green) --- */
+  --accent-green-bg: rgba(22, 101, 52, 0.25);
+  --accent-green-bg-strong: rgba(22, 101, 52, 0.4);
+  --accent-green-border: #14532d; /* green-900 */
+  --accent-green-border-strong: #15803d; /* green-700 */
+  --accent-green-text: #86efac; /* green-300 */
+
+  /* --- Accent surfaces (orange) --- */
+  --accent-orange-bg: rgba(154, 52, 18, 0.25);
+  --accent-orange-bg-strong: rgba(154, 52, 18, 0.4);
+  --accent-orange-border: #7c2d12; /* orange-900 */
+  --accent-orange-text: #fdba74; /* orange-300 */
+
+  /* --- Gradient endpoints (dark) --- */
   --gradient-slate-from: #1e293b;
   --gradient-slate-to: #334155;
-  --gradient-blue-from: #1e3a8a;
-  --gradient-blue-to: #312e81;
-  --gradient-green-from: #065f46;
-  --gradient-green-to: #064e3b;
-  --gradient-purple-from: #581c87;
-  --gradient-purple-to: #831843;
+  --gradient-blue-from: rgba(30, 58, 138, 0.3);
+  --gradient-blue-to: rgba(49, 46, 129, 0.3);
+  --gradient-green-from: rgba(6, 95, 70, 0.3);
+  --gradient-green-to: rgba(6, 78, 59, 0.3);
+  --gradient-purple-from: rgba(88, 28, 135, 0.3);
+  --gradient-purple-to: rgba(131, 24, 67, 0.3);
+  --gradient-emerald-from: rgba(6, 78, 59, 0.3);
+  --gradient-emerald-to: rgba(19, 78, 74, 0.3);
+  --gradient-amber-from: rgba(120, 53, 15, 0.3);
+  --gradient-amber-to: rgba(113, 63, 18, 0.3);
+  --gradient-red-from: rgba(127, 29, 29, 0.3);
+  --gradient-red-to: rgba(131, 24, 67, 0.3);
+  --gradient-indigo-from: rgba(55, 48, 163, 0.3);
+  --gradient-indigo-to: rgba(49, 46, 129, 0.3);
+  --gradient-page-from: #0f172a;
+  --gradient-page-via: #0f172a;
+  --gradient-page-to: #0f172a;
+
+  /* --- Input-specific --- */
+  --input-bg: #1e293b; /* slate-800 */
+  --input-text: #f1f5f9; /* slate-100 */
+  --input-placeholder: #94a3b8; /* slate-400 */
+  --input-border: #475569; /* slate-600 */
+  --input-border-focus: #34d399; /* emerald-400 */
 }
 
+/* ============================================================
+   TAILWIND v4 THEME REGISTRATION
+   Register CSS variables so Tailwind generates utility classes.
+   --color-surface  →  bg-surface, text-surface, border-surface
+   ============================================================ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  /* Core surfaces */
+  --color-surface: var(--surface);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-inset: var(--surface-inset);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-overlay: var(--surface-overlay);
+
+  /* Text */
+  --color-heading: var(--heading);
+  --color-body: var(--body);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-inverse: var(--inverse);
+
+  /* Borders */
+  --color-divider: var(--divider);
+  --color-divider-strong: var(--divider-strong);
+  --color-ring: var(--ring);
+
+  /* Accent emerald */
+  --color-accent-emerald-bg: var(--accent-emerald-bg);
+  --color-accent-emerald-bg-strong: var(--accent-emerald-bg-strong);
+  --color-accent-emerald-border: var(--accent-emerald-border);
+  --color-accent-emerald-border-strong: var(--accent-emerald-border-strong);
+  --color-accent-emerald-text: var(--accent-emerald-text);
+  --color-accent-emerald-text-muted: var(--accent-emerald-text-muted);
+
+  /* Accent blue */
+  --color-accent-blue-bg: var(--accent-blue-bg);
+  --color-accent-blue-bg-strong: var(--accent-blue-bg-strong);
+  --color-accent-blue-border: var(--accent-blue-border);
+  --color-accent-blue-border-strong: var(--accent-blue-border-strong);
+  --color-accent-blue-text: var(--accent-blue-text);
+  --color-accent-blue-text-muted: var(--accent-blue-text-muted);
+
+  /* Accent amber */
+  --color-accent-amber-bg: var(--accent-amber-bg);
+  --color-accent-amber-bg-strong: var(--accent-amber-bg-strong);
+  --color-accent-amber-border: var(--accent-amber-border);
+  --color-accent-amber-border-strong: var(--accent-amber-border-strong);
+  --color-accent-amber-text: var(--accent-amber-text);
+  --color-accent-amber-text-muted: var(--accent-amber-text-muted);
+
+  /* Accent red */
+  --color-accent-red-bg: var(--accent-red-bg);
+  --color-accent-red-bg-strong: var(--accent-red-bg-strong);
+  --color-accent-red-border: var(--accent-red-border);
+  --color-accent-red-border-strong: var(--accent-red-border-strong);
+  --color-accent-red-text: var(--accent-red-text);
+  --color-accent-red-text-muted: var(--accent-red-text-muted);
+
+  /* Accent purple */
+  --color-accent-purple-bg: var(--accent-purple-bg);
+  --color-accent-purple-bg-strong: var(--accent-purple-bg-strong);
+  --color-accent-purple-border: var(--accent-purple-border);
+  --color-accent-purple-border-strong: var(--accent-purple-border-strong);
+  --color-accent-purple-text: var(--accent-purple-text);
+  --color-accent-purple-text-muted: var(--accent-purple-text-muted);
+
+  /* Accent indigo */
+  --color-accent-indigo-bg: var(--accent-indigo-bg);
+  --color-accent-indigo-bg-strong: var(--accent-indigo-bg-strong);
+  --color-accent-indigo-border: var(--accent-indigo-border);
+  --color-accent-indigo-border-strong: var(--accent-indigo-border-strong);
+  --color-accent-indigo-text: var(--accent-indigo-text);
+
+  /* Accent green */
+  --color-accent-green-bg: var(--accent-green-bg);
+  --color-accent-green-bg-strong: var(--accent-green-bg-strong);
+  --color-accent-green-border: var(--accent-green-border);
+  --color-accent-green-border-strong: var(--accent-green-border-strong);
+  --color-accent-green-text: var(--accent-green-text);
+
+  /* Accent orange */
+  --color-accent-orange-bg: var(--accent-orange-bg);
+  --color-accent-orange-bg-strong: var(--accent-orange-bg-strong);
+  --color-accent-orange-border: var(--accent-orange-border);
+  --color-accent-orange-text: var(--accent-orange-text);
+
+  /* Input */
+  --color-input-bg: var(--input-bg);
+  --color-input-text: var(--input-text);
+  --color-input-placeholder: var(--input-placeholder);
+  --color-input-border: var(--input-border);
+  --color-input-border-focus: var(--input-border-focus);
+
+  /* Fonts */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-cinzel: var(--font-cinzel-decorative);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* ============================================================
+   BASE STYLES
+   ============================================================ */
 
 body {
   background: var(--background);
@@ -94,23 +349,23 @@ button {
   cursor: pointer;
 }
 
-/* Fix text readability - make text darker without changing backgrounds */
+/* Form input text colors — uses semantic tokens */
 input,
 textarea,
 select {
-  color: #1f2937; /* Dark gray text instead of light gray */
+  color: var(--input-text);
+  background-color: var(--input-bg);
 }
 
-/* Placeholder text should be medium gray, not too light */
 input::placeholder,
 textarea::placeholder {
-  color: #6b7280; /* Medium gray for good readability */
+  color: var(--input-placeholder);
   opacity: 1;
 }
 
-/* TipTap Editor content - make text darker and more specific */
+/* TipTap Editor content */
 .ProseMirror {
-  color: #1f2937 !important; /* Dark text for readability */
+  color: var(--heading) !important;
 }
 
 .ProseMirror p,
@@ -124,62 +379,27 @@ textarea::placeholder {
 .ProseMirror ul,
 .ProseMirror ol,
 .ProseMirror div {
-  color: #1f2937 !important; /* Ensure all editor content is dark */
+  color: var(--heading) !important;
 }
 
 /* Fix text inputs in editor mode */
 .prose input[type='text'] {
-  color: #1f2937 !important;
+  color: var(--input-text) !important;
 }
-/* but for placeholder text */
 .prose input[type='text']::placeholder {
-  color: #9ca3af !important;
+  color: var(--input-placeholder) !important;
 }
-
-/* Fix light gray text on white buttons */
 
 /* Make sure all text in forms is readable */
 form input,
 form textarea,
 form select {
-  color: #1f2937;
+  color: var(--input-text);
 }
 
-/* Dark mode adjustments */
-@media (prefers-color-scheme: dark) {
-  select {
-    color: #9ca3af;
-  }
-
-  input,
-  textarea {
-    color: #1f2937;
-  }
-
-  input::placeholder,
-  textarea::placeholder {
-    color: #9ca3af;
-  }
-
-  .ProseMirror {
-    color: #f9fafb;
-  }
-
-  .ProseMirror p,
-  .ProseMirror h1,
-  .ProseMirror h2,
-  .ProseMirror h3,
-  .ProseMirror h4,
-  .ProseMirror h5,
-  .ProseMirror h6,
-  .ProseMirror li,
-  .ProseMirror ul,
-  .ProseMirror ol {
-    color: #f9fafb;
-  }
-}
-
-/* Dice Box Styling */
+/* ============================================================
+   DICE BOX STYLING
+   ============================================================ */
 #dice-box {
   position: fixed !important;
   top: 0 !important;
@@ -199,6 +419,9 @@ form select {
   z-index: 9999 !important;
 }
 
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
 .dot1 {
   animation: pulse 1s infinite;
   animation-delay: 0s;

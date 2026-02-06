@@ -56,13 +56,13 @@ export default function CharacterBasicInfo({
   getClassDisplayString,
 }: CharacterBasicInfoProps) {
   const [showMulticlassManager, setShowMulticlassManager] = useState(false);
-  
+
   const isMulticlassed = (character.classes?.length || 0) > 1;
   const classDisplayString = getClassDisplayString();
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-amber-200 bg-white p-6 shadow-lg">
-        <h2 className="mb-4 border-b border-gray-200 pb-2 text-lg font-bold text-gray-800">
+      <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+        <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
           Character Information
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -79,15 +79,17 @@ export default function CharacterBasicInfo({
           {/* Class Display - Show multiclass info or single class selector */}
           {isMulticlassed ? (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="text-body mb-1 block text-sm font-medium">
                 Classes
               </label>
               <div className="flex items-center gap-2">
-                <div className="flex-1 rounded-md border border-gray-300 bg-gray-50 p-2 text-gray-800">
+                <div className="border-divider-strong bg-surface-secondary text-heading flex-1 rounded-md border p-2">
                   {classDisplayString}
                 </div>
                 <Button
-                  onClick={() => setShowMulticlassManager(!showMulticlassManager)}
+                  onClick={() =>
+                    setShowMulticlassManager(!showMulticlassManager)
+                  }
                   variant="primary"
                   size="sm"
                   leftIcon={<Settings size={16} />}
@@ -98,7 +100,10 @@ export default function CharacterBasicInfo({
             </div>
           ) : (
             <div>
-              <SimpleClassSelector value={characterClass} onChange={onUpdateClass} />
+              <SimpleClassSelector
+                value={characterClass}
+                onChange={onUpdateClass}
+              />
             </div>
           )}
 
@@ -111,7 +116,7 @@ export default function CharacterBasicInfo({
                 size="md"
                 leftIcon={<Settings size={16} />}
                 fullWidth
-                className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                className="border-accent-blue-border bg-accent-blue-bg text-accent-blue-text-muted hover:bg-accent-blue-bg-strong"
               >
                 Manage Multiclassing
               </Button>

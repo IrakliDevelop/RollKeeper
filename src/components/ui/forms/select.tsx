@@ -54,7 +54,7 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        'relative z-50 min-w-[8rem] overflow-hidden rounded-lg border-2 border-gray-300 bg-white text-gray-900 shadow-lg',
+        'border-divider-strong bg-surface-raised text-heading relative z-50 min-w-[8rem] overflow-hidden rounded-lg border-2 shadow-lg',
         'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
         position === 'popper' &&
           'data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
@@ -83,7 +83,7 @@ const SelectLabel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Label
     ref={ref}
-    className={cn('px-2 py-1.5 text-sm font-semibold text-gray-900', className)}
+    className={cn('text-heading px-2 py-1.5 text-sm font-semibold', className)}
     {...props}
   />
 ));
@@ -109,7 +109,7 @@ const SelectItem = React.forwardRef<
     ref={ref}
     className={cn(
       'relative flex w-full cursor-default items-center rounded-md py-2 pr-2 pl-8 text-sm outline-none select-none',
-      'focus:bg-gray-100 focus:text-gray-900',
+      'focus:bg-surface-hover focus:text-heading',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className
     )}
@@ -123,7 +123,7 @@ const SelectItem = React.forwardRef<
 
     <div className="flex min-w-0 flex-1 items-center gap-2">
       {icon && (
-        <span className="flex-shrink-0 text-gray-500" aria-hidden="true">
+        <span className="text-muted flex-shrink-0" aria-hidden="true">
           {icon}
         </span>
       )}
@@ -132,7 +132,7 @@ const SelectItem = React.forwardRef<
           <span className="block truncate">{children}</span>
         </SelectPrimitive.ItemText>
         {description && (
-          <span className="block truncate text-xs text-gray-500">
+          <span className="text-muted block truncate text-xs">
             {description}
           </span>
         )}
@@ -148,7 +148,7 @@ const SelectSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Separator
     ref={ref}
-    className={cn('-mx-1 my-1 h-px bg-gray-200', className)}
+    className={cn('bg-divider -mx-1 my-1 h-px', className)}
     {...props}
   />
 ));
@@ -217,7 +217,7 @@ const SelectField = React.forwardRef<
     return (
       <div className={cn('w-full', wrapperClassName)}>
         {label && (
-          <label className="mb-1.5 block text-sm font-medium text-gray-800">
+          <label className="text-heading mb-1.5 block text-sm font-medium">
             {label}
             {required && (
               <span className="ml-1 text-red-500" aria-label="required">
@@ -238,7 +238,7 @@ const SelectField = React.forwardRef<
           <p
             className={cn(
               'mt-1.5 text-sm',
-              error ? 'text-red-600' : 'text-gray-600'
+              error ? 'text-red-600 dark:text-red-400' : 'text-body'
             )}
           >
             {error || helperText}

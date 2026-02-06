@@ -274,10 +274,10 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
 
   if (equippedWeapons.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
+      <div className="border-divider bg-surface-raised rounded-lg border p-6 text-center">
         <div className="mb-3 text-5xl">🗡️</div>
-        <p className="font-semibold text-gray-700">No weapons equipped</p>
-        <p className="mt-1 text-sm text-gray-500">
+        <p className="text-heading font-semibold">No weapons equipped</p>
+        <p className="text-muted mt-1 text-sm">
           Equip weapons in the Equipment section to see them here.
         </p>
       </div>
@@ -291,7 +291,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
         onReorder={handleReorderEquippedWeapons}
         keyExtractor={weapon => weapon.id}
         className="space-y-3"
-        itemClassName="p-4 rounded-lg border-2 border-gray-200 bg-white transition-all hover:shadow-md hover:border-gray-300"
+        itemClassName="p-4 rounded-lg border-2 border-divider bg-surface-raised transition-all hover:shadow-md hover:border-divider-strong"
         showDragHandle={true}
         dragHandlePosition="left"
         renderItem={weapon => {
@@ -323,7 +323,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
               <div className="min-w-0 flex-1">
                 {/* Title and badges */}
                 <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <h4 className="font-bold text-gray-900">{weapon.name}</h4>
+                  <h4 className="text-heading font-bold">{weapon.name}</h4>
                   <Badge
                     variant="success"
                     size="sm"
@@ -347,14 +347,14 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                 {/* Attack and Damage stats */}
                 <div className="mb-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-gray-600">🎯 Attack:</span>
-                    <span className="font-bold text-red-600">
+                    <span className="text-muted">🎯 Attack:</span>
+                    <span className="text-accent-red-text-muted font-bold">
                       {attackString}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-gray-600">⚔️ Damage:</span>
-                    <span className="font-bold text-blue-600">
+                    <span className="text-muted">⚔️ Damage:</span>
+                    <span className="text-accent-blue-text-muted font-bold">
                       {damageString}
                     </span>
                   </div>
@@ -362,8 +362,8 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
 
                 {versatileDamageString && (
                   <div className="mb-3 flex items-center gap-1.5 text-sm">
-                    <span className="text-gray-600">🗡️ Versatile:</span>
-                    <span className="font-bold text-purple-600">
+                    <span className="text-muted">🗡️ Versatile:</span>
+                    <span className="text-accent-purple-text-muted font-bold">
                       {versatileDamageString}
                     </span>
                   </div>
@@ -387,8 +387,8 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                           key={charge.id}
                           className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 ${
                             isExhausted
-                              ? 'border-red-200 bg-red-50'
-                              : 'border-indigo-200 bg-indigo-50'
+                              ? 'border-accent-red-border bg-accent-red-bg'
+                              : 'border-accent-indigo-border bg-accent-indigo-bg'
                           }`}
                         >
                           {/* Clickable name to open details */}
@@ -406,10 +406,12 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                             <Sparkles
                               size={12}
                               className={
-                                isExhausted ? 'text-red-500' : 'text-indigo-600'
+                                isExhausted
+                                  ? 'text-accent-red-text-muted'
+                                  : 'text-accent-indigo-text'
                               }
                             />
-                            <span className="max-w-[120px] truncate text-xs font-medium text-gray-800">
+                            <span className="text-heading max-w-[120px] truncate text-xs font-medium">
                               {charge.name || 'Ability'}
                             </span>
                           </button>
@@ -424,8 +426,8 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                               disabled={isFull}
                               className={`rounded p-0.5 ${
                                 isFull
-                                  ? 'cursor-not-allowed text-gray-300'
-                                  : 'text-green-600 hover:bg-green-100'
+                                  ? 'text-faint cursor-not-allowed'
+                                  : 'text-accent-green-text hover:bg-accent-green-bg'
                               }`}
                               title="Restore charge"
                             >
@@ -434,10 +436,10 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                             <span
                               className={`min-w-[28px] text-center text-xs font-bold ${
                                 isExhausted
-                                  ? 'text-red-600'
+                                  ? 'text-accent-red-text-muted'
                                   : chargesRemaining <= 1
-                                    ? 'text-orange-600'
-                                    : 'text-indigo-600'
+                                    ? 'text-accent-orange-text'
+                                    : 'text-accent-indigo-text'
                               }`}
                             >
                               {chargesRemaining}/{maxCharges}
@@ -450,8 +452,8 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                               disabled={isExhausted}
                               className={`rounded p-0.5 ${
                                 isExhausted
-                                  ? 'cursor-not-allowed text-gray-300'
-                                  : 'text-red-600 hover:bg-red-100'
+                                  ? 'text-faint cursor-not-allowed'
+                                  : 'text-accent-red-text-muted hover:bg-accent-red-bg'
                               }`}
                               title="Use charge"
                             >
@@ -460,7 +462,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                           </div>
 
                           {/* Rest type indicator */}
-                          <div className="ml-1 flex items-center gap-0.5 text-[10px] text-gray-500">
+                          <div className="text-muted ml-1 flex items-center gap-0.5 text-[10px]">
                             <Clock size={10} />
                             <span className="capitalize">
                               {charge.restType[0]}
@@ -534,7 +536,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                   onClick={() => equipWeapon(weapon.id, false)}
                   variant="outline"
                   size="sm"
-                  className="min-w-[110px] border-orange-300 text-orange-700 hover:bg-orange-50"
+                  className="border-accent-orange-border text-accent-orange-text hover:bg-accent-orange-bg min-w-[110px]"
                   title="Unequip weapon"
                 >
                   Unequip
@@ -545,13 +547,13 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
         }}
       />
 
-      <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
-        <p className="text-center text-sm text-blue-800">
+      <div className="border-accent-blue-border bg-accent-blue-bg mt-4 rounded-lg border p-3">
+        <p className="text-accent-blue-text text-center text-sm">
           <strong>💡 Quick Reference:</strong> Manage your full weapon inventory
           in the{' '}
           <button
             onClick={() => switchToTab('equipment')}
-            className="font-semibold text-blue-600 underline transition-colors hover:text-blue-800 hover:no-underline"
+            className="text-accent-blue-text-muted hover:text-accent-blue-text font-semibold underline transition-colors hover:no-underline"
           >
             Equipment tab
           </button>
@@ -569,9 +571,9 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
         >
           <div className="space-y-4">
             {/* Weapon name */}
-            <div className="text-sm text-gray-500">
+            <div className="text-muted text-sm">
               From:{' '}
-              <span className="font-medium text-gray-700">
+              <span className="text-body font-medium">
                 {selectedCharge.weaponName}
               </span>
             </div>
@@ -583,22 +585,20 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                   dangerouslySetInnerHTML={{
                     __html: selectedCharge.charge.description,
                   }}
-                  className="text-gray-700"
+                  className="text-body"
                 />
               </div>
             ) : (
-              <p className="text-sm text-gray-500 italic">
+              <p className="text-muted text-sm italic">
                 No description provided.
               </p>
             )}
 
             {/* Charges info */}
-            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+            <div className="border-accent-indigo-border bg-accent-indigo-bg rounded-lg border p-3">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">
-                  Charges
-                </span>
-                <div className="flex items-center gap-1 text-xs text-gray-500">
+                <span className="text-body text-sm font-medium">Charges</span>
+                <div className="text-muted flex items-center gap-1 text-xs">
                   <Clock size={12} />
                   <span className="capitalize">
                     Recharges on {selectedCharge.charge.restType} rest
@@ -645,7 +645,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                       size="sm"
                       disabled={isFull}
                       leftIcon={<Plus size={14} />}
-                      className="border-green-300 text-green-600 hover:bg-green-50"
+                      className="border-accent-green-border text-accent-green-text hover:bg-accent-green-bg"
                     >
                       Restore
                     </Button>
@@ -654,17 +654,15 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                       <span
                         className={`text-2xl font-bold ${
                           isExhausted
-                            ? 'text-red-600'
+                            ? 'text-accent-red-text-muted'
                             : chargesRemaining <= 1
-                              ? 'text-orange-600'
-                              : 'text-indigo-600'
+                              ? 'text-accent-orange-text'
+                              : 'text-accent-indigo-text'
                         }`}
                       >
                         {chargesRemaining}
                       </span>
-                      <span className="text-lg text-gray-500">
-                        /{maxCharges}
-                      </span>
+                      <span className="text-muted text-lg">/{maxCharges}</span>
                     </div>
 
                     <Button
@@ -697,7 +695,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                       size="sm"
                       disabled={isExhausted}
                       leftIcon={<Minus size={14} />}
-                      className="border-red-300 text-red-600 hover:bg-red-50"
+                      className="border-accent-red-border text-accent-red-text-muted hover:bg-accent-red-bg"
                     >
                       Use
                     </Button>
@@ -716,7 +714,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                 const isExhausted = chargesRemaining <= 0;
 
                 return maxCharges > 1 ? (
-                  <div className="mt-3 h-2 w-full rounded-full bg-gray-200">
+                  <div className="bg-surface-inset mt-3 h-2 w-full rounded-full">
                     <div
                       className={`h-2 rounded-full transition-all duration-300 ${
                         isExhausted
@@ -736,7 +734,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
 
             {/* Proficiency scaling info */}
             {selectedCharge.charge.scaleWithProficiency && (
-              <p className="text-xs text-gray-500">
+              <p className="text-muted text-xs">
                 <Info size={12} className="mr-1 inline" />
                 Scales with proficiency bonus (×
                 {selectedCharge.charge.proficiencyMultiplier || 1})

@@ -22,15 +22,15 @@ export default function SavingThrows({
   onRollSavingThrow,
 }: SavingThrowsProps) {
   return (
-    <div className="rounded-lg border border-amber-200 bg-white p-6 shadow-lg">
-      <h2 className="mb-4 border-b border-gray-200 pb-2 text-lg font-bold text-gray-800">
+    <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+      <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
         Saving Throws
       </h2>
       <div className="space-y-2">
         {(Object.keys(ABILITY_NAMES) as AbilityName[]).map(ability => (
           <div
             key={ability}
-            className="flex items-center gap-3 rounded p-2 transition-colors hover:bg-purple-50"
+            className="hover:bg-accent-purple-bg flex items-center gap-3 rounded p-2 transition-colors"
           >
             <Checkbox
               checked={savingThrows[ability].proficient}
@@ -40,14 +40,14 @@ export default function SavingThrows({
               size="sm"
               variant="primary"
             />
-            <span className="w-8 text-right font-mono text-sm font-semibold text-purple-800">
+            <span className="text-accent-purple-text w-8 text-right font-mono text-sm font-semibold">
               {formatModifier(getSavingThrowModifier(ability))}
             </span>
             <Button
               onClick={() => onRollSavingThrow(ability)}
               variant="ghost"
               size="sm"
-              className="hover:bg-purple-100 hover:text-purple-700"
+              className="hover:bg-accent-purple-bg-strong hover:text-accent-purple-text"
               title={`Roll ${ABILITY_NAMES[ability]} saving throw (d20 + ${formatModifier(getSavingThrowModifier(ability))})`}
             >
               {ABILITY_NAMES[ability]}

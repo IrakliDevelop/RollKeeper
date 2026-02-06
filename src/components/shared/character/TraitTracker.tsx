@@ -93,10 +93,10 @@ export function TraitTracker({
             disabled={readonly || !onUpdateTrait}
             className={`${size} rounded border-2 transition-colors ${
               index < trait.usedUses
-                ? 'border-red-500 bg-red-500' // Used
+                ? 'border-red-500 bg-red-500 dark:border-red-400 dark:bg-red-400' // Used
                 : readonly
-                  ? 'border-gray-300 bg-white'
-                  : 'border-gray-400 bg-white hover:border-gray-600' // Available
+                  ? 'border-border-secondary bg-surface-raised'
+                  : 'border-border-secondary bg-surface-raised hover:border-border-primary' // Available
             } ${readonly ? '' : 'cursor-pointer'}`}
             title={`Use ${index + 1} - ${index < trait.usedUses ? 'Used' : 'Available'}`}
           />
@@ -113,27 +113,25 @@ export function TraitTracker({
   );
 
   const containerClasses = compact
-    ? `rounded-lg border-2 border-indigo-200 bg-white p-3 shadow-sm ${className}`
-    : `rounded-lg border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 space-y-4 shadow-sm ${className}`;
+    ? `rounded-lg border-2 border-accent-indigo-border bg-surface-raised p-3 shadow-sm ${className}`
+    : `rounded-lg border-2 border-accent-indigo-border bg-gradient-to-br from-accent-indigo-bg to-accent-purple-bg p-4 space-y-4 shadow-sm ${className}`;
 
   if (safeTraits.length === 0) {
     return (
       <div className={containerClasses}>
         <div className="mb-4 flex items-center justify-between">
           <h3
-            className={`flex items-center gap-2 font-semibold text-indigo-800 ${compact ? 'text-base' : 'text-lg'}`}
+            className={`text-accent-indigo-text flex items-center gap-2 font-semibold ${compact ? 'text-base' : 'text-lg'}`}
           >
             <Zap size={compact ? 16 : 20} />
             {compact ? 'Abilities' : 'Special Abilities'}
           </h3>
         </div>
         {!compact && (
-          <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 py-8 text-center">
-            <Zap className="mx-auto mb-2 h-10 w-10 text-gray-400" />
-            <p className="font-medium text-gray-600">
-              No special abilities yet
-            </p>
-            <p className="mt-1 text-sm text-gray-500">
+          <div className="border-border-secondary bg-surface-inset rounded-lg border-2 border-dashed py-8 text-center">
+            <Zap className="text-muted mx-auto mb-2 h-10 w-10" />
+            <p className="text-body font-medium">No special abilities yet</p>
+            <p className="text-muted mt-1 text-sm">
               Special abilities appear here when added through Active Abilities
               & Features
             </p>
@@ -148,7 +146,7 @@ export function TraitTracker({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h3
-            className={`flex items-center gap-2 font-semibold text-indigo-800 ${compact ? 'text-base' : 'text-lg'}`}
+            className={`text-accent-indigo-text flex items-center gap-2 font-semibold ${compact ? 'text-base' : 'text-lg'}`}
           >
             <Zap size={compact ? 16 : 20} />
             {compact ? 'Abilities' : 'Special Abilities'}
@@ -170,7 +168,7 @@ export function TraitTracker({
                   variant="ghost"
                   size="xs"
                   leftIcon={<RotateCcw className="h-3 w-3" />}
-                  className="text-blue-600 hover:text-blue-800"
+                  className="text-accent-blue-text-muted hover:text-accent-blue-text"
                   title="Reset short rest abilities"
                 >
                   Short Rest
@@ -184,7 +182,7 @@ export function TraitTracker({
                   variant="ghost"
                   size="xs"
                   leftIcon={<RotateCcw className="h-3 w-3" />}
-                  className="text-indigo-600 hover:text-indigo-800"
+                  className="text-accent-indigo-text-muted hover:text-accent-indigo-text"
                   title="Reset all abilities"
                 >
                   Long Rest
@@ -197,18 +195,18 @@ export function TraitTracker({
       {/* Search Filter */}
       {!compact && safeTraits.length > 3 && (
         <div className="relative">
-          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="text-muted absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Search abilities..."
             value={searchFilter}
             onChange={e => setSearchFilter(e.target.value)}
-            className="w-full rounded-lg border-2 border-indigo-200 bg-white py-2 pr-10 pl-10 text-sm transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 focus:outline-none"
+            className="border-accent-indigo-border bg-surface-raised text-heading focus:border-accent-indigo-border-strong focus:ring-accent-indigo-bg w-full rounded-lg border-2 py-2 pr-10 pl-10 text-sm transition-colors focus:ring-2 focus:outline-none"
           />
           {searchFilter && (
             <button
               onClick={() => setSearchFilter('')}
-              className="absolute top-1/2 right-3 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="text-muted hover:text-body absolute top-1/2 right-3 -translate-y-1/2"
               title="Clear search"
             >
               <X className="h-4 w-4" />
@@ -225,7 +223,7 @@ export function TraitTracker({
           {displayTraits.map(trait => (
             <div
               key={trait.id}
-              className={`rounded-lg border-2 border-indigo-200 bg-white ${compact ? 'p-2' : 'p-3'} transition-shadow hover:shadow-md`}
+              className={`border-accent-indigo-border bg-surface-raised rounded-lg border-2 ${compact ? 'p-2' : 'p-3'} transition-shadow hover:shadow-md`}
             >
               <div>
                 <div
@@ -234,7 +232,7 @@ export function TraitTracker({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h4
-                        className={`font-medium text-gray-900 ${compact ? 'text-sm' : 'text-base'}`}
+                        className={`text-heading font-medium ${compact ? 'text-sm' : 'text-base'}`}
                       >
                         {trait.name}
                       </h4>
@@ -256,7 +254,7 @@ export function TraitTracker({
                     </div>
                     {trait.description && !compact && (
                       <div
-                        className="mt-1 line-clamp-2 text-sm text-gray-600"
+                        className="text-muted mt-1 line-clamp-2 text-sm"
                         dangerouslySetInnerHTML={{ __html: trait.description }}
                       />
                     )}
@@ -268,7 +266,7 @@ export function TraitTracker({
                           onClick={() => onTraitClick(trait)}
                           variant="ghost"
                           size="xs"
-                          className="text-indigo-600 hover:bg-indigo-100"
+                          className="text-accent-indigo-text-muted hover:bg-accent-indigo-bg"
                           title="View ability details"
                         >
                           <Eye className="h-4 w-4" />
@@ -279,7 +277,7 @@ export function TraitTracker({
                           onClick={() => onDeleteTrait(trait.id)}
                           variant="ghost"
                           size="xs"
-                          className="text-red-600 hover:bg-red-100"
+                          className="text-accent-red-text-muted hover:bg-accent-red-bg"
                           title="Delete ability"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -343,14 +341,12 @@ export function TraitTracker({
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 py-8 text-center">
-          <Search className="mx-auto mb-2 h-10 w-10 text-gray-400" />
-          <p className="font-medium text-gray-600">
+        <div className="border-border-secondary bg-surface-inset rounded-lg border-2 border-dashed py-8 text-center">
+          <Search className="text-muted mx-auto mb-2 h-10 w-10" />
+          <p className="text-body font-medium">
             No abilities match your search
           </p>
-          <p className="mt-1 text-sm text-gray-500">
-            Try a different search term
-          </p>
+          <p className="text-muted mt-1 text-sm">Try a different search term</p>
         </div>
       )}
     </div>

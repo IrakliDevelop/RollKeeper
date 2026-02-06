@@ -1,6 +1,6 @@
 /**
  * Card Component
- * 
+ *
  * A versatile card container component with support for headers, bodies, footers,
  * and various visual styles.
  */
@@ -28,7 +28,10 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       <div
         ref={ref}
         className={cn(
-          cardVariants({ variant: isInteractive ? 'interactive' : variant, padding }),
+          cardVariants({
+            variant: isInteractive ? 'interactive' : variant,
+            padding,
+          }),
           className
         )}
         onClick={onClick}
@@ -60,7 +63,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      'text-lg font-semibold leading-none tracking-tight text-gray-900',
+      'text-heading text-lg leading-none font-semibold tracking-tight',
       className
     )}
     {...props}
@@ -72,11 +75,7 @@ const CardDescription = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <p
-    ref={ref}
-    className={cn('text-sm text-gray-600', className)}
-    {...props}
-  />
+  <p ref={ref} className={cn('text-body text-sm', className)} {...props} />
 ));
 CardDescription.displayName = 'CardDescription';
 
@@ -92,13 +91,15 @@ const CardFooter = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn('flex items-center', className)}
-    {...props}
-  />
+  <div ref={ref} className={cn('flex items-center', className)} {...props} />
 ));
 CardFooter.displayName = 'CardFooter';
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };
-
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  CardContent,
+};

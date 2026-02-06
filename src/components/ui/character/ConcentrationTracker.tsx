@@ -37,15 +37,17 @@ export default function ConcentrationTracker({
 
   return (
     <div
-      className={`rounded-lg border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-4 ${className}`}
+      className={`border-accent-amber-border from-accent-amber-bg to-accent-amber-bg-strong rounded-lg border bg-gradient-to-r p-4 ${className}`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <Eye className="text-orange-600" size={20} />
+            <Eye className="text-accent-amber-text-muted" size={20} />
             <div>
-              <h3 className="font-semibold text-orange-900">Concentrating</h3>
-              <div className="flex items-center gap-2 text-sm text-orange-700">
+              <h3 className="text-accent-amber-text font-semibold">
+                Concentrating
+              </h3>
+              <div className="text-accent-amber-text-muted flex items-center gap-2 text-sm">
                 <span className="font-medium">{concentration.spellName}</span>
                 {concentration.castAt && concentration.castAt > 0 && (
                   <>
@@ -69,7 +71,7 @@ export default function ConcentrationTracker({
 
         <button
           onClick={onStopConcentration}
-          className="flex items-center gap-2 rounded-lg border border-orange-300 bg-orange-100 px-3 py-2 text-sm font-medium text-orange-700 transition-colors hover:bg-orange-200"
+          className="border-accent-amber-border-strong bg-accent-amber-bg-strong text-accent-amber-text-muted hover:bg-accent-amber-bg-strong/80 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors"
           title="End concentration"
         >
           <X size={14} />
@@ -77,9 +79,9 @@ export default function ConcentrationTracker({
         </button>
       </div>
 
-      <div className="mt-3 rounded-md bg-orange-100 px-3 py-2 text-xs text-orange-600">
+      <div className="bg-accent-amber-bg-strong text-accent-amber-text-muted mt-3 rounded-md px-3 py-2 text-xs">
         <p className="mb-1 font-medium">Concentration Rules:</p>
-        <ul className="space-y-1 text-orange-700">
+        <ul className="text-accent-amber-text-muted space-y-1">
           <li>• Taking damage may require a Constitution saving throw</li>
           <li>• Casting another concentration spell ends this one</li>
           <li>• Being incapacitated or killed ends concentration</li>

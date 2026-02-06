@@ -33,7 +33,9 @@ const CollapsibleSubsection: React.FC<CollapsibleSubsectionProps> = ({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   useEffect(() => {
-    const savedState = localStorage.getItem(`equipment-subsection-${persistKey}`);
+    const savedState = localStorage.getItem(
+      `equipment-subsection-${persistKey}`
+    );
     if (savedState !== null) {
       setIsExpanded(JSON.parse(savedState));
     }
@@ -42,40 +44,40 @@ const CollapsibleSubsection: React.FC<CollapsibleSubsectionProps> = ({
   const toggleExpanded = () => {
     const newState = !isExpanded;
     setIsExpanded(newState);
-    localStorage.setItem(`equipment-subsection-${persistKey}`, JSON.stringify(newState));
+    localStorage.setItem(
+      `equipment-subsection-${persistKey}`,
+      JSON.stringify(newState)
+    );
   };
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow">
+    <div className="border-divider bg-surface-raised rounded-lg border shadow">
       <button
         onClick={toggleExpanded}
-        className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-gray-50"
+        className="hover:bg-surface-hover flex w-full items-center justify-between p-4 text-left transition-colors"
         aria-expanded={isExpanded}
       >
         <div className="flex items-center gap-2">
           <span className="text-lg">{icon}</span>
-          <h3 className="text-lg font-bold text-gray-800">{title}</h3>
+          <h3 className="text-heading text-lg font-bold">{title}</h3>
         </div>
         <div className="flex items-center gap-2">
           {badge}
           {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
         </div>
       </button>
-      
+
       {isExpanded && (
-        <div className="border-t border-gray-200 p-6">
-          {children}
-        </div>
+        <div className="border-divider border-t p-6">{children}</div>
       )}
     </div>
   );
 };
 
-export default function EquipmentSection({
-  character,
-}: EquipmentSectionProps) {
+export default function EquipmentSection({ character }: EquipmentSectionProps) {
   const equippedArmor = character.armorItems.filter(armor => armor.isEquipped);
-  const attunedItems = character.magicItems.filter(item => item.isAttuned).length +
+  const attunedItems =
+    character.magicItems.filter(item => item.isAttuned).length +
     character.weapons.filter(weapon => weapon.isAttuned).length;
 
   return (
@@ -108,8 +110,10 @@ export default function EquipmentSection({
       >
         <ErrorBoundary
           fallback={
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-              <p className="text-red-600">Unable to load equipment inventory</p>
+            <div className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4">
+              <p className="text-accent-red-text-muted">
+                Unable to load equipment inventory
+              </p>
             </div>
           }
         >
@@ -140,8 +144,10 @@ export default function EquipmentSection({
       >
         <ErrorBoundary
           fallback={
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-              <p className="text-red-600">Unable to load armor management</p>
+            <div className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4">
+              <p className="text-accent-red-text-muted">
+                Unable to load armor management
+              </p>
             </div>
           }
         >

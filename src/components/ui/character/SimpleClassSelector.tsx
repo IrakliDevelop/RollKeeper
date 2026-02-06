@@ -39,7 +39,7 @@ export default function SimpleClassSelector({
           <SelectItem key={classData.name} value={classData.name}>
             <div className="flex flex-col">
               <span className="font-medium">{classData.name}</span>
-              <span className="text-xs text-gray-600">
+              <span className="text-muted text-xs">
                 {classData.spellcaster !== 'none'
                   ? `${
                       classData.spellcaster === 'full'
@@ -59,7 +59,7 @@ export default function SimpleClassSelector({
 
       {/* Show spellcaster info for selected class */}
       {value.name && (
-        <div className="mt-2 text-xs text-gray-600">
+        <div className="text-muted mt-2 text-xs">
           {value.spellcaster === 'none' && '• Non-spellcaster'}
           {value.spellcaster === 'full' &&
             '• Full spellcaster (Spell slots by class level)'}

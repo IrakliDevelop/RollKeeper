@@ -1,6 +1,6 @@
 /**
  * Input Component
- * 
+ *
  * A flexible input component with support for labels, helper text, error states,
  * and prefix/suffix icons.
  */
@@ -78,7 +78,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       <div className={cn('w-full', wrapperClassName)}>
         {label && (
           <label
-            className="mb-1.5 block text-sm font-medium text-gray-800"
+            className="text-heading mb-1.5 block text-sm font-medium"
             htmlFor={props.id}
           >
             {label}
@@ -89,14 +89,14 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             )}
           </label>
         )}
-        
+
         <div className="relative">
           {leftIcon && (
-            <div className="pointer-events-none absolute left-3 top-1/2 flex -translate-y-1/2 items-center text-gray-500">
+            <div className="text-muted pointer-events-none absolute top-1/2 left-3 flex -translate-y-1/2 items-center">
               {leftIcon}
             </div>
           )}
-          
+
           <input
             type={type}
             className={cn(
@@ -110,31 +110,31 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             value={value}
             {...props}
           />
-          
+
           {showClearButton && (
             <button
               type="button"
               onClick={onClear}
-              className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center text-gray-400 transition-colors hover:text-gray-600"
+              className="text-faint hover:text-body absolute top-1/2 right-3 flex -translate-y-1/2 items-center transition-colors"
               aria-label="Clear input"
               tabIndex={-1}
             >
               <X className="h-4 w-4" />
             </button>
           )}
-          
+
           {rightIcon && !showClearButton && (
-            <div className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center text-gray-500">
+            <div className="text-muted pointer-events-none absolute top-1/2 right-3 flex -translate-y-1/2 items-center">
               {rightIcon}
             </div>
           )}
         </div>
-        
+
         {(error || helperText) && (
           <p
             className={cn(
               'mt-1.5 text-sm',
-              error ? 'text-red-600' : 'text-gray-600'
+              error ? 'text-red-600 dark:text-red-400' : 'text-body'
             )}
           >
             {error || helperText}

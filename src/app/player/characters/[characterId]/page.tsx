@@ -304,19 +304,19 @@ export default function CharacterSheet() {
 
   if (!playerCharacter) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="bg-surface flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <FileText size={64} className="mx-auto mb-6 text-gray-400" />
-          <h1 className="mb-2 text-2xl font-bold text-slate-800">
+          <FileText size={64} className="text-faint mx-auto mb-6" />
+          <h1 className="text-heading mb-2 text-2xl font-bold">
             Character Not Found
           </h1>
-          <p className="mb-6 text-slate-600">
+          <p className="text-body mb-6">
             The character you&apos;re looking for doesn&apos;t exist or has been
             deleted.
           </p>
           <Link
             href="/player"
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+            className="bg-accent-blue-text-muted text-inverse hover:bg-accent-blue-text inline-flex items-center gap-2 rounded-lg px-4 py-2 transition-colors"
           >
             <ArrowLeft size={16} />
             Back to Characters
@@ -540,7 +540,7 @@ export default function CharacterSheet() {
   return (
     <ErrorBoundary>
       <NavigationContext.Provider value={{ switchToTab }}>
-        <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="relative min-h-screen bg-gradient-to-br from-[var(--gradient-page-from)] via-[var(--gradient-page-via)] to-[var(--gradient-page-to)]">
           {/* Header */}
           <CharacterSheetHeader
             characterId={characterId}
@@ -601,12 +601,12 @@ export default function CharacterSheet() {
                 icon="⚔️"
                 defaultExpanded={true}
                 persistKey="actions-combat"
-                className="rounded-xl border-2 border-slate-300 bg-gradient-to-r from-slate-50 to-slate-100 shadow-lg backdrop-blur-sm"
+                className="border-divider-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-slate-from)] to-[var(--gradient-slate-to)] shadow-lg backdrop-blur-sm"
                 headerClassName="rounded-t-xl"
                 contentClassName="px-6 pb-6"
                 badge={
                   character.concentration.isConcentrating && (
-                    <span className="rounded-full bg-orange-100 px-3 py-1 text-sm font-medium text-orange-800">
+                    <span className="bg-accent-orange-bg-strong text-accent-orange-text rounded-full px-3 py-1 text-sm font-medium">
                       Concentrating
                     </span>
                   )
@@ -629,17 +629,17 @@ export default function CharacterSheet() {
                 icon="🛌"
                 defaultExpanded={false}
                 persistKey="rest-recovery"
-                className="rounded-lg border border-gray-200 bg-white shadow-lg"
+                className="border-divider bg-surface-raised rounded-lg border shadow-lg"
                 contentClassName="px-6 pb-6"
                 badge={
                   <div className="flex items-center gap-2">
-                    <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                    <span className="bg-accent-amber-bg-strong text-accent-amber-text-muted rounded-md px-2 py-0.5 text-xs font-medium">
                       Day {character.daysSpent || 0}
                     </span>
-                    <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                    <span className="bg-accent-blue-bg-strong text-accent-blue-text-muted rounded-md px-2 py-0.5 text-xs font-medium">
                       Short Rest
                     </span>
-                    <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                    <span className="bg-accent-indigo-bg-strong text-accent-indigo-text rounded-md px-2 py-0.5 text-xs font-medium">
                       Long Rest
                     </span>
                   </div>
@@ -665,11 +665,9 @@ export default function CharacterSheet() {
 
               {/* Section Divider */}
               <div className="flex items-center justify-center">
-                <div className="h-px w-full max-w-md bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
-                <span className="px-4 font-medium text-gray-500">
-                  Core Stats
-                </span>
-                <div className="h-px w-full max-w-md bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+                <div className="via-divider-strong h-px w-full max-w-md bg-gradient-to-r from-transparent to-transparent"></div>
+                <span className="text-muted px-4 font-medium">Core Stats</span>
+                <div className="via-divider-strong h-px w-full max-w-md bg-gradient-to-r from-transparent to-transparent"></div>
               </div>
 
               {/* Core D&D Stats Section */}
@@ -678,15 +676,15 @@ export default function CharacterSheet() {
                 icon="📊"
                 defaultExpanded={true}
                 persistKey="character-statistics"
-                className="rounded-xl border-2 border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg backdrop-blur-sm"
+                className="border-accent-blue-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-blue-from)] to-[var(--gradient-indigo-to)] shadow-lg backdrop-blur-sm"
                 headerClassName="rounded-t-xl"
                 contentClassName="px-6 pb-6"
                 badge={
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-800">
+                    <span className="bg-accent-blue-bg-strong text-accent-blue-text rounded-full px-3 py-1 text-sm font-medium">
                       Level {totalLevel}
                     </span>
-                    <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
+                    <span className="bg-accent-green-bg-strong text-accent-green-text rounded-full px-3 py-1 text-sm font-medium">
                       HP: {character.hitPoints.current}/
                       {character.hitPoints.max}
                     </span>
@@ -734,11 +732,11 @@ export default function CharacterSheet() {
                     {/* Weapon Proficiencies */}
                     <ErrorBoundary
                       fallback={
-                        <div className="rounded-lg border border-amber-200 bg-white p-4 shadow">
-                          <h3 className="mb-2 text-sm font-medium text-gray-700">
+                        <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-4 shadow">
+                          <h3 className="text-body mb-2 text-sm font-medium">
                             Weapon Proficiencies
                           </h3>
-                          <p className="text-gray-500">
+                          <p className="text-muted">
                             Unable to load weapon proficiencies
                           </p>
                         </div>
@@ -762,9 +760,9 @@ export default function CharacterSheet() {
                         ?.length > 0 ||
                         character.conditionsAndDiseases?.activeDiseases
                           ?.length > 0) && (
-                        <div className="rounded-lg border-2 border-red-200 bg-gradient-to-br from-red-50 to-pink-50 p-4 shadow-sm">
+                        <div className="border-accent-red-border rounded-lg border-2 bg-gradient-to-br from-[var(--gradient-red-from)] to-[var(--gradient-red-to)] p-4 shadow-sm">
                           <div className="mb-3 flex items-center justify-between">
-                            <h3 className="flex items-center gap-2 text-base font-semibold text-red-800">
+                            <h3 className="text-accent-red-text flex items-center gap-2 text-base font-semibold">
                               <AlertTriangle className="h-5 w-5" />
                               Active Conditions & Diseases
                             </h3>
@@ -774,7 +772,7 @@ export default function CharacterSheet() {
                               }
                               variant="ghost"
                               size="xs"
-                              className="text-red-600 hover:bg-red-100"
+                              className="text-accent-red-text-muted hover:bg-accent-red-bg-strong"
                             >
                               Manage →
                             </Button>
@@ -784,7 +782,7 @@ export default function CharacterSheet() {
                               condition => (
                                 <div
                                   key={condition.id}
-                                  className="flex items-center justify-between gap-2 rounded-lg border-2 border-red-200 bg-white p-2"
+                                  className="border-accent-red-border bg-surface-raised flex items-center justify-between gap-2 rounded-lg border-2 p-2"
                                 >
                                   <div className="flex items-center gap-2">
                                     <Badge variant="danger" size="sm">
@@ -807,7 +805,7 @@ export default function CharacterSheet() {
                               disease => (
                                 <div
                                   key={disease.id}
-                                  className="flex items-center justify-between gap-2 rounded-lg border-2 border-purple-200 bg-white p-2"
+                                  className="border-accent-purple-border bg-surface-raised flex items-center justify-between gap-2 rounded-lg border-2 p-2"
                                 >
                                   <Badge variant="info" size="sm">
                                     {disease.name}
@@ -869,8 +867,8 @@ export default function CharacterSheet() {
                     />
 
                     {/* Experience Points */}
-                    <div className="rounded-lg border border-amber-200 bg-white p-6 shadow-lg">
-                      <h2 className="mb-4 border-b border-gray-200 pb-2 text-lg font-bold text-gray-800">
+                    <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                      <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
                         Experience Points
                       </h2>
                       <XPTracker
@@ -901,8 +899,8 @@ export default function CharacterSheet() {
                   {/* Right Column - Combat Stats & Features */}
                   <div className="space-y-6 lg:col-span-4">
                     {/* Combat Stats */}
-                    <div className="rounded-lg border border-amber-200 bg-white p-6 shadow-lg">
-                      <h2 className="mb-4 border-b border-gray-200 pb-2 text-lg font-bold text-gray-800">
+                    <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                      <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
                         Combat Stats
                       </h2>
 
@@ -933,11 +931,11 @@ export default function CharacterSheet() {
                       <div className="mb-6">
                         <ErrorBoundary
                           fallback={
-                            <div className="rounded-lg border border-red-200 bg-white p-6 shadow-lg">
-                              <h3 className="mb-4 text-lg font-bold text-red-800">
+                            <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                              <h3 className="text-accent-red-text mb-4 text-lg font-bold">
                                 Hit Points
                               </h3>
-                              <p className="text-gray-500">
+                              <p className="text-muted">
                                 Unable to load HP manager
                               </p>
                             </div>
@@ -963,11 +961,11 @@ export default function CharacterSheet() {
                       {/* Hit Dice */}
                       <ErrorBoundary
                         fallback={
-                          <div className="rounded-lg border border-purple-200 bg-white p-4 shadow">
-                            <h3 className="mb-2 text-sm font-medium text-gray-700">
+                          <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
+                            <h3 className="text-body mb-2 text-sm font-medium">
                               Hit Dice
                             </h3>
-                            <p className="text-gray-500">
+                            <p className="text-muted">
                               Unable to load hit dice tracker
                             </p>
                           </div>
@@ -1002,18 +1000,18 @@ export default function CharacterSheet() {
                 icon="⚡"
                 defaultExpanded={false}
                 persistKey="active-features"
-                className="rounded-xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 shadow-lg backdrop-blur-sm"
+                className="border-accent-amber-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] shadow-lg backdrop-blur-sm"
                 headerClassName="rounded-t-xl"
                 contentClassName="px-6 pb-6"
                 badge={
                   <div className="flex items-center gap-2">
                     {(character.extendedFeatures?.length || 0) > 0 && (
-                      <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-800">
+                      <span className="bg-accent-amber-bg-strong text-accent-amber-text rounded-full px-3 py-1 text-sm font-medium">
                         {character.extendedFeatures?.length || 0} abilities
                       </span>
                     )}
                     {character.extendedFeatures?.some(f => f.usedUses > 0) && (
-                      <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800">
+                      <span className="bg-accent-red-bg-strong text-accent-red-text rounded-full px-3 py-1 text-sm font-medium">
                         {
                           character.extendedFeatures?.filter(
                             f => f.usedUses > 0
@@ -1043,18 +1041,18 @@ export default function CharacterSheet() {
                 icon="📋"
                 defaultExpanded={true}
                 persistKey="character-details"
-                className="rounded-xl border-2 border-green-300 bg-gradient-to-r from-green-50 to-emerald-50 shadow-lg backdrop-blur-sm"
+                className="border-accent-green-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-green-from)] to-[var(--gradient-emerald-to)] shadow-lg backdrop-blur-sm"
                 headerClassName="rounded-t-xl"
                 contentClassName="px-6 pb-6"
                 badge={
                   <div className="flex items-center gap-2">
                     {character.spells.length > 0 && (
-                      <span className="rounded-full bg-purple-100 px-3 py-1 text-sm font-medium text-purple-800">
+                      <span className="bg-accent-purple-bg-strong text-accent-purple-text rounded-full px-3 py-1 text-sm font-medium">
                         {character.spells.length} spells
                       </span>
                     )}
                     {(character.features?.length || 0) > 0 && (
-                      <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
+                      <span className="bg-accent-green-bg-strong text-accent-green-text rounded-full px-3 py-1 text-sm font-medium">
                         {character.features?.length || 0} features
                       </span>
                     )}

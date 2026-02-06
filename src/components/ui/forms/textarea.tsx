@@ -1,6 +1,6 @@
 /**
  * Textarea Component
- * 
+ *
  * A flexible textarea component with support for labels, helper text, error states,
  * auto-resize, and character count.
  */
@@ -72,8 +72,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ) => {
     const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
     const textareaVariant = error ? 'error' : variant;
-    const characterCount =
-      typeof value === 'string' ? value.length : 0;
+    const characterCount = typeof value === 'string' ? value.length : 0;
 
     // Handle auto-resize
     React.useEffect(() => {
@@ -102,7 +101,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
       <div className={cn('w-full', wrapperClassName)}>
         {label && (
           <label
-            className="mb-1.5 block text-sm font-medium text-gray-800"
+            className="text-heading mb-1.5 block text-sm font-medium"
             htmlFor={props.id}
           >
             {label}
@@ -140,18 +139,20 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             <p
               className={cn(
                 'text-sm',
-                error ? 'text-red-600' : 'text-gray-600'
+                error ? 'text-red-600 dark:text-red-400' : 'text-body'
               )}
             >
               {error || helperText}
             </p>
           )}
-          
+
           {showCharacterCount && (
             <p
               className={cn(
-                'ml-auto text-sm text-gray-600',
-                maxLength && characterCount > maxLength * 0.9 && 'text-amber-600',
+                'text-body ml-auto text-sm',
+                maxLength &&
+                  characterCount > maxLength * 0.9 &&
+                  'text-amber-600',
                 maxLength && characterCount >= maxLength && 'text-red-600'
               )}
               aria-live="polite"
@@ -169,4 +170,3 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
 Textarea.displayName = 'Textarea';
 
 export { Textarea };
-
