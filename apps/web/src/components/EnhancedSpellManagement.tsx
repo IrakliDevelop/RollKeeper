@@ -233,8 +233,8 @@ const SpellCard: React.FC<{
       <div
         className={`flex items-center justify-between rounded-lg border-2 p-3 transition-all hover:shadow-md ${
           spell.isPrepared
-            ? 'border-green-300 bg-white'
-            : 'border-gray-200 bg-white hover:border-purple-300'
+            ? 'border-accent-green-border-strong bg-surface-raised'
+            : 'border-divider bg-surface-raised hover:border-accent-purple-border'
         }`}
       >
         <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -242,15 +242,15 @@ const SpellCard: React.FC<{
             onClick={onToggleFavorite}
             className={`flex-shrink-0 transition-colors ${
               isFavorite
-                ? 'text-yellow-500 hover:text-yellow-600'
-                : 'text-gray-400 hover:text-yellow-500'
+                ? 'text-accent-yellow-text hover:text-accent-amber-text'
+                : 'text-faint hover:text-accent-yellow-text'
             }`}
           >
             <Star size={16} fill={isFavorite ? 'currentColor' : 'none'} />
           </button>
 
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="truncate font-bold text-gray-800">
+            <span className="text-heading truncate font-bold">
               {spell.name}
             </span>
             <Badge
@@ -258,13 +258,13 @@ const SpellCard: React.FC<{
               size="sm"
               className={
                 isCantrip
-                  ? 'flex-shrink-0 bg-yellow-100 text-yellow-800'
-                  : 'flex-shrink-0 bg-purple-100 text-purple-800'
+                  ? 'bg-accent-yellow-bg text-accent-yellow-text flex-shrink-0'
+                  : 'bg-accent-purple-bg text-accent-purple-text flex-shrink-0'
               }
             >
               {isCantrip ? 'Cantrip' : `Lv${spell.level}`}
             </Badge>
-            <span className="hidden flex-shrink-0 text-xs text-gray-500 sm:inline">
+            <span className="text-muted hidden flex-shrink-0 text-xs sm:inline">
               {spell.school}
             </span>
           </div>
@@ -313,7 +313,7 @@ const SpellCard: React.FC<{
             variant="ghost"
             size="xs"
             title="Edit spell"
-            className="text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+            className="text-accent-blue-text-muted hover:bg-accent-blue-bg hover:text-accent-blue-text"
           >
             <Edit2 size={14} />
           </Button>
@@ -322,7 +322,7 @@ const SpellCard: React.FC<{
             variant="ghost"
             size="xs"
             title="Delete spell"
-            className="text-red-600 hover:bg-red-50 hover:text-red-800"
+            className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text"
           >
             <Trash2 size={14} />
           </Button>
@@ -335,8 +335,8 @@ const SpellCard: React.FC<{
     <div
       className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${
         spell.isPrepared
-          ? 'border-green-300 bg-white'
-          : 'border-gray-200 bg-white hover:border-purple-300'
+          ? 'border-accent-green-border-strong bg-surface-raised'
+          : 'border-divider bg-surface-raised hover:border-accent-purple-border'
       }`}
     >
       <div className="flex items-start justify-between">
@@ -346,20 +346,20 @@ const SpellCard: React.FC<{
               onClick={onToggleFavorite}
               className={`transition-colors ${
                 isFavorite
-                  ? 'text-yellow-500 hover:text-yellow-600'
-                  : 'text-gray-400 hover:text-yellow-500'
+                  ? 'text-accent-yellow-text hover:text-accent-amber-text'
+                  : 'text-faint hover:text-accent-yellow-text'
               }`}
             >
               <Star size={18} fill={isFavorite ? 'currentColor' : 'none'} />
             </button>
-            <h5 className="font-bold text-gray-800">{spell.name}</h5>
+            <h5 className="text-heading font-bold">{spell.name}</h5>
             <Badge
               variant={isCantrip ? 'warning' : 'primary'}
               size="sm"
               className={
                 isCantrip
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-purple-100 text-purple-800'
+                  ? 'bg-accent-yellow-bg text-accent-yellow-text'
+                  : 'bg-accent-purple-bg text-accent-purple-text'
               }
             >
               {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
@@ -381,7 +381,7 @@ const SpellCard: React.FC<{
             )}
           </div>
 
-          <div className="mb-2 flex flex-wrap items-center gap-4 text-sm text-gray-600">
+          <div className="text-body mb-2 flex flex-wrap items-center gap-4 text-sm">
             <span>
               <strong>School:</strong> {spell.school}
             </span>
@@ -398,7 +398,7 @@ const SpellCard: React.FC<{
             )}
           </div>
 
-          <div className="mb-2 text-sm text-gray-600">
+          <div className="text-body mb-2 text-sm">
             <strong>Components:</strong>{' '}
             {[
               spell.components.verbal && 'V',
@@ -409,7 +409,7 @@ const SpellCard: React.FC<{
               .join(', ')}
             {spell.components.material &&
               spell.components.materialDescription && (
-                <span className="text-gray-500">
+                <span className="text-muted">
                   {' '}
                   ({spell.components.materialDescription})
                 </span>
@@ -425,7 +425,7 @@ const SpellCard: React.FC<{
           )}
 
           <div
-            className="line-clamp-2 text-sm text-gray-700"
+            className="text-body line-clamp-2 text-sm"
             dangerouslySetInnerHTML={{ __html: spell.description }}
           />
         </div>
@@ -436,7 +436,7 @@ const SpellCard: React.FC<{
             variant="primary"
             size="sm"
             leftIcon={<Wand2 size={14} />}
-            className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+            className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
           >
             Cast
           </Button>
@@ -463,7 +463,7 @@ const SpellCard: React.FC<{
               variant="outline"
               size="sm"
               title="Edit spell"
-              className="border-blue-300 text-blue-700 hover:bg-blue-50"
+              className="border-accent-blue-border-strong text-accent-blue-text-muted hover:bg-accent-blue-bg"
             >
               <Edit2 size={16} />
             </Button>
@@ -472,7 +472,7 @@ const SpellCard: React.FC<{
               variant="outline"
               size="sm"
               title="Delete spell"
-              className="border-red-300 text-red-700 hover:bg-red-50"
+              className="border-accent-red-border-strong text-accent-red-text-muted hover:bg-accent-red-bg"
             >
               <Trash2 size={16} />
             </Button>
@@ -514,18 +514,22 @@ const LevelSection: React.FC<{
 }) => {
   const isCantrip = level === 0;
   const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
-  const levelColor = isCantrip ? 'text-yellow-700' : 'text-purple-700';
+  const levelColor = isCantrip
+    ? 'text-accent-yellow-text'
+    : 'text-accent-purple-text';
   const levelBg = isCantrip
-    ? 'bg-gradient-to-r from-yellow-50 to-amber-50'
-    : 'bg-gradient-to-r from-purple-50 to-violet-50';
-  const borderColor = isCantrip ? 'border-yellow-200' : 'border-purple-200';
+    ? 'bg-linear-to-r from-accent-yellow-bg to-accent-amber-bg'
+    : 'bg-linear-to-r from-accent-purple-bg to-accent-violet-bg';
+  const borderColor = isCantrip
+    ? 'border-accent-yellow-border'
+    : 'border-accent-purple-border';
   const preparedCount = spells.filter(
     s => s.isPrepared || s.isAlwaysPrepared
   ).length;
 
   return (
     <div
-      className={`border-2 ${borderColor} overflow-hidden rounded-lg bg-white`}
+      className={`border-2 ${borderColor} bg-surface-raised overflow-hidden rounded-lg`}
     >
       <button
         onClick={onToggle}
@@ -548,8 +552,8 @@ const LevelSection: React.FC<{
               size="sm"
               className={
                 isCantrip
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-purple-100 text-purple-800'
+                  ? 'bg-accent-yellow-bg text-accent-yellow-text'
+                  : 'bg-accent-purple-bg text-accent-purple-text'
               }
             >
               {spells.length} spell{spells.length !== 1 ? 's' : ''}
@@ -558,7 +562,7 @@ const LevelSection: React.FC<{
               <Badge
                 variant="success"
                 size="sm"
-                className="bg-green-100 text-green-800"
+                className="bg-accent-green-bg text-accent-green-text"
               >
                 {preparedCount} prepared
               </Badge>
@@ -568,7 +572,7 @@ const LevelSection: React.FC<{
       </button>
 
       {isExpanded && (
-        <div className="border-t-2 border-gray-100 bg-white p-4">
+        <div className="border-divider bg-surface-raised border-t-2 p-4">
           <DragDropList
             items={spells}
             onReorder={onReorder}
@@ -929,12 +933,12 @@ export const EnhancedSpellManagement: React.FC = () => {
   }, [character.spells]);
 
   return (
-    <div className="rounded-lg border border-purple-200 bg-white p-6 shadow">
+    <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-6 shadow">
       {/* Header */}
       <div className="mb-6 flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-xl font-bold text-gray-800">
-            <BookOpen className="text-purple-600" size={24} />
+          <h3 className="text-heading flex items-center gap-2 text-xl font-bold">
+            <BookOpen className="text-accent-purple-text-muted" size={24} />
             Spells & Cantrips
             <Badge variant="secondary" size="sm">
               {filteredSpells.length} of {character.spells.length}
@@ -943,7 +947,7 @@ export const EnhancedSpellManagement: React.FC = () => {
               <Badge
                 variant="success"
                 size="sm"
-                className="bg-green-100 text-green-800"
+                className="bg-accent-green-bg text-accent-green-text"
               >
                 {preparedSpellsCount} prepared
               </Badge>
@@ -983,7 +987,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                 <Badge
                   variant="danger"
                   size="sm"
-                  className="ml-1 bg-red-600 text-white"
+                  className="text-inverse ml-1 bg-red-500"
                 >
                   {activeFilterCount}
                 </Badge>
@@ -995,7 +999,7 @@ export const EnhancedSpellManagement: React.FC = () => {
               variant="primary"
               size="sm"
               leftIcon={<Plus size={16} />}
-              className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+              className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
             >
               Add Spell
             </Button>
@@ -1004,7 +1008,7 @@ export const EnhancedSpellManagement: React.FC = () => {
 
         {/* Search Bar */}
         <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="text-faint pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <Input
             value={filters.searchQuery}
             onChange={e =>
@@ -1017,9 +1021,9 @@ export const EnhancedSpellManagement: React.FC = () => {
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div className="rounded-lg border-2 border-gray-200 bg-white p-4 shadow-sm">
+          <div className="border-divider bg-surface-raised rounded-lg border-2 p-4 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h4 className="font-bold text-gray-800">Advanced Filters</h4>
+              <h4 className="text-heading font-bold">Advanced Filters</h4>
               <div className="flex items-center gap-2">
                 {activeFilterCount > 0 && (
                   <Button
@@ -1044,7 +1048,7 @@ export const EnhancedSpellManagement: React.FC = () => {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
               {/* Level Filter */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="text-body mb-2 block text-sm font-medium">
                   Level
                 </label>
                 <SelectField
@@ -1068,7 +1072,7 @@ export const EnhancedSpellManagement: React.FC = () => {
 
               {/* School Filter */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="text-body mb-2 block text-sm font-medium">
                   School
                 </label>
                 <SelectField
@@ -1088,7 +1092,7 @@ export const EnhancedSpellManagement: React.FC = () => {
 
               {/* Action Type Filter */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="text-body mb-2 block text-sm font-medium">
                   Action Type
                 </label>
                 <SelectField
@@ -1111,7 +1115,7 @@ export const EnhancedSpellManagement: React.FC = () => {
 
               {/* Damage Type Filter */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="text-body mb-2 block text-sm font-medium">
                   Damage Type
                 </label>
                 <SelectField
@@ -1131,7 +1135,7 @@ export const EnhancedSpellManagement: React.FC = () => {
 
               {/* Prepared Filter */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="text-body mb-2 block text-sm font-medium">
                   Preparation
                 </label>
                 <SelectField
@@ -1151,7 +1155,7 @@ export const EnhancedSpellManagement: React.FC = () => {
 
               {/* Concentration Filter */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="text-body mb-2 block text-sm font-medium">
                   Concentration
                 </label>
                 <SelectField
@@ -1171,7 +1175,7 @@ export const EnhancedSpellManagement: React.FC = () => {
 
               {/* Ritual Filter */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="text-body mb-2 block text-sm font-medium">
                   Ritual
                 </label>
                 <SelectField
@@ -1191,7 +1195,7 @@ export const EnhancedSpellManagement: React.FC = () => {
 
               {/* Sort Options */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="text-body mb-2 block text-sm font-medium">
                   Sort By
                 </label>
                 <div className="flex gap-2">
@@ -1236,9 +1240,9 @@ export const EnhancedSpellManagement: React.FC = () => {
                       }))
                     }
                   />
-                  <span className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                  <span className="text-body flex items-center gap-1 text-sm font-medium">
                     Favorites Only
-                    <Star size={16} className="text-yellow-500" />
+                    <Star size={16} className="text-accent-yellow-text" />
                   </span>
                 </label>
               </div>
@@ -1250,16 +1254,16 @@ export const EnhancedSpellManagement: React.FC = () => {
       {/* Spell List */}
       <div className="space-y-4">
         {character.spells.length === 0 ? (
-          <div className="py-12 text-center text-gray-500">
-            <BookOpen size={64} className="mx-auto mb-4 text-gray-400" />
+          <div className="text-muted py-12 text-center">
+            <BookOpen size={64} className="text-faint mx-auto mb-4" />
             <p className="text-lg font-medium">No spells added yet</p>
             <p className="mt-2 text-sm">
               Click &quot;Add Spell&quot; to get started building your spellbook
             </p>
           </div>
         ) : filteredSpells.length === 0 ? (
-          <div className="py-12 text-center text-gray-500">
-            <Search size={64} className="mx-auto mb-4 text-gray-400" />
+          <div className="text-muted py-12 text-center">
+            <Search size={64} className="text-faint mx-auto mb-4" />
             <p className="text-lg font-medium">No spells match your filters</p>
             <p className="mt-2 text-sm">
               Try adjusting your search terms or clearing some filters
@@ -1269,7 +1273,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                 onClick={clearFilters}
                 variant="primary"
                 size="md"
-                className="mt-4 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+                className="mt-4 bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
               >
                 Clear All Filters
               </Button>
@@ -1309,7 +1313,7 @@ export const EnhancedSpellManagement: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Spell Autocomplete - Only show when adding new spell */}
             {!editingId && (
-              <div className="rounded-lg border-2 border-purple-200 bg-purple-50/30 p-4">
+              <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border-2 p-4">
                 <SpellAutocomplete
                   spells={spellbookSpells}
                   onSelect={handleSpellSelect}
@@ -1321,8 +1325,8 @@ export const EnhancedSpellManagement: React.FC = () => {
 
             {/* Auto-fill success message */}
             {justAutoFilled && (
-              <div className="animate-in fade-in slide-in-from-top-2 rounded-lg border-2 border-green-300 bg-green-50 p-3 duration-300">
-                <div className="flex items-center gap-2 text-green-800">
+              <div className="animate-in fade-in slide-in-from-top-2 border-accent-green-border-strong bg-accent-green-bg rounded-lg border-2 p-3 duration-300">
+                <div className="text-accent-green-text flex items-center gap-2">
                   <Wand2 className="h-5 w-5" />
                   <p className="text-sm font-medium">
                     ✨ Spell details loaded! Review and adjust as needed.
@@ -1333,7 +1337,7 @@ export const EnhancedSpellManagement: React.FC = () => {
 
             {/* Section: Basic Information */}
             <div className="space-y-4">
-              <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+              <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
                 Basic Information
               </h4>
 
@@ -1349,7 +1353,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                 />
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="text-body mb-2 block text-sm font-medium">
                     Level
                   </label>
                   <SelectField
@@ -1370,7 +1374,7 @@ export const EnhancedSpellManagement: React.FC = () => {
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="text-body mb-2 block text-sm font-medium">
                     School
                   </label>
                   <SelectField
@@ -1400,13 +1404,13 @@ export const EnhancedSpellManagement: React.FC = () => {
 
             {/* Section: Casting Details */}
             <div className="space-y-4">
-              <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+              <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
                 Casting Details
               </h4>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="text-body mb-2 block text-sm font-medium">
                     Casting Time
                   </label>
                   <SelectField
@@ -1424,7 +1428,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="text-body mb-2 block text-sm font-medium">
                     Range
                   </label>
                   <SelectField
@@ -1442,7 +1446,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="text-body mb-2 block text-sm font-medium">
                     Duration
                   </label>
                   <SelectField
@@ -1463,7 +1467,7 @@ export const EnhancedSpellManagement: React.FC = () => {
 
             {/* Section: Components */}
             <div className="space-y-4">
-              <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+              <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
                 Components
               </h4>
 
@@ -1481,7 +1485,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                       }))
                     }
                   />
-                  <span className="text-sm font-medium text-gray-800">
+                  <span className="text-heading text-sm font-medium">
                     Verbal (V)
                   </span>
                 </label>
@@ -1499,7 +1503,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                       }))
                     }
                   />
-                  <span className="text-sm font-medium text-gray-800">
+                  <span className="text-heading text-sm font-medium">
                     Somatic (S)
                   </span>
                 </label>
@@ -1517,7 +1521,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                       }))
                     }
                   />
-                  <span className="text-sm font-medium text-gray-800">
+                  <span className="text-heading text-sm font-medium">
                     Material (M)
                   </span>
                 </label>
@@ -1543,7 +1547,7 @@ export const EnhancedSpellManagement: React.FC = () => {
 
             {/* Section: Spell Properties */}
             <div className="space-y-4">
-              <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+              <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
                 Spell Properties
               </h4>
 
@@ -1558,7 +1562,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                       }))
                     }
                   />
-                  <span className="text-sm font-medium text-gray-800">
+                  <span className="text-heading text-sm font-medium">
                     Ritual
                   </span>
                 </label>
@@ -1573,7 +1577,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                       }))
                     }
                   />
-                  <span className="text-sm font-medium text-gray-800">
+                  <span className="text-heading text-sm font-medium">
                     Concentration
                   </span>
                 </label>
@@ -1588,7 +1592,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                       }))
                     }
                   />
-                  <span className="text-sm font-medium text-gray-800">
+                  <span className="text-heading text-sm font-medium">
                     Prepared
                   </span>
                 </label>
@@ -1603,7 +1607,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                       }))
                     }
                   />
-                  <span className="text-sm font-medium text-gray-800">
+                  <span className="text-heading text-sm font-medium">
                     Always Prepared
                   </span>
                 </label>
@@ -1612,12 +1616,12 @@ export const EnhancedSpellManagement: React.FC = () => {
 
             {/* Section: Description */}
             <div className="space-y-4">
-              <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+              <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
                 Description
               </h4>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="text-body mb-2 block text-sm font-medium">
                   Spell Description *
                 </label>
                 <RichTextEditor
@@ -1634,7 +1638,7 @@ export const EnhancedSpellManagement: React.FC = () => {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
+                <label className="text-body mb-2 block text-sm font-medium">
                   At Higher Levels
                 </label>
                 <RichTextEditor
@@ -1653,13 +1657,13 @@ export const EnhancedSpellManagement: React.FC = () => {
 
             {/* Section: Combat Details */}
             <div className="space-y-4">
-              <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+              <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
                 Combat Details
               </h4>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                  <label className="text-body mb-2 block text-sm font-medium">
                     Action Type
                   </label>
                   <SelectField
@@ -1684,7 +1688,7 @@ export const EnhancedSpellManagement: React.FC = () => {
 
                 {formData.actionType === 'save' && (
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <label className="text-body mb-2 block text-sm font-medium">
                       Saving Throw
                     </label>
                     <SelectField
@@ -1721,7 +1725,7 @@ export const EnhancedSpellManagement: React.FC = () => {
 
                 {formData.damage && (
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <label className="text-body mb-2 block text-sm font-medium">
                       Damage Type
                     </label>
                     <SelectField
@@ -1748,7 +1752,7 @@ export const EnhancedSpellManagement: React.FC = () => {
             </div>
 
             {/* Form Actions */}
-            <div className="flex justify-end gap-3 border-t-2 border-gray-200 pt-4">
+            <div className="border-divider flex justify-end gap-3 border-t-2 pt-4">
               <Button
                 type="button"
                 onClick={resetForm}
@@ -1761,7 +1765,7 @@ export const EnhancedSpellManagement: React.FC = () => {
                 type="submit"
                 variant="primary"
                 size="md"
-                className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+                className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
               >
                 {editingId ? 'Update Spell' : 'Add Spell'}
               </Button>

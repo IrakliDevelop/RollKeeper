@@ -1,8 +1,11 @@
 /**
  * Variant Utilities - CVA-based variant definitions
- * 
+ *
  * This file contains reusable variant patterns using class-variance-authority.
  * These patterns ensure consistent styling across similar components.
+ *
+ * Uses semantic color tokens (bg-surface, text-heading, border-divider, etc.)
+ * that auto-switch between light and dark modes via CSS variables.
  */
 
 import { cva, type VariantProps } from 'class-variance-authority';
@@ -27,10 +30,9 @@ export const buttonVariants = cva(
         warning:
           'bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-md hover:from-amber-700 hover:to-amber-800 focus-visible:ring-amber-500 active:scale-[0.98]',
         outline:
-          'border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 focus-visible:ring-gray-500',
-        ghost:
-          'text-gray-700 hover:bg-gray-100 focus-visible:ring-gray-500',
-        link: 'text-emerald-600 underline-offset-4 hover:underline focus-visible:ring-emerald-500',
+          'border-2 border-divider bg-surface-raised text-heading hover:bg-surface-hover hover:border-divider-strong focus-visible:ring-ring',
+        ghost: 'text-heading hover:bg-surface-hover focus-visible:ring-ring',
+        link: 'text-emerald-600 underline-offset-4 hover:underline focus-visible:ring-emerald-500 dark:text-emerald-400',
       },
       size: {
         xs: 'h-7 px-3 text-xs',
@@ -58,16 +60,16 @@ export type ButtonVariants = VariantProps<typeof buttonVariants>;
  */
 export const inputVariants = cva(
   // Base styles
-  'flex w-full rounded-lg border-2 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
+  'flex w-full rounded-lg border-2 bg-input-bg px-3 py-2 text-input-text placeholder:text-input-placeholder transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
   {
     variants: {
       variant: {
         default:
-          'border-gray-300 focus-visible:border-emerald-500 focus-visible:ring-emerald-500',
+          'border-input-border focus-visible:border-input-border-focus focus-visible:ring-emerald-500 dark:focus-visible:ring-emerald-400',
         error:
-          'border-red-300 focus-visible:border-red-500 focus-visible:ring-red-500',
+          'border-red-300 focus-visible:border-red-500 focus-visible:ring-red-500 dark:border-red-700 dark:focus-visible:border-red-500',
         success:
-          'border-green-300 focus-visible:border-green-500 focus-visible:ring-green-500',
+          'border-green-300 focus-visible:border-green-500 focus-visible:ring-green-500 dark:border-green-700 dark:focus-visible:border-green-500',
       },
       size: {
         sm: 'h-9 text-sm',
@@ -89,15 +91,15 @@ export type InputVariants = VariantProps<typeof inputVariants>;
  */
 export const cardVariants = cva(
   // Base styles
-  'rounded-lg bg-white transition-all duration-200',
+  'rounded-lg bg-surface-raised transition-all duration-200',
   {
     variants: {
       variant: {
-        default: 'border border-gray-200',
-        bordered: 'border-2 border-gray-300',
-        elevated: 'border border-gray-200 shadow-md',
+        default: 'border border-divider',
+        bordered: 'border-2 border-divider-strong',
+        elevated: 'border border-divider shadow-md',
         interactive:
-          'border-2 border-gray-200 hover:border-gray-300 hover:shadow-md cursor-pointer',
+          'border-2 border-divider hover:border-divider-strong hover:shadow-md cursor-pointer',
         ghost: 'border-0',
       },
       padding: {
@@ -127,20 +129,18 @@ export const badgeVariants = cva(
     variants: {
       variant: {
         primary:
-          'bg-emerald-100 text-emerald-800 border border-emerald-200',
+          'bg-accent-emerald-bg text-accent-emerald-text border border-accent-emerald-border',
         secondary:
-          'bg-blue-100 text-blue-800 border border-blue-200',
+          'bg-accent-blue-bg text-accent-blue-text border border-accent-blue-border',
         success:
-          'bg-green-100 text-green-800 border border-green-200',
+          'bg-accent-green-bg text-accent-green-text border border-accent-green-border',
         danger:
-          'bg-red-100 text-red-800 border border-red-200',
+          'bg-accent-red-bg text-accent-red-text border border-accent-red-border',
         warning:
-          'bg-amber-100 text-amber-800 border border-amber-200',
-        info: 'bg-sky-100 text-sky-800 border border-sky-200',
-        neutral:
-          'bg-gray-100 text-gray-800 border border-gray-200',
-        outline:
-          'bg-transparent text-gray-700 border border-gray-300',
+          'bg-accent-amber-bg text-accent-amber-text border border-accent-amber-border',
+        info: 'bg-[--accent-blue-bg] text-[--accent-blue-text] border border-[--accent-blue-border]',
+        neutral: 'bg-surface-secondary text-heading border border-divider',
+        outline: 'bg-transparent text-heading border border-divider-strong',
       },
       size: {
         sm: 'text-xs px-2 py-0.5',
@@ -161,15 +161,14 @@ export type BadgeVariants = VariantProps<typeof badgeVariants>;
  * Label variants - used by form labels
  */
 export const labelVariants = cva(
-  'block text-sm font-medium text-gray-800 transition-colors',
+  'block text-sm font-medium text-heading transition-colors',
   {
     variants: {
       variant: {
         default: '',
-        required:
-          "after:content-['*'] after:text-red-500 after:ml-1",
+        required: "after:content-['*'] after:text-red-500 after:ml-1",
         optional:
-          "after:content-['(optional)'] after:text-gray-500 after:ml-1 after:font-normal",
+          "after:content-['(optional)'] after:text-muted after:ml-1 after:font-normal",
       },
       size: {
         sm: 'text-xs',
@@ -192,10 +191,10 @@ export type LabelVariants = VariantProps<typeof labelVariants>;
 export const helperTextVariants = cva('text-sm transition-colors', {
   variants: {
     variant: {
-      default: 'text-gray-600',
-      error: 'text-red-600',
-      success: 'text-green-600',
-      warning: 'text-amber-600',
+      default: 'text-body',
+      error: 'text-red-600 dark:text-red-400',
+      success: 'text-green-600 dark:text-green-400',
+      warning: 'text-amber-600 dark:text-amber-400',
     },
   },
   defaultVariants: {
@@ -204,4 +203,3 @@ export const helperTextVariants = cva('text-sm transition-colors', {
 });
 
 export type HelperTextVariants = VariantProps<typeof helperTextVariants>;
-

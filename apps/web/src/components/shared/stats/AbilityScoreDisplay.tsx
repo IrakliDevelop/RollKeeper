@@ -43,8 +43,8 @@ export function AbilityScoreDisplay({
   };
 
   const containerClasses = compact
-    ? `bg-white rounded-lg shadow border border-amber-200 p-3 ${className}`
-    : `bg-white rounded-lg shadow-lg border border-amber-200 p-6 ${className}`;
+    ? `bg-surface-raised rounded-lg shadow border border-amber-200 p-3 ${className}`
+    : `bg-surface-raised rounded-lg shadow-lg border border-amber-200 p-6 ${className}`;
 
   const gridClasses = compact
     ? 'grid grid-cols-3 sm:grid-cols-6 gap-2'

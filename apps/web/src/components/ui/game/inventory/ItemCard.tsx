@@ -50,17 +50,19 @@ export function ItemCard({
 
   return (
     <div
-      className={`group rounded-lg border-2 border-gray-200 bg-white transition-all hover:shadow-md hover:border-gray-300 ${
+      className={`group border-divider bg-surface-raised hover:border-divider-strong rounded-lg border-2 transition-all hover:shadow-md ${
         compact ? 'p-2' : 'p-4'
       }`}
     >
       <div
         className={`flex items-start justify-between gap-3 ${compact ? 'mb-1' : 'mb-3'}`}
       >
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Package className={`shrink-0 text-blue-600 ${compact ? 'h-3 w-3' : 'h-4 w-4'}`} />
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Package
+            className={`text-accent-blue-text-muted shrink-0 ${compact ? 'h-3 w-3' : 'h-4 w-4'}`}
+          />
           <h5
-            className={`font-bold text-gray-800 truncate ${compact ? 'text-xs' : 'text-sm'}`}
+            className={`text-heading truncate font-bold ${compact ? 'text-xs' : 'text-sm'}`}
           >
             {item.name}
           </h5>
@@ -75,7 +77,7 @@ export function ItemCard({
                 variant="ghost"
                 size="xs"
                 title="Edit item"
-                className="h-6 w-6 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-800"
+                className="text-accent-blue-text-muted hover:bg-accent-blue-bg hover:text-accent-blue-text h-6 w-6 p-0"
               >
                 <Edit2 size={14} />
               </Button>
@@ -86,7 +88,7 @@ export function ItemCard({
                 variant="ghost"
                 size="xs"
                 title="Delete item"
-                className="h-6 w-6 p-0 text-red-600 hover:bg-red-50 hover:text-red-800"
+                className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text h-6 w-6 p-0"
               >
                 <Trash2 size={14} />
               </Button>
@@ -112,13 +114,15 @@ export function ItemCard({
       )}
 
       {/* Item Details */}
-      <div className={`grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-gray-600 ${compact ? 'text-xs' : 'text-sm'}`}>
-        <span className="text-gray-500">Category:</span>
-        <span className="font-medium text-gray-800 capitalize">
+      <div
+        className={`text-body grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 ${compact ? 'text-xs' : 'text-sm'}`}
+      >
+        <span className="text-muted">Category:</span>
+        <span className="text-heading font-medium capitalize">
           {item.category}
         </span>
 
-        <span className="text-gray-500">Quantity:</span>
+        <span className="text-muted">Quantity:</span>
         {onQuantityChange ? (
           <div className="flex items-center gap-2">
             <Button
@@ -126,37 +130,37 @@ export function ItemCard({
               variant="ghost"
               size="xs"
               disabled={item.quantity <= 1}
-              className="h-6 w-6 p-0 text-red-600 hover:bg-red-50 hover:text-red-800 disabled:opacity-30"
+              className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text h-6 w-6 p-0 disabled:opacity-30"
             >
               <Minus size={12} />
             </Button>
-            <span className="min-w-[2rem] text-center font-bold text-gray-800">
+            <span className="text-heading min-w-[2rem] text-center font-bold">
               {item.quantity}
             </span>
             <Button
               onClick={() => onQuantityChange(item.quantity + 1)}
               variant="ghost"
               size="xs"
-              className="h-6 w-6 p-0 text-green-600 hover:bg-green-50 hover:text-green-800"
+              className="text-accent-green-text-muted hover:bg-accent-green-bg hover:text-accent-green-text h-6 w-6 p-0"
             >
               <Plus size={12} />
             </Button>
           </div>
         ) : (
-          <span className="font-bold text-gray-800">{item.quantity}</span>
+          <span className="text-heading font-bold">{item.quantity}</span>
         )}
 
         {totalWeight !== undefined && !compact && (
           <>
-            <span className="text-gray-500">Weight:</span>
-            <span className="font-medium text-gray-800">{totalWeight} lbs</span>
+            <span className="text-muted">Weight:</span>
+            <span className="text-heading font-medium">{totalWeight} lbs</span>
           </>
         )}
 
         {totalValue !== undefined && !compact && (
           <>
-            <span className="text-gray-500">Value:</span>
-            <span className="font-medium text-gray-800">
+            <span className="text-muted">Value:</span>
+            <span className="text-heading font-medium">
               {formatCurrencyFromCopper(totalValue)}
             </span>
           </>
@@ -181,11 +185,10 @@ export function ItemCard({
 
       {/* Description */}
       {item.description && !compact && (
-        <p className="mt-3 line-clamp-2 text-xs text-gray-700 border-t-2 border-gray-100 pt-3">
+        <p className="text-body border-divider mt-3 line-clamp-2 border-t-2 pt-3 text-xs">
           {item.description}
         </p>
       )}
     </div>
   );
 }
-

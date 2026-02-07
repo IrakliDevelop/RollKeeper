@@ -212,10 +212,10 @@ export default function ConditionsDiseasesManager() {
 
   if (isLoading) {
     return (
-      <div className="rounded-lg border-2 border-gray-200 bg-white p-6 shadow-sm">
+      <div className="border-divider bg-surface rounded-lg border-2 p-6 shadow-sm">
         <div className="flex flex-col items-center justify-center py-12">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600"></div>
-          <p className="mt-4 text-gray-600 font-medium">
+          <div className="border-divider border-t-accent-blue-border-strong h-12 w-12 animate-spin rounded-full border-4"></div>
+          <p className="text-muted mt-4 font-medium">
             Loading conditions and diseases...
           </p>
         </div>
@@ -224,16 +224,16 @@ export default function ConditionsDiseasesManager() {
   }
 
   return (
-    <div className="rounded-lg border-2 border-gray-200 bg-white shadow-sm">
+    <div className="border-divider bg-surface rounded-lg border-2 shadow-sm">
       {/* Header */}
-      <div className="border-b-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="flex items-center gap-2 text-xl font-bold text-gray-800">
-            <Activity className="h-6 w-6 text-red-600" />
+      <div className="border-divider from-surface-secondary to-surface-hover border-b-2 bg-linear-to-r p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-heading flex items-center gap-2 text-xl font-bold">
+            <Activity className="text-accent-red-text-muted h-6 w-6" />
             Conditions & Diseases
           </h3>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-body text-sm font-medium">
               Exhaustion Rules:
             </label>
             <SelectField
@@ -249,13 +249,15 @@ export default function ConditionsDiseasesManager() {
         </div>
 
         {/* Exhaustion Quick Controls */}
-        <div className="rounded-lg border-2 border-red-200 bg-gradient-to-r from-red-50 to-orange-50 p-4">
+        <div className="border-accent-red-border from-accent-red-bg to-accent-orange-bg rounded-lg border-2 bg-linear-to-r p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <AlertTriangle className="text-accent-red-text-muted h-5 w-5" />
               <div>
-                <h4 className="font-bold text-red-800">Exhaustion Level</h4>
-                <p className="text-xs text-red-700">
+                <h4 className="text-accent-red-text font-bold">
+                  Exhaustion Level
+                </h4>
+                <p className="text-accent-red-text-muted text-xs">
                   Using {exhaustionVariant === '2014' ? '2014' : '2024'} rules
                 </p>
               </div>
@@ -266,22 +268,22 @@ export default function ConditionsDiseasesManager() {
                 variant="ghost"
                 size="sm"
                 disabled={exhaustionLevel === 0}
-                className="text-red-600 hover:bg-red-100 hover:text-red-800 disabled:opacity-30"
+                className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text disabled:opacity-30"
               >
                 <Minus className="h-4 w-4" />
               </Button>
               <div className="min-w-[4rem] text-center">
-                <div className="text-2xl font-bold text-gray-800">
+                <div className="text-heading text-2xl font-bold">
                   {exhaustionLevel}
                 </div>
-                <div className="text-xs text-gray-600">/ 6</div>
+                <div className="text-muted text-xs">/ 6</div>
               </div>
               <Button
                 onClick={() => handleExhaustionChange(1)}
                 variant="ghost"
                 size="sm"
                 disabled={exhaustionLevel >= 6}
-                className="text-red-600 hover:bg-red-100 hover:text-red-800 disabled:opacity-30"
+                className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text disabled:opacity-30"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -302,7 +304,7 @@ export default function ConditionsDiseasesManager() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b-2 border-gray-200 bg-gray-50 px-6">
+      <div className="border-divider bg-surface-secondary border-b-2 px-6">
         <div className="flex gap-1">
           <button
             onClick={() => {
@@ -311,13 +313,16 @@ export default function ConditionsDiseasesManager() {
             }}
             className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
               activeTab === 'conditions'
-                ? 'border-b-4 border-red-600 text-red-700 bg-white'
-                : 'text-gray-600 hover:text-red-600 hover:bg-gray-100'
+                ? 'border-accent-red-border-strong text-accent-red-text bg-surface border-b-4'
+                : 'text-muted hover:text-accent-red-text-muted hover:bg-surface-hover'
             }`}
           >
             <AlertTriangle className="h-4 w-4" />
             Conditions
-            <Badge variant={activeTab === 'conditions' ? 'danger' : 'secondary'} size="sm">
+            <Badge
+              variant={activeTab === 'conditions' ? 'danger' : 'secondary'}
+              size="sm"
+            >
               {activeConditions.length}
             </Badge>
           </button>
@@ -328,13 +333,16 @@ export default function ConditionsDiseasesManager() {
             }}
             className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
               activeTab === 'diseases'
-                ? 'border-b-4 border-purple-600 text-purple-700 bg-white'
-                : 'text-gray-600 hover:text-purple-600 hover:bg-gray-100'
+                ? 'border-accent-purple-border-strong text-accent-purple-text bg-surface border-b-4'
+                : 'text-muted hover:text-accent-purple-text-muted hover:bg-surface-hover'
             }`}
           >
             <Shield className="h-4 w-4" />
             Diseases
-            <Badge variant={activeTab === 'diseases' ? 'primary' : 'secondary'} size="sm">
+            <Badge
+              variant={activeTab === 'diseases' ? 'primary' : 'secondary'}
+              size="sm"
+            >
               {activeDiseases.length}
             </Badge>
           </button>
@@ -347,7 +355,7 @@ export default function ConditionsDiseasesManager() {
           <div className="space-y-4">
             {/* Active Conditions Header */}
             <div className="flex items-center justify-between">
-              <h4 className="text-lg font-bold text-gray-800">
+              <h4 className="text-heading text-lg font-bold">
                 Active Conditions
               </h4>
               <div className="flex gap-2">
@@ -357,7 +365,7 @@ export default function ConditionsDiseasesManager() {
                     variant="ghost"
                     size="sm"
                     leftIcon={<Trash2 className="h-4 w-4" />}
-                    className="text-red-600 hover:bg-red-50 hover:text-red-800"
+                    className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text"
                   >
                     Clear All
                   </Button>
@@ -370,7 +378,7 @@ export default function ConditionsDiseasesManager() {
                   className={
                     showAddPanel
                       ? ''
-                      : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700'
+                      : 'bg-linear-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600'
                   }
                 >
                   {showAddPanel ? 'Cancel' : 'Add Condition'}
@@ -380,8 +388,8 @@ export default function ConditionsDiseasesManager() {
 
             {/* Add Condition Panel */}
             {showAddPanel && (
-              <div className="rounded-lg border-2 border-red-200 bg-gradient-to-r from-red-50 to-orange-50 p-4">
-                <h5 className="mb-3 font-bold text-red-800">
+              <div className="border-accent-red-border from-accent-red-bg to-accent-orange-bg rounded-lg border-2 bg-linear-to-r p-4">
+                <h5 className="text-accent-red-text mb-3 font-bold">
                   Add New Condition
                 </h5>
                 <Input
@@ -399,14 +407,14 @@ export default function ConditionsDiseasesManager() {
                       <button
                         key={condition.id}
                         onClick={() => handleAddCondition(condition)}
-                        className="w-full rounded-lg border-2 border-white bg-white p-3 text-left transition-all hover:border-red-200 hover:shadow-md"
+                        className="border-divider bg-surface-raised hover:border-accent-red-border w-full rounded-lg border-2 p-3 text-left transition-all hover:shadow-md"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex-1">
-                            <div className="font-semibold text-gray-800">
+                            <div className="text-heading font-semibold">
                               {condition.name}
                             </div>
-                            <div className="mt-1 flex items-center gap-2 text-xs text-gray-600">
+                            <div className="text-muted mt-1 flex items-center gap-2 text-xs">
                               <span>{fullSourceName}</span>
                               {condition.variant && (
                                 <Badge variant="info" size="sm">
@@ -417,13 +425,13 @@ export default function ConditionsDiseasesManager() {
                               )}
                             </div>
                           </div>
-                          <Plus className="h-5 w-5 text-red-600" />
+                          <Plus className="text-accent-red-text-muted h-5 w-5" />
                         </div>
                       </button>
                     );
                   })}
                   {filteredConditions.length === 0 && conditionSearch && (
-                    <p className="py-8 text-center text-gray-500">
+                    <p className="text-muted py-8 text-center">
                       No conditions found matching &quot;{conditionSearch}&quot;
                     </p>
                   )}
@@ -439,18 +447,14 @@ export default function ConditionsDiseasesManager() {
                   condition={condition}
                   onView={openConditionModal}
                   onRemove={removeCondition}
-                  onUpdateCount={(id, count) =>
-                    updateCondition(id, { count })
-                  }
+                  onUpdateCount={(id, count) => updateCondition(id, { count })}
                 />
               ))}
               {activeConditions.length === 0 && (
-                <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 py-12 text-center">
-                  <AlertTriangle className="mx-auto mb-3 h-12 w-12 text-gray-300" />
-                  <p className="text-gray-600 font-medium">
-                    No active conditions
-                  </p>
-                  <p className="mt-1 text-sm text-gray-500">
+                <div className="border-divider-strong bg-surface-secondary rounded-lg border-2 border-dashed py-12 text-center">
+                  <AlertTriangle className="text-faint mx-auto mb-3 h-12 w-12" />
+                  <p className="text-muted font-medium">No active conditions</p>
+                  <p className="text-muted mt-1 text-sm">
                     Click &quot;Add Condition&quot; to get started
                   </p>
                 </div>
@@ -461,7 +465,7 @@ export default function ConditionsDiseasesManager() {
           <div className="space-y-4">
             {/* Active Diseases Header */}
             <div className="flex items-center justify-between">
-              <h4 className="text-lg font-bold text-gray-800">
+              <h4 className="text-heading text-lg font-bold">
                 Active Diseases
               </h4>
               <div className="flex gap-2">
@@ -471,7 +475,7 @@ export default function ConditionsDiseasesManager() {
                     variant="ghost"
                     size="sm"
                     leftIcon={<Trash2 className="h-4 w-4" />}
-                    className="text-purple-600 hover:bg-purple-50 hover:text-purple-800"
+                    className="text-accent-purple-text-muted hover:bg-accent-purple-bg hover:text-accent-purple-text"
                   >
                     Clear All
                   </Button>
@@ -484,7 +488,7 @@ export default function ConditionsDiseasesManager() {
                   className={
                     showAddPanel
                       ? ''
-                      : 'bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'
+                      : 'bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'
                   }
                 >
                   {showAddPanel ? 'Cancel' : 'Add Disease'}
@@ -494,8 +498,8 @@ export default function ConditionsDiseasesManager() {
 
             {/* Add Disease Panel */}
             {showAddPanel && (
-              <div className="rounded-lg border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-violet-50 p-4">
-                <h5 className="mb-3 font-bold text-purple-800">
+              <div className="border-accent-purple-border from-accent-purple-bg to-accent-purple-bg-strong rounded-lg border-2 bg-linear-to-r p-4">
+                <h5 className="text-accent-purple-text mb-3 font-bold">
                   Add New Disease
                 </h5>
                 <Input
@@ -513,30 +517,30 @@ export default function ConditionsDiseasesManager() {
                       <button
                         key={disease.id}
                         onClick={() => handleAddDisease(disease)}
-                        className="w-full rounded-lg border-2 border-white bg-white p-3 text-left transition-all hover:border-purple-200 hover:shadow-md"
+                        className="border-divider bg-surface-raised hover:border-accent-purple-border w-full rounded-lg border-2 p-3 text-left transition-all hover:shadow-md"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex-1">
-                            <div className="font-semibold text-gray-800">
+                            <div className="text-heading font-semibold">
                               {disease.name}
                             </div>
-                            <div className="mt-1 text-xs text-gray-600">
+                            <div className="text-muted mt-1 text-xs">
                               {fullSourceName}
                               {disease.type && (
-                                <span className="font-medium text-purple-700">
+                                <span className="text-accent-purple-text-muted font-medium">
                                   {' '}
                                   • {disease.type}
                                 </span>
                               )}
                             </div>
                           </div>
-                          <Plus className="h-5 w-5 text-purple-600" />
+                          <Plus className="text-accent-purple-text-muted h-5 w-5" />
                         </div>
                       </button>
                     );
                   })}
                   {filteredDiseases.length === 0 && diseaseSearch && (
-                    <p className="py-8 text-center text-gray-500">
+                    <p className="text-muted py-8 text-center">
                       No diseases found matching &quot;{diseaseSearch}&quot;
                     </p>
                   )}
@@ -555,10 +559,10 @@ export default function ConditionsDiseasesManager() {
                 />
               ))}
               {activeDiseases.length === 0 && (
-                <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 py-12 text-center">
-                  <Shield className="mx-auto mb-3 h-12 w-12 text-gray-300" />
-                  <p className="text-gray-600 font-medium">No active diseases</p>
-                  <p className="mt-1 text-sm text-gray-500">
+                <div className="border-divider-strong bg-surface-secondary rounded-lg border-2 border-dashed py-12 text-center">
+                  <Shield className="text-faint mx-auto mb-3 h-12 w-12" />
+                  <p className="text-muted font-medium">No active diseases</p>
+                  <p className="text-muted mt-1 text-sm">
                     Click &quot;Add Disease&quot; to get started
                   </p>
                 </div>

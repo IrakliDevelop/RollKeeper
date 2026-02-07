@@ -44,30 +44,30 @@ export default function FeatureCategorySection({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+    <div className="border-divider bg-surface-raised rounded-lg border shadow-sm">
       {/* Category Header */}
       <button
         onClick={onToggleCollapse}
-        className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-gray-50"
+        className="hover:bg-surface-hover flex w-full items-center justify-between p-4 text-left transition-colors"
       >
         <div className="flex items-center gap-3">
           {isCollapsed ? (
-            <ChevronRight className="h-5 w-5 text-gray-400" />
+            <ChevronRight className="text-muted h-5 w-5" />
           ) : (
-            <ChevronDown className="h-5 w-5 text-gray-400" />
+            <ChevronDown className="text-muted h-5 w-5" />
           )}
           <div>
-            <h3 className="font-semibold text-gray-900">{label}</h3>
-            <p className="text-sm text-gray-500">{description}</p>
+            <h3 className="text-heading font-semibold">{label}</h3>
+            <p className="text-muted text-sm">{description}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
+          <span className="bg-accent-blue-bg text-accent-blue-text rounded-full px-2 py-1 text-xs font-medium">
             {features.length} feature{features.length !== 1 ? 's' : ''}
           </span>
           {usedCount > 0 && (
-            <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-medium text-orange-800">
+            <span className="bg-accent-orange-bg text-accent-orange-text rounded-full px-2 py-1 text-xs font-medium">
               {usedCount} used
             </span>
           )}
@@ -76,7 +76,7 @@ export default function FeatureCategorySection({
 
       {/* Category Content */}
       {!isCollapsed && (
-        <div className="border-t border-gray-100 p-6">
+        <div className="border-divider border-t p-6">
           <DragDropList
             items={features}
             onReorder={onReorderFeatures}

@@ -293,10 +293,10 @@ export default function ArmorDefenseManager() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Section: Basic Information */}
           <div className="space-y-4">
-            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+            <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
               Basic Information
             </h4>
-            
+
             <Input
               label="Name"
               value={formData.name}
@@ -307,7 +307,9 @@ export default function ArmorDefenseManager() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">Category</label>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Category
+                </label>
                 <SelectField
                   value={formData.category}
                   onValueChange={value => {
@@ -326,14 +328,17 @@ export default function ArmorDefenseManager() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">Type</label>
+                <label className="mb-2 block text-sm font-medium text-gray-700">
+                  Type
+                </label>
                 <SelectField
                   value={formData.type}
                   onValueChange={value => handleTypeChange(value as ArmorType)}
                 >
                   {ARMOR_TYPES[formData.category].map(type => (
                     <SelectItem key={type} value={type}>
-                      {type.charAt(0).toUpperCase() + type.slice(1).replace('-', ' ')}
+                      {type.charAt(0).toUpperCase() +
+                        type.slice(1).replace('-', ' ')}
                     </SelectItem>
                   ))}
                   <SelectItem value="custom">Custom</SelectItem>
@@ -344,16 +349,21 @@ export default function ArmorDefenseManager() {
 
           {/* Section: Armor Stats */}
           <div className="space-y-4">
-            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+            <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
               Armor Stats
             </h4>
-            
+
             <div className="grid grid-cols-3 gap-4">
               <Input
                 label="Base AC"
                 type="number"
                 value={formData.baseAC.toString()}
-                onChange={e => setFormData({ ...formData, baseAC: parseInt(e.target.value) || 10 })}
+                onChange={e =>
+                  setFormData({
+                    ...formData,
+                    baseAC: parseInt(e.target.value) || 10,
+                  })
+                }
                 min={10}
                 max={30}
               />
@@ -362,10 +372,14 @@ export default function ArmorDefenseManager() {
                 label="Max Dex Bonus"
                 type="number"
                 value={formData.maxDexBonus?.toString() || ''}
-                onChange={e => setFormData({
-                  ...formData,
-                  maxDexBonus: e.target.value ? parseInt(e.target.value) : undefined,
-                })}
+                onChange={e =>
+                  setFormData({
+                    ...formData,
+                    maxDexBonus: e.target.value
+                      ? parseInt(e.target.value)
+                      : undefined,
+                  })
+                }
                 placeholder="Unlimited"
                 min={0}
                 max={10}
@@ -375,7 +389,12 @@ export default function ArmorDefenseManager() {
                 label="Enhancement"
                 type="number"
                 value={formData.enhancementBonus.toString()}
-                onChange={e => setFormData({ ...formData, enhancementBonus: parseInt(e.target.value) || 0 })}
+                onChange={e =>
+                  setFormData({
+                    ...formData,
+                    enhancementBonus: parseInt(e.target.value) || 0,
+                  })
+                }
                 min={0}
                 max={3}
               />
@@ -384,14 +403,16 @@ export default function ArmorDefenseManager() {
 
           {/* Section: Description */}
           <div className="space-y-4">
-            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+            <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
               Description
             </h4>
-            
+
             <Textarea
               label="Special Properties"
               value={formData.description}
-              onChange={e => setFormData({ ...formData, description: e.target.value })}
+              onChange={e =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               rows={3}
               placeholder="Special properties, abilities, or description..."
             />
@@ -399,53 +420,75 @@ export default function ArmorDefenseManager() {
 
           {/* Section: Properties */}
           <div className="space-y-4">
-            <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+            <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
               Properties
             </h4>
-            
+
             <div className="flex flex-wrap gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex cursor-pointer items-center gap-2">
                 <Checkbox
                   checked={formData.isEquipped}
-                  onCheckedChange={checked => setFormData({ ...formData, isEquipped: checked as boolean })}
+                  onCheckedChange={checked =>
+                    setFormData({ ...formData, isEquipped: checked as boolean })
+                  }
                 />
-                <span className="text-sm font-medium text-gray-800">Currently Equipped</span>
+                <span className="text-sm font-medium text-gray-800">
+                  Currently Equipped
+                </span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex cursor-pointer items-center gap-2">
                 <Checkbox
                   checked={formData.stealthDisadvantage}
-                  onCheckedChange={checked => setFormData({ ...formData, stealthDisadvantage: checked as boolean })}
+                  onCheckedChange={checked =>
+                    setFormData({
+                      ...formData,
+                      stealthDisadvantage: checked as boolean,
+                    })
+                  }
                 />
-                <span className="text-sm font-medium text-gray-800">Stealth Disadvantage</span>
+                <span className="text-sm font-medium text-gray-800">
+                  Stealth Disadvantage
+                </span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex cursor-pointer items-center gap-2">
                 <Checkbox
                   checked={formData.requiresAttunement}
-                  onCheckedChange={checked => setFormData({
-                    ...formData,
-                    requiresAttunement: checked as boolean,
-                    isAttuned: checked ? formData.isAttuned : false,
-                  })}
+                  onCheckedChange={checked =>
+                    setFormData({
+                      ...formData,
+                      requiresAttunement: checked as boolean,
+                      isAttuned: checked ? formData.isAttuned : false,
+                    })
+                  }
                 />
-                <span className="text-sm font-medium text-gray-800">Requires Attunement</span>
+                <span className="text-sm font-medium text-gray-800">
+                  Requires Attunement
+                </span>
               </label>
 
               {formData.requiresAttunement && (
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex cursor-pointer items-center gap-2">
                   <Checkbox
                     checked={formData.isAttuned}
-                    onCheckedChange={checked => setFormData({ ...formData, isAttuned: checked as boolean })}
+                    onCheckedChange={checked =>
+                      setFormData({
+                        ...formData,
+                        isAttuned: checked as boolean,
+                      })
+                    }
                   />
-                  <span className="text-sm font-medium text-gray-800">Attuned</span>
+                  <span className="text-sm font-medium text-gray-800">
+                    Attuned
+                  </span>
                 </label>
               )}
             </div>
           </div>
 
           {/* Form Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t-2 border-gray-200">
+          <div className="flex justify-end gap-3 border-t-2 border-gray-200 pt-4">
             <Button
               type="button"
               onClick={resetForm}
@@ -490,13 +533,13 @@ function ArmorCard({
     <div
       className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${
         equipped
-          ? 'border-green-300 bg-white'
-          : 'border-gray-200 bg-white hover:border-gray-300'
+          ? 'bg-surface-raised border-green-300'
+          : 'bg-surface-raised border-gray-200 hover:border-gray-300'
       }`}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <div className="mb-2 flex items-center gap-2 flex-wrap">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             <h4 className="font-bold text-gray-800">{armor.name}</h4>
             {armor.enhancementBonus > 0 && (
               <Badge variant="warning" size="sm">
@@ -505,7 +548,7 @@ function ArmorCard({
             )}
             {armor.requiresAttunement && (
               <Badge
-                variant={armor.isAttuned ? "primary" : "secondary"}
+                variant={armor.isAttuned ? 'primary' : 'secondary'}
                 size="sm"
               >
                 {armor.isAttuned ? 'Attuned' : 'Requires Attunement'}
@@ -514,7 +557,8 @@ function ArmorCard({
           </div>
 
           <div className="mb-2 text-sm text-gray-600">
-            <span className="font-semibold text-gray-800">AC {totalAC}</span> • {armor.category} armor
+            <span className="font-semibold text-gray-800">AC {totalAC}</span> •{' '}
+            {armor.category} armor
             {armor.maxDexBonus !== undefined && (
               <span> • Max Dex +{armor.maxDexBonus}</span>
             )}
@@ -527,7 +571,7 @@ function ArmorCard({
           )}
 
           {armor.description && (
-            <p className="text-sm text-gray-700 mt-2">{armor.description}</p>
+            <p className="mt-2 text-sm text-gray-700">{armor.description}</p>
           )}
         </div>
 
@@ -538,7 +582,7 @@ function ArmorCard({
               variant="ghost"
               size="xs"
               title="Edit armor"
-              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+              className="text-blue-600 hover:bg-blue-50 hover:text-blue-800"
             >
               <Edit2 size={16} />
             </Button>
@@ -547,16 +591,18 @@ function ArmorCard({
               variant="ghost"
               size="xs"
               title="Delete armor"
-              className="text-red-600 hover:text-red-800 hover:bg-red-50"
+              className="text-red-600 hover:bg-red-50 hover:text-red-800"
             >
               <Trash2 size={16} />
             </Button>
           </div>
           <Button
             onClick={onToggleEquip}
-            variant={equipped ? "success" : "outline"}
+            variant={equipped ? 'success' : 'outline'}
             size="sm"
-            className={equipped ? "" : "hover:bg-green-50 hover:border-green-300"}
+            className={
+              equipped ? '' : 'hover:border-green-300 hover:bg-green-50'
+            }
           >
             {equipped ? 'Equipped' : 'Equip'}
           </Button>

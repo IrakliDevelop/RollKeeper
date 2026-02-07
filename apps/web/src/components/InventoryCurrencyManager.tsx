@@ -230,7 +230,7 @@ export default function InventoryCurrencyManager() {
         <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-5">
           {Object.entries(CURRENCY_TYPES).map(([type, config]) => (
             <div key={type} className="text-center">
-              <div className="rounded-lg border border-yellow-300 bg-white p-3 shadow-sm">
+              <div className="bg-surface-raised rounded-lg border border-yellow-300 p-3 shadow-sm">
                 <div className={`text-2xl font-bold ${config.color}`}>
                   {character.currency[type as keyof Currency] || 0}
                 </div>
@@ -309,7 +309,7 @@ export default function InventoryCurrencyManager() {
             {Object.entries(itemsByCategory).map(([category, items]) => (
               <div
                 key={category}
-                className="rounded-lg border border-purple-200 bg-white p-4"
+                className="bg-surface-raised rounded-lg border border-purple-200 p-4"
               >
                 <h4 className="mb-3 font-semibold text-purple-800 capitalize">
                   {category} ({items.length})
@@ -344,7 +344,7 @@ export default function InventoryCurrencyManager() {
       {/* Item Form Modal */}
       {showItemForm && (
         <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-2xl">
+          <div className="bg-surface-raised max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl shadow-2xl">
             <div className="p-6">
               <h3 className="mb-4 text-xl font-bold text-gray-800">
                 {editingId ? 'Edit Item' : 'Add Item'}
@@ -361,7 +361,7 @@ export default function InventoryCurrencyManager() {
                     onChange={e =>
                       setFormData({ ...formData, name: e.target.value })
                     }
-                    className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
+                    className="bg-surface-raised w-full rounded-lg border border-gray-300 p-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
                     placeholder="e.g., Rope (50 feet), Healing Potion"
                     required
                   />
@@ -377,7 +377,7 @@ export default function InventoryCurrencyManager() {
                       onChange={e =>
                         setFormData({ ...formData, category: e.target.value })
                       }
-                      className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
+                      className="bg-surface-raised w-full rounded-lg border border-gray-300 p-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
                     >
                       {ITEM_CATEGORIES.map(category => (
                         <option key={category} value={category}>
@@ -400,7 +400,7 @@ export default function InventoryCurrencyManager() {
                           quantity: parseInt(e.target.value) || 1,
                         })
                       }
-                      className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
+                      className="bg-surface-raised w-full rounded-lg border border-gray-300 p-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
                       min="1"
                       required
                     />
@@ -424,7 +424,7 @@ export default function InventoryCurrencyManager() {
                             : undefined,
                         })
                       }
-                      className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
+                      className="bg-surface-raised w-full rounded-lg border border-gray-300 p-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
                       placeholder="Per item"
                       min="0"
                     />
@@ -445,7 +445,7 @@ export default function InventoryCurrencyManager() {
                             : undefined,
                         })
                       }
-                      className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
+                      className="bg-surface-raised w-full rounded-lg border border-gray-300 p-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
                       placeholder="Per item"
                       min="0"
                     />
@@ -461,7 +461,7 @@ export default function InventoryCurrencyManager() {
                     onChange={e =>
                       setFormData({ ...formData, description: e.target.value })
                     }
-                    className="w-full rounded-lg border border-gray-300 bg-white p-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
+                    className="bg-surface-raised w-full rounded-lg border border-gray-300 p-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
                     rows={3}
                     placeholder="Item description, properties, or notes..."
                   />
@@ -476,7 +476,7 @@ export default function InventoryCurrencyManager() {
                       type="text"
                       value={tagInput}
                       onChange={e => setTagInput(e.target.value)}
-                      className="flex-1 rounded-lg border border-gray-300 bg-white p-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
+                      className="bg-surface-raised flex-1 rounded-lg border border-gray-300 p-3 text-gray-900 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
                       placeholder="Add tag..."
                       onKeyPress={e =>
                         e.key === 'Enter' && (e.preventDefault(), addTag())
@@ -545,7 +545,7 @@ function ItemCard({ item, onEdit, onDelete, onQuantityChange }: ItemCardProps) {
   const totalValue = item.value ? item.value * item.quantity : undefined;
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-3 transition-all hover:border-gray-300">
+    <div className="bg-surface-raised rounded-lg border border-gray-200 p-3 transition-all hover:border-gray-300">
       <div className="mb-2 flex items-start justify-between">
         <h5 className="text-sm font-semibold text-gray-800">{item.name}</h5>
         <div className="flex gap-1">

@@ -3,8 +3,10 @@ import { useDiceRoller, UseDiceRollerOptions } from '@/hooks/useDiceRoller';
 import { DiceResultDisplay } from './DiceResultDisplay';
 import { RollSummary } from '@/types/dice';
 
-export interface DiceRollerProps
-  extends Omit<UseDiceRollerOptions, 'containerId'> {
+export interface DiceRollerProps extends Omit<
+  UseDiceRollerOptions,
+  'containerId'
+> {
   containerId?: string;
   showControls?: boolean;
   showHistory?: boolean;
@@ -125,7 +127,7 @@ export function DiceRoller({
 
       {/* Status */}
       {showControls && (
-        <div className="rounded-lg border bg-white p-4 shadow">
+        <div className="border-divider bg-surface-raised rounded-lg border p-4 shadow">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-lg font-bold text-gray-900">Dice Roller</h3>
             <div

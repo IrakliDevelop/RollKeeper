@@ -69,7 +69,7 @@ export default function ClassSelector({
   return (
     <div className={`space-y-3 ${className}`}>
       <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700">Class</label>
+        <label className="text-body text-sm font-medium">Class</label>
 
         {/* Toggle between standard and custom */}
         <CustomSwitcher
@@ -93,9 +93,9 @@ export default function ClassSelector({
             value={customName}
             onChange={e => handleCustomClassChange(e.target.value)}
             placeholder="Enter custom class name..."
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-gray-800 shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            className="border-border-primary text-heading focus:border-accent-blue-border-strong focus:ring-accent-blue-border-strong bg-bg-primary w-full rounded-md border px-3 py-2 shadow-sm focus:outline-none"
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-muted text-xs">
             Custom classes default to non-spellcasters. You can adjust spell
             slots manually if needed.
           </p>
@@ -132,7 +132,7 @@ export default function ClassSelector({
 
           {/* Show spellcaster info for selected class */}
           {value.name && !value.isCustom && (
-            <div className="text-xs text-gray-600">
+            <div className="text-muted text-xs">
               {value.spellcaster === 'none' && '• Non-spellcaster'}
               {value.spellcaster === 'full' &&
                 '• Full spellcaster (Spell slots by class level)'}

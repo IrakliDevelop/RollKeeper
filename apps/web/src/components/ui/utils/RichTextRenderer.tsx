@@ -17,7 +17,7 @@ export default function RichTextRenderer({
 }: RichTextRendererProps) {
   if (!content || content.trim() === '') {
     return (
-      <div className={`text-gray-500 italic ${className}`}>
+      <div className={`text-muted italic ${className}`}>
         No content available...
       </div>
     );
@@ -33,7 +33,7 @@ export default function RichTextRenderer({
       {/* Apply the same styles as RichTextEditor for consistency */}
       <style jsx global>{`
         .rich-text-renderer .rich-text-content {
-          color: #1f2937;
+          color: var(--body);
           font-family:
             -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           line-height: 1.7;
@@ -45,7 +45,7 @@ export default function RichTextRenderer({
           font-weight: 800 !important;
           line-height: 1.2 !important;
           margin: 2rem 0 1rem 0 !important;
-          color: #111827 !important;
+          color: var(--heading) !important;
           display: block !important;
         }
 
@@ -54,7 +54,7 @@ export default function RichTextRenderer({
           font-weight: 700 !important;
           line-height: 1.3 !important;
           margin: 1.5rem 0 0.75rem 0 !important;
-          color: #111827 !important;
+          color: var(--heading) !important;
           display: block !important;
         }
 
@@ -63,7 +63,7 @@ export default function RichTextRenderer({
           font-weight: 600 !important;
           line-height: 1.4 !important;
           margin: 1.25rem 0 0.5rem 0 !important;
-          color: #111827 !important;
+          color: var(--heading) !important;
           display: block !important;
         }
 
@@ -116,15 +116,15 @@ export default function RichTextRenderer({
 
         /* Code */
         .rich-text-renderer .rich-text-content code {
-          background-color: #f3f4f6 !important;
-          color: #dc2626 !important;
+          background-color: var(--surface-secondary) !important;
+          color: var(--accent-red-text) !important;
           padding: 0.25rem 0.375rem !important;
           border-radius: 0.25rem !important;
           font-size: 0.875em !important;
           font-family:
             'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New',
             monospace !important;
-          border: 1px solid #e5e7eb !important;
+          border: 1px solid var(--divider) !important;
         }
 
         .rich-text-renderer .rich-text-content pre {
@@ -151,19 +151,19 @@ export default function RichTextRenderer({
         /* Blockquote */
         .rich-text-renderer .rich-text-content blockquote {
           padding: 1rem !important;
-          border-left: 4px solid #3b82f6 !important;
+          border-left: 4px solid var(--accent-blue-border-strong) !important;
           margin: 1rem 0 !important;
           font-style: italic !important;
-          color: #6b7280 !important;
+          color: var(--muted) !important;
           display: block !important;
-          background-color: #f8fafc !important;
+          background-color: var(--surface-secondary) !important;
           border-radius: 0.5rem !important;
         }
 
         /* Horizontal Rule */
         .rich-text-renderer .rich-text-content hr {
           border: none !important;
-          border-top: 2px solid #e5e7eb !important;
+          border-top: 2px solid var(--divider) !important;
           margin: 2rem 0 !important;
           display: block !important;
           width: 100% !important;

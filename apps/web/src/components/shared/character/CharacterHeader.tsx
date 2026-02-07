@@ -65,8 +65,8 @@ export function CharacterHeader({
   className = '',
 }: CharacterHeaderProps) {
   const containerClasses = compact
-    ? `bg-white rounded-lg shadow border border-amber-200 p-3 ${className}`
-    : `bg-white rounded-lg shadow-lg border border-amber-200 p-6 ${className}`;
+    ? `bg-surface-raised rounded-lg shadow border border-accent-amber-border p-3 ${className}`
+    : `bg-surface-raised rounded-lg shadow-lg border border-accent-amber-border p-6 ${className}`;
 
   if (compact) {
     return (
@@ -82,10 +82,10 @@ export function CharacterHeader({
             />
           )}
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-lg font-bold text-gray-800">
+            <h3 className="text-heading truncate text-lg font-bold">
               {name || 'Unnamed Character'}
             </h3>
-            <div className="truncate text-sm text-gray-600">
+            <div className="text-muted truncate text-sm">
               {level && classInfo?.name && (
                 <span>
                   Level {level} {classInfo.name}
@@ -98,7 +98,7 @@ export function CharacterHeader({
                 </span>
               )}
               {showPlayerName && playerName && (
-                <span className="text-gray-500"> ({playerName})</span>
+                <span className="text-faint"> ({playerName})</span>
               )}
             </div>
           </div>
@@ -109,18 +109,18 @@ export function CharacterHeader({
 
   return (
     <div className={containerClasses}>
-      <h2 className="mb-4 border-b border-gray-200 pb-2 text-lg font-bold text-gray-800">
+      <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
         Character Information
       </h2>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {/* Character Name */}
         <div className="sm:col-span-2">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="text-body mb-1 block text-sm font-medium">
             Character Name
           </label>
           {readonly ? (
-            <div className="w-full rounded-md border border-gray-200 bg-gray-50 p-2 text-gray-800">
+            <div className="border-divider bg-surface-inset text-heading w-full rounded-md border p-2">
               {name || 'Unnamed Character'}
             </div>
           ) : (
@@ -129,18 +129,18 @@ export function CharacterHeader({
               placeholder="Enter character name"
               value={name}
               onChange={e => onUpdateName?.(e.target.value)}
-              className="w-full rounded-md border border-gray-300 p-2 text-gray-800 placeholder-gray-400 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="border-divider-strong bg-surface-raised text-heading placeholder-muted focus:ring-accent-blue-border-strong w-full rounded-md border p-2 focus:border-transparent focus:ring-2"
             />
           )}
         </div>
 
         {/* Race */}
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="text-body mb-1 block text-sm font-medium">
             Race
           </label>
           {readonly ? (
-            <div className="w-full rounded-md border border-gray-200 bg-gray-50 p-2 text-gray-800">
+            <div className="border-divider bg-surface-inset text-heading w-full rounded-md border p-2">
               {race || 'Unknown'}
             </div>
           ) : (
@@ -149,17 +149,17 @@ export function CharacterHeader({
               placeholder="Human"
               value={race}
               onChange={e => onUpdateRace?.(e.target.value)}
-              className="w-full rounded-md border border-gray-300 p-2 text-gray-800 placeholder-gray-400 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+              className="border-divider-strong bg-surface-raised text-heading placeholder-muted focus:ring-accent-blue-border-strong w-full rounded-md border p-2 focus:border-transparent focus:ring-2"
             />
           )}
         </div>
 
         {/* Class & Level (Display Only) */}
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="text-body mb-1 block text-sm font-medium">
             Class & Level
           </label>
-          <div className="w-full rounded-md border border-gray-200 bg-gray-50 p-2 text-gray-800">
+          <div className="border-divider bg-surface-inset text-heading w-full rounded-md border p-2">
             {level && classInfo?.name
               ? `Level ${level} ${classInfo.name}`
               : 'Not Set'}
@@ -169,11 +169,11 @@ export function CharacterHeader({
         {/* Background */}
         {showBackground && (
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="text-body mb-1 block text-sm font-medium">
               Background
             </label>
             {readonly ? (
-              <div className="w-full rounded-md border border-gray-200 bg-gray-50 p-2 text-gray-800">
+              <div className="border-divider bg-surface-inset text-heading w-full rounded-md border p-2">
                 {background || 'Unknown'}
               </div>
             ) : (
@@ -182,7 +182,7 @@ export function CharacterHeader({
                 placeholder="Soldier"
                 value={background}
                 onChange={e => onUpdateBackground?.(e.target.value)}
-                className="w-full rounded-md border border-gray-300 p-2 text-gray-800 placeholder-gray-400 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="border-divider-strong bg-surface-raised text-heading placeholder-muted focus:ring-accent-blue-border-strong w-full rounded-md border p-2 focus:border-transparent focus:ring-2"
               />
             )}
           </div>
@@ -191,11 +191,11 @@ export function CharacterHeader({
         {/* Player Name */}
         {showPlayerName && (
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="text-body mb-1 block text-sm font-medium">
               Player Name
             </label>
             {readonly ? (
-              <div className="w-full rounded-md border border-gray-200 bg-gray-50 p-2 text-gray-800">
+              <div className="border-divider bg-surface-inset text-heading w-full rounded-md border p-2">
                 {playerName || 'Unknown'}
               </div>
             ) : (
@@ -204,7 +204,7 @@ export function CharacterHeader({
                 placeholder="Your Name"
                 value={playerName}
                 onChange={e => onUpdatePlayerName?.(e.target.value)}
-                className="w-full rounded-md border border-gray-300 p-2 text-gray-800 placeholder-gray-400 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="border-divider-strong bg-surface-raised text-heading placeholder-muted focus:ring-accent-blue-border-strong w-full rounded-md border p-2 focus:border-transparent focus:ring-2"
               />
             )}
           </div>
@@ -213,18 +213,18 @@ export function CharacterHeader({
         {/* Alignment */}
         {showAlignment && (
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="text-body mb-1 block text-sm font-medium">
               Alignment
             </label>
             {readonly ? (
-              <div className="w-full rounded-md border border-gray-200 bg-gray-50 p-2 text-gray-800">
+              <div className="border-divider bg-surface-inset text-heading w-full rounded-md border p-2">
                 {alignment || 'Unknown'}
               </div>
             ) : (
               <select
                 value={alignment}
                 onChange={e => onUpdateAlignment?.(e.target.value)}
-                className="w-full rounded-md border border-gray-300 p-2 text-gray-800 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                className="border-divider-strong bg-surface-raised text-heading focus:ring-accent-blue-border-strong w-full rounded-md border p-2 focus:border-transparent focus:ring-2"
               >
                 <option value="">Select...</option>
                 {ALIGNMENTS.map(align => (

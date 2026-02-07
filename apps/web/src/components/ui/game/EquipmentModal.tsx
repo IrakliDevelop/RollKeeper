@@ -22,6 +22,8 @@ import {
   WeaponForm,
   MagicItemForm,
 } from './equipment';
+import type { WeaponChargeFormData } from './equipment/WeaponForm';
+import type { MagicItemChargeFormData } from './equipment/MagicItemForm';
 
 interface EquipmentModalProps {
   isOpen: boolean;
@@ -37,11 +39,8 @@ interface MagicItemFormData {
   requiresAttunement: boolean;
   isAttuned: boolean;
   isEquipped?: boolean;
-  charges?: {
-    current: number;
-    max: number;
-    rechargeRule?: string;
-  };
+  // Multiple charges
+  charges?: MagicItemChargeFormData[];
 }
 
 interface WeaponFormData {
@@ -62,6 +61,8 @@ interface WeaponFormData {
   manualProficiency?: boolean;
   requiresAttunement?: boolean;
   isAttuned?: boolean;
+  // Multiple weapon charges
+  charges?: WeaponChargeFormData[];
 }
 
 const initialMagicItemData: MagicItemFormData = {
@@ -73,6 +74,7 @@ const initialMagicItemData: MagicItemFormData = {
   requiresAttunement: false,
   isAttuned: false,
   isEquipped: false,
+  charges: [],
 };
 
 const initialWeaponData: WeaponFormData = {
@@ -98,6 +100,7 @@ const initialWeaponData: WeaponFormData = {
   manualProficiency: undefined,
   requiresAttunement: false,
   isAttuned: false,
+  charges: [],
 };
 
 export default function EquipmentModal({
@@ -111,6 +114,8 @@ export default function EquipmentModal({
     deleteMagicItem,
     attuneMagicItem,
     reorderMagicItems,
+    expendMagicItemCharge,
+    restoreMagicItemCharge,
     addWeapon,
     updateWeapon,
     deleteWeapon,
@@ -141,11 +146,32 @@ export default function EquipmentModal({
   const handleMagicItemSubmit = () => {
     if (!magicItemForm.name.trim()) return;
 
+    // Convert charges form data to MagicItemCharge[] with IDs
+    const chargesWithIds = (magicItemForm.charges || [])
+      .filter(charge => charge.name.trim()) // Only include charges with names
+      .map(charge => ({
+        id:
+          charge.id ||
+          `charge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: charge.name,
+        description: charge.description,
+        maxCharges: charge.maxCharges,
+        usedCharges: charge.usedCharges,
+        restType: charge.restType,
+        scaleWithProficiency: charge.scaleWithProficiency,
+        proficiencyMultiplier: charge.proficiencyMultiplier,
+      }));
+
+    const magicItemData = {
+      ...magicItemForm,
+      charges: chargesWithIds.length > 0 ? chargesWithIds : undefined,
+    };
+
     if (editingMagicItem) {
-      updateMagicItem(editingMagicItem.id, magicItemForm);
+      updateMagicItem(editingMagicItem.id, magicItemData);
       setEditingMagicItem(null);
     } else {
-      addMagicItem(magicItemForm);
+      addMagicItem(magicItemData);
     }
 
     setMagicItemForm(initialMagicItemData);
@@ -154,6 +180,22 @@ export default function EquipmentModal({
 
   const handleWeaponSubmit = () => {
     if (!weaponForm.name.trim()) return;
+
+    // Convert charges form data to WeaponCharge[] with IDs
+    const chargesWithIds = (weaponForm.charges || [])
+      .filter(charge => charge.name.trim()) // Only include charges with names
+      .map(charge => ({
+        id:
+          charge.id ||
+          `charge-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name: charge.name,
+        description: charge.description,
+        maxCharges: charge.maxCharges,
+        usedCharges: charge.usedCharges,
+        restType: charge.restType,
+        scaleWithProficiency: charge.scaleWithProficiency,
+        proficiencyMultiplier: charge.proficiencyMultiplier,
+      }));
 
     const weaponData = {
       ...weaponForm,
@@ -164,6 +206,7 @@ export default function EquipmentModal({
             long: weaponForm.range.long,
           }
         : undefined,
+      charges: chargesWithIds.length > 0 ? chargesWithIds : undefined,
     };
 
     if (editingWeapon) {
@@ -178,6 +221,20 @@ export default function EquipmentModal({
   };
 
   const handleEditMagicItem = (item: MagicItem) => {
+    // Convert MagicItemCharge[] to MagicItemChargeFormData[]
+    const chargesFormData: MagicItemChargeFormData[] = (item.charges || []).map(
+      charge => ({
+        id: charge.id,
+        name: charge.name,
+        description: charge.description,
+        maxCharges: charge.maxCharges,
+        usedCharges: charge.usedCharges,
+        restType: charge.restType,
+        scaleWithProficiency: charge.scaleWithProficiency,
+        proficiencyMultiplier: charge.proficiencyMultiplier,
+      })
+    );
+
     setMagicItemForm({
       name: item.name,
       category: item.category,
@@ -187,7 +244,7 @@ export default function EquipmentModal({
       requiresAttunement: item.requiresAttunement,
       isAttuned: item.isAttuned,
       isEquipped: item.isEquipped,
-      charges: item.charges,
+      charges: chargesFormData,
     });
     setEditingMagicItem(item);
     setShowMagicItemForm(true);
@@ -219,6 +276,20 @@ export default function EquipmentModal({
       ];
     }
 
+    // Convert WeaponCharge[] to WeaponChargeFormData[]
+    const chargesFormData: WeaponChargeFormData[] = (weapon.charges || []).map(
+      charge => ({
+        id: charge.id,
+        name: charge.name,
+        description: charge.description,
+        maxCharges: charge.maxCharges,
+        usedCharges: charge.usedCharges,
+        restType: charge.restType,
+        scaleWithProficiency: charge.scaleWithProficiency,
+        proficiencyMultiplier: charge.proficiencyMultiplier,
+      })
+    );
+
     setWeaponForm({
       name: weapon.name,
       category: weapon.category,
@@ -234,6 +305,7 @@ export default function EquipmentModal({
       manualProficiency: weapon.manualProficiency,
       requiresAttunement: weapon.requiresAttunement || false,
       isAttuned: weapon.isAttuned || false,
+      charges: chargesFormData,
     });
     setEditingWeapon(weapon);
     setShowWeaponForm(true);
@@ -272,7 +344,7 @@ export default function EquipmentModal({
       {/* Show forms if active, otherwise show main content */}
       {showWeaponForm ? (
         <div className="space-y-4">
-          <h3 className="text-xl font-bold text-gray-800">
+          <h3 className="text-heading text-xl font-bold">
             {editingWeapon ? 'Edit Weapon' : 'Add Weapon'}
           </h3>
 
@@ -290,7 +362,7 @@ export default function EquipmentModal({
         </div>
       ) : showMagicItemForm ? (
         <div className="space-y-4">
-          <h3 className="text-xl font-bold text-gray-800">
+          <h3 className="text-heading text-xl font-bold">
             {editingMagicItem ? 'Edit Magic Item' : 'Add Magic Item'}
           </h3>
 
@@ -312,7 +384,7 @@ export default function EquipmentModal({
           {/* Weapons Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="flex items-center gap-2 text-xl font-bold text-gray-800">
+              <h3 className="text-heading flex items-center gap-2 text-xl font-bold">
                 <Sword className="h-5 w-5" />
                 Weapons ({character.weapons.length})
               </h3>
@@ -321,7 +393,7 @@ export default function EquipmentModal({
                 variant="primary"
                 size="md"
                 leftIcon={<Plus size={16} />}
-                className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                className="bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
               >
                 Add Weapon
               </Button>
@@ -329,8 +401,8 @@ export default function EquipmentModal({
 
             <div className="space-y-3">
               {character.weapons.length === 0 ? (
-                <div className="py-8 text-center text-gray-500">
-                  <Sword className="mx-auto mb-2 h-12 w-12 text-gray-300" />
+                <div className="text-muted py-8 text-center">
+                  <Sword className="text-faint mx-auto mb-2 h-12 w-12" />
                   <p>No weapons added yet</p>
                 </div>
               ) : (
@@ -357,7 +429,7 @@ export default function EquipmentModal({
           {/* Magic Items Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="flex items-center gap-2 text-xl font-bold text-gray-800">
+              <h3 className="text-heading flex items-center gap-2 text-xl font-bold">
                 <Wand2 className="h-5 w-5" />
                 Magic Items ({character.magicItems.length})
               </h3>
@@ -366,7 +438,7 @@ export default function EquipmentModal({
                 variant="primary"
                 size="md"
                 leftIcon={<Plus size={16} />}
-                className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+                className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
               >
                 Add Magic Item
               </Button>
@@ -374,8 +446,8 @@ export default function EquipmentModal({
 
             <div className="space-y-3">
               {character.magicItems.length === 0 ? (
-                <div className="py-8 text-center text-gray-500">
-                  <Wand2 className="mx-auto mb-2 h-12 w-12 text-gray-300" />
+                <div className="text-muted py-8 text-center">
+                  <Wand2 className="text-faint mx-auto mb-2 h-12 w-12" />
                   <p>No magic items added yet</p>
                 </div>
               ) : (
@@ -389,9 +461,12 @@ export default function EquipmentModal({
                   renderItem={item => (
                     <MagicItemCard
                       item={item}
+                      characterLevel={character.level}
                       onEdit={handleEditMagicItem}
                       onDelete={deleteMagicItem}
                       onToggleAttunement={handleAttunement}
+                      onExpendCharge={expendMagicItemCharge}
+                      onRestoreCharge={restoreMagicItemCharge}
                     />
                   )}
                 />

@@ -84,29 +84,29 @@ export function Modal({
       <div className="flex min-h-full items-center justify-center p-4">
         <div
           ref={modalRef}
-          className={`relative w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col transform rounded-xl bg-white shadow-2xl transition-all duration-300 ${className} `}
+          className={`relative w-full ${sizeClasses[size]} bg-surface-raised flex max-h-[90vh] transform flex-col rounded-xl shadow-2xl transition-all duration-300 ${className} `}
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
           {(title || showCloseButton) && (
-            <div className="flex items-center justify-between border-b border-gray-200 p-6 flex-shrink-0">
+            <div className="border-divider flex flex-shrink-0 items-center justify-between border-b p-6">
               {title && (
-                <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+                <h2 className="text-heading text-xl font-semibold">{title}</h2>
               )}
               {showCloseButton && (
                 <button
                   onClick={onClose}
-                  className="rounded-lg p-2 transition-colors hover:bg-gray-100"
+                  className="hover:bg-surface-hover rounded-lg p-2 transition-colors"
                   aria-label="Close modal"
                 >
-                  <X size={20} className="text-gray-500" />
+                  <X size={20} className="text-muted" />
                 </button>
               )}
             </div>
           )}
 
           {/* Content - Scrollable area with default padding */}
-          <div className="flex-1 overflow-y-auto min-h-0 p-6">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-6">{children}</div>
         </div>
       </div>
     </div>,
@@ -142,11 +142,11 @@ export function ConfirmationModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
       <div className="p-6">
-        <p className="mb-6 text-gray-700">{message}</p>
+        <p className="text-body mb-6">{message}</p>
         <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="rounded-lg bg-gray-100 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-200"
+            className="bg-surface-secondary text-body hover:bg-surface-hover rounded-lg px-4 py-2 transition-colors"
           >
             {cancelText}
           </button>
@@ -186,7 +186,7 @@ export function LoadingModal({
     >
       <div className="p-6 text-center">
         <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600"></div>
-        <p className="text-gray-700">{message}</p>
+        <p className="text-body">{message}</p>
       </div>
     </Modal>
   );

@@ -46,13 +46,16 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   // Save state to localStorage when it changes
   useEffect(() => {
     if (persistKey && typeof window !== 'undefined') {
-      localStorage.setItem(`collapsible-${persistKey}`, JSON.stringify(isExpanded));
+      localStorage.setItem(
+        `collapsible-${persistKey}`,
+        JSON.stringify(isExpanded)
+      );
     }
   }, [isExpanded, persistKey]);
 
   const handleToggle = () => {
     if (disabled) return;
-    
+
     const newState = !isExpanded;
     setIsExpanded(newState);
     onToggle?.(newState);
@@ -64,21 +67,23 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
       <button
         onClick={handleToggle}
         disabled={disabled}
-        className={`w-full flex items-center justify-between p-4 transition-colors hover:bg-opacity-80 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 ${
+        className={`hover:bg-opacity-80 focus:ring-opacity-50 flex w-full items-center justify-between p-4 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none ${
           disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
         } ${headerClassName}`}
         aria-expanded={isExpanded}
-        aria-controls={persistKey ? `collapsible-content-${persistKey}` : undefined}
+        aria-controls={
+          persistKey ? `collapsible-content-${persistKey}` : undefined
+        }
       >
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             {isExpanded ? (
-              <ChevronDown size={20} className="text-gray-600" />
+              <ChevronDown size={20} className="text-body" />
             ) : (
-              <ChevronRight size={20} className="text-gray-600" />
+              <ChevronRight size={20} className="text-body" />
             )}
             {icon && <span className="text-xl">{icon}</span>}
-            <h2 className="text-xl font-bold text-gray-800">{title}</h2>
+            <h2 className="text-heading text-xl font-bold">{title}</h2>
           </div>
           {badge && <div className="ml-2">{badge}</div>}
         </div>
@@ -88,14 +93,12 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
       <div
         id={persistKey ? `collapsible-content-${persistKey}` : undefined}
         className={`transition-all duration-300 ease-in-out ${
-          isExpanded 
-            ? 'max-h-none opacity-100' 
-            : 'max-h-0 opacity-0 overflow-hidden'
+          isExpanded
+            ? 'max-h-none opacity-100'
+            : 'max-h-0 overflow-hidden opacity-0'
         }`}
       >
-        <div className={`pt-4 ${contentClassName}`}>
-          {children}
-        </div>
+        <div className={`pt-4 ${contentClassName}`}>{children}</div>
       </div>
     </div>
   );

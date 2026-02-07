@@ -1,6 +1,6 @@
 /**
  * Switch Component
- * 
+ *
  * A toggle switch component built on Radix UI Switch primitive.
  * Supports labels, descriptions, sizes, and variants.
  */
@@ -11,8 +11,9 @@ import * as React from 'react';
 import * as SwitchPrimitives from '@radix-ui/react-switch';
 import { cn } from '@/utils/cn';
 
-export interface SwitchProps
-  extends React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root> {
+export interface SwitchProps extends React.ComponentPropsWithoutRef<
+  typeof SwitchPrimitives.Root
+> {
   /**
    * Label text for the switch.
    */
@@ -55,15 +56,15 @@ const sizeClasses = {
 
 const variantClasses = {
   default: {
-    unchecked: 'bg-gray-200',
+    unchecked: 'bg-divider-strong',
     checked: 'bg-emerald-600',
   },
   success: {
-    unchecked: 'bg-gray-200',
+    unchecked: 'bg-divider-strong',
     checked: 'bg-green-600',
   },
   danger: {
-    unchecked: 'bg-gray-200',
+    unchecked: 'bg-divider-strong',
     checked: 'bg-red-600',
   },
 };
@@ -94,7 +95,7 @@ const Switch = React.forwardRef<
         className={cn(
           sizeStyle.root,
           'peer inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+          'focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:outline-none',
           'disabled:cursor-not-allowed disabled:opacity-50',
           checked ? variantStyle.checked : variantStyle.unchecked,
           className
@@ -131,14 +132,14 @@ const Switch = React.forwardRef<
             <span
               className={cn(
                 sizeStyle.text,
-                'font-medium text-gray-900 transition-colors peer-hover:text-gray-700'
+                'text-heading peer-hover:text-body font-medium transition-colors'
               )}
             >
               {label}
             </span>
           )}
           {description && (
-            <span className="text-xs text-gray-600">{description}</span>
+            <span className="text-body text-xs">{description}</span>
           )}
         </div>
       </label>
@@ -149,4 +150,3 @@ const Switch = React.forwardRef<
 Switch.displayName = SwitchPrimitives.Root.displayName;
 
 export { Switch };
-

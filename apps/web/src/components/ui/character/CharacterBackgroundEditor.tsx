@@ -84,11 +84,11 @@ export default function CharacterBackgroundEditor({
 
   return (
     <div
-      className={`rounded-lg border border-gray-200 bg-white shadow-lg ${className}`}
+      className={`border-divider bg-surface-raised rounded-lg border shadow-lg ${className}`}
     >
-      <div className="border-b border-gray-200">
+      <div className="border-divider border-b">
         <div className="p-4">
-          <h2 className="mb-4 text-lg font-bold text-gray-800">
+          <h2 className="text-heading mb-4 text-lg font-bold">
             Character Background
           </h2>
 
@@ -101,7 +101,7 @@ export default function CharacterBackgroundEditor({
                 className={`flex items-center space-x-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                   activeTab === tab.id
                     ? `bg-${tab.color}-100 text-${tab.color}-700 border border-${tab.color}-300`
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+                    : 'text-muted hover:bg-surface-hover hover:text-heading'
                 }`}
               >
                 {tab.icon}
@@ -123,7 +123,7 @@ export default function CharacterBackgroundEditor({
               {activeTabConfig.label}
             </h3>
           </div>
-          <p className="mb-4 text-sm text-gray-600">
+          <p className="text-muted mb-4 text-sm">
             {activeTabConfig.description}
           </p>
         </div>
@@ -138,7 +138,7 @@ export default function CharacterBackgroundEditor({
 
         {/* Character Count & Tips */}
         <div className="mt-4 flex items-start justify-between">
-          <div className="text-xs text-gray-500">
+          <div className="text-muted text-xs">
             {background[activeTab] && (
               <span>
                 {background[activeTab].replace(/<[^>]*>/g, '').length}{' '}
@@ -147,9 +147,9 @@ export default function CharacterBackgroundEditor({
             )}
           </div>
 
-          <div className="max-w-sm text-xs text-gray-500">
+          <div className="text-muted max-w-sm text-xs">
             <details className="cursor-pointer">
-              <summary className="font-medium hover:text-gray-700">
+              <summary className="hover:text-body font-medium">
                 💡 Tips for {activeTabConfig.label}
               </summary>
               <div className="mt-2 space-y-1">

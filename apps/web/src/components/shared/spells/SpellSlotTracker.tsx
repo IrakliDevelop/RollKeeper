@@ -71,8 +71,8 @@ export function SpellSlotTracker({
               index < used
                 ? 'border-red-500 bg-red-500' // Used slot
                 : readonly
-                  ? 'border-gray-300 bg-white'
-                  : 'border-gray-400 bg-white hover:border-gray-600' // Available slot
+                  ? 'border-divider-strong bg-surface-raised'
+                  : 'border-divider-strong bg-surface-raised hover:border-faint' // Available slot
             } ${readonly ? '' : 'cursor-pointer'}`}
             title={`Spell slot ${index + 1} - ${index < used ? 'Used' : 'Available'}`}
           />
@@ -82,8 +82,8 @@ export function SpellSlotTracker({
   };
 
   const containerClasses = compact
-    ? `rounded-lg border-2 border-purple-200 bg-white p-3 space-y-3 shadow-sm ${className}`
-    : `rounded-lg border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-violet-50 p-4 space-y-4 shadow-sm ${className}`;
+    ? `rounded-lg border-2 border-accent-purple-border bg-surface-raised p-3 space-y-3 shadow-sm ${className}`
+    : `rounded-lg border-2 border-accent-purple-border bg-gradient-to-br from-[var(--gradient-purple-from)] to-[var(--gradient-purple-to)] p-4 space-y-4 shadow-sm ${className}`;
 
   // Filter spell levels to show
   const levelsToShow = ([1, 2, 3, 4, 5, 6, 7, 8, 9] as const)
@@ -100,7 +100,7 @@ export function SpellSlotTracker({
     <div className={containerClasses}>
       <div className="flex items-center justify-between">
         <h3
-          className={`flex items-center gap-2 font-semibold text-purple-800 ${compact ? 'text-base' : 'text-lg'}`}
+          className={`text-accent-purple-text flex items-center gap-2 font-semibold ${compact ? 'text-base' : 'text-lg'}`}
         >
           <Zap size={compact ? 16 : 20} />
           Spell Slots
@@ -113,7 +113,7 @@ export function SpellSlotTracker({
                 variant="ghost"
                 size="xs"
                 leftIcon={<RotateCcw className="h-3 w-3" />}
-                className="text-purple-600 hover:text-purple-800"
+                className="text-accent-purple-text-muted hover:text-accent-purple-text"
                 title="Reset all spell slots"
               >
                 Reset Slots
@@ -125,7 +125,7 @@ export function SpellSlotTracker({
                 variant="ghost"
                 size="xs"
                 leftIcon={<RotateCcw className="h-3 w-3" />}
-                className="text-purple-600 hover:text-purple-800"
+                className="text-accent-purple-text-muted hover:text-accent-purple-text"
                 title="Reset pact magic slots"
               >
                 Reset Pact
@@ -139,13 +139,18 @@ export function SpellSlotTracker({
       {hasSpellSlots && levelsToShow.length > 0 && (
         <div className={compact ? 'space-y-2' : 'space-y-3'}>
           {!compact && (
-            <h4 className="text-sm font-semibold text-purple-700">Spell Slots</h4>
+            <h4 className="text-accent-purple-text-muted text-sm font-semibold">
+              Spell Slots
+            </h4>
           )}
           {levelsToShow.map(level => {
             const slot = spellSlots[level];
             const remaining = slot.max - slot.used;
             return (
-              <div key={level} className="flex items-center justify-between rounded-lg border-2 border-purple-200 bg-white p-2">
+              <div
+                key={level}
+                className="border-accent-purple-border bg-surface-raised flex items-center justify-between rounded-lg border-2 p-2"
+              >
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" size="sm">
                     {compact ? `L${level}` : `Level ${level}`}
@@ -173,23 +178,28 @@ export function SpellSlotTracker({
       {/* Warlock Pact Magic */}
       {hasPactMagic && pactMagic && (
         <div
-          className={`space-y-3 border-t-2 border-purple-200 pt-3 ${compact ? 'space-y-2 pt-2' : ''}`}
+          className={`border-accent-purple-border space-y-3 border-t-2 pt-3 ${compact ? 'space-y-2 pt-2' : ''}`}
         >
           <h4
-            className={`font-semibold text-purple-700 ${compact ? 'text-xs' : 'text-sm'}`}
+            className={`text-accent-purple-text-muted font-semibold ${compact ? 'text-xs' : 'text-sm'}`}
           >
             Pact Magic
           </h4>
-          <div className="flex items-center justify-between rounded-lg border-2 border-purple-300 bg-white p-2">
+          <div className="border-accent-purple-border bg-surface-raised flex items-center justify-between rounded-lg border-2 p-2">
             <div className="flex items-center gap-2">
               <Badge variant="info" size="sm">
                 {compact ? `L${pactMagic.level}` : `Level ${pactMagic.level}`}
               </Badge>
               <Badge
-                variant={pactMagic.slots.max - pactMagic.slots.used > 0 ? 'success' : 'neutral'}
+                variant={
+                  pactMagic.slots.max - pactMagic.slots.used > 0
+                    ? 'success'
+                    : 'neutral'
+                }
                 size="sm"
               >
-                {pactMagic.slots.max - pactMagic.slots.used}/{pactMagic.slots.max}
+                {pactMagic.slots.max - pactMagic.slots.used}/
+                {pactMagic.slots.max}
               </Badge>
             </div>
             {renderSlotCheckboxes(
@@ -199,7 +209,7 @@ export function SpellSlotTracker({
             )}
           </div>
           {!compact && (
-            <p className="text-xs text-purple-600 italic">
+            <p className="text-accent-purple-text-muted text-xs italic">
               ⚡ Pact magic slots recharge on a short rest
             </p>
           )}
@@ -208,9 +218,10 @@ export function SpellSlotTracker({
 
       {/* Usage Guide */}
       {!readonly && !hideControls && !compact && (
-        <div className="border-t-2 border-purple-100 pt-2 text-xs text-gray-500">
+        <div className="border-accent-purple-border text-muted border-t-2 pt-2 text-xs">
           <p>
-            💡 Click empty slots to mark as used • Click used slots to mark as available
+            💡 Click empty slots to mark as used • Click used slots to mark as
+            available
           </p>
         </div>
       )}

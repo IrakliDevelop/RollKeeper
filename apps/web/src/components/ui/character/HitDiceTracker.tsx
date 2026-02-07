@@ -40,22 +40,22 @@ const getDieIcon = (dieType: string) => {
   }
 };
 
-// Get color scheme based on die type
+// Get color scheme based on die type - using semantic tokens
 const getDieColor = (dieType: string) => {
   const dieNumber = parseInt(dieType.replace('d', ''));
   switch (dieNumber) {
     case 4:
-      return 'text-orange-600 bg-orange-50 border-orange-200';
+      return 'text-accent-orange-text bg-accent-orange-bg border-accent-orange-border';
     case 6:
-      return 'text-purple-600 bg-purple-50 border-purple-200';
+      return 'text-accent-purple-text bg-accent-purple-bg border-accent-purple-border';
     case 8:
-      return 'text-blue-600 bg-blue-50 border-blue-200';
+      return 'text-accent-blue-text bg-accent-blue-bg border-accent-blue-border';
     case 10:
-      return 'text-green-600 bg-green-50 border-green-200';
+      return 'text-accent-green-text bg-accent-green-bg border-accent-green-border';
     case 12:
-      return 'text-red-600 bg-red-50 border-red-200';
+      return 'text-accent-red-text bg-accent-red-bg border-accent-red-border';
     default:
-      return 'text-gray-600 bg-gray-50 border-gray-200';
+      return 'text-muted bg-surface-inset border-divider';
   }
 };
 
@@ -77,23 +77,23 @@ const getDiceButtonColors = (dieType: string, isAvailable: boolean) => {
       case 12:
         return 'border-red-500 bg-red-500 text-white shadow-md hover:shadow-lg';
       default:
-        return 'border-gray-500 bg-gray-500 text-white shadow-md hover:shadow-lg';
+        return 'border-border-secondary bg-border-secondary text-inverse shadow-md hover:shadow-lg';
     }
   } else {
-    // Empty dice - just colored border
+    // Empty dice - just colored border with transparent background
     switch (dieNumber) {
       case 4:
-        return 'border-orange-500 bg-transparent text-orange-500 hover:bg-orange-50';
+        return 'border-orange-500 bg-transparent text-orange-500 hover:bg-accent-orange-bg';
       case 6:
-        return 'border-purple-500 bg-transparent text-purple-500 hover:bg-purple-50';
+        return 'border-purple-500 bg-transparent text-purple-500 hover:bg-accent-purple-bg';
       case 8:
-        return 'border-blue-500 bg-transparent text-blue-500 hover:bg-blue-50';
+        return 'border-blue-500 bg-transparent text-blue-500 hover:bg-accent-blue-bg';
       case 10:
-        return 'border-green-500 bg-transparent text-green-500 hover:bg-green-50';
+        return 'border-green-500 bg-transparent text-green-500 hover:bg-accent-green-bg';
       case 12:
-        return 'border-red-500 bg-transparent text-red-500 hover:bg-red-50';
+        return 'border-red-500 bg-transparent text-red-500 hover:bg-accent-red-bg';
       default:
-        return 'border-gray-500 bg-transparent text-gray-500 hover:bg-gray-50';
+        return 'border-border-secondary bg-transparent text-muted hover:bg-surface-hover';
     }
   }
 };
@@ -112,9 +112,9 @@ export default function HitDiceTracker({
 
   if (dieTypes.length === 0) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-4 text-lg font-semibold text-gray-900">Hit Dice</h3>
-        <p className="text-sm text-gray-500">
+      <div className="border-divider bg-surface-raised rounded-lg border p-6 shadow-sm">
+        <h3 className="text-heading mb-4 text-lg font-semibold">Hit Dice</h3>
+        <p className="text-muted text-sm">
           No hit dice available. Add class levels to gain hit dice.
         </p>
       </div>
@@ -122,20 +122,20 @@ export default function HitDiceTracker({
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-white to-gray-50 p-6 shadow-lg">
+    <div className="border-divider from-surface-raised to-surface-secondary rounded-xl border bg-gradient-to-br p-6 shadow-lg">
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="rounded-lg bg-gradient-to-br from-red-500 to-red-600 p-2 shadow-md">
             <Dice6 size={20} className="text-white" />
           </div>
-          <h3 className="text-xl font-bold text-gray-900">Hit Dice</h3>
+          <h3 className="text-heading text-xl font-bold">Hit Dice</h3>
         </div>
         <Button
           onClick={onResetAllHitDice}
           variant="secondary"
           size="sm"
           leftIcon={<Moon className="h-4 w-4" />}
-          className="bg-blue-100 text-blue-700 hover:bg-blue-200"
+          className="bg-accent-blue-bg-strong text-accent-blue-text-muted hover:bg-accent-blue-bg"
           title="Long Rest (restore all hit dice - D&D 2024 rules)"
         >
           Long Rest
@@ -155,7 +155,7 @@ export default function HitDiceTracker({
             >
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="bg-opacity-80 rounded-lg bg-white p-2 shadow-sm">
+                  <div className="bg-surface-raised rounded-lg p-2 shadow-sm">
                     {getDieIcon(dieType)}
                   </div>
                   <div>
@@ -233,7 +233,7 @@ export default function HitDiceTracker({
                     disabled={available === 0}
                     variant="outline"
                     size="xs"
-                    className="bg-opacity-90 hover:bg-opacity-100 bg-white"
+                    className="bg-surface-raised hover:bg-surface-hover"
                   >
                     Use 1
                   </Button>
@@ -244,7 +244,7 @@ export default function HitDiceTracker({
                       }
                       variant="outline"
                       size="xs"
-                      className="bg-opacity-90 hover:bg-opacity-100 bg-white"
+                      className="bg-surface-raised hover:bg-surface-hover"
                     >
                       Use {Math.min(available, 5)}
                     </Button>
@@ -258,7 +258,7 @@ export default function HitDiceTracker({
                         onClick={() => onRestoreHitDice(dieType, 1)}
                         variant="outline"
                         size="xs"
-                        className="bg-opacity-90 hover:bg-opacity-100 bg-white"
+                        className="bg-surface-raised hover:bg-surface-hover"
                       >
                         Restore 1
                       </Button>
@@ -267,7 +267,7 @@ export default function HitDiceTracker({
                         variant="outline"
                         size="xs"
                         leftIcon={<RefreshCw className="h-3 w-3" />}
-                        className="bg-opacity-90 hover:bg-opacity-100 bg-white"
+                        className="bg-surface-raised hover:bg-surface-hover"
                       >
                         All
                       </Button>
@@ -280,11 +280,11 @@ export default function HitDiceTracker({
         })}
       </div>
 
-      <div className="mt-6 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
+      <div className="border-accent-blue-border mt-6 rounded-xl border bg-gradient-to-r from-[var(--gradient-blue-from)] to-[var(--gradient-indigo-to)] p-4">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 rounded-lg bg-blue-100 p-2">
+          <div className="bg-accent-blue-bg-strong mt-0.5 rounded-lg p-2">
             <svg
-              className="h-4 w-4 text-blue-600"
+              className="text-accent-blue-text-muted h-4 w-4"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -298,10 +298,10 @@ export default function HitDiceTracker({
             </svg>
           </div>
           <div className="flex-1">
-            <h4 className="mb-2 font-medium text-blue-900">
+            <h4 className="text-accent-blue-text mb-2 font-medium">
               How to Use Hit Dice
             </h4>
-            <div className="space-y-1 text-sm text-blue-800">
+            <div className="text-accent-blue-text space-y-1 text-sm">
               <p>
                 <strong>Click any die:</strong> Use/restore all dice from that
                 position to the end

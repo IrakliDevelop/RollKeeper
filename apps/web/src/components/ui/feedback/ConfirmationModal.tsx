@@ -76,19 +76,19 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         }}
       >
         <div
-          className={`w-full max-w-md rounded-xl border-2 bg-white shadow-2xl ${styles.border} animate-in zoom-in-95 transform duration-200`}
+          className={`bg-surface-raised w-full max-w-md rounded-xl border-2 shadow-2xl ${styles.border} animate-in zoom-in-95 transform duration-200`}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-200 p-6">
+          <div className="border-divider flex items-center justify-between border-b p-6">
             <div className="flex items-center gap-3">
               <div className={`rounded-lg p-2 ${styles.iconBg}`}>
                 <AlertTriangle size={20} className={styles.icon} />
               </div>
-              <h3 className="text-lg font-bold text-gray-800">{title}</h3>
+              <h3 className="text-heading text-lg font-bold">{title}</h3>
             </div>
             <button
               onClick={onClose}
-              className="p-1 text-gray-400 transition-colors hover:text-gray-600"
+              className="text-faint hover:text-body p-1 transition-colors"
             >
               <X size={20} />
             </button>
@@ -96,14 +96,14 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
           {/* Content */}
           <div className="p-6">
-            <p className="leading-relaxed text-gray-700">{message}</p>
+            <p className="text-body leading-relaxed">{message}</p>
           </div>
 
           {/* Actions */}
           <div className="flex gap-3 p-6 pt-0">
             <button
               onClick={onClose}
-              className="flex-1 rounded-lg border border-gray-300 bg-gradient-to-r from-gray-100 to-gray-200 px-4 py-2 text-sm font-medium text-gray-800 shadow-sm transition-all duration-200 hover:from-gray-200 hover:to-gray-300 hover:shadow-md"
+              className="border-divider bg-surface-secondary text-heading hover:bg-surface-hover flex-1 rounded-lg border px-4 py-2 text-sm font-medium shadow-sm transition-all duration-200 hover:shadow-md"
             >
               {cancelText}
             </button>

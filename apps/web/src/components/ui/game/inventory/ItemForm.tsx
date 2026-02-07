@@ -1,10 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  MagicItemRarity,
-  MagicItemCategory,
-} from '@/types/character';
+import { MagicItemRarity, MagicItemCategory } from '@/types/character';
 import { X } from 'lucide-react';
 import { Modal } from '@/components/ui/feedback/Modal';
 import { Button } from '@/components/ui/forms/button';
@@ -122,15 +119,16 @@ export function ItemForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // If custom location is shown and has value, use it
     const finalData = {
       ...formData,
-      location: showCustomLocation && customLocation.trim() 
-        ? customLocation.trim() 
-        : formData.location,
+      location:
+        showCustomLocation && customLocation.trim()
+          ? customLocation.trim()
+          : formData.location,
     };
-    
+
     onSubmit(finalData);
   };
 
@@ -145,7 +143,7 @@ export function ItemForm({
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Section: Basic Information */}
         <div className="space-y-4">
-          <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+          <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
             Basic Information
           </h4>
 
@@ -159,7 +157,7 @@ export function ItemForm({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
+              <label className="text-body mb-2 block text-sm font-medium">
                 Category
               </label>
               <SelectField
@@ -194,13 +192,13 @@ export function ItemForm({
 
         {/* Section: Item Classification */}
         <div className="space-y-4">
-          <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+          <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
             Item Classification
           </h4>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
+              <label className="text-body mb-2 block text-sm font-medium">
                 Rarity
               </label>
               <SelectField
@@ -208,7 +206,8 @@ export function ItemForm({
                 onValueChange={value =>
                   setFormData({
                     ...formData,
-                    rarity: value === 'none' ? undefined : (value as MagicItemRarity),
+                    rarity:
+                      value === 'none' ? undefined : (value as MagicItemRarity),
                   })
                 }
               >
@@ -222,7 +221,7 @@ export function ItemForm({
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
+              <label className="text-body mb-2 block text-sm font-medium">
                 Type
               </label>
               <SelectField
@@ -230,7 +229,10 @@ export function ItemForm({
                 onValueChange={value =>
                   setFormData({
                     ...formData,
-                    type: value === 'none' ? undefined : (value as MagicItemCategory),
+                    type:
+                      value === 'none'
+                        ? undefined
+                        : (value as MagicItemCategory),
                   })
                 }
               >
@@ -247,13 +249,13 @@ export function ItemForm({
 
         {/* Section: Location */}
         <div className="space-y-4">
-          <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+          <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
             Location
           </h4>
 
           <div className="space-y-3">
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
+              <label className="text-body mb-2 block text-sm font-medium">
                 Where is this item stored?
               </label>
               <SelectField
@@ -302,7 +304,7 @@ export function ItemForm({
 
         {/* Section: Item Details */}
         <div className="space-y-4">
-          <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+          <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
             Item Details
           </h4>
 
@@ -315,7 +317,9 @@ export function ItemForm({
               onChange={e =>
                 setFormData({
                   ...formData,
-                  weight: e.target.value ? parseFloat(e.target.value) : undefined,
+                  weight: e.target.value
+                    ? parseFloat(e.target.value)
+                    : undefined,
                 })
               }
               placeholder="Per item"
@@ -350,7 +354,7 @@ export function ItemForm({
 
         {/* Section: Tags */}
         <div className="space-y-4">
-          <h4 className="text-sm font-bold text-gray-800 uppercase tracking-wide border-b-2 border-gray-200 pb-2">
+          <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
             Tags
           </h4>
 
@@ -360,14 +364,16 @@ export function ItemForm({
               onChange={e => setTagInput(e.target.value)}
               placeholder="Add tag..."
               className="flex-1"
-              onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
+              onKeyPress={e =>
+                e.key === 'Enter' && (e.preventDefault(), addTag())
+              }
             />
             <Button
               type="button"
               onClick={addTag}
               variant="primary"
               size="md"
-              className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+              className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
             >
               Add
             </Button>
@@ -386,7 +392,7 @@ export function ItemForm({
                   <button
                     type="button"
                     onClick={() => removeTag(index)}
-                    className="ml-1 text-purple-600 hover:text-purple-800"
+                    className="text-accent-purple-text-muted hover:text-accent-purple-text ml-1"
                   >
                     ×
                   </button>
@@ -397,7 +403,7 @@ export function ItemForm({
         </div>
 
         {/* Form Actions */}
-        <div className="flex justify-end gap-3 pt-4 border-t-2 border-gray-200">
+        <div className="border-divider flex justify-end gap-3 border-t-2 pt-4">
           <Button type="button" onClick={onClose} variant="outline" size="md">
             Cancel
           </Button>
@@ -406,7 +412,7 @@ export function ItemForm({
             variant="primary"
             size="md"
             disabled={!formData.name.trim()}
-            className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+            className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
           >
             {isEditing ? 'Update' : 'Add'} Item
           </Button>
@@ -415,4 +421,3 @@ export function ItemForm({
     </Modal>
   );
 }
-

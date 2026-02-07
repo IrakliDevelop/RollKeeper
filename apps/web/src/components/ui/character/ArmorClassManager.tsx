@@ -132,26 +132,30 @@ export default function ArmorClassManager({
   return (
     <TooltipProvider>
       <div className="mb-6">
-        <div className="rounded-xl border-2 border-red-200 bg-linear-to-r from-red-50 to-red-100 p-6">
+        <div className="border-accent-red-border rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-red-from)] to-[var(--gradient-red-to)] p-6">
           <div className="mb-6 text-center">
-            <h3 className="mb-3 flex items-center justify-center gap-2 text-xl font-bold text-red-800">
+            <h3 className="text-accent-red-text mb-3 flex items-center justify-center gap-2 text-xl font-bold">
               🛡️ ARMOR CLASS
             </h3>
-            <div className="mb-2 text-5xl font-bold text-red-900">
+            <div className="text-accent-red-text mb-2 text-5xl font-bold">
               {calculateCharacterArmorClass(character)}
             </div>
-            <div className="text-base font-medium text-red-700">Total AC</div>
+            <div className="text-accent-red-text-muted text-base font-medium">
+              Total AC
+            </div>
           </div>
 
           {/* AC Components - Row Layout with Better Alignment */}
           <div className="mb-6 space-y-4">
             {/* Base AC Row */}
-            <div className="rounded-lg border-2 border-red-300 bg-white p-4 shadow-sm">
+            <div className="border-accent-red-border-strong bg-surface-raised rounded-lg border-2 p-4 shadow-sm">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-[140px] items-center gap-1.5">
-                  <div className="text-lg font-bold text-red-800">Base AC</div>
+                  <div className="text-accent-red-text text-lg font-bold">
+                    Base AC
+                  </div>
                   <Tooltip content="From armor & dexterity modifier">
-                    <span className="cursor-help text-red-400 transition-colors hover:text-red-600">
+                    <span className="text-accent-red-text-muted hover:text-accent-red-text cursor-help transition-colors">
                       <Info size={16} />
                     </span>
                   </Tooltip>
@@ -162,7 +166,7 @@ export default function ArmorClassManager({
                   onChange={e => handleBaseACChange(e.target.value)}
                   onBlur={handleBaseACBlur}
                   onKeyDown={handleBaseACKeyDown}
-                  className="h-12 w-20 [appearance:textfield] border-2 border-red-300 bg-red-50 text-center text-2xl font-bold text-red-900 focus:border-red-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="border-accent-red-border-strong bg-accent-red-bg text-accent-red-text focus:border-accent-red-text-muted h-12 w-20 [appearance:textfield] border-2 text-center text-2xl font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   min="0"
                   max="30"
                 />
@@ -171,10 +175,10 @@ export default function ArmorClassManager({
 
             {/* Temporary AC Row */}
             <div
-              className={`rounded-lg border-2 bg-white p-4 shadow-sm transition-all duration-200 ${
+              className={`bg-surface-raised rounded-lg border-2 p-4 shadow-sm transition-all duration-200 ${
                 isTempACActive
-                  ? 'border-orange-500 bg-orange-50/50'
-                  : 'border-orange-300 hover:border-orange-400'
+                  ? 'bg-accent-orange-bg border-orange-500'
+                  : 'border-accent-orange-border hover:border-orange-400'
               }`}
             >
               <div className="flex items-center justify-between gap-3">
@@ -208,8 +212,8 @@ export default function ArmorClassManager({
                   disabled={!isTempACActive}
                   className={`h-12 w-20 [appearance:textfield] border-2 text-center text-2xl font-bold focus:border-orange-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                     isTempACActive
-                      ? 'border-orange-300 bg-orange-50 text-orange-900'
-                      : 'border-gray-200 bg-gray-50 text-gray-400'
+                      ? 'border-accent-orange-border bg-accent-orange-bg text-accent-orange-text'
+                      : 'border-divider bg-surface-secondary text-faint'
                   }`}
                   min="0"
                   max="20"
@@ -219,10 +223,10 @@ export default function ArmorClassManager({
 
             {/* Shield Row */}
             <div
-              className={`rounded-lg border-2 bg-white p-4 shadow-sm transition-all duration-200 ${
+              className={`bg-surface-raised rounded-lg border-2 p-4 shadow-sm transition-all duration-200 ${
                 character.isWearingShield
-                  ? 'border-blue-500 bg-blue-50/50'
-                  : 'border-blue-300 hover:border-blue-400'
+                  ? 'border-accent-blue-border-strong bg-accent-blue-bg'
+                  : 'border-accent-blue-border-strong hover:border-accent-blue-text-muted'
               }`}
             >
               <div className="flex items-center justify-between gap-3">
@@ -260,8 +264,8 @@ export default function ArmorClassManager({
                   disabled={!character.isWearingShield}
                   className={`h-12 w-20 [appearance:textfield] border-2 text-center text-2xl font-bold focus:border-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                     character.isWearingShield
-                      ? 'border-blue-300 bg-blue-50 text-blue-900'
-                      : 'border-gray-200 bg-gray-50 text-gray-400'
+                      ? 'border-accent-blue-border-strong bg-accent-blue-bg text-accent-blue-text'
+                      : 'border-divider bg-surface-secondary text-faint'
                   }`}
                   min="0"
                   max="5"
@@ -272,22 +276,22 @@ export default function ArmorClassManager({
 
           {/* AC Formula Display */}
           <div className="text-center">
-            <div className="inline-flex items-center gap-3 rounded-lg border-2 border-red-300 bg-white px-6 py-3 text-lg font-medium text-red-800 shadow-sm">
+            <div className="border-accent-red-border-strong bg-surface-raised text-accent-red-text inline-flex items-center gap-3 rounded-lg border-2 px-6 py-3 text-lg font-medium shadow-sm">
               <span className="text-xl font-bold">{character.armorClass}</span>
-              <span className="text-lg text-red-600">+</span>
+              <span className="text-accent-red-text-muted text-lg">+</span>
               <span className="text-xl font-bold">
                 {character.tempArmorClass}
               </span>
               {character.isWearingShield && (
                 <>
-                  <span className="text-lg text-red-600">+</span>
+                  <span className="text-accent-red-text-muted text-lg">+</span>
                   <span className="text-xl font-bold">
                     {character.shieldBonus}
                   </span>
                 </>
               )}
-              <span className="text-lg text-red-600">=</span>
-              <span className="text-2xl font-bold text-red-900">
+              <span className="text-accent-red-text-muted text-lg">=</span>
+              <span className="text-accent-red-text text-2xl font-bold">
                 {calculateCharacterArmorClass(character)}
               </span>
             </div>

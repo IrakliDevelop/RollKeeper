@@ -35,11 +35,11 @@ export default function CombatStats({
           <div
             className={`flex h-20 flex-col justify-center rounded-lg border-2 p-3 transition-colors ${
               character.initiative.isOverridden
-                ? 'border-orange-300 bg-orange-50'
-                : 'border-yellow-200 bg-yellow-50'
+                ? 'border-accent-orange-border bg-accent-orange-bg'
+                : 'border-accent-amber-border bg-accent-amber-bg'
             }`}
           >
-            <div className="mb-1 flex items-center justify-center gap-1 text-xs font-medium text-yellow-700">
+            <div className="text-accent-amber-text-muted mb-1 flex items-center justify-center gap-1 text-xs font-medium">
               INITIATIVE
               {character.initiative.isOverridden && (
                 <Button
@@ -56,7 +56,7 @@ export default function CombatStats({
                 onClick={onRollInitiative}
                 variant="ghost"
                 size="xs"
-                className="ml-1 h-4 w-4 p-0 text-yellow-600 hover:text-yellow-800"
+                className="text-accent-amber-text-muted hover:text-accent-amber-text ml-1 h-4 w-4 p-0"
                 title={`Roll initiative (d20 + ${formatModifier(getInitiativeModifier())})`}
               >
                 🎲
@@ -68,10 +68,10 @@ export default function CombatStats({
               onChange={e =>
                 onUpdateInitiative(parseInt(e.target.value) || 0, true)
               }
-              className={`border-none bg-transparent text-center text-xl font-bold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+              className={`[appearance:textfield] border-none bg-transparent text-center text-xl font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                 character.initiative.isOverridden
-                  ? 'text-orange-800'
-                  : 'text-yellow-800'
+                  ? 'text-accent-orange-text'
+                  : 'text-accent-amber-text'
               }`}
               title={
                 character.initiative.isOverridden
@@ -84,13 +84,15 @@ export default function CombatStats({
 
         {/* Speed */}
         <div className="text-center">
-          <div className="flex h-20 flex-col justify-center rounded-lg border-2 border-green-200 bg-green-50 p-3">
-            <div className="mb-1 text-xs font-medium text-green-700">SPEED</div>
+          <div className="border-accent-green-border bg-accent-green-bg flex h-20 flex-col justify-center rounded-lg border-2 p-3">
+            <div className="text-accent-green-text mb-1 text-xs font-medium">
+              SPEED
+            </div>
             <Input
               type="number"
               value={character.speed.toString()}
               onChange={e => onUpdateSpeed(parseInt(e.target.value) || 30)}
-              className="border-none bg-transparent text-center text-xl font-bold text-green-800 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-xl font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
           </div>
         </div>
@@ -98,11 +100,13 @@ export default function CombatStats({
 
       {/* Reaction Tracking */}
       <div className="mb-6">
-        <div className="rounded-lg border-2 border-purple-200 bg-purple-50 p-4">
+        <div className="border-accent-purple-border bg-accent-purple-bg rounded-lg border-2 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="text-sm font-bold text-purple-800">REACTION</div>
-              <div className="text-xs text-purple-600">
+              <div className="text-accent-purple-text text-sm font-bold">
+                REACTION
+              </div>
+              <div className="text-accent-purple-text-muted text-xs">
                 {character.reaction.hasUsedReaction
                   ? 'Used this turn'
                   : 'Available'}
@@ -126,7 +130,7 @@ export default function CombatStats({
                 onClick={onResetReaction}
                 variant="ghost"
                 size="xs"
-                className="p-1 text-purple-600 hover:bg-purple-100"
+                className="text-accent-purple-text-muted hover:bg-accent-purple-bg-strong p-1"
                 title="Reset reaction to available"
               >
                 <RotateCcw size={14} />
@@ -134,7 +138,7 @@ export default function CombatStats({
             </div>
           </div>
 
-          <div className="mt-2 rounded bg-purple-100 p-2 text-xs text-purple-700">
+          <div className="bg-accent-purple-bg-strong text-accent-purple-text-muted mt-2 rounded p-2 text-xs">
             <strong>Reaction:</strong> One reaction per turn - used for
             opportunity attacks, spells like Shield, or other triggered
             abilities.

@@ -76,7 +76,7 @@ const Tabs = forwardRef<TabsRef, TabsProps>(
     return (
       <div id="character-tabs" className={`w-full ${className}`}>
         {/* Tab Navigation */}
-        <div className="rounded-t-lg border-b border-gray-200 bg-white shadow-sm">
+        <div className="border-divider bg-surface-raised rounded-t-lg border-b shadow-sm">
           <nav className="scrollbar-hide flex space-x-0 overflow-x-auto">
             {tabs.map(tab => (
               <button
@@ -85,10 +85,10 @@ const Tabs = forwardRef<TabsRef, TabsProps>(
                 disabled={tab.disabled}
                 className={`relative min-w-0 flex-1 border-b-2 px-6 py-4 text-center text-sm font-medium whitespace-nowrap transition-all duration-200 ease-in-out ${
                   activeTab === tab.id
-                    ? 'border-blue-500 bg-blue-50 text-blue-600'
+                    ? 'bg-accent-blue-bg text-accent-blue-text-muted border-blue-500'
                     : tab.disabled
-                      ? 'cursor-not-allowed border-transparent text-gray-400'
-                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700'
+                      ? 'text-muted cursor-not-allowed border-transparent'
+                      : 'text-muted hover:border-divider-strong hover:bg-surface-hover hover:text-body border-transparent'
                 } ${!tab.disabled && 'focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none'} `}
               >
                 <div className="flex items-center justify-center gap-2">
@@ -110,13 +110,13 @@ const Tabs = forwardRef<TabsRef, TabsProps>(
         </div>
 
         {/* Tab Content */}
-        <div className="rounded-b-lg border border-t-0 border-gray-200 bg-white shadow-lg">
+        <div className="border-divider bg-surface-raised rounded-b-lg border border-t-0 shadow-lg">
           <div className="max-h-[80vh] min-h-[400px] overflow-y-auto">
             <div className="p-6">
               {/* Show loading state until mounted, then show content */}
               {!isMounted ? (
                 <div className="flex items-center justify-center py-12">
-                  <div className="text-gray-500">Loading...</div>
+                  <div className="text-muted">Loading...</div>
                 </div>
               ) : (
                 activeTabContent

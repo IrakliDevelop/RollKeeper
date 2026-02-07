@@ -3,16 +3,27 @@
 import React, { useState } from 'react';
 import { Plus, X, Languages as LanguagesIcon, Wrench } from 'lucide-react';
 import { Button, Input } from '@/components/ui/forms';
-import { Language, ToolProficiency, ToolProficiencyLevel } from '@/types/character';
+import {
+  Language,
+  ToolProficiency,
+  ToolProficiencyLevel,
+} from '@/types/character';
 
 interface LanguagesAndProficienciesProps {
   languages: Language[];
   toolProficiencies: ToolProficiency[];
   proficiencyBonus: number;
-  onAddLanguage: (language: Omit<Language, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onAddLanguage: (
+    language: Omit<Language, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
   onDeleteLanguage: (id: string) => void;
-  onAddToolProficiency: (tool: Omit<ToolProficiency, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  onUpdateToolProficiency: (id: string, updates: Partial<ToolProficiency>) => void;
+  onAddToolProficiency: (
+    tool: Omit<ToolProficiency, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
+  onUpdateToolProficiency: (
+    id: string,
+    updates: Partial<ToolProficiency>
+  ) => void;
   onDeleteToolProficiency: (id: string) => void;
 }
 
@@ -64,18 +75,23 @@ export default function LanguagesAndProficiencies({
   };
 
   const getProficiencyColor = (level: ToolProficiencyLevel): string => {
-    if (level === 'expertise') return 'bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-600 shadow-md';
-    if (level === 'proficient') return 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-blue-600 shadow-md';
-    return 'bg-gray-200 text-gray-600 border-gray-400';
+    if (level === 'expertise')
+      return 'bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-600 shadow-md dark:from-purple-600 dark:to-pink-600 dark:border-purple-500';
+    if (level === 'proficient')
+      return 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-blue-600 shadow-md dark:from-blue-600 dark:to-indigo-600 dark:border-blue-500';
+    return 'bg-bg-tertiary text-muted border-border-secondary';
   };
 
   return (
-    <div className="space-y-4 rounded-lg border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-md mt-4">
+    <div className="border-accent-indigo-border from-accent-indigo-bg to-accent-purple-bg mt-4 space-y-4 rounded-lg border bg-gradient-to-br p-4 shadow-md">
       {/* Languages Section */}
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-lg font-semibold text-indigo-900">
-            <LanguagesIcon size={18} className="text-indigo-600" />
+          <h3 className="text-accent-indigo-text flex items-center gap-2 text-lg font-semibold">
+            <LanguagesIcon
+              size={18}
+              className="text-accent-indigo-text-muted"
+            />
             Languages
           </h3>
           {!isAddingLanguage && (
@@ -84,7 +100,7 @@ export default function LanguagesAndProficiencies({
               variant="primary"
               size="xs"
               leftIcon={<Plus size={16} />}
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="bg-accent-indigo-text-muted hover:bg-accent-indigo-text"
               title="Add language"
             />
           )}
@@ -95,8 +111,8 @@ export default function LanguagesAndProficiencies({
             <Input
               type="text"
               value={newLanguageName}
-              onChange={(e) => setNewLanguageName(e.target.value)}
-              onKeyDown={(e) => {
+              onChange={e => setNewLanguageName(e.target.value)}
+              onKeyDown={e => {
                 if (e.key === 'Enter') handleAddLanguage();
                 if (e.key === 'Escape') {
                   setIsAddingLanguage(false);
@@ -111,7 +127,7 @@ export default function LanguagesAndProficiencies({
               onClick={handleAddLanguage}
               variant="primary"
               size="sm"
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="bg-accent-indigo-text-muted hover:bg-accent-indigo-text"
             >
               Add
             </Button>
@@ -122,7 +138,7 @@ export default function LanguagesAndProficiencies({
               }}
               variant="ghost"
               size="sm"
-              className="bg-gray-300 hover:bg-gray-400"
+              className="bg-bg-tertiary hover:bg-bg-tertiary/80 text-body"
             >
               Cancel
             </Button>
@@ -131,19 +147,21 @@ export default function LanguagesAndProficiencies({
 
         <div className="flex flex-wrap gap-2">
           {languages.length === 0 && !isAddingLanguage && (
-            <p className="text-sm italic text-indigo-400">No languages added yet</p>
+            <p className="text-accent-indigo-text-muted text-sm italic">
+              No languages added yet
+            </p>
           )}
-          {languages.map((lang) => (
+          {languages.map(lang => (
             <div
               key={lang.id}
-              className="group flex items-center gap-2 rounded-full border-2 border-indigo-300 bg-gradient-to-r from-indigo-100 to-purple-100 px-4 py-1.5 text-sm font-medium text-indigo-900 shadow-sm transition-all hover:shadow-md"
+              className="group border-accent-indigo-border-strong from-accent-indigo-bg-strong to-accent-purple-bg-strong text-accent-indigo-text flex items-center gap-2 rounded-full border-2 bg-gradient-to-r px-4 py-1.5 text-sm font-medium shadow-sm transition-all hover:shadow-md"
             >
               <span>{lang.name}</span>
               <Button
                 onClick={() => onDeleteLanguage(lang.id)}
                 variant="ghost"
                 size="xs"
-                className="h-5 w-5 rounded-full p-0.5 opacity-0 hover:bg-red-100 group-hover:opacity-100"
+                className="hover:bg-accent-red-bg h-5 w-5 rounded-full p-0.5 opacity-0 group-hover:opacity-100"
                 title="Remove language"
               >
                 <X size={14} className="text-red-600" />
@@ -154,10 +172,10 @@ export default function LanguagesAndProficiencies({
       </div>
 
       {/* Tool Proficiencies Section */}
-      <div className="border-t-2 border-indigo-200 pt-4">
+      <div className="border-accent-indigo-border border-t-2 pt-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-lg font-semibold text-indigo-900">
-            <Wrench size={18} className="text-indigo-600" />
+          <h3 className="text-accent-indigo-text flex items-center gap-2 text-lg font-semibold">
+            <Wrench size={18} className="text-accent-indigo-text-muted" />
             Tool Proficiencies
           </h3>
           {!isAddingTool && (
@@ -166,7 +184,7 @@ export default function LanguagesAndProficiencies({
               variant="primary"
               size="xs"
               leftIcon={<Plus size={16} />}
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="bg-accent-indigo-text-muted hover:bg-accent-indigo-text"
               title="Add tool proficiency"
             />
           )}
@@ -177,8 +195,8 @@ export default function LanguagesAndProficiencies({
             <Input
               type="text"
               value={newToolName}
-              onChange={(e) => setNewToolName(e.target.value)}
-              onKeyDown={(e) => {
+              onChange={e => setNewToolName(e.target.value)}
+              onKeyDown={e => {
                 if (e.key === 'Enter') handleAddTool();
                 if (e.key === 'Escape') {
                   setIsAddingTool(false);
@@ -193,7 +211,7 @@ export default function LanguagesAndProficiencies({
               onClick={handleAddTool}
               variant="primary"
               size="sm"
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="bg-accent-indigo-text-muted hover:bg-accent-indigo-text"
             >
               Add
             </Button>
@@ -204,7 +222,7 @@ export default function LanguagesAndProficiencies({
               }}
               variant="ghost"
               size="sm"
-              className="bg-gray-300 hover:bg-gray-400"
+              className="bg-bg-tertiary hover:bg-bg-tertiary/80 text-body"
             >
               Cancel
             </Button>
@@ -213,15 +231,19 @@ export default function LanguagesAndProficiencies({
 
         <div className="space-y-2">
           {toolProficiencies.length === 0 && !isAddingTool && (
-            <p className="text-sm italic text-indigo-400">No tool proficiencies added yet</p>
+            <p className="text-accent-indigo-text-muted text-sm italic">
+              No tool proficiencies added yet
+            </p>
           )}
-          {toolProficiencies.map((tool) => (
+          {toolProficiencies.map(tool => (
             <div
               key={tool.id}
-              className="group flex items-center justify-between rounded-lg border-2 border-indigo-200 bg-white p-3 shadow-sm transition-all hover:shadow-md"
+              className="group border-accent-indigo-border bg-surface-raised flex items-center justify-between rounded-lg border-2 p-3 shadow-sm transition-all hover:shadow-md"
             >
               <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-gray-800">{tool.name}</span>
+                <span className="text-heading text-sm font-semibold">
+                  {tool.name}
+                </span>
                 <Button
                   onClick={() => cycleProficiencyLevel(tool)}
                   variant="ghost"
@@ -233,7 +255,9 @@ export default function LanguagesAndProficiencies({
                   {tool.proficiencyLevel === 'proficient' && '✓ Proficient'}
                   {tool.proficiencyLevel === 'none' && '○ None'}
                   {tool.proficiencyLevel !== 'none' && (
-                    <span className="ml-1.5 font-mono">{getProficiencyModifier(tool.proficiencyLevel)}</span>
+                    <span className="ml-1.5 font-mono">
+                      {getProficiencyModifier(tool.proficiencyLevel)}
+                    </span>
                   )}
                 </Button>
               </div>
@@ -241,7 +265,7 @@ export default function LanguagesAndProficiencies({
                 onClick={() => onDeleteToolProficiency(tool.id)}
                 variant="ghost"
                 size="xs"
-                className="rounded-full p-1.5 opacity-0 hover:bg-red-100 group-hover:opacity-100"
+                className="hover:bg-accent-red-bg rounded-full p-1.5 opacity-0 group-hover:opacity-100"
                 title="Remove tool"
               >
                 <X size={16} className="text-red-600" />
@@ -251,13 +275,16 @@ export default function LanguagesAndProficiencies({
         </div>
 
         {toolProficiencies.length > 0 && (
-          <div className="mt-3 rounded-lg border-2 border-indigo-300 bg-indigo-100 p-3 text-xs text-indigo-800 shadow-sm">
-            <p className="font-semibold">💡 Tip: Click on the proficiency badge to cycle levels</p>
-            <p className="mt-1">✓ Proficient → ⭐ Expert → ○ None → ✓ Proficient...</p>
+          <div className="border-accent-indigo-border-strong bg-accent-indigo-bg-strong text-accent-indigo-text mt-3 rounded-lg border-2 p-3 text-xs shadow-sm">
+            <p className="font-semibold">
+              💡 Tip: Click on the proficiency badge to cycle levels
+            </p>
+            <p className="mt-1">
+              ✓ Proficient → ⭐ Expert → ○ None → ✓ Proficient...
+            </p>
           </div>
         )}
       </div>
     </div>
   );
 }
-

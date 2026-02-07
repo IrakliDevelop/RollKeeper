@@ -72,14 +72,14 @@ export function XPTracker({
   };
 
   const containerClasses = compact
-    ? `bg-white rounded-lg border border-gray-200 p-3 space-y-3 ${className}`
-    : `bg-white rounded-lg border border-gray-200 p-4 space-y-4 ${className}`;
+    ? `bg-surface-raised rounded-lg border border-divider p-3 space-y-3 ${className}`
+    : `bg-surface-raised rounded-lg border border-divider p-4 space-y-4 ${className}`;
 
   return (
     <div className={containerClasses}>
       <div className="flex items-center justify-between">
         <h3
-          className={`flex items-center gap-2 font-semibold text-indigo-800 ${compact ? 'text-base' : 'text-lg'}`}
+          className={`text-accent-indigo-text flex items-center gap-2 font-semibold ${compact ? 'text-base' : 'text-lg'}`}
         >
           <TrendingUp size={compact ? 16 : 20} />
           {compact ? 'XP' : 'Experience Points'}
@@ -102,21 +102,21 @@ export function XPTracker({
       >
         <div className="text-center">
           <div
-            className={`font-bold text-indigo-800 ${compact ? 'text-lg' : 'text-2xl'}`}
+            className={`text-accent-indigo-text font-bold ${compact ? 'text-lg' : 'text-2xl'}`}
           >
             {currentXP.toLocaleString()}
           </div>
-          <div className={`text-gray-600 ${compact ? 'text-xs' : 'text-xs'}`}>
+          <div className={`text-muted ${compact ? 'text-xs' : 'text-xs'}`}>
             {compact ? 'XP' : 'Current XP'}
           </div>
         </div>
         <div className="text-center">
           <div
-            className={`font-bold text-purple-800 ${compact ? 'text-lg' : 'text-2xl'}`}
+            className={`text-accent-purple-text font-bold ${compact ? 'text-lg' : 'text-2xl'}`}
           >
             Level {currentLevel}
           </div>
-          <div className={`text-gray-600 ${compact ? 'text-xs' : 'text-xs'}`}>
+          <div className={`text-muted ${compact ? 'text-xs' : 'text-xs'}`}>
             {compact ? 'Level' : 'Current Level'}
           </div>
         </div>
@@ -126,29 +126,29 @@ export function XPTracker({
       {!isMaxLevel && !hideProgressBar && (
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">To Next Level:</span>
-            <span className="font-semibold text-gray-800">
+            <span className="text-muted">To Next Level:</span>
+            <span className="text-heading font-semibold">
               {xpToNext.toLocaleString()} XP
             </span>
           </div>
           <div
-            className={`w-full rounded-full bg-gray-200 ${compact ? 'h-2' : 'h-3'}`}
+            className={`bg-bg-tertiary w-full rounded-full ${compact ? 'h-2' : 'h-3'}`}
           >
             <div
               className={`rounded-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500 ease-out ${compact ? 'h-2' : 'h-3'}`}
               style={{ width: `${progress}%` }}
             />
           </div>
-          <div className="text-center text-xs text-gray-500">
+          <div className="text-muted text-center text-xs">
             {progress.toFixed(1)}% to Level {currentLevel + 1}
           </div>
         </div>
       )}
 
       {isMaxLevel && (
-        <div className="rounded-md border border-yellow-300 bg-yellow-50 p-3 text-center">
+        <div className="border-accent-amber-border bg-accent-amber-bg rounded-md border p-3 text-center">
           <div
-            className={`font-medium text-yellow-800 ${compact ? 'text-xs' : 'text-sm'}`}
+            className={`text-accent-amber-text font-medium ${compact ? 'text-xs' : 'text-sm'}`}
           >
             🎉 Maximum Level Reached! 🎉
           </div>
@@ -158,20 +158,24 @@ export function XPTracker({
       {/* XP Management Form */}
       {!readonly && !hideControls && (onAddXP || onSetXP) && (
         <div
-          className={`space-y-3 border-t border-gray-100 pt-3 ${compact ? 'space-y-2 pt-2' : ''}`}
+          className={`border-divider space-y-3 border-t pt-3 ${compact ? 'space-y-2 pt-2' : ''}`}
         >
           {onAddXP && onSetXP && !compact && (
             <div className="flex items-center justify-center gap-3">
-              <span className={`text-sm font-medium ${mode === 'add' ? 'text-indigo-600' : 'text-gray-600'}`}>
+              <span
+                className={`text-sm font-medium ${mode === 'add' ? 'text-accent-indigo-text-muted' : 'text-muted'}`}
+              >
                 ➕ Add XP
               </span>
               <Switch
                 checked={mode === 'set'}
-                onCheckedChange={(checked) => setMode(checked ? 'set' : 'add')}
+                onCheckedChange={checked => setMode(checked ? 'set' : 'add')}
                 size="sm"
                 variant="default"
               />
-              <span className={`text-sm font-medium ${mode === 'set' ? 'text-indigo-600' : 'text-gray-600'}`}>
+              <span
+                className={`text-sm font-medium ${mode === 'set' ? 'text-accent-indigo-text-muted' : 'text-muted'}`}
+              >
                 ✏️ Set XP
               </span>
             </div>
@@ -191,14 +195,14 @@ export function XPTracker({
               disabled={!inputValue || isNaN(parseInt(inputValue))}
               variant="primary"
               size={compact ? 'sm' : 'md'}
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="bg-accent-indigo-text-muted hover:bg-accent-indigo-text"
             >
               {mode === 'add' ? 'Add' : 'Set'}
             </Button>
           </form>
 
           {!compact && (
-            <div className="text-xs text-gray-500">
+            <div className="text-muted text-xs">
               {mode === 'add'
                 ? '• Add XP from encounters, quests, or other sources'
                 : '• Set total XP directly (useful for importing characters)'}
@@ -209,7 +213,7 @@ export function XPTracker({
 
       {/* Level Thresholds Reference */}
       {!isMaxLevel && !hideThresholds && !compact && (
-        <div className="border-t border-gray-100 pt-2 text-xs text-gray-500">
+        <div className="border-divider text-muted border-t pt-2 text-xs">
           <div className="grid grid-cols-2 gap-2">
             <div>
               Level {currentLevel}:{' '}

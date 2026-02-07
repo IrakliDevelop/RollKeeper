@@ -21,28 +21,30 @@ export const SaveIndicator = ({
           icon: <Loader2 size={12} className="animate-spin" />,
           text: 'Saving...',
           dotColor: 'bg-yellow-500',
-          textColor: 'text-yellow-700',
+          textColor: 'text-yellow-700 dark:text-yellow-400',
         };
       case 'saved':
         return {
           icon: <Check size={12} />,
           text: hasUnsavedChanges ? 'Changes pending' : 'All changes saved',
           dotColor: hasUnsavedChanges ? 'bg-yellow-500' : 'bg-green-500',
-          textColor: hasUnsavedChanges ? 'text-yellow-700' : 'text-green-700',
+          textColor: hasUnsavedChanges
+            ? 'text-yellow-700 dark:text-yellow-400'
+            : 'text-green-700 dark:text-green-400',
         };
       case 'error':
         return {
           icon: <AlertCircle size={12} />,
           text: 'Save failed',
           dotColor: 'bg-red-500',
-          textColor: 'text-red-700',
+          textColor: 'text-red-700 dark:text-red-400',
         };
       default:
         return {
           icon: <Save size={12} />,
           text: 'Not saved',
-          dotColor: 'bg-gray-400',
-          textColor: 'text-gray-600',
+          dotColor: 'bg-faint',
+          textColor: 'text-body',
         };
     }
   };
@@ -79,7 +81,7 @@ export const SaveIndicator = ({
         <span className={config.textColor}>{config.text}</span>
       </div>
       {lastSaved && status === 'saved' && !hasUnsavedChanges && (
-        <span className="text-xs text-gray-500">
+        <span className="text-muted text-xs">
           • {formatLastSaved(lastSaved)}
         </span>
       )}

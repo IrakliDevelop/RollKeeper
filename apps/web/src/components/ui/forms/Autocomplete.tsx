@@ -1,6 +1,6 @@
 /**
  * Autocomplete Component
- * 
+ *
  * A searchable dropdown component for selecting from a list of options.
  */
 
@@ -41,10 +41,11 @@ export function Autocomplete({
   // Filter options based on search term
   const filteredOptions = React.useMemo(() => {
     if (!searchTerm) return options;
-    
-    return options.filter(option =>
-      option.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      option.value.toLowerCase().includes(searchTerm.toLowerCase())
+
+    return options.filter(
+      option =>
+        option.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        option.value.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [options, searchTerm]);
 
@@ -57,7 +58,10 @@ export function Autocomplete({
   // Close dropdown when clicking outside
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
         setSearchTerm('');
       }
@@ -101,7 +105,7 @@ export function Autocomplete({
         />
         <button
           type="button"
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+          className="text-muted hover:text-heading absolute top-1/2 right-3 -translate-y-1/2 disabled:opacity-50"
           onClick={() => {
             setIsOpen(!isOpen);
             if (!isOpen) {
@@ -110,14 +114,17 @@ export function Autocomplete({
           }}
           disabled={disabled}
         >
-          <ChevronDown size={16} className={cn('transition-transform', isOpen && 'rotate-180')} />
+          <ChevronDown
+            size={16}
+            className={cn('transition-transform', isOpen && 'rotate-180')}
+          />
         </button>
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border-2 border-gray-300 bg-white shadow-lg">
+        <div className="border-divider-strong bg-surface-raised absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border-2 shadow-lg">
           {filteredOptions.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-gray-600">No results found</div>
+            <div className="text-body px-3 py-2 text-sm">No results found</div>
           ) : (
             <ul className="py-1">
               {filteredOptions.map(option => (
@@ -125,9 +132,10 @@ export function Autocomplete({
                   <button
                     type="button"
                     className={cn(
-                      'flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100',
-                      'text-slate-800 font-medium',
-                      option.value === value && 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100'
+                      'hover:bg-surface-hover flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors',
+                      'text-heading font-medium',
+                      option.value === value &&
+                        'bg-accent-emerald-bg text-accent-emerald-text hover:bg-accent-emerald-bg-strong'
                     )}
                     onClick={() => handleSelect(option.value)}
                   >
@@ -145,4 +153,3 @@ export function Autocomplete({
     </div>
   );
 }
-
