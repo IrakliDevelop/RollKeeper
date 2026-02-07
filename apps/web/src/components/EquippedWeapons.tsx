@@ -58,7 +58,6 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
     reorderWeapons,
     expendWeaponCharge,
     restoreWeaponCharge,
-    setWeaponChargeUsed,
   } = useCharacterStore();
   const { switchToTab } = useNavigation();
 

@@ -48,7 +48,7 @@ export default function CharacterSheetHeader({
   saveStatus,
   lastSaved,
   hasUnsavedChanges,
-  onManualSave,
+  // onManualSave - currently unused, kept in interface for future use
   onExport,
   onShowResetModal,
   onUpdateName,
