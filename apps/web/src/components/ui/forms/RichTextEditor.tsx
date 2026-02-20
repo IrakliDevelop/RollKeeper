@@ -6,6 +6,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
 import Underline from '@tiptap/extension-underline';
+import { TableKit } from '@tiptap/extension-table';
 import {
   Bold,
   Italic,
@@ -22,6 +23,12 @@ import {
   Redo,
   Type,
   Minus,
+  Table,
+  TableCellsMerge,
+  TableCellsSplit,
+  Columns2,
+  Rows2,
+  Trash2,
 } from 'lucide-react';
 
 interface RichTextEditorProps {
@@ -46,7 +53,17 @@ export default function RichTextEditor({
   }, []);
 
   const editor = useEditor({
-    extensions: [StarterKit, TextStyle, Color, Underline],
+    extensions: [
+      StarterKit,
+      TextStyle,
+      Color,
+      Underline,
+      TableKit.configure({
+        table: {
+          resizable: true,
+        },
+      }),
+    ],
     content,
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
@@ -263,6 +280,76 @@ export default function RichTextEditor({
 
         <div className="bg-divider mx-2 h-6 w-px" />
 
+        {/* Table */}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() =>
+              editor
+                .chain()
+                .focus()
+                .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+                .run()
+            }
+            className="text-body hover:bg-surface-hover rounded p-2 transition-colors"
+            title="Insert Table"
+          >
+            <Table size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().addColumnAfter().run()}
+            disabled={!editor.can().addColumnAfter()}
+            className="text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            title="Add Column"
+          >
+            <Columns2 size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().addRowAfter().run()}
+            disabled={!editor.can().addRowAfter()}
+            className="text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            title="Add Row"
+          >
+            <Rows2 size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().mergeCells().run()}
+            disabled={!editor.can().mergeCells()}
+            className="text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            title="Merge Cells"
+          >
+            <TableCellsMerge size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().splitCell().run()}
+            disabled={!editor.can().splitCell()}
+            className="text-body hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            title="Split Cell"
+          >
+            <TableCellsSplit size={16} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().deleteTable().run()}
+            disabled={!editor.can().deleteTable()}
+            className="text-body hover:text-accent-red-text hover:bg-surface-hover rounded p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            title="Delete Table"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+
+        <div className="bg-divider mx-2 h-6 w-px" />
+
         {/* Utility */}
         <div className="flex items-center gap-1">
           <button
@@ -471,6 +558,65 @@ export default function RichTextEditor({
           margin: 2rem 0 !important;
           display: block !important;
           width: 100% !important;
+        }
+
+        /* Tables */
+        .rich-text-editor-content .ProseMirror table {
+          border-collapse: collapse !important;
+          table-layout: fixed !important;
+          width: 100% !important;
+          margin: 1rem 0 !important;
+          overflow: hidden !important;
+          border: 1px solid var(--divider) !important;
+          border-radius: 0.5rem !important;
+        }
+
+        .rich-text-editor-content .ProseMirror td,
+        .rich-text-editor-content .ProseMirror th {
+          min-width: 1em !important;
+          border: 1px solid var(--divider) !important;
+          padding: 0.5rem 0.75rem !important;
+          vertical-align: top !important;
+          box-sizing: border-box !important;
+          position: relative !important;
+        }
+
+        .rich-text-editor-content .ProseMirror th {
+          font-weight: 600 !important;
+          text-align: left !important;
+          background-color: var(--surface-secondary) !important;
+          color: var(--heading) !important;
+        }
+
+        .rich-text-editor-content .ProseMirror td {
+          background-color: var(--surface-raised, white) !important;
+        }
+
+        .rich-text-editor-content .ProseMirror .selectedCell::after {
+          z-index: 2 !important;
+          position: absolute !important;
+          content: '' !important;
+          left: 0 !important;
+          right: 0 !important;
+          top: 0 !important;
+          bottom: 0 !important;
+          background: var(--accent-blue-bg-strong) !important;
+          opacity: 0.3 !important;
+          pointer-events: none !important;
+        }
+
+        .rich-text-editor-content .ProseMirror .column-resize-handle {
+          position: absolute !important;
+          right: -2px !important;
+          top: 0 !important;
+          bottom: -2px !important;
+          width: 4px !important;
+          background-color: var(--accent-blue-border-strong) !important;
+          pointer-events: none !important;
+        }
+
+        .rich-text-editor-content .ProseMirror.resize-cursor {
+          cursor: col-resize !important;
         }
 
         /* First and last child margin reset */
