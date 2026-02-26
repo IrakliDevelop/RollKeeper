@@ -177,6 +177,13 @@ function migrateCharacterData(character: unknown): CharacterState {
     ) {
       result.heroicInspiration = DEFAULT_CHARACTER_STATE.heroicInspiration;
     }
+    // Ensure bardic inspiration exists (initialize for existing characters)
+    if (
+      !result.bardicInspiration ||
+      typeof result.bardicInspiration !== 'object'
+    ) {
+      result.bardicInspiration = DEFAULT_CHARACTER_STATE.bardicInspiration;
+    }
     // Ensure temporary AC field exists
     if (typeof result.tempArmorClass !== 'number') {
       result.tempArmorClass = DEFAULT_CHARACTER_STATE.tempArmorClass;
@@ -367,6 +374,11 @@ interface CharacterStore {
   addHeroicInspiration: (amount?: number) => void;
   useHeroicInspiration: () => void;
   resetHeroicInspiration: () => void;
+
+  // Bardic inspiration management
+  useBardicInspiration: () => void;
+  restoreBardicInspiration: () => void;
+  resetBardicInspiration: () => void;
 
   // Armor Class management
   updateTempArmorClass: (tempAC: number) => void;
@@ -879,6 +891,55 @@ export const useCharacterStore = create<CharacterStore>()(
             heroicInspiration: {
               ...state.character.heroicInspiration,
               count: 0,
+            },
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      // Bardic inspiration management actions
+      useBardicInspiration: () => {
+        set(state => {
+          const current = state.character.bardicInspiration?.usesExpended ?? 0;
+          return {
+            character: {
+              ...state.character,
+              bardicInspiration: {
+                ...state.character.bardicInspiration,
+                usesExpended: current + 1,
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      restoreBardicInspiration: () => {
+        set(state => {
+          const current = state.character.bardicInspiration?.usesExpended ?? 0;
+          return {
+            character: {
+              ...state.character,
+              bardicInspiration: {
+                ...state.character.bardicInspiration,
+                usesExpended: Math.max(0, current - 1),
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      resetBardicInspiration: () => {
+        set(state => ({
+          character: {
+            ...state.character,
+            bardicInspiration: {
+              ...state.character.bardicInspiration,
+              usesExpended: 0,
             },
           },
           hasUnsavedChanges: true,
@@ -3133,6 +3194,11 @@ export const useCharacterStore = create<CharacterStore>()(
           // Reset temp AC
           const resetTempArmorClass = 0;
 
+          // Reset Bardic Inspiration (if Bard)
+          const resetBardicInspiration = character.bardicInspiration
+            ? { ...character.bardicInspiration, usesExpended: 0 }
+            : undefined;
+
           return {
             character: {
               ...character,
@@ -3146,6 +3212,7 @@ export const useCharacterStore = create<CharacterStore>()(
               hitPoints: resetHitPoints,
               reaction: resetReaction,
               tempArmorClass: resetTempArmorClass,
+              bardicInspiration: resetBardicInspiration,
               daysSpent: (character.daysSpent || 0) + 1, // Increment days spent on long rest
             },
             hasUnsavedChanges: true,

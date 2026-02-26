@@ -85,6 +85,7 @@ export default function RestManager({
             <p>• Heals to full HP</p>
             <p>• Clears temp HP & temp AC</p>
             <p>• Resets reaction & death saves</p>
+            <p>• Restores Bardic Inspiration (Bard)</p>
           </div>
 
           <Button

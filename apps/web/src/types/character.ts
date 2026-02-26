@@ -109,6 +109,11 @@ export interface HeroicInspiration {
   maxCount?: number; // Optional maximum (some DMs set limits)
 }
 
+// Bardic Inspiration tracking (Bard class feature)
+export interface BardicInspiration {
+  usesExpended: number; // Number of bardic inspiration uses expended (resets on long rest)
+}
+
 // Rich text content for character information
 export interface RichTextContent {
   id: string;
@@ -576,6 +581,9 @@ export interface CharacterState {
 
   // Heroic Inspiration
   heroicInspiration: HeroicInspiration;
+
+  // Bardic Inspiration (Bard class feature)
+  bardicInspiration?: BardicInspiration;
 
   // Trackable Traits
   trackableTraits: TrackableTrait[];

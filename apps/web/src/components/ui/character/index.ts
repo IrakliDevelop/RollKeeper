@@ -1,6 +1,7 @@
 // Character Sheet Components
 export { default as AbilityScores } from './AbilityScores';
 export { default as ActionsSection } from './ActionsSection';
+export { default as BardicInspirationTracker } from './BardicInspirationTracker';
 export { default as ArmorClassManager } from './ArmorClassManager';
 export { default as CharacterBackgroundEditor } from './CharacterBackgroundEditor';
 export { default as CharacterBasicInfo } from './CharacterBasicInfo';
