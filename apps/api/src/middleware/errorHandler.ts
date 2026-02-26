@@ -17,7 +17,7 @@ export class ApiError extends Error {
   }
 }
 
-export function errorHandler(err: Error, req: Request, res: Response) {
+export function errorHandler(err: Error, _req: Request, res: Response) {
   // Log error in development
   if (process.env.NODE_ENV !== 'production') {
     console.error('Error:', err);
@@ -76,8 +76,9 @@ export function errorHandler(err: Error, req: Request, res: Response) {
  * Async handler wrapper
  * Catches errors in async route handlers
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function asyncHandler(
-  fn: (req: Request, res: Response, next: NextFunction) => Promise<void>
+  fn: (req: any, res: Response, next: NextFunction) => Promise<void>
 ) {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);

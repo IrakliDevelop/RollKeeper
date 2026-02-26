@@ -1,6 +1,7 @@
 'use client';
 
 import { ThemeContext, useThemeInit } from '@/hooks/useTheme';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 export function ThemeProviderWrapper({
   children,
@@ -10,6 +11,8 @@ export function ThemeProviderWrapper({
   const themeValue = useThemeInit();
 
   return (
-    <ThemeContext.Provider value={themeValue}>{children}</ThemeContext.Provider>
+    <ThemeContext.Provider value={themeValue}>
+      <AuthProvider>{children}</AuthProvider>
+    </ThemeContext.Provider>
   );
 }

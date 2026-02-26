@@ -27,6 +27,7 @@
     "@radix-ui/react-tabs": "^1.1.12",
     "@radix-ui/react-toast": "^1.2.14",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@supabase/supabase-js": "^2.97.0",
     "@tiptap/extension-bullet-list": "^3.0.3",
     "@tiptap/extension-color": "^3.0.3",
     "@tiptap/extension-list-item": "^3.0.3",
@@ -45,6 +46,7 @@
     "react-dom": "19.1.0",
     "react-hook-form": "^7.60.0",
     "reactflow": "^11.11.4",
+    "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.3.1",
     "zod": "^4.0.5",
     "zustand": "^5.0.6"

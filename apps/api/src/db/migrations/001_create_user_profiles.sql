@@ -1,23 +1,7 @@
 -- Create user_profiles table
--- This extends Supabase Auth users with additional profile data
+-- Links to Supabase Auth via supabase_uid, but is our own table
 
-CREATE TABLE IF NOT EXISTS user_profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  username TEXT UNIQUE NOT NULL,
-  display_name TEXT,
-  role TEXT DEFAULT 'player' CHECK (role IN ('player', 'dm', 'both')),
-  avatar_url TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create index on username for faster lookups
-CREATE INDEX idx_user_profiles_username ON user_profiles(username);
-
--- Create index on role for filtering
-CREATE INDEX idx_user_profiles_role ON user_profiles(role);
-
--- Create updated_at trigger function
+-- Reusable trigger function for updated_at columns
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -26,31 +10,25 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Add trigger to auto-update updated_at
+CREATE TABLE IF NOT EXISTS user_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  supabase_uid TEXT UNIQUE NOT NULL, -- Links to Supabase Auth user ID
+  username TEXT UNIQUE,
+  display_name TEXT,
+  email TEXT,
+  role TEXT DEFAULT 'player' CHECK (role IN ('player', 'dm', 'both')),
+  avatar_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX idx_user_profiles_supabase_uid ON user_profiles(supabase_uid);
+CREATE INDEX idx_user_profiles_username ON user_profiles(username);
+CREATE INDEX idx_user_profiles_role ON user_profiles(role);
+
+-- Auto-update updated_at
 CREATE TRIGGER update_user_profiles_updated_at
   BEFORE UPDATE ON user_profiles
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
-
--- Add RLS (Row Level Security) policies
-ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
-
--- Users can read their own profile
-CREATE POLICY "Users can view their own profile"
-  ON user_profiles FOR SELECT
-  USING (auth.uid() = id);
-
--- Users can update their own profile
-CREATE POLICY "Users can update their own profile"
-  ON user_profiles FOR UPDATE
-  USING (auth.uid() = id);
-
--- Users can insert their own profile
-CREATE POLICY "Users can insert their own profile"
-  ON user_profiles FOR INSERT
-  WITH CHECK (auth.uid() = id);
-
--- Public profiles are viewable by all authenticated users
-CREATE POLICY "All users can view other profiles"
-  ON user_profiles FOR SELECT
-  USING (auth.role() = 'authenticated');

@@ -10,7 +10,57 @@ import {
   Shield,
   Star,
   ArrowRight,
+  LogIn,
+  UserPlus,
 } from 'lucide-react';
+import { useAuthContext } from '@/contexts/AuthContext';
+
+function AuthNav() {
+  const { isAuthenticated, loading, user, signOut } = useAuthContext();
+
+  if (loading) {
+    return <div className="h-8 w-20 animate-pulse rounded bg-slate-200" />;
+  }
+
+  if (isAuthenticated) {
+    return (
+      <div className="flex items-center space-x-3">
+        <span className="text-sm text-slate-500">{user?.email}</span>
+        <Link
+          href="/dm"
+          className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700"
+        >
+          DM Dashboard
+        </Link>
+        <button
+          onClick={() => signOut()}
+          className="text-sm font-medium text-slate-500 transition-colors hover:text-slate-700"
+        >
+          Sign Out
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center space-x-2">
+      <Link
+        href="/auth/login"
+        className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-purple-600"
+      >
+        <LogIn size={14} />
+        Sign In
+      </Link>
+      <Link
+        href="/auth/signup"
+        className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700"
+      >
+        <UserPlus size={14} />
+        Sign Up
+      </Link>
+    </div>
+  );
+}
 
 export default function LandingPage() {
   return (
@@ -25,26 +75,29 @@ export default function LandingPage() {
                 RollKeeper
               </h1>
             </div>
-            <div className="flex items-center space-x-4">
+            <nav className="hidden items-center space-x-4 md:flex">
               <Link
                 href="/player"
                 className="font-medium text-slate-600 transition-colors hover:text-purple-600"
               >
                 Player Dashboard
               </Link>
-              <span
-                className="cursor-not-allowed font-medium text-slate-400"
-                title="Coming Soon"
+              <Link
+                href="/dm"
+                className="font-medium text-slate-600 transition-colors hover:text-purple-600"
               >
                 DM Toolset
-              </span>
+              </Link>
               <Link
                 href="/resources"
                 className="font-medium text-slate-600 transition-colors hover:text-purple-600"
               >
                 Resources
               </Link>
-            </div>
+              <div className="ml-2 border-l border-slate-200 pl-4">
+                <AuthNav />
+              </div>
+            </nav>
           </div>
         </div>
       </header>
@@ -65,6 +118,10 @@ export default function LandingPage() {
               players and Dungeon Masters. Manage your characters, track
               campaigns, and enhance your tabletop experience with powerful,
               intuitive tools designed by gamers, for gamers.
+            </p>
+            <p className="mx-auto mt-4 max-w-xl text-sm text-slate-500">
+              No account required for character sheets — sign up only if you
+              want campaign features or DM tools.
             </p>
           </div>
 
@@ -120,6 +177,9 @@ export default function LandingPage() {
                 <p className="text-lg text-slate-600">
                   Create and manage multiple characters with powerful digital
                   character sheets
+                </p>
+                <p className="mt-2 text-sm text-slate-400">
+                  No account required
                 </p>
               </div>
 
@@ -180,19 +240,7 @@ export default function LandingPage() {
             </div>
 
             {/* DM Section */}
-            <div className="relative rounded-2xl border border-purple-100 bg-white p-8 shadow-xl">
-              {/* Coming Soon Overlay */}
-              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-slate-900/60 backdrop-blur-sm">
-                <div className="text-center">
-                  <div className="mb-3 inline-flex items-center rounded-full bg-purple-600 px-6 py-3 text-lg font-bold text-white shadow-lg">
-                    Coming Soon
-                  </div>
-                  <p className="text-sm text-white">
-                    DM Tools are currently under development
-                  </p>
-                </div>
-              </div>
-
+            <div className="rounded-2xl border border-purple-100 bg-white p-8 shadow-xl transition-shadow duration-300 hover:shadow-2xl">
               <div className="mb-8 text-center">
                 <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-purple-100">
                   <Crown className="h-10 w-10 text-purple-600" />
@@ -201,8 +249,9 @@ export default function LandingPage() {
                   For Dungeon Masters
                 </h2>
                 <p className="text-lg text-slate-600">
-                  Complete campaign management and combat tracking tools for DMs
+                  Complete campaign management and real-time character tracking
                 </p>
+                <p className="mt-2 text-sm text-slate-400">Account required</p>
               </div>
 
               <div className="mb-8 space-y-4">
@@ -221,10 +270,10 @@ export default function LandingPage() {
                   <Sword className="mt-0.5 h-5 w-5 flex-shrink-0 text-purple-500" />
                   <div>
                     <h4 className="font-semibold text-slate-800">
-                      Combat Tracker
+                      Live Character Sync
                     </h4>
                     <p className="text-sm text-slate-600">
-                      Visual initiative tracking with drag & drop
+                      See player character stats update in real-time
                     </p>
                   </div>
                 </div>
@@ -232,10 +281,10 @@ export default function LandingPage() {
                   <Users className="mt-0.5 h-5 w-5 flex-shrink-0 text-purple-500" />
                   <div>
                     <h4 className="font-semibold text-slate-800">
-                      Player Character Import
+                      Invite Code System
                     </h4>
                     <p className="text-sm text-slate-600">
-                      Import and manage player character sheets
+                      Share a code to let players join your campaign
                     </p>
                   </div>
                 </div>
@@ -252,10 +301,13 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <div className="flex w-full cursor-not-allowed items-center justify-center rounded-xl bg-gradient-to-r from-purple-400 to-purple-500 px-6 py-4 font-semibold text-white opacity-75">
+              <Link
+                href="/dm"
+                className="group flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-4 font-semibold text-white transition-all duration-200 hover:from-purple-700 hover:to-purple-800"
+              >
                 Access DM Toolset
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </div>
+                <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+              </Link>
             </div>
           </div>
         </div>
@@ -336,12 +388,18 @@ export default function LandingPage() {
               >
                 Player Tools
               </Link>
-              <span
-                className="cursor-not-allowed text-slate-500"
-                title="Coming Soon"
+              <Link
+                href="/dm"
+                className="text-slate-300 transition-colors hover:text-white"
               >
                 DM Tools
-              </span>
+              </Link>
+              <Link
+                href="/auth/login"
+                className="text-slate-300 transition-colors hover:text-white"
+              >
+                Sign In
+              </Link>
             </div>
           </div>
         </div>
