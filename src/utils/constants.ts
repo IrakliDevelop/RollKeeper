@@ -443,6 +443,10 @@ export const DEFAULT_CHARACTER_STATE = {
     maxCount: undefined,
   },
 
+  bardicInspiration: {
+    usesExpended: 0,
+  },
+
   trackableTraits: [] as TrackableTrait[],
 
   extendedFeatures: [] as ExtendedFeature[],
