@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/layout';
 import SpellSlotTracker from '@/components/ui/character/SpellSlotTracker';
 import TraitTracker from '@/components/ui/character/TraitTracker';
 import HeroicInspirationTracker from '@/components/ui/character/HeroicInspirationTracker';
+import BardicInspirationTracker from '@/components/ui/character/BardicInspirationTracker';
 import XPTracker from '@/components/ui/character/XPTracker';
 
 import HitPointManager from '@/components/ui/character/HitPointManager';
@@ -148,6 +149,10 @@ export default function CharacterSheet() {
     resetHeroicInspiration,
     toggleReaction,
     resetReaction,
+    // Bardic inspiration methods
+    useBardicInspiration,
+    restoreBardicInspiration,
+    resetBardicInspiration,
     updateTempArmorClass,
     toggleJackOfAllTrades,
     toggleShield,
@@ -753,6 +758,23 @@ export default function CharacterSheet() {
                       onUseInspiration={useHeroicInspiration}
                       onResetInspiration={resetHeroicInspiration}
                     />
+
+                    {/* Bardic Inspiration (Bard class only) */}
+                    {hasHydrated &&
+                      (character.classes?.some(
+                        c => c.className.toLowerCase() === 'bard'
+                      ) ||
+                        character.class?.name?.toLowerCase() === 'bard') && (
+                        <BardicInspirationTracker
+                          bardicInspiration={
+                            character.bardicInspiration ?? { usesExpended: 0 }
+                          }
+                          character={character}
+                          onUseInspiration={useBardicInspiration}
+                          onRestoreInspiration={restoreBardicInspiration}
+                          onResetInspiration={resetBardicInspiration}
+                        />
+                      )}
 
                     {/* Conditions & Diseases Quick View */}
                     {hasHydrated &&
