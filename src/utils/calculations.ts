@@ -73,6 +73,16 @@ export const calculateSkillModifier = (
     modifier += skill.customModifier;
   }
 
+  // Add bonus ability modifiers (e.g. Druid Magician adds WIS to INT checks)
+  if (skill.bonusAbilities && skill.bonusAbilities.length > 0) {
+    for (const bonusAbility of skill.bonusAbilities) {
+      if (bonusAbility !== relatedAbility) {
+        const bonusScore = character.abilities[bonusAbility];
+        modifier += calculateModifier(bonusScore);
+      }
+    }
+  }
+
   return modifier;
 };
 
@@ -136,7 +146,7 @@ export const calculateCharacterArmorClass = (
 ): number => {
   return calculateTotalArmorClass(
     character.armorClass,
-    character.tempArmorClass,
+    character.isTempACActive ? character.tempArmorClass : 0,
     character.isWearingShield,
     character.shieldBonus
   );
