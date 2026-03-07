@@ -22,6 +22,7 @@ import {
   DamageType,
   ToolProficiency,
   Language,
+  AbilityName,
 } from '@/types/character';
 import { ProcessedSpell } from '@/types/spells';
 import {
@@ -187,6 +188,9 @@ function migrateCharacterData(character: unknown): CharacterState {
     // Ensure temporary AC field exists
     if (typeof result.tempArmorClass !== 'number') {
       result.tempArmorClass = DEFAULT_CHARACTER_STATE.tempArmorClass;
+    }
+    if (typeof result.isTempACActive !== 'boolean') {
+      result.isTempACActive = result.tempArmorClass > 0;
     }
     // Ensure shield status exists
     if (typeof result.isWearingShield !== 'boolean') {
@@ -354,6 +358,10 @@ interface CharacterStore {
     skill: keyof CharacterState['skills'],
     expertise: boolean
   ) => void;
+  toggleSkillBonusAbility: (
+    skill: keyof CharacterState['skills'],
+    ability: AbilityName
+  ) => void;
   updateSavingThrowProficiency: (
     ability: keyof CharacterState['savingThrows'],
     proficient: boolean
@@ -382,6 +390,7 @@ interface CharacterStore {
 
   // Armor Class management
   updateTempArmorClass: (tempAC: number) => void;
+  toggleTempAC: () => void;
   toggleShield: () => void;
   resetTempArmorClass: () => void;
   updateShieldBonus: (bonus: number) => void;
@@ -735,6 +744,31 @@ export const useCharacterStore = create<CharacterStore>()(
         }));
       },
 
+      toggleSkillBonusAbility: (skill, ability) => {
+        set(state => {
+          const current = state.character.skills[skill].bonusAbilities || [];
+          const exists = current.includes(ability);
+          const bonusAbilities = exists
+            ? current.filter(a => a !== ability)
+            : [...current, ability];
+          return {
+            character: {
+              ...state.character,
+              skills: {
+                ...state.character.skills,
+                [skill]: {
+                  ...state.character.skills[skill],
+                  bonusAbilities:
+                    bonusAbilities.length > 0 ? bonusAbilities : undefined,
+                },
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as SaveStatus,
+          };
+        });
+      },
+
       updateSavingThrowProficiency: (ability, proficient) => {
         set(state => ({
           character: {
@@ -959,6 +993,17 @@ export const useCharacterStore = create<CharacterStore>()(
         }));
       },
 
+      toggleTempAC: () => {
+        set(state => ({
+          character: {
+            ...state.character,
+            isTempACActive: !state.character.isTempACActive,
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
       toggleShield: () => {
         set(state => ({
           character: {
@@ -975,6 +1020,7 @@ export const useCharacterStore = create<CharacterStore>()(
           character: {
             ...state.character,
             tempArmorClass: 0,
+            isTempACActive: false,
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving',
@@ -3196,8 +3242,8 @@ export const useCharacterStore = create<CharacterStore>()(
             hasUsedReaction: false,
           };
 
-          // Reset temp AC
-          const resetTempArmorClass = 0;
+          // Reset temp AC (deactivate but preserve saved value)
+          const resetIsTempACActive = false;
 
           // Reset Bardic Inspiration (if Bard)
           const resetBardicInspiration = character.bardicInspiration
@@ -3217,7 +3263,7 @@ export const useCharacterStore = create<CharacterStore>()(
               hitDicePools: resetHitDicePools,
               hitPoints: resetHitPoints,
               reaction: resetReaction,
-              tempArmorClass: resetTempArmorClass,
+              isTempACActive: resetIsTempACActive,
               bardicInspiration: resetBardicInspiration,
               daysSpent: (character.daysSpent || 0) + 1,
             },

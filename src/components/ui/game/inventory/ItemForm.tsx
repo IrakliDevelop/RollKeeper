@@ -312,7 +312,7 @@ export function ItemForm({
             <Input
               label="Weight (lbs)"
               type="number"
-              step="0.1"
+              step="0.001"
               value={formData.weight?.toString() || ''}
               onChange={e =>
                 setFormData({

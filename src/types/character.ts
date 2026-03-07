@@ -43,6 +43,7 @@ export interface SkillProficiency {
   proficient: boolean;
   expertise: boolean;
   customModifier?: number;
+  bonusAbilities?: AbilityName[];
 }
 
 // Tool proficiency levels
@@ -562,6 +563,7 @@ export interface CharacterState {
   hitPoints: HitPoints;
   armorClass: number;
   tempArmorClass: number; // Temporary AC bonuses from spells, effects, etc.
+  isTempACActive: boolean; // Whether temporary AC bonus is currently active
   isWearingShield: boolean; // Whether character is currently wearing/using a shield
   shieldBonus: number; // AC bonus from shield (default +2, but can be +1, +3, etc.)
   initiative: InitiativeData;

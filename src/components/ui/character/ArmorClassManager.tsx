@@ -11,6 +11,7 @@ interface ArmorClassManagerProps {
   character: CharacterState;
   onUpdateArmorClass: (ac: number) => void;
   onUpdateTempArmorClass: (tempAC: number) => void;
+  onToggleTempAC: () => void;
   onToggleShield: () => void;
   onUpdateShieldBonus: (bonus: number) => void;
 }
@@ -19,10 +20,10 @@ export default function ArmorClassManager({
   character,
   onUpdateArmorClass,
   onUpdateTempArmorClass,
+  onToggleTempAC,
   onToggleShield,
   onUpdateShieldBonus,
 }: ArmorClassManagerProps) {
-  // Local state for input values to allow empty strings during editing
   const [baseACInput, setBaseACInput] = useState(
     character.armorClass.toString()
   );
@@ -32,25 +33,19 @@ export default function ArmorClassManager({
   const [shieldBonusInput, setShieldBonusInput] = useState(
     character.shieldBonus.toString()
   );
-  const [isTempACActive, setIsTempACActive] = useState(
-    character.tempArmorClass > 0
-  );
 
-  // Update local state when character data changes externally
   useEffect(() => {
     setBaseACInput(character.armorClass.toString());
   }, [character.armorClass]);
 
   useEffect(() => {
     setTempACInput(character.tempArmorClass.toString());
-    setIsTempACActive(character.tempArmorClass > 0);
   }, [character.tempArmorClass]);
 
   useEffect(() => {
     setShieldBonusInput(character.shieldBonus.toString());
   }, [character.shieldBonus]);
 
-  // Handlers for Base AC
   const handleBaseACChange = (value: string) => {
     setBaseACInput(value);
   };
@@ -69,7 +64,6 @@ export default function ArmorClassManager({
     }
   };
 
-  // Handlers for Temp AC
   const handleTempACChange = (value: string) => {
     setTempACInput(value);
   };
@@ -80,9 +74,6 @@ export default function ArmorClassManager({
     const clampedValue = Math.max(0, Math.min(20, finalValue));
     setTempACInput(clampedValue.toString());
     onUpdateTempArmorClass(clampedValue);
-    if (clampedValue === 0) {
-      setIsTempACActive(false);
-    }
   };
 
   const handleTempACKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -91,24 +82,6 @@ export default function ArmorClassManager({
     }
   };
 
-  const handleToggleTempAC = () => {
-    if (isTempACActive) {
-      // Deactivating - reset to 0
-      setTempACInput('0');
-      onUpdateTempArmorClass(0);
-      setIsTempACActive(false);
-    } else {
-      // Activating - set to 1 or keep current value
-      const currentValue = parseInt(tempACInput) || 0;
-      if (currentValue === 0) {
-        setTempACInput('1');
-        onUpdateTempArmorClass(1);
-      }
-      setIsTempACActive(true);
-    }
-  };
-
-  // Handlers for Shield Bonus
   const handleShieldBonusChange = (value: string) => {
     setShieldBonusInput(value);
   };
@@ -176,7 +149,7 @@ export default function ArmorClassManager({
             {/* Temporary AC Row */}
             <div
               className={`bg-surface-raised rounded-lg border-2 p-4 shadow-sm transition-all duration-200 ${
-                isTempACActive
+                character.isTempACActive
                   ? 'bg-accent-orange-bg border-orange-500'
                   : 'border-accent-orange-border hover:border-orange-400'
               }`}
@@ -184,17 +157,18 @@ export default function ArmorClassManager({
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-[140px] items-center gap-1.5">
                   <Tooltip
-                    content={`Click to ${isTempACActive ? 'deactivate and reset' : 'activate'} temporary AC`}
+                    content={`Click to ${character.isTempACActive ? 'deactivate' : 'activate'} temporary AC`}
                   >
                     <button
                       type="button"
-                      onClick={handleToggleTempAC}
+                      onClick={onToggleTempAC}
                       className={`flex items-center gap-2 text-lg font-bold transition-opacity hover:opacity-80 ${
-                        isTempACActive ? 'text-orange-700' : 'text-orange-800'
+                        character.isTempACActive
+                          ? 'text-orange-700'
+                          : 'text-orange-800'
                       }`}
                     >
                       <span>Temp AC</span>
-                      {/* {isTempACActive && <span className="text-xl">✨</span>} */}
                     </button>
                   </Tooltip>
                   <Tooltip content="Bonuses from spells & temporary magical effects">
@@ -209,9 +183,9 @@ export default function ArmorClassManager({
                   onChange={e => handleTempACChange(e.target.value)}
                   onBlur={handleTempACBlur}
                   onKeyDown={handleTempACKeyDown}
-                  disabled={!isTempACActive}
+                  disabled={!character.isTempACActive}
                   className={`h-12 w-20 [appearance:textfield] border-2 text-center text-2xl font-bold focus:border-orange-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
-                    isTempACActive
+                    character.isTempACActive
                       ? 'border-accent-orange-border bg-accent-orange-bg text-accent-orange-text'
                       : 'border-divider bg-surface-secondary text-faint'
                   }`}
@@ -280,7 +254,7 @@ export default function ArmorClassManager({
               <span className="text-xl font-bold">{character.armorClass}</span>
               <span className="text-accent-red-text-muted text-lg">+</span>
               <span className="text-xl font-bold">
-                {character.tempArmorClass}
+                {character.isTempACActive ? character.tempArmorClass : 0}
               </span>
               {character.isWearingShield && (
                 <>

@@ -105,6 +105,7 @@ export default function CharacterSheet() {
     updateAbilityScore,
     updateSkillProficiency,
     updateSkillExpertise,
+    toggleSkillBonusAbility,
     updateSavingThrowProficiency,
     updateHitPoints,
     updateInitiative,
@@ -155,6 +156,7 @@ export default function CharacterSheet() {
     restoreBardicInspiration,
     resetBardicInspiration,
     updateTempArmorClass,
+    toggleTempAC,
     toggleJackOfAllTrades,
     toggleShield,
     updateShieldBonus,
@@ -887,6 +889,7 @@ export default function CharacterSheet() {
                       onUpdateSkillExpertise={updateSkillExpertise}
                       onToggleJackOfAllTrades={toggleJackOfAllTrades}
                       onRollSkillCheck={rollSkillCheck}
+                      onToggleSkillBonusAbility={toggleSkillBonusAbility}
                     />
 
                     {/* Experience Points */}
@@ -934,6 +937,7 @@ export default function CharacterSheet() {
                           updateCharacter({ armorClass: ac })
                         }
                         onUpdateTempArmorClass={updateTempArmorClass}
+                        onToggleTempAC={toggleTempAC}
                         onToggleShield={toggleShield}
                         onUpdateShieldBonus={updateShieldBonus}
                       />
