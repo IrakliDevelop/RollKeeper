@@ -10,6 +10,8 @@ import { formatSpellDescriptionForEditor } from './referenceParser';
 /**
  * Convert ProcessedSpell (from spellbook) to SpellFormData (for character sheet)
  */
+export type FreeCastMode = 'normal' | 'at_will' | 'innate';
+
 export interface SpellFormData {
   name: string;
   level: number;
@@ -34,6 +36,9 @@ export interface SpellFormData {
   damage: string;
   damageType: string;
   source: string;
+  castingSource: string;
+  freeCastMode: FreeCastMode;
+  freeCastMax: number;
 }
 
 /**
@@ -185,6 +190,9 @@ export function convertProcessedSpellToFormData(
     damage: extractedDamage, // Use extracted damage dice from description
     damageType: damageType, // Use from metadata (e.g., "fire")
     source: spell.source,
+    castingSource: '',
+    freeCastMode: 'normal',
+    freeCastMax: 1,
   };
 }
 
@@ -224,6 +232,14 @@ export function convertFormDataToSpell(
     damage: formData.damage || undefined,
     damageType: formData.damageType || undefined,
     source: formData.source || undefined,
+    castingSource: formData.castingSource || undefined,
+    freeCastMax:
+      formData.freeCastMode === 'at_will'
+        ? 0
+        : formData.freeCastMode === 'innate'
+          ? formData.freeCastMax
+          : undefined,
+    freeCastsUsed: formData.freeCastMode !== 'normal' ? 0 : undefined,
     createdAt: now,
     updatedAt: now,
   };

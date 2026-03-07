@@ -13,6 +13,8 @@ import {
   Grid3X3,
   List,
   Eye,
+  Zap,
+  Infinity,
 } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
 import { Spell } from '@/types/character';
@@ -85,6 +87,11 @@ const SpellCard: React.FC<{
   onToggleFavorite,
 }) => {
   const isCantrip = spell.level === 0;
+  const isAtWill = spell.freeCastMax === 0;
+  const isInnate = spell.freeCastMax !== undefined && spell.freeCastMax > 0;
+  const freeCastsRemaining = isInnate
+    ? spell.freeCastMax! - (spell.freeCastsUsed || 0)
+    : 0;
 
   if (compact) {
     return (
@@ -104,6 +111,24 @@ const SpellCard: React.FC<{
           <span className="text-heading truncate text-sm font-medium">
             {spell.name}
           </span>
+          {isAtWill && (
+            <Badge
+              variant="info"
+              size="sm"
+              className="flex-shrink-0 gap-0.5 bg-emerald-100 text-emerald-700"
+            >
+              <Infinity size={10} />
+            </Badge>
+          )}
+          {isInnate && (
+            <Badge
+              variant="info"
+              size="sm"
+              className={`flex-shrink-0 gap-0.5 ${freeCastsRemaining > 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}
+            >
+              <Zap size={10} /> {freeCastsRemaining}/{spell.freeCastMax}
+            </Badge>
+          )}
           {spell.concentration && (
             <Badge variant="warning" size="sm" className="flex-shrink-0">
               ⏱
@@ -165,6 +190,33 @@ const SpellCard: React.FC<{
           {spell.concentration && (
             <Badge variant="warning" size="sm">
               ⏱ Concentration
+            </Badge>
+          )}
+          {isAtWill && (
+            <Badge
+              variant="info"
+              size="sm"
+              className="gap-0.5 bg-emerald-100 text-emerald-700"
+            >
+              <Infinity size={12} /> At Will
+            </Badge>
+          )}
+          {isInnate && (
+            <Badge
+              variant="info"
+              size="sm"
+              className={`gap-0.5 ${freeCastsRemaining > 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}
+            >
+              <Zap size={12} /> {freeCastsRemaining}/{spell.freeCastMax} free
+            </Badge>
+          )}
+          {spell.castingSource && (
+            <Badge
+              variant="secondary"
+              size="sm"
+              className="bg-indigo-100 text-indigo-700"
+            >
+              {spell.castingSource}
             </Badge>
           )}
         </div>
@@ -306,6 +358,7 @@ export function EnhancedQuickSpells({
 }: EnhancedQuickSpellsProps) {
   const {
     character,
+    updateCharacter,
     updateSpellSlot,
     startConcentration,
     stopConcentration,
@@ -497,7 +550,7 @@ export function EnhancedQuickSpells({
     }
   };
 
-  const handleCastSpell = (spellLevel: number) => {
+  const handleCastSpell = (spellLevel: number, useFreecast: boolean) => {
     if (!selectedSpell) return;
 
     if (selectedSpell.concentration) {
@@ -507,7 +560,17 @@ export function EnhancedQuickSpells({
       startConcentration(selectedSpell.name, selectedSpell.id, spellLevel);
     }
 
-    if (selectedSpell.level > 0) {
+    if (useFreecast) {
+      if (selectedSpell.freeCastMax && selectedSpell.freeCastMax > 0) {
+        updateCharacter({
+          spells: character.spells.map(s =>
+            s.id === selectedSpell.id
+              ? { ...s, freeCastsUsed: (s.freeCastsUsed || 0) + 1 }
+              : s
+          ),
+        });
+      }
+    } else if (selectedSpell.level > 0) {
       updateSpellSlot(
         spellLevel as keyof typeof character.spellSlots,
         character.spellSlots[spellLevel as keyof typeof character.spellSlots]

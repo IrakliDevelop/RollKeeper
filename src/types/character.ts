@@ -263,6 +263,9 @@ export interface Spell {
   damage?: string; // Damage dice (if applicable): "1d10", "3d6", etc.
   damageType?: string; // Type of damage: "fire", "cold", "psychic", etc.
   source?: string; // PHB, XGE, etc.
+  castingSource?: string; // e.g. "Fey Touched", "Drow Magic", "Eldritch Invocation"
+  freeCastMax?: number; // 0 = at will (unlimited), 1+ = X free casts per long rest
+  freeCastsUsed?: number; // how many free casts used since last long rest
   createdAt: string;
   updatedAt: string;
 }

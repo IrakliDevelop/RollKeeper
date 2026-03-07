@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Sparkles, Dice6, Wand2 } from 'lucide-react';
+import { Sparkles, Dice6, Wand2, Zap, Infinity } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
 import { Spell } from '@/types/character';
 import {
@@ -47,6 +47,7 @@ export function QuickSpells({
 }: QuickSpellsProps) {
   const {
     character,
+    updateCharacter,
     updateSpellSlot,
     startConcentration,
     stopConcentration,
@@ -211,10 +212,9 @@ export function QuickSpells({
     setCastModalOpen(true);
   };
 
-  const handleCastSpell = (spellLevel: number) => {
+  const handleCastSpell = (spellLevel: number, useFreecast: boolean) => {
     if (!selectedSpell) return;
 
-    // If it's a concentration spell, stop current concentration
     if (selectedSpell.concentration) {
       if (character.concentration.isConcentrating) {
         stopConcentration();
@@ -222,8 +222,17 @@ export function QuickSpells({
       startConcentration(selectedSpell.name, selectedSpell.id, spellLevel);
     }
 
-    // Use spell slot if it's not a cantrip
-    if (selectedSpell.level > 0) {
+    if (useFreecast) {
+      if (selectedSpell.freeCastMax && selectedSpell.freeCastMax > 0) {
+        updateCharacter({
+          spells: character.spells.map(s =>
+            s.id === selectedSpell.id
+              ? { ...s, freeCastsUsed: (s.freeCastsUsed || 0) + 1 }
+              : s
+          ),
+        });
+      }
+    } else if (selectedSpell.level > 0) {
       updateSpellSlot(
         spellLevel as keyof typeof character.spellSlots,
         character.spellSlots[spellLevel as keyof typeof character.spellSlots]
@@ -231,12 +240,8 @@ export function QuickSpells({
       );
     }
 
-    // Close modal
     setCastModalOpen(false);
     setSelectedSpell(null);
-
-    // Show a toast or notification that the spell was cast
-    // You could add a toast system here if desired
   };
 
   if (actionSpells.length === 0) {
@@ -291,6 +296,25 @@ export function QuickSpells({
                   <span className="rounded bg-purple-100 px-2 py-1 text-xs text-purple-700">
                     {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
                   </span>
+                  {spell.freeCastMax === 0 && (
+                    <span className="flex items-center gap-0.5 rounded bg-emerald-100 px-2 py-1 text-xs text-emerald-700">
+                      <Infinity size={10} /> At Will
+                    </span>
+                  )}
+                  {spell.freeCastMax !== undefined && spell.freeCastMax > 0 && (
+                    <span
+                      className={`flex items-center gap-0.5 rounded px-2 py-1 text-xs ${spell.freeCastMax - (spell.freeCastsUsed || 0) > 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}
+                    >
+                      <Zap size={10} />{' '}
+                      {spell.freeCastMax - (spell.freeCastsUsed || 0)}/
+                      {spell.freeCastMax} free
+                    </span>
+                  )}
+                  {spell.castingSource && (
+                    <span className="rounded bg-indigo-100 px-2 py-1 text-xs text-indigo-700">
+                      {spell.castingSource}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -348,7 +372,8 @@ export function QuickSpells({
                     )}
                     {spell.damage && (
                       <span className="rounded-lg border border-amber-300 bg-gradient-to-r from-amber-100 to-amber-200 px-3 py-1.5 font-medium shadow-sm">
-                        {spell.damage} {spell.damageType && `${spell.damageType}`}
+                        {spell.damage}{' '}
+                        {spell.damageType && `${spell.damageType}`}
                       </span>
                     )}
                   </div>
