@@ -65,12 +65,22 @@ import { useSimpleDiceRoll } from '@/hooks/useSimpleDiceRoll';
 
 import { RollSummary } from '@/types/dice';
 import NotHydrated from '@/components/ui/feedback/NotHydrated';
+import CharacterHUD from '@/components/ui/character/CharacterHUD';
+import RestDialog from '@/components/ui/character/RestDialog';
+import TabbedCharacterSheet from '@/components/ui/character/TabbedCharacterSheet';
+import type { TabbedCharacterSheetRef } from '@/components/ui/character/TabbedCharacterSheet';
+import NewLayoutPromptDialog from '@/components/ui/character/NewLayoutPromptDialog';
 
 export default function CharacterSheet() {
   const params = useParams();
   const characterId = params.characterId as string;
 
-  const { getCharacterById, updateCharacterData } = usePlayerStore();
+  const {
+    getCharacterById,
+    updateCharacterData,
+    settings: playerSettings,
+    updateSettings,
+  } = usePlayerStore();
   const playerCharacter = getCharacterById(characterId);
 
   const hasHydrated = useHydration();
@@ -147,7 +157,7 @@ export default function CharacterSheet() {
     resetCharacter,
     addHeroicInspiration,
     updateHeroicInspiration,
-    useHeroicInspiration,
+    useHeroicInspiration: spendHeroicInspiration,
     resetHeroicInspiration,
     toggleReaction,
     resetReaction,
@@ -192,6 +202,13 @@ export default function CharacterSheet() {
   } = useCharacterStore();
 
   const [showResetModal, setShowResetModal] = useState(false);
+  const [pendingRestType, setPendingRestType] = useState<
+    'short' | 'long' | null
+  >(null);
+  const tabbedSheetRef = useRef<TabbedCharacterSheetRef>(null);
+
+  const enableTabbedLayout = playerSettings?.enableTabbedLayout ?? false;
+  const hasSeenLayoutPrompt = playerSettings?.hasSeenLayoutPrompt ?? false;
 
   const { manualSave } = useAutoSave();
 
@@ -272,10 +289,17 @@ export default function CharacterSheet() {
   // All other hooks and refs that were after early returns
   const tabsRef = useRef<GroupedTabsRef>(null);
 
-  // Navigation helper
-  const switchToTab = useCallback((tabId: string) => {
-    tabsRef.current?.switchToTab(tabId);
-  }, []);
+  // Navigation helper — delegates to whichever layout is active
+  const switchToTab = useCallback(
+    (tabId: string) => {
+      if (enableTabbedLayout) {
+        tabbedSheetRef.current?.switchToTab(tabId);
+      } else {
+        tabsRef.current?.switchToTab(tabId);
+      }
+    },
+    [enableTabbedLayout]
+  );
 
   // Auto-update initiative when dexterity changes (if not overridden)
   useEffect(() => {
@@ -534,6 +558,14 @@ export default function CharacterSheet() {
     character.pactMagic
   );
 
+  const handleToggleInspiration = () => {
+    if ((character.heroicInspiration?.count || 0) > 0) {
+      spendHeroicInspiration();
+    } else {
+      addHeroicInspiration();
+    }
+  };
+
   // Export functionality
   const handleExport = () => {
     try {
@@ -601,538 +633,685 @@ export default function CharacterSheet() {
 
             <ExperimentalFeaturesSection />
 
-            {/* Main Character Sheet */}
-            <main className="relative z-10 mx-auto max-w-7xl space-y-8">
-              {/* Actions Section */}
-              <CollapsibleSection
-                title="Actions & Combat"
-                icon="⚔️"
-                defaultExpanded={true}
-                persistKey="actions-combat"
-                className="border-divider-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-slate-from)] to-[var(--gradient-slate-to)] shadow-lg backdrop-blur-sm"
-                headerClassName="rounded-t-xl"
-                contentClassName="px-6 pb-6"
-                badge={
-                  character.concentration.isConcentrating && (
-                    <span className="bg-accent-orange-bg-strong text-accent-orange-text rounded-full px-3 py-1 text-sm font-medium">
-                      Concentrating
-                    </span>
-                  )
+            {/* Character HUD — visible in both layouts */}
+            <CharacterHUD
+              character={character}
+              onShortRest={() => setPendingRestType('short')}
+              onLongRest={() => setPendingRestType('long')}
+              onIncrementDays={incrementDaysSpent}
+              onDecrementDays={() =>
+                updateDaysSpent(Math.max(0, (character.daysSpent || 0) - 1))
+              }
+              onToggleInspiration={handleToggleInspiration}
+              onStopConcentration={stopConcentration}
+              onNavigateToConditions={() => switchToTab('conditions')}
+            />
+
+            {/* Rest Dialog triggered from HUD */}
+            <RestDialog
+              restType={pendingRestType}
+              onConfirm={() => {
+                if (pendingRestType === 'short') {
+                  takeShortRest();
+                  showShortRest();
+                } else if (pendingRestType === 'long') {
+                  takeLongRest();
+                  showLongRest();
                 }
-              >
-                <ActionsSection
+              }}
+              onClose={() => setPendingRestType(null)}
+            />
+
+            {/* One-time layout prompt */}
+            {!enableTabbedLayout && !hasSeenLayoutPrompt && hasHydrated && (
+              <NewLayoutPromptDialog
+                onAccept={() =>
+                  updateSettings({
+                    enableTabbedLayout: true,
+                    hasSeenLayoutPrompt: true,
+                  })
+                }
+                onDismiss={() => updateSettings({ hasSeenLayoutPrompt: true })}
+              />
+            )}
+
+            {enableTabbedLayout ? (
+              /* Tabbed Layout */
+              <main className="relative z-10 mx-auto max-w-7xl">
+                <TabbedCharacterSheet
+                  ref={tabbedSheetRef}
                   character={character}
+                  hasHydrated={hasHydrated}
+                  totalLevel={totalLevel}
+                  proficiencyBonus={proficiencyBonus}
+                  characterHasSpells={characterHasSpells}
+                  updateAbilityScore={updateAbilityScore}
+                  rollAbilityCheck={rollAbilityCheck}
+                  getSavingThrowModifier={getSavingThrowModifier}
+                  updateSavingThrowProficiency={updateSavingThrowProficiency}
+                  rollSavingThrow={rollSavingThrow}
+                  getSkillModifier={getSkillModifier}
+                  updateSkillProficiency={updateSkillProficiency}
+                  updateSkillExpertise={updateSkillExpertise}
+                  toggleJackOfAllTrades={toggleJackOfAllTrades}
+                  rollSkillCheck={rollSkillCheck}
+                  toggleSkillBonusAbility={toggleSkillBonusAbility}
+                  updateCharacter={updateCharacter}
+                  updateClass={updateClass}
+                  updateLevel={updateLevel}
+                  addClassLevel={addClassLevel}
+                  removeClassLevel={removeClassLevel}
+                  updateClassLevel={updateClassLevel}
+                  getClassDisplayString={getClassDisplayString}
+                  addExperience={addExperience}
+                  setExperience={setExperience}
+                  updateSpellSlot={updateSpellSlot}
+                  updatePactMagicSlot={updatePactMagicSlot}
+                  resetSpellSlots={resetSpellSlots}
+                  resetPactMagicSlots={resetPactMagicSlots}
+                  getInitiativeModifier={getInitiativeModifier}
+                  updateInitiative={updateInitiative}
+                  resetInitiativeToDefault={resetInitiativeToDefault}
+                  toggleReaction={toggleReaction}
+                  resetReaction={resetReaction}
+                  rollInitiative={rollInitiative}
+                  updateTempArmorClass={updateTempArmorClass}
+                  toggleTempAC={toggleTempAC}
+                  toggleShield={toggleShield}
+                  updateShieldBonus={updateShieldBonus}
+                  applyDamageToCharacter={applyDamageToCharacter}
+                  applyHealingToCharacter={applyHealingToCharacter}
+                  addTemporaryHPToCharacter={addTemporaryHPToCharacter}
+                  makeDeathSavingThrow={makeDeathSavingThrow}
+                  resetDeathSavingThrows={resetDeathSavingThrows}
+                  toggleHPCalculationMode={toggleHPCalculationMode}
+                  recalculateMaxHP={recalculateMaxHP}
+                  updateHitPoints={updateHitPoints}
+                  useHitDie={useHitDie}
+                  restoreHitDice={restoreHitDice}
+                  resetAllHitDice={resetAllHitDice}
                   showAttackRoll={showAttackRoll}
                   showSavingThrow={showSavingThrow}
                   showDamageRoll={showDamageRoll}
                   animateRoll={diceBoxInitialized ? rollDice : undefined}
                   switchToTab={switchToTab}
-                  onStopConcentration={stopConcentration}
+                  stopConcentration={stopConcentration}
+                  addExtendedFeature={addExtendedFeature}
+                  updateExtendedFeature={updateExtendedFeature}
+                  deleteExtendedFeature={deleteExtendedFeature}
+                  useExtendedFeature={useExtendedFeature}
+                  resetExtendedFeatures={resetExtendedFeatures}
+                  reorderExtendedFeatures={reorderExtendedFeatures}
+                  addToolProficiency={addToolProficiency}
+                  updateToolProficiency={updateToolProficiency}
+                  deleteToolProficiency={deleteToolProficiency}
+                  addHeroicInspiration={addHeroicInspiration}
+                  updateHeroicInspiration={updateHeroicInspiration}
+                  useHeroicInspiration={spendHeroicInspiration}
+                  resetHeroicInspiration={resetHeroicInspiration}
+                  useBardicInspiration={useBardicInspiration}
+                  restoreBardicInspiration={restoreBardicInspiration}
+                  resetBardicInspiration={resetBardicInspiration}
+                  addLanguage={addLanguage}
+                  deleteLanguage={deleteLanguage}
+                  addFeature={addFeature}
+                  updateFeature={updateFeature}
+                  deleteFeature={deleteFeature}
+                  addTrait={addTrait}
+                  updateTrait={updateTrait}
+                  deleteTrait={deleteTrait}
+                  updateCharacterBackground={updateCharacterBackground}
+                  addNote={addNote}
+                  updateNote={updateNote}
+                  deleteNote={deleteNote}
+                  reorderNotes={reorderNotes}
+                  addToast={addToast}
                 />
-              </CollapsibleSection>
-
-              {/* Rest & Recovery - Standalone Section */}
-              <CollapsibleSection
-                title="Rest & Recovery"
-                icon="🛌"
-                defaultExpanded={false}
-                persistKey="rest-recovery"
-                className="border-divider bg-surface-raised rounded-lg border shadow-lg"
-                contentClassName="px-6 pb-6"
-                badge={
-                  <div className="flex items-center gap-2">
-                    <span className="bg-accent-amber-bg-strong text-accent-amber-text-muted rounded-md px-2 py-0.5 text-xs font-medium">
-                      Day {character.daysSpent || 0}
-                    </span>
-                    <span className="bg-accent-blue-bg-strong text-accent-blue-text-muted rounded-md px-2 py-0.5 text-xs font-medium">
-                      Short Rest
-                    </span>
-                    <span className="bg-accent-indigo-bg-strong text-accent-indigo-text rounded-md px-2 py-0.5 text-xs font-medium">
-                      Long Rest
-                    </span>
-                  </div>
-                }
-              >
-                <div className="space-y-6">
-                  {/* Rest Manager */}
-                  <RestManager
-                    onShortRest={takeShortRest}
-                    onLongRest={takeLongRest}
-                    onShowShortRestToast={showShortRest}
-                    onShowLongRestToast={showLongRest}
+              </main>
+            ) : (
+              /* Classic Layout */
+              <main className="relative z-10 mx-auto max-w-7xl space-y-8">
+                {/* Actions Section */}
+                <CollapsibleSection
+                  title="Actions & Combat"
+                  icon="⚔️"
+                  defaultExpanded={true}
+                  persistKey="actions-combat"
+                  className="border-divider-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-slate-from)] to-[var(--gradient-slate-to)] shadow-lg backdrop-blur-sm"
+                  headerClassName="rounded-t-xl"
+                  contentClassName="px-6 pb-6"
+                  badge={
+                    character.concentration.isConcentrating && (
+                      <span className="bg-accent-orange-bg-strong text-accent-orange-text rounded-full px-3 py-1 text-sm font-medium">
+                        Concentrating
+                      </span>
+                    )
+                  }
+                >
+                  <ActionsSection
+                    character={character}
+                    showAttackRoll={showAttackRoll}
+                    showSavingThrow={showSavingThrow}
+                    showDamageRoll={showDamageRoll}
+                    animateRoll={diceBoxInitialized ? rollDice : undefined}
+                    switchToTab={switchToTab}
+                    onStopConcentration={stopConcentration}
                   />
+                </CollapsibleSection>
 
-                  {/* Days Spent Tracker - Full Width */}
-                  <DaysSpentTracker
-                    daysSpent={character.daysSpent || 0}
-                    onUpdateDays={updateDaysSpent}
-                    onIncrementDays={incrementDaysSpent}
-                  />
-                </div>
-              </CollapsibleSection>
-
-              {/* Section Divider */}
-              <div className="flex items-center justify-center">
-                <div className="via-divider-strong h-px w-full max-w-md bg-gradient-to-r from-transparent to-transparent"></div>
-                <span className="text-muted px-4 font-medium">Core Stats</span>
-                <div className="via-divider-strong h-px w-full max-w-md bg-gradient-to-r from-transparent to-transparent"></div>
-              </div>
-
-              {/* Core D&D Stats Section */}
-              <CollapsibleSection
-                title="Character Statistics"
-                icon="📊"
-                defaultExpanded={true}
-                persistKey="character-statistics"
-                className="border-accent-blue-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-blue-from)] to-[var(--gradient-indigo-to)] shadow-lg backdrop-blur-sm"
-                headerClassName="rounded-t-xl"
-                contentClassName="px-6 pb-6"
-                badge={
-                  <div className="flex items-center gap-2">
-                    <span className="bg-accent-blue-bg-strong text-accent-blue-text rounded-full px-3 py-1 text-sm font-medium">
-                      Level {totalLevel}
-                    </span>
-                    <span className="bg-accent-green-bg-strong text-accent-green-text rounded-full px-3 py-1 text-sm font-medium">
-                      HP: {character.hitPoints.current}/
-                      {character.hitPoints.max}
-                    </span>
-                  </div>
-                }
-              >
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-                  {/* Left Column - Basic Info & Ability Scores */}
-                  <div className="space-y-6 lg:col-span-4">
-                    {/* Basic Character Information */}
-                    <CharacterBasicInfo
-                      character={character}
-                      race={character.race}
-                      characterClass={character.class}
-                      level={character.level}
-                      background={character.background}
-                      playerName={character.playerName}
-                      alignment={character.alignment}
-                      onUpdateRace={race => updateCharacter({ race })}
-                      onUpdateClass={updateClass}
-                      onUpdateLevel={updateLevel}
-                      onUpdateBackground={background =>
-                        updateCharacter({ background })
-                      }
-                      onUpdatePlayerName={playerName =>
-                        updateCharacter({ playerName })
-                      }
-                      onUpdateAlignment={alignment =>
-                        updateCharacter({ alignment })
-                      }
-                      onAddClassLevel={addClassLevel}
-                      onRemoveClassLevel={removeClassLevel}
-                      onUpdateClassLevel={updateClassLevel}
-                      getClassDisplayString={getClassDisplayString}
-                    />
-
-                    {/* Ability Scores */}
-                    <AbilityScores
-                      abilities={character.abilities}
-                      characterLevel={totalLevel}
-                      onUpdateAbilityScore={updateAbilityScore}
-                      onRollAbilityCheck={rollAbilityCheck}
-                    />
-
-                    {/* Weapon Proficiencies */}
-                    <ErrorBoundary
-                      fallback={
-                        <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-4 shadow">
-                          <h3 className="text-body mb-2 text-sm font-medium">
-                            Weapon Proficiencies
-                          </h3>
-                          <p className="text-muted">
-                            Unable to load weapon proficiencies
-                          </p>
-                        </div>
-                      }
-                    >
-                      <WeaponProficiencies />
-                    </ErrorBoundary>
-
-                    {/* Heroic Inspiration */}
-                    <HeroicInspirationTracker
-                      inspiration={character.heroicInspiration}
-                      onAddInspiration={addHeroicInspiration}
-                      onUpdateInspiration={updateHeroicInspiration}
-                      onUseInspiration={useHeroicInspiration}
-                      onResetInspiration={resetHeroicInspiration}
-                    />
-
-                    {/* Bardic Inspiration (Bard class only) */}
-                    {hasHydrated &&
-                      (character.classes?.some(
-                        c => c.className.toLowerCase() === 'bard'
-                      ) ||
-                        character.class?.name?.toLowerCase() === 'bard') && (
-                        <BardicInspirationTracker
-                          bardicInspiration={
-                            character.bardicInspiration ?? { usesExpended: 0 }
-                          }
-                          character={character}
-                          onUseInspiration={useBardicInspiration}
-                          onRestoreInspiration={restoreBardicInspiration}
-                          onResetInspiration={resetBardicInspiration}
-                        />
-                      )}
-
-                    {/* Conditions & Diseases Quick View */}
-                    {hasHydrated &&
-                      (character.conditionsAndDiseases?.activeConditions
-                        ?.length > 0 ||
-                        character.conditionsAndDiseases?.activeDiseases
-                          ?.length > 0) && (
-                        <div className="border-accent-red-border rounded-lg border-2 bg-gradient-to-br from-[var(--gradient-red-from)] to-[var(--gradient-red-to)] p-4 shadow-sm">
-                          <div className="mb-3 flex items-center justify-between">
-                            <h3 className="text-accent-red-text flex items-center gap-2 text-base font-semibold">
-                              <AlertTriangle className="h-5 w-5" />
-                              Active Conditions & Diseases
-                            </h3>
-                            <Button
-                              onClick={() =>
-                                tabsRef.current?.switchToTab('conditions')
-                              }
-                              variant="ghost"
-                              size="xs"
-                              className="text-accent-red-text-muted hover:bg-accent-red-bg-strong"
-                            >
-                              Manage →
-                            </Button>
-                          </div>
-                          <div className="space-y-2">
-                            {character.conditionsAndDiseases?.activeConditions?.map?.(
-                              condition => (
-                                <div
-                                  key={condition.id}
-                                  className="border-accent-red-border bg-surface-raised flex items-center justify-between gap-2 rounded-lg border-2 p-2"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="danger" size="sm">
-                                      {condition.name}
-                                    </Badge>
-                                    {condition.stackable &&
-                                      condition.count > 1 && (
-                                        <Badge variant="warning" size="sm">
-                                          Level {condition.count}
-                                        </Badge>
-                                      )}
-                                  </div>
-                                  <Badge variant="neutral" size="sm">
-                                    {condition.source}
-                                  </Badge>
-                                </div>
-                              )
-                            )}
-                            {character.conditionsAndDiseases?.activeDiseases?.map?.(
-                              disease => (
-                                <div
-                                  key={disease.id}
-                                  className="border-accent-purple-border bg-surface-raised flex items-center justify-between gap-2 rounded-lg border-2 p-2"
-                                >
-                                  <Badge variant="info" size="sm">
-                                    {disease.name}
-                                  </Badge>
-                                  <Badge variant="neutral" size="sm">
-                                    {disease.source}
-                                  </Badge>
-                                </div>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                    {/* Quick Stats */}
-                    <QuickStats
-                      passivePerception={10 + getSkillModifier('perception')}
-                      proficiencyBonus={proficiencyBonus}
-                    />
-
-                    {/* Special Abilities - Read-only, only show active abilities from extendedFeatures */}
-                    <TraitTracker<ExtendedFeature>
-                      traits={(character.extendedFeatures || []).filter(
-                        trait => !trait.isPassive
-                      )}
-                      characterLevel={totalLevel}
-                      onUpdateTrait={updateExtendedFeature}
-                      onDeleteTrait={deleteExtendedFeature}
-                      onUseTrait={useExtendedFeature}
-                      onResetTraits={resetExtendedFeatures}
-                      readonly={false}
-                      hideControls={true}
-                      enableViewModal={true}
-                    />
-                  </div>
-
-                  {/* Middle Column - Skills & Saving Throws */}
-                  <div className="space-y-6 lg:col-span-4">
-                    {/* Saving Throws */}
-                    <SavingThrows
-                      savingThrows={character.savingThrows}
-                      getSavingThrowModifier={getSavingThrowModifier}
-                      onUpdateSavingThrowProficiency={
-                        updateSavingThrowProficiency
-                      }
-                      onRollSavingThrow={rollSavingThrow}
-                    />
-
-                    {/* Skills */}
-                    <Skills
-                      skills={character.skills}
-                      jackOfAllTrades={character.jackOfAllTrades ?? false}
-                      proficiencyBonus={proficiencyBonus}
-                      getSkillModifier={getSkillModifier}
-                      onUpdateSkillProficiency={updateSkillProficiency}
-                      onUpdateSkillExpertise={updateSkillExpertise}
-                      onToggleJackOfAllTrades={toggleJackOfAllTrades}
-                      onRollSkillCheck={rollSkillCheck}
-                      onToggleSkillBonusAbility={toggleSkillBonusAbility}
-                    />
-
-                    {/* Experience Points */}
-                    <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                      <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
-                        Experience Points
-                      </h2>
-                      <XPTracker
-                        currentXP={character.experience}
-                        currentLevel={totalLevel}
-                        onAddXP={addExperience}
-                        onSetXP={setExperience}
-                      />
+                {/* Rest & Recovery - Standalone Section */}
+                <CollapsibleSection
+                  title="Rest & Recovery"
+                  icon="🛌"
+                  defaultExpanded={false}
+                  persistKey="rest-recovery"
+                  className="border-divider bg-surface-raised rounded-lg border shadow-lg"
+                  contentClassName="px-6 pb-6"
+                  badge={
+                    <div className="flex items-center gap-2">
+                      <span className="bg-accent-amber-bg-strong text-accent-amber-text-muted rounded-md px-2 py-0.5 text-xs font-medium">
+                        Day {character.daysSpent || 0}
+                      </span>
+                      <span className="bg-accent-blue-bg-strong text-accent-blue-text-muted rounded-md px-2 py-0.5 text-xs font-medium">
+                        Short Rest
+                      </span>
+                      <span className="bg-accent-indigo-bg-strong text-accent-indigo-text rounded-md px-2 py-0.5 text-xs font-medium">
+                        Long Rest
+                      </span>
                     </div>
+                  }
+                >
+                  <div className="space-y-6">
+                    {/* Rest Manager */}
+                    <RestManager
+                      onShortRest={takeShortRest}
+                      onLongRest={takeLongRest}
+                      onShowShortRestToast={showShortRest}
+                      onShowLongRestToast={showLongRest}
+                    />
 
-                    {/* Spell Slots */}
-                    {characterHasSpells && (
-                      <SpellSlotTracker
-                        spellSlots={character.spellSlots}
-                        pactMagic={character.pactMagic}
-                        onSpellSlotChange={updateSpellSlot}
-                        onPactMagicChange={
-                          character.pactMagic ? updatePactMagicSlot : undefined
-                        }
-                        onResetSpellSlots={resetSpellSlots}
-                        onResetPactMagic={
-                          character.pactMagic ? resetPactMagicSlots : undefined
-                        }
-                      />
-                    )}
+                    {/* Days Spent Tracker - Full Width */}
+                    <DaysSpentTracker
+                      daysSpent={character.daysSpent || 0}
+                      onUpdateDays={updateDaysSpent}
+                      onIncrementDays={incrementDaysSpent}
+                    />
                   </div>
+                </CollapsibleSection>
 
-                  {/* Right Column - Combat Stats & Features */}
-                  <div className="space-y-6 lg:col-span-4">
-                    {/* Combat Stats */}
-                    <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                      <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
-                        Combat Stats
-                      </h2>
+                {/* Section Divider */}
+                <div className="flex items-center justify-center">
+                  <div className="via-divider-strong h-px w-full max-w-md bg-gradient-to-r from-transparent to-transparent"></div>
+                  <span className="text-muted px-4 font-medium">
+                    Core Stats
+                  </span>
+                  <div className="via-divider-strong h-px w-full max-w-md bg-gradient-to-r from-transparent to-transparent"></div>
+                </div>
 
-                      {/* Armor Class */}
-                      <ArmorClassManager
+                {/* Core D&D Stats Section */}
+                <CollapsibleSection
+                  title="Character Statistics"
+                  icon="📊"
+                  defaultExpanded={true}
+                  persistKey="character-statistics"
+                  className="border-accent-blue-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-blue-from)] to-[var(--gradient-indigo-to)] shadow-lg backdrop-blur-sm"
+                  headerClassName="rounded-t-xl"
+                  contentClassName="px-6 pb-6"
+                  badge={
+                    <div className="flex items-center gap-2">
+                      <span className="bg-accent-blue-bg-strong text-accent-blue-text rounded-full px-3 py-1 text-sm font-medium">
+                        Level {totalLevel}
+                      </span>
+                      <span className="bg-accent-green-bg-strong text-accent-green-text rounded-full px-3 py-1 text-sm font-medium">
+                        HP: {character.hitPoints.current}/
+                        {character.hitPoints.max}
+                      </span>
+                    </div>
+                  }
+                >
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                    {/* Left Column - Basic Info & Ability Scores */}
+                    <div className="space-y-6 lg:col-span-4">
+                      {/* Basic Character Information */}
+                      <CharacterBasicInfo
                         character={character}
-                        onUpdateArmorClass={ac =>
-                          updateCharacter({ armorClass: ac })
+                        race={character.race}
+                        characterClass={character.class}
+                        level={character.level}
+                        background={character.background}
+                        playerName={character.playerName}
+                        alignment={character.alignment}
+                        onUpdateRace={race => updateCharacter({ race })}
+                        onUpdateClass={updateClass}
+                        onUpdateLevel={updateLevel}
+                        onUpdateBackground={background =>
+                          updateCharacter({ background })
                         }
-                        onUpdateTempArmorClass={updateTempArmorClass}
-                        onToggleTempAC={toggleTempAC}
-                        onToggleShield={toggleShield}
-                        onUpdateShieldBonus={updateShieldBonus}
+                        onUpdatePlayerName={playerName =>
+                          updateCharacter({ playerName })
+                        }
+                        onUpdateAlignment={alignment =>
+                          updateCharacter({ alignment })
+                        }
+                        onAddClassLevel={addClassLevel}
+                        onRemoveClassLevel={removeClassLevel}
+                        onUpdateClassLevel={updateClassLevel}
+                        getClassDisplayString={getClassDisplayString}
                       />
 
-                      {/* Combat Stats */}
-                      <CombatStats
-                        character={character}
-                        getInitiativeModifier={getInitiativeModifier}
-                        onUpdateInitiative={updateInitiative}
-                        onResetInitiativeToDefault={resetInitiativeToDefault}
-                        onUpdateSpeed={speed => updateCharacter({ speed })}
-                        onToggleReaction={toggleReaction}
-                        onResetReaction={resetReaction}
-                        onRollInitiative={rollInitiative}
+                      {/* Ability Scores */}
+                      <AbilityScores
+                        abilities={character.abilities}
+                        characterLevel={totalLevel}
+                        onUpdateAbilityScore={updateAbilityScore}
+                        onRollAbilityCheck={rollAbilityCheck}
                       />
 
-                      {/* Hit Points - Now using comprehensive HP Manager */}
-                      <div className="mb-6">
-                        <ErrorBoundary
-                          fallback={
-                            <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                              <h3 className="text-accent-red-text mb-4 text-lg font-bold">
-                                Hit Points
-                              </h3>
-                              <p className="text-muted">
-                                Unable to load HP manager
-                              </p>
-                            </div>
-                          }
-                        >
-                          <HitPointManager
-                            hitPoints={character.hitPoints}
-                            classInfo={character.class}
-                            level={totalLevel}
-                            constitutionScore={character.abilities.constitution}
-                            onApplyDamage={applyDamageToCharacter}
-                            onApplyHealing={applyHealingToCharacter}
-                            onAddTemporaryHP={addTemporaryHPToCharacter}
-                            onMakeDeathSave={makeDeathSavingThrow}
-                            onResetDeathSaves={resetDeathSavingThrows}
-                            onToggleCalculationMode={toggleHPCalculationMode}
-                            onRecalculateMaxHP={recalculateMaxHP}
-                            onUpdateHitPoints={updateHitPoints}
-                          />
-                        </ErrorBoundary>
-                      </div>
-
-                      {/* Hit Dice */}
+                      {/* Weapon Proficiencies */}
                       <ErrorBoundary
                         fallback={
-                          <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
+                          <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-4 shadow">
                             <h3 className="text-body mb-2 text-sm font-medium">
-                              Hit Dice
+                              Weapon Proficiencies
                             </h3>
                             <p className="text-muted">
-                              Unable to load hit dice tracker
+                              Unable to load weapon proficiencies
                             </p>
                           </div>
                         }
                       >
-                        <HitDiceTracker
-                          hitDicePools={character.hitDicePools || {}}
-                          onUseHitDie={useHitDie}
-                          onRestoreHitDice={restoreHitDice}
-                          onResetAllHitDice={resetAllHitDice}
-                        />
+                        <WeaponProficiencies />
                       </ErrorBoundary>
+
+                      {/* Heroic Inspiration */}
+                      <HeroicInspirationTracker
+                        inspiration={character.heroicInspiration}
+                        onAddInspiration={addHeroicInspiration}
+                        onUpdateInspiration={updateHeroicInspiration}
+                        onUseInspiration={spendHeroicInspiration}
+                        onResetInspiration={resetHeroicInspiration}
+                      />
+
+                      {/* Bardic Inspiration (Bard class only) */}
+                      {hasHydrated &&
+                        (character.classes?.some(
+                          c => c.className.toLowerCase() === 'bard'
+                        ) ||
+                          character.class?.name?.toLowerCase() === 'bard') && (
+                          <BardicInspirationTracker
+                            bardicInspiration={
+                              character.bardicInspiration ?? { usesExpended: 0 }
+                            }
+                            character={character}
+                            onUseInspiration={useBardicInspiration}
+                            onRestoreInspiration={restoreBardicInspiration}
+                            onResetInspiration={resetBardicInspiration}
+                          />
+                        )}
+
+                      {/* Conditions & Diseases Quick View */}
+                      {hasHydrated &&
+                        (character.conditionsAndDiseases?.activeConditions
+                          ?.length > 0 ||
+                          character.conditionsAndDiseases?.activeDiseases
+                            ?.length > 0) && (
+                          <div className="border-accent-red-border rounded-lg border-2 bg-gradient-to-br from-[var(--gradient-red-from)] to-[var(--gradient-red-to)] p-4 shadow-sm">
+                            <div className="mb-3 flex items-center justify-between">
+                              <h3 className="text-accent-red-text flex items-center gap-2 text-base font-semibold">
+                                <AlertTriangle className="h-5 w-5" />
+                                Active Conditions & Diseases
+                              </h3>
+                              <Button
+                                onClick={() =>
+                                  tabsRef.current?.switchToTab('conditions')
+                                }
+                                variant="ghost"
+                                size="xs"
+                                className="text-accent-red-text-muted hover:bg-accent-red-bg-strong"
+                              >
+                                Manage →
+                              </Button>
+                            </div>
+                            <div className="space-y-2">
+                              {character.conditionsAndDiseases?.activeConditions?.map?.(
+                                condition => (
+                                  <div
+                                    key={condition.id}
+                                    className="border-accent-red-border bg-surface-raised flex items-center justify-between gap-2 rounded-lg border-2 p-2"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="danger" size="sm">
+                                        {condition.name}
+                                      </Badge>
+                                      {condition.stackable &&
+                                        condition.count > 1 && (
+                                          <Badge variant="warning" size="sm">
+                                            Level {condition.count}
+                                          </Badge>
+                                        )}
+                                    </div>
+                                    <Badge variant="neutral" size="sm">
+                                      {condition.source}
+                                    </Badge>
+                                  </div>
+                                )
+                              )}
+                              {character.conditionsAndDiseases?.activeDiseases?.map?.(
+                                disease => (
+                                  <div
+                                    key={disease.id}
+                                    className="border-accent-purple-border bg-surface-raised flex items-center justify-between gap-2 rounded-lg border-2 p-2"
+                                  >
+                                    <Badge variant="info" size="sm">
+                                      {disease.name}
+                                    </Badge>
+                                    <Badge variant="neutral" size="sm">
+                                      {disease.source}
+                                    </Badge>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                      {/* Quick Stats */}
+                      <QuickStats
+                        passivePerception={10 + getSkillModifier('perception')}
+                        proficiencyBonus={proficiencyBonus}
+                      />
+
+                      {/* Special Abilities - Read-only, only show active abilities from extendedFeatures */}
+                      <TraitTracker<ExtendedFeature>
+                        traits={(character.extendedFeatures || []).filter(
+                          trait => !trait.isPassive
+                        )}
+                        characterLevel={totalLevel}
+                        onUpdateTrait={updateExtendedFeature}
+                        onDeleteTrait={deleteExtendedFeature}
+                        onUseTrait={useExtendedFeature}
+                        onResetTraits={resetExtendedFeatures}
+                        readonly={false}
+                        hideControls={true}
+                        enableViewModal={true}
+                      />
                     </div>
-                    {/* Languages */}
-                    <Languages
-                      languages={character.languages || []}
-                      onAddLanguage={addLanguage}
-                      onDeleteLanguage={deleteLanguage}
-                    />
-                  </div>
-                </div>
-              </CollapsibleSection>
 
-              {/* Tool Proficiencies Section */}
-              <CollapsibleSection
-                title="Tool Proficiencies"
-                icon="🔧"
-                defaultExpanded={false}
-                persistKey="tool-proficiencies"
-                className="border-accent-indigo-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-indigo-from)] to-[var(--gradient-indigo-to)] shadow-lg backdrop-blur-sm"
-                headerClassName="rounded-t-xl"
-                contentClassName="px-6 pb-6"
-                badge={
-                  (character.toolProficiencies?.length || 0) > 0 ? (
-                    <span className="bg-accent-indigo-bg-strong text-accent-indigo-text rounded-full px-3 py-1 text-sm font-medium">
-                      {character.toolProficiencies?.filter(
-                        t => t.proficiencyLevel !== 'none'
-                      ).length || 0}{' '}
-                      proficient
-                    </span>
-                  ) : undefined
-                }
-              >
-                <ToolProficienciesSection
-                  toolProficiencies={character.toolProficiencies || []}
-                  proficiencyBonus={proficiencyBonus}
-                  onAddToolProficiency={addToolProficiency}
-                  onUpdateToolProficiency={updateToolProficiency}
-                  onDeleteToolProficiency={deleteToolProficiency}
-                />
-              </CollapsibleSection>
+                    {/* Middle Column - Skills & Saving Throws */}
+                    <div className="space-y-6 lg:col-span-4">
+                      {/* Saving Throws */}
+                      <SavingThrows
+                        savingThrows={character.savingThrows}
+                        getSavingThrowModifier={getSavingThrowModifier}
+                        onUpdateSavingThrowProficiency={
+                          updateSavingThrowProficiency
+                        }
+                        onRollSavingThrow={rollSavingThrow}
+                      />
 
-              {/* Active Abilities & Features Section */}
-              <CollapsibleSection
-                title="Active Abilities & Features"
-                icon="⚡"
-                defaultExpanded={false}
-                persistKey="active-features"
-                className="border-accent-amber-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] shadow-lg backdrop-blur-sm"
-                headerClassName="rounded-t-xl"
-                contentClassName="px-6 pb-6"
-                badge={
-                  <div className="flex items-center gap-2">
-                    {(character.extendedFeatures?.length || 0) > 0 && (
-                      <span className="bg-accent-amber-bg-strong text-accent-amber-text rounded-full px-3 py-1 text-sm font-medium">
-                        {character.extendedFeatures?.length || 0} abilities
-                      </span>
-                    )}
-                    {character.extendedFeatures?.some(f => f.usedUses > 0) && (
-                      <span className="bg-accent-red-bg-strong text-accent-red-text rounded-full px-3 py-1 text-sm font-medium">
-                        {
-                          character.extendedFeatures?.filter(
-                            f => f.usedUses > 0
-                          ).length
-                        }{' '}
-                        used
-                      </span>
-                    )}
-                  </div>
-                }
-              >
-                <ExtendedFeaturesSection
-                  features={character.extendedFeatures || []}
-                  character={character}
-                  onAddFeature={addExtendedFeature}
-                  onUpdateFeature={updateExtendedFeature}
-                  onDeleteFeature={deleteExtendedFeature}
-                  onUseFeature={useExtendedFeature}
-                  onResetFeatures={resetExtendedFeatures}
-                  onReorderFeatures={reorderExtendedFeatures}
-                />
-              </CollapsibleSection>
+                      {/* Skills */}
+                      <Skills
+                        skills={character.skills}
+                        jackOfAllTrades={character.jackOfAllTrades ?? false}
+                        proficiencyBonus={proficiencyBonus}
+                        getSkillModifier={getSkillModifier}
+                        onUpdateSkillProficiency={updateSkillProficiency}
+                        onUpdateSkillExpertise={updateSkillExpertise}
+                        onToggleJackOfAllTrades={toggleJackOfAllTrades}
+                        onRollSkillCheck={rollSkillCheck}
+                        onToggleSkillBonusAbility={toggleSkillBonusAbility}
+                      />
 
-              {/* Grouped Tabbed Interface for Additional Sections */}
-              <CollapsibleSection
-                title="Character Details & Management"
-                icon="📋"
-                defaultExpanded={true}
-                persistKey="character-details"
-                className="border-accent-green-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-green-from)] to-[var(--gradient-emerald-to)] shadow-lg backdrop-blur-sm"
-                headerClassName="rounded-t-xl"
-                contentClassName="px-6 pb-6"
-                badge={
-                  <div className="flex items-center gap-2">
-                    {character.spells.length > 0 && (
-                      <span className="bg-accent-purple-bg-strong text-accent-purple-text rounded-full px-3 py-1 text-sm font-medium">
-                        {character.spells.length} spells
-                      </span>
-                    )}
-                    {(character.features?.length || 0) > 0 && (
-                      <span className="bg-accent-green-bg-strong text-accent-green-text rounded-full px-3 py-1 text-sm font-medium">
-                        {character.features?.length || 0} features
-                      </span>
-                    )}
+                      {/* Experience Points */}
+                      <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                        <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
+                          Experience Points
+                        </h2>
+                        <XPTracker
+                          currentXP={character.experience}
+                          currentLevel={totalLevel}
+                          onAddXP={addExperience}
+                          onSetXP={setExperience}
+                        />
+                      </div>
+
+                      {/* Spell Slots */}
+                      {characterHasSpells && (
+                        <SpellSlotTracker
+                          spellSlots={character.spellSlots}
+                          pactMagic={character.pactMagic}
+                          onSpellSlotChange={updateSpellSlot}
+                          onPactMagicChange={
+                            character.pactMagic
+                              ? updatePactMagicSlot
+                              : undefined
+                          }
+                          onResetSpellSlots={resetSpellSlots}
+                          onResetPactMagic={
+                            character.pactMagic
+                              ? resetPactMagicSlots
+                              : undefined
+                          }
+                        />
+                      )}
+                    </div>
+
+                    {/* Right Column - Combat Stats & Features */}
+                    <div className="space-y-6 lg:col-span-4">
+                      {/* Combat Stats */}
+                      <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                        <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
+                          Combat Stats
+                        </h2>
+
+                        {/* Armor Class */}
+                        <ArmorClassManager
+                          character={character}
+                          onUpdateArmorClass={ac =>
+                            updateCharacter({ armorClass: ac })
+                          }
+                          onUpdateTempArmorClass={updateTempArmorClass}
+                          onToggleTempAC={toggleTempAC}
+                          onToggleShield={toggleShield}
+                          onUpdateShieldBonus={updateShieldBonus}
+                        />
+
+                        {/* Combat Stats */}
+                        <CombatStats
+                          character={character}
+                          getInitiativeModifier={getInitiativeModifier}
+                          onUpdateInitiative={updateInitiative}
+                          onResetInitiativeToDefault={resetInitiativeToDefault}
+                          onUpdateSpeed={speed => updateCharacter({ speed })}
+                          onToggleReaction={toggleReaction}
+                          onResetReaction={resetReaction}
+                          onRollInitiative={rollInitiative}
+                        />
+
+                        {/* Hit Points - Now using comprehensive HP Manager */}
+                        <div className="mb-6">
+                          <ErrorBoundary
+                            fallback={
+                              <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                                <h3 className="text-accent-red-text mb-4 text-lg font-bold">
+                                  Hit Points
+                                </h3>
+                                <p className="text-muted">
+                                  Unable to load HP manager
+                                </p>
+                              </div>
+                            }
+                          >
+                            <HitPointManager
+                              hitPoints={character.hitPoints}
+                              classInfo={character.class}
+                              level={totalLevel}
+                              constitutionScore={
+                                character.abilities.constitution
+                              }
+                              onApplyDamage={applyDamageToCharacter}
+                              onApplyHealing={applyHealingToCharacter}
+                              onAddTemporaryHP={addTemporaryHPToCharacter}
+                              onMakeDeathSave={makeDeathSavingThrow}
+                              onResetDeathSaves={resetDeathSavingThrows}
+                              onToggleCalculationMode={toggleHPCalculationMode}
+                              onRecalculateMaxHP={recalculateMaxHP}
+                              onUpdateHitPoints={updateHitPoints}
+                            />
+                          </ErrorBoundary>
+                        </div>
+
+                        {/* Hit Dice */}
+                        <ErrorBoundary
+                          fallback={
+                            <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
+                              <h3 className="text-body mb-2 text-sm font-medium">
+                                Hit Dice
+                              </h3>
+                              <p className="text-muted">
+                                Unable to load hit dice tracker
+                              </p>
+                            </div>
+                          }
+                        >
+                          <HitDiceTracker
+                            hitDicePools={character.hitDicePools || {}}
+                            onUseHitDie={useHitDie}
+                            onRestoreHitDice={restoreHitDice}
+                            onResetAllHitDice={resetAllHitDice}
+                          />
+                        </ErrorBoundary>
+                      </div>
+                      {/* Languages */}
+                      <Languages
+                        languages={character.languages || []}
+                        onAddLanguage={addLanguage}
+                        onDeleteLanguage={deleteLanguage}
+                      />
+                    </div>
                   </div>
-                }
-              >
-                <GroupedTabs
-                  defaultTab="spellcasting"
-                  className="w-full"
-                  groups={createCharacterSheetTabsConfig({
-                    character,
-                    hasHydrated,
-                    addFeature,
-                    updateFeature,
-                    deleteFeature,
-                    addTrait,
-                    updateTrait,
-                    deleteTrait,
-                    updateCharacterBackground,
-                    addNote,
-                    updateNote,
-                    deleteNote,
-                    reorderNotes,
-                    addToast,
-                  })}
-                  ref={tabsRef}
-                />
-              </CollapsibleSection>
-            </main>
+                </CollapsibleSection>
+
+                {/* Tool Proficiencies Section */}
+                <CollapsibleSection
+                  title="Tool Proficiencies"
+                  icon="🔧"
+                  defaultExpanded={false}
+                  persistKey="tool-proficiencies"
+                  className="border-accent-indigo-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-indigo-from)] to-[var(--gradient-indigo-to)] shadow-lg backdrop-blur-sm"
+                  headerClassName="rounded-t-xl"
+                  contentClassName="px-6 pb-6"
+                  badge={
+                    (character.toolProficiencies?.length || 0) > 0 ? (
+                      <span className="bg-accent-indigo-bg-strong text-accent-indigo-text rounded-full px-3 py-1 text-sm font-medium">
+                        {character.toolProficiencies?.filter(
+                          t => t.proficiencyLevel !== 'none'
+                        ).length || 0}{' '}
+                        proficient
+                      </span>
+                    ) : undefined
+                  }
+                >
+                  <ToolProficienciesSection
+                    toolProficiencies={character.toolProficiencies || []}
+                    proficiencyBonus={proficiencyBonus}
+                    onAddToolProficiency={addToolProficiency}
+                    onUpdateToolProficiency={updateToolProficiency}
+                    onDeleteToolProficiency={deleteToolProficiency}
+                  />
+                </CollapsibleSection>
+
+                {/* Active Abilities & Features Section */}
+                <CollapsibleSection
+                  title="Active Abilities & Features"
+                  icon="⚡"
+                  defaultExpanded={false}
+                  persistKey="active-features"
+                  className="border-accent-amber-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] shadow-lg backdrop-blur-sm"
+                  headerClassName="rounded-t-xl"
+                  contentClassName="px-6 pb-6"
+                  badge={
+                    <div className="flex items-center gap-2">
+                      {(character.extendedFeatures?.length || 0) > 0 && (
+                        <span className="bg-accent-amber-bg-strong text-accent-amber-text rounded-full px-3 py-1 text-sm font-medium">
+                          {character.extendedFeatures?.length || 0} abilities
+                        </span>
+                      )}
+                      {character.extendedFeatures?.some(
+                        f => f.usedUses > 0
+                      ) && (
+                        <span className="bg-accent-red-bg-strong text-accent-red-text rounded-full px-3 py-1 text-sm font-medium">
+                          {
+                            character.extendedFeatures?.filter(
+                              f => f.usedUses > 0
+                            ).length
+                          }{' '}
+                          used
+                        </span>
+                      )}
+                    </div>
+                  }
+                >
+                  <ExtendedFeaturesSection
+                    features={character.extendedFeatures || []}
+                    character={character}
+                    onAddFeature={addExtendedFeature}
+                    onUpdateFeature={updateExtendedFeature}
+                    onDeleteFeature={deleteExtendedFeature}
+                    onUseFeature={useExtendedFeature}
+                    onResetFeatures={resetExtendedFeatures}
+                    onReorderFeatures={reorderExtendedFeatures}
+                  />
+                </CollapsibleSection>
+
+                {/* Grouped Tabbed Interface for Additional Sections */}
+                <CollapsibleSection
+                  title="Character Details & Management"
+                  icon="📋"
+                  defaultExpanded={true}
+                  persistKey="character-details"
+                  className="border-accent-green-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-green-from)] to-[var(--gradient-emerald-to)] shadow-lg backdrop-blur-sm"
+                  headerClassName="rounded-t-xl"
+                  contentClassName="px-6 pb-6"
+                  badge={
+                    <div className="flex items-center gap-2">
+                      {character.spells.length > 0 && (
+                        <span className="bg-accent-purple-bg-strong text-accent-purple-text rounded-full px-3 py-1 text-sm font-medium">
+                          {character.spells.length} spells
+                        </span>
+                      )}
+                      {(character.features?.length || 0) > 0 && (
+                        <span className="bg-accent-green-bg-strong text-accent-green-text rounded-full px-3 py-1 text-sm font-medium">
+                          {character.features?.length || 0} features
+                        </span>
+                      )}
+                    </div>
+                  }
+                >
+                  <GroupedTabs
+                    defaultTab="spellcasting"
+                    className="w-full"
+                    groups={createCharacterSheetTabsConfig({
+                      character,
+                      hasHydrated,
+                      addFeature,
+                      updateFeature,
+                      deleteFeature,
+                      addTrait,
+                      updateTrait,
+                      deleteTrait,
+                      updateCharacterBackground,
+                      addNote,
+                      updateNote,
+                      deleteNote,
+                      reorderNotes,
+                      addToast,
+                    })}
+                    ref={tabsRef}
+                  />
+                </CollapsibleSection>
+              </main>
+            )}
 
             <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 

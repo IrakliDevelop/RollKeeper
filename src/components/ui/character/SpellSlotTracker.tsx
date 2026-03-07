@@ -11,6 +11,7 @@ interface SpellSlotTrackerProps {
   onPactMagicChange?: (used: number) => void;
   onResetSpellSlots: () => void;
   onResetPactMagic?: () => void;
+  compact?: boolean;
   className?: string;
 }
 
@@ -21,9 +22,9 @@ export default function SpellSlotTracker({
   onPactMagicChange,
   onResetSpellSlots,
   onResetPactMagic,
+  compact = false,
   className = '',
 }: SpellSlotTrackerProps) {
-  // Use the shared SpellSlotTracker component with full functionality
   return (
     <SharedSpellSlotTracker
       spellSlots={spellSlots}
@@ -33,7 +34,7 @@ export default function SpellSlotTracker({
       onResetSpellSlots={onResetSpellSlots}
       onResetPactMagic={onResetPactMagic}
       readonly={false}
-      compact={false}
+      compact={compact}
       hideControls={false}
       hideResetButtons={false}
       showOnlyUsed={false}
