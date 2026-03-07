@@ -18,7 +18,6 @@ export function LevelUpOverlay({
   characterName,
   autoDismissAfter = 4000,
 }: LevelUpOverlayProps) {
-  console.log('LevelUpOverlay rendered', isVisible, newLevel, characterName);
   const [shouldRender, setShouldRender] = useState(false);
   const [animationPhase, setAnimationPhase] = useState<
     'entering' | 'visible' | 'exiting' | 'hidden'

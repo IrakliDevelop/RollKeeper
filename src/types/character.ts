@@ -53,6 +53,7 @@ export interface ToolProficiency {
   id: string;
   name: string; // e.g., "Thieves' Tools", "Smith's Tools", "Lute"
   proficiencyLevel: ToolProficiencyLevel;
+  isTemporary?: boolean; // Swappable proficiency (e.g. elf trance)
   createdAt: string;
   updatedAt: string;
 }

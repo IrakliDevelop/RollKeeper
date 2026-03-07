@@ -37,7 +37,8 @@ import CombatStats from '@/components/ui/character/CombatStats';
 import ActionsSection from '@/components/ui/character/ActionsSection';
 import CollapsibleSection from '@/components/ui/layout/CollapsibleSection';
 import QuickStats from '@/components/ui/character/QuickStats';
-import LanguagesAndProficiencies from '@/components/ui/character/LanguagesAndProficiencies';
+import Languages from '@/components/ui/character/LanguagesAndProficiencies';
+import ToolProficienciesSection from '@/components/ui/character/ToolProficienciesSection';
 import { ExtendedFeaturesSection } from '@/components/ui/character/ExtendedFeatures';
 import { useHydration } from '@/hooks/useHydration';
 import { ABILITY_NAMES, SKILL_NAMES } from '@/utils/constants';
@@ -1001,19 +1002,43 @@ export default function CharacterSheet() {
                         />
                       </ErrorBoundary>
                     </div>
-                    {/* Languages & Tool Proficiencies */}
-                    <LanguagesAndProficiencies
+                    {/* Languages */}
+                    <Languages
                       languages={character.languages || []}
-                      toolProficiencies={character.toolProficiencies || []}
-                      proficiencyBonus={proficiencyBonus}
                       onAddLanguage={addLanguage}
                       onDeleteLanguage={deleteLanguage}
-                      onAddToolProficiency={addToolProficiency}
-                      onUpdateToolProficiency={updateToolProficiency}
-                      onDeleteToolProficiency={deleteToolProficiency}
                     />
                   </div>
                 </div>
+              </CollapsibleSection>
+
+              {/* Tool Proficiencies Section */}
+              <CollapsibleSection
+                title="Tool Proficiencies"
+                icon="🔧"
+                defaultExpanded={false}
+                persistKey="tool-proficiencies"
+                className="border-accent-indigo-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-indigo-from)] to-[var(--gradient-indigo-to)] shadow-lg backdrop-blur-sm"
+                headerClassName="rounded-t-xl"
+                contentClassName="px-6 pb-6"
+                badge={
+                  (character.toolProficiencies?.length || 0) > 0 ? (
+                    <span className="bg-accent-indigo-bg-strong text-accent-indigo-text rounded-full px-3 py-1 text-sm font-medium">
+                      {character.toolProficiencies?.filter(
+                        t => t.proficiencyLevel !== 'none'
+                      ).length || 0}{' '}
+                      proficient
+                    </span>
+                  ) : undefined
+                }
+              >
+                <ToolProficienciesSection
+                  toolProficiencies={character.toolProficiencies || []}
+                  proficiencyBonus={proficiencyBonus}
+                  onAddToolProficiency={addToolProficiency}
+                  onUpdateToolProficiency={updateToolProficiency}
+                  onDeleteToolProficiency={deleteToolProficiency}
+                />
               </CollapsibleSection>
 
               {/* Active Abilities & Features Section */}

@@ -40,7 +40,7 @@ export function useDragAndDrop({
 
       setDraggedIndex(index);
       e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/html', e.currentTarget.outerHTML);
+      e.dataTransfer.setData('text/plain', String(index));
       (e.currentTarget as HTMLElement).style.opacity = '0.5';
     },
     [disabled]
