@@ -3145,6 +3145,11 @@ export const useCharacterStore = create<CharacterStore>()(
             };
           });
 
+          // Reset free casts on all spells (innate / at-will tracking)
+          const resetSpells = character.spells.map(spell =>
+            spell.freeCastsUsed ? { ...spell, freeCastsUsed: 0 } : spell
+          );
+
           // Reset ALL spell slots
           const resetSpellSlots = { ...character.spellSlots };
           for (let level = 1; level <= 9; level++) {
@@ -3206,6 +3211,7 @@ export const useCharacterStore = create<CharacterStore>()(
               extendedFeatures: resetExtendedFeatures,
               weapons: resetWeapons,
               magicItems: resetMagicItems,
+              spells: resetSpells,
               spellSlots: resetSpellSlots,
               pactMagic: resetPactMagic,
               hitDicePools: resetHitDicePools,
@@ -3213,7 +3219,7 @@ export const useCharacterStore = create<CharacterStore>()(
               reaction: resetReaction,
               tempArmorClass: resetTempArmorClass,
               bardicInspiration: resetBardicInspiration,
-              daysSpent: (character.daysSpent || 0) + 1, // Increment days spent on long rest
+              daysSpent: (character.daysSpent || 0) + 1,
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',

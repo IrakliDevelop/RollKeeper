@@ -3,7 +3,15 @@
 import React, { useState } from 'react';
 import { Spell, SpellActionType } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
-import { Plus, Edit2, Trash2, Eye, BookOpen } from 'lucide-react';
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Eye,
+  BookOpen,
+  Zap,
+  Infinity,
+} from 'lucide-react';
 import { FancySelect } from '@/components/ui/forms/FancySelect';
 import { ModalPortal } from '@/components/ui/feedback/ModalPortal';
 import DragDropList from '@/components/ui/layout/DragDropList';
@@ -399,6 +407,27 @@ export const SpellManagement: React.FC = () => {
                               {spell.isAlwaysPrepared && (
                                 <span className="rounded bg-indigo-100 px-2 py-1 text-xs text-indigo-800">
                                   Always Prepared
+                                </span>
+                              )}
+                              {spell.freeCastMax === 0 && (
+                                <span className="flex items-center gap-0.5 rounded bg-emerald-100 px-2 py-1 text-xs text-emerald-700">
+                                  <Infinity size={10} /> At Will
+                                </span>
+                              )}
+                              {spell.freeCastMax !== undefined &&
+                                spell.freeCastMax > 0 && (
+                                  <span
+                                    className={`flex items-center gap-0.5 rounded px-2 py-1 text-xs ${spell.freeCastMax - (spell.freeCastsUsed || 0) > 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}
+                                  >
+                                    <Zap size={10} />{' '}
+                                    {spell.freeCastMax -
+                                      (spell.freeCastsUsed || 0)}
+                                    /{spell.freeCastMax} free
+                                  </span>
+                                )}
+                              {spell.castingSource && (
+                                <span className="rounded bg-indigo-100 px-2 py-1 text-xs text-indigo-700">
+                                  {spell.castingSource}
                                 </span>
                               )}
                             </div>

@@ -20,6 +20,8 @@ import {
   SortDesc,
   X,
   Wand2,
+  Zap,
+  Infinity,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -32,7 +34,11 @@ import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { SpellAutocomplete } from '@/components/ui/forms/SpellAutocomplete';
 import { useSpellsData } from '@/hooks/useSpellsData';
-import { convertProcessedSpellToFormData } from '@/utils/spellConversion';
+import {
+  convertProcessedSpellToFormData,
+  type SpellFormData,
+  type FreeCastMode,
+} from '@/utils/spellConversion';
 import { ProcessedSpell } from '@/types/spells';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
 
@@ -125,32 +131,6 @@ const DAMAGE_TYPES = [
   'Thunder',
 ];
 
-interface SpellFormData {
-  name: string;
-  level: number;
-  school: string;
-  castingTime: string;
-  range: string;
-  components: {
-    verbal: boolean;
-    somatic: boolean;
-    material: boolean;
-    materialDescription: string;
-  };
-  duration: string;
-  description: string;
-  higherLevel: string;
-  ritual: boolean;
-  concentration: boolean;
-  isPrepared: boolean;
-  isAlwaysPrepared: boolean;
-  actionType: SpellActionType | '';
-  savingThrow: string;
-  damage: string;
-  damageType: string;
-  source: string;
-}
-
 interface SpellFilters {
   searchQuery: string;
   level: number | 'all';
@@ -191,6 +171,9 @@ const initialFormData: SpellFormData = {
   damage: '',
   damageType: '',
   source: 'PHB',
+  castingSource: '',
+  freeCastMode: 'normal',
+  freeCastMax: 1,
 };
 
 const initialFilters: SpellFilters = {
@@ -227,6 +210,11 @@ const SpellCard: React.FC<{
   onCast,
 }) => {
   const isCantrip = spell.level === 0;
+  const isAtWill = spell.freeCastMax === 0;
+  const isInnate = spell.freeCastMax !== undefined && spell.freeCastMax > 0;
+  const freeCastsRemaining = isInnate
+    ? spell.freeCastMax! - (spell.freeCastsUsed || 0)
+    : 0;
 
   if (compact) {
     return (
@@ -270,6 +258,24 @@ const SpellCard: React.FC<{
           </div>
 
           <div className="flex flex-shrink-0 items-center gap-1">
+            {isAtWill && (
+              <Badge
+                variant="info"
+                size="sm"
+                className="flex-shrink-0 gap-0.5 bg-emerald-100 text-emerald-700"
+              >
+                <Infinity size={10} /> At Will
+              </Badge>
+            )}
+            {isInnate && (
+              <Badge
+                variant="info"
+                size="sm"
+                className={`flex-shrink-0 gap-0.5 ${freeCastsRemaining > 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}
+              >
+                <Zap size={10} /> {freeCastsRemaining}/{spell.freeCastMax}
+              </Badge>
+            )}
             {spell.concentration && (
               <Badge variant="warning" size="sm">
                 C
@@ -377,6 +383,33 @@ const SpellCard: React.FC<{
             {spell.isAlwaysPrepared && (
               <Badge variant="info" size="sm">
                 Always Prepared
+              </Badge>
+            )}
+            {isAtWill && (
+              <Badge
+                variant="info"
+                size="sm"
+                className="gap-0.5 bg-emerald-100 text-emerald-700"
+              >
+                <Infinity size={12} /> At Will
+              </Badge>
+            )}
+            {isInnate && (
+              <Badge
+                variant="info"
+                size="sm"
+                className={`gap-0.5 ${freeCastsRemaining > 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}
+              >
+                <Zap size={12} /> {freeCastsRemaining}/{spell.freeCastMax} free
+              </Badge>
+            )}
+            {spell.castingSource && (
+              <Badge
+                variant="secondary"
+                size="sm"
+                className="bg-indigo-100 text-indigo-700"
+              >
+                {spell.castingSource}
               </Badge>
             )}
           </div>
@@ -768,26 +801,49 @@ export const EnhancedSpellManagement: React.FC = () => {
 
     if (!formData.name.trim()) return;
 
+    const {
+      freeCastMode,
+      freeCastMax: freeCastMaxVal,
+      castingSource: castingSrc,
+      ...restFormData
+    } = formData;
     const spellData: Omit<Spell, 'id' | 'createdAt' | 'updatedAt'> = {
-      ...formData,
-      higherLevel: formData.higherLevel || undefined,
-      ritual: formData.ritual || undefined,
-      concentration: formData.concentration || undefined,
-      isPrepared: formData.isPrepared || undefined,
-      isAlwaysPrepared: formData.isAlwaysPrepared || undefined,
-      actionType: formData.actionType || undefined,
-      savingThrow: formData.savingThrow || undefined,
-      damage: formData.damage || undefined,
-      damageType: formData.damageType || undefined,
-      source: formData.source || undefined,
+      ...restFormData,
+      higherLevel: restFormData.higherLevel || undefined,
+      ritual: restFormData.ritual || undefined,
+      concentration: restFormData.concentration || undefined,
+      isPrepared: restFormData.isPrepared || undefined,
+      isAlwaysPrepared: restFormData.isAlwaysPrepared || undefined,
+      actionType: restFormData.actionType || undefined,
+      savingThrow: restFormData.savingThrow || undefined,
+      damage: restFormData.damage || undefined,
+      damageType: restFormData.damageType || undefined,
+      source: restFormData.source || undefined,
+      castingSource: castingSrc || undefined,
+      freeCastMax:
+        freeCastMode === 'at_will'
+          ? 0
+          : freeCastMode === 'innate'
+            ? freeCastMaxVal
+            : undefined,
+      freeCastsUsed: freeCastMode !== 'normal' ? 0 : undefined,
     };
 
     if (editingId) {
-      const updatedSpells = character.spells.map(spell =>
-        spell.id === editingId
-          ? { ...spell, ...spellData, updatedAt: new Date().toISOString() }
-          : spell
-      );
+      const updatedSpells = character.spells.map(spell => {
+        if (spell.id !== editingId) return spell;
+        const updated = {
+          ...spell,
+          ...spellData,
+          updatedAt: new Date().toISOString(),
+        };
+        if (spellData.freeCastMax === undefined) {
+          delete updated.freeCastsUsed;
+          delete updated.freeCastMax;
+          delete updated.castingSource;
+        }
+        return updated;
+      });
       updateCharacter({ spells: updatedSpells });
     } else {
       const newSpell: Spell = {
@@ -809,6 +865,17 @@ export const EnhancedSpellManagement: React.FC = () => {
   };
 
   const handleEdit = (spell: Spell) => {
+    let freeCastMode: FreeCastMode = 'normal';
+    let freeCastMax = 1;
+    if (spell.freeCastMax !== undefined) {
+      if (spell.freeCastMax === 0) {
+        freeCastMode = 'at_will';
+      } else {
+        freeCastMode = 'innate';
+        freeCastMax = spell.freeCastMax;
+      }
+    }
+
     setFormData({
       name: spell.name,
       level: spell.level,
@@ -831,6 +898,9 @@ export const EnhancedSpellManagement: React.FC = () => {
       damage: spell.damage || '',
       damageType: spell.damageType || '',
       source: spell.source || 'PHB',
+      castingSource: spell.castingSource || '',
+      freeCastMode,
+      freeCastMax,
     });
     setEditingId(spell.id);
     setIsFormOpen(true);
@@ -879,7 +949,7 @@ export const EnhancedSpellManagement: React.FC = () => {
     setCastModalOpen(true);
   };
 
-  const handleCastSpellConfirm = (spellLevel: number) => {
+  const handleCastSpellConfirm = (spellLevel: number, useFreecast: boolean) => {
     if (!selectedSpell) return;
 
     if (selectedSpell.concentration) {
@@ -889,7 +959,17 @@ export const EnhancedSpellManagement: React.FC = () => {
       startConcentration(selectedSpell.name, selectedSpell.id, spellLevel);
     }
 
-    if (selectedSpell.level > 0) {
+    if (useFreecast) {
+      if (selectedSpell.freeCastMax && selectedSpell.freeCastMax > 0) {
+        updateCharacter({
+          spells: character.spells.map(s =>
+            s.id === selectedSpell.id
+              ? { ...s, freeCastsUsed: (s.freeCastsUsed || 0) + 1 }
+              : s
+          ),
+        });
+      }
+    } else if (selectedSpell.level > 0) {
       updateSpellSlot(
         spellLevel as keyof typeof character.spellSlots,
         character.spellSlots[spellLevel as keyof typeof character.spellSlots]
@@ -1612,6 +1692,76 @@ export const EnhancedSpellManagement: React.FC = () => {
                   </span>
                 </label>
               </div>
+            </div>
+
+            {/* Section: Casting Source */}
+            <div className="space-y-4">
+              <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+                Casting Source
+              </h4>
+
+              <Input
+                label="Source / Origin"
+                value={formData.castingSource}
+                onChange={e =>
+                  setFormData(prev => ({
+                    ...prev,
+                    castingSource: e.target.value,
+                  }))
+                }
+                placeholder='e.g. "Fey Touched", "Drow Magic", "Eldritch Invocation"'
+                helperText="Where this spell comes from (feat, race, background, etc.)"
+              />
+
+              <div>
+                <label className="text-body mb-2 block text-sm font-medium">
+                  Free Casting
+                </label>
+                <SelectField
+                  value={formData.freeCastMode}
+                  onValueChange={value =>
+                    setFormData(prev => ({
+                      ...prev,
+                      freeCastMode: value as FreeCastMode,
+                    }))
+                  }
+                >
+                  <SelectItem value="normal">
+                    Normal (uses spell slot)
+                  </SelectItem>
+                  <SelectItem value="at_will">
+                    At Will (no slot needed, unlimited)
+                  </SelectItem>
+                  <SelectItem value="innate">
+                    Innate (limited free casts per long rest)
+                  </SelectItem>
+                </SelectField>
+                <p className="text-muted mt-1 text-xs">
+                  {formData.freeCastMode === 'normal' &&
+                    'Standard spellcasting — always uses a spell slot.'}
+                  {formData.freeCastMode === 'at_will' &&
+                    'Can always be cast without using a spell slot.'}
+                  {formData.freeCastMode === 'innate' &&
+                    'Can be cast a limited number of times for free per long rest, then requires a slot.'}
+                </p>
+              </div>
+
+              {formData.freeCastMode === 'innate' && (
+                <Input
+                  label="Free Casts per Long Rest"
+                  type="number"
+                  value={formData.freeCastMax.toString()}
+                  onChange={e =>
+                    setFormData(prev => ({
+                      ...prev,
+                      freeCastMax: Math.max(1, parseInt(e.target.value) || 1),
+                    }))
+                  }
+                  min={1}
+                  max={10}
+                  helperText="How many times this spell can be cast without a slot before needing a long rest"
+                />
+              )}
             </div>
 
             {/* Section: Description */}
