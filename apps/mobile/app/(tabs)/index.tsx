@@ -23,13 +23,13 @@ export default function CharactersScreen() {
   const renderCharacter = ({ item }: { item: CharacterStub }) => (
     <Link href={`/character/${item.id}` as any} asChild>
       <Pressable
-        style={[
+        style={StyleSheet.flatten([
           styles.card,
           {
             backgroundColor: Colors[colorScheme].surface,
             borderColor: Colors[colorScheme].border,
           },
-        ]}
+        ])}
       >
         <View style={styles.cardContent}>
           <Text style={styles.characterName}>{item.name}</Text>
