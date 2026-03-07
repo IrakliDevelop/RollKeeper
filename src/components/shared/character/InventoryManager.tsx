@@ -11,6 +11,8 @@ import {
   Search,
   ChevronDown,
   ChevronRight,
+  List,
+  Grid3X3,
 } from 'lucide-react';
 import { formatCurrencyFromCopper } from '@/utils/currency';
 import DragDropList from '@/components/ui/layout/DragDropList';
@@ -21,6 +23,7 @@ import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import {
   ItemCard,
   ItemForm,
+  ItemViewModal,
   initialInventoryFormData,
   type InventoryFormData,
 } from '../../ui/game/inventory';
@@ -86,6 +89,7 @@ export function InventoryManager({
 }: InventoryManagerProps) {
   const [showItemForm, setShowItemForm] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [viewingItem, setViewingItem] = useState<InventoryItem | null>(null);
   const [formData, setFormData] = useState<InventoryFormData>(
     initialInventoryFormData
   );
@@ -93,9 +97,12 @@ export function InventoryManager({
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [compactView, setCompactView] = useState(true);
   const [collapsedLocations, setCollapsedLocations] = useState<Set<string>>(
     new Set()
   );
+
+  const effectiveCompact = compact || compactView;
 
   // Get all unique locations from items
   const allLocations = useMemo(() => {
@@ -190,6 +197,7 @@ export function InventoryManager({
   }, [filteredItems]);
 
   const handleEditItem = (item: InventoryItem) => {
+    setViewingItem(null);
     setEditingItem(item);
     setFormData({
       name: item.name,
@@ -233,11 +241,32 @@ export function InventoryManager({
     });
   };
 
-  const activeFilterCount = [
+  const advancedFilterCount = [
     filterLocation !== 'all' ? 1 : 0,
     filterCategory !== 'all' ? 1 : 0,
-    searchQuery ? 1 : 0,
   ].reduce((a, b) => a + b, 0);
+
+  const renderItemCard = (item: InventoryItem) => (
+    <ItemCard
+      item={item}
+      onView={setViewingItem}
+      onEdit={readonly || !onUpdateItem ? undefined : handleEditItem}
+      onDelete={
+        readonly || !onDeleteItem ? undefined : () => onDeleteItem(item.id)
+      }
+      onQuantityChange={
+        readonly || !onQuantityChange
+          ? undefined
+          : (quantity: number) => onQuantityChange(item.id, quantity)
+      }
+      onUse={
+        readonly || !onQuantityChange || item.category !== 'consumable'
+          ? undefined
+          : () => onQuantityChange(item.id, Math.max(0, item.quantity - 1))
+      }
+      compact={effectiveCompact}
+    />
+  );
 
   return (
     <div
@@ -248,12 +277,29 @@ export function InventoryManager({
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-heading flex items-center gap-2 text-xl font-bold">
             <Package className="h-6 w-6 text-purple-600" />
-            {compact ? 'Inventory' : 'Inventory & Equipment'}
+            {effectiveCompact ? 'Inventory' : 'Inventory & Equipment'}
           </h2>
           <div className="flex items-center gap-2">
             <Badge variant="primary" size="md">
               {filteredItems.length} items
             </Badge>
+            {!compact && (
+              <Button
+                onClick={() => setCompactView(!compactView)}
+                variant={compactView ? 'primary' : 'ghost'}
+                size="sm"
+                title={
+                  compactView
+                    ? 'Switch to detailed view'
+                    : 'Switch to compact view'
+                }
+                className={
+                  compactView ? 'bg-purple-600 hover:bg-purple-700' : ''
+                }
+              >
+                {compactView ? <List size={18} /> : <Grid3X3 size={18} />}
+              </Button>
+            )}
             {!readonly && !hideAddButton && onAddItem && (
               <Button
                 onClick={() => setShowItemForm(true)}
@@ -297,16 +343,38 @@ export function InventoryManager({
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Search + Filters */}
       {!hideFilters && !showOnlyLocation && (
         <div className="border-divider bg-surface-secondary border-b-2 p-4">
-          <div className="mb-3 flex items-center justify-between">
+          {/* Always-visible search */}
+          <div className="relative">
+            <Search className="text-muted absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search items..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="border-divider bg-surface-raised text-heading focus:border-accent-purple-border focus:ring-accent-purple-bg w-full rounded-lg border-2 py-2 pr-10 pl-10 text-sm transition-colors focus:ring-2 focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="text-muted hover:text-body absolute top-1/2 right-3 -translate-y-1/2"
+                title="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Advanced filters toggle */}
+          <div className="mt-3 flex items-center justify-between">
             <h3 className="text-heading flex items-center gap-2 text-sm font-bold tracking-wide uppercase">
               <Filter className="h-4 w-4" />
-              Filters
-              {activeFilterCount > 0 && (
+              Advanced Filters
+              {advancedFilterCount > 0 && (
                 <Badge variant="primary" size="sm">
-                  {activeFilterCount}
+                  {advancedFilterCount}
                 </Badge>
               )}
             </h3>
@@ -321,21 +389,7 @@ export function InventoryManager({
 
           {showFilters && (
             <>
-              <div className="mb-3">
-                <label className="text-body mb-2 flex items-center gap-1 text-sm font-medium">
-                  <Search className="h-3 w-3" />
-                  Search Items
-                </label>
-                <Input
-                  leftIcon={<Search className="h-4 w-4" />}
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Search by name, description, or tags..."
-                  className="w-full"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="text-body mb-2 flex items-center gap-1 text-sm font-medium">
                     <MapPin className="h-3 w-3" />
@@ -374,12 +428,11 @@ export function InventoryManager({
                 </div>
               </div>
 
-              {activeFilterCount > 0 && (
+              {advancedFilterCount > 0 && (
                 <Button
                   onClick={() => {
                     setFilterLocation('all');
                     setFilterCategory('all');
-                    setSearchQuery('');
                   }}
                   variant="ghost"
                   size="sm"
@@ -398,7 +451,6 @@ export function InventoryManager({
       <div className="p-6">
         {filteredItems.length > 0 ? (
           hideLocations ? (
-            // Simple list view
             <DragDropList
               items={filteredItems}
               onReorder={onReorderItems || (() => {})}
@@ -406,29 +458,9 @@ export function InventoryManager({
               className="space-y-3"
               showDragHandle={!readonly && !!onReorderItems}
               dragHandlePosition="left"
-              renderItem={item => (
-                <ItemCard
-                  item={item}
-                  onEdit={
-                    readonly || !onUpdateItem ? undefined : handleEditItem
-                  }
-                  onDelete={
-                    readonly || !onDeleteItem
-                      ? undefined
-                      : () => onDeleteItem(item.id)
-                  }
-                  onQuantityChange={
-                    readonly || !onQuantityChange
-                      ? undefined
-                      : (quantity: number) =>
-                          onQuantityChange(item.id, quantity)
-                  }
-                  compact={compact}
-                />
-              )}
+              renderItem={item => renderItemCard(item)}
             />
           ) : (
-            // Grouped by location
             <div className="space-y-4">
               {Object.entries(itemsByLocation).map(
                 ([location, locationItems]) => {
@@ -465,27 +497,9 @@ export function InventoryManager({
                       {!isCollapsed && (
                         <div className="space-y-3 p-4 pt-0">
                           {locationItems.map(item => (
-                            <ItemCard
-                              key={item.id}
-                              item={item}
-                              onEdit={
-                                readonly || !onUpdateItem
-                                  ? undefined
-                                  : handleEditItem
-                              }
-                              onDelete={
-                                readonly || !onDeleteItem
-                                  ? undefined
-                                  : () => onDeleteItem(item.id)
-                              }
-                              onQuantityChange={
-                                readonly || !onQuantityChange
-                                  ? undefined
-                                  : (quantity: number) =>
-                                      onQuantityChange(item.id, quantity)
-                              }
-                              compact={compact}
-                            />
+                            <React.Fragment key={item.id}>
+                              {renderItemCard(item)}
+                            </React.Fragment>
                           ))}
                         </div>
                       )}
@@ -500,7 +514,7 @@ export function InventoryManager({
             <Package className="text-muted mx-auto mb-3 h-12 w-12" />
             <p className="text-body font-medium">No items found</p>
             <p className="text-muted mt-1 text-sm">
-              {activeFilterCount > 0
+              {advancedFilterCount > 0 || searchQuery
                 ? 'Try adjusting your filters or add new items'
                 : 'Add items to track your equipment and supplies'}
             </p>
@@ -516,6 +530,13 @@ export function InventoryManager({
         initialData={formData}
         availableLocations={allLocations}
         isEditing={!!editingItem}
+      />
+
+      {/* Item View Modal */}
+      <ItemViewModal
+        item={viewingItem}
+        onClose={() => setViewingItem(null)}
+        onEdit={readonly || !onUpdateItem ? undefined : handleEditItem}
       />
     </div>
   );

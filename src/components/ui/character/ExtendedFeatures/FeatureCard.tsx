@@ -70,9 +70,9 @@ export default function FeatureCard({
         } ${isExhausted ? 'border-accent-red-border bg-accent-red-bg' : 'border-divider-strong hover:border-accent-indigo-border-strong'}`}
       >
         {/* Feature Header */}
-        <div className="mb-3 flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h4 className="text-heading truncate text-sm leading-tight font-semibold">
+        <div className="mb-3 space-y-1.5">
+          <div className="min-w-0">
+            <h4 className="text-heading text-sm leading-tight font-semibold">
               {feature.name}
             </h4>
             {feature.sourceDetail && (
@@ -83,7 +83,7 @@ export default function FeatureCard({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-shrink-0 items-center gap-1 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
+          <div className="flex flex-shrink-0 items-center gap-1">
             {/* Use Button */}
             {!readonly && hasUses && !isExhausted && (
               <Button

@@ -47,6 +47,8 @@ import {
   getProficiencyBonus,
   hasSpellSlots,
   calculateSkillModifier,
+  calculateSpellAttackBonus,
+  calculateCarryingCapacity,
 } from '@/utils/calculations';
 import { exportCharacterToFile } from '@/utils/fileOperations';
 import {
@@ -1018,7 +1020,25 @@ export default function CharacterSheet() {
                       {/* Quick Stats */}
                       <QuickStats
                         passivePerception={10 + getSkillModifier('perception')}
+                        passiveInsight={10 + getSkillModifier('insight')}
+                        passiveInvestigation={
+                          10 + getSkillModifier('investigation')
+                        }
                         proficiencyBonus={proficiencyBonus}
+                        carryingCapacity={calculateCarryingCapacity(character)}
+                        currentWeight={
+                          character.inventoryItems.reduce(
+                            (sum, item) =>
+                              sum + (item.weight || 0) * item.quantity,
+                            0
+                          ) +
+                          (character.armorItems?.reduce(
+                            (sum, item) => sum + (item.weight || 0),
+                            0
+                          ) || 0)
+                        }
+                        itemCount={character.inventoryItems.length}
+                        spellAttackBonus={calculateSpellAttackBonus(character)}
                       />
 
                       {/* Special Abilities - Read-only, only show active abilities from extendedFeatures */}

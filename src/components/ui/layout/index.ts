@@ -16,4 +16,6 @@ export { default as FeaturesNavigationSection } from './FeaturesNavigationSectio
 export { default as GroupedTabs, TabContent } from './GroupedTabs';
 export type { GroupedTabsRef } from './GroupedTabs';
 export { default as Tabs } from './Tabs';
+export { default as BookmarkTabs } from './BookmarkTabs';
+export type { BookmarkTabItem, BookmarkTabsRef } from './BookmarkTabs';
 export { VirtualizedList } from './VirtualizedList';

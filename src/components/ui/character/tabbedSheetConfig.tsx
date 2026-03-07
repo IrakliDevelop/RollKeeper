@@ -31,6 +31,10 @@ import Languages from '@/components/ui/character/LanguagesAndProficiencies';
 import { ToastData } from '@/components/ui/feedback/Toast';
 import type { BookmarkTabItem } from '@/components/ui/layout/BookmarkTabs';
 import {
+  calculateSpellAttackBonus,
+  calculateCarryingCapacity,
+} from '@/utils/calculations';
+import {
   CharacterState,
   RichTextContent,
   CharacterBackground,
@@ -271,6 +275,7 @@ export function createTabbedSheetConfig(
       icon: '📊',
       content: (
         <div className="space-y-6">
+          {/* Header row: Basic Info + Quick Stats */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <CharacterBasicInfo
               character={character}
@@ -299,27 +304,44 @@ export function createTabbedSheetConfig(
             />
             <QuickStats
               passivePerception={10 + params.getSkillModifier('perception')}
+              passiveInsight={10 + params.getSkillModifier('insight')}
+              passiveInvestigation={
+                10 + params.getSkillModifier('investigation')
+              }
               proficiencyBonus={proficiencyBonus}
+              carryingCapacity={calculateCarryingCapacity(character)}
+              currentWeight={
+                character.inventoryItems.reduce(
+                  (sum, item) => sum + (item.weight || 0) * item.quantity,
+                  0
+                ) +
+                (character.armorItems?.reduce(
+                  (sum, item) => sum + (item.weight || 0),
+                  0
+                ) || 0)
+              }
+              itemCount={character.inventoryItems.length}
+              spellAttackBonus={calculateSpellAttackBonus(character)}
             />
           </div>
 
-          <AbilityScores
-            abilities={character.abilities}
-            characterLevel={totalLevel}
-            onUpdateAbilityScore={params.updateAbilityScore}
-            onRollAbilityCheck={params.rollAbilityCheck}
-          />
-
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <SavingThrows
-              savingThrows={character.savingThrows}
-              getSavingThrowModifier={params.getSavingThrowModifier}
-              onUpdateSavingThrowProficiency={
-                params.updateSavingThrowProficiency
-              }
-              onRollSavingThrow={params.rollSavingThrow}
-            />
+          {/* Core stats: Abilities + Saves + XP on left, Skills on right (sticky) */}
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
             <div className="space-y-6">
+              <AbilityScores
+                abilities={character.abilities}
+                characterLevel={totalLevel}
+                onUpdateAbilityScore={params.updateAbilityScore}
+                onRollAbilityCheck={params.rollAbilityCheck}
+              />
+              <SavingThrows
+                savingThrows={character.savingThrows}
+                getSavingThrowModifier={params.getSavingThrowModifier}
+                onUpdateSavingThrowProficiency={
+                  params.updateSavingThrowProficiency
+                }
+                onRollSavingThrow={params.rollSavingThrow}
+              />
               <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
                 <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
                   Experience Points
@@ -332,19 +354,21 @@ export function createTabbedSheetConfig(
                 />
               </div>
             </div>
-          </div>
 
-          <Skills
-            skills={character.skills}
-            jackOfAllTrades={character.jackOfAllTrades ?? false}
-            proficiencyBonus={proficiencyBonus}
-            getSkillModifier={params.getSkillModifier}
-            onUpdateSkillProficiency={params.updateSkillProficiency}
-            onUpdateSkillExpertise={params.updateSkillExpertise}
-            onToggleJackOfAllTrades={params.toggleJackOfAllTrades}
-            onRollSkillCheck={params.rollSkillCheck}
-            onToggleSkillBonusAbility={params.toggleSkillBonusAbility}
-          />
+            <div className="lg:sticky lg:top-4">
+              <Skills
+                skills={character.skills}
+                jackOfAllTrades={character.jackOfAllTrades ?? false}
+                proficiencyBonus={proficiencyBonus}
+                getSkillModifier={params.getSkillModifier}
+                onUpdateSkillProficiency={params.updateSkillProficiency}
+                onUpdateSkillExpertise={params.updateSkillExpertise}
+                onToggleJackOfAllTrades={params.toggleJackOfAllTrades}
+                onRollSkillCheck={params.rollSkillCheck}
+                onToggleSkillBonusAbility={params.toggleSkillBonusAbility}
+              />
+            </div>
+          </div>
         </div>
       ),
     },
@@ -529,66 +553,14 @@ export function createTabbedSheetConfig(
           </span>
         ) : undefined,
       content: (
-        <div className="space-y-6">
-          <ExtendedFeaturesSection
-            features={character.extendedFeatures || []}
-            character={character}
-            onAddFeature={params.addExtendedFeature}
-            onUpdateFeature={params.updateExtendedFeature}
-            onDeleteFeature={params.deleteExtendedFeature}
-            onUseFeature={params.useExtendedFeature}
-            onResetFeatures={params.resetExtendedFeatures}
-            onReorderFeatures={params.reorderExtendedFeatures}
-          />
-
-          <TraitTracker<ExtendedFeature>
-            traits={(character.extendedFeatures || []).filter(
-              t => !t.isPassive
-            )}
-            characterLevel={totalLevel}
-            onUpdateTrait={params.updateExtendedFeature}
-            onDeleteTrait={params.deleteExtendedFeature}
-            onUseTrait={params.useExtendedFeature}
-            onResetTraits={params.resetExtendedFeatures}
-            readonly={false}
-            hideControls={true}
-            enableViewModal={true}
-          />
-
-          <HeroicInspirationTracker
-            inspiration={character.heroicInspiration}
-            onAddInspiration={params.addHeroicInspiration}
-            onUpdateInspiration={params.updateHeroicInspiration}
-            onUseInspiration={params.useHeroicInspiration}
-            onResetInspiration={params.resetHeroicInspiration}
-          />
-
-          {hasHydrated && isBard && (
-            <BardicInspirationTracker
-              bardicInspiration={
-                character.bardicInspiration ?? { usesExpended: 0 }
-              }
-              character={character}
-              onUseInspiration={params.useBardicInspiration}
-              onRestoreInspiration={params.restoreBardicInspiration}
-              onResetInspiration={params.resetBardicInspiration}
-            />
-          )}
-
-          <ToolProficienciesSection
-            toolProficiencies={character.toolProficiencies || []}
-            proficiencyBonus={proficiencyBonus}
-            onAddToolProficiency={params.addToolProficiency}
-            onUpdateToolProficiency={params.updateToolProficiency}
-            onDeleteToolProficiency={params.deleteToolProficiency}
-          />
-
-          <Languages
-            languages={character.languages || []}
-            onAddLanguage={params.addLanguage}
-            onDeleteLanguage={params.deleteLanguage}
-          />
-        </div>
+        <FeaturesTabContent
+          character={character}
+          totalLevel={totalLevel}
+          proficiencyBonus={proficiencyBonus}
+          hasHydrated={hasHydrated}
+          isBard={isBard}
+          params={params}
+        />
       ),
     },
 
@@ -746,6 +718,123 @@ function InventoryTabContent({ character }: { character: CharacterState }) {
         >
           <CurrencyManager />
         </ErrorBoundary>
+      )}
+    </div>
+  );
+}
+
+const FEATURES_SUB_TABS = [
+  { id: 'abilities', label: 'Abilities', icon: '⚡' },
+  { id: 'inspiration', label: 'Inspiration', icon: '✨' },
+  { id: 'proficiencies', label: 'Proficiencies', icon: '🔧' },
+] as const;
+
+type FeaturesSubTab = (typeof FEATURES_SUB_TABS)[number]['id'];
+
+function FeaturesTabContent({
+  character,
+  totalLevel,
+  proficiencyBonus,
+  hasHydrated,
+  isBard,
+  params,
+}: {
+  character: CharacterState;
+  totalLevel: number;
+  proficiencyBonus: number;
+  hasHydrated: boolean;
+  isBard: boolean;
+  params: TabbedSheetConfigParams;
+}) {
+  const [activeSubTab, setActiveSubTab] = useState<FeaturesSubTab>('abilities');
+
+  return (
+    <div className="space-y-4">
+      {/* Segmented control */}
+      <div className="bg-surface-secondary inline-flex rounded-lg p-1">
+        {FEATURES_SUB_TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveSubTab(tab.id)}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition-all ${
+              activeSubTab === tab.id
+                ? 'bg-surface-raised text-heading shadow-sm'
+                : 'text-muted hover:text-body'
+            }`}
+          >
+            <span className="mr-1.5">{tab.icon}</span>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Sub-tab content */}
+      {activeSubTab === 'abilities' && (
+        <div className="space-y-6">
+          <TraitTracker<ExtendedFeature>
+            traits={(character.extendedFeatures || []).filter(
+              t => !t.isPassive
+            )}
+            characterLevel={totalLevel}
+            onUpdateTrait={params.updateExtendedFeature}
+            onDeleteTrait={params.deleteExtendedFeature}
+            onUseTrait={params.useExtendedFeature}
+            onResetTraits={params.resetExtendedFeatures}
+            readonly={false}
+            hideControls={true}
+            enableViewModal={true}
+          />
+          <ExtendedFeaturesSection
+            features={character.extendedFeatures || []}
+            character={character}
+            onAddFeature={params.addExtendedFeature}
+            onUpdateFeature={params.updateExtendedFeature}
+            onDeleteFeature={params.deleteExtendedFeature}
+            onUseFeature={params.useExtendedFeature}
+            onResetFeatures={params.resetExtendedFeatures}
+            onReorderFeatures={params.reorderExtendedFeatures}
+          />
+        </div>
+      )}
+
+      {activeSubTab === 'inspiration' && (
+        <div className="space-y-6">
+          <HeroicInspirationTracker
+            inspiration={character.heroicInspiration}
+            onAddInspiration={params.addHeroicInspiration}
+            onUpdateInspiration={params.updateHeroicInspiration}
+            onUseInspiration={params.useHeroicInspiration}
+            onResetInspiration={params.resetHeroicInspiration}
+          />
+          {hasHydrated && isBard && (
+            <BardicInspirationTracker
+              bardicInspiration={
+                character.bardicInspiration ?? { usesExpended: 0 }
+              }
+              character={character}
+              onUseInspiration={params.useBardicInspiration}
+              onRestoreInspiration={params.restoreBardicInspiration}
+              onResetInspiration={params.resetBardicInspiration}
+            />
+          )}
+        </div>
+      )}
+
+      {activeSubTab === 'proficiencies' && (
+        <div className="space-y-6">
+          <ToolProficienciesSection
+            toolProficiencies={character.toolProficiencies || []}
+            proficiencyBonus={proficiencyBonus}
+            onAddToolProficiency={params.addToolProficiency}
+            onUpdateToolProficiency={params.updateToolProficiency}
+            onDeleteToolProficiency={params.deleteToolProficiency}
+          />
+          <Languages
+            languages={character.languages || []}
+            onAddLanguage={params.addLanguage}
+            onDeleteLanguage={params.deleteLanguage}
+          />
+        </div>
       )}
     </div>
   );
