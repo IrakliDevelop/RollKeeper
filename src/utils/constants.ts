@@ -405,6 +405,7 @@ export const DEFAULT_CHARACTER_STATE = {
 
   armorClass: 10,
   tempArmorClass: 0,
+  isTempACActive: false,
   isWearingShield: false,
   shieldBonus: 2,
   initiative: {
