@@ -652,7 +652,7 @@ export const EnhancedSpellManagement: React.FC = () => {
   const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null);
   const [filters, setFilters] = useState<SpellFilters>(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
-  const [compactView, setCompactView] = useState(false);
+  const [compactView, setCompactView] = useState(true);
   const [sortBy, setSortBy] = useState<'name' | 'level' | 'school'>('level');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [expandedLevels, setExpandedLevels] = useState<Set<number>>(

@@ -25,11 +25,15 @@ export interface PlayerCharacter {
 export interface PlayerSettings {
   enableDeathAnimation: boolean;
   enableLevelUpAnimation: boolean;
+  enableTabbedLayout: boolean;
+  hasSeenLayoutPrompt: boolean;
 }
 
 const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   enableDeathAnimation: false,
   enableLevelUpAnimation: false,
+  enableTabbedLayout: false,
+  hasSeenLayoutPrompt: false,
 };
 
 // Store state interface

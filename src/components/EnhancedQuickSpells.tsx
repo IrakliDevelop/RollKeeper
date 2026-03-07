@@ -370,7 +370,7 @@ export function EnhancedQuickSpells({
   const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null);
   const [viewingSpell, setViewingSpell] = useState<Spell | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [compactView, setCompactView] = useState(false);
+  const [compactView, setCompactView] = useState(true);
   const [expandedLevels, setExpandedLevels] = useState<Set<number>>(
     new Set([0, 1, 2])
   ); // Default: cantrips and levels 1-2 expanded
