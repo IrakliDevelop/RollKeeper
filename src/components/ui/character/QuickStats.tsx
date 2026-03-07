@@ -8,7 +8,7 @@ const WEIGHT_NUDGES = [
   'Your items are apparently weightless. Bag of Holding?',
   'Zero weight? Are your items made of dreams?',
   'Carrying items but no weight... suspicious.',
-  'Physics called — it wants its gravity back.',
+  'Physics called, it wants its gravity back.',
   'Feather Fall on your whole inventory, huh?',
   'Your backpack defies the laws of nature.',
   'Weightless gear? Even a Wizard would be impressed.',
