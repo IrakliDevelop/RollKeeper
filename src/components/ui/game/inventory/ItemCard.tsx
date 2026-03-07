@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { InventoryItem, MagicItemRarity } from '@/types/character';
-import { Edit2, Trash2, Plus, Minus, Package } from 'lucide-react';
+import { Edit2, Trash2, Plus, Minus, Package, Zap, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { formatCurrencyFromCopper } from '@/utils/currency';
@@ -10,8 +10,10 @@ import { formatCurrencyFromCopper } from '@/utils/currency';
 interface ItemCardProps {
   item: InventoryItem;
   onEdit?: (item: InventoryItem) => void;
+  onView?: (item: InventoryItem) => void;
   onDelete?: () => void;
   onQuantityChange?: (quantity: number) => void;
+  onUse?: () => void;
   compact?: boolean;
 }
 
@@ -41,17 +43,24 @@ const getRarityVariant = (
 export function ItemCard({
   item,
   onEdit,
+  onView,
   onDelete,
   onQuantityChange,
+  onUse,
   compact = false,
 }: ItemCardProps) {
   const totalWeight = item.weight ? item.weight * item.quantity : undefined;
   const totalValue = item.value ? item.value * item.quantity : undefined;
+  const isDepleted = item.quantity === 0;
 
   return (
     <div
-      className={`group border-divider bg-surface-raised hover:border-divider-strong rounded-lg border-2 transition-all hover:shadow-md ${
+      className={`group rounded-lg border-2 transition-all ${
         compact ? 'p-2' : 'p-4'
+      } ${
+        isDepleted
+          ? 'border-divider-strong bg-surface-secondary border-dashed opacity-60'
+          : 'border-divider bg-surface-raised hover:border-divider-strong hover:shadow-md'
       }`}
     >
       <div
@@ -66,35 +75,60 @@ export function ItemCard({
           >
             {item.name}
           </h5>
+          {isDepleted && (
+            <Badge variant="neutral" size="sm">
+              Depleted
+            </Badge>
+          )}
         </div>
 
         {/* Action Buttons */}
-        {(onEdit || onDelete) && (
-          <div className="flex items-center gap-1">
-            {onEdit && (
-              <Button
-                onClick={() => onEdit(item)}
-                variant="ghost"
-                size="xs"
-                title="Edit item"
-                className="text-accent-blue-text-muted hover:bg-accent-blue-bg hover:text-accent-blue-text h-6 w-6 p-0"
-              >
-                <Edit2 size={14} />
-              </Button>
-            )}
-            {onDelete && (
-              <Button
-                onClick={onDelete}
-                variant="ghost"
-                size="xs"
-                title="Delete item"
-                className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text h-6 w-6 p-0"
-              >
-                <Trash2 size={14} />
-              </Button>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-1">
+          {onUse && item.category === 'consumable' && !isDepleted && (
+            <Button
+              onClick={onUse}
+              variant="ghost"
+              size="xs"
+              title="Use item"
+              className="text-accent-indigo-text-muted hover:bg-accent-indigo-bg hover:text-accent-indigo-text h-6 w-6 p-0"
+            >
+              <Zap size={14} />
+            </Button>
+          )}
+          {onView && (
+            <Button
+              onClick={() => onView(item)}
+              variant="ghost"
+              size="xs"
+              title="View details"
+              className="text-muted hover:bg-surface-hover hover:text-body h-6 w-6 p-0"
+            >
+              <Eye size={14} />
+            </Button>
+          )}
+          {onEdit && (
+            <Button
+              onClick={() => onEdit(item)}
+              variant="ghost"
+              size="xs"
+              title="Edit item"
+              className="text-accent-blue-text-muted hover:bg-accent-blue-bg hover:text-accent-blue-text h-6 w-6 p-0"
+            >
+              <Edit2 size={14} />
+            </Button>
+          )}
+          {onDelete && (
+            <Button
+              onClick={onDelete}
+              variant="ghost"
+              size="xs"
+              title="Delete item"
+              className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text h-6 w-6 p-0"
+            >
+              <Trash2 size={14} />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Rarity and Type Badges */}
@@ -126,10 +160,10 @@ export function ItemCard({
         {onQuantityChange ? (
           <div className="flex items-center gap-2">
             <Button
-              onClick={() => onQuantityChange(Math.max(1, item.quantity - 1))}
+              onClick={() => onQuantityChange(Math.max(0, item.quantity - 1))}
               variant="ghost"
               size="xs"
-              disabled={item.quantity <= 1}
+              disabled={item.quantity <= 0}
               className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text h-6 w-6 p-0 disabled:opacity-30"
             >
               <Minus size={12} />
