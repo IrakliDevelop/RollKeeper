@@ -1,6 +1,6 @@
 'use client';
 
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useState, useEffect } from 'react';
 import { useDragAndDrop } from '@/hooks/useDragAndDrop';
 import DragHandle from './DragHandle';
 
@@ -14,6 +14,14 @@ interface DragDropListProps<T> {
   showDragHandle?: boolean;
   dragHandlePosition?: 'left' | 'right';
   keyExtractor: (item: T, index: number) => string | number;
+}
+
+function useHasHover() {
+  const [hasHover, setHasHover] = useState(true);
+  useEffect(() => {
+    setHasHover(window.matchMedia('(hover: hover)').matches);
+  }, []);
+  return hasHover;
 }
 
 /**
@@ -30,6 +38,9 @@ export default function DragDropList<T>({
   dragHandlePosition = 'left',
   keyExtractor,
 }: DragDropListProps<T>) {
+  const hasHover = useHasHover();
+  const canDrag = !disabled && hasHover;
+
   const {
     handleDragStart,
     handleDragEnd,
@@ -38,7 +49,7 @@ export default function DragDropList<T>({
     handleDrop,
     getDragOverStyles,
     getDraggedStyles,
-  } = useDragAndDrop({ onReorder, disabled });
+  } = useDragAndDrop({ onReorder, disabled: !canDrag });
 
   if (items.length === 0) {
     return null;
@@ -56,32 +67,29 @@ export default function DragDropList<T>({
           <div
             key={key}
             className={` ${itemClassName} ${dragOverStyles} ${draggedStyles} transition-all duration-200`}
-            draggable={!disabled}
-            onDragStart={e => handleDragStart(e, index)}
-            onDragEnd={handleDragEnd}
-            onDragOver={e => handleDragOver(e, index)}
-            onDragLeave={handleDragLeave}
-            onDrop={e => handleDrop(e, index)}
+            draggable={canDrag}
+            onDragStart={canDrag ? e => handleDragStart(e, index) : undefined}
+            onDragEnd={canDrag ? handleDragEnd : undefined}
+            onDragOver={canDrag ? e => handleDragOver(e, index) : undefined}
+            onDragLeave={canDrag ? handleDragLeave : undefined}
+            onDrop={canDrag ? e => handleDrop(e, index) : undefined}
           >
-            {showDragHandle && dragHandlePosition === 'left' && (
-              <div className="flex items-center">
-                <DragHandle isDragEnabled={!disabled} className="mr-2" />
-                <div className="flex-1">
-                  {renderItem(item, index, isDragging)}
+            {showDragHandle && canDrag ? (
+              <div className="relative h-full">
+                {renderItem(item, index, isDragging)}
+                <div
+                  className={`absolute z-10 opacity-40 transition-opacity group-hover:opacity-80 hover:!opacity-100 ${
+                    dragHandlePosition === 'right'
+                      ? 'right-1.5 bottom-1.5'
+                      : 'bottom-1.5 left-1.5'
+                  }`}
+                >
+                  <DragHandle isDragEnabled={canDrag} />
                 </div>
               </div>
+            ) : (
+              renderItem(item, index, isDragging)
             )}
-
-            {showDragHandle && dragHandlePosition === 'right' && (
-              <div className="flex items-center">
-                <div className="flex-1">
-                  {renderItem(item, index, isDragging)}
-                </div>
-                <DragHandle isDragEnabled={!disabled} className="ml-2" />
-              </div>
-            )}
-
-            {!showDragHandle && renderItem(item, index, isDragging)}
           </div>
         );
       })}

@@ -83,7 +83,7 @@ export default function FeatureCard({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <div className="flex flex-shrink-0 items-center gap-1 opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
             {/* Use Button */}
             {!readonly && hasUses && !isExhausted && (
               <Button
@@ -190,18 +190,20 @@ export default function FeatureCard({
         )}
       </div>
 
-      {/* Feature Modal */}
-      <UnifiedFeatureModal
-        feature={feature}
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={onUpdate}
-        onDelete={onDelete}
-        onUse={onUse}
-        existingFeatures={[]}
-        character={character}
-        readonly={readonly}
-      />
+      {/* Feature Modal - only mount when open to avoid N×useFeatureSourcesData overhead */}
+      {isModalOpen && (
+        <UnifiedFeatureModal
+          feature={feature}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSave={onUpdate}
+          onDelete={onDelete}
+          onUse={onUse}
+          existingFeatures={[]}
+          character={character}
+          readonly={readonly}
+        />
+      )}
     </>
   );
 }
