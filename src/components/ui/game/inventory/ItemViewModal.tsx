@@ -46,8 +46,12 @@ const getRarityVariant = (
 export function ItemViewModal({ item, onClose, onEdit }: ItemViewModalProps) {
   if (!item) return null;
 
-  const totalWeight = item.weight ? item.weight * item.quantity : undefined;
-  const totalValue = item.value ? item.value * item.quantity : undefined;
+  const totalWeight = item.weight
+    ? parseFloat((item.weight * item.quantity).toFixed(2))
+    : undefined;
+  const totalValue = item.value
+    ? parseFloat((item.value * item.quantity).toFixed(2))
+    : undefined;
   const isDepleted = item.quantity === 0;
 
   return (
