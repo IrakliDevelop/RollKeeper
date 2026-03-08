@@ -18,7 +18,6 @@ import { formatCurrencyFromCopper } from '@/utils/currency';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
-import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import {
   ItemCard,
