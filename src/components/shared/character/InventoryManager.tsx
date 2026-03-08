@@ -26,6 +26,7 @@ import {
   initialInventoryFormData,
   type InventoryFormData,
 } from '../../ui/game/inventory';
+import { useItemsData } from '@/hooks/useItemsData';
 
 const ITEM_CATEGORIES = [
   'weapon',
@@ -86,6 +87,7 @@ export function InventoryManager({
   maxItemsToShow,
   className = '',
 }: InventoryManagerProps) {
+  const { items: databaseItems, loading: itemsLoading } = useItemsData();
   const [showItemForm, setShowItemForm] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [viewingItem, setViewingItem] = useState<InventoryItem | null>(null);
@@ -367,24 +369,23 @@ export function InventoryManager({
           </div>
 
           {/* Advanced filters toggle */}
-          <div className="mt-3 flex items-center justify-between">
-            <h3 className="text-heading flex items-center gap-2 text-sm font-bold tracking-wide uppercase">
-              <Filter className="h-4 w-4" />
-              Advanced Filters
-              {advancedFilterCount > 0 && (
-                <Badge variant="primary" size="sm">
-                  {advancedFilterCount}
-                </Badge>
-              )}
-            </h3>
-            <Button
-              onClick={() => setShowFilters(!showFilters)}
-              variant="ghost"
-              size="xs"
-            >
-              {showFilters ? 'Hide' : 'Show'}
-            </Button>
-          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="text-heading hover:text-accent-purple-text mt-3 flex w-full items-center gap-2 text-sm font-bold tracking-wide uppercase transition-colors"
+          >
+            <Filter className="h-4 w-4" />
+            Advanced Filters
+            {advancedFilterCount > 0 && (
+              <Badge variant="primary" size="sm">
+                {advancedFilterCount}
+              </Badge>
+            )}
+            {showFilters ? (
+              <ChevronDown className="ml-auto h-4 w-4" />
+            ) : (
+              <ChevronRight className="ml-auto h-4 w-4" />
+            )}
+          </button>
 
           {showFilters && (
             <>
@@ -454,7 +455,7 @@ export function InventoryManager({
               items={filteredItems}
               onReorder={onReorderItems || (() => {})}
               keyExtractor={item => item.id}
-              className="space-y-3"
+              className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4"
               showDragHandle={!readonly && !!onReorderItems}
               dragHandlePosition="left"
               renderItem={item => renderItemCard(item)}
@@ -494,7 +495,7 @@ export function InventoryManager({
                       </button>
 
                       {!isCollapsed && (
-                        <div className="space-y-3 p-4 pt-0">
+                        <div className="grid grid-cols-2 gap-3 p-4 pt-0 lg:grid-cols-3 xl:grid-cols-4">
                           {locationItems.map(item => (
                             <React.Fragment key={item.id}>
                               {renderItemCard(item)}
@@ -529,6 +530,8 @@ export function InventoryManager({
         initialData={formData}
         availableLocations={allLocations}
         isEditing={!!editingItem}
+        databaseItems={databaseItems}
+        itemsLoading={itemsLoading}
       />
 
       {/* Item View Modal */}

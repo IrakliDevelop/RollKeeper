@@ -9,6 +9,9 @@ import { Badge } from '@/components/ui/layout/badge';
 import { Input } from '@/components/ui/forms/input';
 import { Textarea } from '@/components/ui/forms/textarea';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { ProcessedItem } from '@/types/items';
+import { ItemAutocomplete } from '@/components/ui/forms/ItemAutocomplete';
+import { convertProcessedItemToFormData } from '@/utils/itemConversion';
 
 const ITEM_CATEGORIES = [
   'weapon',
@@ -62,6 +65,8 @@ interface ItemFormProps {
   initialData?: InventoryFormData;
   availableLocations: string[];
   isEditing: boolean;
+  databaseItems?: ProcessedItem[];
+  itemsLoading?: boolean;
 }
 
 export const initialInventoryFormData: InventoryFormData = {
@@ -84,6 +89,8 @@ export function ItemForm({
   initialData = initialInventoryFormData,
   availableLocations,
   isEditing,
+  databaseItems = [],
+  itemsLoading = false,
 }: ItemFormProps) {
   const [formData, setFormData] = useState<InventoryFormData>(initialData);
   const [tagInput, setTagInput] = useState('');
@@ -99,6 +106,10 @@ export function ItemForm({
       setShowCustomLocation(false);
     }
   }, [isOpen, initialData]);
+
+  const handleItemSelect = (item: ProcessedItem) => {
+    setFormData(convertProcessedItemToFormData(item));
+  };
 
   const addTag = () => {
     if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
@@ -120,9 +131,9 @@ export function ItemForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // If custom location is shown and has value, use it
     const finalData = {
       ...formData,
+      quantity: Math.max(1, formData.quantity),
       location:
         showCustomLocation && customLocation.trim()
           ? customLocation.trim()
@@ -141,6 +152,18 @@ export function ItemForm({
       closeOnBackdropClick={true}
     >
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Autocomplete Section */}
+        {databaseItems.length > 0 && (
+          <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border-2 p-4">
+            <ItemAutocomplete
+              items={databaseItems}
+              onSelect={handleItemSelect}
+              loading={itemsLoading}
+              placeholder="Search D&D items to auto-fill..."
+            />
+          </div>
+        )}
+
         {/* Section: Basic Information */}
         <div className="space-y-4">
           <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
@@ -177,11 +200,12 @@ export function ItemForm({
             <Input
               label="Quantity"
               type="number"
-              value={formData.quantity.toString()}
+              value={formData.quantity > 0 ? formData.quantity.toString() : ''}
               onChange={e =>
                 setFormData({
                   ...formData,
-                  quantity: parseInt(e.target.value) || 1,
+                  quantity:
+                    e.target.value === '' ? 0 : parseInt(e.target.value) || 0,
                 })
               }
               min={1}
@@ -402,8 +426,8 @@ export function ItemForm({
           )}
         </div>
 
-        {/* Form Actions */}
-        <div className="border-divider flex justify-end gap-3 border-t-2 pt-4">
+        {/* Form Actions - sticky at bottom */}
+        <div className="bg-surface-raised border-divider sticky -bottom-6 -mx-6 -mb-6 flex justify-end gap-3 border-t-2 px-6 py-4">
           <Button type="button" onClick={onClose} variant="outline" size="md">
             Cancel
           </Button>
