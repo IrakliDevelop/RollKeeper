@@ -8,6 +8,7 @@ import React, {
   useImperativeHandle,
   useRef,
   useCallback,
+  useMemo,
 } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -38,7 +39,16 @@ const PERSIST_PREFIX = 'bookmark-tabs-';
 
 const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
   ({ tabs, defaultTab, persistKey, className = '', onTabChange }, ref) => {
-    const visibleTabs = tabs.filter(t => !t.hidden);
+    const rootRef = useRef<HTMLDivElement>(null);
+    const navRef = useRef<HTMLDivElement>(null);
+    const [canScrollLeft, setCanScrollLeft] = useState(false);
+    const [canScrollRight, setCanScrollRight] = useState(false);
+
+    const visibleTabs = useMemo(() => tabs.filter(t => !t.hidden), [tabs]);
+    const visibleTabIds = useMemo(
+      () => visibleTabs.map(t => t.id).join(','),
+      [visibleTabs]
+    );
 
     const getInitialTab = () => {
       if (persistKey) {
@@ -54,13 +64,25 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
 
     const [activeTab, setActiveTab] = useState(getInitialTab);
     const [isMounted, setIsMounted] = useState(false);
-    const navRef = useRef<HTMLDivElement>(null);
-    const [canScrollLeft, setCanScrollLeft] = useState(false);
-    const [canScrollRight, setCanScrollRight] = useState(false);
 
     useEffect(() => {
       setIsMounted(true);
     }, []);
+
+    useEffect(() => {
+      const stillValid = visibleTabs.some(
+        t => t.id === activeTab && !t.disabled
+      );
+      if (!stillValid) {
+        const fallback =
+          defaultTab &&
+          visibleTabs.find(t => t.id === defaultTab && !t.disabled)
+            ? defaultTab
+            : visibleTabs[0]?.id;
+        if (fallback) setActiveTab(fallback);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visibleTabIds]);
 
     const checkScrollability = useCallback(() => {
       const nav = navRef.current;
@@ -103,8 +125,10 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
           if (tab) {
             handleTabChange(tabId);
             setTimeout(() => {
-              const el = document.getElementById('bookmark-tabs-root');
-              el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              rootRef.current?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+              });
             }, 100);
           }
         },
@@ -123,12 +147,15 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
       });
     };
 
+    const tabButtonId = (tabId: string) => `tab-${tabId}`;
+    const tabPanelId = (tabId: string) => `tabpanel-${tabId}`;
+
     const activeTabContent = isMounted
       ? visibleTabs.find(t => t.id === activeTab)?.content
       : null;
 
     return (
-      <div id="bookmark-tabs-root" className={`w-full ${className}`}>
+      <div ref={rootRef} className={`w-full ${className}`}>
         {/* Tab Navigation */}
         <div className="relative flex items-end">
           {/* Left scroll indicator */}
@@ -152,9 +179,11 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
               return (
                 <button
                   key={tab.id}
+                  id={tabButtonId(tab.id)}
                   role="tab"
                   aria-selected={isActive}
-                  aria-controls={`tabpanel-${tab.id}`}
+                  aria-controls={isActive ? tabPanelId(tab.id) : undefined}
+                  tabIndex={isActive ? 0 : -1}
                   onClick={() => !tab.disabled && handleTabChange(tab.id)}
                   disabled={tab.disabled}
                   className={`relative flex min-w-0 shrink-0 items-center gap-1.5 rounded-t-lg px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-all duration-200 ${
@@ -192,8 +221,8 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
         {/* Tab Content */}
         <div
           role="tabpanel"
-          id={`tabpanel-${activeTab}`}
-          aria-labelledby={activeTab}
+          id={tabPanelId(activeTab)}
+          aria-labelledby={tabButtonId(activeTab)}
           className="border-divider bg-surface-raised rounded-tr-lg rounded-b-lg border shadow-lg"
         >
           <div className="p-4 sm:p-6">

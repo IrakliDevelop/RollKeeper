@@ -609,7 +609,7 @@ export default function PlayerDashboardPage() {
                   <label className="relative inline-flex cursor-pointer items-center">
                     <input
                       type="checkbox"
-                      checked={settings?.enableTabbedLayout}
+                      checked={settings?.enableTabbedLayout ?? false}
                       onChange={e =>
                         updateSettings({
                           enableTabbedLayout: e.target.checked,
