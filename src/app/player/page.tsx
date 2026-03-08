@@ -440,17 +440,13 @@ export default function PlayerDashboardPage() {
                 </Button>
               </Link>
 
-              <label className="cursor-pointer">
-                <Button variant="success" leftIcon={<Upload size={20} />}>
-                  Import Character
-                </Button>
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleImportCharacter}
-                  className="hidden"
-                />
-              </label>
+              <Button
+                variant="success"
+                leftIcon={<Upload size={20} />}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Import Character
+              </Button>
 
               <Button
                 onClick={handleTryMigration}
