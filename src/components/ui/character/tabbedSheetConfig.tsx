@@ -33,6 +33,7 @@ import type { BookmarkTabItem } from '@/components/ui/layout/BookmarkTabs';
 import {
   calculateSpellAttackBonus,
   calculateCarryingCapacity,
+  calculateSpellSaveDC,
 } from '@/utils/calculations';
 import {
   CharacterState,
@@ -322,6 +323,7 @@ export function createTabbedSheetConfig(
               }
               itemCount={character.inventoryItems.length}
               spellAttackBonus={calculateSpellAttackBonus(character)}
+              spellSaveDC={calculateSpellSaveDC(character)}
             />
           </div>
 
