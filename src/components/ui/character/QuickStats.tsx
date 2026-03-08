@@ -49,8 +49,9 @@ export default function QuickStats({
 
   const weightPercent =
     carryingCapacity > 0
-      ? Math.min(100, Math.round((currentWeight / carryingCapacity) * 100))
+      ? Math.round((currentWeight / carryingCapacity) * 100)
       : 0;
+  const weightBarPercent = Math.min(100, weightPercent);
 
   const showWeightNudge = itemCount > 0 && currentWeight === 0;
 
@@ -145,7 +146,7 @@ export default function QuickStats({
           <div className="bg-divider dark:bg-divider h-2 w-full overflow-hidden rounded-full">
             <div
               className={`h-full rounded-full transition-all duration-300 ${getWeightColor()}`}
-              style={{ width: `${weightPercent}%` }}
+              style={{ width: `${weightBarPercent}%` }}
             />
           </div>
           {weightPercent > 100 && (

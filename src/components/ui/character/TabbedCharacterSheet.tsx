@@ -1,6 +1,6 @@
 'use client';
 
-import React, { forwardRef, useImperativeHandle, useRef, useMemo } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 import BookmarkTabs from '@/components/ui/layout/BookmarkTabs';
 import type { BookmarkTabsRef } from '@/components/ui/layout/BookmarkTabs';
 import {
@@ -30,7 +30,7 @@ const TabbedCharacterSheet = forwardRef<
 >((props, ref) => {
   const tabsRef = useRef<BookmarkTabsRef>(null);
 
-  const tabs = useMemo(() => createTabbedSheetConfig(props), [props]);
+  const tabs = createTabbedSheetConfig(props);
 
   useImperativeHandle(
     ref,

@@ -209,7 +209,7 @@ export default function CharacterHUD({
               <Minus className="h-3.5 w-3.5" />
             </button>
             <span className="min-w-[48px] text-center text-sm font-medium">
-              Day {character.daysSpent}
+              Day {character.daysSpent || 0}
             </span>
             <button
               onClick={onIncrementDays}
