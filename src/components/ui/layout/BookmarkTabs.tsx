@@ -147,12 +147,21 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
       });
     };
 
+    const [visitedTabs, setVisitedTabs] = useState<Set<string>>(
+      () => new Set([activeTab])
+    );
+
+    useEffect(() => {
+      setVisitedTabs(prev => {
+        if (prev.has(activeTab)) return prev;
+        const next = new Set(prev);
+        next.add(activeTab);
+        return next;
+      });
+    }, [activeTab]);
+
     const tabButtonId = (tabId: string) => `tab-${tabId}`;
     const tabPanelId = (tabId: string) => `tabpanel-${tabId}`;
-
-    const activeTabContent = isMounted
-      ? visibleTabs.find(t => t.id === activeTab)?.content
-      : null;
 
     return (
       <div ref={rootRef} className={`w-full ${className}`}>
@@ -182,7 +191,9 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
                   id={tabButtonId(tab.id)}
                   role="tab"
                   aria-selected={isActive}
-                  aria-controls={isActive ? tabPanelId(tab.id) : undefined}
+                  aria-controls={
+                    visitedTabs.has(tab.id) ? tabPanelId(tab.id) : undefined
+                  }
                   tabIndex={isActive ? 0 : -1}
                   onClick={() => !tab.disabled && handleTabChange(tab.id)}
                   disabled={tab.disabled}
@@ -218,22 +229,29 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
           )}
         </div>
 
-        {/* Tab Content */}
-        <div
-          role="tabpanel"
-          id={tabPanelId(activeTab)}
-          aria-labelledby={tabButtonId(activeTab)}
-          className="border-divider bg-surface-raised rounded-tr-lg rounded-b-lg border shadow-lg"
-        >
+        {/* Tab Panels — visited tabs stay mounted but hidden */}
+        <div className="border-divider bg-surface-raised rounded-tr-lg rounded-b-lg border shadow-lg">
           <div className="p-4 sm:p-6">
             {!isMounted ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-muted">Loading...</div>
               </div>
             ) : (
-              <div className="animate-in fade-in duration-200">
-                {activeTabContent}
-              </div>
+              visibleTabs.map(tab => {
+                const isActive = activeTab === tab.id;
+                if (!visitedTabs.has(tab.id)) return null;
+                return (
+                  <div
+                    key={tab.id}
+                    role="tabpanel"
+                    id={tabPanelId(tab.id)}
+                    aria-labelledby={tabButtonId(tab.id)}
+                    hidden={!isActive}
+                  >
+                    {tab.content}
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
