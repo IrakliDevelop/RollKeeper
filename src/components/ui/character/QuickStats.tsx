@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { formatModifier } from '@/utils/calculations';
-import { Eye, Search, Weight, Sparkles } from 'lucide-react';
+import { Eye, Search, Weight, Sparkles, Shield } from 'lucide-react';
 
 const WEIGHT_NUDGES = [
   'Your items are apparently weightless. Bag of Holding?',
@@ -27,6 +27,7 @@ interface QuickStatsProps {
   currentWeight: number;
   itemCount: number;
   spellAttackBonus?: number | null;
+  spellSaveDC?: number | null;
 }
 
 export default function QuickStats({
@@ -38,6 +39,7 @@ export default function QuickStats({
   currentWeight,
   itemCount,
   spellAttackBonus,
+  spellSaveDC,
 }: QuickStatsProps) {
   const [nudgeIndex, setNudgeIndex] = useState(0);
 
@@ -117,6 +119,15 @@ export default function QuickStats({
             </span>
           </div>
         )}
+        {spellSaveDC != null && (
+          <div className="flex items-center justify-between">
+            <span className="text-body flex items-center gap-1.5">
+              <Shield className="h-3.5 w-3.5 text-indigo-500" />
+              Spell Save DC
+            </span>
+            <span className="text-heading font-semibold">{spellSaveDC}</span>
+          </div>
+        )}
 
         <div className="border-divider my-1 border-t" />
 
@@ -131,7 +142,7 @@ export default function QuickStats({
               {currentWeight.toFixed(1)} / {carryingCapacity} lbs
             </span>
           </div>
-          <div className="bg-surface-secondary h-2 w-full overflow-hidden rounded-full">
+          <div className="bg-divider dark:bg-divider h-2 w-full overflow-hidden rounded-full">
             <div
               className={`h-full rounded-full transition-all duration-300 ${getWeightColor()}`}
               style={{ width: `${weightPercent}%` }}
