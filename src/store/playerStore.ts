@@ -453,11 +453,14 @@ export const usePlayerStore = create<PlayerStoreState>()(
       name: PLAYER_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
       version: 1,
-      // Migration function for future versions
-      migrate: (persistedState: unknown) => {
-        // Handle data migrations here when we update the schema
-        return persistedState;
-      },
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...(persistedState as Partial<PlayerStoreState>),
+        settings: {
+          ...DEFAULT_PLAYER_SETTINGS,
+          ...((persistedState as Partial<PlayerStoreState>)?.settings ?? {}),
+        },
+      }),
       onRehydrateStorage: () => {
         return (state: PlayerStoreState | undefined) => {
           // Auto-migrate on store initialization if needed

@@ -23,6 +23,7 @@ export default function NewLayoutPromptDialog({
   onDismiss,
 }: NewLayoutPromptDialogProps) {
   const [open, setOpen] = useState(false);
+  const acceptedRef = React.useRef(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setOpen(true), 2000);
@@ -30,6 +31,7 @@ export default function NewLayoutPromptDialog({
   }, []);
 
   const handleAccept = () => {
+    acceptedRef.current = true;
     setOpen(false);
     onAccept();
   };
@@ -40,7 +42,12 @@ export default function NewLayoutPromptDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={val => !val && handleDismiss()}>
+    <Dialog
+      open={open}
+      onOpenChange={val => {
+        if (!val && !acceptedRef.current) handleDismiss();
+      }}
+    >
       <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
