@@ -20,7 +20,10 @@ import {
   WeaponForm,
   MagicItemForm,
 } from './equipment';
-import type { WeaponChargeFormData } from './equipment/WeaponForm';
+import type {
+  WeaponChargeFormData,
+  WeaponFormData,
+} from './equipment/WeaponForm';
 import type {
   MagicItemChargeFormData,
   MagicItemFormData,
@@ -28,33 +31,14 @@ import type {
 import { MagicItemAutocomplete } from '@/components/ui/forms/MagicItemAutocomplete';
 import { useMagicItemsData } from '@/hooks/useMagicItemsData';
 import { convertProcessedMagicItemToFormData } from '@/utils/magicItemConversion';
-import type { ProcessedMagicItem } from '@/types/items';
+import { WeaponAutocomplete } from '@/components/ui/forms/WeaponAutocomplete';
+import { useWeaponsDbData } from '@/hooks/useWeaponsDbData';
+import { convertProcessedWeaponToFormData } from '@/utils/weaponConversion';
+import type { ProcessedMagicItem, ProcessedWeapon } from '@/types/items';
 
 interface EquipmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-}
-
-interface WeaponFormData {
-  name: string;
-  category: WeaponCategory;
-  weaponType: WeaponType[];
-  damage: WeaponDamage[];
-  enhancementBonus: number;
-  attackBonus?: number;
-  damageBonus?: number;
-  properties: string[];
-  description?: string;
-  range?: {
-    normal?: number;
-    long?: number;
-  };
-  isEquipped: boolean;
-  manualProficiency?: boolean;
-  requiresAttunement?: boolean;
-  isAttuned?: boolean;
-  // Multiple weapon charges
-  charges?: WeaponChargeFormData[];
 }
 
 const initialMagicItemData: MagicItemFormData = {
@@ -116,6 +100,9 @@ export default function EquipmentModal({
     deleteWeapon,
     equipWeapon,
     reorderWeapons,
+    expendWeaponChargePoolAbility,
+    restoreWeaponChargePool,
+    setWeaponChargePoolUsed,
   } = useCharacterStore();
 
   const { items: magicItemsDb, loading: magicItemsLoading } =
@@ -124,6 +111,16 @@ export default function EquipmentModal({
   const handleMagicItemSelect = (item: ProcessedMagicItem) => {
     const autoFilled = convertProcessedMagicItemToFormData(item);
     setMagicItemForm(prev => ({
+      ...prev,
+      ...autoFilled,
+    }));
+  };
+
+  const { items: weaponsDb, loading: weaponsLoading } = useWeaponsDbData();
+
+  const handleWeaponDbSelect = (item: ProcessedWeapon) => {
+    const autoFilled = convertProcessedWeaponToFormData(item);
+    setWeaponForm(prev => ({
       ...prev,
       ...autoFilled,
     }));
@@ -224,6 +221,25 @@ export default function EquipmentModal({
         proficiencyMultiplier: charge.proficiencyMultiplier,
       }));
 
+    const chargePool = weaponForm.chargePool
+      ? {
+          maxCharges: weaponForm.chargePool.maxCharges,
+          usedCharges: weaponForm.chargePool.usedCharges,
+          rechargeType: weaponForm.chargePool.rechargeType,
+          rechargeAmount: weaponForm.chargePool.rechargeAmount,
+          abilities: weaponForm.chargePool.abilities.map(a => ({
+            id:
+              a.id ||
+              `cpa-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name: a.name,
+            description: a.description,
+            cost: a.cost,
+            isSpell: a.isSpell,
+            spellLevel: a.spellLevel,
+          })),
+        }
+      : undefined;
+
     const weaponData = {
       ...weaponForm,
       properties: weaponForm.properties.filter(p => p.trim()),
@@ -234,6 +250,9 @@ export default function EquipmentModal({
           }
         : undefined,
       charges: chargesWithIds.length > 0 ? chargesWithIds : undefined,
+      chargePool,
+      bonusSpellAttack: weaponForm.bonusSpellAttack,
+      bonusSpellSaveDc: weaponForm.bonusSpellSaveDc,
     };
 
     if (editingWeapon) {
@@ -328,6 +347,16 @@ export default function EquipmentModal({
       })
     );
 
+    const chargePoolData = weapon.chargePool
+      ? {
+          maxCharges: weapon.chargePool.maxCharges,
+          usedCharges: weapon.chargePool.usedCharges,
+          rechargeType: weapon.chargePool.rechargeType,
+          rechargeAmount: weapon.chargePool.rechargeAmount,
+          abilities: weapon.chargePool.abilities,
+        }
+      : undefined;
+
     setWeaponForm({
       name: weapon.name,
       category: weapon.category,
@@ -344,6 +373,9 @@ export default function EquipmentModal({
       requiresAttunement: weapon.requiresAttunement || false,
       isAttuned: weapon.isAttuned || false,
       charges: chargesFormData,
+      chargePool: chargePoolData,
+      bonusSpellAttack: weapon.bonusSpellAttack,
+      bonusSpellSaveDc: weapon.bonusSpellSaveDc,
     });
     setEditingWeapon(weapon);
     setShowWeaponForm(true);
@@ -396,6 +428,13 @@ export default function EquipmentModal({
               setWeaponForm(initialWeaponData);
             }}
             isEditing={!!editingWeapon}
+            autocompleteSlot={
+              <WeaponAutocomplete
+                items={weaponsDb}
+                onSelect={handleWeaponDbSelect}
+                loading={weaponsLoading}
+              />
+            }
           />
         </div>
       ) : showMagicItemForm ? (
@@ -464,6 +503,11 @@ export default function EquipmentModal({
                       onEdit={handleEditWeapon}
                       onDelete={deleteWeapon}
                       onToggleEquip={equipWeapon}
+                      onExpendWeaponChargePoolAbility={
+                        expendWeaponChargePoolAbility
+                      }
+                      onRestoreWeaponChargePool={restoreWeaponChargePool}
+                      onSetWeaponChargePoolUsed={setWeaponChargePoolUsed}
                     />
                   )}
                 />

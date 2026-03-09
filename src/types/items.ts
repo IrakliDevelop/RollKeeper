@@ -61,7 +61,11 @@ export interface ProcessedItem {
   rawType: string;
 }
 
-import type { MagicItemCategory, MagicItemRarity } from './character';
+import type {
+  MagicItemCategory,
+  MagicItemRarity,
+  ArmorCategory,
+} from './character';
 
 export interface ProcessedMagicItem {
   id: string;
@@ -90,4 +94,47 @@ export interface ProcessedMagicItem {
     weaponCategory?: string;
     property?: string[];
   };
+}
+
+export interface ProcessedWeapon {
+  id: string;
+  name: string;
+  source: string;
+  type: string;
+  weaponCategory: string;
+  rarity: string;
+  weight?: number;
+  description: string;
+  requiresAttunement: boolean;
+  attunementRequirement?: string;
+  dmg1?: string;
+  dmgType?: string;
+  dmg2?: string;
+  property?: string[];
+  range?: string;
+  bonusWeapon?: number;
+  bonusSpellAttack?: number;
+  bonusSpellSaveDc?: number;
+  charges?: number;
+  recharge?: string;
+  rechargeAmount?: string;
+  attachedSpells?: Record<string, unknown>;
+}
+
+export interface ProcessedArmor {
+  id: string;
+  name: string;
+  source: string;
+  type: string;
+  category: ArmorCategory;
+  rarity: string;
+  weight?: number;
+  description: string;
+  requiresAttunement: boolean;
+  attunementRequirement?: string;
+  ac: number;
+  bonusAc?: number;
+  stealthDisadvantage: boolean;
+  strengthRequirement?: number;
+  baseItem?: string;
 }
