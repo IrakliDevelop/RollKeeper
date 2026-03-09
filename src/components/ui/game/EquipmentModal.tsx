@@ -14,12 +14,9 @@ import { Plus, Sword, Wand2 } from 'lucide-react';
 import { Modal } from '@/components/ui/feedback/Modal';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { Button } from '@/components/ui/forms/button';
-import {
-  WeaponCard,
-  MagicItemCard,
-  WeaponForm,
-  MagicItemForm,
-} from './equipment';
+import { WeaponForm, MagicItemForm } from './equipment';
+import { WeaponCard } from './equipment/WeaponCard';
+import { MagicItemCard } from './equipment/MagicItemCard';
 import type {
   WeaponChargeFormData,
   WeaponFormData,

@@ -8,7 +8,9 @@ import InventoryManager from '@/components/ui/game/InventoryManager';
 import CurrencyManager from '@/components/ui/game/CurrencyManager';
 import { SpellcastingStats } from '@/components/SpellcastingStats';
 import { EnhancedSpellManagement } from '@/components/EnhancedSpellManagement';
-import EquipmentSection from '@/components/ui/character/EquipmentSection';
+import { WeaponsTab } from '@/components/ui/character/equipment/WeaponsTab';
+import { MagicItemsTab } from '@/components/ui/character/equipment/MagicItemsTab';
+import { ArmorTab } from '@/components/ui/character/equipment/ArmorTab';
 import ActionsSection from '@/components/ui/character/ActionsSection';
 import CharacterBasicInfo from '@/components/ui/character/CharacterBasicInfo';
 import AbilityScores from '@/components/ui/character/AbilityScores';
@@ -664,7 +666,9 @@ export function createTabbedSheetConfig(
 }
 
 const INVENTORY_SUB_TABS = [
-  { id: 'equipment', label: 'Equipment', icon: '🛡️' },
+  { id: 'weapons', label: 'Weapons', icon: '⚔️' },
+  { id: 'magic-items', label: 'Magic Items', icon: '✨' },
+  { id: 'armor', label: 'Armor', icon: '🛡️' },
   { id: 'items', label: 'Items', icon: '🎒' },
   { id: 'currency', label: 'Currency', icon: '💰' },
 ] as const;
@@ -672,18 +676,16 @@ const INVENTORY_SUB_TABS = [
 type InventorySubTab = (typeof INVENTORY_SUB_TABS)[number]['id'];
 
 function InventoryTabContent({ character }: { character: CharacterState }) {
-  const [activeSubTab, setActiveSubTab] =
-    useState<InventorySubTab>('equipment');
+  const [activeSubTab, setActiveSubTab] = useState<InventorySubTab>('weapons');
 
   return (
     <div className="space-y-4">
-      {/* Segmented control */}
-      <div className="bg-surface-secondary inline-flex rounded-lg p-1">
+      <div className="bg-surface-secondary inline-flex flex-wrap rounded-lg p-1">
         {INVENTORY_SUB_TABS.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveSubTab(tab.id)}
-            className={`rounded-md px-4 py-2 text-sm font-medium transition-all ${
+            className={`rounded-md px-3 py-2 text-sm font-medium transition-all ${
               activeSubTab === tab.id
                 ? 'bg-surface-raised text-heading shadow-sm'
                 : 'text-muted hover:text-body'
@@ -695,9 +697,40 @@ function InventoryTabContent({ character }: { character: CharacterState }) {
         ))}
       </div>
 
-      {/* Sub-tab content */}
-      {activeSubTab === 'equipment' && (
-        <EquipmentSection character={character} />
+      {activeSubTab === 'weapons' && (
+        <ErrorBoundary
+          fallback={
+            <div className="text-muted p-6 text-center">
+              Unable to load weapons
+            </div>
+          }
+        >
+          <WeaponsTab />
+        </ErrorBoundary>
+      )}
+
+      {activeSubTab === 'magic-items' && (
+        <ErrorBoundary
+          fallback={
+            <div className="text-muted p-6 text-center">
+              Unable to load magic items
+            </div>
+          }
+        >
+          <MagicItemsTab />
+        </ErrorBoundary>
+      )}
+
+      {activeSubTab === 'armor' && (
+        <ErrorBoundary
+          fallback={
+            <div className="text-muted p-6 text-center">
+              Unable to load armor
+            </div>
+          }
+        >
+          <ArmorTab />
+        </ErrorBoundary>
       )}
 
       {activeSubTab === 'items' && (
