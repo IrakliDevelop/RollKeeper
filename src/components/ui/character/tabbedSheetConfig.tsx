@@ -47,6 +47,7 @@ import {
   HeroicInspiration,
   ToolProficiency,
   Language,
+  Spell,
 } from '@/types/character';
 
 export interface TabbedSheetConfigParams {
@@ -164,6 +165,7 @@ export interface TabbedSheetConfigParams {
     destinationIndex: number,
     sourceType?: string
   ) => void;
+  addSpellsFromFeat?: (spells: Spell[]) => void;
 
   // Tool proficiencies
   addToolProficiency: (
@@ -795,6 +797,7 @@ function FeaturesTabContent({
             onUseFeature={params.useExtendedFeature}
             onResetFeatures={params.resetExtendedFeatures}
             onReorderFeatures={params.reorderExtendedFeatures}
+            onAddSpells={params.addSpellsFromFeat}
           />
         </div>
       )}
