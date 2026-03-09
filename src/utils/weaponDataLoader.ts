@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { ProcessedWeapon } from '@/types/items';
+import { stripTags, parseEntriesToHtml } from '@/utils/parseEntriesToHtml';
 
 let cachedWeapons: ProcessedWeapon[] | null = null;
 
@@ -39,64 +40,6 @@ function parseBonus(value: unknown): number | undefined {
   return undefined;
 }
 
-function stripTags(text: string): string {
-  return text
-    .replace(/\{@\w+\s+([^|}]+?)(?:\|[^}]*)?\}/g, '$1')
-    .replace(/\{@\w+\s+([^}]+)\}/g, '$1');
-}
-
-function parseEntries(entries: unknown[]): string {
-  return entries
-    .map(entry => {
-      if (typeof entry === 'string') return stripTags(entry);
-
-      if (typeof entry === 'object' && entry !== null) {
-        const obj = entry as Record<string, unknown>;
-
-        if (obj.type === 'list' && Array.isArray(obj.items)) {
-          return obj.items
-            .map((item: unknown) => {
-              if (typeof item === 'string') return `- ${stripTags(item)}`;
-              if (
-                typeof item === 'object' &&
-                item !== null &&
-                (item as Record<string, unknown>).type === 'item'
-              ) {
-                const i = item as Record<string, unknown>;
-                const name = i.name ? `**${i.name}.** ` : '';
-                const sub = Array.isArray(i.entries)
-                  ? parseEntries(i.entries)
-                  : (i.entry as string) || '';
-                return `- ${name}${stripTags(sub)}`;
-              }
-              return '';
-            })
-            .filter(Boolean)
-            .join('\n');
-        }
-
-        if (obj.type === 'entries' && Array.isArray(obj.entries)) {
-          const heading = obj.name ? `**${obj.name}**\n\n` : '';
-          return heading + parseEntries(obj.entries);
-        }
-
-        if (obj.type === 'table') {
-          return obj.caption
-            ? `**${obj.caption}** _(See table in source material)_`
-            : '_(See table in source material)_';
-        }
-
-        if (Array.isArray(obj.entries)) {
-          return parseEntries(obj.entries);
-        }
-      }
-
-      return '';
-    })
-    .filter(Boolean)
-    .join('\n\n');
-}
-
 interface RawWeaponItem {
   name: string;
   source: string;
@@ -125,8 +68,10 @@ interface RawWeaponItem {
 
 function processWeapon(raw: RawWeaponItem): ProcessedWeapon {
   const description = [
-    ...(raw.entries ? [parseEntries(raw.entries)] : []),
-    ...(raw.additionalEntries ? [parseEntries(raw.additionalEntries)] : []),
+    ...(raw.entries ? [parseEntriesToHtml(raw.entries)] : []),
+    ...(raw.additionalEntries
+      ? [parseEntriesToHtml(raw.additionalEntries)]
+      : []),
   ]
     .filter(Boolean)
     .join('\n\n');
