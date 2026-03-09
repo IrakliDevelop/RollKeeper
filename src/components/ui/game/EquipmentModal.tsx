@@ -8,8 +8,6 @@ import {
   WeaponType,
   DamageType,
   WeaponDamage,
-  MagicItemCategory,
-  MagicItemRarity,
 } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Sword, Wand2 } from 'lucide-react';
@@ -23,24 +21,18 @@ import {
   MagicItemForm,
 } from './equipment';
 import type { WeaponChargeFormData } from './equipment/WeaponForm';
-import type { MagicItemChargeFormData } from './equipment/MagicItemForm';
+import type {
+  MagicItemChargeFormData,
+  MagicItemFormData,
+} from './equipment/MagicItemForm';
+import { MagicItemAutocomplete } from '@/components/ui/forms/MagicItemAutocomplete';
+import { useMagicItemsData } from '@/hooks/useMagicItemsData';
+import { convertProcessedMagicItemToFormData } from '@/utils/magicItemConversion';
+import type { ProcessedMagicItem } from '@/types/items';
 
 interface EquipmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-}
-
-interface MagicItemFormData {
-  name: string;
-  category: MagicItemCategory;
-  rarity: MagicItemRarity;
-  description: string;
-  properties: string[];
-  requiresAttunement: boolean;
-  isAttuned: boolean;
-  isEquipped?: boolean;
-  // Multiple charges
-  charges?: MagicItemChargeFormData[];
 }
 
 interface WeaponFormData {
@@ -116,12 +108,26 @@ export default function EquipmentModal({
     reorderMagicItems,
     expendMagicItemCharge,
     restoreMagicItemCharge,
+    expendChargePoolAbility,
+    restoreChargePool,
+    setChargePoolUsed,
     addWeapon,
     updateWeapon,
     deleteWeapon,
     equipWeapon,
     reorderWeapons,
   } = useCharacterStore();
+
+  const { items: magicItemsDb, loading: magicItemsLoading } =
+    useMagicItemsData();
+
+  const handleMagicItemSelect = (item: ProcessedMagicItem) => {
+    const autoFilled = convertProcessedMagicItemToFormData(item);
+    setMagicItemForm(prev => ({
+      ...prev,
+      ...autoFilled,
+    }));
+  };
 
   const [showMagicItemForm, setShowMagicItemForm] = useState(false);
   const [showWeaponForm, setShowWeaponForm] = useState(false);
@@ -146,9 +152,8 @@ export default function EquipmentModal({
   const handleMagicItemSubmit = () => {
     if (!magicItemForm.name.trim()) return;
 
-    // Convert charges form data to MagicItemCharge[] with IDs
     const chargesWithIds = (magicItemForm.charges || [])
-      .filter(charge => charge.name.trim()) // Only include charges with names
+      .filter(charge => charge.name.trim())
       .map(charge => ({
         id:
           charge.id ||
@@ -162,9 +167,31 @@ export default function EquipmentModal({
         proficiencyMultiplier: charge.proficiencyMultiplier,
       }));
 
+    const chargePool = magicItemForm.chargePool
+      ? {
+          maxCharges: magicItemForm.chargePool.maxCharges,
+          usedCharges: magicItemForm.chargePool.usedCharges,
+          rechargeType: magicItemForm.chargePool.rechargeType,
+          rechargeAmount: magicItemForm.chargePool.rechargeAmount,
+          abilities: magicItemForm.chargePool.abilities.map(a => ({
+            id:
+              a.id ||
+              `cpa-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name: a.name,
+            description: a.description,
+            cost: a.cost,
+            isSpell: a.isSpell,
+            spellLevel: a.spellLevel,
+          })),
+        }
+      : undefined;
+
     const magicItemData = {
       ...magicItemForm,
       charges: chargesWithIds.length > 0 ? chargesWithIds : undefined,
+      chargePool,
+      bonusSpellAttack: magicItemForm.bonusSpellAttack,
+      bonusSpellSaveDc: magicItemForm.bonusSpellSaveDc,
     };
 
     if (editingMagicItem) {
@@ -245,6 +272,17 @@ export default function EquipmentModal({
       isAttuned: item.isAttuned,
       isEquipped: item.isEquipped,
       charges: chargesFormData,
+      chargePool: item.chargePool
+        ? {
+            maxCharges: item.chargePool.maxCharges,
+            usedCharges: item.chargePool.usedCharges,
+            rechargeType: item.chargePool.rechargeType,
+            rechargeAmount: item.chargePool.rechargeAmount,
+            abilities: item.chargePool.abilities,
+          }
+        : undefined,
+      bonusSpellAttack: item.bonusSpellAttack,
+      bonusSpellSaveDc: item.bonusSpellSaveDc,
     });
     setEditingMagicItem(item);
     setShowMagicItemForm(true);
@@ -376,6 +414,13 @@ export default function EquipmentModal({
               setMagicItemForm(initialMagicItemData);
             }}
             isEditing={!!editingMagicItem}
+            autocompleteSlot={
+              <MagicItemAutocomplete
+                items={magicItemsDb}
+                onSelect={handleMagicItemSelect}
+                loading={magicItemsLoading}
+              />
+            }
           />
         </div>
       ) : (
@@ -467,6 +512,9 @@ export default function EquipmentModal({
                       onToggleAttunement={handleAttunement}
                       onExpendCharge={expendMagicItemCharge}
                       onRestoreCharge={restoreMagicItemCharge}
+                      onExpendChargePoolAbility={expendChargePoolAbility}
+                      onRestoreChargePool={restoreChargePool}
+                      onSetChargePoolUsed={setChargePoolUsed}
                     />
                   )}
                 />
