@@ -9,9 +9,13 @@ import DragDropList from '@/components/ui/layout/DragDropList';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { Input } from '@/components/ui/forms/input';
-import { Textarea } from '@/components/ui/forms/textarea';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Checkbox } from '@/components/ui/forms/checkbox';
+import RichTextEditor from '@/components/ui/forms/RichTextEditor';
+import { ArmorAutocomplete } from '@/components/ui/forms/ArmorAutocomplete';
+import { useArmorDbData } from '@/hooks/useArmorDbData';
+import { convertProcessedArmorToFormData } from '@/utils/armorConversion';
+import type { ProcessedArmor } from '@/types/items';
 
 const ARMOR_CATEGORIES: ArmorCategory[] = [
   'light',
@@ -94,9 +98,19 @@ export default function ArmorDefenseManager() {
     reorderArmorItems,
   } = useCharacterStore();
 
+  const { items: armorDb, loading: armorDbLoading } = useArmorDbData();
+
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<ArmorFormData>(initialFormData);
+
+  const handleArmorDbSelect = (item: ProcessedArmor) => {
+    const autoFilled = convertProcessedArmorToFormData(item);
+    setFormData(prev => ({
+      ...prev,
+      ...autoFilled,
+    }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,6 +161,7 @@ export default function ArmorDefenseManager() {
 
   const handleTypeChange = (type: ArmorType) => {
     const stats = ARMOR_STATS[type];
+    if (!stats) return;
     setFormData(prev => ({
       ...prev,
       type,
@@ -291,6 +306,17 @@ export default function ArmorDefenseManager() {
         closeOnBackdropClick={true}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Database search (when not editing) */}
+          {!editingId && (
+            <div className="space-y-4">
+              <ArmorAutocomplete
+                items={armorDb}
+                onSelect={handleArmorDbSelect}
+                loading={armorDbLoading}
+              />
+            </div>
+          )}
+
           {/* Section: Basic Information */}
           <div className="space-y-4">
             <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
@@ -407,15 +433,18 @@ export default function ArmorDefenseManager() {
               Description
             </h4>
 
-            <Textarea
-              label="Special Properties"
-              value={formData.description}
-              onChange={e =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              rows={3}
-              placeholder="Special properties, abilities, or description..."
-            />
+            <div>
+              <label className="text-body mb-2 block text-sm font-medium">
+                Special Properties
+              </label>
+              <RichTextEditor
+                content={formData.description}
+                onChange={content =>
+                  setFormData(prev => ({ ...prev, description: content }))
+                }
+                placeholder="Special properties, abilities, or description..."
+              />
+            </div>
           </div>
 
           {/* Section: Properties */}

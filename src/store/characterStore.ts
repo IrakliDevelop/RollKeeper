@@ -558,6 +558,9 @@ interface CharacterStore {
     chargeId: string,
     usedCount: number
   ) => void;
+  expendWeaponChargePoolAbility: (weaponId: string, abilityId: string) => void;
+  restoreWeaponChargePool: (weaponId: string, amount: number) => void;
+  setWeaponChargePoolUsed: (weaponId: string, usedCount: number) => void;
 
   // Magic item management
   addMagicItem: (
@@ -3514,6 +3517,90 @@ export const useCharacterStore = create<CharacterStore>()(
               ...state.character,
               weapons: updatedWeapons,
             },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      expendWeaponChargePoolAbility: (weaponId, abilityId) => {
+        set(state => {
+          const updatedWeapons = state.character.weapons.map(weapon => {
+            if (weapon.id !== weaponId || !weapon.chargePool) return weapon;
+
+            const ability = weapon.chargePool.abilities.find(
+              a => a.id === abilityId
+            );
+            if (!ability) return weapon;
+
+            const newUsed = weapon.chargePool.usedCharges + ability.cost;
+            if (newUsed > weapon.chargePool.maxCharges) return weapon;
+
+            return {
+              ...weapon,
+              chargePool: {
+                ...weapon.chargePool,
+                usedCharges: newUsed,
+              },
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          return {
+            character: { ...state.character, weapons: updatedWeapons },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      restoreWeaponChargePool: (weaponId, amount) => {
+        set(state => {
+          const updatedWeapons = state.character.weapons.map(weapon => {
+            if (weapon.id !== weaponId || !weapon.chargePool) return weapon;
+
+            const newUsed = Math.max(0, weapon.chargePool.usedCharges - amount);
+
+            return {
+              ...weapon,
+              chargePool: {
+                ...weapon.chargePool,
+                usedCharges: newUsed,
+              },
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          return {
+            character: { ...state.character, weapons: updatedWeapons },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      setWeaponChargePoolUsed: (weaponId, usedCount) => {
+        set(state => {
+          const updatedWeapons = state.character.weapons.map(weapon => {
+            if (weapon.id !== weaponId || !weapon.chargePool) return weapon;
+
+            const clamped = Math.max(
+              0,
+              Math.min(usedCount, weapon.chargePool.maxCharges)
+            );
+
+            return {
+              ...weapon,
+              chargePool: {
+                ...weapon.chargePool,
+                usedCharges: clamped,
+              },
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          return {
+            character: { ...state.character, weapons: updatedWeapons },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
           };

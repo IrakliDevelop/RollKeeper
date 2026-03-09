@@ -1,0 +1,251 @@
+'use client';
+
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { ProcessedWeapon } from '@/types/items';
+import { Search, X, Loader2, Sword } from 'lucide-react';
+import { Badge } from '@/components/ui/layout/badge';
+
+interface WeaponAutocompleteProps {
+  items: ProcessedWeapon[];
+  onSelect: (item: ProcessedWeapon) => void;
+  loading?: boolean;
+  disabled?: boolean;
+  placeholder?: string;
+  className?: string;
+}
+
+const RARITY_VARIANTS: Record<
+  string,
+  'primary' | 'info' | 'success' | 'warning' | 'secondary' | 'danger'
+> = {
+  common: 'secondary',
+  uncommon: 'success',
+  rare: 'info',
+  'very rare': 'primary',
+  legendary: 'warning',
+  artifact: 'danger',
+};
+
+export function WeaponAutocomplete({
+  items,
+  onSelect,
+  loading = false,
+  disabled = false,
+  placeholder = 'Search weapons database...',
+  className = '',
+}: WeaponAutocompleteProps) {
+  const [query, setQuery] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const filteredItems = useMemo(() => {
+    if (!query.trim()) return [];
+    const q = query.toLowerCase().trim();
+
+    return items
+      .filter(item => {
+        const name = item.name.toLowerCase();
+        return (
+          name.includes(q) ||
+          item.weaponCategory.includes(q) ||
+          item.rarity.includes(q) ||
+          (item.dmgType && item.dmgType.includes(q))
+        );
+      })
+      .sort((a, b) => {
+        const aName = a.name.toLowerCase();
+        const bName = b.name.toLowerCase();
+        if (aName === q && bName !== q) return -1;
+        if (bName === q && aName !== q) return 1;
+        const aStarts = aName.startsWith(q);
+        const bStarts = bName.startsWith(q);
+        if (aStarts && !bStarts) return -1;
+        if (bStarts && !aStarts) return 1;
+        return aName.localeCompare(bName);
+      })
+      .slice(0, 50);
+  }, [items, query]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [filteredItems]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        setIsOpen(true);
+        return;
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedIndex(prev =>
+          prev < filteredItems.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedIndex(prev => (prev > 0 ? prev - 1 : 0));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (filteredItems[selectedIndex]) {
+          handleSelect(filteredItems[selectedIndex]);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setIsOpen(false);
+        break;
+    }
+  };
+
+  const handleSelect = (item: ProcessedWeapon) => {
+    setQuery('');
+    setIsOpen(false);
+    onSelect(item);
+  };
+
+  const handleClear = () => {
+    setQuery('');
+    setIsOpen(false);
+    inputRef.current?.focus();
+  };
+
+  return (
+    <div className={`relative ${className}`}>
+      <div className="mb-2 flex items-center gap-2">
+        <Sword className="text-accent-blue-text-muted h-5 w-5" />
+        <h4 className="text-body text-sm font-semibold">
+          Search Weapon Database
+        </h4>
+        {loading && (
+          <Loader2 className="text-accent-blue-text-muted h-4 w-4 animate-spin" />
+        )}
+      </div>
+
+      <div className="relative">
+        <div className="relative">
+          <Search className="text-muted absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={e => {
+              setQuery(e.target.value);
+              setIsOpen(true);
+            }}
+            onKeyDown={handleKeyDown}
+            onFocus={() => query && setIsOpen(true)}
+            placeholder={placeholder}
+            disabled={disabled || loading}
+            className="border-divider-strong text-heading focus:border-accent-blue-border-strong focus:ring-accent-blue-bg/20 disabled:bg-surface-inset w-full rounded-lg border py-2 pr-10 pl-10 text-sm focus:ring-2 focus:outline-none disabled:cursor-not-allowed"
+          />
+          {query && (
+            <button
+              onClick={handleClear}
+              className="text-muted hover:text-body absolute top-1/2 right-3 -translate-y-1/2"
+              type="button"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {isOpen && query && (
+          <div
+            ref={dropdownRef}
+            className="border-divider bg-surface-raised absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-lg border shadow-lg"
+          >
+            {filteredItems.length > 0 ? (
+              <ul className="py-1">
+                {filteredItems.map((item, index) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(item)}
+                      className={`w-full px-4 py-2 text-left transition-colors ${
+                        index === selectedIndex
+                          ? 'bg-accent-blue-bg-strong'
+                          : 'hover:bg-surface-hover'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg">
+                          {item.type === 'R' ? '🏹' : '⚔️'}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-heading truncate font-medium">
+                            {item.name}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {item.rarity !== 'none' && (
+                              <Badge
+                                variant={
+                                  RARITY_VARIANTS[item.rarity] || 'secondary'
+                                }
+                                size="sm"
+                              >
+                                {item.rarity.charAt(0).toUpperCase() +
+                                  item.rarity.slice(1)}
+                              </Badge>
+                            )}
+                            <span className="text-muted text-xs">
+                              {item.weaponCategory} · {item.dmg1}
+                              {item.dmgType ? ` ${item.dmgType}` : ''}
+                              {item.bonusWeapon
+                                ? ` (+${item.bonusWeapon})`
+                                : ''}
+                            </span>
+                            {item.requiresAttunement && (
+                              <span className="text-muted text-xs italic">
+                                Attunement
+                              </span>
+                            )}
+                            <span className="text-faint text-xs">
+                              {item.source}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-muted px-4 py-8 text-center text-sm">
+                <p>No weapons found</p>
+                <p className="mt-1 text-xs">Try a different search term</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <p className="text-muted mt-2 text-xs">
+        Search and select a weapon to auto-fill the form, or fill manually.
+      </p>
+    </div>
+  );
+}

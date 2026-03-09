@@ -7,13 +7,14 @@ import {
   DamageType,
   WeaponDamage,
 } from '@/types/character';
-import { Plus, Trash2, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Sparkles, Zap, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
-import { Textarea } from '@/components/ui/forms/textarea';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Checkbox } from '@/components/ui/forms/checkbox';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
+import { Badge } from '@/components/ui/layout/badge';
+import type { ChargePoolFormData } from '@/utils/magicItemConversion';
 
 // Form data version of WeaponCharge (without requiring id for new entries)
 export interface WeaponChargeFormData {
@@ -22,7 +23,7 @@ export interface WeaponChargeFormData {
   description?: string;
   maxCharges: number;
   usedCharges: number;
-  restType: 'short' | 'long';
+  restType: 'short' | 'long' | 'dawn';
   scaleWithProficiency?: boolean;
   proficiencyMultiplier?: number;
 }
@@ -45,8 +46,10 @@ export interface WeaponFormData {
   manualProficiency?: boolean;
   requiresAttunement?: boolean;
   isAttuned?: boolean;
-  // Multiple weapon charges
   charges?: WeaponChargeFormData[];
+  chargePool?: ChargePoolFormData;
+  bonusSpellAttack?: number;
+  bonusSpellSaveDc?: number;
 }
 
 interface WeaponFormProps {
@@ -55,6 +58,7 @@ interface WeaponFormProps {
   onSubmit: () => void;
   onCancel: () => void;
   isEditing: boolean;
+  autocompleteSlot?: React.ReactNode;
 }
 
 const WEAPON_CATEGORIES: WeaponCategory[] = [
@@ -111,6 +115,7 @@ export function WeaponForm({
   onSubmit,
   onCancel,
   isEditing,
+  autocompleteSlot,
 }: WeaponFormProps) {
   const toggleWeaponType = (type: WeaponType) => {
     setFormData(prev => ({
@@ -154,6 +159,11 @@ export function WeaponForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Autocomplete search (when not editing) */}
+      {!isEditing && autocompleteSlot && (
+        <div className="space-y-4">{autocompleteSlot}</div>
+      )}
+
       {/* Section: Basic Information */}
       <div className="space-y-4">
         <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
@@ -379,18 +389,18 @@ export function WeaponForm({
           Description
         </h4>
 
-        <Textarea
-          label="Special Properties"
-          value={formData.description || ''}
-          onChange={e =>
-            setFormData({
-              ...formData,
-              description: e.target.value,
-            })
-          }
-          rows={3}
-          placeholder="Special properties, abilities, or description..."
-        />
+        <div>
+          <label className="text-body mb-2 block text-sm font-medium">
+            Special Properties
+          </label>
+          <RichTextEditor
+            content={formData.description || ''}
+            onChange={content =>
+              setFormData(prev => ({ ...prev, description: content }))
+            }
+            placeholder="Special properties, abilities, or description..."
+          />
+        </div>
       </div>
 
       {/* Section: Charges */}
@@ -545,6 +555,192 @@ export function WeaponForm({
           </div>
         )}
       </div>
+
+      {/* Section: Charge Pool (from weapon database) */}
+      {formData.chargePool && (
+        <div className="space-y-4">
+          <div className="border-divider flex items-center justify-between border-b-2 pb-2">
+            <h4 className="text-heading flex items-center gap-2 text-sm font-bold tracking-wide uppercase">
+              <Zap size={16} className="text-accent-amber-text" />
+              Shared Charge Pool
+            </h4>
+          </div>
+
+          <div className="border-accent-amber-border bg-accent-amber-bg rounded-lg border p-4">
+            <div className="mb-4 grid grid-cols-3 gap-3">
+              <Input
+                label="Max Charges"
+                type="number"
+                min={0}
+                value={formData.chargePool.maxCharges.toString()}
+                onChange={e =>
+                  setFormData(prev => ({
+                    ...prev,
+                    chargePool: prev.chargePool
+                      ? {
+                          ...prev.chargePool,
+                          maxCharges: parseInt(e.target.value) || 0,
+                        }
+                      : undefined,
+                  }))
+                }
+              />
+              <div>
+                <label className="text-body mb-2 block text-sm font-medium">
+                  Recharges
+                </label>
+                <SelectField
+                  value={formData.chargePool.rechargeType}
+                  onValueChange={value =>
+                    setFormData(prev => ({
+                      ...prev,
+                      chargePool: prev.chargePool
+                        ? {
+                            ...prev.chargePool,
+                            rechargeType:
+                              value as typeof prev.chargePool.rechargeType,
+                          }
+                        : undefined,
+                    }))
+                  }
+                >
+                  <SelectItem value="dawn">At Dawn</SelectItem>
+                  <SelectItem value="dusk">At Dusk</SelectItem>
+                  <SelectItem value="short">Short Rest</SelectItem>
+                  <SelectItem value="long">Long Rest</SelectItem>
+                  <SelectItem value="midnight">Midnight</SelectItem>
+                  <SelectItem value="special">Special</SelectItem>
+                </SelectField>
+              </div>
+              <Input
+                label="Recharge Amount"
+                value={formData.chargePool.rechargeAmount || ''}
+                onChange={e =>
+                  setFormData(prev => ({
+                    ...prev,
+                    chargePool: prev.chargePool
+                      ? {
+                          ...prev.chargePool,
+                          rechargeAmount: e.target.value || undefined,
+                        }
+                      : undefined,
+                  }))
+                }
+                placeholder="e.g., 1d6+4"
+              />
+            </div>
+
+            {formData.chargePool.abilities.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-body text-xs font-semibold uppercase">
+                  Abilities
+                </p>
+                {formData.chargePool.abilities.map((ability, idx) => (
+                  <div
+                    key={ability.id || idx}
+                    className="bg-surface-raised flex items-center gap-3 rounded-lg px-3 py-2"
+                  >
+                    <Badge
+                      variant={ability.cost === 0 ? 'success' : 'warning'}
+                      size="sm"
+                    >
+                      {ability.cost === 0
+                        ? ability.description === 'Ritual only'
+                          ? 'Ritual'
+                          : 'Free'
+                        : `${ability.cost} charge${ability.cost !== 1 ? 's' : ''}`}
+                    </Badge>
+                    <Input
+                      value={ability.name}
+                      onChange={e =>
+                        setFormData(prev => ({
+                          ...prev,
+                          chargePool: prev.chargePool
+                            ? {
+                                ...prev.chargePool,
+                                abilities: prev.chargePool.abilities.map(
+                                  (a, i) =>
+                                    i === idx
+                                      ? { ...a, name: e.target.value }
+                                      : a
+                                ),
+                              }
+                            : undefined,
+                        }))
+                      }
+                      className="flex-1 text-sm"
+                      wrapperClassName="flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData(prev => ({
+                          ...prev,
+                          chargePool: prev.chargePool
+                            ? {
+                                ...prev.chargePool,
+                                abilities: prev.chargePool.abilities.filter(
+                                  (_, i) => i !== idx
+                                ),
+                              }
+                            : undefined,
+                        }))
+                      }
+                      className="text-muted hover:text-accent-red-text shrink-0 p-1"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Section: Spell Bonuses */}
+      {(formData.bonusSpellAttack !== undefined ||
+        formData.bonusSpellSaveDc !== undefined ||
+        formData.chargePool) && (
+        <div className="space-y-4">
+          <h4 className="border-divider text-heading flex items-center gap-2 border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+            <Shield size={16} className="text-accent-indigo-text" />
+            Spell Bonuses
+          </h4>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Bonus to Spell Attack"
+              type="number"
+              min={0}
+              max={5}
+              value={(formData.bonusSpellAttack ?? '').toString()}
+              onChange={e => {
+                const val = e.target.value
+                  ? parseInt(e.target.value)
+                  : undefined;
+                setFormData(prev => ({ ...prev, bonusSpellAttack: val }));
+              }}
+              placeholder="+0"
+              helperText="Added to spell attack rolls"
+            />
+            <Input
+              label="Bonus to Spell Save DC"
+              type="number"
+              min={0}
+              max={5}
+              value={(formData.bonusSpellSaveDc ?? '').toString()}
+              onChange={e => {
+                const val = e.target.value
+                  ? parseInt(e.target.value)
+                  : undefined;
+                setFormData(prev => ({ ...prev, bonusSpellSaveDc: val }));
+              }}
+              placeholder="+0"
+              helperText="Added to spell save DC"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Section: Properties */}
       <div className="space-y-4">

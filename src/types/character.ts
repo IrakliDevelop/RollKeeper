@@ -348,40 +348,39 @@ export interface WeaponCharge {
   description?: string; // Description of what this charge does
   maxCharges: number; // Maximum number of charges
   usedCharges: number; // Number of charges already used
-  restType: 'short' | 'long'; // When this charge recharges
-  scaleWithProficiency?: boolean; // If true, maxCharges scales with proficiency bonus
-  proficiencyMultiplier?: number; // Multiplier for proficiency bonus (default 1)
+  restType: 'short' | 'long' | 'dawn';
+  scaleWithProficiency?: boolean;
+  proficiencyMultiplier?: number;
 }
 
-// Individual weapon/magic item
 export interface Weapon {
   id: string;
   name: string;
   category: WeaponCategory;
   weaponType: WeaponType[];
-  // Updated to support multiple damage types
-  damage: WeaponDamage[]; // Array of damage entries
-  // Legacy single damage support for backward compatibility
+  damage: WeaponDamage[];
   legacyDamage?: {
     dice: string;
     type: DamageType;
     versatiledice?: string;
   };
-  enhancementBonus: number; // +0, +1, +2, +3 (enhancement bonus)
-  attackBonus?: number; // Additional custom attack bonus beyond enhancement
-  damageBonus?: number; // Additional custom damage bonus beyond enhancement
-  properties: string[]; // Custom properties like "magical", "silvered", etc.
-  description?: string; // Optional description for magic items
+  enhancementBonus: number;
+  attackBonus?: number;
+  damageBonus?: number;
+  properties: string[];
+  description?: string;
   range?: {
     normal: number;
     long?: number;
   };
-  isEquipped: boolean; // Whether this weapon is currently equipped/ready
-  manualProficiency?: boolean; // Manual override for proficiency (undefined = use auto calculation)
-  requiresAttunement?: boolean; // Whether this weapon requires attunement
-  isAttuned?: boolean; // Whether character is attuned to this item
-  // Weapon charges - multiple charge types per weapon
-  charges?: WeaponCharge[]; // Array of different charge abilities
+  isEquipped: boolean;
+  manualProficiency?: boolean;
+  requiresAttunement?: boolean;
+  isAttuned?: boolean;
+  charges?: WeaponCharge[];
+  chargePool?: ChargePool;
+  bonusSpellAttack?: number;
+  bonusSpellSaveDc?: number;
   createdAt: string;
   updatedAt: string;
 }
