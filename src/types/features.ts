@@ -65,6 +65,7 @@ export interface FeatureAutocompleteItem {
     prerequisites?: string[];
     abilityIncreases?: string;
     repeatable?: boolean;
+    additionalSpells?: unknown[];
 
     // For class features
     className?: string;
@@ -111,6 +112,7 @@ export function featToAutocompleteItem(
       prerequisites: feat.prerequisites,
       abilityIncreases: feat.abilityIncreases,
       repeatable: feat.repeatable,
+      additionalSpells: feat.additionalSpells,
     },
     tags: feat.tags,
   };

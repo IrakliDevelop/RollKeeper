@@ -52,6 +52,7 @@ export interface ProcessedFeat {
   category?: string;
   repeatable: boolean;
   grantsSpells: boolean;
+  additionalSpells?: unknown[];
   isSrd: boolean;
   tags: string[];
 }
@@ -252,6 +253,9 @@ function processFeat(rawFeat: RawFeatData): ProcessedFeat {
     category: rawFeat.category,
     repeatable: rawFeat.repeatable || false,
     grantsSpells: grantsSpells(rawFeat),
+    additionalSpells: grantsSpells(rawFeat)
+      ? rawFeat.additionalSpells
+      : undefined,
     isSrd:
       rawFeat.srd ||
       rawFeat.srd52 ||

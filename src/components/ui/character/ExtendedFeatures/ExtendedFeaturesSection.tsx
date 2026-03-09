@@ -6,6 +6,7 @@ import {
   FeatureCategory,
   groupFeaturesBySource,
   CharacterState,
+  Spell,
 } from '@/types/character';
 import { ChevronDown, ChevronRight, Plus, Settings } from 'lucide-react';
 import FeatureCategorySection from '@/components/ui/character/ExtendedFeatures/FeatureCategorySection';
@@ -27,6 +28,7 @@ interface ExtendedFeaturesSectionProps {
     destinationIndex: number,
     sourceType?: string
   ) => void;
+  onAddSpells?: (spells: Spell[]) => void;
   readonly?: boolean;
   className?: string;
 }
@@ -40,6 +42,7 @@ export default function ExtendedFeaturesSection({
   onUseFeature,
   onResetFeatures,
   onReorderFeatures,
+  onAddSpells,
   readonly = false,
   className = '',
 }: ExtendedFeaturesSectionProps) {
@@ -200,6 +203,7 @@ export default function ExtendedFeaturesSection({
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSave={onAddFeature}
+        onAddSpells={onAddSpells}
         existingFeatures={features}
         character={character}
       />

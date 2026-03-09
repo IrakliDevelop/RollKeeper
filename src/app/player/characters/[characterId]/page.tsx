@@ -56,6 +56,7 @@ import {
   SkillName,
   CharacterState,
   ExtendedFeature,
+  Spell,
 } from '@/types/character';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import GroupedTabs, {
@@ -202,6 +203,16 @@ export default function CharacterSheet() {
     levelUpAnimationLevel,
     clearLevelUpAnimation,
   } = useCharacterStore();
+
+  const handleAddSpellsFromFeat = useCallback(
+    (spells: Spell[]) => {
+      if (spells.length === 0) return;
+      updateCharacter({
+        spells: [...(character.spells || []), ...spells],
+      });
+    },
+    [character.spells, updateCharacter]
+  );
 
   const [showResetModal, setShowResetModal] = useState(false);
   const [pendingRestType, setPendingRestType] = useState<
@@ -744,6 +755,7 @@ export default function CharacterSheet() {
                   useExtendedFeature={useExtendedFeature}
                   resetExtendedFeatures={resetExtendedFeatures}
                   reorderExtendedFeatures={reorderExtendedFeatures}
+                  addSpellsFromFeat={handleAddSpellsFromFeat}
                   addToolProficiency={addToolProficiency}
                   updateToolProficiency={updateToolProficiency}
                   deleteToolProficiency={deleteToolProficiency}
@@ -1281,6 +1293,7 @@ export default function CharacterSheet() {
                     onUseFeature={useExtendedFeature}
                     onResetFeatures={resetExtendedFeatures}
                     onReorderFeatures={reorderExtendedFeatures}
+                    onAddSpells={handleAddSpellsFromFeat}
                   />
                 </CollapsibleSection>
 
