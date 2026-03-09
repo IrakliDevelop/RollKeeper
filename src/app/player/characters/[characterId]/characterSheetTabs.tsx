@@ -9,7 +9,9 @@ import InventoryManager from '@/components/ui/game/InventoryManager';
 import CurrencyManager from '@/components/ui/game/CurrencyManager';
 import { SpellcastingStats } from '@/components/SpellcastingStats';
 import { EnhancedSpellManagement } from '@/components/EnhancedSpellManagement';
-import EquipmentSection from '@/components/ui/character/EquipmentSection';
+import { WeaponsTab } from '@/components/ui/character/equipment/WeaponsTab';
+import { MagicItemsTab } from '@/components/ui/character/equipment/MagicItemsTab';
+import { ArmorTab } from '@/components/ui/character/equipment/ArmorTab';
 import { ToastData } from '@/components/ui/feedback/Toast';
 import {
   CharacterState,
@@ -110,7 +112,11 @@ export const createCharacterSheetTabsConfig = ({
         icon: '🛡️',
         content: (
           <TabContent>
-            <EquipmentSection character={character} />
+            <div className="space-y-8">
+              <WeaponsTab />
+              <MagicItemsTab />
+              <ArmorTab />
+            </div>
           </TabContent>
         ),
       },
