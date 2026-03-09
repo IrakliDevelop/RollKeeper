@@ -419,6 +419,24 @@ export interface MagicItemCharge {
   proficiencyMultiplier?: number; // Multiplier for proficiency bonus (default 1)
 }
 
+// Shared charge pool: a single pool of charges with abilities that cost varying amounts
+export interface ChargePoolAbility {
+  id: string;
+  name: string;
+  description?: string;
+  cost: number;
+  isSpell?: boolean;
+  spellLevel?: number;
+}
+
+export interface ChargePool {
+  maxCharges: number;
+  usedCharges: number;
+  rechargeType: 'short' | 'long' | 'dawn' | 'dusk' | 'midnight' | 'special';
+  rechargeAmount?: string;
+  abilities: ChargePoolAbility[];
+}
+
 // Magic item interface
 export interface MagicItem {
   id: string;
@@ -426,13 +444,14 @@ export interface MagicItem {
   category: MagicItemCategory;
   rarity: MagicItemRarity;
   description: string;
-  properties: string[]; // Special properties or abilities
+  properties: string[];
   requiresAttunement: boolean;
   isAttuned: boolean;
-  isEquipped?: boolean; // For wearable items
-  // Multiple charge types per magic item
-  charges?: MagicItemCharge[]; // Array of different charge abilities
-  // Legacy charges format for backward compatibility
+  isEquipped?: boolean;
+  charges?: MagicItemCharge[];
+  chargePool?: ChargePool;
+  bonusSpellAttack?: number;
+  bonusSpellSaveDc?: number;
   legacyCharges?: {
     current: number;
     max: number;

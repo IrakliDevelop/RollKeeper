@@ -60,7 +60,7 @@ export interface ParsedAdditionalSpells {
   groups?: SpellListGroup[];
 }
 
-function cleanSpellName(ref: string): { name: string; level?: number } {
+export function cleanSpellName(ref: string): { name: string; level?: number } {
   let cleaned = ref;
 
   // Strip source suffix: "misty step|xphb" -> "misty step"

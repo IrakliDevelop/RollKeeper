@@ -2,13 +2,13 @@
 
 import React from 'react';
 import { MagicItemCategory, MagicItemRarity } from '@/types/character';
-import { Plus, Trash2, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Sparkles, Zap, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
-import { Textarea } from '@/components/ui/forms/textarea';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Checkbox } from '@/components/ui/forms/checkbox';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
+import { Badge } from '@/components/ui/layout/badge';
 
 // Form data version of MagicItemCharge (without requiring id for new entries)
 export interface MagicItemChargeFormData {
@@ -22,7 +22,9 @@ export interface MagicItemChargeFormData {
   proficiencyMultiplier?: number;
 }
 
-interface MagicItemFormData {
+import type { ChargePoolFormData } from '@/utils/magicItemConversion';
+
+export interface MagicItemFormData {
   name: string;
   category: MagicItemCategory;
   rarity: MagicItemRarity;
@@ -31,8 +33,10 @@ interface MagicItemFormData {
   requiresAttunement: boolean;
   isAttuned: boolean;
   isEquipped?: boolean;
-  // Multiple charges
   charges?: MagicItemChargeFormData[];
+  chargePool?: ChargePoolFormData;
+  bonusSpellAttack?: number;
+  bonusSpellSaveDc?: number;
 }
 
 interface MagicItemFormProps {
@@ -41,6 +45,7 @@ interface MagicItemFormProps {
   onSubmit: () => void;
   onCancel: () => void;
   isEditing: boolean;
+  autocompleteSlot?: React.ReactNode;
 }
 
 const MAGIC_ITEM_CATEGORIES: MagicItemCategory[] = [
@@ -83,6 +88,7 @@ export function MagicItemForm({
   onSubmit,
   onCancel,
   isEditing,
+  autocompleteSlot,
 }: MagicItemFormProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,8 +121,44 @@ export function MagicItemForm({
     }));
   };
 
+  const updatePoolAbility = (
+    index: number,
+    updates: Partial<{ name: string; cost: number; description: string }>
+  ) => {
+    if (!formData.chargePool) return;
+    setFormData(prev => ({
+      ...prev,
+      chargePool: prev.chargePool
+        ? {
+            ...prev.chargePool,
+            abilities: prev.chargePool.abilities.map((a, i) =>
+              i === index ? { ...a, ...updates } : a
+            ),
+          }
+        : undefined,
+    }));
+  };
+
+  const removePoolAbility = (index: number) => {
+    if (!formData.chargePool) return;
+    setFormData(prev => ({
+      ...prev,
+      chargePool: prev.chargePool
+        ? {
+            ...prev.chargePool,
+            abilities: prev.chargePool.abilities.filter((_, i) => i !== index),
+          }
+        : undefined,
+    }));
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Autocomplete search (when not editing) */}
+      {!isEditing && autocompleteSlot && (
+        <div className="space-y-4">{autocompleteSlot}</div>
+      )}
+
       {/* Section: Basic Information */}
       <div className="space-y-4">
         <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
@@ -182,18 +224,22 @@ export function MagicItemForm({
           Description
         </h4>
 
-        <Textarea
-          label="Item Properties"
-          value={formData.description}
-          onChange={e =>
-            setFormData({
-              ...formData,
-              description: e.target.value,
-            })
-          }
-          rows={3}
-          placeholder="Describe the item's properties and abilities..."
-        />
+        <div>
+          <label className="text-body mb-1 block text-sm font-medium">
+            Item Properties
+          </label>
+          <RichTextEditor
+            content={formData.description}
+            onChange={(content: string) =>
+              setFormData({
+                ...formData,
+                description: content,
+              })
+            }
+            placeholder="Describe the item's properties and abilities..."
+            minHeight="120px"
+          />
+        </div>
       </div>
 
       {/* Section: Charges */}
@@ -349,6 +395,173 @@ export function MagicItemForm({
           </div>
         )}
       </div>
+
+      {/* Section: Charge Pool (from item database) */}
+      {formData.chargePool && (
+        <div className="space-y-4">
+          <div className="border-divider flex items-center justify-between border-b-2 pb-2">
+            <h4 className="text-heading flex items-center gap-2 text-sm font-bold tracking-wide uppercase">
+              <Zap size={16} className="text-accent-amber-text" />
+              Shared Charge Pool
+            </h4>
+          </div>
+
+          <div className="border-accent-amber-border bg-accent-amber-bg rounded-lg border p-4">
+            <div className="mb-4 grid grid-cols-3 gap-3">
+              <Input
+                label="Max Charges"
+                type="number"
+                min={0}
+                value={formData.chargePool.maxCharges.toString()}
+                onChange={e =>
+                  setFormData(prev => ({
+                    ...prev,
+                    chargePool: prev.chargePool
+                      ? {
+                          ...prev.chargePool,
+                          maxCharges: parseInt(e.target.value) || 0,
+                        }
+                      : undefined,
+                  }))
+                }
+              />
+              <div>
+                <label className="text-body mb-2 block text-sm font-medium">
+                  Recharges
+                </label>
+                <SelectField
+                  value={formData.chargePool.rechargeType}
+                  onValueChange={value =>
+                    setFormData(prev => ({
+                      ...prev,
+                      chargePool: prev.chargePool
+                        ? {
+                            ...prev.chargePool,
+                            rechargeType:
+                              value as typeof prev.chargePool.rechargeType,
+                          }
+                        : undefined,
+                    }))
+                  }
+                >
+                  <SelectItem value="dawn">At Dawn</SelectItem>
+                  <SelectItem value="dusk">At Dusk</SelectItem>
+                  <SelectItem value="short">Short Rest</SelectItem>
+                  <SelectItem value="long">Long Rest</SelectItem>
+                  <SelectItem value="midnight">Midnight</SelectItem>
+                  <SelectItem value="special">Special</SelectItem>
+                </SelectField>
+              </div>
+              <Input
+                label="Recharge Amount"
+                value={formData.chargePool.rechargeAmount || ''}
+                onChange={e =>
+                  setFormData(prev => ({
+                    ...prev,
+                    chargePool: prev.chargePool
+                      ? {
+                          ...prev.chargePool,
+                          rechargeAmount: e.target.value || undefined,
+                        }
+                      : undefined,
+                  }))
+                }
+                placeholder="e.g., 1d6+4"
+              />
+            </div>
+
+            {formData.chargePool.abilities.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-body text-xs font-semibold uppercase">
+                  Abilities
+                </p>
+                {formData.chargePool.abilities.map((ability, idx) => (
+                  <div
+                    key={ability.id || idx}
+                    className="bg-surface-raised flex items-center gap-3 rounded-lg px-3 py-2"
+                  >
+                    <Badge
+                      variant={ability.cost === 0 ? 'success' : 'warning'}
+                      size="sm"
+                    >
+                      {ability.cost === 0
+                        ? ability.description === 'Ritual only'
+                          ? 'Ritual'
+                          : 'Free'
+                        : `${ability.cost} charge${ability.cost !== 1 ? 's' : ''}`}
+                    </Badge>
+                    <Input
+                      value={ability.name}
+                      onChange={e =>
+                        updatePoolAbility(idx, { name: e.target.value })
+                      }
+                      className="flex-1 text-sm"
+                      wrapperClassName="flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removePoolAbility(idx)}
+                      className="text-muted hover:text-accent-red-text shrink-0 p-1"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Section: Spell Bonuses */}
+      {(formData.bonusSpellAttack !== undefined ||
+        formData.bonusSpellSaveDc !== undefined ||
+        formData.chargePool) && (
+        <div className="space-y-4">
+          <h4 className="border-divider text-heading flex items-center gap-2 border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+            <Shield size={16} className="text-accent-indigo-text" />
+            Spell Bonuses
+          </h4>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Bonus to Spell Attack"
+              type="number"
+              min={0}
+              max={5}
+              value={(formData.bonusSpellAttack ?? '').toString()}
+              onChange={e => {
+                const val = e.target.value
+                  ? parseInt(e.target.value)
+                  : undefined;
+                setFormData(prev => ({
+                  ...prev,
+                  bonusSpellAttack: val,
+                }));
+              }}
+              placeholder="+0"
+              helperText="Added to spell attack rolls"
+            />
+            <Input
+              label="Bonus to Spell Save DC"
+              type="number"
+              min={0}
+              max={5}
+              value={(formData.bonusSpellSaveDc ?? '').toString()}
+              onChange={e => {
+                const val = e.target.value
+                  ? parseInt(e.target.value)
+                  : undefined;
+                setFormData(prev => ({
+                  ...prev,
+                  bonusSpellSaveDc: val,
+                }));
+              }}
+              placeholder="+0"
+              helperText="Added to spell save DC"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Section: Properties */}
       <div className="space-y-4">

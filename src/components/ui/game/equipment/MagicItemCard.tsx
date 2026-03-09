@@ -11,6 +11,7 @@ import {
   Plus,
   Info,
   Sun,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -25,6 +26,9 @@ interface MagicItemCardProps {
   onToggleAttunement: (item: MagicItem, shouldAttune: boolean) => void;
   onExpendCharge: (itemId: string, chargeId: string) => void;
   onRestoreCharge: (itemId: string, chargeId: string) => void;
+  onExpendChargePoolAbility?: (itemId: string, abilityId: string) => void;
+  onRestoreChargePool?: (itemId: string, amount: number) => void;
+  onSetChargePoolUsed?: (itemId: string, usedCount: number) => void;
 }
 
 const getRarityVariant = (
@@ -66,13 +70,20 @@ export function MagicItemCard({
   onToggleAttunement,
   onExpendCharge,
   onRestoreCharge,
+  onExpendChargePoolAbility,
+  onRestoreChargePool,
+  onSetChargePoolUsed,
 }: MagicItemCardProps) {
-  // State for charge detail modal
   const [selectedCharge, setSelectedCharge] = useState<MagicItemCharge | null>(
     null
   );
+  const [localPoolUsed, setLocalPoolUsed] = useState<number | null>(null);
 
   const hasCharges = item.charges && item.charges.length > 0;
+  const hasPool = !!item.chargePool;
+  const poolUsed = localPoolUsed ?? item.chargePool?.usedCharges ?? 0;
+  const poolMax = item.chargePool?.maxCharges ?? 0;
+  const poolRemaining = poolMax - poolUsed;
 
   return (
     <>
@@ -200,6 +211,179 @@ export function MagicItemCard({
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Shared Charge Pool */}
+            {hasPool && item.chargePool && (
+              <div className="border-accent-amber-border bg-accent-amber-bg mb-2 rounded-lg border p-3">
+                {/* Pool header with total charges */}
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap size={14} className="text-accent-amber-text" />
+                    <span className="text-heading text-xs font-bold tracking-wider uppercase">
+                      Charges
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        if (poolUsed <= 0) return;
+                        const newUsed = poolUsed - 1;
+                        setLocalPoolUsed(newUsed);
+                        onRestoreChargePool?.(item.id, 1);
+                      }}
+                      disabled={poolUsed <= 0}
+                      className={`rounded p-0.5 ${
+                        poolUsed <= 0
+                          ? 'text-faint cursor-not-allowed'
+                          : 'text-accent-green-text-muted hover:bg-accent-green-bg'
+                      }`}
+                      title="Restore 1 charge"
+                    >
+                      <Plus size={14} />
+                    </button>
+                    <span
+                      className={`min-w-[36px] text-center text-sm font-bold ${
+                        poolRemaining <= 0
+                          ? 'text-accent-red-text-muted'
+                          : poolRemaining <= Math.ceil(poolMax * 0.25)
+                            ? 'text-accent-orange-text-muted'
+                            : 'text-accent-amber-text'
+                      }`}
+                    >
+                      {poolRemaining}/{poolMax}
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (poolRemaining <= 0) return;
+                        const newUsed = poolUsed + 1;
+                        setLocalPoolUsed(newUsed);
+                        onSetChargePoolUsed?.(item.id, newUsed);
+                      }}
+                      disabled={poolRemaining <= 0}
+                      className={`rounded p-0.5 ${
+                        poolRemaining <= 0
+                          ? 'text-faint cursor-not-allowed'
+                          : 'text-accent-red-text-muted hover:bg-accent-red-bg'
+                      }`}
+                      title="Use 1 charge"
+                    >
+                      <Minus size={14} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                {poolMax > 0 && (
+                  <div className="bg-surface-hover mb-2 h-1.5 w-full rounded-full">
+                    <div
+                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                        poolRemaining <= 0
+                          ? 'bg-accent-red-bg-strong'
+                          : poolRemaining <= Math.ceil(poolMax * 0.25)
+                            ? 'bg-accent-orange-bg-strong'
+                            : 'bg-accent-amber-bg-strong'
+                      }`}
+                      style={{
+                        width: `${poolMax > 0 ? (poolRemaining / poolMax) * 100 : 0}%`,
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Recharge info */}
+                <div className="text-muted mb-2 text-[10px]">
+                  Regains {item.chargePool.rechargeAmount || 'all charges'} at{' '}
+                  {item.chargePool.rechargeType === 'dawn'
+                    ? 'dawn'
+                    : item.chargePool.rechargeType === 'dusk'
+                      ? 'dusk'
+                      : item.chargePool.rechargeType === 'midnight'
+                        ? 'midnight'
+                        : item.chargePool.rechargeType === 'short'
+                          ? 'short rest'
+                          : item.chargePool.rechargeType === 'long'
+                            ? 'long rest'
+                            : item.chargePool.rechargeType}
+                </div>
+
+                {/* Abilities list */}
+                <div className="space-y-1">
+                  {item.chargePool.abilities.map(ability => {
+                    const canUse =
+                      ability.cost === 0 || ability.cost <= poolRemaining;
+
+                    return (
+                      <div
+                        key={ability.id}
+                        className={`flex items-center justify-between gap-2 rounded px-2 py-1 text-xs ${
+                          canUse
+                            ? 'bg-surface-raised'
+                            : 'bg-surface-inset opacity-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 overflow-hidden">
+                          {ability.isSpell && (
+                            <Sparkles
+                              size={10}
+                              className="text-accent-purple-text-muted shrink-0"
+                            />
+                          )}
+                          <span className="text-heading truncate font-medium">
+                            {ability.name}
+                          </span>
+                          {ability.description && (
+                            <span className="text-faint shrink-0 text-[10px]">
+                              ({ability.description})
+                            </span>
+                          )}
+                        </div>
+                        {ability.cost > 0 ? (
+                          <button
+                            onClick={() => {
+                              if (!canUse) return;
+                              const newUsed = poolUsed + ability.cost;
+                              setLocalPoolUsed(newUsed);
+                              onExpendChargePoolAbility?.(item.id, ability.id);
+                            }}
+                            disabled={!canUse}
+                            className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold transition-colors ${
+                              canUse
+                                ? 'bg-accent-amber-bg-strong text-accent-amber-text hover:bg-accent-amber-border cursor-pointer'
+                                : 'text-faint cursor-not-allowed'
+                            }`}
+                            title={`Use ${ability.cost} charge${ability.cost !== 1 ? 's' : ''}`}
+                          >
+                            {ability.cost} {ability.cost === 1 ? 'chg' : 'chg'}
+                          </button>
+                        ) : (
+                          <Badge variant="success" size="sm">
+                            {ability.description === 'Ritual only'
+                              ? 'Ritual'
+                              : 'Free'}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Spell bonus indicators */}
+            {(item.bonusSpellAttack || item.bonusSpellSaveDc) && (
+              <div className="mb-2 flex gap-2">
+                {item.bonusSpellAttack && (
+                  <Badge variant="info" size="sm">
+                    +{item.bonusSpellAttack} Spell Attack
+                  </Badge>
+                )}
+                {item.bonusSpellSaveDc && (
+                  <Badge variant="info" size="sm">
+                    +{item.bonusSpellSaveDc} Spell Save DC
+                  </Badge>
+                )}
               </div>
             )}
 

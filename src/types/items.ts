@@ -60,3 +60,34 @@ export interface ProcessedItem {
   range?: string;
   rawType: string;
 }
+
+import type { MagicItemCategory, MagicItemRarity } from './character';
+
+export interface ProcessedMagicItem {
+  id: string;
+  name: string;
+  source: string;
+  type: string;
+  category: MagicItemCategory;
+  rarity: MagicItemRarity;
+  weight?: number;
+  value?: number;
+  description: string;
+  requiresAttunement: boolean;
+  attunementRequirement?: string;
+  charges?: number;
+  recharge?: string;
+  rechargeAmount?: string;
+  bonusSpellAttack?: number;
+  bonusSpellSaveDc?: number;
+  bonusWeapon?: number;
+  attachedSpells?: Record<string, unknown>;
+  isWeaponLike: boolean;
+  weaponData?: {
+    dmg1?: string;
+    dmgType?: string;
+    dmg2?: string;
+    weaponCategory?: string;
+    property?: string[];
+  };
+}

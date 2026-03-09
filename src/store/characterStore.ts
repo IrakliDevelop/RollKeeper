@@ -575,6 +575,9 @@ interface CharacterStore {
     chargeId: string,
     usedCount: number
   ) => void;
+  expendChargePoolAbility: (itemId: string, abilityId: string) => void;
+  restoreChargePool: (itemId: string, amount: number) => void;
+  setChargePoolUsed: (itemId: string, usedCount: number) => void;
 
   // Armor management
   addArmorItem: (
@@ -3734,6 +3737,91 @@ export const useCharacterStore = create<CharacterStore>()(
               ...state.character,
               magicItems: updatedMagicItems,
             },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      expendChargePoolAbility: (itemId, abilityId) => {
+        set(state => {
+          const updatedMagicItems = state.character.magicItems.map(item => {
+            if (item.id !== itemId || !item.chargePool) return item;
+
+            const ability = item.chargePool.abilities.find(
+              a => a.id === abilityId
+            );
+            if (!ability) return item;
+
+            const remaining =
+              item.chargePool.maxCharges - item.chargePool.usedCharges;
+            if (ability.cost > remaining) return item;
+
+            return {
+              ...item,
+              chargePool: {
+                ...item.chargePool,
+                usedCharges: item.chargePool.usedCharges + ability.cost,
+              },
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          return {
+            character: { ...state.character, magicItems: updatedMagicItems },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      restoreChargePool: (itemId, amount) => {
+        set(state => {
+          const updatedMagicItems = state.character.magicItems.map(item => {
+            if (item.id !== itemId || !item.chargePool) return item;
+
+            const newUsed = Math.max(0, item.chargePool.usedCharges - amount);
+
+            return {
+              ...item,
+              chargePool: {
+                ...item.chargePool,
+                usedCharges: newUsed,
+              },
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          return {
+            character: { ...state.character, magicItems: updatedMagicItems },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      setChargePoolUsed: (itemId, usedCount) => {
+        set(state => {
+          const updatedMagicItems = state.character.magicItems.map(item => {
+            if (item.id !== itemId || !item.chargePool) return item;
+
+            const clamped = Math.max(
+              0,
+              Math.min(usedCount, item.chargePool.maxCharges)
+            );
+
+            return {
+              ...item,
+              chargePool: {
+                ...item.chargePool,
+                usedCharges: clamped,
+              },
+              updatedAt: new Date().toISOString(),
+            };
+          });
+
+          return {
+            character: { ...state.character, magicItems: updatedMagicItems },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
           };
