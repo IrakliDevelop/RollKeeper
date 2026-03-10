@@ -32,12 +32,12 @@ export default function LandingPage() {
               >
                 Player Dashboard
               </Link>
-              <span
-                className="cursor-not-allowed font-medium text-slate-400"
-                title="Coming Soon"
+              <Link
+                href="/dm"
+                className="font-medium text-slate-600 transition-colors hover:text-purple-600"
               >
                 DM Toolset
-              </span>
+              </Link>
               <Link
                 href="/resources"
                 className="font-medium text-slate-600 transition-colors hover:text-purple-600"
@@ -180,19 +180,7 @@ export default function LandingPage() {
             </div>
 
             {/* DM Section */}
-            <div className="relative rounded-2xl border border-purple-100 bg-white p-8 shadow-xl">
-              {/* Coming Soon Overlay */}
-              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-slate-900/60 backdrop-blur-sm">
-                <div className="text-center">
-                  <div className="mb-3 inline-flex items-center rounded-full bg-purple-600 px-6 py-3 text-lg font-bold text-white shadow-lg">
-                    Coming Soon
-                  </div>
-                  <p className="text-sm text-white">
-                    DM Tools are currently under development
-                  </p>
-                </div>
-              </div>
-
+            <div className="rounded-2xl border border-purple-100 bg-white p-8 shadow-xl transition-shadow duration-300 hover:shadow-2xl">
               <div className="mb-8 text-center">
                 <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-purple-100">
                   <Crown className="h-10 w-10 text-purple-600" />
@@ -232,10 +220,10 @@ export default function LandingPage() {
                   <Users className="mt-0.5 h-5 w-5 flex-shrink-0 text-purple-500" />
                   <div>
                     <h4 className="font-semibold text-slate-800">
-                      Player Character Import
+                      Live Player Sync
                     </h4>
                     <p className="text-sm text-slate-600">
-                      Import and manage player character sheets
+                      See player stats, HP, and inventory in real time
                     </p>
                   </div>
                 </div>
@@ -252,10 +240,13 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <div className="flex w-full cursor-not-allowed items-center justify-center rounded-xl bg-gradient-to-r from-purple-400 to-purple-500 px-6 py-4 font-semibold text-white opacity-75">
+              <Link
+                href="/dm"
+                className="group flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-4 font-semibold text-white transition-all duration-200 hover:from-purple-700 hover:to-purple-800"
+              >
                 Access DM Toolset
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </div>
+                <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+              </Link>
             </div>
           </div>
         </div>
@@ -336,12 +327,12 @@ export default function LandingPage() {
               >
                 Player Tools
               </Link>
-              <span
-                className="cursor-not-allowed text-slate-500"
-                title="Coming Soon"
+              <Link
+                href="/dm"
+                className="text-slate-300 transition-colors hover:text-white"
               >
                 DM Tools
-              </span>
+              </Link>
             </div>
           </div>
         </div>

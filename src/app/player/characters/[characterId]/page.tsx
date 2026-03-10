@@ -6,6 +6,8 @@ import { useParams } from 'next/navigation';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { usePlayerSync } from '@/hooks/usePlayerSync';
+import { SyncIndicator } from '@/components/ui/campaign/SyncIndicator';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
 
@@ -223,7 +225,21 @@ export default function CharacterSheet() {
   const enableTabbedLayout = playerSettings?.enableTabbedLayout ?? false;
   const hasSeenLayoutPrompt = playerSettings?.hasSeenLayoutPrompt ?? false;
 
-  const { manualSave } = useAutoSave();
+  const playerSync = usePlayerSync({ characterId });
+
+  const handleAfterSave = useCallback(() => {
+    if (playerSync.syncEnabled && playerSync.autoSync && character) {
+      playerSync.syncNow(character);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    playerSync.syncEnabled,
+    playerSync.autoSync,
+    playerSync.syncNow,
+    character,
+  ]);
+
+  const { manualSave } = useAutoSave({ onAfterSave: handleAfterSave });
 
   const lastLoadedCharacterRef = useRef<string | null>(null);
   const lastSyncedCharacterRef = useRef<CharacterState | null>(null);
@@ -609,6 +625,20 @@ export default function CharacterSheet() {
             onShowResetModal={() => setShowResetModal(true)}
             onUpdateName={name => updateCharacter({ name })}
             onAddToast={addToast}
+            extraHeaderContent={
+              <SyncIndicator
+                syncStatus={playerSync.syncStatus}
+                lastSyncedAt={playerSync.lastSyncedAt}
+                campaignCode={playerSync.campaignCode}
+                campaignName={playerSync.campaignName}
+                autoSync={playerSync.autoSync}
+                syncEnabled={playerSync.syncEnabled}
+                onSyncNow={playerSync.syncNow}
+                onToggleAutoSync={playerSync.toggleAutoSync}
+                onLeaveCampaign={playerSync.leaveCampaign}
+                characterData={character}
+              />
+            }
           />
 
           <div className="p-4">

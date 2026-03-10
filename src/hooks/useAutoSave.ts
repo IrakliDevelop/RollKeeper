@@ -5,13 +5,16 @@ import { AUTOSAVE_DELAY } from '@/utils/constants';
 interface UseAutoSaveOptions {
   delay?: number;
   enabled?: boolean;
+  onAfterSave?: () => void;
 }
 
 export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
-  const { delay = AUTOSAVE_DELAY, enabled = true } = options;
+  const { delay = AUTOSAVE_DELAY, enabled = true, onAfterSave } = options;
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialMount = useRef(true);
+  const onAfterSaveRef = useRef(onAfterSave);
+  onAfterSaveRef.current = onAfterSave;
 
   const {
     hasUnsavedChanges,
@@ -21,7 +24,6 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
     markSaved,
   } = useCharacterStore();
 
-  // Debounced save function
   const debouncedSave = useCallback(() => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -38,6 +40,7 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
         saveCharacter();
         setSaveStatus('saved');
         markSaved();
+        onAfterSaveRef.current?.();
       } catch (error) {
         console.error('Auto-save failed:', error);
         setSaveStatus('error');
@@ -52,7 +55,6 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
     markSaved,
   ]);
 
-  // Manual save function (for Ctrl+S, etc.)
   const manualSave = useCallback(() => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -68,6 +70,7 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
       saveCharacter();
       setSaveStatus('saved');
       markSaved();
+      onAfterSaveRef.current?.();
     } catch (error) {
       console.error('Manual save failed:', error);
       setSaveStatus('error');
