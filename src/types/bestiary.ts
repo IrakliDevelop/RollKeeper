@@ -29,9 +29,34 @@ export interface ProcessedMonster {
   cr: string;
   traits?: ProcessedTrait[];
   actions?: ProcessedTrait[];
+  reactions?: ProcessedTrait[];
   legendaryActions?: ProcessedTrait[];
   source: string;
   page: number;
+
+  // Numeric values for encounter use
+  acValue: number;
+  hpAverage: number;
+  hpFormula: string;
+  legendaryActionCount: number; // 0 if no legendary actions
+  conditionImmunities: string[];
+
+  // Spellcasting data (raw for encounter tracker)
+  spellcastingEntries?: ProcessedSpellcasting[];
+}
+
+export interface ProcessedSpellcasting {
+  name: string;
+  headerText: string;
+  ability?: string;
+  dc?: number;
+  toHit?: number;
+  spells: Record<string, ProcessedSpellLevel>; // key = spell level ("0", "1", etc.)
+}
+
+export interface ProcessedSpellLevel {
+  slots?: number;
+  spells: string[]; // Cleaned spell names (no {@spell} tags)
 }
 
 export interface RawMonsterData {
@@ -77,8 +102,25 @@ export interface RawMonsterData {
   trait?: { name: string; entries: string[] }[];
   action?: { name: string; entries: string[] }[];
   legendary?: { name: string; entries: string[] }[];
+  reaction?: { name: string; entries: string[] }[];
+  legendaryActions?: number;
+  conditionImmune?: string[];
+  spellcasting?: RawSpellcasting[];
   source: string;
   page?: number;
+}
+
+export interface RawSpellcasting {
+  name: string;
+  type?: string;
+  headerEntries?: string[];
+  spells?: Record<
+    string,
+    {
+      slots?: number;
+      spells?: string[];
+    }
+  >;
 }
 
 // Bestiary filtering and search options

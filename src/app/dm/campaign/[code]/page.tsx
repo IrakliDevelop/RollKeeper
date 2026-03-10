@@ -3,11 +3,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Crown, Copy, Check, RefreshCw, Users } from 'lucide-react';
+import {
+  ArrowLeft,
+  Crown,
+  Copy,
+  Check,
+  RefreshCw,
+  Users,
+  Swords,
+} from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { PlayerSummaryCard } from '@/components/ui/campaign/PlayerSummaryCard';
+import { NPCSection } from '@/components/ui/campaign/NPCSection';
 import { useCampaignSync } from '@/hooks/useCampaignSync';
 import { useDmStore } from '@/store/dmStore';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
@@ -105,7 +114,18 @@ export default function CampaignViewPage() {
                 )}
               </div>
             </div>
-            <ThemeToggle showSystemOption />
+            <div className="flex items-center gap-3">
+              <Link href={`/dm/campaign/${code}/encounters`}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<Swords size={16} />}
+                >
+                  Encounters
+                </Button>
+              </Link>
+              <ThemeToggle showSystemOption />
+            </div>
           </div>
         </div>
       </header>
@@ -141,7 +161,7 @@ export default function CampaignViewPage() {
         </div>
       </div>
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-muted animate-pulse text-lg">
@@ -205,6 +225,9 @@ export default function CampaignViewPage() {
             </div>
           </>
         )}
+
+        {/* NPC Management — always visible */}
+        {!loading && !error && <NPCSection />}
       </main>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
