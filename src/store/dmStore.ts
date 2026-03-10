@@ -11,6 +11,10 @@ interface DmStoreState {
   addCampaign: (campaign: CampaignInfo) => void;
   removeCampaign: (code: string) => void;
   getCampaign: (code: string) => CampaignInfo | undefined;
+  updateCampaign: (code: string, updates: Partial<CampaignInfo>) => void;
+  setCustomCounterLabel: (code: string, label: string | undefined) => void;
+  adjustPlayerCounter: (code: string, playerId: string, delta: number) => void;
+  setPlayerCounter: (code: string, playerId: string, value: number) => void;
 }
 
 function generateDmId(): string {
@@ -37,6 +41,53 @@ export const useDmStore = create<DmStoreState>()(
 
       getCampaign: (code: string) => {
         return get().campaigns.find(c => c.code === code);
+      },
+
+      updateCampaign: (code, updates) => {
+        set(state => ({
+          campaigns: state.campaigns.map(c =>
+            c.code === code ? { ...c, ...updates } : c
+          ),
+        }));
+      },
+
+      setCustomCounterLabel: (code, label) => {
+        set(state => ({
+          campaigns: state.campaigns.map(c =>
+            c.code === code ? { ...c, customCounterLabel: label } : c
+          ),
+        }));
+      },
+
+      adjustPlayerCounter: (code, playerId, delta) => {
+        set(state => ({
+          campaigns: state.campaigns.map(c => {
+            if (c.code !== code) return c;
+            const current = c.playerCounters?.[playerId] ?? 0;
+            return {
+              ...c,
+              playerCounters: {
+                ...c.playerCounters,
+                [playerId]: Math.max(0, current + delta),
+              },
+            };
+          }),
+        }));
+      },
+
+      setPlayerCounter: (code, playerId, value) => {
+        set(state => ({
+          campaigns: state.campaigns.map(c => {
+            if (c.code !== code) return c;
+            return {
+              ...c,
+              playerCounters: {
+                ...c.playerCounters,
+                [playerId]: Math.max(0, value),
+              },
+            };
+          }),
+        }));
       },
     }),
     {

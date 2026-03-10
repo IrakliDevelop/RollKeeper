@@ -11,21 +11,25 @@ import {
   RefreshCw,
   Users,
   Swords,
+  Angry,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { PlayerSummaryCard } from '@/components/ui/campaign/PlayerSummaryCard';
+import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
 import { NPCSection } from '@/components/ui/campaign/NPCSection';
 import { useCampaignSync } from '@/hooks/useCampaignSync';
 import { useDmStore } from '@/store/dmStore';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
+import { CampaignPlayerData } from '@/types/campaign';
 
 export default function CampaignViewPage() {
   const params = useParams();
   const code = params.code as string;
 
-  const { dmId, getCampaign } = useDmStore();
+  const { dmId, getCampaign, setCustomCounterLabel, adjustPlayerCounter } =
+    useDmStore();
   const localCampaign = getCampaign(code);
 
   const { players, campaignName, loading, error, lastFetched, refresh } =
@@ -39,8 +43,14 @@ export default function CampaignViewPage() {
 
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] =
+    useState<CampaignPlayerData | null>(null);
+  const [editingCounterLabel, setEditingCounterLabel] = useState(false);
+  const [counterLabelInput, setCounterLabelInput] = useState('');
   const { toasts, addToast, dismissToast } = useToast();
   const knownPlayerIdsRef = useRef<Set<string>>(new Set());
+
+  const customCounterLabel = localCampaign?.customCounterLabel;
 
   useEffect(() => {
     if (loading) return;
@@ -76,6 +86,12 @@ export default function CampaignViewPage() {
     setRefreshing(true);
     await refresh();
     setRefreshing(false);
+  };
+
+  const handleSaveCounterLabel = () => {
+    const label = counterLabelInput.trim() || undefined;
+    setCustomCounterLabel(code, label);
+    setEditingCounterLabel(false);
   };
 
   return (
@@ -212,15 +228,84 @@ export default function CampaignViewPage() {
           </div>
         ) : (
           <>
-            <div className="mb-6 flex items-center gap-2">
-              <Users size={20} className="text-muted" />
-              <h2 className="text-heading text-lg font-semibold">
-                Players ({players.length})
-              </h2>
+            {/* Players header + custom counter config */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Users size={20} className="text-muted" />
+                <h2 className="text-heading text-lg font-semibold">
+                  Players ({players.length})
+                </h2>
+              </div>
+
+              {/* Custom counter label config */}
+              <div className="flex items-center gap-2">
+                <Angry size={14} className="text-muted" />
+                {editingCounterLabel ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={counterLabelInput}
+                      onChange={e => setCounterLabelInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleSaveCounterLabel();
+                        if (e.key === 'Escape') setEditingCounterLabel(false);
+                      }}
+                      placeholder="e.g. Desperation Points"
+                      className="bg-surface-secondary text-body rounded px-2 py-1 text-sm"
+                      autoFocus
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleSaveCounterLabel}
+                    >
+                      Save
+                    </Button>
+                    {customCounterLabel && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setCustomCounterLabel(code, undefined);
+                          setEditingCounterLabel(false);
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setCounterLabelInput(customCounterLabel ?? '');
+                      setEditingCounterLabel(true);
+                    }}
+                    className="text-muted hover:text-body text-sm transition-colors"
+                  >
+                    {customCounterLabel
+                      ? `Custom Counter: ${customCounterLabel}`
+                      : 'Add custom player counter...'}
+                  </button>
+                )}
+              </div>
             </div>
+
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {players.map(player => (
-                <PlayerSummaryCard key={player.playerId} player={player} />
+                <PlayerSummaryCard
+                  key={player.playerId}
+                  player={player}
+                  customCounterLabel={customCounterLabel}
+                  counterValue={
+                    localCampaign?.playerCounters?.[player.playerId] ?? 0
+                  }
+                  onAdjustCounter={
+                    customCounterLabel
+                      ? delta =>
+                          adjustPlayerCounter(code, player.playerId, delta)
+                      : undefined
+                  }
+                  onClick={() => setSelectedPlayer(player)}
+                />
               ))}
             </div>
           </>
@@ -229,6 +314,28 @@ export default function CampaignViewPage() {
         {/* NPC Management — always visible */}
         {!loading && !error && <NPCSection />}
       </main>
+
+      {/* Player Detail Dialog */}
+      {selectedPlayer && (
+        <PlayerDetailDialog
+          open={!!selectedPlayer}
+          onOpenChange={open => {
+            if (!open) setSelectedPlayer(null);
+          }}
+          player={selectedPlayer}
+          customCounterLabel={customCounterLabel}
+          counterValue={
+            localCampaign?.playerCounters?.[selectedPlayer.playerId] ?? 0
+          }
+          onAdjustCounter={
+            customCounterLabel
+              ? delta =>
+                  adjustPlayerCounter(code, selectedPlayer.playerId, delta)
+              : undefined
+          }
+        />
+      )}
+
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );

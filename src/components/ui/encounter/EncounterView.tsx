@@ -14,6 +14,8 @@ import {
 import { Button } from '@/components/ui/forms/button';
 import { InitiativeTracker } from './InitiativeTracker';
 import { AddEntityDialog } from './AddEntityDialog';
+import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
+import { CampaignPlayerData } from '@/types/campaign';
 
 interface EncounterViewProps {
   encounterId: string;
@@ -27,6 +29,9 @@ export function EncounterView({
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [viewingPlayer, setViewingPlayer] = useState<CampaignPlayerData | null>(
+    null
+  );
 
   const encounter = useEncounterStore(state =>
     state.encounters.find(e => e.id === encounterId)
@@ -56,7 +61,7 @@ export function EncounterView({
 
   const { npcs } = useNPCStore();
 
-  const { dmId } = useDmStore();
+  const { dmId, adjustPlayerCounter } = useDmStore();
   const campaign = useDmStore(state => state.getCampaign(campaignCode));
 
   const { players: campaignPlayers } = useCampaignSync({
@@ -233,6 +238,17 @@ export function EncounterView({
         onUseLairAction={(entityId, actionId) =>
           expendLairAction(encounterId, entityId, actionId)
         }
+        customCounterLabel={campaign?.customCounterLabel}
+        playerCounterValues={campaign?.playerCounters}
+        onAdjustPlayerCounter={(playerId, delta) =>
+          adjustPlayerCounter(campaignCode, playerId, delta)
+        }
+        onViewPlayer={playerCharacterId => {
+          const player = campaignPlayers.find(
+            p => p.playerId === playerCharacterId
+          );
+          if (player) setViewingPlayer(player);
+        }}
       />
 
       {/* Add entity dialog */}
@@ -246,6 +262,29 @@ export function EncounterView({
         campaignPlayers={mappedPlayers}
         npcs={npcs}
       />
+
+      {/* Player detail dialog */}
+      {viewingPlayer && (
+        <PlayerDetailDialog
+          open={!!viewingPlayer}
+          onOpenChange={open => {
+            if (!open) setViewingPlayer(null);
+          }}
+          player={viewingPlayer}
+          customCounterLabel={campaign?.customCounterLabel}
+          counterValue={campaign?.playerCounters?.[viewingPlayer.playerId] ?? 0}
+          onAdjustCounter={
+            campaign?.customCounterLabel
+              ? delta =>
+                  adjustPlayerCounter(
+                    campaignCode,
+                    viewingPlayer.playerId,
+                    delta
+                  )
+              : undefined
+          }
+        />
+      )}
     </div>
   );
 }

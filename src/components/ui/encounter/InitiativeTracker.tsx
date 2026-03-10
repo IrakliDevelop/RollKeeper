@@ -34,6 +34,10 @@ interface InitiativeTrackerProps {
   onSetConcentration: (entityId: string, spellName: string | null) => void;
   onUseLairAction: (entityId: string, actionId: string) => void;
   onSetInitiative: (entityId: string, value: number) => void;
+  customCounterLabel?: string;
+  playerCounterValues?: Record<string, number>;
+  onAdjustPlayerCounter?: (playerId: string, delta: number) => void;
+  onViewPlayer?: (playerCharacterId: string) => void;
 }
 
 export function InitiativeTracker({
@@ -57,6 +61,10 @@ export function InitiativeTracker({
   onSetConcentration,
   onUseLairAction,
   onSetInitiative,
+  customCounterLabel,
+  playerCounterValues,
+  onAdjustPlayerCounter,
+  onViewPlayer,
 }: InitiativeTrackerProps) {
   const currentEntity = encounter.entities[encounter.currentTurn];
 
@@ -172,6 +180,27 @@ export function InitiativeTracker({
               }
               onUseLairAction={actionId => onUseLairAction(entity.id, actionId)}
               onSetInitiative={value => onSetInitiative(entity.id, value)}
+              customCounterLabel={customCounterLabel}
+              counterValue={
+                entity.playerCharacterId
+                  ? (playerCounterValues?.[entity.playerCharacterId] ?? 0)
+                  : 0
+              }
+              onAdjustCounter={
+                entity.type === 'player' &&
+                entity.playerCharacterId &&
+                onAdjustPlayerCounter
+                  ? delta =>
+                      onAdjustPlayerCounter(entity.playerCharacterId!, delta)
+                  : undefined
+              }
+              onViewPlayer={
+                entity.type === 'player' &&
+                entity.playerCharacterId &&
+                onViewPlayer
+                  ? () => onViewPlayer(entity.playerCharacterId!)
+                  : undefined
+              }
             />
           ))}
         </div>

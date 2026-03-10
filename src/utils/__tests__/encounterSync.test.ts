@@ -20,7 +20,12 @@ describe('mergePlayerSyncData', () => {
     });
     const playerData = createMockPlayerData({
       characterData: createMockCharacterState({
-        hitPoints: { current: 38, max: 44, temp: 0, calculationMode: 'auto' },
+        hitPoints: {
+          current: 38,
+          max: 44,
+          temporary: 0,
+          calculationMode: 'auto',
+        },
         armorClass: 18,
       }),
     });
@@ -150,6 +155,7 @@ describe('mergePlayerSyncData', () => {
               description: 'Cannot see.',
               stackable: false,
               count: 1,
+              appliedAt: '2025-01-01T00:00:00.000Z',
             },
           ],
           activeDiseases: [],
@@ -185,6 +191,7 @@ describe('mergePlayerSyncData', () => {
               description: 'Disadvantage on attacks.',
               stackable: false,
               count: 1,
+              appliedAt: '2025-01-01T00:00:00.000Z',
             },
           ],
           activeDiseases: [],

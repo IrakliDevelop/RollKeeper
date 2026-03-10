@@ -24,6 +24,8 @@ export function mergePlayerSyncData(
       ? char.concentration.spellName
       : undefined;
 
+  const inspirationCount = char.heroicInspiration?.count ?? 0;
+
   // Build player-synced conditions from character data
   const playerConditions: EncounterCondition[] = (
     char.conditionsAndDiseases?.activeConditions ?? []
@@ -50,6 +52,7 @@ export function mergePlayerSyncData(
     tempHp,
     armorClass,
     concentrationSpell,
+    inspirationCount,
     conditions: mergedConditions,
   };
 }
@@ -66,6 +69,7 @@ export function hasPlayerDataChanged(
   if (updates.tempHp !== entity.tempHp) return true;
   if (updates.armorClass !== entity.armorClass) return true;
   if (updates.concentrationSpell !== entity.concentrationSpell) return true;
+  if (updates.inspirationCount !== entity.inspirationCount) return true;
 
   // Compare conditions by name set
   if (updates.conditions) {

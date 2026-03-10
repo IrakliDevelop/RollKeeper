@@ -10,7 +10,6 @@ import {
   Sparkles,
   Sun,
   Moon,
-  Star,
   Plus,
   Minus,
   X,
@@ -234,7 +233,7 @@ export default function CharacterHUD({
                 : 'Add Heroic Inspiration'
             }
           >
-            <Star
+            <Sparkles
               className={`h-4 w-4 ${hasInspiration ? 'fill-current' : ''}`}
             />
           </button>
