@@ -6,8 +6,10 @@ import {
   ChevronUp,
   Shield,
   Eye,
-  EyeOff,
   Sparkles,
+  Angry,
+  Minus,
+  Plus,
 } from 'lucide-react';
 import { EncounterEntity } from '@/types/encounter';
 import { HPBar } from '@/components/shared/combat/HPBar';
@@ -18,6 +20,7 @@ interface EntityCardProps {
   entity: EncounterEntity;
   isCurrentTurn: boolean;
   lastSynced?: string; // ISO timestamp for player sync freshness
+  customCounterLabel?: string; // DM-named counter label
   onUpdate: (updates: Partial<EncounterEntity>) => void;
   onRemove: () => void;
   onDamage: (amount: number) => void;
@@ -31,6 +34,9 @@ interface EntityCardProps {
   onSetConcentration: (spellName: string | null) => void;
   onUseLairAction?: (actionId: string) => void;
   onSetInitiative: (value: number) => void;
+  counterValue?: number;
+  onAdjustCounter?: (delta: number) => void;
+  onViewPlayer?: () => void;
 }
 
 const TYPE_STYLES: Record<
@@ -59,6 +65,47 @@ const TYPE_STYLES: Record<
   },
 };
 
+function DmCounterControl({
+  label,
+  value,
+  onAdjust,
+}: {
+  label: string;
+  value: number;
+  onAdjust: (delta: number) => void;
+}) {
+  return (
+    <div
+      className="bg-accent-purple-bg flex items-center gap-1 rounded-full px-1.5 py-0.5"
+      title={label}
+    >
+      <Angry size={10} className="text-accent-purple-text" />
+      <button
+        onClick={e => {
+          e.stopPropagation();
+          onAdjust(-1);
+        }}
+        className="text-accent-purple-text hover:bg-surface-secondary rounded p-0.5 transition-colors"
+        disabled={value <= 0}
+      >
+        <Minus size={10} />
+      </button>
+      <span className="text-accent-purple-text min-w-[1rem] text-center text-[11px] font-bold tabular-nums">
+        {value}
+      </span>
+      <button
+        onClick={e => {
+          e.stopPropagation();
+          onAdjust(1);
+        }}
+        className="text-accent-purple-text hover:bg-surface-secondary rounded p-0.5 transition-colors"
+      >
+        <Plus size={10} />
+      </button>
+    </div>
+  );
+}
+
 function SyncIndicator({ lastSynced }: { lastSynced?: string }) {
   if (!lastSynced) return null;
   const ago = Date.now() - new Date(lastSynced).getTime();
@@ -86,6 +133,7 @@ export function EntityCard({
   entity,
   isCurrentTurn,
   lastSynced,
+  customCounterLabel,
   onUpdate,
   onRemove,
   onDamage,
@@ -99,6 +147,9 @@ export function EntityCard({
   onSetConcentration,
   onUseLairAction,
   onSetInitiative,
+  counterValue = 0,
+  onAdjustCounter,
+  onViewPlayer,
 }: EntityCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [editingInit, setEditingInit] = useState(false);
@@ -167,6 +218,15 @@ export function EntityCard({
             {entity.type === 'player' && (
               <SyncIndicator lastSynced={lastSynced} />
             )}
+            {entity.type === 'player' && (entity.inspirationCount ?? 0) > 0 && (
+              <span
+                className="bg-accent-amber-bg text-accent-amber-text inline-flex shrink-0 items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                title={`${entity.inspirationCount} Inspiration`}
+              >
+                <Sparkles size={10} />
+                {entity.inspirationCount}
+              </span>
+            )}
             {entity.concentrationSpell && (
               <span className="bg-accent-orange-bg text-accent-orange-text shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium">
                 <Sparkles size={10} className="mr-0.5 inline" />
@@ -219,7 +279,7 @@ export function EntityCard({
           )}
         </div>
 
-        {/* Right side: AC + controls */}
+        {/* Right side: AC + DM counter + controls */}
         <div className="flex shrink-0 items-center gap-2">
           {entity.type !== 'lair' && (
             <div className="text-muted flex items-center gap-1 text-sm">
@@ -230,14 +290,24 @@ export function EntityCard({
             </div>
           )}
 
+          {customCounterLabel &&
+            entity.type === 'player' &&
+            onAdjustCounter && (
+              <DmCounterControl
+                label={customCounterLabel}
+                value={counterValue}
+                onAdjust={onAdjustCounter}
+              />
+            )}
+
           <div className="flex items-center gap-1">
-            {entity.isHidden !== undefined && (
+            {entity.type === 'player' && onViewPlayer && (
               <button
-                onClick={() => onUpdate({ isHidden: !entity.isHidden })}
-                className="text-muted hover:text-body rounded p-1 transition-colors"
-                title={entity.isHidden ? 'Show' : 'Hide'}
+                onClick={onViewPlayer}
+                className="text-muted hover:text-accent-blue-text rounded p-1 transition-colors"
+                title="View character details"
               >
-                {entity.isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                <Eye size={14} />
               </button>
             )}
             <button

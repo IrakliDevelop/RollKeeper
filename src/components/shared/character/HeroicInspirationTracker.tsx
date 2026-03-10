@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { HeroicInspiration } from '@/types/character';
-import { Star, Plus, Minus, RotateCcw, Settings } from 'lucide-react';
+import { Sparkles, Plus, Minus, RotateCcw, Settings } from 'lucide-react';
 import { Button, Input } from '@/components/ui/forms';
 
 interface HeroicInspirationTrackerProps {
@@ -102,7 +102,7 @@ export function HeroicInspirationTracker({
                       : 'Click to add inspiration'
               }
             >
-              <Star
+              <Sparkles
                 size={compact ? 12 : 16}
                 className={isActive ? 'fill-current' : ''}
               />
@@ -122,7 +122,7 @@ export function HeroicInspirationTracker({
       {!compact && (
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Star className="h-5 w-5 fill-current text-yellow-600" />
+            <Sparkles className="h-5 w-5 fill-current text-yellow-600" />
             <h3 className="text-accent-amber-text text-lg font-bold">
               Heroic Inspiration
             </h3>

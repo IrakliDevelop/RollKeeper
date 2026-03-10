@@ -107,6 +107,9 @@ export interface EncounterEntity {
   }>;
   regionalEffects?: string[];
 
+  // Player-synced (read-only for DM)
+  inspirationCount?: number; // Heroic inspiration dice from player
+
   // Visual
   color?: string; // For grouping same monsters
   isHidden?: boolean; // DM can hide from players
@@ -129,7 +132,6 @@ export interface Encounter {
 
   // Settings
   sortOrder: 'initiative' | 'manual';
-
   // Timestamps
   createdAt: string;
   updatedAt: string;

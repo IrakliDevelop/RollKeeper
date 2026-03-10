@@ -1,7 +1,16 @@
 'use client';
 
 import React from 'react';
-import { Shield, Swords, Heart, Sparkles, AlertTriangle } from 'lucide-react';
+import {
+  Shield,
+  Swords,
+  Heart,
+  Sparkles,
+  AlertTriangle,
+  Angry,
+  Minus,
+  Plus,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import { CampaignPlayerData } from '@/types/campaign';
 
@@ -73,9 +82,19 @@ function getFreshnessDot(dateString: string): string {
 
 interface PlayerSummaryCardProps {
   player: CampaignPlayerData;
+  customCounterLabel?: string;
+  counterValue?: number;
+  onAdjustCounter?: (delta: number) => void;
+  onClick?: () => void;
 }
 
-export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
+export function PlayerSummaryCard({
+  player,
+  customCounterLabel,
+  counterValue = 0,
+  onAdjustCounter,
+  onClick,
+}: PlayerSummaryCardProps) {
   const { characterData: char } = player;
 
   const currentHp = char.hitPoints?.current ?? 0;
@@ -88,11 +107,27 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
   const equippedWeapon = char.weapons?.find(w => w.isEquipped);
   const isConcentrating = char.concentration?.isConcentrating;
   const concentrationSpell = char.concentration?.spellName;
+  const inspirationCount = char.heroicInspiration?.count ?? 0;
 
   const activeConditions = char.conditionsAndDiseases?.activeConditions ?? [];
 
   return (
-    <div className="border-divider bg-surface-raised rounded-lg border-2 shadow-md transition-all hover:shadow-lg">
+    <div
+      className={`border-divider bg-surface-raised rounded-lg border-2 shadow-md transition-all hover:shadow-lg ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
       <div className="p-5">
         {/* Header: Name, Race, Class, Level */}
         <div className="mb-4 flex items-start justify-between">
@@ -156,7 +191,90 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
               </span>
             </div>
           )}
+          {/* Inspiration — mini golden star boxes */}
+          <div
+            className="flex items-center gap-1"
+            title={
+              inspirationCount > 0
+                ? `${inspirationCount} Heroic Inspiration dice — player can reroll and take the better result`
+                : 'No Heroic Inspiration'
+            }
+          >
+            {Array.from({ length: Math.max(inspirationCount, 1) }, (_, i) => {
+              const isActive = i < inspirationCount;
+              return (
+                <div
+                  key={i}
+                  className={`flex h-5 w-5 items-center justify-center rounded border-2 transition-all ${
+                    isActive
+                      ? 'scale-110 border-yellow-600 bg-gradient-to-br from-yellow-400 to-yellow-600 text-white shadow-sm'
+                      : 'bg-surface-raised border-yellow-300 text-yellow-600 dark:border-yellow-600 dark:text-yellow-400'
+                  }`}
+                >
+                  <Sparkles
+                    size={10}
+                    className={isActive ? 'fill-current' : ''}
+                  />
+                </div>
+              );
+            })}
+          </div>
         </div>
+
+        {/* DM Custom Counter — mini colored boxes */}
+        {customCounterLabel && onAdjustCounter && (
+          <div
+            className="border-accent-purple-border bg-accent-purple-bg mb-3 flex items-center justify-between rounded-lg border px-3 py-2"
+            onClick={e => e.stopPropagation()}
+            onKeyDown={e => e.stopPropagation()}
+            role="group"
+            aria-label={customCounterLabel}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-accent-purple-text flex items-center gap-1 text-xs font-semibold">
+                <Angry size={12} />
+                {customCounterLabel}
+              </span>
+              <div className="flex gap-1">
+                {counterValue > 0 ? (
+                  Array.from({ length: counterValue }, (_, i) => (
+                    <div
+                      key={i}
+                      className="flex h-5 w-5 items-center justify-center rounded border-2 border-purple-500 bg-purple-500 text-white shadow-sm"
+                    >
+                      <Angry size={10} />
+                    </div>
+                  ))
+                ) : (
+                  <span className="text-accent-purple-text text-xs opacity-60">
+                    0
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onAdjustCounter(-1);
+                }}
+                className="text-accent-purple-text hover:bg-surface-secondary rounded p-0.5 transition-colors"
+                disabled={counterValue <= 0}
+              >
+                <Minus size={12} />
+              </button>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onAdjustCounter(1);
+                }}
+                className="text-accent-purple-text hover:bg-surface-secondary rounded p-0.5 transition-colors"
+              >
+                <Plus size={12} />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Concentration & Conditions */}
         <div className="flex flex-wrap gap-1.5">
@@ -184,6 +302,9 @@ export function PlayerSummaryCard({ player }: PlayerSummaryCardProps) {
               Synced {formatTimeAgo(player.lastSynced)}
             </span>
           </div>
+          {onClick && (
+            <span className="text-muted text-xs">Click for details</span>
+          )}
         </div>
       </div>
     </div>

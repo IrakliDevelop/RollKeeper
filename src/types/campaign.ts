@@ -19,4 +19,6 @@ export interface CampaignInfo {
   code: string;
   name: string;
   createdAt: string;
+  customCounterLabel?: string;
+  playerCounters?: Record<string, number>; // playerId → counter value
 }
