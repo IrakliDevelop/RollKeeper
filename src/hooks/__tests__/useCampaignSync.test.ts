@@ -135,4 +135,148 @@ describe('useCampaignSync', () => {
 
     expect(fetchFn as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
   });
+
+  describe('activity-aware polling', () => {
+    it('pauses polling when tab becomes hidden', async () => {
+      const fetchFn = mockFetchResponse(200, {
+        campaign: { name: 'Test' },
+        players: [],
+      });
+
+      renderHook(() => useCampaignSync(defaultOptions));
+
+      await waitFor(() => {
+        expect(fetchFn as ReturnType<typeof vi.fn>).toHaveBeenCalled();
+      });
+
+      const callsAfterInit = (fetchFn as ReturnType<typeof vi.fn>).mock.calls
+        .length;
+
+      // Simulate tab hidden
+      Object.defineProperty(document, 'hidden', {
+        value: true,
+        writable: true,
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      // Advance past several poll intervals
+      await act(async () => {
+        vi.advanceTimersByTime(30000);
+      });
+
+      // No new fetches should have happened
+      expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls.length).toBe(
+        callsAfterInit
+      );
+
+      // Restore
+      Object.defineProperty(document, 'hidden', {
+        value: false,
+        writable: true,
+      });
+    });
+
+    it('resumes polling with immediate fetch when tab becomes visible', async () => {
+      const fetchFn = mockFetchResponse(200, {
+        campaign: { name: 'Test' },
+        players: [],
+      });
+
+      renderHook(() => useCampaignSync(defaultOptions));
+
+      await waitFor(() => {
+        expect(fetchFn as ReturnType<typeof vi.fn>).toHaveBeenCalled();
+      });
+
+      // Hide tab
+      Object.defineProperty(document, 'hidden', {
+        value: true,
+        writable: true,
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      const callsWhilePaused = (fetchFn as ReturnType<typeof vi.fn>).mock.calls
+        .length;
+
+      // Show tab again
+      Object.defineProperty(document, 'hidden', {
+        value: false,
+        writable: true,
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      // Should trigger an immediate fetch on resume
+      await waitFor(() => {
+        expect(
+          (fetchFn as ReturnType<typeof vi.fn>).mock.calls.length
+        ).toBeGreaterThan(callsWhilePaused);
+      });
+    });
+
+    it('pauses polling after idle timeout', async () => {
+      const fetchFn = mockFetchResponse(200, {
+        campaign: { name: 'Test' },
+        players: [],
+      });
+
+      renderHook(() =>
+        useCampaignSync({ ...defaultOptions, idleTimeout: 5000 })
+      );
+
+      await waitFor(() => {
+        expect(fetchFn as ReturnType<typeof vi.fn>).toHaveBeenCalled();
+      });
+
+      // Advance past the idle timeout
+      await act(async () => {
+        vi.advanceTimersByTime(6000);
+      });
+
+      const callsAfterIdle = (fetchFn as ReturnType<typeof vi.fn>).mock.calls
+        .length;
+
+      // Advance past several poll intervals
+      await act(async () => {
+        vi.advanceTimersByTime(30000);
+      });
+
+      // No new fetches should have happened
+      expect((fetchFn as ReturnType<typeof vi.fn>).mock.calls.length).toBe(
+        callsAfterIdle
+      );
+    });
+
+    it('resumes polling on user activity after idle pause', async () => {
+      const fetchFn = mockFetchResponse(200, {
+        campaign: { name: 'Test' },
+        players: [],
+      });
+
+      renderHook(() =>
+        useCampaignSync({ ...defaultOptions, idleTimeout: 5000 })
+      );
+
+      await waitFor(() => {
+        expect(fetchFn as ReturnType<typeof vi.fn>).toHaveBeenCalled();
+      });
+
+      // Go idle
+      await act(async () => {
+        vi.advanceTimersByTime(6000);
+      });
+
+      const callsAfterIdle = (fetchFn as ReturnType<typeof vi.fn>).mock.calls
+        .length;
+
+      // Simulate user activity
+      window.dispatchEvent(new Event('mousemove'));
+
+      // Should fetch immediately on resume
+      await waitFor(() => {
+        expect(
+          (fetchFn as ReturnType<typeof vi.fn>).mock.calls.length
+        ).toBeGreaterThan(callsAfterIdle);
+      });
+    });
+  });
 });
