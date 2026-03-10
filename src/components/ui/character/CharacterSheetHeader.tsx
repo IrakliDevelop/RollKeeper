@@ -37,6 +37,7 @@ interface CharacterSheetHeaderProps {
     title: string;
     message: string;
   }) => void;
+  extraHeaderContent?: React.ReactNode;
 }
 
 export default function CharacterSheetHeader({
@@ -53,6 +54,7 @@ export default function CharacterSheetHeader({
   onShowResetModal,
   onUpdateName,
   onAddToast,
+  extraHeaderContent,
 }: CharacterSheetHeaderProps) {
   const { exportCharacter } = useCharacterStore();
   const { getCharacterById, updateCharacterData } = usePlayerStore();
@@ -141,6 +143,8 @@ export default function CharacterSheetHeader({
 
             <div className="flex items-center space-x-4">
               <SaveIndicator lastSaved={lastSaved} status={saveStatus} />
+
+              {extraHeaderContent}
 
               <ThemeToggle />
 

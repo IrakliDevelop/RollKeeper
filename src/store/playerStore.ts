@@ -17,9 +17,14 @@ export interface PlayerCharacter {
   updatedAt: Date;
   lastPlayed: Date;
   characterData: CharacterState;
-  avatar?: string; // Base64 encoded image from character data
+  avatar?: string;
   tags: string[];
   isArchived: boolean;
+  campaignCode?: string;
+  campaignName?: string;
+  syncEnabled?: boolean;
+  autoSync?: boolean;
+  lastSyncedAt?: string;
 }
 
 export interface PlayerSettings {

@@ -19,12 +19,15 @@ import {
   ChevronUp,
   TrendingUp,
   LayoutGrid,
+  Link2,
 } from 'lucide-react';
 import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
 import { AvatarUpload } from '@/components/ui/character/AvatarUpload';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { JoinCampaignDialog } from '@/components/ui/campaign/JoinCampaignDialog';
+import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 
 export default function PlayerDashboardPage() {
   const {
@@ -38,11 +41,14 @@ export default function PlayerDashboardPage() {
     duplicateCharacter,
     migrateFromOldStorage,
     importCharacter,
+    updateCharacter,
     settings,
     updateSettings,
   } = usePlayerStore();
 
   const [showSettings, setShowSettings] = useState(false);
+  const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+  const { toasts, addToast, dismissToast } = useToast();
 
   const activeCharacters = getActiveCharacters();
   const archivedCharacters = getArchivedCharacters();
@@ -101,14 +107,17 @@ export default function PlayerDashboardPage() {
         const fileText = await file.text();
         const characterData = JSON.parse(fileText);
 
-        // Try to determine character name for import
         let characterName = 'Imported Character';
-        if (characterData.characterName) {
+        if (characterData.name) {
+          characterName = characterData.name;
+        } else if (characterData.characterName) {
           characterName = characterData.characterName;
-        } else if (characterData.state?.characterName) {
-          characterName = characterData.state.characterName;
-        } else if (characterData.character?.characterName) {
-          characterName = characterData.character.characterName;
+        } else if (characterData.state?.name) {
+          characterName = characterData.state.name;
+        } else if (characterData.character?.name) {
+          characterName = characterData.character.name;
+        } else if (characterData.characterData?.name) {
+          characterName = characterData.characterData.name;
         }
 
         const characterId = importCharacter(characterData, characterName);
@@ -134,6 +143,29 @@ export default function PlayerDashboardPage() {
     } else {
       alert('No old character data found to migrate.');
     }
+  };
+
+  const handleJoinCampaign = (
+    code: string,
+    characterId: string,
+    campaignName: string
+  ) => {
+    updateCharacter(characterId, {
+      campaignCode: code,
+      campaignName,
+      syncEnabled: true,
+      autoSync: true,
+      lastSyncedAt: new Date().toISOString(),
+    });
+
+    const character = characters.find(c => c.id === characterId);
+    addToast({
+      type: 'success',
+      title: 'Campaign Joined',
+      message: `${character?.name ?? 'Your character'} is now synced to "${campaignName}".`,
+      details: ['Auto-sync is enabled', 'Your DM will see your character data'],
+      duration: 5000,
+    });
   };
 
   const getClassBadgeVariant = (
@@ -204,7 +236,7 @@ export default function PlayerDashboardPage() {
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <h3 className="text-heading mb-1 truncate text-xl font-semibold">
+                <h3 className="text-heading mb-1 line-clamp-2 text-xl font-semibold">
                   {character.name}
                 </h3>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -243,16 +275,20 @@ export default function PlayerDashboardPage() {
               )}
             </div>
 
-            {/* Tags */}
-            {character.tags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {character.tags.map(tag => (
-                  <Badge key={tag} variant="neutral" size="sm">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            )}
+            {/* Campaign + Tags */}
+            <div className="mt-2 flex flex-wrap gap-1">
+              {character.campaignCode && (
+                <Badge variant="info" size="sm">
+                  <Link2 size={10} className="mr-1" />
+                  {character.campaignName || character.campaignCode}
+                </Badge>
+              )}
+              {character.tags.map(tag => (
+                <Badge key={tag} variant="neutral" size="sm">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -349,7 +385,13 @@ export default function PlayerDashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {/* Import Character */}
+            <Button
+              variant="outline"
+              leftIcon={<Link2 size={18} />}
+              onClick={() => setJoinDialogOpen(true)}
+            >
+              Join Campaign
+            </Button>
             <Button
               variant="success"
               leftIcon={<Upload size={18} />}
@@ -364,8 +406,6 @@ export default function PlayerDashboardPage() {
               onChange={handleImportCharacter}
               className="hidden"
             />
-
-            {/* New Character */}
             <Link href="/player/characters/new">
               <Button variant="secondary" leftIcon={<Plus size={18} />}>
                 New Character
@@ -501,6 +541,13 @@ export default function PlayerDashboardPage() {
           </>
         )}
 
+        <JoinCampaignDialog
+          open={joinDialogOpen}
+          onOpenChange={setJoinDialogOpen}
+          characters={characters}
+          onJoin={handleJoinCampaign}
+        />
+
         {/* Settings Section */}
         <div className="mb-8">
           <button
@@ -627,6 +674,7 @@ export default function PlayerDashboardPage() {
           )}
         </div>
       </main>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }
