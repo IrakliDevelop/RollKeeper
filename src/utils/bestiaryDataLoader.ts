@@ -4,6 +4,8 @@ import {
   RawMonsterData,
   ProcessedMonster,
   ProcessedTrait,
+  ProcessedSpellcasting,
+  RawSpellcasting,
 } from '@/types/bestiary';
 import { formatSourceForDisplay } from './sourceUtils';
 import { parseReferences } from './referenceParser';
@@ -182,12 +184,60 @@ function processTraits(
   }));
 }
 
+function extractAcValue(
+  ac?: (number | { ac: number; from?: string[] })[]
+): number {
+  if (!ac || ac.length === 0) return 10;
+  const mainAc = ac[0];
+  if (typeof mainAc === 'number') return mainAc;
+  if (typeof mainAc === 'object' && mainAc.ac) return mainAc.ac;
+  return 10;
+}
+
+function cleanSpellName(spellRef: string): string {
+  // Remove {@spell name|source} tags → just the name
+  return spellRef.replace(/\{@spell\s+([^|}]+)(?:\|[^}]*)?\}/g, '$1').trim();
+}
+
+function processSpellcasting(raw: RawSpellcasting[]): ProcessedSpellcasting[] {
+  return raw.map(entry => {
+    const headerText = entry.headerEntries?.join(' ') ?? '';
+
+    // Parse DC and to-hit from header text
+    const dcMatch = headerText.match(/\{@dc (\d+)\}/);
+    const hitMatch = headerText.match(/\{@hit (\d+)\}/);
+    // Try to identify the spellcasting ability
+    const abilityMatch = headerText.match(/spellcasting ability is (\w+)/i);
+
+    const spells: ProcessedSpellcasting['spells'] = {};
+    if (entry.spells) {
+      for (const [level, data] of Object.entries(entry.spells)) {
+        spells[level] = {
+          slots: data.slots,
+          spells: (data.spells ?? []).map(cleanSpellName),
+        };
+      }
+    }
+
+    return {
+      name: entry.name,
+      headerText: cleanSpellName(headerText),
+      ability: abilityMatch?.[1],
+      dc: dcMatch ? parseInt(dcMatch[1], 10) : undefined,
+      toHit: hitMatch ? parseInt(hitMatch[1], 10) : undefined,
+      spells,
+    };
+  });
+}
+
 function processMonster(monster: RawMonsterData): ProcessedMonster {
   const id = generateMonsterId(monster.name, monster.source);
   const typeData =
     typeof monster.type === 'object'
       ? monster.type
       : { type: monster.type || 'unknown' };
+
+  const hasLegendary = !!monster.legendary && monster.legendary.length > 0;
 
   return {
     id,
@@ -237,9 +287,22 @@ function processMonster(monster: RawMonsterData): ProcessedMonster {
     cr: formatCr(monster.cr as ChallengeRating | undefined),
     traits: processTraits(monster.trait),
     actions: processTraits(monster.action),
+    reactions: processTraits(monster.reaction),
     legendaryActions: processTraits(monster.legendary),
     source: formatSourceForDisplay(monster.source),
     page: monster.page ?? 0,
+
+    // Numeric encounter fields
+    acValue: extractAcValue(monster.ac),
+    hpAverage: monster.hp?.average ?? 0,
+    hpFormula: monster.hp?.formula ?? '',
+    legendaryActionCount: hasLegendary
+      ? (monster.legendaryActions ?? 3) // D&D 5e default is 3
+      : 0,
+    conditionImmunities: monster.conditionImmune ?? [],
+    spellcastingEntries: monster.spellcasting
+      ? processSpellcasting(monster.spellcasting)
+      : undefined,
   };
 }
 

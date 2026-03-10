@@ -1,0 +1,168 @@
+// Encounter tracker types for DM combat management
+
+export interface EncounterCondition {
+  id: string;
+  name: string;
+  description?: string;
+  duration?: string; // "Until end of next turn", "1 minute", etc.
+  sourceEntity?: string; // Who applied this
+  sourceSpell?: string; // What spell caused this
+  stackCount?: number;
+  source?: 'player-sync' | 'dm'; // Where this condition came from
+}
+
+export interface MonsterAbility {
+  id: string;
+  name: string;
+  description: string;
+  usageType: 'unlimited' | 'recharge' | 'per-rest' | 'per-day';
+  rechargeOn?: number; // Recharge 5-6 means 5
+  maxUses?: number;
+  usedUses: number;
+  restType?: 'short' | 'long' | 'dawn';
+}
+
+export interface LegendaryActionPool {
+  maxActions: number;
+  usedActions: number;
+  actions: Array<{
+    id: string;
+    name: string;
+    cost: number;
+    description: string;
+  }>;
+}
+
+export interface MonsterSpellcasting {
+  ability: string;
+  dc: number;
+  toHit: number;
+  atWill: string[];
+  perDay: Record<string, string[]>; // "3": ["fireball", "lightning bolt"]
+  slots?: Record<string, { max: number; used: number }>; // Spell slots by level
+  usedSpells: Record<string, number>; // Track per-day usage
+}
+
+export interface MonsterStatBlock {
+  str: number;
+  dex: number;
+  con: number;
+  int: number;
+  wis: number;
+  cha: number;
+  saves: string;
+  skills: string;
+  speed: string;
+  resistances: string;
+  immunities: string;
+  vulnerabilities: string;
+  conditionImmunities: string[];
+  senses: string;
+  passivePerception: number;
+  traits: Array<{ name: string; text: string }>;
+  actions: Array<{ name: string; text: string }>;
+  reactions: Array<{ name: string; text: string }>;
+  cr: string;
+  type: string;
+  size: string;
+  languages: string;
+  alignment: string;
+  hpFormula: string;
+}
+
+export type EntityType = 'player' | 'npc' | 'monster' | 'lair';
+
+export interface EncounterEntity {
+  id: string;
+  type: EntityType;
+  name: string;
+  initiative: number | null;
+  initiativeModifier: number;
+
+  // Combat stats
+  currentHp: number;
+  maxHp: number;
+  tempHp: number;
+  armorClass: number;
+
+  // Conditions
+  conditions: EncounterCondition[];
+  concentrationSpell?: string;
+
+  // For monsters/NPCs
+  abilities?: MonsterAbility[];
+  legendaryActions?: LegendaryActionPool;
+  spellcasting?: MonsterSpellcasting;
+
+  // Monster source reference
+  monsterSourceId?: string; // ProcessedMonster id for stat block lookup
+  monsterStatBlock?: MonsterStatBlock; // Full stat block for display
+
+  // Lair action specific
+  lairActions?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    usedThisRound: boolean;
+  }>;
+  regionalEffects?: string[];
+
+  // Visual
+  color?: string; // For grouping same monsters
+  isHidden?: boolean; // DM can hide from players
+
+  // Player sync reference
+  playerCharacterId?: string; // Link to playerStore character
+  campaignCode?: string; // Campaign for live sync
+}
+
+export interface Encounter {
+  id: string;
+  name: string;
+  campaignCode?: string;
+
+  // Combat state
+  entities: EncounterEntity[];
+  currentTurn: number; // Index in sorted initiative order
+  round: number;
+  isActive: boolean;
+
+  // Settings
+  sortOrder: 'initiative' | 'manual';
+
+  // Timestamps
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CampaignNPC {
+  id: string;
+  name: string;
+  description?: string;
+
+  // Basic stats
+  armorClass: number;
+  maxHp: number;
+  speed: string;
+
+  // Optional stats
+  abilityScores?: {
+    str: number;
+    dex: number;
+    con: number;
+    int: number;
+    wis: number;
+    cha: number;
+  };
+
+  // Optional abilities
+  traits?: string[];
+  actions?: string[];
+
+  // Visual
+  avatarUrl?: string;
+
+  // Metadata
+  createdAt: string;
+  updatedAt: string;
+}
