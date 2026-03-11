@@ -8,6 +8,7 @@ import {
   Swords,
   Weight,
   Sparkles,
+  Brain,
   AlertTriangle,
   Angry,
   Gem,
@@ -475,7 +476,7 @@ function ConditionsSection({ char }: { char: CharacterState }) {
       <div className="flex flex-wrap gap-1.5">
         {isConcentrating && char.concentration?.spellName && (
           <Badge variant="info" size="sm">
-            <Sparkles size={10} className="mr-1" />
+            <Brain size={10} className="mr-1" />
             {char.concentration.spellName}
           </Badge>
         )}

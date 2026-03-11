@@ -6,6 +6,7 @@ import {
   Swords,
   Heart,
   Sparkles,
+  Brain,
   AlertTriangle,
   Angry,
   Minus,
@@ -281,7 +282,7 @@ export function PlayerSummaryCard({
         <div className="flex flex-wrap gap-1.5">
           {isConcentrating && concentrationSpell && (
             <Badge variant="info" size="sm">
-              <Sparkles size={10} className="mr-1" />
+              <Brain size={10} className="mr-1" />
               {concentrationSpell}
             </Badge>
           )}

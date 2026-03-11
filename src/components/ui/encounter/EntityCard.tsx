@@ -19,7 +19,8 @@ import {
   Milk,
   Skull,
   X,
-  Zap,
+  Brain,
+  ClockAlert,
 } from 'lucide-react';
 import { EncounterEntity, ChessPiece } from '@/types/encounter';
 import { HPBar } from '@/components/shared/combat/HPBar';
@@ -534,13 +535,13 @@ export function EntityCard({
                 className="bg-accent-red-bg text-accent-red-text inline-flex shrink-0 items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold"
                 title="Reaction used"
               >
-                <Zap size={10} />
+                <ClockAlert size={10} />
                 Reaction
               </span>
             )}
             {entity.concentrationSpell && (
               <span className="bg-accent-orange-bg text-accent-orange-text shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium">
-                <Sparkles size={10} className="mr-0.5 inline" />
+                <Brain size={10} className="mr-0.5 inline" />
                 {entity.concentrationSpell}
               </span>
             )}
