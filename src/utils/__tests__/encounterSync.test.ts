@@ -27,6 +27,7 @@ describe('mergePlayerSyncData', () => {
           calculationMode: 'auto',
         },
         armorClass: 18,
+        isWearingShield: false,
       }),
     });
 
@@ -46,7 +47,7 @@ describe('mergePlayerSyncData', () => {
     expect(result).toBeNull();
   });
 
-  it('uses tempArmorClass when isTempACActive', () => {
+  it('calculates AC with temp AC when active', () => {
     const entity = createMockEncounterEntity({
       type: 'player',
       armorClass: 16,
@@ -54,13 +55,15 @@ describe('mergePlayerSyncData', () => {
     const playerData = createMockPlayerData({
       characterData: createMockCharacterState({
         armorClass: 16,
-        tempArmorClass: 22,
+        tempArmorClass: 5,
         isTempACActive: true,
+        isWearingShield: false,
       }),
     });
 
     const result = mergePlayerSyncData(entity, playerData)!;
-    expect(result.armorClass).toBe(22);
+    // base 16 + temp 5 = 21
+    expect(result.armorClass).toBe(21);
   });
 
   it('uses base armorClass when isTempACActive is false', () => {
@@ -71,13 +74,52 @@ describe('mergePlayerSyncData', () => {
     const playerData = createMockPlayerData({
       characterData: createMockCharacterState({
         armorClass: 18,
-        tempArmorClass: 22,
+        tempArmorClass: 5,
         isTempACActive: false,
+        isWearingShield: false,
       }),
     });
 
     const result = mergePlayerSyncData(entity, playerData)!;
     expect(result.armorClass).toBe(18);
+  });
+
+  it('includes shield bonus in AC calculation', () => {
+    const entity = createMockEncounterEntity({
+      type: 'player',
+      armorClass: 16,
+    });
+    const playerData = createMockPlayerData({
+      characterData: createMockCharacterState({
+        armorClass: 16,
+        isWearingShield: true,
+        shieldBonus: 2,
+      }),
+    });
+
+    const result = mergePlayerSyncData(entity, playerData)!;
+    // base 16 + shield 2 = 18
+    expect(result.armorClass).toBe(18);
+  });
+
+  it('includes both temp AC and shield bonus', () => {
+    const entity = createMockEncounterEntity({
+      type: 'player',
+      armorClass: 14,
+    });
+    const playerData = createMockPlayerData({
+      characterData: createMockCharacterState({
+        armorClass: 14,
+        tempArmorClass: 3,
+        isTempACActive: true,
+        isWearingShield: true,
+        shieldBonus: 2,
+      }),
+    });
+
+    const result = mergePlayerSyncData(entity, playerData)!;
+    // base 14 + temp 3 + shield 2 = 19
+    expect(result.armorClass).toBe(19);
   });
 
   it('returns concentration spell when active', () => {

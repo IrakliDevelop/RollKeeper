@@ -1,5 +1,6 @@
 import { EncounterEntity, EncounterCondition } from '@/types/encounter';
 import { CampaignPlayerData } from '@/types/campaign';
+import { calculateCharacterArmorClass } from '@/utils/calculations';
 
 /**
  * Merge live player data from campaign sync into an encounter entity.
@@ -15,9 +16,7 @@ export function mergePlayerSyncData(
   const currentHp = char.hitPoints?.current ?? entity.currentHp;
   const maxHp = char.hitPoints?.max ?? entity.maxHp;
   const tempHp = char.hitPoints?.temporary ?? entity.tempHp;
-  const armorClass = char.isTempACActive
-    ? (char.tempArmorClass ?? char.armorClass ?? entity.armorClass)
-    : (char.armorClass ?? entity.armorClass);
+  const armorClass = calculateCharacterArmorClass(char);
 
   const concentrationSpell =
     char.concentration?.isConcentrating && char.concentration?.spellName

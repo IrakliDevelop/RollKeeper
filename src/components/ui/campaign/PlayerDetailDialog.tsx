@@ -27,7 +27,11 @@ import { Badge } from '@/components/ui/layout/badge';
 import { CampaignPlayerData } from '@/types/campaign';
 import { CharacterState } from '@/types/character';
 import { calculateEncumbrance, EncumbranceInfo } from '@/utils/encumbrance';
-import { calculateModifier, getProficiencyBonus } from '@/utils/calculations';
+import {
+  calculateModifier,
+  getProficiencyBonus,
+  calculateCharacterArmorClass,
+} from '@/utils/calculations';
 
 interface PlayerDetailDialogProps {
   open: boolean;
@@ -125,9 +129,7 @@ export function PlayerDetailDialog({
   const currentHp = char.hitPoints?.current ?? 0;
   const maxHp = char.hitPoints?.max ?? 0;
   const tempHp = char.hitPoints?.temporary ?? 0;
-  const ac = char.isTempACActive
-    ? (char.tempArmorClass ?? char.armorClass)
-    : char.armorClass;
+  const ac = calculateCharacterArmorClass(char);
   const level = char.totalLevel || char.level || 1;
   const charClass = char.classes?.length
     ? char.classes.map(c => `${c.className} ${c.level}`).join(' / ')

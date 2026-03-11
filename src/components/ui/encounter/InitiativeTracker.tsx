@@ -1,7 +1,15 @@
 'use client';
 
-import React from 'react';
-import { SkipForward, SkipBack, Play, Square, Dices } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  SkipForward,
+  SkipBack,
+  Play,
+  Square,
+  Dices,
+  EyeOff,
+  Eye,
+} from 'lucide-react';
 import {
   Encounter,
   EncounterEntity,
@@ -66,6 +74,7 @@ export function InitiativeTracker({
   onAdjustPlayerCounter,
   onViewPlayer,
 }: InitiativeTrackerProps) {
+  const [hidePlayerHp, setHidePlayerHp] = useState(false);
   const currentEntity = encounter.entities[encounter.currentTurn];
 
   return (
@@ -103,7 +112,18 @@ export function InitiativeTracker({
                 </>
               )}
             </div>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              <Button
+                variant={hidePlayerHp ? 'warning' : 'ghost'}
+                size="sm"
+                onClick={() => setHidePlayerHp(prev => !prev)}
+                leftIcon={
+                  hidePlayerHp ? <EyeOff size={14} /> : <Eye size={14} />
+                }
+                title={hidePlayerHp ? 'Show player HP' : 'Hide player HP'}
+              >
+                Player HP
+              </Button>
               <Button
                 variant="danger"
                 size="sm"
@@ -154,6 +174,7 @@ export function InitiativeTracker({
               isCurrentTurn={
                 encounter.isActive && idx === encounter.currentTurn
               }
+              hidePlayerHp={hidePlayerHp}
               lastSynced={
                 entity.playerCharacterId
                   ? playerSyncMap?.[entity.playerCharacterId]
