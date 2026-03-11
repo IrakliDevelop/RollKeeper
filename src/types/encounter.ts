@@ -72,6 +72,14 @@ export interface MonsterStatBlock {
 
 export type EntityType = 'player' | 'npc' | 'monster' | 'lair';
 
+export type ChessPiece =
+  | 'king'
+  | 'queen'
+  | 'rook'
+  | 'bishop'
+  | 'knight'
+  | 'pawn';
+
 export interface EncounterEntity {
   id: string;
   type: EntityType;
@@ -109,10 +117,13 @@ export interface EncounterEntity {
 
   // Player-synced (read-only for DM)
   inspirationCount?: number; // Heroic inspiration dice from player
+  deathSaves?: { successes: number; failures: number; isStabilized: boolean };
+  hasUsedReaction?: boolean; // Whether player has used their reaction this round
 
   // Visual
   color?: string; // For grouping same monsters
   isHidden?: boolean; // DM can hide from players
+  chessPiece?: ChessPiece; // Chess piece icon for map correlation
 
   // Player sync reference
   playerCharacterId?: string; // Link to playerStore character

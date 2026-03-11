@@ -46,6 +46,10 @@ interface InitiativeTrackerProps {
   playerCounterValues?: Record<string, number>;
   onAdjustPlayerCounter?: (playerId: string, delta: number) => void;
   onViewPlayer?: (playerCharacterId: string) => void;
+  onChangePlayerColor?: (
+    playerCharacterId: string,
+    color: string | undefined
+  ) => void;
 }
 
 export function InitiativeTracker({
@@ -73,6 +77,7 @@ export function InitiativeTracker({
   playerCounterValues,
   onAdjustPlayerCounter,
   onViewPlayer,
+  onChangePlayerColor,
 }: InitiativeTrackerProps) {
   const [hidePlayerHp, setHidePlayerHp] = useState(false);
   const currentEntity = encounter.entities[encounter.currentTurn];
@@ -220,6 +225,14 @@ export function InitiativeTracker({
                 entity.playerCharacterId &&
                 onViewPlayer
                   ? () => onViewPlayer(entity.playerCharacterId!)
+                  : undefined
+              }
+              onChangePlayerColor={
+                entity.type === 'player' &&
+                entity.playerCharacterId &&
+                onChangePlayerColor
+                  ? color =>
+                      onChangePlayerColor(entity.playerCharacterId!, color)
                   : undefined
               }
             />

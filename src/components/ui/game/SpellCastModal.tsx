@@ -11,7 +11,9 @@ interface SpellCastModalProps {
   spell: Spell;
   spellSlots: SpellSlots;
   concentration: ConcentrationState;
+  hasUsedReaction?: boolean;
   onCastSpell: (spellLevel: number, useFreecast: boolean) => void;
+  onResetReaction?: () => void;
 }
 
 export function SpellCastModal({
@@ -20,7 +22,9 @@ export function SpellCastModal({
   spell,
   spellSlots,
   concentration,
+  hasUsedReaction,
   onCastSpell,
+  onResetReaction,
 }: SpellCastModalProps) {
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const [useFreecast, setUseFreecast] = useState(false);
@@ -69,6 +73,8 @@ export function SpellCastModal({
   const isConcentrationSpell = spell.concentration;
   const alreadyConcentrating = concentration.isConcentrating;
   const concentrationWarning = isConcentrationSpell && alreadyConcentrating;
+  const isReactionSpell = spell.castingTime?.toLowerCase().includes('reaction');
+  const reactionWarning = isReactionSpell && hasUsedReaction;
 
   const handleCast = () => {
     if (selectedLevel !== null) {
@@ -157,6 +163,34 @@ export function SpellCastModal({
                 Casting this spell will end your concentration on the previous
                 spell.
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Reaction Warning */}
+        {reactionWarning && (
+          <div className="bg-accent-red-bg border-accent-red-border-strong flex items-start gap-3 rounded-lg border-2 p-3">
+            <Zap
+              className="text-accent-red-text mt-0.5 flex-shrink-0"
+              size={16}
+            />
+            <div className="flex-1 text-sm">
+              <p className="text-accent-red-text mb-1 font-medium">
+                Reaction Already Used
+              </p>
+              <p className="text-accent-red-text">
+                You&apos;ve already used your reaction this round. You typically
+                can&apos;t cast this spell until your reaction resets on your
+                next turn.
+              </p>
+              {onResetReaction && (
+                <button
+                  onClick={onResetReaction}
+                  className="border-accent-red-border-strong text-accent-red-text hover:bg-accent-red-text mt-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors hover:text-white"
+                >
+                  Reset Reaction
+                </button>
+              )}
             </div>
           </div>
         )}

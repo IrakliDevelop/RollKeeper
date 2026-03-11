@@ -169,6 +169,29 @@ export function EntityCardExpanded({
                   if (e.key === 'Enter') handleDamage();
                 }}
               />
+              <div className="flex gap-1">
+                <button
+                  onClick={() => {
+                    const val = parseInt(hpInput);
+                    if (!isNaN(val) && val > 0)
+                      setHpInput(String(Math.floor(val / 2)));
+                  }}
+                  className="bg-surface-raised text-muted hover:text-heading rounded-md px-2.5 py-1.5 text-xs font-bold shadow-sm transition-colors"
+                  title="Half (resistance)"
+                >
+                  ½×
+                </button>
+                <button
+                  onClick={() => {
+                    const val = parseInt(hpInput);
+                    if (!isNaN(val) && val > 0) setHpInput(String(val * 2));
+                  }}
+                  className="bg-surface-raised text-muted hover:text-heading rounded-md px-2.5 py-1.5 text-xs font-bold shadow-sm transition-colors"
+                  title="Double (vulnerability)"
+                >
+                  2×
+                </button>
+              </div>
               <Button
                 variant="danger"
                 size="sm"
@@ -317,18 +340,18 @@ export function EntityCardExpanded({
               Legendary Actions
             </h4>
             <div className="flex items-center gap-2">
-              <div className="flex gap-0.5">
+              <div className="flex gap-1">
                 {Array.from({
                   length: entity.legendaryActions.maxActions,
                 }).map((_, i) => (
                   <span
                     key={i}
-                    className={`h-2.5 w-2.5 rounded-full ${
+                    className={`h-3 w-3 rounded-full border-2 ${
                       i <
                       entity.legendaryActions!.maxActions -
                         entity.legendaryActions!.usedActions
-                        ? 'bg-accent-amber-bg-strong'
-                        : 'bg-surface-raised'
+                        ? 'border-accent-amber-border-strong bg-accent-amber-border-strong'
+                        : 'border-divider bg-surface-raised'
                     }`}
                   />
                 ))}
@@ -411,41 +434,74 @@ export function EntityCardExpanded({
         </div>
       )}
 
-      {/* Concentration */}
+      {/* Concentration & Reaction */}
       {!isLair && (
-        <div className="flex items-center gap-2">
-          <Zap size={14} className="text-accent-orange-text shrink-0" />
-          <span className="text-body text-xs">Concentration:</span>
-          {isPlayer ? (
-            <span className="text-body text-xs">
-              {entity.concentrationSpell ? (
-                <span className="text-accent-orange-text font-medium">
-                  {entity.concentrationSpell}
-                </span>
-              ) : (
-                <span className="text-faint">None</span>
-              )}
-              <span className="text-faint ml-1">(synced)</span>
-            </span>
-          ) : (
-            <>
-              <input
-                type="text"
-                value={entity.concentrationSpell ?? ''}
-                onChange={e => onSetConcentration(e.target.value || null)}
-                placeholder="None"
-                className="bg-surface-raised text-body placeholder:text-faint flex-1 rounded px-2 py-0.5 text-xs shadow-sm"
-              />
-              {entity.concentrationSpell && (
-                <button
-                  onClick={() => onSetConcentration(null)}
-                  className="text-muted hover:text-accent-red-text text-xs"
-                >
-                  Drop
-                </button>
-              )}
-            </>
-          )}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Zap size={14} className="text-accent-orange-text shrink-0" />
+            <span className="text-body text-xs">Concentration:</span>
+            {isPlayer ? (
+              <span className="text-body text-xs">
+                {entity.concentrationSpell ? (
+                  <span className="text-accent-orange-text font-medium">
+                    {entity.concentrationSpell}
+                  </span>
+                ) : (
+                  <span className="text-faint">None</span>
+                )}
+                <span className="text-faint ml-1">(synced)</span>
+              </span>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={entity.concentrationSpell ?? ''}
+                  onChange={e => onSetConcentration(e.target.value || null)}
+                  placeholder="None"
+                  className="bg-surface-raised text-body placeholder:text-faint flex-1 rounded px-2 py-0.5 text-xs shadow-sm"
+                />
+                {entity.concentrationSpell && (
+                  <button
+                    onClick={() => onSetConcentration(null)}
+                    className="text-muted hover:text-accent-red-text text-xs"
+                  >
+                    Drop
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Reaction toggle */}
+          <div className="flex items-center gap-2">
+            <Zap size={14} className="text-accent-red-text shrink-0" />
+            <span className="text-body text-xs">Reaction:</span>
+            {isPlayer ? (
+              <span className="text-body text-xs">
+                {entity.hasUsedReaction ? (
+                  <span className="text-accent-red-text font-medium">Used</span>
+                ) : (
+                  <span className="text-accent-emerald-text font-medium">
+                    Available
+                  </span>
+                )}
+                <span className="text-faint ml-1">(synced)</span>
+              </span>
+            ) : (
+              <button
+                onClick={() =>
+                  onUpdate({ hasUsedReaction: !entity.hasUsedReaction })
+                }
+                className={`rounded-md border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                  entity.hasUsedReaction
+                    ? 'border-accent-red-border-strong bg-accent-red-bg text-accent-red-text'
+                    : 'border-accent-emerald-border bg-accent-emerald-bg text-accent-emerald-text'
+                }`}
+              >
+                {entity.hasUsedReaction ? 'Used' : 'Available'}
+              </button>
+            )}
+          </div>
         </div>
       )}
 

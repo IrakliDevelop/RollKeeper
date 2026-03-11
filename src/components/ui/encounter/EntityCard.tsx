@@ -10,8 +10,18 @@ import {
   Angry,
   Minus,
   Plus,
+  ChessBishop,
+  ChessKing,
+  ChessKnight,
+  ChessPawn,
+  ChessQueen,
+  ChessRook,
+  Milk,
+  Skull,
+  X,
+  Zap,
 } from 'lucide-react';
-import { EncounterEntity } from '@/types/encounter';
+import { EncounterEntity, ChessPiece } from '@/types/encounter';
 import { HPBar } from '@/components/shared/combat/HPBar';
 import { ConditionBadge } from '@/components/shared/combat/ConditionBadge';
 import { EntityCardExpanded } from './EntityCardExpanded';
@@ -38,6 +48,7 @@ interface EntityCardProps {
   counterValue?: number;
   onAdjustCounter?: (delta: number) => void;
   onViewPlayer?: () => void;
+  onChangePlayerColor?: (color: string | undefined) => void;
 }
 
 const TYPE_STYLES: Record<
@@ -47,28 +58,256 @@ const TYPE_STYLES: Record<
   player: {
     border: 'border-accent-blue-border',
     badge: 'text-accent-blue-text',
-    badgeBg: 'bg-accent-blue-bg',
-    cardBg: 'bg-accent-blue-bg/70',
+    badgeBg: 'bg-accent-blue-bg-strong',
+    cardBg: 'bg-accent-blue-bg',
   },
   npc: {
     border: 'border-accent-amber-border',
     badge: 'text-accent-amber-text',
-    badgeBg: 'bg-accent-amber-bg',
-    cardBg: 'bg-accent-amber-bg/70',
+    badgeBg: 'bg-accent-amber-bg-strong',
+    cardBg: 'bg-accent-amber-bg',
   },
   monster: {
     border: 'border-accent-purple-border',
     badge: 'text-accent-purple-text',
-    badgeBg: 'bg-accent-purple-bg',
-    cardBg: 'bg-accent-purple-bg/70',
+    badgeBg: 'bg-accent-purple-bg-strong',
+    cardBg: 'bg-accent-purple-bg',
   },
   lair: {
     border: 'border-accent-emerald-border',
     badge: 'text-accent-emerald-text',
-    badgeBg: 'bg-accent-emerald-bg',
-    cardBg: 'bg-accent-emerald-bg/70',
+    badgeBg: 'bg-accent-emerald-bg-strong',
+    cardBg: 'bg-accent-emerald-bg',
   },
 };
+
+const CHESS_PIECES: {
+  piece: ChessPiece;
+  Icon: React.ComponentType<{
+    size?: number;
+    className?: string;
+    style?: React.CSSProperties;
+  }>;
+}[] = [
+  { piece: 'king', Icon: ChessKing },
+  { piece: 'queen', Icon: ChessQueen },
+  { piece: 'rook', Icon: ChessRook },
+  { piece: 'bishop', Icon: ChessBishop },
+  { piece: 'knight', Icon: ChessKnight },
+  { piece: 'pawn', Icon: ChessPawn },
+];
+
+const PIECE_COLORS = [
+  { name: 'White', value: '#e2e8f0' },
+  { name: 'Black', value: '#1e293b' },
+  { name: 'Red', value: '#ef4444' },
+  { name: 'Blue', value: '#3b82f6' },
+  { name: 'Green', value: '#22c55e' },
+  { name: 'Yellow', value: '#eab308' },
+  { name: 'Purple', value: '#a855f7' },
+  { name: 'Orange', value: '#f97316' },
+  { name: 'Brown', value: '#92400e' },
+];
+
+function getChessPieceIcon(piece: ChessPiece) {
+  return CHESS_PIECES.find(p => p.piece === piece)?.Icon;
+}
+
+function ChessPiecePicker({
+  piece,
+  color,
+  onChangePiece,
+  onChangeColor,
+}: {
+  piece?: ChessPiece;
+  color?: string;
+  onChangePiece: (piece: ChessPiece | undefined) => void;
+  onChangeColor: (color: string | undefined) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    const Icon = piece ? getChessPieceIcon(piece) : null;
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors ${
+          Icon || color
+            ? 'bg-surface-raised shadow-sm'
+            : 'text-faint hover:text-muted hover:bg-surface-raised'
+        }`}
+        title={
+          piece
+            ? `${piece}${color ? ` (${PIECE_COLORS.find(c => c.value === color)?.name ?? color})` : ''} — click to change`
+            : 'Assign chess piece'
+        }
+      >
+        {Icon ? (
+          <Icon
+            size={18}
+            style={color ? { color } : undefined}
+            className={color ? '' : 'text-heading'}
+          />
+        ) : color ? (
+          <span
+            className="border-divider h-4 w-4 rounded-full border"
+            style={{ backgroundColor: color }}
+          />
+        ) : (
+          <ChessPawn size={14} className="opacity-40" />
+        )}
+      </button>
+    );
+  }
+
+  return (
+    <div className="bg-surface-raised z-10 flex flex-col gap-1.5 rounded-lg p-1.5 shadow-lg">
+      {/* Piece row */}
+      <div className="flex items-center gap-0.5">
+        {CHESS_PIECES.map(({ piece: p, Icon }) => (
+          <button
+            key={p}
+            onClick={() => onChangePiece(p === piece ? undefined : p)}
+            className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
+              p === piece
+                ? 'bg-accent-amber-bg-strong text-heading'
+                : 'text-muted hover:text-heading hover:bg-surface-secondary'
+            }`}
+            title={p.charAt(0).toUpperCase() + p.slice(1)}
+          >
+            <Icon
+              size={16}
+              style={color && p === piece ? { color } : undefined}
+            />
+          </button>
+        ))}
+      </div>
+      {/* Color row */}
+      <div className="flex items-center gap-0.5">
+        {PIECE_COLORS.map(c => (
+          <button
+            key={c.value}
+            onClick={() =>
+              onChangeColor(c.value === color ? undefined : c.value)
+            }
+            className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
+              c.value === color
+                ? 'ring-heading ring-2'
+                : 'hover:bg-surface-secondary'
+            }`}
+            title={c.name}
+          >
+            <span
+              className="border-divider h-4 w-4 rounded-full border"
+              style={{ backgroundColor: c.value }}
+            />
+          </button>
+        ))}
+      </div>
+      {/* Actions */}
+      <div className="flex items-center justify-between">
+        {(piece || color) && (
+          <button
+            onClick={() => {
+              onChangePiece(undefined);
+              onChangeColor(undefined);
+              setOpen(false);
+            }}
+            className="text-faint hover:text-accent-red-text px-1 text-[10px] font-medium transition-colors"
+          >
+            Clear
+          </button>
+        )}
+        <button
+          onClick={() => setOpen(false)}
+          className="text-faint hover:text-heading ml-auto px-1 text-[10px] font-medium transition-colors"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PlayerColorPicker({
+  color,
+  onChange,
+}: {
+  color?: string;
+  onChange: (color: string | undefined) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors ${
+          color
+            ? 'bg-surface-raised shadow-sm'
+            : 'text-faint hover:text-muted hover:bg-surface-raised'
+        }`}
+        title={
+          color
+            ? `Figurine color: ${PIECE_COLORS.find(c => c.value === color)?.name ?? color} — click to change`
+            : 'Assign figurine color'
+        }
+      >
+        <Milk
+          size={18}
+          style={color ? { color } : undefined}
+          className={color ? '' : 'opacity-40'}
+        />
+      </button>
+    );
+  }
+
+  return (
+    <div className="bg-surface-raised z-10 flex flex-col gap-1.5 rounded-lg p-1.5 shadow-lg">
+      <div className="flex items-center gap-0.5">
+        {PIECE_COLORS.map(c => (
+          <button
+            key={c.value}
+            onClick={() => {
+              onChange(c.value === color ? undefined : c.value);
+              setOpen(false);
+            }}
+            className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
+              c.value === color
+                ? 'ring-heading ring-2'
+                : 'hover:bg-surface-secondary'
+            }`}
+            title={c.name}
+          >
+            <span
+              className="border-divider h-4 w-4 rounded-full border"
+              style={{ backgroundColor: c.value }}
+            />
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center justify-between">
+        {color && (
+          <button
+            onClick={() => {
+              onChange(undefined);
+              setOpen(false);
+            }}
+            className="text-faint hover:text-accent-red-text px-1 text-[10px] font-medium transition-colors"
+          >
+            Clear
+          </button>
+        )}
+        <button
+          onClick={() => setOpen(false)}
+          className="text-faint hover:text-heading ml-auto px-1 text-[10px] font-medium transition-colors"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function DmCounterControl({
   label,
@@ -156,12 +395,18 @@ export function EntityCard({
   counterValue = 0,
   onAdjustCounter,
   onViewPlayer,
+  onChangePlayerColor,
 }: EntityCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [editingInit, setEditingInit] = useState(false);
   const [initInput, setInitInput] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
   const style = TYPE_STYLES[entity.type] ?? TYPE_STYLES.monster;
-  const isDead = entity.currentHp <= 0 && entity.type !== 'lair';
+  const isDown = entity.currentHp <= 0 && entity.type !== 'lair';
+  const isPlayerDead =
+    entity.type === 'player' && entity.deathSaves?.failures === 3;
+  const isDead = entity.type === 'player' ? isPlayerDead : isDown;
 
   return (
     <div
@@ -206,18 +451,71 @@ export function EntityCard({
           </button>
         )}
 
+        {/* Chess piece (monsters/NPCs) or figurine color (players) */}
+        {entity.type === 'player' && onChangePlayerColor && (
+          <PlayerColorPicker
+            color={entity.color}
+            onChange={color => {
+              onUpdate({ color });
+              onChangePlayerColor(color);
+            }}
+          />
+        )}
+        {entity.type !== 'player' && entity.type !== 'lair' && (
+          <ChessPiecePicker
+            piece={entity.chessPiece}
+            color={entity.color}
+            onChangePiece={p => onUpdate({ chessPiece: p })}
+            onChangeColor={c => onUpdate({ color: c })}
+          />
+        )}
+
         {/* Name + HP + Conditions */}
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center gap-2">
+            {editingName ? (
+              <input
+                type="text"
+                value={nameInput}
+                onChange={e => setNameInput(e.target.value)}
+                onBlur={() => {
+                  const trimmed = nameInput.trim();
+                  if (trimmed && trimmed !== entity.name)
+                    onUpdate({ name: trimmed });
+                  setEditingName(false);
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const trimmed = nameInput.trim();
+                    if (trimmed && trimmed !== entity.name)
+                      onUpdate({ name: trimmed });
+                    setEditingName(false);
+                  }
+                  if (e.key === 'Escape') setEditingName(false);
+                }}
+                className="text-heading bg-surface-raised max-w-[200px] min-w-0 rounded px-1.5 py-0.5 font-semibold shadow-sm"
+                autoFocus
+              />
+            ) : (
+              <span
+                className={`text-heading truncate font-semibold ${isDead ? 'line-through' : ''} ${entity.type !== 'player' ? 'hover:text-body cursor-pointer rounded transition-colors' : ''}`}
+                onClick={() => {
+                  if (entity.type !== 'player') {
+                    setNameInput(entity.name);
+                    setEditingName(true);
+                  }
+                }}
+                title={entity.type !== 'player' ? 'Click to rename' : undefined}
+              >
+                {entity.name}
+              </span>
+            )}
             <span
-              className={`text-heading truncate font-semibold ${isDead ? 'line-through' : ''}`}
+              className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold shadow-sm ${style.badgeBg} ${style.badge} ${style.border}`}
             >
-              {entity.name}
-            </span>
-            <span
-              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${style.badgeBg} ${style.badge}`}
-            >
-              {entity.type.charAt(0).toUpperCase() + entity.type.slice(1)}
+              {entity.type === 'npc'
+                ? 'NPC'
+                : entity.type.charAt(0).toUpperCase() + entity.type.slice(1)}
             </span>
             {entity.type === 'player' && (
               <SyncIndicator lastSynced={lastSynced} />
@@ -229,6 +527,15 @@ export function EntityCard({
               >
                 <Sparkles size={10} />
                 {entity.inspirationCount}
+              </span>
+            )}
+            {entity.hasUsedReaction && (
+              <span
+                className="bg-accent-red-bg text-accent-red-text inline-flex shrink-0 items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                title="Reaction used"
+              >
+                <Zap size={10} />
+                Reaction
               </span>
             )}
             {entity.concentrationSpell && (
@@ -251,6 +558,63 @@ export function EntityCard({
                 size="sm"
               />
             ))}
+
+          {/* Death Saving Throws (players at 0 HP) */}
+          {entity.type === 'player' &&
+            entity.currentHp <= 0 &&
+            entity.deathSaves && (
+              <div className="mt-1 flex items-center gap-2">
+                <Skull size={14} className="text-heading shrink-0" />
+                {entity.deathSaves.isStabilized ? (
+                  <span className="text-accent-amber-text bg-accent-amber-bg-strong rounded-full px-2.5 py-0.5 text-xs font-semibold">
+                    Stabilized
+                  </span>
+                ) : entity.deathSaves.failures >= 3 ? (
+                  <span className="text-accent-red-text bg-accent-red-bg-strong rounded-full px-2.5 py-0.5 text-xs font-semibold">
+                    Dead
+                  </span>
+                ) : (
+                  <>
+                    <div
+                      className="flex items-center gap-1.5"
+                      title="Death save successes"
+                    >
+                      <span className="text-xs font-semibold text-green-600 dark:text-green-400">
+                        S
+                      </span>
+                      {[1, 2, 3].map(i => (
+                        <span
+                          key={`s-${i}`}
+                          className={`h-3.5 w-3.5 rounded-full border-2 ${
+                            i <= entity.deathSaves!.successes
+                              ? 'border-green-500 bg-green-500'
+                              : 'border-divider bg-surface-raised'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <div
+                      className="flex items-center gap-1.5"
+                      title="Death save failures"
+                    >
+                      <span className="text-xs font-semibold text-red-500 dark:text-red-400">
+                        F
+                      </span>
+                      {[1, 2, 3].map(i => (
+                        <span
+                          key={`f-${i}`}
+                          className={`h-3.5 w-3.5 rounded-full border-2 ${
+                            i <= entity.deathSaves!.failures
+                              ? 'border-red-500 bg-red-500'
+                              : 'border-divider bg-surface-raised'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
           {/* Lair actions quick display */}
           {entity.type === 'lair' && entity.lairActions && (

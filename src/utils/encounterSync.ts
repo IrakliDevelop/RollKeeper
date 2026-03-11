@@ -24,6 +24,16 @@ export function mergePlayerSyncData(
       : undefined;
 
   const inspirationCount = char.heroicInspiration?.count ?? 0;
+  const hasUsedReaction = char.reaction?.hasUsedReaction ?? false;
+
+  // Death saving throws (only present when at 0 HP)
+  const deathSaves = char.hitPoints?.deathSaves
+    ? {
+        successes: char.hitPoints.deathSaves.successes,
+        failures: char.hitPoints.deathSaves.failures,
+        isStabilized: char.hitPoints.deathSaves.isStabilized,
+      }
+    : undefined;
 
   // Build player-synced conditions from character data
   const playerConditions: EncounterCondition[] = (
@@ -52,6 +62,8 @@ export function mergePlayerSyncData(
     armorClass,
     concentrationSpell,
     inspirationCount,
+    hasUsedReaction,
+    deathSaves,
     conditions: mergedConditions,
   };
 }
@@ -69,6 +81,19 @@ export function hasPlayerDataChanged(
   if (updates.armorClass !== entity.armorClass) return true;
   if (updates.concentrationSpell !== entity.concentrationSpell) return true;
   if (updates.inspirationCount !== entity.inspirationCount) return true;
+  if (updates.hasUsedReaction !== entity.hasUsedReaction) return true;
+
+  // Compare death saves
+  if (updates.deathSaves !== undefined || entity.deathSaves !== undefined) {
+    const uDs = updates.deathSaves;
+    const eDs = entity.deathSaves;
+    if (!uDs !== !eDs) return true;
+    if (uDs && eDs) {
+      if (uDs.successes !== eDs.successes) return true;
+      if (uDs.failures !== eDs.failures) return true;
+      if (uDs.isStabilized !== eDs.isStabilized) return true;
+    }
+  }
 
   // Compare conditions by name set
   if (updates.conditions) {

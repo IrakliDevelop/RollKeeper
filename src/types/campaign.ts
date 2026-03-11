@@ -21,4 +21,5 @@ export interface CampaignInfo {
   createdAt: string;
   customCounterLabel?: string;
   playerCounters?: Record<string, number>; // playerId → counter value
+  playerColors?: Record<string, string>; // playerCharacterId → color hex
 }

@@ -52,6 +52,7 @@ export function QuickSpells({
     startConcentration,
     stopConcentration,
     reorderSpells,
+    toggleReaction,
   } = useCharacterStore();
 
   // Modal state
@@ -240,6 +241,14 @@ export function QuickSpells({
       );
     }
 
+    // Auto-trigger reaction usage when casting a reaction spell
+    if (
+      selectedSpell.castingTime?.toLowerCase().includes('reaction') &&
+      !character.reaction?.hasUsedReaction
+    ) {
+      toggleReaction();
+    }
+
     setCastModalOpen(false);
     setSelectedSpell(null);
   };
@@ -395,7 +404,9 @@ export function QuickSpells({
           spell={selectedSpell}
           spellSlots={character.spellSlots}
           concentration={character.concentration}
+          hasUsedReaction={character.reaction?.hasUsedReaction}
           onCastSpell={handleCastSpell}
+          onResetReaction={toggleReaction}
         />
       )}
     </>

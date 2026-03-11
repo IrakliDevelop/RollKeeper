@@ -686,6 +686,7 @@ export default function CharacterSheet() {
                 updateDaysSpent(Math.max(0, (character.daysSpent || 0) - 1))
               }
               onToggleInspiration={handleToggleInspiration}
+              onToggleReaction={toggleReaction}
               onStopConcentration={stopConcentration}
               onNavigateToConditions={() => switchToTab('conditions')}
             />

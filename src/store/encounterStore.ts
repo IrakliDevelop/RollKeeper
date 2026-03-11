@@ -314,10 +314,19 @@ export const useEncounterStore = create<EncounterStoreState>()(
                 });
               }
 
+              // Reset reaction for the entity whose turn is starting
+              const incomingTurn = isNewRound ? 0 : nextTurn;
+              const incomingEntity = entities[incomingTurn];
+              if (incomingEntity?.hasUsedReaction) {
+                entities = entities.map((e, i) =>
+                  i === incomingTurn ? { ...e, hasUsedReaction: false } : e
+                );
+              }
+
               return {
                 ...enc,
                 entities,
-                currentTurn: isNewRound ? 0 : nextTurn,
+                currentTurn: incomingTurn,
                 round: isNewRound ? enc.round + 1 : enc.round,
                 updatedAt: new Date().toISOString(),
               };

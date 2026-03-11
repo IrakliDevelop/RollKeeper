@@ -30,6 +30,7 @@ interface CharacterHUDProps {
   onIncrementDays: () => void;
   onDecrementDays: () => void;
   onToggleInspiration: () => void;
+  onToggleReaction: () => void;
   onStopConcentration: () => void;
   onNavigateToConditions?: () => void;
 }
@@ -41,6 +42,7 @@ export default function CharacterHUD({
   onIncrementDays,
   onDecrementDays,
   onToggleInspiration,
+  onToggleReaction,
   onStopConcentration,
   onNavigateToConditions,
 }: CharacterHUDProps) {
@@ -63,6 +65,7 @@ export default function CharacterHUD({
 
   const isConcentrating = character.concentration?.isConcentrating;
   const hasInspiration = (character.heroicInspiration?.count || 0) > 0;
+  const hasUsedReaction = character.reaction?.hasUsedReaction ?? false;
 
   const getHPColor = () => {
     if (hpPercent > 60) return 'bg-emerald-500';
@@ -235,6 +238,25 @@ export default function CharacterHUD({
           >
             <Sparkles
               className={`h-4 w-4 ${hasInspiration ? 'fill-current' : ''}`}
+            />
+          </button>
+
+          {/* Reaction Toggle */}
+          <button
+            onClick={onToggleReaction}
+            className={`rounded-lg border px-2.5 py-2 transition-colors ${
+              hasUsedReaction
+                ? 'border-red-400 bg-red-50 text-red-600 dark:border-red-600 dark:bg-red-950 dark:text-red-400'
+                : 'border-divider text-muted hover:bg-surface-hover hover:text-red-600'
+            }`}
+            title={
+              hasUsedReaction
+                ? 'Reaction used — click to reset'
+                : 'Mark reaction as used'
+            }
+          >
+            <Zap
+              className={`h-4 w-4 ${hasUsedReaction ? 'fill-current' : ''}`}
             />
           </button>
         </div>
