@@ -643,6 +643,7 @@ export const EnhancedSpellManagement: React.FC = () => {
     updateSpellSlot,
     startConcentration,
     stopConcentration,
+    toggleReaction,
   } = useCharacterStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -975,6 +976,14 @@ export const EnhancedSpellManagement: React.FC = () => {
         character.spellSlots[spellLevel as keyof typeof character.spellSlots]
           .used + 1
       );
+    }
+
+    // Auto-trigger reaction usage when casting a reaction spell
+    if (
+      selectedSpell.castingTime?.toLowerCase().includes('reaction') &&
+      !character.reaction?.hasUsedReaction
+    ) {
+      toggleReaction();
     }
 
     setCastModalOpen(false);
@@ -1947,7 +1956,9 @@ export const EnhancedSpellManagement: React.FC = () => {
           spell={selectedSpell}
           spellSlots={character.spellSlots}
           concentration={character.concentration}
+          hasUsedReaction={character.reaction?.hasUsedReaction}
           onCastSpell={handleCastSpellConfirm}
+          onResetReaction={toggleReaction}
         />
       )}
     </div>
