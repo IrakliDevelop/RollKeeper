@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import { CampaignPlayerData } from '@/types/campaign';
+import { calculateCharacterArmorClass } from '@/utils/calculations';
 
 function getClassBadgeVariant(
   className: string
@@ -100,7 +101,7 @@ export function PlayerSummaryCard({
   const currentHp = char.hitPoints?.current ?? 0;
   const maxHp = char.hitPoints?.max ?? 0;
   const tempHp = char.hitPoints?.temporary ?? 0;
-  const ac = char.isTempACActive ? char.tempArmorClass : char.armorClass;
+  const ac = calculateCharacterArmorClass(char);
   const charClass = char.class?.name || 'Unknown';
   const level = char.totalLevel || char.level || 1;
 

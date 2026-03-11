@@ -13,9 +13,9 @@ interface HPBarProps {
 
 function getHPColorClass(percent: number): string {
   if (percent <= 0) return 'bg-surface-secondary';
-  if (percent <= 25) return 'bg-accent-red-bg-strong';
-  if (percent <= 50) return 'bg-accent-amber-bg-strong';
-  return 'bg-accent-emerald-bg-strong';
+  if (percent <= 25) return 'bg-accent-red-text';
+  if (percent <= 50) return 'bg-accent-amber-border-strong';
+  return 'bg-accent-emerald-text';
 }
 
 const sizeMap = {
@@ -39,7 +39,7 @@ export function HPBar({
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <div
-        className={`bg-surface-secondary flex-1 overflow-hidden rounded-full ${sizeMap[size]}`}
+        className={`bg-surface-raised flex-1 overflow-hidden rounded-full shadow-inner ${sizeMap[size]}`}
       >
         <div
           className={`${sizeMap[size]} rounded-full transition-all duration-300 ${colorClass}`}

@@ -139,7 +139,7 @@ export function EntityCardExpanded({
                     }
                     if (e.key === 'Escape') setEditingMaxHp(false);
                   }}
-                  className="bg-surface-secondary text-heading w-14 rounded px-1 py-0.5 text-center text-xs font-medium"
+                  className="bg-surface-raised text-heading w-14 rounded px-1 py-0.5 text-center text-xs font-medium shadow-sm"
                   autoFocus
                 />
               ) : (
@@ -164,7 +164,7 @@ export function EntityCardExpanded({
                 onChange={e => setHpInput(e.target.value)}
                 placeholder="Amount"
                 type="number"
-                className="w-24"
+                wrapperClassName="w-24"
                 onKeyDown={e => {
                   if (e.key === 'Enter') handleDamage();
                 }}
@@ -185,7 +185,7 @@ export function EntityCardExpanded({
               >
                 Heal
               </Button>
-              <div className="text-muted ml-auto flex items-center gap-1 text-sm">
+              <div className="text-muted ml-2 flex items-center gap-1 text-sm">
                 <Shield size={14} />
                 <input
                   type="number"
@@ -195,7 +195,7 @@ export function EntityCardExpanded({
                       armorClass: parseInt(e.target.value) || 0,
                     })
                   }
-                  className="bg-surface-secondary text-heading w-12 rounded px-1 py-0.5 text-center text-sm font-medium"
+                  className="bg-surface-raised text-heading w-12 rounded px-1 py-0.5 text-center text-sm font-medium shadow-sm"
                 />
               </div>
             </div>
@@ -264,7 +264,7 @@ export function EntityCardExpanded({
           {entity.abilities.map(ability => (
             <div
               key={ability.id}
-              className="bg-surface-secondary flex items-center justify-between rounded px-2 py-1.5"
+              className="bg-surface-raised flex items-center justify-between rounded px-2 py-1.5 shadow-sm"
             >
               <div className="min-w-0 flex-1">
                 <span className="text-body text-sm font-medium">
@@ -328,7 +328,7 @@ export function EntityCardExpanded({
                       entity.legendaryActions!.maxActions -
                         entity.legendaryActions!.usedActions
                         ? 'bg-accent-amber-bg-strong'
-                        : 'bg-surface-secondary'
+                        : 'bg-surface-raised'
                     }`}
                   />
                 ))}
@@ -350,7 +350,7 @@ export function EntityCardExpanded({
             return (
               <div
                 key={action.id}
-                className="bg-surface-secondary flex items-center justify-between rounded px-2 py-1.5"
+                className="bg-surface-raised flex items-center justify-between rounded px-2 py-1.5 shadow-sm"
               >
                 <div className="min-w-0 flex-1">
                   <span className="text-body text-sm font-medium">
@@ -366,7 +366,7 @@ export function EntityCardExpanded({
                   className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
                     canUse
                       ? 'bg-accent-amber-bg text-accent-amber-text hover:opacity-80'
-                      : 'bg-surface-secondary text-faint cursor-not-allowed'
+                      : 'bg-surface-raised text-faint cursor-not-allowed'
                   }`}
                 >
                   Use
@@ -386,7 +386,7 @@ export function EntityCardExpanded({
           {entity.lairActions.map(la => (
             <div
               key={la.id}
-              className="bg-surface-secondary flex items-center justify-between rounded px-2 py-1.5"
+              className="bg-surface-raised flex items-center justify-between rounded px-2 py-1.5 shadow-sm"
             >
               <div className="min-w-0 flex-1">
                 <span className="text-body text-sm font-medium">{la.name}</span>
@@ -400,8 +400,8 @@ export function EntityCardExpanded({
                 disabled={la.usedThisRound}
                 className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium transition-colors ${
                   la.usedThisRound
-                    ? 'bg-surface-secondary text-faint cursor-not-allowed'
-                    : 'bg-accent-amber-bg text-accent-amber-text hover:opacity-80'
+                    ? 'bg-surface-raised text-faint cursor-not-allowed'
+                    : 'bg-accent-emerald-bg text-accent-emerald-text hover:opacity-80'
                 }`}
               >
                 {la.usedThisRound ? 'Used' : 'Use'}
@@ -434,7 +434,7 @@ export function EntityCardExpanded({
                 value={entity.concentrationSpell ?? ''}
                 onChange={e => onSetConcentration(e.target.value || null)}
                 placeholder="None"
-                className="bg-surface-secondary text-body placeholder:text-faint flex-1 rounded px-2 py-0.5 text-xs"
+                className="bg-surface-raised text-body placeholder:text-faint flex-1 rounded px-2 py-0.5 text-xs shadow-sm"
               />
               {entity.concentrationSpell && (
                 <button
@@ -473,7 +473,7 @@ export function EntityCardExpanded({
                 className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
                   isActive
                     ? 'bg-accent-red-bg text-accent-red-text'
-                    : 'bg-surface-secondary text-muted hover:text-body'
+                    : 'bg-surface-raised text-muted hover:text-body shadow-sm'
                 }`}
               >
                 {cond}

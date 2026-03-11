@@ -180,7 +180,7 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
 
           <nav
             ref={navRef}
-            className="scrollbar-hide flex items-end gap-0.5 overflow-x-auto px-1 pt-2"
+            className="scrollbar-hide flex items-end gap-0.5 overflow-x-auto overflow-y-hidden px-1 pt-2"
             role="tablist"
           >
             {visibleTabs.map(tab => {

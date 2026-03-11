@@ -19,6 +19,7 @@ import { EntityCardExpanded } from './EntityCardExpanded';
 interface EntityCardProps {
   entity: EncounterEntity;
   isCurrentTurn: boolean;
+  hidePlayerHp?: boolean;
   lastSynced?: string; // ISO timestamp for player sync freshness
   customCounterLabel?: string; // DM-named counter label
   onUpdate: (updates: Partial<EncounterEntity>) => void;
@@ -41,27 +42,31 @@ interface EntityCardProps {
 
 const TYPE_STYLES: Record<
   string,
-  { border: string; badge: string; badgeBg: string }
+  { border: string; badge: string; badgeBg: string; cardBg: string }
 > = {
   player: {
     border: 'border-accent-blue-border',
     badge: 'text-accent-blue-text',
     badgeBg: 'bg-accent-blue-bg',
+    cardBg: 'bg-accent-blue-bg/70',
   },
   npc: {
-    border: 'border-accent-purple-border',
-    badge: 'text-accent-purple-text',
-    badgeBg: 'bg-accent-purple-bg',
-  },
-  monster: {
-    border: 'border-accent-red-border',
-    badge: 'text-accent-red-text',
-    badgeBg: 'bg-accent-red-bg',
-  },
-  lair: {
     border: 'border-accent-amber-border',
     badge: 'text-accent-amber-text',
     badgeBg: 'bg-accent-amber-bg',
+    cardBg: 'bg-accent-amber-bg/70',
+  },
+  monster: {
+    border: 'border-accent-purple-border',
+    badge: 'text-accent-purple-text',
+    badgeBg: 'bg-accent-purple-bg',
+    cardBg: 'bg-accent-purple-bg/70',
+  },
+  lair: {
+    border: 'border-accent-emerald-border',
+    badge: 'text-accent-emerald-text',
+    badgeBg: 'bg-accent-emerald-bg',
+    cardBg: 'bg-accent-emerald-bg/70',
   },
 };
 
@@ -132,6 +137,7 @@ function SyncIndicator({ lastSynced }: { lastSynced?: string }) {
 export function EntityCard({
   entity,
   isCurrentTurn,
+  hidePlayerHp,
   lastSynced,
   customCounterLabel,
   onUpdate,
@@ -159,10 +165,8 @@ export function EntityCard({
 
   return (
     <div
-      className={`bg-surface-raised rounded-lg border-2 shadow-sm transition-all ${style.border} ${
-        isCurrentTurn
-          ? 'ring-accent-amber-border ring-2 ring-offset-1 ring-offset-transparent'
-          : ''
+      className={`rounded-lg shadow-sm transition-all ${style.cardBg} ${style.border} ${
+        isCurrentTurn ? 'border-4 shadow-md' : 'border-2'
       } ${isDead ? 'opacity-60' : ''} ${entity.isHidden ? 'border-dashed' : ''}`}
     >
       {/* Compact view — always visible */}
@@ -186,7 +190,7 @@ export function EntityCard({
               }
               if (e.key === 'Escape') setEditingInit(false);
             }}
-            className="bg-surface-secondary text-heading h-10 w-10 rounded-lg text-center text-sm font-bold"
+            className="bg-surface-raised text-heading h-10 w-10 rounded-lg text-center text-sm font-bold shadow-sm"
             autoFocus
           />
         ) : (
@@ -195,7 +199,7 @@ export function EntityCard({
               setInitInput(entity.initiative?.toString() ?? '');
               setEditingInit(true);
             }}
-            className="bg-surface-secondary text-heading hover:ring-accent-amber-border flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold tabular-nums transition-all hover:ring-2"
+            className="bg-surface-raised text-heading hover:ring-accent-amber-border flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold tabular-nums shadow-sm transition-all hover:ring-2"
             title="Click to set initiative"
           >
             {entity.initiative ?? '—'}
@@ -235,15 +239,18 @@ export function EntityCard({
             )}
           </div>
 
-          {/* HP Bar (skip for lair entities) */}
-          {entity.type !== 'lair' && (
-            <HPBar
-              current={entity.currentHp}
-              max={entity.maxHp}
-              temp={entity.tempHp}
-              size="sm"
-            />
-          )}
+          {/* HP Bar (skip for lair entities, optionally hidden for players) */}
+          {entity.type !== 'lair' &&
+            (hidePlayerHp && entity.type === 'player' ? (
+              <div className="text-muted text-xs italic">HP hidden</div>
+            ) : (
+              <HPBar
+                current={entity.currentHp}
+                max={entity.maxHp}
+                temp={entity.tempHp}
+                size="sm"
+              />
+            ))}
 
           {/* Lair actions quick display */}
           {entity.type === 'lair' && entity.lairActions && (
@@ -254,7 +261,7 @@ export function EntityCard({
                   className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
                     la.usedThisRound
                       ? 'bg-surface-secondary text-faint line-through'
-                      : 'bg-accent-amber-bg text-accent-amber-text'
+                      : 'bg-accent-emerald-bg text-accent-emerald-text'
                   }`}
                 >
                   {la.name}
@@ -282,9 +289,9 @@ export function EntityCard({
         {/* Right side: AC + DM counter + controls */}
         <div className="flex shrink-0 items-center gap-2">
           {entity.type !== 'lair' && (
-            <div className="text-muted flex items-center gap-1 text-sm">
+            <div className="bg-surface-raised text-heading flex items-center gap-1 rounded-md px-1.5 py-0.5 text-sm shadow-sm">
               <Shield size={14} />
-              <span className="font-medium tabular-nums">
+              <span className="font-bold tabular-nums">
                 {entity.armorClass}
               </span>
             </div>

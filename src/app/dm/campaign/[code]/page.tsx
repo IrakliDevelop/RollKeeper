@@ -12,6 +12,7 @@ import {
   Users,
   Swords,
   Angry,
+  CalendarDays,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -131,6 +132,15 @@ export default function CampaignViewPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Link href={`/dm/campaign/${code}/calendar`}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<CalendarDays size={16} />}
+                >
+                  Calendar
+                </Button>
+              </Link>
               <Link href={`/dm/campaign/${code}/encounters`}>
                 <Button
                   variant="secondary"
