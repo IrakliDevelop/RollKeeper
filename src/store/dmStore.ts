@@ -15,6 +15,15 @@ interface DmStoreState {
   setCustomCounterLabel: (code: string, label: string | undefined) => void;
   adjustPlayerCounter: (code: string, playerId: string, delta: number) => void;
   setPlayerCounter: (code: string, playerId: string, value: number) => void;
+  setPlayerColor: (
+    code: string,
+    playerCharacterId: string,
+    color: string | undefined
+  ) => void;
+  getPlayerColor: (
+    code: string,
+    playerCharacterId: string
+  ) => string | undefined;
 }
 
 function generateDmId(): string {
@@ -88,6 +97,26 @@ export const useDmStore = create<DmStoreState>()(
             };
           }),
         }));
+      },
+
+      setPlayerColor: (code, playerCharacterId, color) => {
+        set(state => ({
+          campaigns: state.campaigns.map(c => {
+            if (c.code !== code) return c;
+            const colors = { ...c.playerColors };
+            if (color) {
+              colors[playerCharacterId] = color;
+            } else {
+              delete colors[playerCharacterId];
+            }
+            return { ...c, playerColors: colors };
+          }),
+        }));
+      },
+
+      getPlayerColor: (code, playerCharacterId) => {
+        const campaign = get().campaigns.find(c => c.code === code);
+        return campaign?.playerColors?.[playerCharacterId];
       },
     }),
     {

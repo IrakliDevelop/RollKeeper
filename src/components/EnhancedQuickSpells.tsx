@@ -363,6 +363,7 @@ export function EnhancedQuickSpells({
     startConcentration,
     stopConcentration,
     toggleSpellFavorite,
+    toggleReaction,
   } = useCharacterStore();
 
   // Local state
@@ -578,6 +579,14 @@ export function EnhancedQuickSpells({
       );
     }
 
+    // Auto-trigger reaction usage when casting a reaction spell
+    if (
+      selectedSpell.castingTime?.toLowerCase().includes('reaction') &&
+      !character.reaction?.hasUsedReaction
+    ) {
+      toggleReaction();
+    }
+
     setCastModalOpen(false);
     setSelectedSpell(null);
   };
@@ -761,7 +770,9 @@ export function EnhancedQuickSpells({
           spell={selectedSpell}
           spellSlots={character.spellSlots}
           concentration={character.concentration}
+          hasUsedReaction={character.reaction?.hasUsedReaction}
           onCastSpell={handleCastSpell}
+          onResetReaction={toggleReaction}
         />
       )}
 

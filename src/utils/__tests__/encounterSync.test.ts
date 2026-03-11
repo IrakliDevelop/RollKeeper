@@ -270,6 +270,51 @@ describe('mergePlayerSyncData', () => {
     const result = mergePlayerSyncData(entity, playerData)!;
     expect(result.tempHp).toBe(10);
   });
+
+  it('syncs death saving throws when at 0 HP', () => {
+    const entity = createMockEncounterEntity({
+      type: 'player',
+      currentHp: 0,
+    });
+    const playerData = createMockPlayerData({
+      characterData: createMockCharacterState({
+        hitPoints: {
+          current: 0,
+          max: 44,
+          temporary: 0,
+          calculationMode: 'auto',
+          deathSaves: { successes: 2, failures: 1, isStabilized: false },
+        },
+      }),
+    });
+
+    const result = mergePlayerSyncData(entity, playerData)!;
+    expect(result.deathSaves).toEqual({
+      successes: 2,
+      failures: 1,
+      isStabilized: false,
+    });
+  });
+
+  it('returns undefined deathSaves when player is alive', () => {
+    const entity = createMockEncounterEntity({
+      type: 'player',
+      currentHp: 20,
+    });
+    const playerData = createMockPlayerData({
+      characterData: createMockCharacterState({
+        hitPoints: {
+          current: 20,
+          max: 44,
+          temporary: 0,
+          calculationMode: 'auto',
+        },
+      }),
+    });
+
+    const result = mergePlayerSyncData(entity, playerData)!;
+    expect(result.deathSaves).toBeUndefined();
+  });
 });
 
 describe('hasPlayerDataChanged', () => {

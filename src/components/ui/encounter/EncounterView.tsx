@@ -61,7 +61,7 @@ export function EncounterView({
 
   const { npcs } = useNPCStore();
 
-  const { dmId, adjustPlayerCounter } = useDmStore();
+  const { dmId, adjustPlayerCounter, setPlayerColor } = useDmStore();
   const campaign = useDmStore(state => state.getCampaign(campaignCode));
 
   const { players: campaignPlayers } = useCampaignSync({
@@ -249,6 +249,9 @@ export function EncounterView({
           );
           if (player) setViewingPlayer(player);
         }}
+        onChangePlayerColor={(playerCharacterId, color) =>
+          setPlayerColor(campaignCode, playerCharacterId, color)
+        }
       />
 
       {/* Add entity dialog */}
@@ -261,6 +264,7 @@ export function EncounterView({
         campaignCode={campaignCode}
         campaignPlayers={mappedPlayers}
         npcs={npcs}
+        playerColors={campaign?.playerColors}
       />
 
       {/* Player detail dialog */}

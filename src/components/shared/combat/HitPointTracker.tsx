@@ -358,16 +358,37 @@ export function HitPointTracker({
                 value={damageAmount}
                 onChange={e => setDamageAmount(e.target.value)}
                 placeholder="Amount"
-                className="border-accent-red-border bg-surface-raised text-heading focus:border-accent-red-border-strong focus:ring-accent-red-bg-strong w-24 rounded-md border px-3 py-2 text-center focus:ring-2"
+                className="border-accent-red-border bg-surface-raised text-heading focus:border-accent-red-border-strong focus:ring-accent-red-bg-strong min-w-0 flex-1 rounded-md border px-3 py-2 text-center text-lg font-semibold focus:ring-2"
                 min="1"
               />
               <button
+                onClick={() => {
+                  const val = parseInt(damageAmount);
+                  if (!isNaN(val) && val > 0)
+                    setDamageAmount(String(Math.floor(val / 2)));
+                }}
+                className="bg-surface-secondary text-muted hover:text-heading min-h-[44px] min-w-[44px] rounded-md px-3 py-2 text-sm font-bold shadow-sm transition-colors"
+                title="Half (resistance)"
+              >
+                ½×
+              </button>
+              <button
+                onClick={() => {
+                  const val = parseInt(damageAmount);
+                  if (!isNaN(val) && val > 0) setDamageAmount(String(val * 2));
+                }}
+                className="bg-surface-secondary text-muted hover:text-heading min-h-[44px] min-w-[44px] rounded-md px-3 py-2 text-sm font-bold shadow-sm transition-colors"
+                title="Double (vulnerability)"
+              >
+                2×
+              </button>
+              <button
                 onClick={handleDamage}
                 disabled={!damageAmount || parseInt(damageAmount) <= 0}
-                className="disabled:bg-surface-hover disabled:text-muted flex flex-1 items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed"
+                className="disabled:bg-surface-hover disabled:text-muted flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed"
               >
                 <Minus size={16} />
-                Apply Damage
+                Dmg
               </button>
             </div>
           </div>
@@ -383,16 +404,16 @@ export function HitPointTracker({
                 value={healingAmount}
                 onChange={e => setHealingAmount(e.target.value)}
                 placeholder="Amount"
-                className="border-accent-green-border bg-surface-raised text-heading focus:border-accent-green-border-strong focus:ring-accent-green-bg-strong w-24 rounded-md border px-3 py-2 text-center focus:ring-2"
+                className="border-accent-green-border bg-surface-raised text-heading focus:border-accent-green-border-strong focus:ring-accent-green-bg-strong min-w-0 flex-1 rounded-md border px-3 py-2 text-center text-lg font-semibold focus:ring-2"
                 min="1"
               />
               <button
                 onClick={handleHealing}
                 disabled={!healingAmount || parseInt(healingAmount) <= 0}
-                className="disabled:bg-surface-hover disabled:text-muted flex flex-1 items-center justify-center gap-2 rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed"
+                className="disabled:bg-surface-hover disabled:text-muted flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed"
               >
                 <Plus size={16} />
-                Apply Healing
+                Heal
               </button>
             </div>
           </div>
@@ -408,16 +429,16 @@ export function HitPointTracker({
                 value={tempHPAmount}
                 onChange={e => setTempHPAmount(e.target.value)}
                 placeholder="Amount"
-                className="border-accent-blue-border bg-surface-raised text-heading focus:border-accent-blue-border-strong focus:ring-accent-blue-bg-strong w-24 rounded-md border px-3 py-2 text-center focus:ring-2"
+                className="border-accent-blue-border bg-surface-raised text-heading focus:border-accent-blue-border-strong focus:ring-accent-blue-bg-strong min-w-0 flex-1 rounded-md border px-3 py-2 text-center text-lg font-semibold focus:ring-2"
                 min="1"
               />
               <button
                 onClick={handleTempHP}
                 disabled={!tempHPAmount || parseInt(tempHPAmount) <= 0}
-                className="disabled:bg-surface-hover disabled:text-muted flex flex-1 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed"
+                className="disabled:bg-surface-hover disabled:text-muted flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed"
               >
                 <Shield size={16} />
-                Add Temp HP
+                Temp
               </button>
             </div>
           </div>
