@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Eye, X, Clock } from 'lucide-react';
+import { Brain, X, Clock } from 'lucide-react';
 import { ConcentrationState } from '@/types/character';
 
 interface ConcentrationTrackerProps {
@@ -42,7 +42,7 @@ export default function ConcentrationTracker({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <Eye className="text-accent-amber-text-muted" size={20} />
+            <Brain className="text-accent-amber-text-muted" size={20} />
             <div>
               <h3 className="text-accent-amber-text font-semibold">
                 Concentrating

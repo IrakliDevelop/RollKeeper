@@ -4,6 +4,8 @@ import React from 'react';
 import {
   Heart,
   Shield,
+  ClockAlert,
+  Brain,
   Zap,
   Footprints,
   Award,
@@ -156,6 +158,7 @@ export default function CharacterHUD({
                 className="bg-accent-amber-bg text-accent-amber-text flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80"
                 title={`Concentrating on ${character.concentration.spellName || 'spell'} — click to stop`}
               >
+                <Brain className="h-3.5 w-3.5 shrink-0" />
                 <span className="max-w-[100px] truncate">
                   {character.concentration.spellName || 'Conc.'}
                 </span>
@@ -255,9 +258,7 @@ export default function CharacterHUD({
                 : 'Mark reaction as used'
             }
           >
-            <Zap
-              className={`h-4 w-4 ${hasUsedReaction ? 'fill-current' : ''}`}
-            />
+            <ClockAlert className="h-4 w-4" />
           </button>
         </div>
       </div>

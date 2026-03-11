@@ -7,7 +7,8 @@ import {
   Shield,
   Trash2,
   RotateCcw,
-  Zap,
+  Brain,
+  ClockAlert,
   BookOpen,
   ChevronDown,
   ChevronUp,
@@ -438,7 +439,7 @@ export function EntityCardExpanded({
       {!isLair && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Zap size={14} className="text-accent-orange-text shrink-0" />
+            <Brain size={14} className="text-accent-orange-text shrink-0" />
             <span className="text-body text-xs">Concentration:</span>
             {isPlayer ? (
               <span className="text-body text-xs">
@@ -474,7 +475,7 @@ export function EntityCardExpanded({
 
           {/* Reaction toggle */}
           <div className="flex items-center gap-2">
-            <Zap size={14} className="text-accent-red-text shrink-0" />
+            <ClockAlert size={14} className="text-accent-red-text shrink-0" />
             <span className="text-body text-xs">Reaction:</span>
             {isPlayer ? (
               <span className="text-body text-xs">

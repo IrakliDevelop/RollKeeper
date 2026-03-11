@@ -1,7 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AlertTriangle, Sparkles, Zap, Infinity } from 'lucide-react';
+import {
+  AlertTriangle,
+  Sparkles,
+  Zap,
+  ClockAlert,
+  Infinity,
+} from 'lucide-react';
 import { Spell, SpellSlots, ConcentrationState } from '@/types/character';
 import { Modal } from '@/components/ui/feedback/Modal';
 
@@ -170,7 +176,7 @@ export function SpellCastModal({
         {/* Reaction Warning */}
         {reactionWarning && (
           <div className="bg-accent-red-bg border-accent-red-border-strong flex items-start gap-3 rounded-lg border-2 p-3">
-            <Zap
+            <ClockAlert
               className="text-accent-red-text mt-0.5 flex-shrink-0"
               size={16}
             />
