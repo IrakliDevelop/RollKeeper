@@ -216,6 +216,7 @@ export interface TabbedSheetConfigParams {
   deleteNote: (id: string) => void;
   reorderNotes: (sourceIndex: number, destinationIndex: number) => void;
   addToast: (toast: Omit<ToastData, 'id'>) => void;
+  calendarDays?: number | null;
 }
 
 export function createTabbedSheetConfig(
@@ -629,23 +630,27 @@ export function createTabbedSheetConfig(
             />
           </ErrorBoundary>
 
-          <div className="text-body flex items-center gap-2 text-sm">
-            <span className="border-accent-amber-border text-accent-amber-text inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] px-3 py-1 font-medium shadow-sm">
-              <span className="text-base">📅</span>
-              Campaign Day {character.daysSpent || 0}
-            </span>
-            <span className="text-faint">•</span>
-            <span className="text-muted">
-              {Math.floor((character.daysSpent || 0) / 7) > 0 ? (
-                <>
-                  Week {Math.floor((character.daysSpent || 0) / 7) + 1}, Day{' '}
-                  {((character.daysSpent || 0) % 7) + 1}
-                </>
-              ) : (
-                `Day ${(character.daysSpent || 0) + 1} of the adventure`
-              )}
-            </span>
-          </div>
+          {(() => {
+            const days = params.calendarDays ?? character.daysSpent ?? 0;
+            return (
+              <div className="text-body flex items-center gap-2 text-sm">
+                <span className="border-accent-amber-border text-accent-amber-text inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] px-3 py-1 font-medium shadow-sm">
+                  <span className="text-base">📅</span>
+                  Campaign Day {days}
+                </span>
+                <span className="text-faint">•</span>
+                <span className="text-muted">
+                  {Math.floor(days / 7) > 0 ? (
+                    <>
+                      Week {Math.floor(days / 7) + 1}, Day {(days % 7) + 1}
+                    </>
+                  ) : (
+                    `Day ${days + 1} of the adventure`
+                  )}
+                </span>
+              </div>
+            );
+          })()}
 
           <ErrorBoundary
             fallback={

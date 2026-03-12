@@ -16,7 +16,7 @@ import { EventListView } from './EventListView';
 import { JumpToDateDialog } from './JumpToDateDialog';
 import { useCalendar } from '@/hooks/useCalendar';
 import { useCalendarStore } from '@/store/calendarStore';
-import { dateToTime } from '@/utils/calendarCalculations';
+import { dateToTime, getCampaignDays } from '@/utils/calendarCalculations';
 import type { SelectedDay } from './CalendarGrid';
 import type { CalendarEvent } from '@/types/calendar';
 
@@ -37,7 +37,7 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
     state.calendars.find(c => c.campaignCode === campaignCode)
   );
   const advanceTime = useCalendarStore(state => state.advanceTime);
-  const setTime = useCalendarStore(state => state.setTime);
+  const setStartDate = useCalendarStore(state => state.setStartDate);
   const addEvent = useCalendarStore(state => state.addEvent);
   const updateEvent = useCalendarStore(state => state.updateEvent);
   const deleteEvent = useCalendarStore(state => state.deleteEvent);
@@ -144,22 +144,21 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
     }
   };
 
-  const handleJumpToDate = (year: number, month: number, day: number) => {
+  const handleSetStartDate = (year: number, month: number, day: number) => {
     const newTime = dateToTime(
-      {
-        year,
-        month,
-        dayOfMonth: day,
-        hour: date.hour,
-        minute: date.minute,
-        second: date.second,
-      },
+      { year, month, dayOfMonth: day, hour: 0, minute: 0, second: 0 },
       config
     );
-    setTime(campaignCode, newTime);
+    setStartDate(campaignCode, newTime);
     setBrowseYear(null);
     setBrowseMonth(null);
   };
+
+  const campaignDays = getCampaignDays(
+    calendar.currentTime,
+    calendar.startTime ?? 0,
+    config
+  );
 
   return (
     <div className="space-y-6">
@@ -173,34 +172,39 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
               moonPhases={moonPhases}
               dayPeriod={dayPeriod}
             />
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                leftIcon={<MapPin size={16} />}
-                onClick={() => setJumpDialogOpen(true)}
-              >
-                Jump to Date
-              </Button>
-              <Link href={`/dm/campaign/${campaignCode}/calendar/settings`}>
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
-                  leftIcon={<Settings size={16} />}
+                  leftIcon={<MapPin size={16} />}
+                  onClick={() => setJumpDialogOpen(true)}
                 >
-                  Settings
+                  Start Date
                 </Button>
-              </Link>
-              {onReset && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<RotateCcw size={16} />}
-                  onClick={onReset}
-                >
-                  Reset
-                </Button>
-              )}
+                <Link href={`/dm/campaign/${campaignCode}/calendar/settings`}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<Settings size={16} />}
+                  >
+                    Settings
+                  </Button>
+                </Link>
+                {onReset && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<RotateCcw size={16} />}
+                    onClick={onReset}
+                  >
+                    Reset
+                  </Button>
+                )}
+              </div>
+              <span className="text-muted text-sm">
+                Day {campaignDays + 1} of the campaign
+              </span>
             </div>
           </div>
           <div className="border-divider border-t pt-4">
@@ -296,11 +300,11 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
         defaultDate={selectedDay ?? undefined}
       />
 
-      {/* Jump to date dialog */}
+      {/* Start date dialog */}
       <JumpToDateDialog
         open={jumpDialogOpen}
         onClose={() => setJumpDialogOpen(false)}
-        onJump={handleJumpToDate}
+        onJump={handleSetStartDate}
         config={config}
         currentDate={date}
       />

@@ -21,6 +21,7 @@ interface CalendarStoreState {
   deleteCalendar: (campaignCode: string) => void;
   updateConfig: (campaignCode: string, config: CalendarConfig) => void;
   setTime: (campaignCode: string, time: number) => void;
+  setStartDate: (campaignCode: string, time: number) => void;
   advanceTime: (campaignCode: string, deltaMs: number) => void;
   addEvent: (
     campaignCode: string,
@@ -54,7 +55,13 @@ export const useCalendarStore = create<CalendarStoreState>()(
           return {
             calendars: [
               ...state.calendars,
-              { campaignCode, config, currentTime: 0, events: [] },
+              {
+                campaignCode,
+                config,
+                currentTime: 0,
+                startTime: 0,
+                events: [],
+              },
             ],
           };
         });
@@ -84,6 +91,16 @@ export const useCalendarStore = create<CalendarStoreState>()(
         set(state => ({
           calendars: state.calendars.map(c =>
             c.campaignCode === campaignCode ? { ...c, currentTime: time } : c
+          ),
+        }));
+      },
+
+      setStartDate: (campaignCode, time) => {
+        set(state => ({
+          calendars: state.calendars.map(c =>
+            c.campaignCode === campaignCode
+              ? { ...c, startTime: time, currentTime: time }
+              : c
           ),
         }));
       },
@@ -151,20 +168,23 @@ export const useCalendarStore = create<CalendarStoreState>()(
     {
       name: CALENDAR_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
-      version: 2,
+      version: 3,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as CalendarStoreState;
+        let calendars = state.calendars ?? [];
         if (version < 2) {
-          // Add events array to calendars that don't have it
-          return {
-            ...state,
-            calendars: (state.calendars ?? []).map((c: CampaignCalendar) => ({
-              ...c,
-              events: c.events ?? [],
-            })),
-          };
+          calendars = calendars.map((c: CampaignCalendar) => ({
+            ...c,
+            events: c.events ?? [],
+          }));
         }
-        return state;
+        if (version < 3) {
+          calendars = calendars.map((c: CampaignCalendar) => ({
+            ...c,
+            startTime: c.startTime ?? 0,
+          }));
+        }
+        return { ...state, calendars };
       },
     }
   )

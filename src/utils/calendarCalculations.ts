@@ -32,6 +32,17 @@ export function getMsPerDay(config: CalendarConfig): number {
 }
 
 /**
+ * Get the number of campaign days elapsed (currentTime - startTime) / msPerDay.
+ */
+export function getCampaignDays(
+  currentTime: number,
+  startTime: number,
+  config: CalendarConfig
+): number {
+  return Math.floor((currentTime - startTime) / getMsPerDay(config));
+}
+
+/**
  * Convert a currentTime (ms since epoch) into a CalendarDate.
  */
 export function timeToDate(time: number, config: CalendarConfig): CalendarDate {

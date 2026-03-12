@@ -20,7 +20,11 @@ import { useCalendar } from '@/hooks/useCalendar';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useCharacterStore } from '@/store/characterStore';
 import { CALENDAR_PRESETS } from '@/utils/calendarPresets';
-import { getMsPerDay, dateToTime } from '@/utils/calendarCalculations';
+import {
+  getMsPerDay,
+  dateToTime,
+  getCampaignDays,
+} from '@/utils/calendarCalculations';
 import type { SelectedDay } from './CalendarGrid';
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import type { CalendarEvent } from '@/types/calendar';
@@ -67,7 +71,7 @@ export function PlayerCalendarView({
   const addEvent = useCalendarStore(state => state.addEvent);
   const updateEvent = useCalendarStore(state => state.updateEvent);
   const deleteEvent = useCalendarStore(state => state.deleteEvent);
-  const setTime = useCalendarStore(state => state.setTime);
+  const setStartDate = useCalendarStore(state => state.setStartDate);
 
   const [selectedPreset, setSelectedPreset] = useState<string>(
     CALENDAR_PRESETS[0].id
@@ -230,22 +234,21 @@ export function PlayerCalendarView({
     setConfirmingReset(false);
   };
 
-  const handleJumpToDate = (year: number, month: number, day: number) => {
+  const handleSetStartDate = (year: number, month: number, day: number) => {
     const newTime = dateToTime(
-      {
-        year,
-        month,
-        dayOfMonth: day,
-        hour: date.hour,
-        minute: date.minute,
-        second: date.second,
-      },
+      { year, month, dayOfMonth: day, hour: 0, minute: 0, second: 0 },
       config
     );
-    setTime(characterId, newTime);
+    setStartDate(characterId, newTime);
     setBrowseYear(null);
     setBrowseMonth(null);
   };
+
+  const campaignDays = getCampaignDays(
+    calendar.currentTime,
+    calendar.startTime ?? 0,
+    config
+  );
 
   const monthName =
     config.months[date.month]?.name ?? `Month ${date.month + 1}`;
@@ -267,60 +270,65 @@ export function PlayerCalendarView({
           </h3>
           {date.season && <Badge variant="info">{date.season.name}</Badge>}
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<MapPin size={14} />}
-            onClick={() => setJumpDialogOpen(true)}
-            title="Jump to a specific date"
-          >
-            Jump
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<Undo2 size={14} />}
-            onClick={() => {
-              advanceTime(characterId, -getMsPerDay(config));
-              setBrowseYear(null);
-              setBrowseMonth(null);
-            }}
-            title="Go back one day"
-          >
-            Prev Day
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<Moon size={14} />}
-            onClick={handleLongRest}
-          >
-            Long Rest
-          </Button>
-          {confirmingReset ? (
-            <div className="flex items-center gap-1">
-              <Button variant="danger" size="sm" onClick={handleReset}>
-                Confirm
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setConfirmingReset(false)}
-              >
-                Cancel
-              </Button>
-            </div>
-          ) : (
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
-              leftIcon={<RotateCcw size={14} />}
-              onClick={handleReset}
+              leftIcon={<MapPin size={14} />}
+              onClick={() => setJumpDialogOpen(true)}
+              title="Set campaign start date"
             >
-              Reset
+              Start Date
             </Button>
-          )}
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<Undo2 size={14} />}
+              onClick={() => {
+                advanceTime(characterId, -getMsPerDay(config));
+                setBrowseYear(null);
+                setBrowseMonth(null);
+              }}
+              title="Go back one day"
+            >
+              Prev Day
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Moon size={14} />}
+              onClick={handleLongRest}
+            >
+              Long Rest
+            </Button>
+            {confirmingReset ? (
+              <div className="flex items-center gap-1">
+                <Button variant="danger" size="sm" onClick={handleReset}>
+                  Confirm
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmingReset(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                leftIcon={<RotateCcw size={14} />}
+                onClick={handleReset}
+              >
+                Reset
+              </Button>
+            )}
+          </div>
+          <span className="text-muted text-xs">
+            Day {campaignDays + 1} of the campaign
+          </span>
         </div>
       </div>
 
@@ -399,7 +407,7 @@ export function PlayerCalendarView({
       <JumpToDateDialog
         open={jumpDialogOpen}
         onClose={() => setJumpDialogOpen(false)}
-        onJump={handleJumpToDate}
+        onJump={handleSetStartDate}
         config={config}
         currentDate={date}
       />

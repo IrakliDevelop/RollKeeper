@@ -30,6 +30,7 @@ import {
 
 interface CharacterHUDProps {
   character: CharacterState;
+  calendarDays?: number | null;
   onShortRest: () => void;
   onLongRest: () => void;
   onIncrementDays: () => void;
@@ -43,6 +44,7 @@ interface CharacterHUDProps {
 
 export default function CharacterHUD({
   character,
+  calendarDays,
   onShortRest,
   onLongRest,
   onIncrementDays,
@@ -210,23 +212,27 @@ export default function CharacterHUD({
 
           {/* Day Counter */}
           <div className="border-divider text-muted flex items-center gap-1 rounded-lg border px-2 py-1.5">
-            <button
-              onClick={onDecrementDays}
-              className="hover:text-body rounded p-0.5 transition-colors"
-              title="Decrease day"
-            >
-              <Minus className="h-3.5 w-3.5" />
-            </button>
+            {calendarDays == null && (
+              <button
+                onClick={onDecrementDays}
+                className="hover:text-body rounded p-0.5 transition-colors"
+                title="Decrease day"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+            )}
             <span className="min-w-[48px] text-center text-sm font-medium">
-              Day {character.daysSpent || 0}
+              Day {calendarDays ?? character.daysSpent ?? 0}
             </span>
-            <button
-              onClick={onIncrementDays}
-              className="hover:text-body rounded p-0.5 transition-colors"
-              title="Increase day"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
+            {calendarDays == null && (
+              <button
+                onClick={onIncrementDays}
+                className="hover:text-body rounded p-0.5 transition-colors"
+                title="Increase day"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Heroic Inspiration */}
