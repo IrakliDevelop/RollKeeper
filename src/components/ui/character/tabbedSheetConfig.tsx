@@ -217,6 +217,7 @@ export interface TabbedSheetConfigParams {
   reorderNotes: (sourceIndex: number, destinationIndex: number) => void;
   addToast: (toast: Omit<ToastData, 'id'>) => void;
   calendarDays?: number | null;
+  campaignCode?: string;
 }
 
 export function createTabbedSheetConfig(
@@ -687,6 +688,7 @@ export function createTabbedSheetConfig(
         >
           <PlayerCalendarView
             characterId={character.id}
+            campaignCode={params.campaignCode}
             addToast={params.addToast}
           />
         </ErrorBoundary>
