@@ -326,6 +326,24 @@ export const ALIGNMENTS = [
   'Chaotic Evil',
 ];
 
+// Creature types (D&D 5e)
+export const CREATURE_TYPES = [
+  'Humanoid',
+  'Aberration',
+  'Beast',
+  'Celestial',
+  'Construct',
+  'Dragon',
+  'Elemental',
+  'Fey',
+  'Fiend',
+  'Giant',
+  'Monstrosity',
+  'Ooze',
+  'Plant',
+  'Undead',
+];
+
 // Common backgrounds
 export const BACKGROUNDS = [
   'Acolyte',
@@ -356,6 +374,7 @@ export const DEFAULT_CHARACTER_STATE = {
   experience: 0,
   background: '',
   alignment: '',
+  creatureType: 'Humanoid',
   playerName: '',
 
   abilities: {

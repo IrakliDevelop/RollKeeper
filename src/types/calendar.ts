@@ -61,10 +61,21 @@ export interface CalendarConfig {
   mechanics: MechanicsConfig;
 }
 
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string; // HTML from RichTextEditor
+  year: number; // display year (with offset applied)
+  month: number; // 0-based month index
+  day: number; // 0-based day of month
+  createdAt: number; // timestamp for ordering
+}
+
 export interface CampaignCalendar {
   campaignCode: string;
   config: CalendarConfig;
   currentTime: number; // milliseconds since epoch
+  events: CalendarEvent[];
 }
 
 // Derived from currentTime + config — never stored

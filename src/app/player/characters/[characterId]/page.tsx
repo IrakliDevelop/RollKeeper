@@ -615,8 +615,14 @@ export default function CharacterSheet() {
             characterId={characterId}
             characterName={character.name}
             characterRace={character.race}
-            characterClass={character.class?.name || 'Unknown Class'}
-            characterLevel={character.level}
+            characterClass={
+              getClassDisplayString() ||
+              character.class?.name ||
+              'Unknown Class'
+            }
+            characterLevel={character.totalLevel || character.level}
+            characterAlignment={character.alignment}
+            characterCreatureType={character.creatureType || 'Humanoid'}
             saveStatus={saveStatus}
             lastSaved={lastSaved}
             hasUnsavedChanges={hasUnsavedChanges}
@@ -689,6 +695,7 @@ export default function CharacterSheet() {
               onToggleReaction={toggleReaction}
               onStopConcentration={stopConcentration}
               onNavigateToConditions={() => switchToTab('conditions')}
+              onUpdateCharacter={updateCharacter}
             />
 
             {/* Rest Dialog triggered from HUD */}
@@ -926,6 +933,7 @@ export default function CharacterSheet() {
                         background={character.background}
                         playerName={character.playerName}
                         alignment={character.alignment}
+                        creatureType={character.creatureType || 'Humanoid'}
                         onUpdateRace={race => updateCharacter({ race })}
                         onUpdateClass={updateClass}
                         onUpdateLevel={updateLevel}
@@ -937,6 +945,9 @@ export default function CharacterSheet() {
                         }
                         onUpdateAlignment={alignment =>
                           updateCharacter({ alignment })
+                        }
+                        onUpdateCreatureType={creatureType =>
+                          updateCharacter({ creatureType })
                         }
                         onAddClassLevel={addClassLevel}
                         onRemoveClassLevel={removeClassLevel}
@@ -1186,6 +1197,7 @@ export default function CharacterSheet() {
                           onUpdateInitiative={updateInitiative}
                           onResetInitiativeToDefault={resetInitiativeToDefault}
                           onUpdateSpeed={speed => updateCharacter({ speed })}
+                          onUpdateCharacter={updateCharacter}
                           onToggleReaction={toggleReaction}
                           onResetReaction={resetReaction}
                           onRollInitiative={rollInitiative}

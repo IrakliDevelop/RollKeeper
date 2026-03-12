@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { SaveIndicator } from '@/components/ui/feedback/SaveIndicator';
+import { Badge } from '@/components/ui/layout/badge';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
@@ -25,6 +26,8 @@ interface CharacterSheetHeaderProps {
   characterRace: string;
   characterClass: string;
   characterLevel: number;
+  characterAlignment: string;
+  characterCreatureType: string;
   saveStatus: 'saving' | 'saved' | 'error';
   lastSaved: Date | string | null;
   hasUnsavedChanges: boolean;
@@ -46,6 +49,8 @@ export default function CharacterSheetHeader({
   characterRace,
   characterClass,
   characterLevel,
+  characterAlignment,
+  characterCreatureType,
   saveStatus,
   lastSaved,
   hasUnsavedChanges,
@@ -272,6 +277,33 @@ export default function CharacterSheetHeader({
                     {characterName || 'Unnamed Character'}
                   </h2>
                 )}
+                {/* Identity line */}
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  {characterRace && (
+                    <span className="text-body text-sm">{characterRace}</span>
+                  )}
+                  {characterRace && characterClass && (
+                    <span className="text-faint">·</span>
+                  )}
+                  {characterClass && (
+                    <Badge variant="info">{characterClass}</Badge>
+                  )}
+                  {characterCreatureType &&
+                    characterCreatureType !== 'Humanoid' && (
+                      <>
+                        <span className="text-faint">·</span>
+                        <Badge variant="neutral">{characterCreatureType}</Badge>
+                      </>
+                    )}
+                  {characterAlignment && (
+                    <>
+                      <span className="text-faint">·</span>
+                      <span className="text-muted text-sm">
+                        {characterAlignment}
+                      </span>
+                    </>
+                  )}
+                </div>
                 <SaveIndicator
                   status={saveStatus}
                   lastSaved={lastSaved}

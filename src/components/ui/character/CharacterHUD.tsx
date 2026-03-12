@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Heart,
   Shield,
@@ -16,6 +16,9 @@ import {
   Minus,
   X,
   AlertCircle,
+  Bird,
+  Mountain,
+  Waves,
 } from 'lucide-react';
 import { CharacterState } from '@/types/character';
 import {
@@ -35,6 +38,7 @@ interface CharacterHUDProps {
   onToggleReaction: () => void;
   onStopConcentration: () => void;
   onNavigateToConditions?: () => void;
+  onUpdateCharacter?: (updates: Partial<CharacterState>) => void;
 }
 
 export default function CharacterHUD({
@@ -47,6 +51,7 @@ export default function CharacterHUD({
   onToggleReaction,
   onStopConcentration,
   onNavigateToConditions,
+  onUpdateCharacter,
 }: CharacterHUDProps) {
   const totalLevel = character.totalLevel || character.level;
   const proficiencyBonus = getProficiencyBonus(totalLevel);
@@ -126,10 +131,9 @@ export default function CharacterHUD({
           />
 
           {/* Speed */}
-          <StatChip
-            icon={<Footprints className="h-5 w-5 text-emerald-500" />}
-            value={`${character.speed}ft`}
-            label="Spd"
+          <SpeedChip
+            character={character}
+            onUpdateCharacter={onUpdateCharacter}
           />
 
           {/* Proficiency Bonus */}
@@ -285,6 +289,157 @@ function StatChip({
       <span className="text-faint hidden text-xs uppercase sm:inline">
         {label}
       </span>
+    </div>
+  );
+}
+
+function SpeedChip({
+  character,
+  onUpdateCharacter,
+}: {
+  character: CharacterState;
+  onUpdateCharacter?: (updates: Partial<CharacterState>) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  const hasExtraSpeeds = !!(
+    character.flySpeed ||
+    character.climbSpeed ||
+    character.swimSpeed
+  );
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  return (
+    <div className="relative" ref={popoverRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="border-divider hover:bg-surface-hover flex items-center gap-1.5 rounded-lg border px-3 py-2.5 transition-colors"
+        title="Click to edit speeds"
+      >
+        <Footprints className="h-5 w-5 text-emerald-500" />
+        <span className="text-heading text-lg font-bold">
+          {character.speed}ft
+        </span>
+        {hasExtraSpeeds && (
+          <div className="text-muted flex items-center gap-1 text-xs">
+            {!!character.flySpeed && (
+              <span
+                className="flex items-center gap-0.5"
+                title={`Fly ${character.flySpeed}ft`}
+              >
+                <Bird size={10} />
+                {character.flySpeed}
+              </span>
+            )}
+            {!!character.climbSpeed && (
+              <span
+                className="flex items-center gap-0.5"
+                title={`Climb ${character.climbSpeed}ft`}
+              >
+                <Mountain size={10} />
+                {character.climbSpeed}
+              </span>
+            )}
+            {!!character.swimSpeed && (
+              <span
+                className="flex items-center gap-0.5"
+                title={`Swim ${character.swimSpeed}ft`}
+              >
+                <Waves size={10} />
+                {character.swimSpeed}
+              </span>
+            )}
+          </div>
+        )}
+        <span className="text-faint hidden text-xs uppercase sm:inline">
+          Spd
+        </span>
+      </button>
+
+      {isOpen && onUpdateCharacter && (
+        <div className="bg-surface-raised border-divider absolute top-full left-0 z-50 mt-1 w-56 rounded-lg border p-3 shadow-lg">
+          <div className="space-y-2">
+            <SpeedRow
+              icon={<Footprints size={14} className="text-emerald-500" />}
+              label="Walk"
+              value={character.speed}
+              onChange={v => onUpdateCharacter({ speed: v })}
+            />
+            <SpeedRow
+              icon={<Bird size={14} className="text-emerald-500" />}
+              label="Fly"
+              value={character.flySpeed || 0}
+              onChange={v => onUpdateCharacter({ flySpeed: v })}
+            />
+            <SpeedRow
+              icon={<Mountain size={14} className="text-emerald-500" />}
+              label="Climb"
+              value={character.climbSpeed || 0}
+              onChange={v => onUpdateCharacter({ climbSpeed: v })}
+            />
+            <SpeedRow
+              icon={<Waves size={14} className="text-emerald-500" />}
+              label="Swim"
+              value={character.swimSpeed || 0}
+              onChange={v => onUpdateCharacter({ swimSpeed: v })}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SpeedRow({
+  icon,
+  label,
+  value,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {icon}
+      <span className="text-body w-12 text-xs font-medium">{label}</span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onChange(Math.max(0, value - 5))}
+          className="text-muted hover:text-body hover:bg-surface-hover rounded p-0.5 transition-colors"
+        >
+          <Minus size={12} />
+        </button>
+        <input
+          type="number"
+          value={value}
+          onChange={e => onChange(Math.max(0, parseInt(e.target.value) || 0))}
+          className="text-heading bg-surface-secondary w-14 [appearance:textfield] rounded px-1.5 py-0.5 text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        />
+        <button
+          onClick={() => onChange(value + 5)}
+          className="text-muted hover:text-body hover:bg-surface-hover rounded p-0.5 transition-colors"
+        >
+          <Plus size={12} />
+        </button>
+        <span className="text-faint text-xs">ft</span>
+      </div>
     </div>
   );
 }

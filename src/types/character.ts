@@ -550,6 +550,7 @@ export interface CharacterState {
   experience: number;
   background: string;
   alignment: string;
+  creatureType: string;
   playerName: string;
 
   // Ability Scores
@@ -587,6 +588,9 @@ export interface CharacterState {
   initiative: InitiativeData;
   reaction: ReactionData;
   speed: number;
+  flySpeed?: number;
+  climbSpeed?: number;
+  swimSpeed?: number;
   hitDice: string; // e.g., "1d8", "2d6" (for backwards compatibility)
 
   // Saving Throws

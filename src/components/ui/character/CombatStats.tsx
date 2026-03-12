@@ -1,6 +1,7 @@
 'use client';
 
-import { RotateCcw } from 'lucide-react';
+import { useState } from 'react';
+import { RotateCcw, Plus, X, Bird, Mountain, Waves } from 'lucide-react';
 import { formatModifier } from '@/utils/calculations';
 import { Button, Input, Switch } from '@/components/ui/forms';
 import { CharacterState } from '@/types/character';
@@ -11,6 +12,7 @@ interface CombatStatsProps {
   onUpdateInitiative: (value: number, isOverridden: boolean) => void;
   onResetInitiativeToDefault: () => void;
   onUpdateSpeed: (speed: number) => void;
+  onUpdateCharacter: (updates: Partial<CharacterState>) => void;
   onToggleReaction: () => void;
   onResetReaction: () => void;
   onRollInitiative: () => void;
@@ -22,10 +24,14 @@ export default function CombatStats({
   onUpdateInitiative,
   onResetInitiativeToDefault,
   onUpdateSpeed,
+  onUpdateCharacter,
   onToggleReaction,
   onResetReaction,
   onRollInitiative,
 }: CombatStatsProps) {
+  const [showExtraSpeeds, setShowExtraSpeeds] = useState(
+    !!(character.flySpeed || character.climbSpeed || character.swimSpeed)
+  );
   return (
     <>
       {/* Initiative and Speed Row */}
@@ -85,8 +91,21 @@ export default function CombatStats({
         {/* Speed */}
         <div className="text-center">
           <div className="border-accent-green-border bg-accent-green-bg flex h-20 flex-col justify-center rounded-lg border-2 p-3">
-            <div className="text-accent-green-text mb-1 text-xs font-medium">
+            <div className="text-accent-green-text mb-1 flex items-center justify-center gap-1 text-xs font-medium">
               SPEED
+              <Button
+                onClick={() => setShowExtraSpeeds(!showExtraSpeeds)}
+                variant="ghost"
+                size="xs"
+                className="text-accent-green-text-muted hover:text-accent-green-text ml-1 h-4 w-4 p-0"
+                title={
+                  showExtraSpeeds
+                    ? 'Hide extra speeds'
+                    : 'Add fly/climb/swim speeds'
+                }
+              >
+                {showExtraSpeeds ? <X size={10} /> : <Plus size={10} />}
+              </Button>
             </div>
             <Input
               type="number"
@@ -97,6 +116,57 @@ export default function CombatStats({
           </div>
         </div>
       </div>
+
+      {/* Extra Speeds */}
+      {showExtraSpeeds && (
+        <div className="mb-6 grid grid-cols-3 gap-3">
+          <div className="border-accent-green-border bg-accent-green-bg rounded-lg border p-2 text-center">
+            <div className="text-accent-green-text-muted mb-1 flex items-center justify-center gap-1 text-xs font-medium">
+              <Bird size={12} />
+              FLY
+            </div>
+            <Input
+              type="number"
+              value={(character.flySpeed || 0).toString()}
+              onChange={e =>
+                onUpdateCharacter({ flySpeed: parseInt(e.target.value) || 0 })
+              }
+              className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              placeholder="0"
+            />
+          </div>
+          <div className="border-accent-green-border bg-accent-green-bg rounded-lg border p-2 text-center">
+            <div className="text-accent-green-text-muted mb-1 flex items-center justify-center gap-1 text-xs font-medium">
+              <Mountain size={12} />
+              CLIMB
+            </div>
+            <Input
+              type="number"
+              value={(character.climbSpeed || 0).toString()}
+              onChange={e =>
+                onUpdateCharacter({ climbSpeed: parseInt(e.target.value) || 0 })
+              }
+              className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              placeholder="0"
+            />
+          </div>
+          <div className="border-accent-green-border bg-accent-green-bg rounded-lg border p-2 text-center">
+            <div className="text-accent-green-text-muted mb-1 flex items-center justify-center gap-1 text-xs font-medium">
+              <Waves size={12} />
+              SWIM
+            </div>
+            <Input
+              type="number"
+              value={(character.swimSpeed || 0).toString()}
+              onChange={e =>
+                onUpdateCharacter({ swimSpeed: parseInt(e.target.value) || 0 })
+              }
+              className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              placeholder="0"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Reaction Tracking */}
       <div className="mb-6">

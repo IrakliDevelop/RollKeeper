@@ -290,6 +290,7 @@ export function createTabbedSheetConfig(
               background={character.background}
               playerName={character.playerName}
               alignment={character.alignment}
+              creatureType={character.creatureType || 'Humanoid'}
               onUpdateRace={race => params.updateCharacter({ race })}
               onUpdateClass={params.updateClass}
               onUpdateLevel={params.updateLevel}
@@ -301,6 +302,9 @@ export function createTabbedSheetConfig(
               }
               onUpdateAlignment={alignment =>
                 params.updateCharacter({ alignment })
+              }
+              onUpdateCreatureType={creatureType =>
+                params.updateCharacter({ creatureType })
               }
               onAddClassLevel={params.addClassLevel}
               onRemoveClassLevel={params.removeClassLevel}
@@ -404,6 +408,7 @@ export function createTabbedSheetConfig(
                 onUpdateInitiative={params.updateInitiative}
                 onResetInitiativeToDefault={params.resetInitiativeToDefault}
                 onUpdateSpeed={speed => params.updateCharacter({ speed })}
+                onUpdateCharacter={params.updateCharacter}
                 onToggleReaction={params.toggleReaction}
                 onResetReaction={params.resetReaction}
                 onRollInitiative={params.rollInitiative}
