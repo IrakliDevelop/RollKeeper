@@ -6,7 +6,7 @@ import SimpleClassSelector from '@/components/ui/character/SimpleClassSelector';
 import MulticlassManager from '@/components/ui/character/MulticlassManager';
 import { Button, Input } from '@/components/ui/forms';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
-import { ALIGNMENTS } from '@/utils/constants';
+import { ALIGNMENTS, CREATURE_TYPES } from '@/utils/constants';
 import { CharacterState } from '@/types/character';
 
 interface CharacterBasicInfoProps {
@@ -17,12 +17,14 @@ interface CharacterBasicInfoProps {
   background: string;
   playerName: string;
   alignment: string;
+  creatureType: string;
   onUpdateRace: (race: string) => void;
   onUpdateClass: (characterClass: CharacterState['class']) => void;
   onUpdateLevel: (level: number) => void;
   onUpdateBackground: (background: string) => void;
   onUpdatePlayerName: (playerName: string) => void;
   onUpdateAlignment: (alignment: string) => void;
+  onUpdateCreatureType: (creatureType: string) => void;
   // Multiclass methods
   onAddClassLevel: (
     className: string,
@@ -44,12 +46,14 @@ export default function CharacterBasicInfo({
   background,
   playerName,
   alignment,
+  creatureType,
   onUpdateRace,
   onUpdateClass,
   onUpdateLevel,
   onUpdateBackground,
   onUpdatePlayerName,
   onUpdateAlignment,
+  onUpdateCreatureType,
   onAddClassLevel,
   onRemoveClassLevel,
   onUpdateClassLevel,
@@ -161,6 +165,19 @@ export default function CharacterBasicInfo({
               {ALIGNMENTS.map(align => (
                 <SelectItem key={align} value={align}>
                   {align}
+                </SelectItem>
+              ))}
+            </SelectField>
+          </div>
+          <div>
+            <SelectField
+              label="Creature Type"
+              value={creatureType || 'Humanoid'}
+              onValueChange={onUpdateCreatureType}
+            >
+              {CREATURE_TYPES.map(type => (
+                <SelectItem key={type} value={type}>
+                  {type}
                 </SelectItem>
               ))}
             </SelectField>

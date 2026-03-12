@@ -33,6 +33,12 @@ const config: Config = {
         sans: ['var(--font-geist-sans)'],
         mono: ['var(--font-geist-mono)'],
       },
+      keyframes: {
+        'popover-in': {
+          '0%': { opacity: '0', transform: 'scaleY(0.96) translateY(-2px)' },
+          '100%': { opacity: '1', transform: 'scaleY(1) translateY(0)' },
+        },
+      },
     },
   },
   plugins: [],

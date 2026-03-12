@@ -1,8 +1,18 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { CalendarConfig, CampaignCalendar } from '@/types/calendar';
+import type {
+  CalendarConfig,
+  CalendarEvent,
+  CampaignCalendar,
+} from '@/types/calendar';
 
 const CALENDAR_STORAGE_KEY = 'rollkeeper-calendar-data';
+
+function generateEventId(): string {
+  return (
+    'evt-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9)
+  );
+}
 
 interface CalendarStoreState {
   calendars: CampaignCalendar[];
@@ -12,6 +22,22 @@ interface CalendarStoreState {
   updateConfig: (campaignCode: string, config: CalendarConfig) => void;
   setTime: (campaignCode: string, time: number) => void;
   advanceTime: (campaignCode: string, deltaMs: number) => void;
+  addEvent: (
+    campaignCode: string,
+    event: Omit<CalendarEvent, 'id' | 'createdAt'>
+  ) => void;
+  updateEvent: (
+    campaignCode: string,
+    eventId: string,
+    updates: Partial<Omit<CalendarEvent, 'id' | 'createdAt'>>
+  ) => void;
+  deleteEvent: (campaignCode: string, eventId: string) => void;
+  getEventsForDay: (
+    campaignCode: string,
+    year: number,
+    month: number,
+    day: number
+  ) => CalendarEvent[];
 }
 
 export const useCalendarStore = create<CalendarStoreState>()(
@@ -28,7 +54,7 @@ export const useCalendarStore = create<CalendarStoreState>()(
           return {
             calendars: [
               ...state.calendars,
-              { campaignCode, config, currentTime: 0 },
+              { campaignCode, config, currentTime: 0, events: [] },
             ],
           };
         });
@@ -71,11 +97,75 @@ export const useCalendarStore = create<CalendarStoreState>()(
           ),
         }));
       },
+
+      addEvent: (campaignCode, event) => {
+        const newEvent: CalendarEvent = {
+          ...event,
+          id: generateEventId(),
+          createdAt: Date.now(),
+        };
+        set(state => ({
+          calendars: state.calendars.map(c =>
+            c.campaignCode === campaignCode
+              ? { ...c, events: [...(c.events ?? []), newEvent] }
+              : c
+          ),
+        }));
+      },
+
+      updateEvent: (campaignCode, eventId, updates) => {
+        set(state => ({
+          calendars: state.calendars.map(c =>
+            c.campaignCode === campaignCode
+              ? {
+                  ...c,
+                  events: (c.events ?? []).map(e =>
+                    e.id === eventId ? { ...e, ...updates } : e
+                  ),
+                }
+              : c
+          ),
+        }));
+      },
+
+      deleteEvent: (campaignCode, eventId) => {
+        set(state => ({
+          calendars: state.calendars.map(c =>
+            c.campaignCode === campaignCode
+              ? { ...c, events: (c.events ?? []).filter(e => e.id !== eventId) }
+              : c
+          ),
+        }));
+      },
+
+      getEventsForDay: (campaignCode, year, month, day) => {
+        const calendar = get().calendars.find(
+          c => c.campaignCode === campaignCode
+        );
+        if (!calendar) return [];
+        return (calendar.events ?? [])
+          .filter(e => e.year === year && e.month === month && e.day === day)
+          .sort((a, b) => a.createdAt - b.createdAt);
+      },
     }),
     {
       name: CALENDAR_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
-      version: 1,
+      version: 2,
+      migrate: (persisted: unknown, version: number) => {
+        const state = persisted as CalendarStoreState;
+        if (version < 2) {
+          // Add events array to calendars that don't have it
+          return {
+            ...state,
+            calendars: (state.calendars ?? []).map((c: CampaignCalendar) => ({
+              ...c,
+              events: c.events ?? [],
+            })),
+          };
+        }
+        return state;
+      },
     }
   )
 );
