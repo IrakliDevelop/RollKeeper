@@ -1,18 +1,26 @@
 'use client';
 
 import { useState } from 'react';
-import { Moon, CalendarDays, List, RotateCcw, Undo2 } from 'lucide-react';
+import {
+  Moon,
+  CalendarDays,
+  List,
+  RotateCcw,
+  Undo2,
+  MapPin,
+} from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { CalendarNav } from './CalendarNav';
 import { CalendarGrid } from './CalendarGrid';
 import { EventDialog } from './EventDialog';
 import { EventListView } from './EventListView';
+import { JumpToDateDialog } from './JumpToDateDialog';
 import { useCalendar } from '@/hooks/useCalendar';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useCharacterStore } from '@/store/characterStore';
 import { CALENDAR_PRESETS } from '@/utils/calendarPresets';
-import { getMsPerDay } from '@/utils/calendarCalculations';
+import { getMsPerDay, dateToTime } from '@/utils/calendarCalculations';
 import type { SelectedDay } from './CalendarGrid';
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import type { CalendarEvent } from '@/types/calendar';
@@ -32,6 +40,8 @@ function getPresetDescription(id: string): string {
       return 'Faer\u00fbn calendar with 10-day tendays, 5 holidays';
     case 'greyhawk':
       return '7-day weeks, 12 months of 28 days, 4 festivals';
+    case 'barovia':
+      return '7-day weeks, 12 months of 28 days, 28-day moon cycle';
     default:
       return '';
   }
@@ -57,6 +67,7 @@ export function PlayerCalendarView({
   const addEvent = useCalendarStore(state => state.addEvent);
   const updateEvent = useCalendarStore(state => state.updateEvent);
   const deleteEvent = useCalendarStore(state => state.deleteEvent);
+  const setTime = useCalendarStore(state => state.setTime);
 
   const [selectedPreset, setSelectedPreset] = useState<string>(
     CALENDAR_PRESETS[0].id
@@ -69,6 +80,7 @@ export function PlayerCalendarView({
   const [selectedDay, setSelectedDay] = useState<SelectedDay | null>(null);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | undefined>();
+  const [jumpDialogOpen, setJumpDialogOpen] = useState(false);
 
   // Setup state
   if (!exists || !calendar || !date) {
@@ -218,6 +230,23 @@ export function PlayerCalendarView({
     setConfirmingReset(false);
   };
 
+  const handleJumpToDate = (year: number, month: number, day: number) => {
+    const newTime = dateToTime(
+      {
+        year,
+        month,
+        dayOfMonth: day,
+        hour: date.hour,
+        minute: date.minute,
+        second: date.second,
+      },
+      config
+    );
+    setTime(characterId, newTime);
+    setBrowseYear(null);
+    setBrowseMonth(null);
+  };
+
   const monthName =
     config.months[date.month]?.name ?? `Month ${date.month + 1}`;
   const era = config.eras.find(
@@ -239,6 +268,15 @@ export function PlayerCalendarView({
           {date.season && <Badge variant="info">{date.season.name}</Badge>}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon={<MapPin size={14} />}
+            onClick={() => setJumpDialogOpen(true)}
+            title="Jump to a specific date"
+          >
+            Jump
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -356,6 +394,14 @@ export function PlayerCalendarView({
         event={editingEvent}
         config={config}
         defaultDate={selectedDay ?? undefined}
+      />
+
+      <JumpToDateDialog
+        open={jumpDialogOpen}
+        onClose={() => setJumpDialogOpen(false)}
+        onJump={handleJumpToDate}
+        config={config}
+        currentDate={date}
       />
     </div>
   );
