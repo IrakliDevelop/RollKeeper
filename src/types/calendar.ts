@@ -75,6 +75,7 @@ export interface CampaignCalendar {
   campaignCode: string;
   config: CalendarConfig;
   currentTime: number; // milliseconds since epoch
+  startTime: number; // milliseconds since epoch — campaign start reference
   events: CalendarEvent[];
 }
 

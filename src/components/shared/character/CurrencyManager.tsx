@@ -12,37 +12,48 @@ const CURRENCY_TYPES: {
     name: string;
     abbr: string;
     color: string;
+    boxClasses: string;
     badgeVariant: 'secondary' | 'warning' | 'success' | 'neutral' | 'danger';
   };
 } = {
   platinum: {
     name: 'Platinum',
     abbr: 'pp',
-    color: 'text-body',
+    color: 'text-indigo-900 dark:text-indigo-100',
+    boxClasses:
+      'border-slate-200 bg-gradient-to-b from-white to-slate-50 dark:border-slate-500 dark:from-slate-700 dark:to-slate-750',
     badgeVariant: 'neutral',
   },
   gold: {
     name: 'Gold',
     abbr: 'gp',
-    color: 'text-yellow-700',
+    color: 'text-amber-900 dark:text-amber-200',
+    boxClasses:
+      'border-accent-amber-border from-accent-amber-bg to-accent-amber-bg-strong',
     badgeVariant: 'warning',
   },
   electrum: {
     name: 'Electrum',
     abbr: 'ep',
-    color: 'text-green-700',
+    color: 'text-emerald-900 dark:text-emerald-200',
+    boxClasses:
+      'border-accent-emerald-border from-accent-emerald-bg to-accent-emerald-bg-strong',
     badgeVariant: 'success',
   },
   silver: {
     name: 'Silver',
     abbr: 'sp',
-    color: 'text-body',
+    color: 'text-blue-900 dark:text-blue-100',
+    boxClasses:
+      'border-slate-200 bg-gradient-to-b from-gray-50 to-slate-100 dark:border-slate-500 dark:from-slate-600 dark:to-slate-700',
     badgeVariant: 'secondary',
   },
   copper: {
     name: 'Copper',
     abbr: 'cp',
-    color: 'text-orange-700',
+    color: 'text-orange-900 dark:text-orange-200',
+    boxClasses:
+      'border-accent-orange-border from-accent-orange-bg to-accent-orange-bg-strong',
     badgeVariant: 'danger',
   },
 };
@@ -100,30 +111,18 @@ export function CurrencyManager({
     0
   );
 
-  // Convert total wealth to the most appropriate denominations
+  // Convert total wealth to gold-based denominations
   const getWealthBreakdown = (totalCopper: number) => {
     if (totalCopper === 0) return 'No wealth';
 
     const breakdown = [];
     let remaining = totalCopper;
 
-    // Convert to highest denominations first
-    if (remaining >= CURRENCY_VALUES.platinum) {
-      const pp = Math.floor(remaining / CURRENCY_VALUES.platinum);
-      breakdown.push(`${pp} pp`);
-      remaining %= CURRENCY_VALUES.platinum;
-    }
-
+    // Use gold as the primary denomination
     if (remaining >= CURRENCY_VALUES.gold) {
       const gp = Math.floor(remaining / CURRENCY_VALUES.gold);
       breakdown.push(`${gp} gp`);
       remaining %= CURRENCY_VALUES.gold;
-    }
-
-    if (remaining >= CURRENCY_VALUES.electrum) {
-      const ep = Math.floor(remaining / CURRENCY_VALUES.electrum);
-      breakdown.push(`${ep} ep`);
-      remaining %= CURRENCY_VALUES.electrum;
     }
 
     if (remaining >= CURRENCY_VALUES.silver) {
@@ -136,8 +135,7 @@ export function CurrencyManager({
       breakdown.push(`${remaining} cp`);
     }
 
-    // Show up to 3 most significant denominations
-    return breakdown.slice(0, 3).join(', ');
+    return breakdown.join(', ');
   };
 
   const handleCurrencyChange = (type: keyof Currency, value: string) => {
@@ -208,7 +206,7 @@ export function CurrencyManager({
               {Object.entries(CURRENCY_TYPES).map(([type, config]) => (
                 <div key={type} className="text-center">
                   <div
-                    className={`border-accent-amber-border from-accent-amber-bg to-accent-amber-bg-strong hover:border-accent-amber-border-strong rounded-lg border-2 bg-gradient-to-b transition-all hover:shadow-md ${compact ? 'p-3' : 'p-4'}`}
+                    className={`rounded-lg border-2 bg-gradient-to-b transition-all hover:shadow-md ${config.boxClasses} ${compact ? 'p-3' : 'p-4'}`}
                   >
                     <div
                       className={`font-bold ${config.color} ${compact ? 'mb-1 text-2xl' : 'mb-2 text-4xl'}`}

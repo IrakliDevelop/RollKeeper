@@ -73,7 +73,7 @@ import NotHydrated from '@/components/ui/feedback/NotHydrated';
 import CharacterHUD from '@/components/ui/character/CharacterHUD';
 import RestDialog from '@/components/ui/character/RestDialog';
 import { useCalendarStore } from '@/store/calendarStore';
-import { getMsPerDay } from '@/utils/calendarCalculations';
+import { getMsPerDay, getCampaignDays } from '@/utils/calendarCalculations';
 import TabbedCharacterSheet from '@/components/ui/character/TabbedCharacterSheet';
 import type { TabbedCharacterSheetRef } from '@/components/ui/character/TabbedCharacterSheet';
 import NewLayoutPromptDialog from '@/components/ui/character/NewLayoutPromptDialog';
@@ -207,6 +207,18 @@ export default function CharacterSheet() {
     levelUpAnimationLevel,
     clearLevelUpAnimation,
   } = useCharacterStore();
+
+  // Derive campaign days from calendar if it exists
+  const playerCalendar = useCalendarStore(state =>
+    state.calendars.find(c => c.campaignCode === characterId)
+  );
+  const calendarDays = playerCalendar
+    ? getCampaignDays(
+        playerCalendar.currentTime,
+        playerCalendar.startTime ?? 0,
+        playerCalendar.config
+      )
+    : null;
 
   const handleAddSpellsFromFeat = useCallback(
     (spells: Spell[]) => {
@@ -687,6 +699,7 @@ export default function CharacterSheet() {
             {/* Character HUD — visible in both layouts */}
             <CharacterHUD
               character={character}
+              calendarDays={calendarDays}
               onShortRest={() => setPendingRestType('short')}
               onLongRest={() => setPendingRestType('long')}
               onIncrementDays={incrementDaysSpent}
@@ -829,6 +842,7 @@ export default function CharacterSheet() {
                   deleteNote={deleteNote}
                   reorderNotes={reorderNotes}
                   addToast={addToast}
+                  calendarDays={calendarDays}
                 />
               </main>
             ) : (
@@ -873,7 +887,7 @@ export default function CharacterSheet() {
                   badge={
                     <div className="flex items-center gap-2">
                       <span className="bg-accent-amber-bg-strong text-accent-amber-text-muted rounded-md px-2 py-0.5 text-xs font-medium">
-                        Day {character.daysSpent || 0}
+                        Day {calendarDays ?? character.daysSpent ?? 0}
                       </span>
                       <span className="bg-accent-blue-bg-strong text-accent-blue-text-muted rounded-md px-2 py-0.5 text-xs font-medium">
                         Short Rest
@@ -1403,6 +1417,7 @@ export default function CharacterSheet() {
                       deleteNote,
                       reorderNotes,
                       addToast,
+                      calendarDays,
                     })}
                     ref={tabsRef}
                   />
