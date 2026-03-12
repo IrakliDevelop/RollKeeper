@@ -40,6 +40,10 @@ export function campaignSharedKey(code: string, feature: string): string {
   return `campaign:${code}:shared:${feature}`;
 }
 
+export function campaignMessagesKey(code: string, playerId: string): string {
+  return `campaign:${code}:messages:${playerId}`;
+}
+
 export async function refreshCampaignTTL(
   redis: Redis,
   code: string

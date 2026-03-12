@@ -16,10 +16,12 @@ interface UseSharedCampaignStateResult {
   loading: boolean;
   error: string | null;
   lastFetched: Date | null;
+  acknowledgeMessage: (messageId: string) => Promise<void>;
 }
 
 export function useSharedCampaignState(
-  campaignCode: string | null | undefined
+  campaignCode: string | null | undefined,
+  playerId?: string | null
 ): UseSharedCampaignStateResult {
   const [sharedState, setSharedState] = useState<SharedCampaignState | null>(
     null
@@ -34,9 +36,9 @@ export function useSharedCampaignState(
   const fetchSharedState = useCallback(async () => {
     if (!campaignCode) return;
     try {
-      const res = await fetch(
-        `/api/campaign/${campaignCode}/shared?role=player`
-      );
+      const params = new URLSearchParams({ role: 'player' });
+      if (playerId) params.set('playerId', playerId);
+      const res = await fetch(`/api/campaign/${campaignCode}/shared?${params}`);
       if (!res.ok) {
         throw new Error('Failed to fetch shared state');
       }
@@ -51,7 +53,7 @@ export function useSharedCampaignState(
     } finally {
       setLoading(false);
     }
-  }, [campaignCode]);
+  }, [campaignCode, playerId]);
 
   const stopPolling = useCallback(() => {
     if (intervalRef.current) {
@@ -144,5 +146,29 @@ export function useSharedCampaignState(
     };
   }, [campaignCode, fetchSharedState, startPolling, stopPolling]);
 
-  return { sharedState, loading, error, lastFetched };
+  const acknowledgeMessage = useCallback(
+    async (messageId: string) => {
+      if (!campaignCode || !playerId) return;
+      try {
+        await fetch(`/api/campaign/${campaignCode}/shared`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId, messageId }),
+        });
+        // Optimistically remove from local state
+        setSharedState(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            messages: prev.messages.filter(m => m.id !== messageId),
+          };
+        });
+      } catch (err) {
+        console.error('Failed to acknowledge message:', err);
+      }
+    },
+    [campaignCode, playerId]
+  );
+
+  return { sharedState, loading, error, lastFetched, acknowledgeMessage };
 }

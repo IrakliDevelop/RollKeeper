@@ -583,94 +583,7 @@ export function createTabbedSheetConfig(
       id: 'character',
       label: 'Character',
       icon: '📋',
-      content: (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <ErrorBoundary
-              fallback={
-                <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                  <p className="text-muted">Unable to load features editor</p>
-                </div>
-              }
-            >
-              <FeaturesTraitsManager
-                items={character.features}
-                category="feature"
-                onAdd={params.addFeature}
-                onUpdate={params.updateFeature}
-                onDelete={params.deleteFeature}
-              />
-            </ErrorBoundary>
-            <ErrorBoundary
-              fallback={
-                <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                  <p className="text-muted">Unable to load traits editor</p>
-                </div>
-              }
-            >
-              <FeaturesTraitsManager
-                items={character.traits}
-                category="trait"
-                onAdd={params.addTrait}
-                onUpdate={params.updateTrait}
-                onDelete={params.deleteTrait}
-              />
-            </ErrorBoundary>
-          </div>
-
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <p className="text-muted">Unable to load background editor</p>
-              </div>
-            }
-          >
-            <CharacterBackgroundEditor
-              background={character.characterBackground}
-              onChange={params.updateCharacterBackground}
-            />
-          </ErrorBoundary>
-
-          {(() => {
-            const days = params.calendarDays ?? character.daysSpent ?? 0;
-            return (
-              <div className="text-body flex items-center gap-2 text-sm">
-                <span className="border-accent-amber-border text-accent-amber-text inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] px-3 py-1 font-medium shadow-sm">
-                  <span className="text-base">📅</span>
-                  Campaign Day {days}
-                </span>
-                <span className="text-faint">•</span>
-                <span className="text-muted">
-                  {Math.floor(days / 7) > 0 ? (
-                    <>
-                      Week {Math.floor(days / 7) + 1}, Day {(days % 7) + 1}
-                    </>
-                  ) : (
-                    `Day ${days + 1} of the adventure`
-                  )}
-                </span>
-              </div>
-            );
-          })()}
-
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-blue-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <p className="text-muted">Unable to load notes editor</p>
-              </div>
-            }
-          >
-            <NotesManager
-              items={character.notes}
-              onAdd={params.addNote}
-              onUpdate={params.updateNote}
-              onDelete={params.deleteNote}
-              onReorder={params.reorderNotes}
-              onAddToast={params.addToast}
-            />
-          </ErrorBoundary>
-        </div>
-      ),
+      content: <CharacterTabContent character={character} params={params} />,
     },
 
     // Tab 8: Calendar
@@ -789,6 +702,151 @@ function InventoryTabContent({ character }: { character: CharacterState }) {
         >
           <CurrencyManager />
         </ErrorBoundary>
+      )}
+    </div>
+  );
+}
+
+const CHARACTER_SUB_TABS = [
+  { id: 'notes', label: 'Session Notes', icon: '📝' },
+  { id: 'details', label: 'Features & Background', icon: '📋' },
+] as const;
+
+type CharacterSubTab = (typeof CHARACTER_SUB_TABS)[number]['id'];
+
+// Global setter so external code (e.g. DM message accept) can switch to the notes sub-tab
+let characterSubTabSetter: ((tab: CharacterSubTab) => void) | null = null;
+export function setCharacterSubTab(tab: CharacterSubTab) {
+  characterSubTabSetter?.(tab);
+}
+
+function CharacterTabContent({
+  character,
+  params,
+}: {
+  character: CharacterState;
+  params: TabbedSheetConfigParams;
+}) {
+  const [activeSubTab, setActiveSubTab] = useState<CharacterSubTab>('notes');
+
+  // Register the setter so external code can switch sub-tabs
+  React.useEffect(() => {
+    characterSubTabSetter = setActiveSubTab;
+    return () => {
+      characterSubTabSetter = null;
+    };
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-surface-secondary inline-flex rounded-lg p-1">
+        {CHARACTER_SUB_TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveSubTab(tab.id)}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition-all ${
+              activeSubTab === tab.id
+                ? 'bg-surface-raised text-heading shadow-sm'
+                : 'text-muted hover:text-body'
+            }`}
+          >
+            <span className="mr-1.5">{tab.icon}</span>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeSubTab === 'notes' && (
+        <div className="space-y-6">
+          {(() => {
+            const days = params.calendarDays ?? character.daysSpent ?? 0;
+            return (
+              <div className="text-body flex items-center gap-2 text-sm">
+                <span className="border-accent-amber-border text-accent-amber-text inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] px-3 py-1 font-medium shadow-sm">
+                  <span className="text-base">📅</span>
+                  Campaign Day {days}
+                </span>
+                <span className="text-faint">•</span>
+                <span className="text-muted">
+                  {Math.floor(days / 7) > 0 ? (
+                    <>
+                      Week {Math.floor(days / 7) + 1}, Day {(days % 7) + 1}
+                    </>
+                  ) : (
+                    `Day ${days + 1} of the adventure`
+                  )}
+                </span>
+              </div>
+            );
+          })()}
+
+          <ErrorBoundary
+            fallback={
+              <div className="border-accent-blue-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                <p className="text-muted">Unable to load notes editor</p>
+              </div>
+            }
+          >
+            <NotesManager
+              items={character.notes}
+              onAdd={params.addNote}
+              onUpdate={params.updateNote}
+              onDelete={params.deleteNote}
+              onReorder={params.reorderNotes}
+              onAddToast={params.addToast}
+            />
+          </ErrorBoundary>
+        </div>
+      )}
+
+      {activeSubTab === 'details' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ErrorBoundary
+              fallback={
+                <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                  <p className="text-muted">Unable to load features editor</p>
+                </div>
+              }
+            >
+              <FeaturesTraitsManager
+                items={character.features}
+                category="feature"
+                onAdd={params.addFeature}
+                onUpdate={params.updateFeature}
+                onDelete={params.deleteFeature}
+              />
+            </ErrorBoundary>
+            <ErrorBoundary
+              fallback={
+                <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                  <p className="text-muted">Unable to load traits editor</p>
+                </div>
+              }
+            >
+              <FeaturesTraitsManager
+                items={character.traits}
+                category="trait"
+                onAdd={params.addTrait}
+                onUpdate={params.updateTrait}
+                onDelete={params.deleteTrait}
+              />
+            </ErrorBoundary>
+          </div>
+
+          <ErrorBoundary
+            fallback={
+              <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                <p className="text-muted">Unable to load background editor</p>
+              </div>
+            }
+          >
+            <CharacterBackgroundEditor
+              background={character.characterBackground}
+              onChange={params.updateCharacterBackground}
+            />
+          </ErrorBoundary>
+        </div>
       )}
     </div>
   );

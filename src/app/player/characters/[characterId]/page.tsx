@@ -8,6 +8,7 @@ import { useCharacterStore } from '@/store/characterStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { usePlayerSync } from '@/hooks/usePlayerSync';
 import { SyncIndicator } from '@/components/ui/campaign/SyncIndicator';
+import { DmMessageNotification } from '@/components/ui/campaign/DmMessageNotification';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
 
@@ -77,6 +78,7 @@ import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
 import { getMsPerDay, getCampaignDays } from '@/utils/calendarCalculations';
 import TabbedCharacterSheet from '@/components/ui/character/TabbedCharacterSheet';
 import type { TabbedCharacterSheetRef } from '@/components/ui/character/TabbedCharacterSheet';
+import { setCharacterSubTab } from '@/components/ui/character/tabbedSheetConfig';
 import NewLayoutPromptDialog from '@/components/ui/character/NewLayoutPromptDialog';
 
 export default function CharacterSheet() {
@@ -236,7 +238,10 @@ export default function CharacterSheet() {
   const playerSync = usePlayerSync({ characterId });
 
   // Shared DM calendar state (when in a campaign)
-  const { sharedState } = useSharedCampaignState(playerSync.campaignCode);
+  const { sharedState, acknowledgeMessage } = useSharedCampaignState(
+    playerSync.campaignCode,
+    characterId
+  );
   const sharedCalendar = sharedState?.calendar ?? null;
 
   const calendarDays = sharedCalendar
@@ -724,6 +729,32 @@ export default function CharacterSheet() {
               onNavigateToConditions={() => switchToTab('conditions')}
               onUpdateCharacter={updateCharacter}
             />
+
+            {/* DM Message Notifications */}
+            {(sharedState?.messages?.length ?? 0) > 0 && (
+              <DmMessageNotification
+                messages={sharedState!.messages}
+                onAccept={msg => {
+                  addNote({
+                    title: `[DM] ${msg.title}`,
+                    content: msg.content,
+                    category: 'note',
+                  });
+                  acknowledgeMessage(msg.id);
+                  switchToTab('character');
+                  setCharacterSubTab('notes');
+                  addToast({
+                    type: 'success',
+                    title: 'Message saved',
+                    message: `"${msg.title}" has been added to your notes`,
+                    duration: 4000,
+                  });
+                }}
+                onDismiss={messageId => {
+                  acknowledgeMessage(messageId);
+                }}
+              />
+            )}
 
             {/* Rest Dialog triggered from HUD */}
             <RestDialog

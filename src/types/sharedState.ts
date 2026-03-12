@@ -16,17 +16,23 @@ export interface SharedCalendarPlayer {
   updatedAt: string;
 }
 
+// DM-to-player message stored in Redis
+export interface DmMessage {
+  id: string;
+  title: string;
+  content: string; // HTML rich text
+  sentAt: string; // ISO timestamp
+}
+
 // Full shared state envelope returned by GET
 export interface SharedCampaignState {
   calendar: SharedCalendarPlayer | null;
-  // Future features:
-  // encounter: SharedEncounter | null;
-  // announcements: SharedAnnouncement[] | null;
+  messages: DmMessage[];
 }
 
 // POST body for DM pushing shared state
 export interface SharedStateUpdateRequest {
-  feature: string; // 'calendar' | 'encounter' | ...
+  feature: string; // 'calendar' | 'message' | ...
   data: unknown;
   dmId: string;
 }
