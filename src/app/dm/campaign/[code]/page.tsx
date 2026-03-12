@@ -13,12 +13,14 @@ import {
   Swords,
   Angry,
   CalendarDays,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { PlayerSummaryCard } from '@/components/ui/campaign/PlayerSummaryCard';
 import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
+import { SendMessageDialog } from '@/components/ui/campaign/SendMessageDialog';
 import { NPCSection } from '@/components/ui/campaign/NPCSection';
 import { useCampaignSync } from '@/hooks/useCampaignSync';
 import { useDmStore } from '@/store/dmStore';
@@ -48,6 +50,9 @@ export default function CampaignViewPage() {
     useState<CampaignPlayerData | null>(null);
   const [editingCounterLabel, setEditingCounterLabel] = useState(false);
   const [counterLabelInput, setCounterLabelInput] = useState('');
+  const [messageTarget, setMessageTarget] = useState<
+    CampaignPlayerData | null | 'all'
+  >(null);
   const { toasts, addToast, dismissToast } = useToast();
   const knownPlayerIdsRef = useRef<Set<string>>(new Set());
 
@@ -240,11 +245,21 @@ export default function CampaignViewPage() {
           <>
             {/* Players header + custom counter config */}
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Users size={20} className="text-muted" />
-                <h2 className="text-heading text-lg font-semibold">
-                  Players ({players.length})
-                </h2>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Users size={20} className="text-muted" />
+                  <h2 className="text-heading text-lg font-semibold">
+                    Players ({players.length})
+                  </h2>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<MessageSquare size={14} />}
+                  onClick={() => setMessageTarget('all')}
+                >
+                  Message All
+                </Button>
               </div>
 
               {/* Custom counter label config */}
@@ -343,8 +358,21 @@ export default function CampaignViewPage() {
                   adjustPlayerCounter(code, selectedPlayer.playerId, delta)
               : undefined
           }
+          onSendMessage={() => {
+            setMessageTarget(selectedPlayer);
+            setSelectedPlayer(null);
+          }}
         />
       )}
+
+      <SendMessageDialog
+        open={messageTarget !== null}
+        onClose={() => setMessageTarget(null)}
+        players={players}
+        targetPlayer={messageTarget === 'all' ? null : messageTarget}
+        campaignCode={code}
+        dmId={dmId}
+      />
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>

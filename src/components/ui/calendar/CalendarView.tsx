@@ -37,6 +37,7 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
     state.calendars.find(c => c.campaignCode === campaignCode)
   );
   const advanceTime = useCalendarStore(state => state.advanceTime);
+  const setCalendarTime = useCalendarStore(state => state.setTime);
   const setStartDate = useCalendarStore(state => state.setStartDate);
   const addEvent = useCalendarStore(state => state.addEvent);
   const updateEvent = useCalendarStore(state => state.updateEvent);
@@ -171,6 +172,13 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
               config={config}
               moonPhases={moonPhases}
               dayPeriod={dayPeriod}
+              onTimeEdit={(hour, minute) => {
+                const newTime = dateToTime(
+                  { ...date, hour, minute, second: 0 },
+                  config
+                );
+                setCalendarTime(campaignCode, newTime);
+              }}
             />
             <div className="flex flex-col items-end gap-2">
               <div className="flex items-center gap-2">

@@ -16,7 +16,9 @@ import {
   Link2,
   Minus,
   Plus,
+  MessageSquare,
 } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
 import {
   Dialog,
   DialogContent,
@@ -41,6 +43,7 @@ interface PlayerDetailDialogProps {
   customCounterLabel?: string;
   counterValue?: number;
   onAdjustCounter?: (delta: number) => void;
+  onSendMessage?: () => void;
 }
 
 const ABILITY_KEYS = [
@@ -123,6 +126,7 @@ export function PlayerDetailDialog({
   customCounterLabel,
   counterValue = 0,
   onAdjustCounter,
+  onSendMessage,
 }: PlayerDetailDialogProps) {
   const char = player.characterData;
   if (!char) return null;
@@ -156,10 +160,22 @@ export function PlayerDetailDialog({
               </Badge>
             </span>
           </DialogTitle>
-          <p className="text-muted text-sm">
-            {char.race || 'Unknown'} · {char.alignment || 'Unaligned'} · Player:{' '}
-            {player.playerName}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-muted text-sm">
+              {char.race || 'Unknown'} · {char.alignment || 'Unaligned'} ·
+              Player: {player.playerName}
+            </p>
+            {onSendMessage && (
+              <Button
+                variant="ghost"
+                size="sm"
+                leftIcon={<MessageSquare size={14} />}
+                onClick={onSendMessage}
+              >
+                Message
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         <DialogBody>
