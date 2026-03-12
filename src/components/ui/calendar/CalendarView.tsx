@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Settings, RotateCcw, CalendarDays, List } from 'lucide-react';
+import { Settings, RotateCcw, CalendarDays, List, MapPin } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/layout/card';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -13,8 +13,10 @@ import { CalendarGrid } from './CalendarGrid';
 import { MoonLegend } from './MoonLegend';
 import { EventDialog } from './EventDialog';
 import { EventListView } from './EventListView';
+import { JumpToDateDialog } from './JumpToDateDialog';
 import { useCalendar } from '@/hooks/useCalendar';
 import { useCalendarStore } from '@/store/calendarStore';
+import { dateToTime } from '@/utils/calendarCalculations';
 import type { SelectedDay } from './CalendarGrid';
 import type { CalendarEvent } from '@/types/calendar';
 
@@ -35,6 +37,7 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
     state.calendars.find(c => c.campaignCode === campaignCode)
   );
   const advanceTime = useCalendarStore(state => state.advanceTime);
+  const setTime = useCalendarStore(state => state.setTime);
   const addEvent = useCalendarStore(state => state.addEvent);
   const updateEvent = useCalendarStore(state => state.updateEvent);
   const deleteEvent = useCalendarStore(state => state.deleteEvent);
@@ -53,6 +56,7 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | undefined>(
     undefined
   );
+  const [jumpDialogOpen, setJumpDialogOpen] = useState(false);
 
   if (!calendar || !date) return null;
 
@@ -140,6 +144,23 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
     }
   };
 
+  const handleJumpToDate = (year: number, month: number, day: number) => {
+    const newTime = dateToTime(
+      {
+        year,
+        month,
+        dayOfMonth: day,
+        hour: date.hour,
+        minute: date.minute,
+        second: date.second,
+      },
+      config
+    );
+    setTime(campaignCode, newTime);
+    setBrowseYear(null);
+    setBrowseMonth(null);
+  };
+
   return (
     <div className="space-y-6">
       {/* Time display + controls */}
@@ -153,6 +174,14 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
               dayPeriod={dayPeriod}
             />
             <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                leftIcon={<MapPin size={16} />}
+                onClick={() => setJumpDialogOpen(true)}
+              >
+                Jump to Date
+              </Button>
               <Link href={`/dm/campaign/${campaignCode}/calendar/settings`}>
                 <Button
                   variant="ghost"
@@ -265,6 +294,15 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
         event={editingEvent}
         config={config}
         defaultDate={selectedDay ?? undefined}
+      />
+
+      {/* Jump to date dialog */}
+      <JumpToDateDialog
+        open={jumpDialogOpen}
+        onClose={() => setJumpDialogOpen(false)}
+        onJump={handleJumpToDate}
+        config={config}
+        currentDate={date}
       />
     </div>
   );

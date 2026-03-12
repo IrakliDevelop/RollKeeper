@@ -235,6 +235,81 @@ export function createGreyhawkCalendar(): CalendarConfig {
   };
 }
 
+/**
+ * Barovian calendar (Ravenloft / Curse of Strahd) homebrewed version.
+ * 12 months of 28 days each = 336 days. 4 weeks per month.
+ * Moon cycle matches month length (28 days), new moon at month start.
+ * Perpetually overcast — late sunrise, early sunset.
+ */
+export function createBarovianCalendar(): CalendarConfig {
+  return {
+    clock: { hoursPerDay: 24, minutesPerHour: 60, secondsPerMinute: 60 },
+    weekDays: [
+      { name: 'Sunday' },
+      { name: 'Monday' },
+      { name: 'Tuesday' },
+      { name: 'Wednesday' },
+      { name: 'Thursday' },
+      { name: 'Friday' },
+      { name: 'Saturday' },
+    ],
+    months: [
+      { name: 'Ynvar', days: 28 },
+      { name: 'Fivral', days: 28 },
+      { name: 'Mart', days: 28 },
+      { name: 'Aprel', days: 28 },
+      { name: 'Mai', days: 28 },
+      { name: 'Eyune', days: 28 },
+      { name: 'Eyule', days: 28 },
+      { name: 'Avgust', days: 28 },
+      { name: 'Sintyavr', days: 28 },
+      { name: 'Octyavr', days: 28 },
+      { name: 'Nayavr', days: 28 },
+      { name: 'Dekavr', days: 28 },
+    ],
+    seasons: [
+      {
+        name: 'Winter',
+        startDay: 0,
+        endDay: 83,
+        sunriseHour: 8,
+        sunsetHour: 16,
+      },
+      {
+        name: 'Spring',
+        startDay: 84,
+        endDay: 167,
+        sunriseHour: 7,
+        sunsetHour: 18,
+      },
+      {
+        name: 'Summer',
+        startDay: 168,
+        endDay: 251,
+        sunriseHour: 6,
+        sunsetHour: 19,
+      },
+      {
+        name: 'Autumn',
+        startDay: 252,
+        endDay: 335,
+        sunriseHour: 7,
+        sunsetHour: 17,
+      },
+    ],
+    moons: [{ name: 'Moon', color: '#B0B0B0', phaseOffset: 0, period: 28 }],
+    namedYears: [],
+    eras: [{ name: 'AC', abbreviation: 'AC', startYear: 1 }], // homebrew era
+    yearOffset: 1,
+    yearStartWeekdayOffset: 0,
+    mechanics: {
+      hoursPerLongRest: 8,
+      minutesPerShortRest: 60,
+      secondsPerRound: 6,
+    },
+  };
+}
+
 export const CALENDAR_PRESETS = [
   { id: 'default', name: 'Default (Simple)', create: createDefaultCalendar },
   {
@@ -243,4 +318,9 @@ export const CALENDAR_PRESETS = [
     create: createHarptosCalendar,
   },
   { id: 'greyhawk', name: 'Greyhawk (Oerth)', create: createGreyhawkCalendar },
+  {
+    id: 'barovia',
+    name: 'Barovia (Ravenloft)',
+    create: createBarovianCalendar,
+  },
 ] as const;

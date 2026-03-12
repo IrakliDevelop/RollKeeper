@@ -106,7 +106,7 @@ export default function CalendarPage() {
                 days, months, moons, and more in settings afterwards.
               </p>
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {CALENDAR_PRESETS.map(preset => (
                   <button
                     key={preset.id}
@@ -146,6 +146,8 @@ function getPresetDescription(id: string): string {
       return 'Faer\u00fbn calendar with 10-day tendays, 5 holidays, Sel\u00fbne moon';
     case 'greyhawk':
       return '7-day weeks, 12 months of 28 days, 4 festivals, 2 moons';
+    case 'barovia':
+      return '7-day weeks, 12 months of 28 days, 28-day moon cycle';
     default:
       return '';
   }
