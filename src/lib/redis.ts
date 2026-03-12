@@ -36,6 +36,10 @@ export function campaignPlayerKey(code: string, playerId: string): string {
   return `campaign:${code}:player:${playerId}`;
 }
 
+export function campaignSharedKey(code: string, feature: string): string {
+  return `campaign:${code}:shared:${feature}`;
+}
+
 export async function refreshCampaignTTL(
   redis: Redis,
   code: string

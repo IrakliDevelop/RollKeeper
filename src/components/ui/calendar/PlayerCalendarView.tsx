@@ -8,6 +8,7 @@ import {
   RotateCcw,
   Undo2,
   MapPin,
+  Link2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -19,9 +20,12 @@ import { JumpToDateDialog } from './JumpToDateDialog';
 import { useCalendar } from '@/hooks/useCalendar';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useCharacterStore } from '@/store/characterStore';
+import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
+import { useTimeAgo } from '@/hooks/useTimeAgo';
 import { CALENDAR_PRESETS } from '@/utils/calendarPresets';
 import {
   getMsPerDay,
+  timeToDate,
   dateToTime,
   getCampaignDays,
 } from '@/utils/calendarCalculations';
@@ -53,14 +57,16 @@ function getPresetDescription(id: string): string {
 
 interface PlayerCalendarViewProps {
   characterId: string;
+  campaignCode?: string;
   addToast?: (toast: Omit<ToastData, 'id'>) => void;
 }
 
 export function PlayerCalendarView({
   characterId,
+  campaignCode,
   addToast,
 }: PlayerCalendarViewProps) {
-  const { exists, date } = useCalendar(characterId);
+  const { exists, date: localDate } = useCalendar(characterId);
   const takeLongRest = useCharacterStore(state => state.takeLongRest);
   const calendar = useCalendarStore(state =>
     state.calendars.find(c => c.campaignCode === characterId)
@@ -72,6 +78,24 @@ export function PlayerCalendarView({
   const updateEvent = useCalendarStore(state => state.updateEvent);
   const deleteEvent = useCalendarStore(state => state.deleteEvent);
   const setStartDate = useCalendarStore(state => state.setStartDate);
+
+  // Shared state from DM (only when in a campaign)
+  const { sharedState, lastFetched } = useSharedCampaignState(campaignCode);
+  const sharedCalendar = sharedState?.calendar ?? null;
+  const lastFetchedAgo = useTimeAgo(lastFetched);
+
+  // Synced mode: campaign code exists AND DM has shared calendar data
+  const isSynced = !!campaignCode && !!sharedCalendar;
+
+  // Derive date and config from shared state when synced
+  const syncedDate = isSynced
+    ? timeToDate(sharedCalendar.currentTime, sharedCalendar.config)
+    : null;
+  const syncedConfig = isSynced ? sharedCalendar.config : null;
+
+  // Effective values (synced or local)
+  const date = syncedDate ?? localDate;
+  const config = syncedConfig ?? calendar?.config;
 
   const [selectedPreset, setSelectedPreset] = useState<string>(
     CALENDAR_PRESETS[0].id
@@ -86,8 +110,8 @@ export function PlayerCalendarView({
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | undefined>();
   const [jumpDialogOpen, setJumpDialogOpen] = useState(false);
 
-  // Setup state
-  if (!exists || !calendar || !date) {
+  // Setup state — only show when NOT synced and no local calendar
+  if (!isSynced && (!exists || !calendar || !localDate)) {
     const handleCreate = () => {
       const preset = CALENDAR_PRESETS.find(p => p.id === selectedPreset);
       if (!preset) return;
@@ -126,29 +150,54 @@ export function PlayerCalendarView({
     );
   }
 
+  // Guard — at this point we must have date and config
+  if (!date || !config) {
+    return (
+      <div className="text-muted py-8 text-center text-sm">
+        Waiting for calendar data from DM...
+      </div>
+    );
+  }
+
   // Active state
-  const config = calendar.config;
-  const events = calendar.events ?? [];
+  const events = isSynced ? [] : (calendar?.events ?? []);
   const displayYear = browseYear ?? date.year;
   const displayMonth = browseMonth ?? date.month;
   const isBrowsing = browseYear !== null || browseMonth !== null;
 
+  const campaignDays = isSynced
+    ? getCampaignDays(
+        sharedCalendar.currentTime,
+        sharedCalendar.startTime,
+        sharedCalendar.config
+      )
+    : calendar
+      ? getCampaignDays(calendar.currentTime, calendar.startTime ?? 0, config)
+      : 0;
+
   const handleLongRest = () => {
     takeLongRest();
-    advanceTime(characterId, getMsPerDay(config));
+    if (!isSynced) {
+      advanceTime(characterId, getMsPerDay(config));
+    }
     setBrowseYear(null);
     setBrowseMonth(null);
+    const details = [
+      'All abilities restored',
+      'All spell slots restored',
+      'Hit points fully restored',
+      'Hit dice partially restored',
+    ];
+    if (!isSynced) {
+      details.push('Calendar advanced by 1 day');
+    }
     addToast?.({
       type: 'rest',
-      title: '🌙 Long Rest Complete',
-      message: 'Your character has taken a long rest and a new day begins',
-      details: [
-        'All abilities restored',
-        'All spell slots restored',
-        'Hit points fully restored',
-        'Hit dice partially restored',
-        'Calendar advanced by 1 day',
-      ],
+      title: '\u{1F319} Long Rest Complete',
+      message:
+        'Your character has taken a long rest' +
+        (isSynced ? '' : ' and a new day begins'),
+      details,
       duration: 6000,
     });
   };
@@ -183,6 +232,7 @@ export function PlayerCalendarView({
   };
 
   const handleDayClick = (year: number, month: number, day: number) => {
+    if (isSynced) return; // No day interaction in synced mode
     if (
       selectedDay &&
       selectedDay.year === year &&
@@ -196,11 +246,13 @@ export function PlayerCalendarView({
   };
 
   const handleAddEvent = () => {
+    if (isSynced) return;
     setEditingEvent(undefined);
     setEventDialogOpen(true);
   };
 
   const handleEditEvent = (event: CalendarEvent) => {
+    if (isSynced) return;
     setEditingEvent(event);
     setEventDialogOpen(true);
   };
@@ -244,12 +296,6 @@ export function PlayerCalendarView({
     setBrowseMonth(null);
   };
 
-  const campaignDays = getCampaignDays(
-    calendar.currentTime,
-    calendar.startTime ?? 0,
-    config
-  );
-
   const monthName =
     config.months[date.month]?.name ?? `Month ${date.month + 1}`;
   const era = config.eras.find(
@@ -269,31 +315,47 @@ export function PlayerCalendarView({
             {eraStr}
           </h3>
           {date.season && <Badge variant="info">{date.season.name}</Badge>}
+          {isSynced && (
+            <>
+              <Badge variant="success">
+                <Link2 size={10} className="mr-1 inline" />
+                Synced with DM
+              </Badge>
+              {lastFetchedAgo && (
+                <span className="text-faint text-xs">{lastFetchedAgo}</span>
+              )}
+            </>
+          )}
         </div>
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              leftIcon={<MapPin size={14} />}
-              onClick={() => setJumpDialogOpen(true)}
-              title="Set campaign start date"
-            >
-              Start Date
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              leftIcon={<Undo2 size={14} />}
-              onClick={() => {
-                advanceTime(characterId, -getMsPerDay(config));
-                setBrowseYear(null);
-                setBrowseMonth(null);
-              }}
-              title="Go back one day"
-            >
-              Prev Day
-            </Button>
+            {/* Hide Start Date, Prev Day, Reset in synced mode */}
+            {!isSynced && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<MapPin size={14} />}
+                  onClick={() => setJumpDialogOpen(true)}
+                  title="Set campaign start date"
+                >
+                  Start Date
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<Undo2 size={14} />}
+                  onClick={() => {
+                    advanceTime(characterId, -getMsPerDay(config));
+                    setBrowseYear(null);
+                    setBrowseMonth(null);
+                  }}
+                  title="Go back one day"
+                >
+                  Prev Day
+                </Button>
+              </>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -302,28 +364,32 @@ export function PlayerCalendarView({
             >
               Long Rest
             </Button>
-            {confirmingReset ? (
-              <div className="flex items-center gap-1">
-                <Button variant="danger" size="sm" onClick={handleReset}>
-                  Confirm
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setConfirmingReset(false)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                leftIcon={<RotateCcw size={14} />}
-                onClick={handleReset}
-              >
-                Reset
-              </Button>
+            {!isSynced && (
+              <>
+                {confirmingReset ? (
+                  <div className="flex items-center gap-1">
+                    <Button variant="danger" size="sm" onClick={handleReset}>
+                      Confirm
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmingReset(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<RotateCcw size={14} />}
+                    onClick={handleReset}
+                  >
+                    Reset
+                  </Button>
+                )}
+              </>
             )}
           </div>
           <span className="text-muted text-xs">
@@ -332,31 +398,33 @@ export function PlayerCalendarView({
         </div>
       </div>
 
-      {/* Sub-tab switcher */}
-      <div className="bg-surface-secondary inline-flex rounded-lg p-1">
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
-              activeTab === tab.id
-                ? 'bg-surface-raised text-heading shadow-sm'
-                : 'text-muted hover:text-body'
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-            {tab.id === 'events' && events.length > 0 && (
-              <Badge variant="neutral" className="ml-1">
-                {events.length}
-              </Badge>
-            )}
-          </button>
-        ))}
-      </div>
+      {/* Sub-tab switcher — hide Events tab in synced mode */}
+      {!isSynced && (
+        <div className="bg-surface-secondary inline-flex rounded-lg p-1">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
+                activeTab === tab.id
+                  ? 'bg-surface-raised text-heading shadow-sm'
+                  : 'text-muted hover:text-body'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+              {tab.id === 'events' && events.length > 0 && (
+                <Badge variant="neutral" className="ml-1">
+                  {events.length}
+                </Badge>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Tab content */}
-      {activeTab === 'calendar' ? (
+      {activeTab === 'calendar' || isSynced ? (
         <div>
           <CalendarNav
             browseYear={displayYear}
@@ -374,11 +442,15 @@ export function PlayerCalendarView({
               config={config}
               currentDate={date}
               events={events}
-              selectedDay={selectedDay}
+              selectedDay={isSynced ? null : selectedDay}
               onDayClick={handleDayClick}
-              onAddEvent={handleAddEvent}
-              onEditEvent={handleEditEvent}
-              onDeleteEvent={eventId => deleteEvent(characterId, eventId)}
+              onAddEvent={isSynced ? undefined : handleAddEvent}
+              onEditEvent={isSynced ? undefined : handleEditEvent}
+              onDeleteEvent={
+                isSynced
+                  ? undefined
+                  : eventId => deleteEvent(characterId, eventId)
+              }
               showMoonPhases={false}
             />
           </div>
@@ -394,23 +466,27 @@ export function PlayerCalendarView({
         />
       )}
 
-      <EventDialog
-        open={eventDialogOpen}
-        onClose={() => setEventDialogOpen(false)}
-        onSave={handleSaveEvent}
-        onDelete={editingEvent ? handleDeleteEvent : undefined}
-        event={editingEvent}
-        config={config}
-        defaultDate={selectedDay ?? undefined}
-      />
+      {!isSynced && (
+        <>
+          <EventDialog
+            open={eventDialogOpen}
+            onClose={() => setEventDialogOpen(false)}
+            onSave={handleSaveEvent}
+            onDelete={editingEvent ? handleDeleteEvent : undefined}
+            event={editingEvent}
+            config={config}
+            defaultDate={selectedDay ?? undefined}
+          />
 
-      <JumpToDateDialog
-        open={jumpDialogOpen}
-        onClose={() => setJumpDialogOpen(false)}
-        onJump={handleSetStartDate}
-        config={config}
-        currentDate={date}
-      />
+          <JumpToDateDialog
+            open={jumpDialogOpen}
+            onClose={() => setJumpDialogOpen(false)}
+            onJump={handleSetStartDate}
+            config={config}
+            currentDate={date}
+          />
+        </>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, CalendarDays } from 'lucide-react';
+import { ArrowLeft, CalendarDays, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import {
   Card,
@@ -14,15 +14,23 @@ import {
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { CalendarView } from '@/components/ui/calendar/CalendarView';
 import { useCalendarStore } from '@/store/calendarStore';
+import { useDmStore } from '@/store/dmStore';
 import { useCalendar } from '@/hooks/useCalendar';
+import { useDmCalendarSync } from '@/hooks/useDmCalendarSync';
+import { useTimeAgo } from '@/hooks/useTimeAgo';
 import { CALENDAR_PRESETS } from '@/utils/calendarPresets';
 
 export default function CalendarPage() {
   const params = useParams();
   const code = params.code as string;
   const { exists } = useCalendar(code);
+  const dmId = useDmStore(state => state.dmId);
   const initCalendar = useCalendarStore(state => state.initCalendar);
   const deleteCalendar = useCalendarStore(state => state.deleteCalendar);
+
+  // Auto-push calendar changes to Redis for player sync
+  const { lastPushed, error: syncError } = useDmCalendarSync(code, dmId);
+  const lastPushedAgo = useTimeAgo(lastPushed);
 
   const [selectedPreset, setSelectedPreset] = useState<string>(
     CALENDAR_PRESETS[0].id
@@ -94,7 +102,23 @@ export default function CalendarPage() {
         )}
 
         {exists ? (
-          <CalendarView campaignCode={code} onReset={handleReset} />
+          <>
+            <CalendarView campaignCode={code} onReset={handleReset} />
+            <div className="mt-4 flex items-center gap-2 text-xs">
+              {syncError ? (
+                <span className="text-accent-red-text flex items-center gap-1">
+                  <AlertCircle size={12} />
+                  Sync error: {syncError}
+                </span>
+              ) : lastPushedAgo ? (
+                <span className="text-muted">
+                  Synced to players {lastPushedAgo}
+                </span>
+              ) : (
+                <span className="text-faint">Syncing...</span>
+              )}
+            </div>
+          </>
         ) : (
           <Card>
             <CardHeader className="p-6">

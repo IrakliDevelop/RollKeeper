@@ -73,6 +73,7 @@ import NotHydrated from '@/components/ui/feedback/NotHydrated';
 import CharacterHUD from '@/components/ui/character/CharacterHUD';
 import RestDialog from '@/components/ui/character/RestDialog';
 import { useCalendarStore } from '@/store/calendarStore';
+import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
 import { getMsPerDay, getCampaignDays } from '@/utils/calendarCalculations';
 import TabbedCharacterSheet from '@/components/ui/character/TabbedCharacterSheet';
 import type { TabbedCharacterSheetRef } from '@/components/ui/character/TabbedCharacterSheet';
@@ -208,17 +209,10 @@ export default function CharacterSheet() {
     clearLevelUpAnimation,
   } = useCharacterStore();
 
-  // Derive campaign days from calendar if it exists
+  // Derive campaign days from local calendar (may be overridden by shared state below)
   const playerCalendar = useCalendarStore(state =>
     state.calendars.find(c => c.campaignCode === characterId)
   );
-  const calendarDays = playerCalendar
-    ? getCampaignDays(
-        playerCalendar.currentTime,
-        playerCalendar.startTime ?? 0,
-        playerCalendar.config
-      )
-    : null;
 
   const handleAddSpellsFromFeat = useCallback(
     (spells: Spell[]) => {
@@ -240,6 +234,24 @@ export default function CharacterSheet() {
   const hasSeenLayoutPrompt = playerSettings?.hasSeenLayoutPrompt ?? false;
 
   const playerSync = usePlayerSync({ characterId });
+
+  // Shared DM calendar state (when in a campaign)
+  const { sharedState } = useSharedCampaignState(playerSync.campaignCode);
+  const sharedCalendar = sharedState?.calendar ?? null;
+
+  const calendarDays = sharedCalendar
+    ? getCampaignDays(
+        sharedCalendar.currentTime,
+        sharedCalendar.startTime,
+        sharedCalendar.config
+      )
+    : playerCalendar
+      ? getCampaignDays(
+          playerCalendar.currentTime,
+          playerCalendar.startTime ?? 0,
+          playerCalendar.config
+        )
+      : null;
 
   const handleAfterSave = useCallback(() => {
     if (playerSync.syncEnabled && playerSync.autoSync && character) {
@@ -723,14 +735,16 @@ export default function CharacterSheet() {
                 } else if (pendingRestType === 'long') {
                   takeLongRest();
                   showLongRest();
-                  // Advance calendar by 1 day if the character has one set up
-                  const cal = useCalendarStore
-                    .getState()
-                    .getCalendar(characterId);
-                  if (cal) {
-                    useCalendarStore
+                  // Advance calendar by 1 day if not synced with DM
+                  if (!sharedCalendar) {
+                    const cal = useCalendarStore
                       .getState()
-                      .advanceTime(characterId, getMsPerDay(cal.config));
+                      .getCalendar(characterId);
+                    if (cal) {
+                      useCalendarStore
+                        .getState()
+                        .advanceTime(characterId, getMsPerDay(cal.config));
+                    }
                   }
                 }
               }}
@@ -843,6 +857,7 @@ export default function CharacterSheet() {
                   reorderNotes={reorderNotes}
                   addToast={addToast}
                   calendarDays={calendarDays}
+                  campaignCode={playerSync.campaignCode ?? undefined}
                 />
               </main>
             ) : (
@@ -904,13 +919,18 @@ export default function CharacterSheet() {
                       onShortRest={takeShortRest}
                       onLongRest={() => {
                         takeLongRest();
-                        const cal = useCalendarStore
-                          .getState()
-                          .getCalendar(characterId);
-                        if (cal) {
-                          useCalendarStore
+                        if (!sharedCalendar) {
+                          const cal = useCalendarStore
                             .getState()
-                            .advanceTime(characterId, getMsPerDay(cal.config));
+                            .getCalendar(characterId);
+                          if (cal) {
+                            useCalendarStore
+                              .getState()
+                              .advanceTime(
+                                characterId,
+                                getMsPerDay(cal.config)
+                              );
+                          }
                         }
                       }}
                       onShowShortRestToast={showShortRest}
