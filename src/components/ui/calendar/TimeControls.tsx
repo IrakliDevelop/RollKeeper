@@ -8,6 +8,7 @@ import {
   Moon as MoonIcon,
   CalendarDays,
   CalendarRange,
+  Undo2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import type { CalendarConfig } from '@/types/calendar';
@@ -85,6 +86,15 @@ export function TimeControls({
 
   return (
     <div className="flex flex-wrap gap-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        leftIcon={<Undo2 size={14} />}
+        onClick={() => onAdvance(-dayMs)}
+        title="Go back one day"
+      >
+        -Day
+      </Button>
       {buttons.map(btn => (
         <Button
           key={btn.label}

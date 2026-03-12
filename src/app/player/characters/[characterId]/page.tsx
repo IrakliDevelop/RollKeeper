@@ -72,6 +72,8 @@ import { RollSummary } from '@/types/dice';
 import NotHydrated from '@/components/ui/feedback/NotHydrated';
 import CharacterHUD from '@/components/ui/character/CharacterHUD';
 import RestDialog from '@/components/ui/character/RestDialog';
+import { useCalendarStore } from '@/store/calendarStore';
+import { getMsPerDay } from '@/utils/calendarCalculations';
 import TabbedCharacterSheet from '@/components/ui/character/TabbedCharacterSheet';
 import type { TabbedCharacterSheetRef } from '@/components/ui/character/TabbedCharacterSheet';
 import NewLayoutPromptDialog from '@/components/ui/character/NewLayoutPromptDialog';
@@ -708,6 +710,15 @@ export default function CharacterSheet() {
                 } else if (pendingRestType === 'long') {
                   takeLongRest();
                   showLongRest();
+                  // Advance calendar by 1 day if the character has one set up
+                  const cal = useCalendarStore
+                    .getState()
+                    .getCalendar(characterId);
+                  if (cal) {
+                    useCalendarStore
+                      .getState()
+                      .advanceTime(characterId, getMsPerDay(cal.config));
+                  }
                 }
               }}
               onClose={() => setPendingRestType(null)}
@@ -877,7 +888,17 @@ export default function CharacterSheet() {
                     {/* Rest Manager */}
                     <RestManager
                       onShortRest={takeShortRest}
-                      onLongRest={takeLongRest}
+                      onLongRest={() => {
+                        takeLongRest();
+                        const cal = useCalendarStore
+                          .getState()
+                          .getCalendar(characterId);
+                        if (cal) {
+                          useCalendarStore
+                            .getState()
+                            .advanceTime(characterId, getMsPerDay(cal.config));
+                        }
+                      }}
                       onShowShortRestToast={showShortRest}
                       onShowLongRestToast={showLongRest}
                     />

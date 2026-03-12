@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
+import { PlayerCalendarView } from '@/components/ui/calendar/PlayerCalendarView';
 import ConditionsDiseasesManager from '@/components/ui/game/ConditionsDiseasesManager';
 import CharacterBackgroundEditor from '@/components/ui/character/CharacterBackgroundEditor';
 import FeaturesTraitsManager from '@/components/ui/game/FeaturesTraitsManager';
@@ -663,6 +664,27 @@ export function createTabbedSheetConfig(
             />
           </ErrorBoundary>
         </div>
+      ),
+    },
+
+    // Tab 8: Calendar
+    {
+      id: 'calendar',
+      label: 'Calendar',
+      icon: '📅',
+      content: (
+        <ErrorBoundary
+          fallback={
+            <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+              <p className="text-muted">Unable to load calendar</p>
+            </div>
+          }
+        >
+          <PlayerCalendarView
+            characterId={character.id}
+            addToast={params.addToast}
+          />
+        </ErrorBoundary>
       ),
     },
   ];

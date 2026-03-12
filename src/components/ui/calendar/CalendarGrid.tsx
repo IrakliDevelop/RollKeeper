@@ -34,6 +34,7 @@ interface CalendarGridProps {
   onAddEvent?: () => void;
   onEditEvent?: (event: CalendarEvent) => void;
   onDeleteEvent?: (eventId: string) => void;
+  showMoonPhases?: boolean;
 }
 
 /**
@@ -180,6 +181,7 @@ export function CalendarGrid({
   onAddEvent,
   onEditEvent,
   onDeleteEvent,
+  showMoonPhases = true,
 }: CalendarGridProps) {
   const grid = getMonthGrid(browseYear, browseMonth, config);
   const isCurrentMonth =
@@ -342,7 +344,7 @@ export function CalendarGrid({
                           </div>
                         )}
                       </button>
-                      {transitions.length > 0 && (
+                      {showMoonPhases && transitions.length > 0 && (
                         <div className="mt-0.5 flex justify-center gap-0.5">
                           {transitions.map(mp => (
                             <MoonPhaseIcon
