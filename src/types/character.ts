@@ -27,6 +27,7 @@ export type SkillName =
   | 'survival';
 
 import type { SpellbookState } from './spells';
+import type { Summon } from './summon';
 
 // Character abilities with scores
 export interface CharacterAbilities {
@@ -660,6 +661,9 @@ export interface CharacterState {
   toolProficiencies: ToolProficiency[];
 
   daysSpent: number; // Number of in-game days spent in the campaign
+
+  // Summons (familiars, summoned creatures)
+  summons?: Summon[];
 
   // Miscellaneous
 }

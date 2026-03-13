@@ -41,6 +41,12 @@ import {
 } from '@/utils/spellConversion';
 import { ProcessedSpell } from '@/types/spells';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
+import { SummonCreaturePickerModal } from '@/components/ui/character/summons';
+import { isSummoningSpell } from '@/utils/summonConverter';
+import {
+  calculateSpellAttackBonus,
+  getSpellcastingAbilityModifier,
+} from '@/utils/calculations';
 
 // Constants for spell schools and common casting times
 const SPELL_SCHOOLS = [
@@ -644,6 +650,7 @@ export const EnhancedSpellManagement: React.FC = () => {
     startConcentration,
     stopConcentration,
     toggleReaction,
+    addSummon,
   } = useCharacterStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -651,6 +658,11 @@ export const EnhancedSpellManagement: React.FC = () => {
   const [viewingSpell, setViewingSpell] = useState<Spell | null>(null);
   const [castModalOpen, setCastModalOpen] = useState(false);
   const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null);
+  const [summonPickerOpen, setSummonPickerOpen] = useState(false);
+  const [summonPickerSpell, setSummonPickerSpell] = useState<Spell | null>(
+    null
+  );
+  const [summonPickerLevel, setSummonPickerLevel] = useState(0);
   const [filters, setFilters] = useState<SpellFilters>(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
   const [compactView, setCompactView] = useState(true);
@@ -950,7 +962,11 @@ export const EnhancedSpellManagement: React.FC = () => {
     setCastModalOpen(true);
   };
 
-  const handleCastSpellConfirm = (spellLevel: number, useFreecast: boolean) => {
+  const handleCastSpellConfirm = (
+    spellLevel: number,
+    useFreecast: boolean,
+    isRitual?: boolean
+  ) => {
     if (!selectedSpell) return;
 
     if (selectedSpell.concentration) {
@@ -960,7 +976,9 @@ export const EnhancedSpellManagement: React.FC = () => {
       startConcentration(selectedSpell.name, selectedSpell.id, spellLevel);
     }
 
-    if (useFreecast) {
+    if (isRitual) {
+      // Ritual casting: no slot consumed, no freecast used
+    } else if (useFreecast) {
       if (selectedSpell.freeCastMax && selectedSpell.freeCastMax > 0) {
         updateCharacter({
           spells: character.spells.map(s =>
@@ -984,6 +1002,13 @@ export const EnhancedSpellManagement: React.FC = () => {
       !character.reaction?.hasUsedReaction
     ) {
       toggleReaction();
+    }
+
+    // Open summon creature picker for summoning spells
+    if (isSummoningSpell(selectedSpell)) {
+      setSummonPickerSpell(selectedSpell);
+      setSummonPickerLevel(spellLevel);
+      setSummonPickerOpen(true);
     }
 
     setCastModalOpen(false);
@@ -1959,6 +1984,22 @@ export const EnhancedSpellManagement: React.FC = () => {
           hasUsedReaction={character.reaction?.hasUsedReaction}
           onCastSpell={handleCastSpellConfirm}
           onResetReaction={toggleReaction}
+        />
+      )}
+
+      {/* Summon Creature Picker Modal */}
+      {summonPickerSpell && (
+        <SummonCreaturePickerModal
+          open={summonPickerOpen}
+          onClose={() => {
+            setSummonPickerOpen(false);
+            setSummonPickerSpell(null);
+          }}
+          spell={summonPickerSpell}
+          castAtLevel={summonPickerLevel}
+          onSummonCreated={addSummon}
+          spellAttackBonus={calculateSpellAttackBonus(character)}
+          spellcastingAbilityMod={getSpellcastingAbilityModifier(character)}
         />
       )}
     </div>

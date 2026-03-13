@@ -10,6 +10,7 @@ import { useCampaignSync } from '@/hooks/useCampaignSync';
 import {
   mergePlayerSyncData,
   hasPlayerDataChanged,
+  syncSummonsToEncounter,
 } from '@/utils/encounterSync';
 import { Button } from '@/components/ui/forms/button';
 import { InitiativeTracker } from './InitiativeTracker';
@@ -80,6 +81,7 @@ export function EncounterView({
     armorClass: p.characterData?.armorClass ?? 10,
     currentHp: p.characterData?.hitPoints?.current ?? 0,
     maxHp: p.characterData?.hitPoints?.max ?? 0,
+    dexterity: p.characterData?.abilities?.dexterity ?? 10,
   }));
 
   // Build player sync timestamp map for freshness indicators
@@ -103,10 +105,21 @@ export function EncounterView({
           p => p.playerId === entity.playerCharacterId
         );
         if (playerData) {
+          // Sync player HP/AC/conditions
           const updates = mergePlayerSyncData(entity, playerData);
           if (updates && hasPlayerDataChanged(entity, updates)) {
             updateEntity(encounterId, entity.id, updates);
           }
+          // Sync player's summons into encounter
+          const playerSummons = playerData.characterData?.summons ?? [];
+          syncSummonsToEncounter(
+            encounter,
+            entity,
+            playerSummons,
+            addEntity,
+            updateEntity,
+            removeEntity
+          );
         }
       }
     }
@@ -207,7 +220,19 @@ export function EncounterView({
         onUpdateEntity={(entityId, updates) =>
           updateEntity(encounterId, entityId, updates)
         }
-        onRemoveEntity={entityId => removeEntity(encounterId, entityId)}
+        onRemoveEntity={entityId => {
+          // Cascade-remove summon entities when removing a player
+          const entity = encounter.entities.find(e => e.id === entityId);
+          if (entity?.type === 'player' && entity.playerCharacterId) {
+            const summonEntities = encounter.entities.filter(
+              e => e.summonOwnerId === entity.playerCharacterId
+            );
+            for (const se of summonEntities) {
+              removeEntity(encounterId, se.id);
+            }
+          }
+          removeEntity(encounterId, entityId);
+        }}
         onDamageEntity={(entityId, amount) =>
           damageEntity(encounterId, entityId, amount)
         }

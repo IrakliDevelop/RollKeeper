@@ -1,4 +1,9 @@
-import { EncounterEntity, EncounterCondition } from '@/types/encounter';
+import {
+  EncounterEntity,
+  EncounterCondition,
+  Encounter,
+} from '@/types/encounter';
+import type { Summon } from '@/types/summon';
 import { CampaignPlayerData } from '@/types/campaign';
 import { calculateCharacterArmorClass } from '@/utils/calculations';
 
@@ -25,6 +30,8 @@ export function mergePlayerSyncData(
 
   const inspirationCount = char.heroicInspiration?.count ?? 0;
   const hasUsedReaction = char.reaction?.hasUsedReaction ?? false;
+  const dex = char.abilities?.dexterity ?? 10;
+  const initiativeModifier = Math.floor((dex - 10) / 2);
 
   // Death saving throws (only present when at 0 HP)
   const deathSaves = char.hitPoints?.deathSaves
@@ -60,6 +67,7 @@ export function mergePlayerSyncData(
     maxHp,
     tempHp,
     armorClass,
+    initiativeModifier,
     concentrationSpell,
     inspirationCount,
     hasUsedReaction,
@@ -79,6 +87,11 @@ export function hasPlayerDataChanged(
   if (updates.maxHp !== entity.maxHp) return true;
   if (updates.tempHp !== entity.tempHp) return true;
   if (updates.armorClass !== entity.armorClass) return true;
+  if (
+    updates.initiativeModifier !== undefined &&
+    updates.initiativeModifier !== entity.initiativeModifier
+  )
+    return true;
   if (updates.concentrationSpell !== entity.concentrationSpell) return true;
   if (updates.inspirationCount !== entity.inspirationCount) return true;
   if (updates.hasUsedReaction !== entity.hasUsedReaction) return true;
@@ -109,4 +122,162 @@ export function hasPlayerDataChanged(
   }
 
   return false;
+}
+
+/**
+ * Merge live summon data from player sync into an encounter entity.
+ * Preserves DM-added conditions while replacing player-synced ones.
+ */
+export function mergeSummonSyncData(
+  entity: EncounterEntity,
+  summon: Summon
+): Partial<EncounterEntity> {
+  const se = summon.entity;
+
+  // Build player-synced conditions from summon entity
+  const playerConditions: EncounterCondition[] = se.conditions.map(c => ({
+    ...c,
+    id:
+      c.source === 'dm'
+        ? c.id
+        : `psync-summon-${c.name.toLowerCase().replace(/\s+/g, '-')}`,
+    source: c.source ?? ('player-sync' as const),
+  }));
+
+  // Preserve DM-added conditions on the encounter entity
+  const dmConditions = entity.conditions.filter(c => c.source === 'dm');
+  const playerConditionNames = new Set(playerConditions.map(c => c.name));
+  const uniqueDmConditions = dmConditions.filter(
+    c => !playerConditionNames.has(c.name)
+  );
+  const mergedConditions = [...uniqueDmConditions, ...playerConditions];
+
+  return {
+    name: summon.customName || se.name,
+    currentHp: se.currentHp,
+    maxHp: se.maxHp,
+    tempHp: se.tempHp,
+    armorClass: se.armorClass,
+    conditions: mergedConditions,
+    concentrationSpell: summon.requiresConcentration
+      ? summon.sourceSpellName
+      : undefined,
+  };
+}
+
+/**
+ * Check if any summon-synced fields have changed to avoid unnecessary updates.
+ */
+export function hasSummonDataChanged(
+  entity: EncounterEntity,
+  updates: Partial<EncounterEntity>
+): boolean {
+  if (updates.currentHp !== entity.currentHp) return true;
+  if (updates.maxHp !== entity.maxHp) return true;
+  if (updates.tempHp !== entity.tempHp) return true;
+  if (updates.armorClass !== entity.armorClass) return true;
+  if (
+    updates.initiative !== undefined &&
+    updates.initiative !== entity.initiative
+  )
+    return true;
+  if (updates.name !== entity.name) return true;
+  if (updates.concentrationSpell !== entity.concentrationSpell) return true;
+
+  if (updates.conditions) {
+    const currentNames = entity.conditions
+      .map(c => `${c.name}-${c.source}`)
+      .sort()
+      .join(',');
+    const updateNames = updates.conditions
+      .map(c => `${c.name}-${c.source}`)
+      .sort()
+      .join(',');
+    if (currentNames !== updateNames) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Sync a player's summons into an encounter.
+ * Adds new summons, updates existing ones, and removes stale ones.
+ */
+export function syncSummonsToEncounter(
+  encounter: Encounter,
+  playerEntity: EncounterEntity,
+  playerSummons: Summon[],
+  addEntity: (encounterId: string, entity: Omit<EncounterEntity, 'id'>) => void,
+  updateEntity: (
+    encounterId: string,
+    entityId: string,
+    updates: Partial<EncounterEntity>
+  ) => void,
+  removeEntity: (encounterId: string, entityId: string) => void
+): void {
+  const ownerId = playerEntity.playerCharacterId;
+  if (!ownerId) return;
+
+  // Find existing summon entities for this player
+  const existingSummonEntities = encounter.entities.filter(
+    e => e.summonOwnerId === ownerId
+  );
+
+  const activeSummonIds = new Set(playerSummons.map(s => s.id));
+  const existingSummonIds = new Set(
+    existingSummonEntities.map(e => e.summonId).filter(Boolean)
+  );
+
+  // Add new summons (same initiative as owner — sort function places them after)
+  const ownerInit = playerEntity.initiative;
+  for (const summon of playerSummons) {
+    if (existingSummonIds.has(summon.id)) continue;
+
+    const se = summon.entity;
+
+    addEntity(encounter.id, {
+      type: 'monster',
+      name: summon.customName || se.name,
+      initiative: ownerInit,
+      initiativeModifier: se.initiativeModifier,
+      currentHp: se.currentHp,
+      maxHp: se.maxHp,
+      tempHp: se.tempHp,
+      armorClass: se.armorClass,
+      conditions: se.conditions,
+      monsterStatBlock: se.monsterStatBlock,
+      monsterSourceId: se.monsterSourceId,
+      concentrationSpell: summon.requiresConcentration
+        ? summon.sourceSpellName
+        : undefined,
+      summonId: summon.id,
+      summonOwnerId: ownerId,
+      isHidden: false,
+    });
+  }
+
+  // Update existing summons (including initiative tracking from owner)
+  for (const entity of existingSummonEntities) {
+    if (!entity.summonId) continue;
+    const summon = playerSummons.find(s => s.id === entity.summonId);
+    if (!summon) continue;
+
+    const updates = mergeSummonSyncData(entity, summon);
+
+    // Keep summon initiative in sync with owner's
+    if (entity.initiative !== ownerInit) {
+      updates.initiative = ownerInit;
+    }
+
+    if (hasSummonDataChanged(entity, updates)) {
+      updateEntity(encounter.id, entity.id, updates);
+    }
+  }
+
+  // Remove stale summons (no longer in player's summons array)
+  for (const entity of existingSummonEntities) {
+    if (entity.summonId && !activeSummonIds.has(entity.summonId)) {
+      removeEntity(encounter.id, entity.id);
+    }
+  }
 }

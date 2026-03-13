@@ -31,6 +31,7 @@ import TraitTracker from '@/components/ui/character/TraitTracker';
 import HeroicInspirationTracker from '@/components/ui/character/HeroicInspirationTracker';
 import BardicInspirationTracker from '@/components/ui/character/BardicInspirationTracker';
 import Languages from '@/components/ui/character/LanguagesAndProficiencies';
+import { SummonsSubTab } from '@/components/ui/character/summons';
 import { ToastData } from '@/components/ui/feedback/Toast';
 import type { BookmarkTabItem } from '@/components/ui/layout/BookmarkTabs';
 import {
@@ -386,114 +387,24 @@ export function createTabbedSheetConfig(
       ),
     },
 
-    // Tab 3: Combat
+    // Tab 3: Combat (with sub-tabs)
     {
       id: 'combat',
       label: 'Combat',
       icon: '🛡️',
+      badge:
+        (character.summons?.length || 0) > 0 ? (
+          <span className="bg-accent-emerald-bg text-accent-emerald-text rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+            {character.summons!.length}
+          </span>
+        ) : undefined,
       content: (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="space-y-6">
-              <ArmorClassManager
-                character={character}
-                onUpdateArmorClass={ac =>
-                  params.updateCharacter({ armorClass: ac })
-                }
-                onUpdateTempArmorClass={params.updateTempArmorClass}
-                onToggleTempAC={params.toggleTempAC}
-                onToggleShield={params.toggleShield}
-                onUpdateShieldBonus={params.updateShieldBonus}
-              />
-              <CombatStats
-                character={character}
-                getInitiativeModifier={params.getInitiativeModifier}
-                onUpdateInitiative={params.updateInitiative}
-                onResetInitiativeToDefault={params.resetInitiativeToDefault}
-                onUpdateSpeed={speed => params.updateCharacter({ speed })}
-                onUpdateCharacter={params.updateCharacter}
-                onToggleReaction={params.toggleReaction}
-                onResetReaction={params.resetReaction}
-                onRollInitiative={params.rollInitiative}
-              />
-            </div>
-            <div className="space-y-6">
-              <ErrorBoundary
-                fallback={
-                  <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                    <p className="text-muted">Unable to load HP manager</p>
-                  </div>
-                }
-              >
-                <HitPointManager
-                  hitPoints={character.hitPoints}
-                  classInfo={character.class}
-                  level={totalLevel}
-                  constitutionScore={character.abilities.constitution}
-                  onApplyDamage={params.applyDamageToCharacter}
-                  onApplyHealing={params.applyHealingToCharacter}
-                  onAddTemporaryHP={params.addTemporaryHPToCharacter}
-                  onMakeDeathSave={params.makeDeathSavingThrow}
-                  onResetDeathSaves={params.resetDeathSavingThrows}
-                  onToggleCalculationMode={params.toggleHPCalculationMode}
-                  onRecalculateMaxHP={params.recalculateMaxHP}
-                  onUpdateHitPoints={params.updateHitPoints}
-                />
-              </ErrorBoundary>
-              <ErrorBoundary
-                fallback={
-                  <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
-                    <p className="text-muted">
-                      Unable to load hit dice tracker
-                    </p>
-                  </div>
-                }
-              >
-                <HitDiceTracker
-                  hitDicePools={character.hitDicePools || {}}
-                  onUseHitDie={params.useHitDie}
-                  onRestoreHitDice={params.restoreHitDice}
-                  onResetAllHitDice={params.resetAllHitDice}
-                />
-              </ErrorBoundary>
-            </div>
-          </div>
-
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-4 shadow">
-                <p className="text-muted">
-                  Unable to load weapon proficiencies
-                </p>
-              </div>
-            }
-          >
-            <WeaponProficiencies />
-          </ErrorBoundary>
-
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <p className="text-muted">
-                  Unable to load conditions and diseases manager
-                </p>
-              </div>
-            }
-          >
-            {hasHydrated ? (
-              <ConditionsDiseasesManager />
-            ) : (
-              <div className="border-divider bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <div className="py-4 text-center">
-                  <div className="border-accent-blue-text-muted mx-auto h-8 w-8 animate-spin rounded-full border-b-2" />
-                  <p className="text-body mt-2">
-                    Loading conditions and diseases...
-                  </p>
-                </div>
-              </div>
-            )}
-          </ErrorBoundary>
-        </div>
+        <CombatTabContent
+          character={character}
+          hasHydrated={hasHydrated}
+          totalLevel={totalLevel}
+          params={params}
+        />
       ),
     },
 
@@ -847,6 +758,171 @@ function CharacterTabContent({
             />
           </ErrorBoundary>
         </div>
+      )}
+    </div>
+  );
+}
+
+const COMBAT_SUB_TABS = [
+  { id: 'player', label: 'Player', icon: '🗡️' },
+  { id: 'summons', label: 'Summons', icon: '🐾' },
+] as const;
+
+type CombatSubTab = (typeof COMBAT_SUB_TABS)[number]['id'];
+
+function CombatTabContent({
+  character,
+  hasHydrated,
+  totalLevel,
+  params,
+}: {
+  character: CharacterState;
+  hasHydrated: boolean;
+  totalLevel: number;
+  params: TabbedSheetConfigParams;
+}) {
+  const [activeSubTab, setActiveSubTab] = useState<CombatSubTab>('player');
+  const summonCount = character.summons?.length || 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-surface-secondary inline-flex rounded-lg p-1">
+        {COMBAT_SUB_TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveSubTab(tab.id)}
+            className={`rounded-md px-3 py-2 text-sm font-medium transition-all ${
+              activeSubTab === tab.id
+                ? 'bg-surface-raised text-heading shadow-sm'
+                : 'text-muted hover:text-body'
+            }`}
+          >
+            <span className="mr-1.5">{tab.icon}</span>
+            {tab.label}
+            {tab.id === 'summons' && summonCount > 0 && (
+              <span className="bg-accent-emerald-bg text-accent-emerald-text ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+                {summonCount}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {activeSubTab === 'player' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="space-y-6">
+              <ArmorClassManager
+                character={character}
+                onUpdateArmorClass={ac =>
+                  params.updateCharacter({ armorClass: ac })
+                }
+                onUpdateTempArmorClass={params.updateTempArmorClass}
+                onToggleTempAC={params.toggleTempAC}
+                onToggleShield={params.toggleShield}
+                onUpdateShieldBonus={params.updateShieldBonus}
+              />
+              <CombatStats
+                character={character}
+                getInitiativeModifier={params.getInitiativeModifier}
+                onUpdateInitiative={params.updateInitiative}
+                onResetInitiativeToDefault={params.resetInitiativeToDefault}
+                onUpdateSpeed={speed => params.updateCharacter({ speed })}
+                onUpdateCharacter={params.updateCharacter}
+                onToggleReaction={params.toggleReaction}
+                onResetReaction={params.resetReaction}
+                onRollInitiative={params.rollInitiative}
+              />
+            </div>
+            <div className="space-y-6">
+              <ErrorBoundary
+                fallback={
+                  <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                    <p className="text-muted">Unable to load HP manager</p>
+                  </div>
+                }
+              >
+                <HitPointManager
+                  hitPoints={character.hitPoints}
+                  classInfo={character.class}
+                  level={totalLevel}
+                  constitutionScore={character.abilities.constitution}
+                  onApplyDamage={params.applyDamageToCharacter}
+                  onApplyHealing={params.applyHealingToCharacter}
+                  onAddTemporaryHP={params.addTemporaryHPToCharacter}
+                  onMakeDeathSave={params.makeDeathSavingThrow}
+                  onResetDeathSaves={params.resetDeathSavingThrows}
+                  onToggleCalculationMode={params.toggleHPCalculationMode}
+                  onRecalculateMaxHP={params.recalculateMaxHP}
+                  onUpdateHitPoints={params.updateHitPoints}
+                />
+              </ErrorBoundary>
+              <ErrorBoundary
+                fallback={
+                  <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
+                    <p className="text-muted">
+                      Unable to load hit dice tracker
+                    </p>
+                  </div>
+                }
+              >
+                <HitDiceTracker
+                  hitDicePools={character.hitDicePools || {}}
+                  onUseHitDie={params.useHitDie}
+                  onRestoreHitDice={params.restoreHitDice}
+                  onResetAllHitDice={params.resetAllHitDice}
+                />
+              </ErrorBoundary>
+            </div>
+          </div>
+
+          <ErrorBoundary
+            fallback={
+              <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-4 shadow">
+                <p className="text-muted">
+                  Unable to load weapon proficiencies
+                </p>
+              </div>
+            }
+          >
+            <WeaponProficiencies />
+          </ErrorBoundary>
+
+          <ErrorBoundary
+            fallback={
+              <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                <p className="text-muted">
+                  Unable to load conditions and diseases manager
+                </p>
+              </div>
+            }
+          >
+            {hasHydrated ? (
+              <ConditionsDiseasesManager />
+            ) : (
+              <div className="border-divider bg-surface-raised rounded-lg border p-6 shadow-lg">
+                <div className="py-4 text-center">
+                  <div className="border-accent-blue-text-muted mx-auto h-8 w-8 animate-spin rounded-full border-b-2" />
+                  <p className="text-body mt-2">
+                    Loading conditions and diseases...
+                  </p>
+                </div>
+              </div>
+            )}
+          </ErrorBoundary>
+        </div>
+      )}
+
+      {activeSubTab === 'summons' && (
+        <ErrorBoundary
+          fallback={
+            <div className="border-divider bg-surface-raised rounded-lg border p-6">
+              <p className="text-muted">Unable to load summons</p>
+            </div>
+          }
+        >
+          <SummonsSubTab />
+        </ErrorBoundary>
       )}
     </div>
   );

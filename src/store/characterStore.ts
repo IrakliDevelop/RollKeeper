@@ -240,6 +240,10 @@ function migrateCharacterData(character: unknown): CharacterState {
     if (typeof result.daysSpent !== 'number') {
       result.daysSpent = DEFAULT_CHARACTER_STATE.daysSpent;
     }
+    // Ensure summons array exists
+    if (!Array.isArray(result.summons)) {
+      result.summons = [];
+    }
     return result;
   }
 
@@ -634,6 +638,24 @@ interface CharacterStore {
     destinationIndex: number
   ) => void;
   reorderSpells: (sourceIndex: number, destinationIndex: number) => void;
+
+  // Summon management
+  addSummon: (summon: import('@/types/summon').Summon) => void;
+  removeSummon: (summonId: string) => void;
+  updateSummonEntity: (
+    summonId: string,
+    updates: Partial<import('@/types/encounter').EncounterEntity>
+  ) => void;
+  damageSummon: (summonId: string, amount: number) => void;
+  healSummon: (summonId: string, amount: number) => void;
+  addSummonTempHp: (summonId: string, amount: number) => void;
+  addSummonCondition: (
+    summonId: string,
+    condition: import('@/types/encounter').EncounterCondition
+  ) => void;
+  removeSummonCondition: (summonId: string, conditionId: string) => void;
+  removeConcentrationSummons: () => void;
+  dismissFamiliar: () => void;
 
   // Persistence actions
   saveCharacter: () => void;
@@ -1899,6 +1921,10 @@ export const useCharacterStore = create<CharacterStore>()(
               castAt: undefined,
               startedAt: undefined,
             },
+            // Auto-dismiss concentration summons
+            summons: (state.character.summons || []).filter(
+              s => !s.requiresConcentration
+            ),
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving',
@@ -3256,6 +3282,19 @@ export const useCharacterStore = create<CharacterStore>()(
             ? { ...character.bardicInspiration, usesExpended: 0 }
             : undefined;
 
+          // Reset summons HP to max, clear temp HP and conditions
+          const resetSummons = character.summons?.map(summon => ({
+            ...summon,
+            entity: {
+              ...summon.entity,
+              currentHp: summon.entity.maxHp,
+              tempHp: 0,
+              conditions: summon.entity.conditions.filter(
+                c => c.source === 'dm'
+              ),
+            },
+          }));
+
           return {
             character: {
               ...character,
@@ -3271,6 +3310,7 @@ export const useCharacterStore = create<CharacterStore>()(
               reaction: resetReaction,
               isTempACActive: resetIsTempACActive,
               bardicInspiration: resetBardicInspiration,
+              summons: resetSummons,
               daysSpent: (character.daysSpent || 0) + 1,
             },
             hasUnsavedChanges: true,
@@ -4340,6 +4380,213 @@ export const useCharacterStore = create<CharacterStore>()(
             saveStatus: 'saving',
           };
         });
+      },
+
+      // Summon management
+      addSummon: summon => {
+        set(state => {
+          const summons = state.character.summons || [];
+          // For familiars, replace existing one
+          if (summon.type === 'familiar') {
+            return {
+              character: {
+                ...state.character,
+                summons: [
+                  ...summons.filter(s => s.type !== 'familiar'),
+                  summon,
+                ],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          }
+          return {
+            character: {
+              ...state.character,
+              summons: [...summons, summon],
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
+          };
+        });
+      },
+
+      removeSummon: summonId => {
+        set(state => ({
+          character: {
+            ...state.character,
+            summons: (state.character.summons || []).filter(
+              s => s.id !== summonId
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      updateSummonEntity: (summonId, updates) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            summons: (state.character.summons || []).map(s =>
+              s.id === summonId
+                ? { ...s, entity: { ...s.entity, ...updates } }
+                : s
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      damageSummon: (summonId, amount) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            summons: (state.character.summons || []).map(s => {
+              if (s.id !== summonId) return s;
+              let remaining = amount;
+              let newTemp = s.entity.tempHp;
+              let newCurrent = s.entity.currentHp;
+              // Temp HP absorbs first
+              if (newTemp > 0) {
+                if (remaining <= newTemp) {
+                  newTemp -= remaining;
+                  remaining = 0;
+                } else {
+                  remaining -= newTemp;
+                  newTemp = 0;
+                }
+              }
+              newCurrent = Math.max(0, newCurrent - remaining);
+              return {
+                ...s,
+                entity: {
+                  ...s.entity,
+                  currentHp: newCurrent,
+                  tempHp: newTemp,
+                },
+              };
+            }),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      healSummon: (summonId, amount) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            summons: (state.character.summons || []).map(s =>
+              s.id === summonId
+                ? {
+                    ...s,
+                    entity: {
+                      ...s.entity,
+                      currentHp: Math.min(
+                        s.entity.maxHp,
+                        s.entity.currentHp + amount
+                      ),
+                    },
+                  }
+                : s
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      addSummonTempHp: (summonId, amount) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            summons: (state.character.summons || []).map(s =>
+              s.id === summonId
+                ? {
+                    ...s,
+                    entity: {
+                      ...s.entity,
+                      tempHp: Math.max(s.entity.tempHp, amount),
+                    },
+                  }
+                : s
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      addSummonCondition: (summonId, condition) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            summons: (state.character.summons || []).map(s =>
+              s.id === summonId
+                ? {
+                    ...s,
+                    entity: {
+                      ...s.entity,
+                      conditions: [...s.entity.conditions, condition],
+                    },
+                  }
+                : s
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      removeSummonCondition: (summonId, conditionId) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            summons: (state.character.summons || []).map(s =>
+              s.id === summonId
+                ? {
+                    ...s,
+                    entity: {
+                      ...s.entity,
+                      conditions: s.entity.conditions.filter(
+                        c => c.id !== conditionId
+                      ),
+                    },
+                  }
+                : s
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      removeConcentrationSummons: () => {
+        set(state => ({
+          character: {
+            ...state.character,
+            summons: (state.character.summons || []).filter(
+              s => !s.requiresConcentration
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      dismissFamiliar: () => {
+        set(state => ({
+          character: {
+            ...state.character,
+            summons: (state.character.summons || []).filter(
+              s => s.type !== 'familiar'
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
       },
 
       // Persistence actions
