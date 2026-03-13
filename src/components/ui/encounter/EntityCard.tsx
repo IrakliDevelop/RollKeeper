@@ -403,7 +403,9 @@ export function EntityCard({
   const [initInput, setInitInput] = useState('');
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
-  const style = TYPE_STYLES[entity.type] ?? TYPE_STYLES.monster;
+  const style = entity.summonOwnerId
+    ? TYPE_STYLES.player
+    : (TYPE_STYLES[entity.type] ?? TYPE_STYLES.monster);
   const isDown = entity.currentHp <= 0 && entity.type !== 'lair';
   const isPlayerDead =
     entity.type === 'player' && entity.deathSaves?.failures === 3;
@@ -411,32 +413,39 @@ export function EntityCard({
 
   return (
     <div
-      className={`rounded-lg shadow-sm transition-all ${style.cardBg} ${style.border} ${
-        isCurrentTurn ? 'border-4 shadow-md' : 'border-2'
+      className={`relative rounded-lg transition-all ${style.cardBg} ${style.border} border-2 ${
+        isCurrentTurn
+          ? 'shadow-accent-amber-bg-strong ring-accent-amber-border scale-[1.01] shadow-lg ring-2'
+          : 'shadow-sm'
       } ${isDead ? 'opacity-60' : ''} ${entity.isHidden ? 'border-dashed' : ''}`}
     >
+      {/* Active turn — pulsing left strip */}
+      {isCurrentTurn && (
+        <div className="bg-accent-amber-text animate-turn-pulse absolute inset-y-0 left-0 w-1.5 rounded-l-lg" />
+      )}
       {/* Compact view — always visible */}
       <div className="flex items-center gap-3 p-3">
         {/* Initiative */}
         {editingInit ? (
           <input
             type="number"
+            step="any"
             value={initInput}
             onChange={e => setInitInput(e.target.value)}
             onBlur={() => {
-              const val = parseInt(initInput);
+              const val = parseFloat(initInput);
               if (!isNaN(val)) onSetInitiative(val);
               setEditingInit(false);
             }}
             onKeyDown={e => {
               if (e.key === 'Enter') {
-                const val = parseInt(initInput);
+                const val = parseFloat(initInput);
                 if (!isNaN(val)) onSetInitiative(val);
                 setEditingInit(false);
               }
               if (e.key === 'Escape') setEditingInit(false);
             }}
-            className="bg-surface-raised text-heading h-10 w-10 rounded-lg text-center text-sm font-bold shadow-sm"
+            className="bg-surface-raised text-heading h-10 w-12 rounded-lg text-center text-sm font-bold shadow-sm"
             autoFocus
           />
         ) : (
@@ -445,10 +454,18 @@ export function EntityCard({
               setInitInput(entity.initiative?.toString() ?? '');
               setEditingInit(true);
             }}
-            className="bg-surface-raised text-heading hover:ring-accent-amber-border flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold tabular-nums shadow-sm transition-all hover:ring-2"
+            className={`hover:ring-accent-amber-border flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold tabular-nums shadow-sm transition-all hover:ring-2 ${
+              isCurrentTurn
+                ? 'bg-accent-amber-bg-strong text-accent-amber-text ring-accent-amber-border ring-2'
+                : 'bg-surface-raised text-heading'
+            }`}
             title="Click to set initiative"
           >
-            {entity.initiative ?? '—'}
+            {entity.initiative != null
+              ? Number.isInteger(entity.initiative)
+                ? entity.initiative
+                : entity.initiative.toFixed(1)
+              : '—'}
           </button>
         )}
 
@@ -514,11 +531,13 @@ export function EntityCard({
             <span
               className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold shadow-sm ${style.badgeBg} ${style.badge} ${style.border}`}
             >
-              {entity.type === 'npc'
-                ? 'NPC'
-                : entity.type.charAt(0).toUpperCase() + entity.type.slice(1)}
+              {entity.summonOwnerId
+                ? 'Summon'
+                : entity.type === 'npc'
+                  ? 'NPC'
+                  : entity.type.charAt(0).toUpperCase() + entity.type.slice(1)}
             </span>
-            {entity.type === 'player' && (
+            {(entity.type === 'player' || entity.summonOwnerId) && (
               <SyncIndicator lastSynced={lastSynced} />
             )}
             {entity.type === 'player' && (entity.inspirationCount ?? 0) > 0 && (

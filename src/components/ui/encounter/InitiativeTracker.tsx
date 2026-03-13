@@ -183,7 +183,9 @@ export function InitiativeTracker({
               lastSynced={
                 entity.playerCharacterId
                   ? playerSyncMap?.[entity.playerCharacterId]
-                  : undefined
+                  : entity.summonOwnerId
+                    ? playerSyncMap?.[entity.summonOwnerId]
+                    : undefined
               }
               onUpdate={updates => onUpdateEntity(entity.id, updates)}
               onRemove={() => onRemoveEntity(entity.id)}

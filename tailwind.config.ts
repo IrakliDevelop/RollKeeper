@@ -38,6 +38,13 @@ const config: Config = {
           '0%': { opacity: '0', transform: 'scaleY(0.96) translateY(-2px)' },
           '100%': { opacity: '1', transform: 'scaleY(1) translateY(0)' },
         },
+        'turn-pulse': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.5' },
+        },
+      },
+      animation: {
+        'turn-pulse': 'turn-pulse 2s ease-in-out infinite',
       },
     },
   },

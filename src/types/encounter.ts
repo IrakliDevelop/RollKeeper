@@ -128,6 +128,10 @@ export interface EncounterEntity {
   // Player sync reference
   playerCharacterId?: string; // Link to playerStore character
   campaignCode?: string; // Campaign for live sync
+
+  // Summon sync reference (auto-managed via player sync)
+  summonId?: string; // Links to Summon.id from character's summons[]
+  summonOwnerId?: string; // playerCharacterId of the summoning player
 }
 
 export interface Encounter {

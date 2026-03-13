@@ -142,16 +142,51 @@ function updateEncounterById(
 
 // Sort entities by initiative (descending), with lair actions losing ties
 function getSortedEntities(entities: EncounterEntity[]): EncounterEntity[] {
-  return [...entities].sort((a, b) => {
+  // First pass: standard initiative sort
+  const sorted = [...entities].sort((a, b) => {
     const aInit = a.initiative ?? -Infinity;
     const bInit = b.initiative ?? -Infinity;
     if (aInit !== bInit) return bInit - aInit;
     // Lair actions lose ties
     if (a.type === 'lair' && b.type !== 'lair') return 1;
     if (b.type === 'lair' && a.type !== 'lair') return -1;
-    // Higher dex modifier wins ties
-    return b.initiativeModifier - a.initiativeModifier;
+    // Summons sort after their owner (non-summons first at same initiative)
+    if (a.summonOwnerId && !b.summonOwnerId) return 1;
+    if (b.summonOwnerId && !a.summonOwnerId) return -1;
+    // Ties: preserve current order
+    return 0;
   });
+
+  // Second pass: move summons directly after their owner
+  const result: EncounterEntity[] = [];
+  const summonsByOwner = new Map<string, EncounterEntity[]>();
+
+  // Group summons by owner
+  for (const e of sorted) {
+    if (e.summonOwnerId) {
+      const list = summonsByOwner.get(e.summonOwnerId) ?? [];
+      list.push(e);
+      summonsByOwner.set(e.summonOwnerId, list);
+    }
+  }
+
+  // Build result: each non-summon entity followed by its summons
+  for (const e of sorted) {
+    if (e.summonOwnerId) continue; // handled below their owner
+    result.push(e);
+    const ownerKey = e.playerCharacterId;
+    if (ownerKey && summonsByOwner.has(ownerKey)) {
+      result.push(...summonsByOwner.get(ownerKey)!);
+      summonsByOwner.delete(ownerKey);
+    }
+  }
+
+  // Append any orphaned summons (owner not in encounter)
+  for (const summons of summonsByOwner.values()) {
+    result.push(...summons);
+  }
+
+  return result;
 }
 
 export const useEncounterStore = create<EncounterStoreState>()(
@@ -378,12 +413,37 @@ export const useEncounterStore = create<EncounterStoreState>()(
 
       setInitiative: (encounterId, entityId, value) => {
         set(state => ({
-          encounters: updateEntityInEncounter(
-            state.encounters,
-            encounterId,
-            entityId,
-            e => ({ ...e, initiative: value })
-          ),
+          encounters: state.encounters.map(enc => {
+            if (enc.id !== encounterId) return enc;
+
+            // Update the entity's initiative
+            const updated = enc.entities.map(e =>
+              e.id === entityId ? { ...e, initiative: value } : e
+            );
+
+            // Re-sort if combat is active and not manually ordered
+            if (enc.isActive && enc.sortOrder !== 'manual') {
+              // Remember whose turn it is so we can preserve it
+              const currentEntityId = enc.entities[enc.currentTurn]?.id;
+              const sorted = getSortedEntities(updated);
+              const newTurnIndex = currentEntityId
+                ? sorted.findIndex(e => e.id === currentEntityId)
+                : enc.currentTurn;
+
+              return {
+                ...enc,
+                entities: sorted,
+                currentTurn: newTurnIndex >= 0 ? newTurnIndex : enc.currentTurn,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+
+            return {
+              ...enc,
+              entities: updated,
+              updatedAt: new Date().toISOString(),
+            };
+          }),
         }));
       },
 
@@ -404,9 +464,11 @@ export const useEncounterStore = create<EncounterStoreState>()(
             enc => ({
               ...enc,
               entities: enc.entities.map(e => {
-                // Don't roll for lair actions (always 20) or players (DM enters manually)
+                // Don't roll for lair actions (always 20), players (DM enters manually),
+                // or summons (they follow their owner's initiative via sync)
                 if (e.type === 'lair') return { ...e, initiative: 20 };
                 if (e.type === 'player') return e;
+                if (e.summonOwnerId) return e;
                 const roll = rollD20();
                 return { ...e, initiative: roll + e.initiativeModifier };
               }),

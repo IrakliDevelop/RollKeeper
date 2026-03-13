@@ -7,6 +7,7 @@ import {
   Zap,
   ClockAlert,
   Infinity,
+  BookOpen,
 } from 'lucide-react';
 import { Spell, SpellSlots, ConcentrationState } from '@/types/character';
 import { Modal } from '@/components/ui/feedback/Modal';
@@ -18,7 +19,11 @@ interface SpellCastModalProps {
   spellSlots: SpellSlots;
   concentration: ConcentrationState;
   hasUsedReaction?: boolean;
-  onCastSpell: (spellLevel: number, useFreecast: boolean) => void;
+  onCastSpell: (
+    spellLevel: number,
+    useFreecast: boolean,
+    isRitual?: boolean
+  ) => void;
   onResetReaction?: () => void;
 }
 
@@ -34,6 +39,7 @@ export function SpellCastModal({
 }: SpellCastModalProps) {
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const [useFreecast, setUseFreecast] = useState(false);
+  const [useRitual, setUseRitual] = useState(false);
 
   const isAtWill = spell.freeCastMax === 0;
   const isInnate = spell.freeCastMax !== undefined && spell.freeCastMax > 0;
@@ -42,6 +48,7 @@ export function SpellCastModal({
     ? spell.freeCastMax! - (spell.freeCastsUsed || 0)
     : 0;
   const canFreecast = isAtWill || (isInnate && freeCastsRemaining > 0);
+  const canRitual = spell.ritual === true && spell.level > 0;
 
   const availableLevels = [];
   for (let level = Math.max(1, spell.level); level <= 9; level++) {
@@ -53,6 +60,7 @@ export function SpellCastModal({
 
   React.useEffect(() => {
     if (!isOpen) return;
+    setUseRitual(false);
     if (spell.level === 0) {
       setSelectedLevel(0);
       setUseFreecast(false);
@@ -84,10 +92,11 @@ export function SpellCastModal({
 
   const handleCast = () => {
     if (selectedLevel !== null) {
-      onCastSpell(selectedLevel, useFreecast);
+      onCastSpell(selectedLevel, useFreecast, useRitual);
       onClose();
       setSelectedLevel(null);
       setUseFreecast(false);
+      setUseRitual(false);
     }
   };
 
@@ -95,22 +104,32 @@ export function SpellCastModal({
     onClose();
     setSelectedLevel(null);
     setUseFreecast(false);
+    setUseRitual(false);
   };
 
   const handleSelectFreecast = () => {
     setUseFreecast(true);
+    setUseRitual(false);
     setSelectedLevel(spell.level);
   };
 
   const handleSelectSlot = (level: number) => {
     setUseFreecast(false);
+    setUseRitual(false);
     setSelectedLevel(level);
+  };
+
+  const handleSelectRitual = () => {
+    setUseRitual(true);
+    setUseFreecast(false);
+    setSelectedLevel(spell.level);
   };
 
   const canCast =
     selectedLevel !== null &&
     (spell.level === 0 ||
       useFreecast ||
+      useRitual ||
       availableLevels.includes(selectedLevel));
 
   return (
@@ -142,6 +161,12 @@ export function SpellCastModal({
                 <span className="font-medium text-orange-600">
                   Concentration
                 </span>
+              </>
+            )}
+            {spell.ritual && (
+              <>
+                <span>&bull;</span>
+                <span className="font-medium text-blue-600">Ritual</span>
               </>
             )}
           </div>
@@ -286,8 +311,51 @@ export function SpellCastModal({
               </div>
             )}
 
+            {/* Ritual Casting Option */}
+            {canRitual && (
+              <div>
+                <h4 className="mb-3 font-medium text-gray-900">
+                  Ritual Casting:
+                </h4>
+                <button
+                  onClick={handleSelectRitual}
+                  className={`flex w-full items-center justify-between rounded-lg border-2 p-3 transition-all duration-200 ${
+                    useRitual
+                      ? 'border-blue-500 bg-blue-100 shadow-md'
+                      : 'border-blue-300 bg-blue-50 hover:border-blue-400 hover:bg-blue-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`flex h-6 w-6 items-center justify-center rounded-full ${
+                        useRitual
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-blue-400 text-white'
+                      }`}
+                    >
+                      <BookOpen size={14} />
+                    </div>
+                    <span
+                      className={`font-medium ${
+                        useRitual ? 'text-blue-900' : 'text-blue-800'
+                      }`}
+                    >
+                      Cast as Ritual (no slot)
+                    </span>
+                  </div>
+                  <span
+                    className={`text-sm ${
+                      useRitual ? 'text-blue-700' : 'text-blue-600'
+                    }`}
+                  >
+                    +10 min casting time
+                  </span>
+                </button>
+              </div>
+            )}
+
             {/* Slot-Based Casting */}
-            {availableLevels.length === 0 && !canFreecast ? (
+            {availableLevels.length === 0 && !canFreecast && !canRitual ? (
               <div className="py-4 text-center">
                 <p className="mb-2 text-gray-600">
                   No available spell slots to cast this spell.
@@ -300,7 +368,7 @@ export function SpellCastModal({
               availableLevels.length > 0 && (
                 <div>
                   <h4 className="mb-3 font-medium text-gray-900">
-                    {hasFreeCasting
+                    {hasFreeCasting || canRitual
                       ? 'Or use a spell slot:'
                       : 'Choose spell slot level:'}
                   </h4>
@@ -406,17 +474,26 @@ export function SpellCastModal({
           <button
             onClick={handleCast}
             className={`rounded-lg px-6 py-2 font-medium text-white shadow-md transition-all duration-200 hover:shadow-lg ${
-              useFreecast
-                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
-                : 'bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'
+              useRitual
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+                : useFreecast
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
+                  : 'bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'
             }`}
           >
-            {useFreecast ? 'Cast Free' : 'Cast'} {spell.name}
-            {selectedLevel !== null && selectedLevel > 0 && !useFreecast && (
-              <span className="ml-1 text-purple-200">
-                (Level {selectedLevel})
-              </span>
-            )}
+            {useRitual
+              ? `Cast ${spell.name} as Ritual`
+              : useFreecast
+                ? `Cast Free ${spell.name}`
+                : `Cast ${spell.name}`}
+            {selectedLevel !== null &&
+              selectedLevel > 0 &&
+              !useFreecast &&
+              !useRitual && (
+                <span className="ml-1 text-purple-200">
+                  (Level {selectedLevel})
+                </span>
+              )}
           </button>
         )}
       </div>

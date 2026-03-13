@@ -38,6 +38,7 @@ interface AddEntityDialogProps {
     armorClass: number;
     currentHp: number;
     maxHp: number;
+    dexterity: number;
   }>;
   npcs?: CampaignNPC[];
   playerColors?: Record<string, string>;
@@ -168,7 +169,7 @@ export function AddEntityDialog({
       type: 'player',
       name: player.name,
       initiative: null,
-      initiativeModifier: 0,
+      initiativeModifier: Math.floor((player.dexterity - 10) / 2),
       currentHp: player.currentHp,
       maxHp: player.maxHp,
       tempHp: 0,

@@ -132,9 +132,12 @@ export function MonsterStatBlockPanel({
         <StatRow
           label="Senses"
           value={
-            statBlock.senses
-              ? `${statBlock.senses}, passive Perception ${statBlock.passivePerception}`
-              : `passive Perception ${statBlock.passivePerception}`
+            statBlock.senses &&
+            statBlock.senses.toLowerCase().includes('passive perception')
+              ? statBlock.senses
+              : statBlock.senses
+                ? `${statBlock.senses}, passive Perception ${statBlock.passivePerception}`
+                : `passive Perception ${statBlock.passivePerception}`
           }
         />
         <StatRow label="Languages" value={statBlock.languages} />

@@ -73,6 +73,7 @@ export function EntityCardExpanded({
   const [maxHpInput, setMaxHpInput] = useState('');
 
   const isPlayer = entity.type === 'player';
+  const isPlayerOwned = isPlayer || !!entity.summonOwnerId;
 
   const handleDamage = () => {
     const amount = parseInt(hpInput);
@@ -110,8 +111,8 @@ export function EntityCardExpanded({
                 size="lg"
               />
             </div>
-            {/* Editable max HP for non-players */}
-            {!isPlayer &&
+            {/* Editable max HP for non-players (summons are player-managed too) */}
+            {!isPlayerOwned &&
               (editingMaxHp ? (
                 <input
                   type="number"
@@ -157,8 +158,8 @@ export function EntityCardExpanded({
               ))}
           </div>
 
-          {/* Damage/Heal controls — not for players (synced from player sheet) */}
-          {!isPlayer && (
+          {/* Damage/Heal controls — not for players or summons (synced from player sheet) */}
+          {!isPlayerOwned && (
             <div className="flex items-center gap-2">
               <Input
                 value={hpInput}
