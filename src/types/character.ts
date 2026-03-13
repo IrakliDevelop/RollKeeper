@@ -665,6 +665,9 @@ export interface CharacterState {
   // Summons (familiars, summoned creatures)
   summons?: Summon[];
 
+  // Saved creature templates (reusable across summon cycles)
+  savedCreatures?: import('@/types/summon').SavedCreature[];
+
   // Miscellaneous
 }
 

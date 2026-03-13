@@ -657,6 +657,14 @@ interface CharacterStore {
   removeConcentrationSummons: () => void;
   dismissFamiliar: () => void;
 
+  // Saved creature templates
+  addSavedCreature: (creature: import('@/types/summon').SavedCreature) => void;
+  updateSavedCreature: (
+    creatureId: string,
+    updates: Partial<import('@/types/summon').SavedCreature>
+  ) => void;
+  removeSavedCreature: (creatureId: string) => void;
+
   // Persistence actions
   saveCharacter: () => void;
   loadCharacter: (character: CharacterState) => void;
@@ -4582,6 +4590,49 @@ export const useCharacterStore = create<CharacterStore>()(
             ...state.character,
             summons: (state.character.summons || []).filter(
               s => s.type !== 'familiar'
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      // Saved creature templates
+      addSavedCreature: creature => {
+        set(state => ({
+          character: {
+            ...state.character,
+            savedCreatures: [
+              ...(state.character.savedCreatures || []),
+              creature,
+            ],
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      updateSavedCreature: (creatureId, updates) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            savedCreatures: (state.character.savedCreatures || []).map(c =>
+              c.id === creatureId
+                ? { ...c, ...updates, updatedAt: new Date().toISOString() }
+                : c
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      removeSavedCreature: creatureId => {
+        set(state => ({
+          character: {
+            ...state.character,
+            savedCreatures: (state.character.savedCreatures || []).filter(
+              c => c.id !== creatureId
             ),
           },
           hasUnsavedChanges: true,

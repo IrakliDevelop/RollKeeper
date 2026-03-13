@@ -14,3 +14,42 @@ export interface Summon {
   createdAt: string;
   customName?: string;
 }
+
+/** A reusable creature template that persists across summon dismiss/death cycles */
+export interface SavedCreature {
+  id: string;
+  name: string;
+  // Core stats
+  size: string;
+  type: string;
+  alignment: string;
+  ac: number;
+  hp: number;
+  hpFormula?: string;
+  speed: string;
+  // Ability scores
+  str: number;
+  dex: number;
+  con: number;
+  int: number;
+  wis: number;
+  cha: number;
+  // Optional detail fields
+  saves?: string;
+  skills?: string;
+  resistances?: string;
+  immunities?: string;
+  vulnerabilities?: string;
+  conditionImmunities?: string[];
+  senses?: string;
+  passivePerception?: number;
+  languages?: string;
+  cr?: string;
+  // Abilities
+  traits?: Array<{ name: string; text: string }>;
+  actions?: Array<{ name: string; text: string }>;
+  reactions?: Array<{ name: string; text: string }>;
+  // Metadata
+  createdAt: string;
+  updatedAt: string;
+}

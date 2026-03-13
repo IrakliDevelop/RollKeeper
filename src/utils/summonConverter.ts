@@ -1,5 +1,5 @@
 import type { Spell } from '@/types/character';
-import type { Summon, SummonType } from '@/types/summon';
+import type { Summon, SummonType, SavedCreature } from '@/types/summon';
 import type { ProcessedMonster } from '@/types/bestiary';
 import { monsterToEncounterEntity } from './encounterConverter';
 import { searchMonsters } from './apiClient';
@@ -470,6 +470,112 @@ export function createSummonFromMonster(
       ...entityData,
       id: generateId(),
       name: customName || monster.name,
+    },
+    sourceSpellName: spellName,
+    sourceSpellId: spellId,
+    castAtLevel,
+    requiresConcentration,
+    duration,
+    createdAt: new Date().toISOString(),
+    customName,
+  };
+}
+
+/** Build a MonsterStatBlock from a SavedCreature */
+function savedCreatureToStatBlock(
+  creature: SavedCreature
+): import('@/types/encounter').MonsterStatBlock {
+  return {
+    str: creature.str,
+    dex: creature.dex,
+    con: creature.con,
+    int: creature.int,
+    wis: creature.wis,
+    cha: creature.cha,
+    saves: creature.saves || '',
+    skills: creature.skills || '',
+    speed: creature.speed,
+    resistances: creature.resistances || '',
+    immunities: creature.immunities || '',
+    vulnerabilities: creature.vulnerabilities || '',
+    conditionImmunities: creature.conditionImmunities || [],
+    senses: creature.senses || '',
+    passivePerception:
+      creature.passivePerception ?? 10 + Math.floor((creature.wis - 10) / 2),
+    traits: creature.traits || [],
+    actions: creature.actions || [],
+    reactions: creature.reactions || [],
+    cr: creature.cr || '0',
+    type: creature.type,
+    size: creature.size,
+    languages: creature.languages || '',
+    alignment: creature.alignment,
+    hpFormula: creature.hpFormula || String(creature.hp),
+  };
+}
+
+/** Create a familiar summon from a saved creature template */
+export function createFamiliarFromSavedCreature(
+  creature: SavedCreature,
+  spellId?: string,
+  customName?: string
+): Summon {
+  const dexMod = Math.floor((creature.dex - 10) / 2);
+
+  return {
+    id: generateId(),
+    type: 'familiar',
+    entity: {
+      id: generateId(),
+      type: 'monster',
+      name: customName || creature.name,
+      initiative: null,
+      initiativeModifier: dexMod,
+      currentHp: creature.hp,
+      maxHp: creature.hp,
+      tempHp: 0,
+      armorClass: creature.ac,
+      conditions: [],
+      monsterStatBlock: savedCreatureToStatBlock(creature),
+      isHidden: false,
+    },
+    sourceSpellName: 'Find Familiar',
+    sourceSpellId: spellId,
+    requiresConcentration: false,
+    duration: 'Until dismissed',
+    createdAt: new Date().toISOString(),
+    customName,
+  };
+}
+
+/** Create a summon from a saved creature template (for non-familiar spells) */
+export function createSummonFromSavedCreature(
+  creature: SavedCreature,
+  spellName: string,
+  spellId?: string,
+  castAtLevel?: number,
+  requiresConcentration: boolean = true,
+  duration: string = '1 hour',
+  customName?: string
+): Summon {
+  const dexMod = Math.floor((creature.dex - 10) / 2);
+
+  return {
+    id: generateId(),
+    type: 'summon',
+    entity: {
+      id: generateId(),
+      type: 'monster',
+      name: customName || creature.name,
+      initiative: null,
+      initiativeModifier: dexMod,
+      currentHp: creature.hp,
+      maxHp: creature.hp,
+      tempHp: 0,
+      armorClass: creature.ac,
+      conditions: [],
+      monsterStatBlock: savedCreatureToStatBlock(creature),
+      isHidden: false,
     },
     sourceSpellName: spellName,
     sourceSpellId: spellId,
