@@ -99,3 +99,8 @@ temp/
 
 *storybook.log
 storybook-static
+
+# electron
+/electron-dist
+/dist-electron
+/.electron-cache
