@@ -1,0 +1,44 @@
+appId: com.rollkeeper.app
+productName: RollKeeper
+copyright: Copyright © 2026 Irakli Iremashvili
+
+directories:
+  output: dist-electron
+  buildResources: build
+
+files:
+  - electron-dist/**/*
+
+extraResources:
+  - from: .next/standalone
+    to: standalone
+    filter:
+      - "**/*"
+  - from: .next/static
+    to: standalone/.next/static
+    filter:
+      - "**/*"
+  - from: public
+    to: standalone/public
+    filter:
+      - "**/*"
+
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.games
+
+dmg:
+  title: RollKeeper
+
+win:
+  target:
+    - nsis
+    - portable
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerSidebar: null
+  uninstallerSidebar: null
