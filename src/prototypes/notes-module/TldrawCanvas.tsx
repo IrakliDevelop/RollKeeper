@@ -415,7 +415,7 @@ export default function TldrawCanvas() {
         className={`relative flex-1 ${placingNoteId ? 'cursor-crosshair' : ''}`}
       >
         <Tldraw
-          licenseKey={process.env.TLDRAW_LICENSE_KEY}
+          licenseKey={process.env.NEXT_PUBLIC_TLDRAW_LICENSE_KEY}
           shapeUtils={customShapeUtils}
           snapshot={snapshot ?? undefined}
           onMount={handleMount}
