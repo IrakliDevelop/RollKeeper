@@ -1200,6 +1200,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1246,6 +1247,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1297,6 +1299,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1615,7 +1618,8 @@
 				"Otherworldly Wings|Sorcerer||Divine Soul|XGE|14",
 				"Unearthly Recovery|Sorcerer||Divine Soul|XGE|18"
 			],
-			"hasFluff": true
+			"hasFluff": true,
+			"hasFluffImages": true
 		},
 		{
 			"name": "Divine Soul",
@@ -1632,6 +1636,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1667,7 +1672,8 @@
 				"Shadow Walk|Sorcerer||Shadow|XGE|14",
 				"Umbral Form|Sorcerer||Shadow|XGE|18"
 			],
-			"hasFluff": true
+			"hasFluff": true,
+			"hasFluffImages": true
 		},
 		{
 			"name": "Shadow Magic",
@@ -1684,6 +1690,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1717,7 +1724,8 @@
 				"Storm's Fury|Sorcerer||Storm|XGE|14",
 				"Wind Soul|Sorcerer||Storm|XGE|18"
 			],
-			"hasFluff": true
+			"hasFluff": true,
+			"hasFluffImages": true
 		},
 		{
 			"name": "Storm Sorcery",
@@ -1734,6 +1742,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1809,6 +1818,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1891,6 +1901,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1907,90 +1918,6 @@
 					"name": "Clockwork Soul",
 					"source": "TCE",
 					"shortName": "Clockwork Soul",
-					"className": "Sorcerer",
-					"classSource": "PHB"
-				}
-			}
-		},
-		{
-			"name": "Runechild",
-			"shortName": "Runechild",
-			"source": "TDCSR",
-			"className": "Sorcerer",
-			"classSource": "PHB",
-			"page": 176,
-			"edition": "classic",
-			"additionalSpells": [
-				{
-					"known": {
-						"3": [
-							"longstrider",
-							"protection from evil and good"
-						],
-						"5": [
-							"lesser restoration",
-							"protection from poison"
-						],
-						"9": [
-							"glyph of warding",
-							"magic circle"
-						],
-						"13": [
-							"death ward",
-							"freedom of movement"
-						],
-						"17": [
-							"greater restoration",
-							"telekinesis"
-						]
-					}
-				}
-			],
-			"subclassFeatures": [
-				"Runechild|Sorcerer|PHB|Runechild|TDCSR|1",
-				"Glyph of Aegis (6th Level)|Sorcerer|PHB|Runechild|TDCSR|6",
-				"Sigilic Augmentation|Sorcerer|PHB|Runechild|TDCSR|6",
-				"Manifest Inscriptions|Sorcerer|PHB|Runechild|TDCSR|6",
-				"Glyph of Aegis (14th Level)|Sorcerer|PHB|Runechild|TDCSR|14",
-				"Runic Torrent|Sorcerer|PHB|Runechild|TDCSR|14",
-				"Arcane Exemplar|Sorcerer|PHB|Runechild|TDCSR|18"
-			],
-			"hasFluffImages": true
-		},
-		{
-			"name": "Runechild",
-			"shortName": "Runechild",
-			"source": "TDCSR",
-			"className": "Sorcerer",
-			"classSource": "XPHB",
-			"_copy": {
-				"name": "Runechild",
-				"source": "TDCSR",
-				"shortName": "Runechild",
-				"className": "Sorcerer",
-				"classSource": "PHB",
-				"_preserve": {
-					"page": true,
-					"otherSources": true,
-					"srd": true,
-					"basicRules": true,
-					"reprintedAs": true
-				}
-			},
-			"subclassFeatures": [
-				"Runechild|Sorcerer|XPHB|Runechild|TDCSR|3",
-				"Glyph of Aegis (6th Level)|Sorcerer|PHB|Runechild|TDCSR|6",
-				"Sigilic Augmentation|Sorcerer|PHB|Runechild|TDCSR|6",
-				"Manifest Inscriptions|Sorcerer|PHB|Runechild|TDCSR|6",
-				"Glyph of Aegis (14th Level)|Sorcerer|PHB|Runechild|TDCSR|14",
-				"Runic Torrent|Sorcerer|PHB|Runechild|TDCSR|14",
-				"Arcane Exemplar|Sorcerer|PHB|Runechild|TDCSR|18"
-			],
-			"fluff": {
-				"_subclassFluff": {
-					"name": "Runechild",
-					"source": "TDCSR",
-					"shortName": "Runechild",
 					"className": "Sorcerer",
 					"classSource": "PHB"
 				}
@@ -2060,6 +1987,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -2219,6 +2147,49 @@
 				"Bend Luck|Sorcerer|XPHB|Wild Magic|XPHB|6",
 				"Controlled Chaos|Sorcerer|XPHB|Wild Magic|XPHB|14",
 				"Tamed Surge|Sorcerer|XPHB|Wild Magic|XPHB|18"
+			],
+			"hasFluffImages": true
+		},
+		{
+			"name": "Spellfire Sorcery",
+			"shortName": "Spellfire",
+			"source": "FRHoF",
+			"className": "Sorcerer",
+			"classSource": "XPHB",
+			"page": 24,
+			"edition": "one",
+			"additionalSpells": [
+				{
+					"prepared": {
+						"3": [
+							"cure wounds|xphb",
+							"guiding bolt|xphb",
+							"lesser restoration|xphb",
+							"scorching ray|xphb"
+						],
+						"5": [
+							"aura of vitality|xphb",
+							"dispel magic|xphb"
+						],
+						"6": [
+							"counterspell|xphb"
+						],
+						"7": [
+							"fire shield|xphb",
+							"wall of fire|xphb"
+						],
+						"9": [
+							"greater restoration|xphb",
+							"flame strike|xphb"
+						]
+					}
+				}
+			],
+			"subclassFeatures": [
+				"Spellfire Sorcery|Sorcerer|XPHB|Spellfire|FRHoF|3|FRHoF",
+				"Absorb Spells|Sorcerer|XPHB|Spellfire|FRHoF|6|FRHoF",
+				"Honed Spellfire|Sorcerer|XPHB|Spellfire|FRHoF|14|FRHoF",
+				"Crown of Spellfire|Sorcerer|XPHB|Spellfire|FRHoF|18|FRHoF"
 			],
 			"hasFluffImages": true
 		}
@@ -3805,7 +3776,10 @@
 					],
 					"data": {
 						"genTables": {
-							"tableInclude": true
+							"tableInclude": true,
+							"reprintedAs": [
+								"Wild Magic Surge|XPHB"
+							]
 						}
 					}
 				}
@@ -4313,212 +4287,6 @@
 			]
 		},
 		{
-			"name": "Runechild",
-			"source": "TDCSR",
-			"page": 176,
-			"className": "Sorcerer",
-			"classSource": "PHB",
-			"subclassShortName": "Runechild",
-			"subclassSource": "TDCSR",
-			"level": 1,
-			"header": 1,
-			"entries": [
-				"The mysterious weave and flow of magic is feared by many folk across Exandria. But while some spellcasters must study the essence and nature of magic in the hope of learning to harness it, sorcerers possess an innate talent to sculpt and wield the errant strands of power that shape the world. For some sorcerers, the body becomes a conduit for this power, which is collected and stored in the form of natural runes\u2014and which sees a sorcerer named as a Runechild.",
-				"The talents of a Runechild are rare, and sorcerers with this origin are sought after for study by mages and scholars alike, driven by a prevalent belief that the secrets of their runes can help understand the mysteries of magic. Others sometimes seek to enslave Runechild sorcerers, using their bodies as tortured spell batteries for diabolic pursuits. Runechild sorcerers were subjugated throughout the {@book Age of Arcanum|TDCSR|1|Age of Arcanum}, and many of their contemporaries now search for ways to hide their essence\u2014a task that isn't easy given the revealing nature of their gifts.",
-				{
-					"type": "refSubclassFeature",
-					"subclassFeature": "Essence Runes|Sorcerer|PHB|Runechild|TDCSR|1"
-				},
-				{
-					"type": "refSubclassFeature",
-					"subclassFeature": "Runic Magic|Sorcerer|PHB|Runechild|TDCSR|1"
-				},
-				{
-					"type": "refSubclassFeature",
-					"subclassFeature": "Glyph of Aegis|Sorcerer|PHB|Runechild|TDCSR|1"
-				}
-			]
-		},
-		{
-			"name": "Essence Runes",
-			"source": "TDCSR",
-			"page": 177,
-			"className": "Sorcerer",
-			"classSource": "PHB",
-			"subclassShortName": "Runechild",
-			"subclassSource": "TDCSR",
-			"level": 1,
-			"header": 2,
-			"entries": [
-				"At 1st level, your body begins to express your innate magic as runes traced out across your skin. You start with 1 essence rune, and gain an additional rune whenever you gain a level in this class. These runes can manifest anywhere on your body, though the first usually manifests on the forehead. Your essence runes remain invisible when inert.",
-				"At the end of a turn during which you spent one or more sorcery points, a number of your essence runes equal to the number of sorcery points you spent begin to glow with stored energy, becoming charged runes. You use these charged runes to power your Runechild subclass features. Also, as a bonus action, you may spend a sorcery point to convert two essence runes into two charged runes.",
-				"If you have no sorcery points and no charged runes, you can convert a single essence rune into a charged rune as an action.",
-				"If you have 5 or more charged runes, you emit bright light in a 5-foot radius and dim light for an additional 5 feet.",
-				"If you expend a charged rune to use one of your Runechild features, it returns to being an inert essence rune. Any charged runes also revert to inert essence runes after you finish a {@quickref resting|PHB|2|0|long rest}."
-			]
-		},
-		{
-			"name": "Glyph of Aegis",
-			"source": "TDCSR",
-			"page": 177,
-			"className": "Sorcerer",
-			"classSource": "PHB",
-			"subclassShortName": "Runechild",
-			"subclassSource": "TDCSR",
-			"level": 1,
-			"header": 2,
-			"entries": [
-				"Starting at 1st level, you can release the stored arcane power within your runes to absorb or deflect threatening attacks. Whenever you take damage, you can expend any number of charged runes as a reaction. Roll a number of {@dice d6|d6s} equal to the number of runes you expended, and reduce the damage by the total."
-			]
-		},
-		{
-			"name": "Runic Magic",
-			"source": "TDCSR",
-			"page": 177,
-			"className": "Sorcerer",
-			"classSource": "PHB",
-			"subclassShortName": "Runechild",
-			"subclassSource": "TDCSR",
-			"level": 1,
-			"header": 2,
-			"entries": [
-				"Beginning at 1st level, you learn additional spells when you reach certain levels in this class, as shown on the Runic Spells table. Each of these spells counts as a sorcerer spell for you, but it doesn't count against the number of sorcerer spells you know.",
-				"When you gain a level in this class, you can replace one spell you gained from this feature with another spell of the same level. The new spell must be {@filter an abjuration or transmutation spell from the sorcerer, warlock, or wizard spell list|spells|school=A;T|class=Sorcerer;Warlock;Wizard}.",
-				{
-					"type": "table",
-					"caption": "Runic Spells",
-					"colLabels": [
-						"Sorcerer Level",
-						"Spells"
-					],
-					"colStyles": [
-						"col-2 text-center",
-						"col-10"
-					],
-					"rows": [
-						[
-							"1st",
-							"{@spell longstrider}, {@spell protection from evil and good}"
-						],
-						[
-							"3rd",
-							"{@spell lesser restoration}, {@spell protection from poison}"
-						],
-						[
-							"5th",
-							"{@spell glyph of warding}, {@spell magic circle}"
-						],
-						[
-							"7th",
-							"{@spell death ward}, {@spell freedom of movement}"
-						],
-						[
-							"9th",
-							"{@spell greater restoration}, {@spell telekinesis}"
-						]
-					]
-				}
-			]
-		},
-		{
-			"name": "Glyph of Aegis (6th Level)",
-			"source": "TDCSR",
-			"page": 177,
-			"className": "Sorcerer",
-			"classSource": "PHB",
-			"subclassShortName": "Runechild",
-			"subclassSource": "TDCSR",
-			"level": 6,
-			"header": 2,
-			"entries": [
-				"When you reach 6th level, you can touch a creature as an action and expend up to 3 charged runes to transfer your protective power to it for up to 1 hour. The next time that creature takes damage within the next hour, it rolls {@dice 1d6} per charged rune spent and reduces the damage by the total. You can't transfer this power to a creature already under the effect of Glyph of Aegis."
-			]
-		},
-		{
-			"name": "Manifest Inscriptions",
-			"source": "TDCSR",
-			"page": 178,
-			"className": "Sorcerer",
-			"classSource": "PHB",
-			"subclassShortName": "Runechild",
-			"subclassSource": "TDCSR",
-			"level": 6,
-			"header": 2,
-			"entries": [
-				"Also at 6th level, you can reveal hidden glyphs and enchantments that surround you. As an action, you expend one charged rune to reveal hidden or invisible arcane traps, marks, runes, wards, sensors, or glyphs within 60 feet of you. They glow with dim light in a 5-foot radius for 1 minute.",
-				"You have {@quickref Advantage and Disadvantage|PHB|2|0|advantage} on Intelligence ({@skill Arcana}) checks to discern the nature of any magic revealed in this way for the duration. If the glyphs you reveal mean something in a language you can't read, you can understand them while they are glowing as if you knew that language."
-			]
-		},
-		{
-			"name": "Sigilic Augmentation",
-			"source": "TDCSR",
-			"page": 178,
-			"className": "Sorcerer",
-			"classSource": "PHB",
-			"subclassShortName": "Runechild",
-			"subclassSource": "TDCSR",
-			"level": 6,
-			"header": 2,
-			"entries": [
-				"At 6th level, you can channel your runes to temporarily bolster your physical capabilities. When you make a Strength, Dexterity, or Constitution ability check, you can expend a charged rune as a reaction to gain {@quickref Advantage and Disadvantage|PHB|2|0|advantage} on the roll.",
-				"In addition, when you are forced to make a Strength, Dexterity, or Constitution {@quickref saving throws|PHB|2|1|saving throw}, you can use your reaction and expend a charged rune to gain {@quickref Advantage and Disadvantage|PHB|2|0|advantage} on the {@quickref saving throws|PHB|2|1|saving throw}. Once you use this feature in this way, you can't use it in this way again until you complete a {@quickref resting|PHB|2|0|long rest}."
-			]
-		},
-		{
-			"name": "Glyph of Aegis (14th Level)",
-			"source": "TDCSR",
-			"page": 177,
-			"className": "Sorcerer",
-			"classSource": "PHB",
-			"subclassShortName": "Runechild",
-			"subclassSource": "TDCSR",
-			"level": 14,
-			"header": 2,
-			"entries": [
-				"Your Glyph of Aegis die becomes a {@dice d8} at 14th level."
-			]
-		},
-		{
-			"name": "Runic Torrent",
-			"source": "TDCSR",
-			"page": 178,
-			"className": "Sorcerer",
-			"classSource": "PHB",
-			"subclassShortName": "Runechild",
-			"subclassSource": "TDCSR",
-			"level": 14,
-			"header": 2,
-			"entries": [
-				"Upon reaching 14th level, you can channel runic energy to overpower even the staunchest defenses. When you cast a spell, you can expend 2 charged runes to cause the spell to deal force damage instead of its usual damage types. Additionally, all creatures targeted by the spell or within the spell's area must succeed on a Strength {@quickref saving throws|PHB|2|1|saving throw} against your spell save DC or be knocked prone or pushed up to 15 feet away from the spell's point of origin (your choice).",
-				"Once you use this feature, you can't do so again until you complete a {@quickref resting|PHB|2|0|short or long rest}."
-			]
-		},
-		{
-			"name": "Arcane Exemplar",
-			"source": "TDCSR",
-			"page": 178,
-			"className": "Sorcerer",
-			"classSource": "PHB",
-			"subclassShortName": "Runechild",
-			"subclassSource": "TDCSR",
-			"level": 18,
-			"header": 2,
-			"entries": [
-				"Starting at 18th level, you can use a bonus action and expend a charged rune to become a being of pure magical energy. While in your exemplar form, you gain the following benefits:",
-				{
-					"type": "list",
-					"items": [
-						"You have a flying speed of 60 feet.",
-						"Creatures have {@quickref Advantage and Disadvantage|PHB|2|0|disadvantage} on {@quickref saving throws|PHB|2|1} against your sorcerer spells.",
-						"You have resistance to damage dealt by spells.",
-						"Whenever you cast a spell of 1st level or higher, you regain hit points equal to the spell's level."
-					]
-				},
-				"Your exemplar form lasts until the end of your turn. However, you can expend a charged rune at the end of your turn (no action required) to extend the duration until the end of your next turn. When your exemplar form ends, you are {@condition stunned} until the end of your next turn.",
-				"Once you use this feature, you can't use it again until you complete a {@quickref resting|PHB|2|0|long rest}."
-			]
-		},
-		{
 			"name": "Divine Soul",
 			"source": "XGE",
 			"page": 50,
@@ -4933,6 +4701,189 @@
 			}
 		},
 		{
+			"name": "Bolstering Flames",
+			"source": "FRHoF",
+			"page": 24,
+			"className": "Sorcerer",
+			"classSource": "XPHB",
+			"subclassShortName": "Spellfire",
+			"subclassSource": "FRHoF",
+			"level": 3,
+			"entries": [
+				"You or one creature you can see within 30 feet of yourself gains {@variantrule Temporary Hit Points|XPHB} equal to {@dice 1d4} plus your Charisma modifier."
+			]
+		},
+		{
+			"name": "Radiant Fire",
+			"source": "FRHoF",
+			"page": 24,
+			"className": "Sorcerer",
+			"classSource": "XPHB",
+			"subclassShortName": "Spellfire",
+			"subclassSource": "FRHoF",
+			"level": 3,
+			"entries": [
+				"One creature you can see within 30 feet of yourself takes {@damage 1d4} Fire or Radiant damage (your choice)."
+			]
+		},
+		{
+			"name": "Spellfire Burst",
+			"source": "FRHoF",
+			"page": 24,
+			"className": "Sorcerer",
+			"classSource": "XPHB",
+			"subclassShortName": "Spellfire",
+			"subclassSource": "FRHoF",
+			"level": 3,
+			"entries": [
+				"When you spend at least 1 Sorcery Point as part of the {@action Magic|XPHB} action or a {@variantrule Bonus Action|XPHB} on your turn, you can unleash one of the following magical effects of your choice. You can do so only once per turn.",
+				{
+					"type": "refSubclassFeature",
+					"subclassFeature": "Bolstering Flames|Sorcerer|XPHB|Spellfire|FRHoF|3|FRHoF"
+				},
+				{
+					"type": "refSubclassFeature",
+					"subclassFeature": "Radiant Fire|Sorcerer|XPHB|Spellfire|FRHoF|3|FRHoF"
+				}
+			]
+		},
+		{
+			"name": "Spellfire Sorcery",
+			"source": "FRHoF",
+			"page": 24,
+			"className": "Sorcerer",
+			"classSource": "XPHB",
+			"subclassShortName": "Spellfire",
+			"subclassSource": "FRHoF",
+			"level": 3,
+			"entries": [
+				"{@i Wield Raw Magic}",
+				"Your innate power stems from the source of magic itself: the Weave. This connection manifests as a rare ability known as spellfire, and you surge with radiant bursts of this raw magic. Your talent with spellfire allows you to heal allies, sear enemies, and absorb powerful spells.",
+				"Wielders of spellfire tend to have a penchant for wandering. Many travel between cosmopolitan settlements, such as those along the Sword Coast, and wield their magic in service of the common good. Others realize their own strange powers by roaming equally strange lands, from the magic-blasted wastes of the desert of Anauroch to the god-touched wilds of the Old Empires. Wherever they go in the Realms, spellfire Sorcerers are courted by factions with interests in the arcane arts, such as the Harpers, Cult of the Dragon, and Red Wizards.",
+				{
+					"type": "refSubclassFeature",
+					"subclassFeature": "Spellfire Burst|Sorcerer|XPHB|Spellfire|FRHoF|3|FRHoF"
+				},
+				{
+					"type": "refSubclassFeature",
+					"subclassFeature": "Spellfire Spells|Sorcerer|XPHB|Spellfire|FRHoF|3|FRHoF"
+				}
+			]
+		},
+		{
+			"name": "Spellfire Spells",
+			"source": "FRHoF",
+			"page": 24,
+			"className": "Sorcerer",
+			"classSource": "XPHB",
+			"subclassShortName": "Spellfire",
+			"subclassSource": "FRHoF",
+			"level": 3,
+			"entries": [
+				"When you reach a Sorcerer level specified in the Spellfire Spells table, you thereafter always have the listed spells prepared.",
+				{
+					"type": "table",
+					"colLabels": [
+						"Sorcerer Level",
+						"Spells"
+					],
+					"colStyles": [
+						"col-2 text-center",
+						"col-10"
+					],
+					"rows": [
+						[
+							"3",
+							"{@spell Cure Wounds|XPHB}, {@spell Guiding Bolt|XPHB}, {@spell Lesser Restoration|XPHB}, {@spell Scorching Ray|XPHB}"
+						],
+						[
+							"5",
+							"{@spell Aura of Vitality|XPHB}, {@spell Dispel Magic|XPHB}"
+						],
+						[
+							"7",
+							"{@spell Fire Shield|XPHB}, {@spell Wall of Fire|XPHB}"
+						],
+						[
+							"9",
+							"{@spell Greater Restoration|XPHB}, {@spell Flame Strike|XPHB}"
+						]
+					]
+				}
+			]
+		},
+		{
+			"name": "Absorb Spells",
+			"source": "FRHoF",
+			"page": 25,
+			"className": "Sorcerer",
+			"classSource": "XPHB",
+			"subclassShortName": "Spellfire",
+			"subclassSource": "FRHoF",
+			"level": 6,
+			"header": 2,
+			"entries": [
+				"You always have {@spell Counterspell|XPHB} prepared.",
+				"Additionally, whenever a target fails the saving throw against a {@spell Counterspell|XPHB} you cast, you regain {@dice 1d4} Sorcery Points."
+			]
+		},
+		{
+			"name": "Honed Spellfire",
+			"source": "FRHoF",
+			"page": 25,
+			"className": "Sorcerer",
+			"classSource": "XPHB",
+			"subclassShortName": "Spellfire",
+			"subclassSource": "FRHoF",
+			"level": 14,
+			"header": 2,
+			"entries": [
+				"Your {@subclassFeature Spellfire Burst|Sorcerer|XPHB|Spellfire|FRHoF|3|FRHoF} improves. You add your {@class Sorcerer|XPHB} level to the {@variantrule Temporary Hit Points|XPHB} gained from {@subclassFeature Bolstering Flames|Sorcerer|XPHB|Spellfire|FRHoF|3|FRHoF}, and the damage of {@subclassFeature Radiant Fire|Sorcerer|XPHB|Spellfire|FRHoF|3|FRHoF} increases to {@dice 1d8}."
+			]
+		},
+		{
+			"name": "Crown of Spellfire",
+			"source": "FRHoF",
+			"page": 25,
+			"className": "Sorcerer",
+			"classSource": "XPHB",
+			"subclassShortName": "Spellfire",
+			"subclassSource": "FRHoF",
+			"level": 18,
+			"header": 2,
+			"consumes": {
+				"name": "Sorcery Point",
+				"amount": 7
+			},
+			"entries": [
+				"When you use {@classFeature Innate Sorcery|Sorcerer|XPHB|1}, you can alter it and infuse yourself with the essence of spellfire, gaining the following benefits while this use of Innate Sorcery is active. Once you use this feature to alter Innate Sorcery, you can't use it again until you finish a {@variantrule Long Rest|XPHB} unless you spend 5 Sorcery Points (no action required) to restore your use of it.",
+				{
+					"type": "entries",
+					"name": "Burning Life Force",
+					"page": 8,
+					"entries": [
+						"Once per turn when you are hit by an attack roll, you can expend a number of {@variantrule Hit Point Dice|XPHB}, up to a maximum equal to your Charisma modifier (minimum of one). Roll the expended dice, and reduce the amount of damage from that attack equal to the total rolled."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Flight",
+					"page": 8,
+					"entries": [
+						"You gain a {@variantrule Fly Speed|XPHB} of 60 feet and can hover."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Spell Avoidance",
+					"page": 8,
+					"entries": [
+						"When you're subjected to a spell or magical effect that allows you to make a saving throw to take only half damage, you instead take no damage if you succeed on the saving throw and only half damage if you fail. You can't use this benefit if you have the {@condition Incapacitated|XPHB} condition."
+					]
+				}
+			]
+		},
+		{
 			"name": "Draconic Bloodline",
 			"source": "PHB",
 			"className": "Sorcerer",
@@ -5032,27 +4983,6 @@
 				"classSource": "PHB",
 				"subclassShortName": "Clockwork Soul",
 				"subclassSource": "TCE",
-				"level": 1,
-				"_preserve": {
-					"page": true
-				}
-			}
-		},
-		{
-			"name": "Runechild",
-			"source": "TDCSR",
-			"className": "Sorcerer",
-			"classSource": "XPHB",
-			"subclassShortName": "Runechild",
-			"subclassSource": "TDCSR",
-			"level": 3,
-			"_copy": {
-				"name": "Runechild",
-				"source": "TDCSR",
-				"className": "Sorcerer",
-				"classSource": "PHB",
-				"subclassShortName": "Runechild",
-				"subclassSource": "TDCSR",
 				"level": 1,
 				"_preserve": {
 					"page": true
@@ -5842,7 +5772,7 @@
 			"level": 14,
 			"header": 2,
 			"entries": [
-				"You gain a modicum of control over the surges of your wild magic. Whenever you roll on the Wild {@action Magic|XPHB} Surge table, you can roll twice and use either number."
+				"You gain a modicum of control over the surges of your wild magic. Whenever you roll on the Wild Magic Surge table, you can roll twice and use either number."
 			]
 		},
 		{
