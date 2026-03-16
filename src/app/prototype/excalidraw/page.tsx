@@ -2,21 +2,21 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ArrowLeft, AlertTriangle, Hexagon } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Pen } from 'lucide-react';
 
-const TldrawCanvas = dynamic(
-  () => import('@/prototypes/notes-module/TldrawCanvas'),
+const ExcalidrawCanvas = dynamic(
+  () => import('@/prototypes/notes-module/ExcalidrawCanvas'),
   {
     loading: () => (
       <div className="flex h-full items-center justify-center text-gray-500">
-        Loading tldraw canvas...
+        Loading Excalidraw canvas...
       </div>
     ),
     ssr: false,
   }
 );
 
-export default function TldrawPrototypePage() {
+export default function ExcalidrawPrototypePage() {
   return (
     <div className="flex h-screen flex-col">
       {/* Prototype Banner */}
@@ -25,7 +25,8 @@ export default function TldrawPrototypePage() {
           <div className="flex items-center gap-2 text-amber-800">
             <AlertTriangle size={14} />
             <span className="text-xs font-medium">
-              Prototype — tldraw freeform notes canvas (draw + note cards)
+              Prototype — Excalidraw freeform notes canvas (open-source
+              alternative)
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -37,11 +38,11 @@ export default function TldrawPrototypePage() {
               ReactFlow Canvas
             </Link>
             <Link
-              href="/prototype/excalidraw"
+              href="/prototype/tldraw"
               className="flex items-center gap-1.5 rounded bg-amber-100 px-2.5 py-1 text-xs text-amber-800 hover:bg-amber-200"
             >
-              <Hexagon size={12} />
-              Excalidraw Canvas
+              <Pen size={12} />
+              tldraw Canvas
             </Link>
             <Link
               href="/"
@@ -55,7 +56,7 @@ export default function TldrawPrototypePage() {
 
       {/* Canvas */}
       <div className="flex-1">
-        <TldrawCanvas />
+        <ExcalidrawCanvas />
       </div>
     </div>
   );
