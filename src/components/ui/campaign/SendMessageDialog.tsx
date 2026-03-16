@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/feedback/dialog-new';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
-import { Checkbox } from '@/components/ui/forms/checkbox';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
 import type { CampaignPlayerData } from '@/types/campaign';
 import type { DmMessage } from '@/types/sharedState';
@@ -42,9 +41,10 @@ export function SendMessageDialog({
 }: SendMessageDialogProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [sendToAll, setSendToAll] = useState(!targetPlayer);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const sendToAll = !targetPlayer;
 
   const handleSend = async () => {
     if (!title.trim()) return;
@@ -83,10 +83,8 @@ export function SendMessageDialog({
         throw new Error(body.error || `Failed (${res.status})`);
       }
 
-      // Reset and close
       setTitle('');
       setContent('');
-      setSendToAll(!targetPlayer);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send message');
@@ -100,7 +98,6 @@ export function SendMessageDialog({
       setTitle('');
       setContent('');
       setError(null);
-      setSendToAll(!targetPlayer);
       onClose();
     }
   };
@@ -122,21 +119,6 @@ export function SendMessageDialog({
           <div className="space-y-2">
             <label className="text-body text-sm font-medium">To</label>
             <div className="text-heading text-sm">{recipientLabel}</div>
-            {targetPlayer && players.length > 1 && (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="send-to-all"
-                  checked={sendToAll}
-                  onCheckedChange={checked => setSendToAll(!!checked)}
-                />
-                <label
-                  htmlFor="send-to-all"
-                  className="text-body cursor-pointer text-sm"
-                >
-                  Send to all players instead
-                </label>
-              </div>
-            )}
           </div>
 
           {/* Title */}
