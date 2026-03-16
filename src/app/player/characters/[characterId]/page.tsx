@@ -9,6 +9,10 @@ import { useAutoSave } from '@/hooks/useAutoSave';
 import { usePlayerSync } from '@/hooks/usePlayerSync';
 import { SyncIndicator } from '@/components/ui/campaign/SyncIndicator';
 import { DmMessageNotification } from '@/components/ui/campaign/DmMessageNotification';
+import { DmEffectsNotification } from '@/components/ui/campaign/DmEffectsNotification';
+import { DmCounterNotification } from '@/components/ui/campaign/DmCounterNotification';
+import { useDmConditionOverrides } from '@/hooks/useDmConditionOverrides';
+import type { DmEffect } from '@/types/sharedState';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
 
@@ -238,11 +242,52 @@ export default function CharacterSheet() {
   const playerSync = usePlayerSync({ characterId });
 
   // Shared DM calendar state (when in a campaign)
-  const { sharedState, acknowledgeMessage } = useSharedCampaignState(
-    playerSync.campaignCode,
-    characterId
-  );
+  const { sharedState, acknowledgeMessage, acknowledgeDmEffects } =
+    useSharedCampaignState(playerSync.campaignCode, characterId);
   const sharedCalendar = sharedState?.calendar ?? null;
+
+  // Latch DM effects into local state for the notification toast before
+  // acknowledgment clears them from shared state.
+  const [pendingEffectToasts, setPendingEffectToasts] = useState<DmEffect[]>(
+    []
+  );
+
+  useEffect(() => {
+    const additions = (sharedState?.dmEffects ?? []).filter(
+      e => e.action === 'add'
+    );
+    if (additions.length > 0) {
+      setPendingEffectToasts(additions);
+    }
+  }, [sharedState?.dmEffects]);
+
+  // Apply DM condition overrides (additions/removals) to character store,
+  // then acknowledge to clear them from Redis so the player owns the conditions.
+  useDmConditionOverrides(sharedState?.dmEffects, acknowledgeDmEffects);
+
+  // Detect custom counter changes from the DM and show a toast
+  const prevCounterRef = useRef<number | null>(null);
+  const [counterToast, setCounterToast] = useState<{
+    label: string;
+    value: number;
+    delta: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const counter = sharedState?.customCounter;
+    if (!counter) return;
+
+    const prev = prevCounterRef.current;
+    prevCounterRef.current = counter.value;
+
+    if (prev !== null && counter.value !== prev) {
+      setCounterToast({
+        label: counter.label,
+        value: counter.value,
+        delta: counter.value - prev,
+      });
+    }
+  }, [sharedState?.customCounter]);
 
   const calendarDays = sharedCalendar
     ? getCampaignDays(
@@ -726,9 +771,34 @@ export default function CharacterSheet() {
               onToggleInspiration={handleToggleInspiration}
               onToggleReaction={toggleReaction}
               onStopConcentration={stopConcentration}
-              onNavigateToConditions={() => switchToTab('conditions')}
+              onNavigateToConditions={() => {
+                switchToTab('conditions');
+                setTimeout(() => {
+                  document
+                    .getElementById('conditions-section')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 150);
+              }}
               onUpdateCharacter={updateCharacter}
             />
+
+            {/* DM Effects (applied by DM in encounter) */}
+            {pendingEffectToasts.length > 0 && (
+              <DmEffectsNotification
+                effects={pendingEffectToasts}
+                onDismiss={() => setPendingEffectToasts([])}
+              />
+            )}
+
+            {/* DM Custom Counter change notification */}
+            {counterToast && (
+              <DmCounterNotification
+                label={counterToast.label}
+                value={counterToast.value}
+                delta={counterToast.delta}
+                onDismiss={() => setCounterToast(null)}
+              />
+            )}
 
             {/* DM Message Notifications */}
             {(sharedState?.messages?.length ?? 0) > 0 && (
@@ -889,6 +959,7 @@ export default function CharacterSheet() {
                   addToast={addToast}
                   calendarDays={calendarDays}
                   campaignCode={playerSync.campaignCode ?? undefined}
+                  customCounter={sharedState?.customCounter}
                 />
               </main>
             ) : (

@@ -42,23 +42,37 @@ export function mergePlayerSyncData(
       }
     : undefined;
 
-  // Build player-synced conditions from character data
+  // Build player-synced conditions from character data,
+  // filtering out any the DM has explicitly suppressed (removed).
+  const suppressed = new Set(entity.suppressedConditions ?? []);
+
   const playerConditions: EncounterCondition[] = (
     char.conditionsAndDiseases?.activeConditions ?? []
-  ).map(c => ({
-    id: `psync-${c.name.toLowerCase().replace(/\s+/g, '-')}`,
-    name: c.name,
-    description: c.description,
-    source: 'player-sync' as const,
-  }));
+  )
+    .filter(c => !suppressed.has(c.name))
+    .map(c => ({
+      id: `psync-${c.name.toLowerCase().replace(/\s+/g, '-')}`,
+      name: c.name,
+      description: c.description,
+      source: 'player-sync' as const,
+    }));
+
+  // Clean up stale suppressions: if the player no longer has a condition,
+  // no need to keep suppressing it.
+  const playerConditionNames = new Set(
+    (char.conditionsAndDiseases?.activeConditions ?? []).map(c => c.name)
+  );
+  const updatedSuppressed = [...suppressed].filter(name =>
+    playerConditionNames.has(name)
+  );
 
   // Preserve DM-added conditions
   const dmConditions = entity.conditions.filter(c => c.source === 'dm');
 
   // Merge: DM conditions + player-synced conditions (deduplicated by name)
-  const playerConditionNames = new Set(playerConditions.map(c => c.name));
+  const mergedPlayerNames = new Set(playerConditions.map(c => c.name));
   const uniqueDmConditions = dmConditions.filter(
-    c => !playerConditionNames.has(c.name)
+    c => !mergedPlayerNames.has(c.name)
   );
   const mergedConditions = [...uniqueDmConditions, ...playerConditions];
 
@@ -73,6 +87,8 @@ export function mergePlayerSyncData(
     hasUsedReaction,
     deathSaves,
     conditions: mergedConditions,
+    suppressedConditions:
+      updatedSuppressed.length > 0 ? updatedSuppressed : undefined,
   };
 }
 

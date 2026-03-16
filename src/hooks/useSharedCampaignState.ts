@@ -17,6 +17,7 @@ interface UseSharedCampaignStateResult {
   error: string | null;
   lastFetched: Date | null;
   acknowledgeMessage: (messageId: string) => Promise<void>;
+  acknowledgeDmEffects: () => Promise<void>;
 }
 
 export function useSharedCampaignState(
@@ -170,5 +171,29 @@ export function useSharedCampaignState(
     [campaignCode, playerId]
   );
 
-  return { sharedState, loading, error, lastFetched, acknowledgeMessage };
+  const acknowledgeDmEffects = useCallback(async () => {
+    if (!campaignCode || !playerId) return;
+    try {
+      await fetch(`/api/campaign/${campaignCode}/shared`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId, type: 'effects' }),
+      });
+      setSharedState(prev => {
+        if (!prev) return prev;
+        return { ...prev, dmEffects: [] };
+      });
+    } catch (err) {
+      console.error('Failed to acknowledge DM effects:', err);
+    }
+  }, [campaignCode, playerId]);
+
+  return {
+    sharedState,
+    loading,
+    error,
+    lastFetched,
+    acknowledgeMessage,
+    acknowledgeDmEffects,
+  };
 }

@@ -23,6 +23,7 @@ import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog'
 import { SendMessageDialog } from '@/components/ui/campaign/SendMessageDialog';
 import { NPCSection } from '@/components/ui/campaign/NPCSection';
 import { useCampaignSync } from '@/hooks/useCampaignSync';
+import { useDmCounterSync } from '@/hooks/useDmCounterSync';
 import { useDmStore } from '@/store/dmStore';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import { CampaignPlayerData } from '@/types/campaign';
@@ -43,6 +44,8 @@ export default function CampaignViewPage() {
       createdAt: localCampaign?.createdAt ?? new Date().toISOString(),
       interval: 10000,
     });
+
+  useDmCounterSync(code, dmId);
 
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);

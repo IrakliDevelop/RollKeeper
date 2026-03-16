@@ -164,6 +164,24 @@ export const calculatePassivePerception = (
 };
 
 /**
+ * Calculate passive insight
+ * Passive insight = 10 + Insight skill modifier
+ */
+export const calculatePassiveInsight = (character: CharacterState): number => {
+  return 10 + calculateSkillModifier(character, 'insight');
+};
+
+/**
+ * Calculate passive investigation
+ * Passive investigation = 10 + Investigation skill modifier
+ */
+export const calculatePassiveInvestigation = (
+  character: CharacterState
+): number => {
+  return 10 + calculateSkillModifier(character, 'investigation');
+};
+
+/**
  * Calculate hit point maximum based on level and constitution
  * This is a simplified calculation - in reality it depends on class hit die
  */

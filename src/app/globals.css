@@ -395,6 +395,24 @@
 }
 
 /* ============================================================
+   ANIMATIONS
+   ============================================================ */
+
+@keyframes condition-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--accent-red-border-strong, #ef4444);
+  }
+  50% {
+    box-shadow: 0 0 8px 4px var(--accent-red-border-strong, #ef4444);
+  }
+}
+
+@utility animate-condition-pulse {
+  animation: condition-pulse 2s ease-in-out infinite;
+}
+
+/* ============================================================
    BASE STYLES
    ============================================================ */
 

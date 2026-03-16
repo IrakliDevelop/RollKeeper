@@ -120,6 +120,9 @@ export interface EncounterEntity {
   deathSaves?: { successes: number; failures: number; isStabilized: boolean };
   hasUsedReaction?: boolean; // Whether player has used their reaction this round
 
+  // DM condition authority: player-synced conditions the DM explicitly removed
+  suppressedConditions?: string[];
+
   // Visual
   color?: string; // For grouping same monsters
   isHidden?: boolean; // DM can hide from players

@@ -44,6 +44,10 @@ export function campaignMessagesKey(code: string, playerId: string): string {
   return `campaign:${code}:messages:${playerId}`;
 }
 
+export function campaignEffectsKey(code: string, playerId: string): string {
+  return `campaign:${code}:effects:${playerId}`;
+}
+
 export async function refreshCampaignTTL(
   redis: Redis,
   code: string

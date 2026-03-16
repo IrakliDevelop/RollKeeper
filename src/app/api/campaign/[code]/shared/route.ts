@@ -4,6 +4,7 @@ import {
   campaignKey,
   campaignSharedKey,
   campaignMessagesKey,
+  campaignEffectsKey,
   campaignPlayersKey,
   refreshCampaignTTL,
   SLIDING_TTL_SECONDS,
@@ -11,9 +12,11 @@ import {
 import type { CampaignData } from '@/types/campaign';
 import type {
   DmMessage,
+  DmEffect,
   SharedCalendar,
   SharedCalendarPlayer,
   SharedCampaignState,
+  SharedCustomCounter,
 } from '@/types/sharedState';
 
 export async function GET(
@@ -50,23 +53,47 @@ export async function GET(
       }
     }
 
-    // Fetch pending messages for this player
+    // Fetch pending messages, DM effects, and custom counter for this player
     let messages: DmMessage[] = [];
+    let dmEffects: DmEffect[] = [];
+    let customCounter: SharedCampaignState['customCounter'] = null;
+
     if (playerId) {
-      const messagesRaw = await redis.get<string>(
-        campaignMessagesKey(code, playerId)
-      );
+      const [messagesRaw, effectsRaw, countersRaw] = await Promise.all([
+        redis.get<string>(campaignMessagesKey(code, playerId)),
+        redis.get<string>(campaignEffectsKey(code, playerId)),
+        redis.get<string>(campaignSharedKey(code, 'counters')),
+      ]);
       if (messagesRaw) {
         messages =
           typeof messagesRaw === 'string'
             ? JSON.parse(messagesRaw)
             : messagesRaw;
       }
+      if (effectsRaw) {
+        dmEffects =
+          typeof effectsRaw === 'string' ? JSON.parse(effectsRaw) : effectsRaw;
+      }
+      if (countersRaw) {
+        const parsed: SharedCustomCounter =
+          typeof countersRaw === 'string'
+            ? JSON.parse(countersRaw)
+            : countersRaw;
+        const value = parsed.counters?.[playerId] ?? 0;
+        if (parsed.label) {
+          customCounter = { label: parsed.label, value };
+        }
+      }
     }
 
     await refreshCampaignTTL(redis, code);
 
-    const state: SharedCampaignState = { calendar, messages };
+    const state: SharedCampaignState = {
+      calendar,
+      messages,
+      dmEffects,
+      customCounter,
+    };
     return NextResponse.json(state);
   } catch (error) {
     console.error('Error fetching shared state:', error);
@@ -157,6 +184,32 @@ export async function POST(
       return NextResponse.json({ success: true });
     }
 
+    if (feature === 'effects') {
+      const { playerId: targetPlayerId, effects } = data as {
+        playerId: string;
+        effects: DmEffect[];
+      };
+
+      if (!targetPlayerId) {
+        return NextResponse.json(
+          { error: 'playerId is required for effects' },
+          { status: 400 }
+        );
+      }
+
+      const key = campaignEffectsKey(code, targetPlayerId);
+      if (effects.length === 0) {
+        await redis.del(key);
+      } else {
+        await redis.set(key, JSON.stringify(effects), {
+          ex: SLIDING_TTL_SECONDS,
+        });
+      }
+
+      await refreshCampaignTTL(redis, code);
+      return NextResponse.json({ success: true });
+    }
+
     // Default: store as shared feature key (calendar, etc.)
     await Promise.all([
       redis.set(campaignSharedKey(code, feature), JSON.stringify(data), {
@@ -175,23 +228,40 @@ export async function POST(
   }
 }
 
-// DELETE — player acknowledges (removes) a message
+// DELETE — player acknowledges (removes) a message or DM effects
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
     const { code } = await params;
-    const { playerId, messageId } = await request.json();
+    const body = await request.json();
+    const { playerId, type } = body;
 
-    if (!playerId || !messageId) {
+    if (!playerId) {
       return NextResponse.json(
-        { error: 'playerId and messageId are required' },
+        { error: 'playerId is required' },
         { status: 400 }
       );
     }
 
     const redis = getRedis();
+
+    // Acknowledge all DM effects for this player
+    if (type === 'effects') {
+      await redis.del(campaignEffectsKey(code, playerId));
+      return NextResponse.json({ success: true });
+    }
+
+    // Default: acknowledge a specific message
+    const { messageId } = body;
+    if (!messageId) {
+      return NextResponse.json(
+        { error: 'messageId is required' },
+        { status: 400 }
+      );
+    }
+
     const key = campaignMessagesKey(code, playerId);
     const raw = await redis.get<string>(key);
 
@@ -211,9 +281,9 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error acknowledging message:', error);
+    console.error('Error acknowledging shared data:', error);
     return NextResponse.json(
-      { error: 'Failed to acknowledge message' },
+      { error: 'Failed to acknowledge' },
       { status: 500 }
     );
   }
