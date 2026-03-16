@@ -534,6 +534,189 @@ form select {
   }
 }
 
+/* ============================================================
+   LANDING PAGE BACKGROUNDS & TEXTURES
+   ============================================================ */
+
+.landing-dot-grid {
+  background-image: radial-gradient(
+    circle,
+    var(--divider) 1px,
+    transparent 1px
+  );
+  background-size: 24px 24px;
+}
+
+.landing-gradient-band-blue {
+  background: linear-gradient(
+    135deg,
+    var(--accent-blue-bg) 0%,
+    var(--accent-indigo-bg) 40%,
+    transparent 70%
+  );
+}
+
+.landing-gradient-band-purple {
+  background: linear-gradient(
+    -135deg,
+    var(--accent-purple-bg) 0%,
+    var(--accent-violet-bg) 40%,
+    transparent 70%
+  );
+}
+
+.landing-gradient-sweep {
+  background: linear-gradient(
+    160deg,
+    var(--accent-blue-bg) 0%,
+    var(--accent-purple-bg) 30%,
+    var(--accent-indigo-bg) 60%,
+    transparent 85%
+  );
+}
+
+.landing-gradient-glow-center {
+  background: radial-gradient(
+    ellipse 60% 50% at 50% 50%,
+    var(--accent-purple-bg-strong) 0%,
+    var(--accent-indigo-bg) 40%,
+    transparent 70%
+  );
+}
+
+/* ============================================================
+   LANDING PAGE ANIMATIONS
+   ============================================================ */
+
+@keyframes drift {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(10px, -15px);
+  }
+  50% {
+    transform: translate(-5px, -25px);
+  }
+  75% {
+    transform: translate(-15px, -10px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes drift-reverse {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-12px, -10px);
+  }
+  50% {
+    transform: translate(8px, -20px);
+  }
+  75% {
+    transform: translate(15px, -8px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes orb-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(30px, -20px) scale(1.05);
+  }
+  66% {
+    transform: translate(-20px, 15px) scale(0.95);
+  }
+}
+
+@keyframes orb-float-alt {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(-25px, 20px) scale(0.95);
+  }
+  66% {
+    transform: translate(15px, -25px) scale(1.05);
+  }
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes icon-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-drift {
+  animation: drift 8s ease-in-out infinite;
+}
+
+.animate-drift-reverse {
+  animation: drift-reverse 10s ease-in-out infinite;
+}
+
+.animate-drift-slow {
+  animation: drift 14s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background-size: 200% 200%;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+.animate-orb-float {
+  animation: orb-float 12s ease-in-out infinite;
+}
+
+.animate-orb-float-alt {
+  animation: orb-float-alt 15s ease-in-out infinite;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 4s ease-in-out infinite;
+}
+
+.animate-icon-bob {
+  animation: icon-bob 3s ease-in-out infinite;
+}
+
 /* Error page animations */
 @keyframes float {
   0%,
