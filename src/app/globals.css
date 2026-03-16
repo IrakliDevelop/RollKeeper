@@ -576,3 +576,31 @@ form select {
 .animate-float-slow {
   animation: float-slow 8s ease-in-out infinite 1s;
 }
+
+/* Landing page fade-in animations */
+@keyframes landing-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-fade-in {
+  animation: landing-fade-in 0.7s ease-out both;
+}
+
+.landing-delay-1 {
+  animation-delay: 0.15s;
+}
+
+.landing-delay-2 {
+  animation-delay: 0.3s;
+}
+
+.landing-delay-3 {
+  animation-delay: 0.45s;
+}
