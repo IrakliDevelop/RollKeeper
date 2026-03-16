@@ -13,6 +13,10 @@ import {
   formatProficiencyType,
 } from '@/utils/classFilters';
 import { X, Filter } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/layout/card';
+import { Checkbox } from '@/components/ui/forms/checkbox';
+import { Button } from '@/components/ui/forms/button';
+import { Badge } from '@/components/ui/layout/badge';
 
 interface ClassFiltersPanelProps {
   filters: ClassFilters;
@@ -45,10 +49,7 @@ export default function ClassFiltersPanel({
     key: K,
     value: ClassFilters[K]
   ) => {
-    onFiltersChange({
-      ...filters,
-      [key]: value,
-    });
+    onFiltersChange({ ...filters, [key]: value });
   };
 
   const toggleArrayFilter = <T,>(
@@ -59,7 +60,6 @@ export default function ClassFiltersPanel({
     const newArray = currentArray.includes(value)
       ? currentArray.filter(item => item !== value)
       : [...currentArray, value];
-
     updateFilter(key, newArray as ClassFilters[typeof key]);
   };
 
@@ -68,294 +68,267 @@ export default function ClassFiltersPanel({
   );
 
   return (
-    <div className="space-y-6 rounded-lg border border-slate-600/50 bg-slate-800/30 p-6 backdrop-blur-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Filter className="h-5 w-5 text-emerald-400" />
-          <h3 className="text-lg font-semibold text-white">Filter Classes</h3>
+    <Card
+      variant="bordered"
+      padding="md"
+      className="border-accent-emerald-border/50 bg-surface-secondary ring-accent-emerald-border/20 mb-6 shadow-md ring-1"
+    >
+      <CardContent className="space-y-6 p-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="bg-accent-emerald-bg-strong rounded-lg p-2">
+              <Filter className="text-accent-emerald-text h-4 w-4" />
+            </div>
+            <h3 className="text-heading text-lg font-semibold">
+              Filter Classes
+            </h3>
+          </div>
+          {hasActiveFilters && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClearFilters}
+              leftIcon={<X size={14} />}
+            >
+              Clear All
+            </Button>
+          )}
         </div>
 
-        {hasActiveFilters && (
-          <button
-            onClick={onClearFilters}
-            className="flex items-center gap-2 rounded-lg border border-slate-600/50 bg-slate-700/50 px-3 py-1.5 text-sm text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
-          >
-            <X size={16} />
-            Clear All
-          </button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Sources */}
-        <div>
-          <label className="mb-3 block text-sm font-medium text-slate-300">
-            Sources ({filters.sources?.length || 0} selected)
-          </label>
-          <div className="max-h-40 space-y-2 overflow-y-auto">
-            {filterOptions.sources.map(source => (
-              <label
-                key={source}
-                className="group flex cursor-pointer items-center space-x-2"
-              >
-                <input
-                  type="checkbox"
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <h4 className="text-body mb-3 text-sm font-medium">
+              Sources ({filters.sources?.length || 0})
+            </h4>
+            <div className="max-h-40 space-y-2 overflow-y-auto">
+              {filterOptions.sources.map(source => (
+                <Checkbox
+                  key={source}
                   checked={filters.sources?.includes(source) || false}
-                  onChange={() =>
+                  onCheckedChange={() =>
                     toggleArrayFilter('sources', source, filters.sources)
                   }
-                  className="rounded border-slate-600 bg-slate-700 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-800"
+                  label={source}
+                  size="md"
                 />
-                <span className="text-sm text-slate-400 transition-colors group-hover:text-slate-300">
-                  {source}
-                </span>
-              </label>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Spellcasting Types */}
-        <div>
-          <label className="mb-3 block text-sm font-medium text-slate-300">
-            Spellcasting ({filters.spellcastingTypes?.length || 0} selected)
-          </label>
-          <div className="space-y-2">
-            {filterOptions.spellcastingTypes.map(type => (
-              <label
-                key={type}
-                className="group flex cursor-pointer items-center space-x-2"
-              >
-                <input
-                  type="checkbox"
+          <div>
+            <h4 className="text-body mb-3 text-sm font-medium">
+              Spellcasting ({filters.spellcastingTypes?.length || 0})
+            </h4>
+            <div className="space-y-2">
+              {filterOptions.spellcastingTypes.map(type => (
+                <Checkbox
+                  key={type}
                   checked={filters.spellcastingTypes?.includes(type) || false}
-                  onChange={() =>
+                  onCheckedChange={() =>
                     toggleArrayFilter(
                       'spellcastingTypes',
                       type,
                       filters.spellcastingTypes
                     )
                   }
-                  className="rounded border-slate-600 bg-slate-700 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-800"
+                  label={formatSpellcastingType(type)}
+                  size="md"
                 />
-                <span className="text-sm text-slate-400 transition-colors group-hover:text-slate-300">
-                  {formatSpellcastingType(type)}
-                </span>
-              </label>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Spellcasting Abilities */}
-        <div>
-          <label className="mb-3 block text-sm font-medium text-slate-300">
-            Spellcasting Ability ({filters.spellcastingAbilities?.length || 0}{' '}
-            selected)
-          </label>
-          <div className="space-y-2">
-            {SPELLCASTING_ABILITIES.map(ability => (
-              <label
-                key={ability}
-                className="group flex cursor-pointer items-center space-x-2"
-              >
-                <input
-                  type="checkbox"
+          <div>
+            <h4 className="text-body mb-3 text-sm font-medium">
+              Casting Ability ({filters.spellcastingAbilities?.length || 0})
+            </h4>
+            <div className="space-y-2">
+              {SPELLCASTING_ABILITIES.map(ability => (
+                <Checkbox
+                  key={ability}
                   checked={
                     filters.spellcastingAbilities?.includes(ability) || false
                   }
-                  onChange={() =>
+                  onCheckedChange={() =>
                     toggleArrayFilter(
                       'spellcastingAbilities',
                       ability,
                       filters.spellcastingAbilities
                     )
                   }
-                  className="rounded border-slate-600 bg-slate-700 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-800"
+                  label={formatSpellcastingAbility(ability)}
+                  size="md"
                 />
-                <span className="text-sm text-slate-400 transition-colors group-hover:text-slate-300">
-                  {formatSpellcastingAbility(ability)}
-                </span>
-              </label>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Hit Dice Types */}
-        <div>
-          <label className="mb-3 block text-sm font-medium text-slate-300">
-            Hit Dice ({filters.hitDiceTypes?.length || 0} selected)
-          </label>
-          <div className="space-y-2">
-            {filterOptions.hitDiceTypes.map(hitDie => (
-              <label
-                key={hitDie}
-                className="group flex cursor-pointer items-center space-x-2"
-              >
-                <input
-                  type="checkbox"
+          <div>
+            <h4 className="text-body mb-3 text-sm font-medium">
+              Hit Dice ({filters.hitDiceTypes?.length || 0})
+            </h4>
+            <div className="space-y-2">
+              {filterOptions.hitDiceTypes.map(hitDie => (
+                <Checkbox
+                  key={hitDie}
                   checked={filters.hitDiceTypes?.includes(hitDie) || false}
-                  onChange={() =>
+                  onCheckedChange={() =>
                     toggleArrayFilter(
                       'hitDiceTypes',
                       hitDie,
                       filters.hitDiceTypes
                     )
                   }
-                  className="rounded border-slate-600 bg-slate-700 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-800"
+                  label={hitDie}
+                  size="md"
                 />
-                <span className="text-sm text-slate-400 transition-colors group-hover:text-slate-300">
-                  {hitDie}
-                </span>
-              </label>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Primary Abilities */}
-        <div>
-          <label className="mb-3 block text-sm font-medium text-slate-300">
-            Saving Throws ({filters.primaryAbilities?.length || 0} selected)
-          </label>
-          <div className="space-y-2">
-            {PRIMARY_ABILITIES.map(ability => (
-              <label
-                key={ability}
-                className="group flex cursor-pointer items-center space-x-2"
-              >
-                <input
-                  type="checkbox"
+          <div>
+            <h4 className="text-body mb-3 text-sm font-medium">
+              Saving Throws ({filters.primaryAbilities?.length || 0})
+            </h4>
+            <div className="space-y-2">
+              {PRIMARY_ABILITIES.map(ability => (
+                <Checkbox
+                  key={ability}
                   checked={filters.primaryAbilities?.includes(ability) || false}
-                  onChange={() =>
+                  onCheckedChange={() =>
                     toggleArrayFilter(
                       'primaryAbilities',
                       ability,
                       filters.primaryAbilities
                     )
                   }
-                  className="rounded border-slate-600 bg-slate-700 text-emerald-600 focus:ring-emerald-500 focus:ring-offset-slate-800"
+                  label={formatProficiencyType(ability)}
+                  size="md"
                 />
-                <span className="text-sm text-slate-400 transition-colors group-hover:text-slate-300">
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {hasActiveFilters && (
+          <div className="border-divider border-t pt-4">
+            <div className="text-muted mb-2 text-sm">Active filters:</div>
+            <div className="flex flex-wrap gap-2">
+              {filters.sources?.map(source => (
+                <Badge
+                  key={`source-${source}`}
+                  variant="info"
+                  size="sm"
+                  rightIcon={
+                    <button
+                      onClick={() =>
+                        toggleArrayFilter('sources', source, filters.sources)
+                      }
+                      aria-label={`Remove ${source} filter`}
+                    >
+                      <X size={12} />
+                    </button>
+                  }
+                >
+                  {source}
+                </Badge>
+              ))}
+              {filters.spellcastingTypes?.map(type => (
+                <Badge
+                  key={`casting-${type}`}
+                  variant="secondary"
+                  size="sm"
+                  rightIcon={
+                    <button
+                      onClick={() =>
+                        toggleArrayFilter(
+                          'spellcastingTypes',
+                          type,
+                          filters.spellcastingTypes
+                        )
+                      }
+                      aria-label={`Remove ${type} filter`}
+                    >
+                      <X size={12} />
+                    </button>
+                  }
+                >
+                  {formatSpellcastingType(type)}
+                </Badge>
+              ))}
+              {filters.spellcastingAbilities?.map(ability => (
+                <Badge
+                  key={`ability-${ability}`}
+                  variant="success"
+                  size="sm"
+                  rightIcon={
+                    <button
+                      onClick={() =>
+                        toggleArrayFilter(
+                          'spellcastingAbilities',
+                          ability,
+                          filters.spellcastingAbilities
+                        )
+                      }
+                      aria-label={`Remove ${ability} filter`}
+                    >
+                      <X size={12} />
+                    </button>
+                  }
+                >
+                  {formatSpellcastingAbility(ability)}
+                </Badge>
+              ))}
+              {filters.hitDiceTypes?.map(hitDie => (
+                <Badge
+                  key={`hitdie-${hitDie}`}
+                  variant="warning"
+                  size="sm"
+                  rightIcon={
+                    <button
+                      onClick={() =>
+                        toggleArrayFilter(
+                          'hitDiceTypes',
+                          hitDie,
+                          filters.hitDiceTypes
+                        )
+                      }
+                      aria-label={`Remove ${hitDie} filter`}
+                    >
+                      <X size={12} />
+                    </button>
+                  }
+                >
+                  {hitDie}
+                </Badge>
+              ))}
+              {filters.primaryAbilities?.map(ability => (
+                <Badge
+                  key={`primary-${ability}`}
+                  variant="info"
+                  size="sm"
+                  rightIcon={
+                    <button
+                      onClick={() =>
+                        toggleArrayFilter(
+                          'primaryAbilities',
+                          ability,
+                          filters.primaryAbilities
+                        )
+                      }
+                      aria-label={`Remove ${ability} filter`}
+                    >
+                      <X size={12} />
+                    </button>
+                  }
+                >
                   {formatProficiencyType(ability)}
-                </span>
-              </label>
-            ))}
+                </Badge>
+              ))}
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* Active filters summary */}
-      {hasActiveFilters && (
-        <div className="border-t border-slate-600/50 pt-4">
-          <div className="mb-2 text-sm text-slate-400">Active filters:</div>
-          <div className="flex flex-wrap gap-2">
-            {/* Sources */}
-            {filters.sources?.map(source => (
-              <span
-                key={`source-${source}`}
-                className="inline-flex items-center gap-1 rounded border border-blue-500/30 bg-blue-500/20 px-2 py-1 text-xs text-blue-400"
-              >
-                {source}
-                <button
-                  onClick={() =>
-                    toggleArrayFilter('sources', source, filters.sources)
-                  }
-                  className="hover:text-blue-300"
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-
-            {/* Spellcasting Types */}
-            {filters.spellcastingTypes?.map(type => (
-              <span
-                key={`casting-${type}`}
-                className="inline-flex items-center gap-1 rounded border border-purple-500/30 bg-purple-500/20 px-2 py-1 text-xs text-purple-400"
-              >
-                {formatSpellcastingType(type)}
-                <button
-                  onClick={() =>
-                    toggleArrayFilter(
-                      'spellcastingTypes',
-                      type,
-                      filters.spellcastingTypes
-                    )
-                  }
-                  className="hover:text-purple-300"
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-
-            {/* Spellcasting Abilities */}
-            {filters.spellcastingAbilities?.map(ability => (
-              <span
-                key={`ability-${ability}`}
-                className="inline-flex items-center gap-1 rounded border border-emerald-500/30 bg-emerald-500/20 px-2 py-1 text-xs text-emerald-400"
-              >
-                {formatSpellcastingAbility(ability)}
-                <button
-                  onClick={() =>
-                    toggleArrayFilter(
-                      'spellcastingAbilities',
-                      ability,
-                      filters.spellcastingAbilities
-                    )
-                  }
-                  className="hover:text-emerald-300"
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-
-            {/* Hit Dice */}
-            {filters.hitDiceTypes?.map(hitDie => (
-              <span
-                key={`hitdie-${hitDie}`}
-                className="inline-flex items-center gap-1 rounded border border-orange-500/30 bg-orange-500/20 px-2 py-1 text-xs text-orange-400"
-              >
-                {hitDie}
-                <button
-                  onClick={() =>
-                    toggleArrayFilter(
-                      'hitDiceTypes',
-                      hitDie,
-                      filters.hitDiceTypes
-                    )
-                  }
-                  className="hover:text-orange-300"
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-
-            {/* Primary Abilities */}
-            {filters.primaryAbilities?.map(ability => (
-              <span
-                key={`primary-${ability}`}
-                className="inline-flex items-center gap-1 rounded border border-cyan-500/30 bg-cyan-500/20 px-2 py-1 text-xs text-cyan-400"
-              >
-                {formatProficiencyType(ability)}
-                <button
-                  onClick={() =>
-                    toggleArrayFilter(
-                      'primaryAbilities',
-                      ability,
-                      filters.primaryAbilities
-                    )
-                  }
-                  className="hover:text-cyan-300"
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

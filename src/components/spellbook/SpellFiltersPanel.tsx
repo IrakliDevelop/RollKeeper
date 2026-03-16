@@ -8,7 +8,11 @@ import {
   SpellClass,
 } from '@/types/spells';
 import { useCharacterStore } from '@/store/characterStore';
-import { Filter } from 'lucide-react';
+import { Filter, X } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
+import { Checkbox } from '@/components/ui/forms/checkbox';
+import { Card, CardContent } from '@/components/ui/layout/card';
+import { Badge } from '@/components/ui/layout/badge';
 
 interface SpellFiltersPanelProps {
   filters: SpellFilters;
@@ -52,27 +56,20 @@ export default function SpellFiltersPanel({
 
   const handleCharacterClassFilter = () => {
     const characterClassName = character.class?.name?.toLowerCase() || '';
-
-    // Map common class names to spell class names
     const classMap: Record<string, SpellClass> = {
       fighter: 'eldritch knight',
       rogue: 'arcane trickster',
     };
-
     const spellClassName =
       (classMap[characterClassName] as SpellClass) ||
       (characterClassName as SpellClass);
 
     if (filters.classes.includes(spellClassName)) {
-      // Remove character class filter
       onFilterChange({
         classes: filters.classes.filter(c => c !== spellClassName),
       });
     } else {
-      // Add character class filter
-      onFilterChange({
-        classes: [...filters.classes, spellClassName],
-      });
+      onFilterChange({ classes: [...filters.classes, spellClassName] });
     }
   };
 
@@ -90,7 +87,6 @@ export default function SpellFiltersPanel({
     'arcane trickster',
   ];
 
-  // Check if character class filter is active
   const characterClassName = character.class?.name?.toLowerCase() || '';
   const classMap: Record<string, SpellClass> = {
     fighter: 'eldritch knight',
@@ -101,228 +97,299 @@ export default function SpellFiltersPanel({
     (characterClassName as SpellClass);
   const isCharacterClassFiltered = filters.classes.includes(spellClassName);
 
+  const hasActiveFilters =
+    filters.levels.length > 0 ||
+    filters.schools.length > 0 ||
+    filters.classes.length > 0 ||
+    filters.sources.length > 0 ||
+    filters.components.length > 0 ||
+    filters.concentration !== undefined ||
+    filters.ritual !== undefined;
+
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-600/50 bg-slate-800/50 shadow-lg backdrop-blur-sm">
-      {/* Header with decorative border */}
-      <div className="relative border-b border-slate-600/50 bg-gradient-to-r from-slate-800/60 to-slate-700/60 p-4">
-        <div className="absolute top-0 right-0 left-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
-
+    <Card
+      variant="bordered"
+      padding="md"
+      className="border-accent-purple-border/50 bg-surface-secondary ring-accent-purple-border/20 shadow-md ring-1"
+    >
+      <CardContent className="space-y-6 p-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-500/30 bg-amber-600/20">
-              <Filter className="h-4 w-4 text-amber-400" />
+          <div className="flex items-center gap-2">
+            <div className="bg-accent-purple-bg-strong rounded-lg p-2">
+              <Filter className="text-accent-purple-text h-4 w-4" />
             </div>
-            <h3 className="text-lg font-semibold text-white">Spell Filters</h3>
+            <h3 className="text-heading text-lg font-semibold">
+              Spell Filters
+            </h3>
+            <span className="text-muted text-sm">
+              {spellCount} of {totalSpells}
+            </span>
           </div>
-          <button
-            onClick={onClearFilters}
-            className="text-sm text-amber-400 underline transition-colors hover:text-amber-300"
-          >
-            Clear All
-          </button>
-        </div>
-
-        <div className="absolute right-1/4 bottom-0 left-1/4 h-px bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
-      </div>
-
-      <div className="space-y-6 p-6">
-        {/* Results Summary */}
-        <div className="relative rounded-lg border border-amber-500/20 bg-gradient-to-br from-amber-600/10 to-amber-800/10 p-4 text-center">
-          <div className="absolute top-0 right-1/3 left-1/3 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
-
-          <div className="mb-1 text-3xl font-bold text-amber-400">
-            {spellCount}
-          </div>
-          <div className="text-sm text-slate-300">of {totalSpells} spells</div>
-
-          <div className="absolute right-1/3 bottom-0 left-1/3 h-px bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
-        </div>
-
-        {/* Character Class Quick Filter */}
-        {character.class?.spellcaster !== 'none' && character.class?.name && (
-          <div>
-            <h4 className="mb-3 text-sm font-medium text-slate-300">
-              Character Class
-            </h4>
-            <button
-              onClick={handleCharacterClassFilter}
-              className={`flex w-full items-center justify-between rounded-lg border p-3 transition-all ${
-                isCharacterClassFiltered
-                  ? 'border-amber-500/50 bg-amber-600/20 text-amber-300'
-                  : 'border-slate-600/50 bg-slate-700/30 text-slate-300 hover:bg-slate-600/30'
-              }`}
+          {hasActiveFilters && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClearFilters}
+              leftIcon={<X size={14} />}
             >
-              <div className="flex items-center gap-3">
-                <div
-                  className={`h-3 w-3 rounded-full ${
-                    isCharacterClassFiltered ? 'bg-amber-400' : 'bg-slate-500'
-                  }`}
-                />
-                <span className="font-medium capitalize">
-                  {character.class.name} Spells
-                </span>
-              </div>
-              <span className="rounded bg-slate-600 px-2 py-1 text-xs">
-                {isCharacterClassFiltered ? 'Active' : 'Show Only'}
-              </span>
-            </button>
-            <p className="mt-2 text-xs text-slate-400">
-              Show only spells available to your {character.class.name}
-            </p>
-          </div>
-        )}
+              Clear All
+            </Button>
+          )}
+        </div>
 
-        {/* Spell Levels */}
-        <div className="mb-6">
-          <h4 className="mb-3 text-sm font-medium text-slate-200">
-            Spell Level
-          </h4>
-          <div className="grid grid-cols-5 gap-2">
-            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => (
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {/* Character Class Quick Filter */}
+          {character.class?.spellcaster !== 'none' && character.class?.name && (
+            <div>
+              <h4 className="text-body mb-3 text-sm font-medium">
+                Character Class
+              </h4>
               <button
-                key={level}
-                onClick={() => handleLevelToggle(level)}
-                className={`rounded p-2 text-sm font-medium transition-all ${
-                  filters.levels.includes(level)
-                    ? 'bg-amber-500 text-slate-900'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                onClick={handleCharacterClassFilter}
+                className={`flex min-h-[44px] w-full items-center justify-between rounded-lg border p-3 transition-all ${
+                  isCharacterClassFiltered
+                    ? 'border-accent-purple-border bg-accent-purple-bg text-accent-purple-text'
+                    : 'border-divider bg-surface-raised text-body hover:bg-surface-hover'
                 }`}
+                aria-pressed={isCharacterClassFiltered}
               >
-                {level === 0 ? 'C' : level}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Schools */}
-        <div className="mb-6">
-          <h4 className="mb-3 text-sm font-medium text-slate-200">School</h4>
-          <div className="space-y-2">
-            {Object.entries(SPELL_SCHOOLS).map(([school, name]) => (
-              <label
-                key={school}
-                className="flex cursor-pointer items-center space-x-2"
-              >
-                <input
-                  type="checkbox"
-                  checked={filters.schools.includes(school as SpellSchool)}
-                  onChange={() => handleSchoolToggle(school as SpellSchool)}
-                  className="rounded border-slate-600 bg-slate-700 text-amber-500 focus:ring-amber-500"
-                />
-                <span className="text-sm text-slate-300">{name}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Spell Classes */}
-        <div>
-          <h4 className="mb-3 text-sm font-medium text-slate-300">Classes</h4>
-          <div className="grid grid-cols-2 gap-2">
-            {availableClasses.map(className => (
-              <button
-                key={className}
-                onClick={() => handleClassToggle(className)}
-                className={`rounded p-2 text-xs transition-all ${
-                  filters.classes.includes(className)
-                    ? 'border border-amber-500/50 bg-amber-600/30 text-amber-300'
-                    : 'border border-slate-600/30 bg-slate-700/30 text-slate-300 hover:bg-slate-600/30'
-                }`}
-              >
-                <span className="capitalize">
-                  {className === 'eldritch knight'
-                    ? 'E. Knight'
-                    : className === 'arcane trickster'
-                      ? 'A. Trickster'
-                      : className}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Ritual & Concentration */}
-        <div>
-          <h4 className="mb-3 text-sm font-medium text-slate-300">
-            Special Properties
-          </h4>
-          <div className="space-y-2">
-            <label className="flex cursor-pointer items-center gap-3">
-              <input
-                type="checkbox"
-                checked={filters.ritual === true}
-                onChange={e =>
-                  onFilterChange({
-                    ritual: e.target.checked ? true : undefined,
-                  })
-                }
-                className="rounded border-slate-600 bg-slate-700 text-amber-500 focus:ring-amber-500"
-              />
-              <span className="text-sm text-slate-300">Ritual spells only</span>
-            </label>
-
-            <label className="flex cursor-pointer items-center gap-3">
-              <input
-                type="checkbox"
-                checked={filters.concentration === true}
-                onChange={e =>
-                  onFilterChange({
-                    concentration: e.target.checked ? true : undefined,
-                  })
-                }
-                className="rounded border-slate-600 bg-slate-700 text-amber-500 focus:ring-amber-500"
-              />
-              <span className="text-sm text-slate-300">
-                Concentration spells only
-              </span>
-            </label>
-
-            <label className="flex cursor-pointer items-center gap-3">
-              <input
-                type="checkbox"
-                checked={filters.concentration === false}
-                onChange={e =>
-                  onFilterChange({
-                    concentration: e.target.checked ? false : undefined,
-                  })
-                }
-                className="rounded border-slate-600 bg-slate-700 text-amber-500 focus:ring-amber-500"
-              />
-              <span className="text-sm text-slate-300">
-                Non-concentration only
-              </span>
-            </label>
-          </div>
-        </div>
-
-        {/* Sources */}
-        {availableSources.length > 1 && (
-          <div>
-            <h4 className="mb-3 text-sm font-medium text-slate-300">Sources</h4>
-            <div className="max-h-40 space-y-2 overflow-y-auto">
-              {availableSources.map(source => (
-                <label
-                  key={source}
-                  className="flex cursor-pointer items-center gap-3"
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`h-3 w-3 rounded-full ${isCharacterClassFiltered ? 'bg-accent-purple-bg-strong' : 'bg-surface-secondary'}`}
+                  />
+                  <span className="font-medium capitalize">
+                    {character.class.name} Spells
+                  </span>
+                </div>
+                <Badge
+                  variant={isCharacterClassFiltered ? 'primary' : 'neutral'}
+                  size="sm"
                 >
-                  <input
-                    type="checkbox"
+                  {isCharacterClassFiltered ? 'Active' : 'Show Only'}
+                </Badge>
+              </button>
+            </div>
+          )}
+
+          {/* Spell Levels */}
+          <div>
+            <h4 className="text-body mb-3 text-sm font-medium">Spell Level</h4>
+            <div className="grid grid-cols-5 gap-2">
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => (
+                <button
+                  key={level}
+                  onClick={() => handleLevelToggle(level)}
+                  className={`min-h-[44px] rounded-lg p-2 text-sm font-medium transition-all ${
+                    filters.levels.includes(level)
+                      ? 'bg-accent-purple-bg-strong text-accent-purple-text shadow-sm'
+                      : 'bg-surface-raised text-body hover:bg-surface-hover'
+                  }`}
+                  aria-pressed={filters.levels.includes(level)}
+                >
+                  {level === 0 ? 'C' : level}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Schools */}
+          <div>
+            <h4 className="text-body mb-3 text-sm font-medium">School</h4>
+            <div className="max-h-48 space-y-2 overflow-y-auto">
+              {Object.entries(SPELL_SCHOOLS).map(([school, name]) => (
+                <Checkbox
+                  key={school}
+                  checked={filters.schools.includes(school as SpellSchool)}
+                  onCheckedChange={() =>
+                    handleSchoolToggle(school as SpellSchool)
+                  }
+                  label={name}
+                  size="md"
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Spell Classes */}
+          <div>
+            <h4 className="text-body mb-3 text-sm font-medium">Classes</h4>
+            <div className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto">
+              {availableClasses.map(className => (
+                <button
+                  key={className}
+                  onClick={() => handleClassToggle(className)}
+                  className={`min-h-[44px] rounded-lg border px-3 py-2 text-xs font-medium transition-all ${
+                    filters.classes.includes(className)
+                      ? 'border-accent-purple-border bg-accent-purple-bg text-accent-purple-text'
+                      : 'border-divider bg-surface-raised text-body hover:bg-surface-hover'
+                  }`}
+                  aria-pressed={filters.classes.includes(className)}
+                >
+                  <span className="capitalize">
+                    {className === 'eldritch knight'
+                      ? 'E. Knight'
+                      : className === 'arcane trickster'
+                        ? 'A. Trickster'
+                        : className}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Ritual & Concentration */}
+          <div>
+            <h4 className="text-body mb-3 text-sm font-medium">
+              Special Properties
+            </h4>
+            <div className="space-y-2">
+              <Checkbox
+                checked={filters.ritual === true}
+                onCheckedChange={checked =>
+                  onFilterChange({ ritual: checked ? true : undefined })
+                }
+                label="Ritual spells only"
+                size="md"
+              />
+              <Checkbox
+                checked={filters.concentration === true}
+                onCheckedChange={checked =>
+                  onFilterChange({ concentration: checked ? true : undefined })
+                }
+                label="Concentration spells only"
+                size="md"
+              />
+              <Checkbox
+                checked={filters.concentration === false}
+                onCheckedChange={checked =>
+                  onFilterChange({ concentration: checked ? false : undefined })
+                }
+                label="Non-concentration only"
+                size="md"
+              />
+            </div>
+          </div>
+
+          {/* Sources */}
+          {availableSources.length > 1 && (
+            <div>
+              <h4 className="text-body mb-3 text-sm font-medium">Sources</h4>
+              <div className="max-h-40 space-y-2 overflow-y-auto">
+                {availableSources.map(source => (
+                  <Checkbox
+                    key={source}
                     checked={filters.sources.includes(source)}
-                    onChange={e => {
-                      const newSources = e.target.checked
+                    onCheckedChange={checked => {
+                      const newSources = checked
                         ? [...filters.sources, source]
                         : filters.sources.filter(s => s !== source);
                       onFilterChange({ sources: newSources });
                     }}
-                    className="rounded border-slate-600 bg-slate-700 text-amber-500 focus:ring-amber-500"
+                    label={source}
+                    size="md"
                   />
-                  <span className="text-sm text-slate-300">{source}</span>
-                </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Active filters summary */}
+        {hasActiveFilters && (
+          <div className="border-divider border-t pt-4">
+            <div className="text-muted mb-2 text-sm">Active filters:</div>
+            <div className="flex flex-wrap gap-2">
+              {filters.levels.map(level => (
+                <Badge
+                  key={`level-${level}`}
+                  variant="info"
+                  size="sm"
+                  rightIcon={
+                    <button
+                      onClick={() => handleLevelToggle(level)}
+                      aria-label={`Remove level ${level} filter`}
+                    >
+                      <X size={12} />
+                    </button>
+                  }
+                >
+                  {level === 0 ? 'Cantrip' : `Level ${level}`}
+                </Badge>
               ))}
+              {filters.schools.map(school => (
+                <Badge
+                  key={`school-${school}`}
+                  variant="secondary"
+                  size="sm"
+                  rightIcon={
+                    <button
+                      onClick={() => handleSchoolToggle(school)}
+                      aria-label={`Remove ${school} filter`}
+                    >
+                      <X size={12} />
+                    </button>
+                  }
+                >
+                  {SPELL_SCHOOLS[school]}
+                </Badge>
+              ))}
+              {filters.classes.map(cls => (
+                <Badge
+                  key={`class-${cls}`}
+                  variant="success"
+                  size="sm"
+                  rightIcon={
+                    <button
+                      onClick={() => handleClassToggle(cls)}
+                      aria-label={`Remove ${cls} filter`}
+                    >
+                      <X size={12} />
+                    </button>
+                  }
+                >
+                  <span className="capitalize">{cls}</span>
+                </Badge>
+              ))}
+              {filters.ritual !== undefined && (
+                <Badge
+                  variant="warning"
+                  size="sm"
+                  rightIcon={
+                    <button
+                      onClick={() => onFilterChange({ ritual: undefined })}
+                      aria-label="Remove ritual filter"
+                    >
+                      <X size={12} />
+                    </button>
+                  }
+                >
+                  Ritual
+                </Badge>
+              )}
+              {filters.concentration !== undefined && (
+                <Badge
+                  variant="danger"
+                  size="sm"
+                  rightIcon={
+                    <button
+                      onClick={() =>
+                        onFilterChange({ concentration: undefined })
+                      }
+                      aria-label="Remove concentration filter"
+                    >
+                      <X size={12} />
+                    </button>
+                  }
+                >
+                  {filters.concentration
+                    ? 'Concentration'
+                    : 'Non-concentration'}
+                </Badge>
+              )}
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

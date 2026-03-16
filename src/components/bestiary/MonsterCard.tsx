@@ -1,6 +1,7 @@
 import { ProcessedMonster } from '@/types/bestiary';
 import { Shield, Heart, Zap } from 'lucide-react';
-import { Badge } from '@/components/ui';
+import { Badge } from '@/components/ui/layout/badge';
+import { Card, CardContent } from '@/components/ui/layout/card';
 import { getCRColor, formatSize, formatAlignment } from '@/utils/bestiaryUtils';
 
 interface MonsterCardProps {
@@ -10,41 +11,44 @@ interface MonsterCardProps {
 
 export default function MonsterCard({ monster, onClick }: MonsterCardProps) {
   return (
-    <div
+    <Card
+      variant="bordered"
+      padding="md"
+      interactive
       onClick={onClick}
-      className="flex h-full cursor-pointer flex-col justify-between rounded-lg border border-slate-700/50 bg-slate-800/50 p-5 transition-all duration-300 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-900/20"
+      className="flex h-full flex-col justify-between transition-all hover:shadow-md"
     >
-      <div>
-        <div className="flex items-start justify-between">
-          <h2 className="flex-1 pr-2 text-xl font-bold tracking-wide text-slate-100">
+      <CardContent className="p-0">
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <h2 className="text-heading flex-1 text-lg leading-tight font-bold">
             {monster.name}
           </h2>
           <Badge
-            className={`px-2.5 py-1 text-base font-bold ${getCRColor(monster.cr)}`}
+            className={`shrink-0 px-2.5 py-1 text-sm font-bold ${getCRColor(monster.cr)}`}
           >
             CR {monster.cr}
           </Badge>
         </div>
-        <p className="mt-1 text-sm text-slate-400 italic">
+        <p className="text-muted mt-1 text-sm italic">
           {formatSize(monster.size)} {String(monster.type)},{' '}
           {formatAlignment(monster.alignment)}
         </p>
-      </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-x-4 gap-y-2 text-sm text-slate-300">
-        <div className="flex items-center gap-2">
-          <Shield size={16} className="text-sky-400" />
-          <span>AC {monster.ac.split(' ')[0]}</span>
+        <div className="text-body mt-4 grid grid-cols-3 gap-x-4 gap-y-2 text-sm">
+          <div className="flex items-center gap-2">
+            <Shield size={16} className="text-accent-blue-text shrink-0" />
+            <span>AC {monster.ac.split(' ')[0]}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Heart size={16} className="text-accent-red-text shrink-0" />
+            <span>HP {monster.hp.split(' ')[0]}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Zap size={16} className="text-accent-amber-text shrink-0" />
+            <span className="truncate">{monster.speed.split(',')[0]}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Heart size={16} className="text-red-400" />
-          <span>HP {monster.hp.split(' ')[0]}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Zap size={16} className="text-yellow-400" />
-          <span className="truncate">{monster.speed.split(',')[0]}</span>
-        </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

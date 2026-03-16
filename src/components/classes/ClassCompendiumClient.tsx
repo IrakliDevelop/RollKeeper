@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ProcessedClass, ClassFilters } from '@/types/classes';
 import {
   filterClasses,
@@ -8,18 +8,12 @@ import {
   getSpellcastingTypes,
   getHitDiceTypes,
 } from '@/utils/classFilters';
-import {
-  Search,
-  Filter,
-  Shield,
-  Users,
-  Grid,
-  List,
-  Loader2,
-  ChevronDown,
-} from 'lucide-react';
+import { Search, Filter, Shield, Users, Grid, List } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
+import { Input } from '@/components/ui/forms/input';
 import ClassCard from './ClassCard';
 import ClassFiltersPanel from './ClassFiltersPanel';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 
 type ViewMode = 'classes' | 'subclasses';
 type DisplayMode = 'grid' | 'list';
@@ -37,13 +31,6 @@ export default function ClassCompendiumClient({
   const [showFilters, setShowFilters] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Infinite scroll state
-  const [displayedCount, setDisplayedCount] = useState(20); // Initial load
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-  const ITEMS_PER_LOAD = 15;
-  const SMALL_RESULT_THRESHOLD = 30;
-
   const [filters, setFilters] = useState<ClassFilters>({
     sources: [],
     spellcastingTypes: [],
@@ -53,64 +40,16 @@ export default function ClassCompendiumClient({
     searchQuery: '',
   });
 
-  // Filter classes based on current filters and search
   const filteredClasses = useMemo(() => {
-    const currentFilters = {
-      ...filters,
-      searchQuery: searchQuery,
-    };
-
-    return filterClasses(classes, currentFilters);
+    return filterClasses(classes, { ...filters, searchQuery });
   }, [classes, filters, searchQuery]);
 
-  // Smart loading strategy: show all for small results, progressive for large
-  const shouldUseInfiniteScroll =
-    filteredClasses.length > SMALL_RESULT_THRESHOLD;
-  const visibleClasses = shouldUseInfiniteScroll
-    ? filteredClasses.slice(0, displayedCount)
-    : filteredClasses;
-  const hasMoreClasses =
-    shouldUseInfiniteScroll && displayedCount < filteredClasses.length;
+  const { displayedCount, hasMore, loadMoreRef } = useInfiniteScroll({
+    totalItems: filteredClasses.length,
+  });
 
-  // Reset displayed count when filters change
-  useEffect(() => {
-    setDisplayedCount(20);
-  }, [filteredClasses.length]);
+  const visibleClasses = filteredClasses.slice(0, displayedCount);
 
-  // Infinite scroll effect
-  useEffect(() => {
-    if (!shouldUseInfiniteScroll) return;
-
-    const observer = new IntersectionObserver(
-      async entries => {
-        if (entries[0].isIntersecting && hasMoreClasses && !isLoadingMore) {
-          setIsLoadingMore(true);
-
-          // Simulate loading delay for better UX
-          await new Promise(resolve => setTimeout(resolve, 300));
-
-          setDisplayedCount(prev =>
-            Math.min(prev + ITEMS_PER_LOAD, filteredClasses.length)
-          );
-          setIsLoadingMore(false);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [
-    hasMoreClasses,
-    isLoadingMore,
-    shouldUseInfiniteScroll,
-    filteredClasses.length,
-  ]);
-
-  // Clear all filters
   const clearFilters = () => {
     setFilters({
       sources: [],
@@ -123,7 +62,6 @@ export default function ClassCompendiumClient({
     setSearchQuery('');
   };
 
-  // Get filter options from available classes
   const filterOptions = useMemo(
     () => ({
       sources: getClassSources(classes),
@@ -134,143 +72,97 @@ export default function ClassCompendiumClient({
   );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="relative mb-8">
-        {/* Background decorative elements */}
-        <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-emerald-500/5 via-transparent to-emerald-500/5" />
-        <div className="absolute top-0 right-1/4 left-1/4 h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
-
-        <div className="relative rounded-lg border border-slate-600/50 bg-slate-800/30 p-6 backdrop-blur-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {/* Class icon */}
-              <div className="flex h-16 w-16 items-center justify-center rounded-lg border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-600/20 to-emerald-800/20 shadow-lg">
-                <Shield className="h-8 w-8 text-emerald-400" />
-              </div>
-
-              <div>
-                <h1 className="mb-2 text-4xl font-bold tracking-wide text-white">
-                  Class Compendium
-                </h1>
-                <p className="text-lg text-slate-300">
-                  Explore the paths of adventure and mastery
-                </p>
-              </div>
-            </div>
-
-            {/* Display Mode Toggle */}
-            <div className="flex items-center gap-3">
-              <div className="flex rounded-lg border border-slate-600/50 bg-slate-800/50 p-1">
-                <button
-                  onClick={() => setDisplayMode('grid')}
-                  className={`rounded-md p-2 transition-all ${
-                    displayMode === 'grid'
-                      ? 'bg-emerald-600 text-white shadow-md'
-                      : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
-                  }`}
-                  title="Grid View"
-                >
-                  <Grid size={18} />
-                </button>
-                <button
-                  onClick={() => setDisplayMode('list')}
-                  className={`rounded-md p-2 transition-all ${
-                    displayMode === 'list'
-                      ? 'bg-emerald-600 text-white shadow-md'
-                      : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
-                  }`}
-                  title="List View"
-                >
-                  <List size={18} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-6 pt-6">
+      {/* Tab Navigation */}
+      <div className="border-divider bg-surface-raised flex gap-1 rounded-xl border p-1">
+        {[
+          { key: 'classes' as const, label: 'Browse Classes', icon: Shield },
+          {
+            key: 'subclasses' as const,
+            label: 'Browse Subclasses',
+            icon: Users,
+          },
+        ].map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setViewMode(key)}
+            className={`flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-medium transition-all sm:text-base ${
+              viewMode === key
+                ? 'bg-accent-emerald-bg-strong text-accent-emerald-text shadow-sm'
+                : 'text-muted hover:bg-surface-hover hover:text-heading'
+            }`}
+          >
+            <Icon size={18} />
+            <span>{label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* View Mode Navigation */}
-      <div className="relative mb-8">
-        <div className="flex space-x-1 rounded-lg border border-slate-600/50 bg-slate-800/50 p-1 shadow-lg backdrop-blur-sm">
-          {[
-            { key: 'classes' as const, label: 'Browse Classes', icon: Shield },
-            {
-              key: 'subclasses' as const,
-              label: 'Browse Subclasses',
-              icon: Users,
-            },
-          ].map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setViewMode(key)}
-              className={`flex items-center gap-3 rounded-md px-6 py-4 font-medium transition-all ${
-                viewMode === key
-                  ? 'scale-[1.02] transform bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-lg'
-                  : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
-              }`}
-            >
-              <Icon size={20} />
-              <span>{label}</span>
-              {viewMode === key && (
-                <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-200" />
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Tab indicator line */}
-        <div className="absolute right-0 bottom-0 left-0 h-px bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
-      </div>
-
-      {/* Content based on view mode */}
       {viewMode === 'classes' ? (
-        <div className="space-y-6">
-          {/* Search and Filter Controls */}
-          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-            {/* Search Bar */}
-            <div className="relative max-w-md flex-1">
-              <Search
-                className="absolute top-1/2 left-3 -translate-y-1/2 transform text-slate-400"
-                size={20}
-              />
-              <input
-                type="text"
-                placeholder="Search classes, abilities, hit dice..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-slate-600/50 bg-slate-800/50 py-3 pr-4 pl-10 text-white placeholder-slate-400 backdrop-blur-sm focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/50 focus:outline-none"
-              />
-            </div>
-
-            {/* Filter Controls */}
-            <div className="flex items-center gap-3">
-              {/* Results count */}
-              <div className="text-sm whitespace-nowrap text-slate-400">
-                {filteredClasses.length}{' '}
-                {filteredClasses.length === 1 ? 'class' : 'classes'}
+        <div>
+          {/* Sticky toolbar */}
+          <div className="bg-surface-raised border-divider sticky top-0 z-20 -mx-4 mb-6 border-b px-4 py-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="flex flex-1 items-center gap-2 sm:gap-3">
+                <div className="max-w-sm flex-1">
+                  <Input
+                    placeholder="Search classes..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    leftIcon={<Search size={16} />}
+                    clearable
+                    onClear={() => setSearchQuery('')}
+                    aria-label="Search classes"
+                  />
+                </div>
+                <span className="text-muted hidden text-sm sm:inline">
+                  {filteredClasses.length}{' '}
+                  {filteredClasses.length === 1 ? 'class' : 'classes'}
+                </span>
               </div>
 
-              {/* Filter toggle */}
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 rounded-lg border px-4 py-2 backdrop-blur-sm transition-all ${
-                  showFilters
-                    ? 'border-emerald-500/50 bg-emerald-600/20 text-emerald-300'
-                    : 'border-slate-600/50 bg-slate-800/50 text-slate-300 hover:bg-slate-700/50 hover:text-white'
-                }`}
-              >
-                <Filter size={16} />
-                <span>Filters</span>
-                <ChevronDown
-                  size={16}
-                  className={`transition-transform ${showFilters ? 'rotate-180' : ''}`}
-                />
-              </button>
+              <div className="flex items-center gap-2">
+                <div className="border-divider bg-surface flex gap-0.5 rounded-lg border p-0.5">
+                  <button
+                    onClick={() => setDisplayMode('grid')}
+                    className={`min-h-[36px] min-w-[36px] rounded-md p-2 transition-all ${
+                      displayMode === 'grid'
+                        ? 'bg-accent-emerald-bg-strong text-accent-emerald-text'
+                        : 'text-muted hover:text-heading'
+                    }`}
+                    aria-label="Grid view"
+                    aria-pressed={displayMode === 'grid'}
+                  >
+                    <Grid size={18} />
+                  </button>
+                  <button
+                    onClick={() => setDisplayMode('list')}
+                    className={`min-h-[36px] min-w-[36px] rounded-md p-2 transition-all ${
+                      displayMode === 'list'
+                        ? 'bg-accent-emerald-bg-strong text-accent-emerald-text'
+                        : 'text-muted hover:text-heading'
+                    }`}
+                    aria-label="List view"
+                    aria-pressed={displayMode === 'list'}
+                  >
+                    <List size={18} />
+                  </button>
+                </div>
+
+                <Button
+                  variant={showFilters ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  leftIcon={<Filter size={16} />}
+                  aria-expanded={showFilters}
+                >
+                  Filters
+                </Button>
+              </div>
             </div>
           </div>
 
-          {/* Filters Panel */}
+          {/* Filters panel - top, not sidebar */}
           {showFilters && (
             <ClassFiltersPanel
               filters={filters}
@@ -280,86 +172,53 @@ export default function ClassCompendiumClient({
             />
           )}
 
-          {/* Classes Grid/List */}
-          <div className="space-y-6">
-            <div className="flex-1">
-              {visibleClasses.length > 0 ? (
-                <>
-                  {/* Classes Grid */}
-                  <div
-                    className={
-                      displayMode === 'grid'
-                        ? 'grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-                        : 'space-y-4'
-                    }
-                  >
-                    {visibleClasses.map((classData, index) => (
-                      <div
-                        key={classData.id}
-                        className="animate-in fade-in-0 duration-300"
-                        style={{
-                          animationDelay: `${(index % ITEMS_PER_LOAD) * 50}ms`,
-                        }}
-                      >
-                        <ClassCard
-                          classData={classData}
-                          displayMode={displayMode}
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Loading More Indicator and Load More Button */}
-                  {shouldUseInfiniteScroll && (
-                    <div className="mt-8 flex flex-col items-center space-y-4">
-                      {hasMoreClasses && (
-                        <div
-                          ref={loadMoreRef}
-                          className="flex items-center space-x-2 text-slate-400"
-                        >
-                          {isLoadingMore ? (
-                            <>
-                              <Loader2 className="h-5 w-5 animate-spin text-emerald-500" />
-                              <span>Loading more classes...</span>
-                            </>
-                          ) : (
-                            <span>Scroll to load more classes</span>
-                          )}
-                        </div>
-                      )}
-
-                      {!hasMoreClasses &&
-                        filteredClasses.length > SMALL_RESULT_THRESHOLD && (
-                          <div className="text-center text-slate-400">
-                            <p>All {filteredClasses.length} classes loaded</p>
-                          </div>
-                        )}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="py-12 text-center">
-                  <p className="text-lg text-slate-400">
-                    No classes found matching your criteria.
-                  </p>
-                  <button
-                    onClick={clearFilters}
-                    className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-white transition-colors hover:bg-emerald-700"
-                  >
-                    Clear Filters
-                  </button>
+          {/* Class grid */}
+          <div className="mt-6">
+            {visibleClasses.length > 0 ? (
+              <>
+                <div
+                  className={
+                    displayMode === 'grid'
+                      ? 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                      : 'space-y-4'
+                  }
+                >
+                  {visibleClasses.map(classData => (
+                    <ClassCard
+                      key={classData.id}
+                      classData={classData}
+                      displayMode={displayMode}
+                    />
+                  ))}
                 </div>
-              )}
-            </div>
+
+                <div ref={loadMoreRef} className="h-10" />
+
+                {hasMore && (
+                  <div className="flex justify-center py-4">
+                    <div className="bg-surface-secondary h-8 w-8 animate-pulse rounded-full" />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="py-16 text-center">
+                <p className="text-muted mb-4 text-lg">
+                  No classes found matching your criteria.
+                </p>
+                <Button variant="outline" onClick={clearFilters}>
+                  Clear Filters
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       ) : (
-        <div className="py-12 text-center">
-          <Users className="mx-auto mb-4 h-16 w-16 text-slate-400" />
-          <h3 className="mb-2 text-xl font-semibold text-white">
+        <div className="py-16 text-center">
+          <Users className="text-muted mx-auto mb-4 h-16 w-16" />
+          <h3 className="text-heading mb-2 text-xl font-semibold">
             Subclass Browser
           </h3>
-          <p className="text-slate-400">
+          <p className="text-muted">
             Subclass browsing feature coming soon! For now, explore subclasses
             within their parent classes.
           </p>

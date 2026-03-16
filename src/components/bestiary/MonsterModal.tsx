@@ -5,8 +5,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/feedback/dialog';
-import { Badge } from '@/components/ui';
+  DialogBody,
+} from '@/components/ui/feedback/dialog-new';
+import { Badge } from '@/components/ui/layout/badge';
+import { Card, CardContent } from '@/components/ui/layout/card';
 import { getCRColor, formatSize, formatAlignment } from '@/utils/bestiaryUtils';
 import { Shield, Heart, Zap, Swords, Brain, Star } from 'lucide-react';
 
@@ -24,13 +26,15 @@ const StatBlock = ({
   label: string;
   value: string | number;
 }) => (
-  <div className="flex flex-col items-center justify-center rounded-md border border-slate-700/50 bg-slate-800/70 p-3">
-    <Icon className="mb-1.5 h-6 w-6 text-sky-300" />
-    <span className="text-xs font-semibold tracking-wider text-slate-400 uppercase">
-      {label}
-    </span>
-    <span className="text-lg font-bold text-slate-100">{value}</span>
-  </div>
+  <Card variant="bordered" padding="sm">
+    <CardContent className="flex flex-col items-center justify-center p-0">
+      <Icon className="text-accent-blue-text mb-1.5 h-5 w-5" />
+      <span className="text-faint text-xs font-semibold tracking-wider uppercase">
+        {label}
+      </span>
+      <span className="text-heading text-lg font-bold">{value}</span>
+    </CardContent>
+  </Card>
 );
 
 export default function MonsterModal({
@@ -41,175 +45,195 @@ export default function MonsterModal({
 
   return (
     <Dialog open={!!monster} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-[95vw] max-w-4xl overflow-y-auto border-slate-700 bg-slate-900 p-0 text-slate-200">
-        <DialogHeader className="p-6 pb-4">
-          <div className="flex items-start justify-between">
+      <DialogContent size="lg">
+        <DialogHeader className="pr-10">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <DialogTitle className="text-3xl font-bold tracking-wider text-white">
+              <DialogTitle className="text-2xl sm:text-3xl">
                 {monster.name}
               </DialogTitle>
-              <DialogDescription className="text-md text-slate-400 italic">
+              <DialogDescription className="text-muted text-base italic">
                 {formatSize(monster.size)} {String(monster.type)},{' '}
                 {formatAlignment(monster.alignment)}
               </DialogDescription>
             </div>
             <Badge
-              className={`px-4 py-1.5 text-lg font-bold ${getCRColor(monster.cr)}`}
+              className={`shrink-0 px-4 py-1.5 text-lg font-bold ${getCRColor(monster.cr)}`}
             >
               CR {monster.cr}
             </Badge>
           </div>
         </DialogHeader>
 
-        <div className="px-6 pb-6">
-          {/* Core Stats */}
-          <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3">
-            <div className="flex items-center gap-3 rounded-md border border-slate-700/50 bg-slate-800/50 p-3">
-              <Shield size={24} className="text-sky-400" />
-              <div>
-                <div className="text-lg font-bold text-slate-100">
-                  {monster.ac}
-                </div>
-                <div className="text-xs text-slate-400">Armor Class</div>
-              </div>
+        <DialogBody>
+          <div className="space-y-6">
+            {/* Core Stats */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <Card variant="bordered" padding="sm">
+                <CardContent className="flex items-center gap-3 p-0">
+                  <Shield
+                    size={22}
+                    className="text-accent-blue-text shrink-0"
+                  />
+                  <div>
+                    <div className="text-heading text-lg font-bold">
+                      {monster.ac}
+                    </div>
+                    <div className="text-faint text-xs">Armor Class</div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card variant="bordered" padding="sm">
+                <CardContent className="flex items-center gap-3 p-0">
+                  <Heart size={22} className="text-accent-red-text shrink-0" />
+                  <div>
+                    <div className="text-heading text-lg font-bold">
+                      {monster.hp}
+                    </div>
+                    <div className="text-faint text-xs">Hit Points</div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card variant="bordered" padding="sm">
+                <CardContent className="flex items-center gap-3 p-0">
+                  <Zap size={22} className="text-accent-amber-text shrink-0" />
+                  <div>
+                    <div className="text-heading truncate text-lg font-bold">
+                      {monster.speed}
+                    </div>
+                    <div className="text-faint text-xs">Speed</div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-            <div className="flex items-center gap-3 rounded-md border border-slate-700/50 bg-slate-800/50 p-3">
-              <Heart size={24} className="text-red-400" />
-              <div>
-                <div className="text-lg font-bold text-slate-100">
-                  {monster.hp}
-                </div>
-                <div className="text-xs text-slate-400">Hit Points</div>
-              </div>
+
+            {/* Ability Scores */}
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+              <StatBlock icon={Swords} label="STR" value={monster.str} />
+              <StatBlock icon={Zap} label="DEX" value={monster.dex} />
+              <StatBlock icon={Heart} label="CON" value={monster.con} />
+              <StatBlock icon={Brain} label="INT" value={monster.int} />
+              <StatBlock icon={Star} label="WIS" value={monster.wis} />
+              <StatBlock icon={Star} label="CHA" value={monster.cha} />
             </div>
-            <div className="flex items-center gap-3 rounded-md border border-slate-700/50 bg-slate-800/50 p-3">
-              <Zap size={24} className="text-yellow-400" />
-              <div>
-                <div className="truncate text-lg font-bold text-slate-100">
-                  {monster.speed}
-                </div>
-                <div className="text-xs text-slate-400">Speed</div>
-              </div>
-            </div>
-          </div>
 
-          {/* Ability Scores */}
-          <div className="mb-6 grid grid-cols-6 gap-2">
-            <StatBlock icon={Swords} label="STR" value={monster.str} />
-            <StatBlock icon={Zap} label="DEX" value={monster.dex} />
-            <StatBlock icon={Heart} label="CON" value={monster.con} />
-            <StatBlock icon={Brain} label="INT" value={monster.int} />
-            <StatBlock icon={Star} label="WIS" value={monster.wis} />
-            <StatBlock icon={Star} label="CHA" value={monster.cha} />
-          </div>
-
-          {/* Other Details */}
-          <div className="space-y-2 text-sm [&>p]:border-b [&>p]:border-slate-800 [&>p]:py-2">
-            {monster.saves && (
-              <p>
-                <strong className="pr-2 font-semibold text-slate-300">
-                  Saving Throws:
-                </strong>{' '}
-                {monster.saves}
-              </p>
-            )}
-            {monster.skills && (
-              <p>
-                <strong className="pr-2 font-semibold text-slate-300">
-                  Skills:
-                </strong>{' '}
-                {monster.skills}
-              </p>
-            )}
-            {monster.resistances && (
-              <p>
-                <strong className="pr-2 font-semibold text-slate-300">
-                  Resistances:
-                </strong>{' '}
-                {monster.resistances}
-              </p>
-            )}
-            {monster.immunities && (
-              <p>
-                <strong className="pr-2 font-semibold text-slate-300">
-                  Immunities:
-                </strong>{' '}
-                {monster.immunities}
-              </p>
-            )}
-            {monster.vulnerabilities && (
-              <p>
-                <strong className="pr-2 font-semibold text-slate-300">
-                  Vulnerabilities:
-                </strong>{' '}
-                {monster.vulnerabilities}
-              </p>
-            )}
-            {monster.senses && (
-              <p>
-                <strong className="pr-2 font-semibold text-slate-300">
-                  Senses:
-                </strong>{' '}
-                {monster.senses}, passive Perception {monster.passivePerception}
-              </p>
-            )}
-            {monster.languages && (
-              <p>
-                <strong className="pr-2 font-semibold text-slate-300">
-                  Languages:
-                </strong>{' '}
-                {monster.languages}
-              </p>
-            )}
-          </div>
-
-          {/* Traits, Actions, etc. */}
-          <div className="prose prose-sm prose-invert mt-6 max-w-none space-y-5">
-            {monster.traits && monster.traits.length > 0 && (
-              <h3 className="mb-3 border-b border-emerald-400/30 pb-2 text-xl font-bold text-emerald-400">
-                Traits
-              </h3>
-            )}
-            {monster.traits?.map((t, i) => (
-              <div key={`trait-${i}`}>
-                <h4 className="font-bold text-slate-100">{t.name}</h4>
-                <div
-                  className="whitespace-pre-line text-slate-300"
-                  dangerouslySetInnerHTML={{ __html: t.text }}
-                />
-              </div>
-            ))}
-            {monster.actions && monster.actions.length > 0 && (
-              <h3 className="mb-3 border-b border-emerald-400/30 pb-2 text-xl font-bold text-emerald-400">
-                Actions
-              </h3>
-            )}
-            {monster.actions?.map((a, i) => (
-              <div key={`action-${i}`}>
-                <h4 className="font-bold text-slate-100">{a.name}</h4>
-                <div
-                  className="whitespace-pre-line text-slate-300"
-                  dangerouslySetInnerHTML={{ __html: a.text }}
-                />
-              </div>
-            ))}
-            {monster.legendaryActions &&
-              monster.legendaryActions.length > 0 && (
-                <h3 className="mb-3 border-b border-emerald-400/30 pb-2 text-xl font-bold text-emerald-400">
-                  Legendary Actions
-                </h3>
+            {/* Details */}
+            <div className="text-body border-divider space-y-0 text-sm [&>p]:border-b [&>p]:py-2.5">
+              {monster.saves && (
+                <p>
+                  <strong className="text-heading pr-2 font-semibold">
+                    Saving Throws:
+                  </strong>{' '}
+                  {monster.saves}
+                </p>
               )}
-            {monster.legendaryActions?.map((la, i) => (
-              <div key={`legendary-${i}`}>
-                <h4 className="font-bold text-slate-100">{la.name}</h4>
-                <div
-                  className="whitespace-pre-line text-slate-300"
-                  dangerouslySetInnerHTML={{ __html: la.text }}
-                />
-              </div>
-            ))}
+              {monster.skills && (
+                <p>
+                  <strong className="text-heading pr-2 font-semibold">
+                    Skills:
+                  </strong>{' '}
+                  {monster.skills}
+                </p>
+              )}
+              {monster.resistances && (
+                <p>
+                  <strong className="text-heading pr-2 font-semibold">
+                    Resistances:
+                  </strong>{' '}
+                  {monster.resistances}
+                </p>
+              )}
+              {monster.immunities && (
+                <p>
+                  <strong className="text-heading pr-2 font-semibold">
+                    Immunities:
+                  </strong>{' '}
+                  {monster.immunities}
+                </p>
+              )}
+              {monster.vulnerabilities && (
+                <p>
+                  <strong className="text-heading pr-2 font-semibold">
+                    Vulnerabilities:
+                  </strong>{' '}
+                  {monster.vulnerabilities}
+                </p>
+              )}
+              {monster.senses && (
+                <p>
+                  <strong className="text-heading pr-2 font-semibold">
+                    Senses:
+                  </strong>{' '}
+                  {monster.senses}, passive Perception{' '}
+                  {monster.passivePerception}
+                </p>
+              )}
+              {monster.languages && (
+                <p>
+                  <strong className="text-heading pr-2 font-semibold">
+                    Languages:
+                  </strong>{' '}
+                  {monster.languages}
+                </p>
+              )}
+            </div>
+
+            {/* Traits, Actions, Legendary Actions */}
+            <div className="space-y-5">
+              {monster.traits && monster.traits.length > 0 && (
+                <div>
+                  <h3 className="text-accent-red-text border-accent-red-border mb-3 border-b pb-2 text-xl font-bold">
+                    Traits
+                  </h3>
+                  {monster.traits.map((t, i) => (
+                    <div key={`trait-${i}`} className="mb-3">
+                      <h4 className="text-heading font-bold">{t.name}</h4>
+                      <div
+                        className="text-body text-sm whitespace-pre-line"
+                        dangerouslySetInnerHTML={{ __html: t.text }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {monster.actions && monster.actions.length > 0 && (
+                <div>
+                  <h3 className="text-accent-red-text border-accent-red-border mb-3 border-b pb-2 text-xl font-bold">
+                    Actions
+                  </h3>
+                  {monster.actions.map((a, i) => (
+                    <div key={`action-${i}`} className="mb-3">
+                      <h4 className="text-heading font-bold">{a.name}</h4>
+                      <div
+                        className="text-body text-sm whitespace-pre-line"
+                        dangerouslySetInnerHTML={{ __html: a.text }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {monster.legendaryActions &&
+                monster.legendaryActions.length > 0 && (
+                  <div>
+                    <h3 className="text-accent-red-text border-accent-red-border mb-3 border-b pb-2 text-xl font-bold">
+                      Legendary Actions
+                    </h3>
+                    {monster.legendaryActions.map((la, i) => (
+                      <div key={`legendary-${i}`} className="mb-3">
+                        <h4 className="text-heading font-bold">{la.name}</h4>
+                        <div
+                          className="text-body text-sm whitespace-pre-line"
+                          dangerouslySetInnerHTML={{ __html: la.text }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+            </div>
           </div>
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );
