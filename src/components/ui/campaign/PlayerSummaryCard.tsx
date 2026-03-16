@@ -11,10 +11,18 @@ import {
   Angry,
   Minus,
   Plus,
+  Eye,
+  Lightbulb,
+  Search,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import { CampaignPlayerData } from '@/types/campaign';
-import { calculateCharacterArmorClass } from '@/utils/calculations';
+import {
+  calculateCharacterArmorClass,
+  calculatePassivePerception,
+  calculatePassiveInsight,
+  calculatePassiveInvestigation,
+} from '@/utils/calculations';
 
 function getClassBadgeVariant(
   className: string
@@ -110,6 +118,10 @@ export function PlayerSummaryCard({
   const isConcentrating = char.concentration?.isConcentrating;
   const concentrationSpell = char.concentration?.spellName;
   const inspirationCount = char.heroicInspiration?.count ?? 0;
+
+  const passivePerception = calculatePassivePerception(char);
+  const passiveInsight = calculatePassiveInsight(char);
+  const passiveInvestigation = calculatePassiveInvestigation(char);
 
   const activeConditions = char.conditionsAndDiseases?.activeConditions ?? [];
 
@@ -220,6 +232,42 @@ export function PlayerSummaryCard({
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        {/* Passive Scores */}
+        <div className="bg-surface-secondary mb-3 flex items-center justify-between rounded-lg px-3 py-2">
+          <div className="flex items-center gap-1.5" title="Passive Perception">
+            <Eye size={13} className="text-accent-emerald-text" />
+            <span className="text-muted text-[10px] tracking-wide uppercase">
+              Perception
+            </span>
+            <span className="text-heading text-sm font-bold">
+              {passivePerception}
+            </span>
+          </div>
+          <div className="bg-divider h-4 w-px" />
+          <div className="flex items-center gap-1.5" title="Passive Insight">
+            <Lightbulb size={13} className="text-accent-amber-text" />
+            <span className="text-muted text-[10px] tracking-wide uppercase">
+              Insight
+            </span>
+            <span className="text-heading text-sm font-bold">
+              {passiveInsight}
+            </span>
+          </div>
+          <div className="bg-divider h-4 w-px" />
+          <div
+            className="flex items-center gap-1.5"
+            title="Passive Investigation"
+          >
+            <Search size={13} className="text-accent-blue-text" />
+            <span className="text-muted text-[10px] tracking-wide uppercase">
+              Investigation
+            </span>
+            <span className="text-heading text-sm font-bold">
+              {passiveInvestigation}
+            </span>
           </div>
         </div>
 

@@ -175,7 +175,7 @@ export default function CharacterHUD({
             {activeConditionsCount > 0 && (
               <button
                 onClick={onNavigateToConditions}
-                className="bg-accent-red-bg text-accent-red-text flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80"
+                className="bg-accent-red-bg text-accent-red-text animate-condition-pulse flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80"
                 title="View active conditions"
               >
                 <AlertCircle className="h-3.5 w-3.5" />

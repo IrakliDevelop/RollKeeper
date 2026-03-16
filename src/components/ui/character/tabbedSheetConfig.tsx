@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Angry } from 'lucide-react';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { PlayerCalendarView } from '@/components/ui/calendar/PlayerCalendarView';
 import ConditionsDiseasesManager from '@/components/ui/game/ConditionsDiseasesManager';
@@ -219,6 +220,7 @@ export interface TabbedSheetConfigParams {
   addToast: (toast: Omit<ToastData, 'id'>) => void;
   calendarDays?: number | null;
   campaignCode?: string;
+  customCounter?: { label: string; value: number } | null;
 }
 
 export function createTabbedSheetConfig(
@@ -485,6 +487,7 @@ export function createTabbedSheetConfig(
           hasHydrated={hasHydrated}
           isBard={isBard}
           params={params}
+          customCounter={params.customCounter}
         />
       ),
     },
@@ -888,28 +891,30 @@ function CombatTabContent({
             <WeaponProficiencies />
           </ErrorBoundary>
 
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <p className="text-muted">
-                  Unable to load conditions and diseases manager
-                </p>
-              </div>
-            }
-          >
-            {hasHydrated ? (
-              <ConditionsDiseasesManager />
-            ) : (
-              <div className="border-divider bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <div className="py-4 text-center">
-                  <div className="border-accent-blue-text-muted mx-auto h-8 w-8 animate-spin rounded-full border-b-2" />
-                  <p className="text-body mt-2">
-                    Loading conditions and diseases...
+          <div id="conditions-section">
+            <ErrorBoundary
+              fallback={
+                <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                  <p className="text-muted">
+                    Unable to load conditions and diseases manager
                   </p>
                 </div>
-              </div>
-            )}
-          </ErrorBoundary>
+              }
+            >
+              {hasHydrated ? (
+                <ConditionsDiseasesManager />
+              ) : (
+                <div className="border-divider bg-surface-raised rounded-lg border p-6 shadow-lg">
+                  <div className="py-4 text-center">
+                    <div className="border-accent-blue-text-muted mx-auto h-8 w-8 animate-spin rounded-full border-b-2" />
+                    <p className="text-body mt-2">
+                      Loading conditions and diseases...
+                    </p>
+                  </div>
+                </div>
+              )}
+            </ErrorBoundary>
+          </div>
         </div>
       )}
 
@@ -924,6 +929,53 @@ function CombatTabContent({
           <SummonsSubTab />
         </ErrorBoundary>
       )}
+    </div>
+  );
+}
+
+function DmCustomCounterDisplay({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="from-accent-purple-bg to-accent-purple-bg-strong border-accent-purple-border-strong rounded-lg border-2 bg-linear-to-br p-4">
+      {/* Header */}
+      <div className="mb-3 flex items-center gap-2">
+        <Angry className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+        <h3 className="text-accent-purple-text text-lg font-bold">{label}</h3>
+      </div>
+
+      {/* Count */}
+      <div className="mb-4 text-center">
+        <div className="text-accent-purple-text text-3xl font-bold">
+          {value}
+        </div>
+        <div className="text-accent-purple-text-muted text-sm">
+          {value === 1 ? '1 point' : `${value} points`}
+        </div>
+      </div>
+
+      {/* Visual boxes — one per point, no empty placeholders */}
+      <div className="mb-4 flex flex-wrap justify-center gap-2">
+        {Array.from({ length: value }, (_, i) => (
+          <div
+            key={i}
+            className="border-accent-purple-border-strong bg-accent-purple-bg-strong text-accent-purple-text flex h-10 w-10 scale-110 transform items-center justify-center rounded-lg border-2 shadow-lg"
+          >
+            <Angry size={16} />
+          </div>
+        ))}
+      </div>
+
+      {/* Helper text */}
+      <div className="bg-accent-purple-bg-strong text-accent-purple-text-muted rounded p-2 text-center text-xs">
+        <p>
+          <strong>{label}</strong> are assigned by your DM.
+        </p>
+      </div>
     </div>
   );
 }
@@ -943,6 +995,7 @@ function FeaturesTabContent({
   hasHydrated,
   isBard,
   params,
+  customCounter,
 }: {
   character: CharacterState;
   totalLevel: number;
@@ -950,6 +1003,7 @@ function FeaturesTabContent({
   hasHydrated: boolean;
   isBard: boolean;
   params: TabbedSheetConfigParams;
+  customCounter?: { label: string; value: number } | null;
 }) {
   const [activeSubTab, setActiveSubTab] = useState<FeaturesSubTab>('abilities');
 
@@ -1021,6 +1075,12 @@ function FeaturesTabContent({
               onUseInspiration={params.useBardicInspiration}
               onRestoreInspiration={params.restoreBardicInspiration}
               onResetInspiration={params.resetBardicInspiration}
+            />
+          )}
+          {customCounter && customCounter.value > 0 && (
+            <DmCustomCounterDisplay
+              label={customCounter.label}
+              value={customCounter.value}
             />
           )}
         </div>

@@ -12,6 +12,8 @@ import {
   hasPlayerDataChanged,
   syncSummonsToEncounter,
 } from '@/utils/encounterSync';
+import { useDmEffectsSync } from '@/hooks/useDmEffectsSync';
+import { useDmCounterSync } from '@/hooks/useDmCounterSync';
 import { Button } from '@/components/ui/forms/button';
 import { InitiativeTracker } from './InitiativeTracker';
 import { AddEntityDialog } from './AddEntityDialog';
@@ -64,6 +66,9 @@ export function EncounterView({
 
   const { dmId, adjustPlayerCounter, setPlayerColor } = useDmStore();
   const campaign = useDmStore(state => state.getCampaign(campaignCode));
+
+  const { syncPlayerEffects } = useDmEffectsSync({ campaignCode, dmId });
+  useDmCounterSync(campaignCode, dmId);
 
   const { players: campaignPlayers } = useCampaignSync({
     code: campaignCode,
@@ -239,12 +244,63 @@ export function EncounterView({
         onHealEntity={(entityId, amount) =>
           healEntity(encounterId, entityId, amount)
         }
-        onAddCondition={(entityId, condition) =>
-          addCondition(encounterId, entityId, condition)
-        }
-        onRemoveCondition={(entityId, conditionId) =>
-          removeCondition(encounterId, entityId, conditionId)
-        }
+        onAddCondition={(entityId, condition) => {
+          addCondition(encounterId, entityId, condition);
+          const entity = encounter.entities.find(e => e.id === entityId);
+          if (entity?.type === 'player' && entity.playerCharacterId) {
+            // Build a snapshot of the entity after the add for sync
+            const snapshot = {
+              ...entity,
+              conditions: [
+                ...entity.conditions,
+                { ...condition, id: 'pending', source: 'dm' as const },
+              ],
+            };
+            syncPlayerEffects(entity.playerCharacterId, snapshot);
+          }
+        }}
+        onRemoveCondition={(entityId, conditionId) => {
+          const entity = encounter.entities.find(e => e.id === entityId);
+
+          if (entity?.type === 'player' && entity.playerCharacterId) {
+            const removedCondition = entity.conditions.find(
+              c => c.id === conditionId
+            );
+
+            // If DM removes a player-synced condition, suppress it
+            if (removedCondition?.source === 'player-sync') {
+              const suppressed = [
+                ...(entity.suppressedConditions ?? []),
+                removedCondition.name,
+              ];
+              updateEntity(encounterId, entityId, {
+                suppressedConditions: [...new Set(suppressed)],
+              });
+            }
+
+            removeCondition(encounterId, entityId, conditionId);
+
+            // Build snapshot after removal + suppression for sync
+            const updatedSuppressed =
+              removedCondition?.source === 'player-sync'
+                ? [
+                    ...new Set([
+                      ...(entity.suppressedConditions ?? []),
+                      removedCondition.name,
+                    ]),
+                  ]
+                : entity.suppressedConditions;
+
+            const snapshot = {
+              ...entity,
+              conditions: entity.conditions.filter(c => c.id !== conditionId),
+              suppressedConditions: updatedSuppressed,
+            };
+            syncPlayerEffects(entity.playerCharacterId, snapshot);
+          } else {
+            removeCondition(encounterId, entityId, conditionId);
+          }
+        }}
         onUseAbility={(entityId, abilityId) =>
           expendAbility(encounterId, entityId, abilityId)
         }

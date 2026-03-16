@@ -28,6 +28,7 @@ export function usePlayerSync({
     'idle' | 'syncing' | 'synced' | 'error'
   >('idle');
   const syncInFlight = useRef(false);
+  const pendingSyncData = useRef<CharacterState | null>(null);
 
   const campaignCode = character?.campaignCode ?? null;
   const campaignName = character?.campaignName ?? null;
@@ -65,7 +66,12 @@ export function usePlayerSync({
 
   const syncNow = useCallback(
     async (characterData: CharacterState) => {
-      if (!campaignCode || !syncEnabled || syncInFlight.current) return;
+      if (!campaignCode || !syncEnabled) return;
+
+      if (syncInFlight.current) {
+        pendingSyncData.current = characterData;
+        return;
+      }
 
       syncInFlight.current = true;
       setSyncStatus('syncing');
@@ -100,6 +106,12 @@ export function usePlayerSync({
         setSyncStatus('error');
       } finally {
         syncInFlight.current = false;
+
+        const pending = pendingSyncData.current;
+        if (pending) {
+          pendingSyncData.current = null;
+          syncNow(pending);
+        }
       }
     },
     [campaignCode, syncEnabled, characterId, updateCharacter, attemptRejoin]

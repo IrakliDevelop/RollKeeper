@@ -24,10 +24,29 @@ export interface DmMessage {
   sentAt: string; // ISO timestamp
 }
 
+// DM condition override on a player (synced from encounter)
+export interface DmEffect {
+  id: string;
+  name: string;
+  action: 'add' | 'remove';
+  description?: string;
+  sourceSpell?: string;
+  appliedAt: string; // ISO timestamp
+}
+
+// DM custom counter synced per-player (e.g. "Desperation Points")
+export interface SharedCustomCounter {
+  label: string;
+  counters: Record<string, number>; // playerId → value
+  updatedAt: string; // ISO timestamp
+}
+
 // Full shared state envelope returned by GET
 export interface SharedCampaignState {
   calendar: SharedCalendarPlayer | null;
   messages: DmMessage[];
+  dmEffects: DmEffect[];
+  customCounter: { label: string; value: number } | null;
 }
 
 // POST body for DM pushing shared state

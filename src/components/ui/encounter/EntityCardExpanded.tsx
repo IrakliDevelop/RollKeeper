@@ -25,7 +25,11 @@ interface EntityCardExpandedProps {
   onRemove: () => void;
   onDamage: (amount: number) => void;
   onHeal: (amount: number) => void;
-  onAddCondition: (condition: { name: string; description?: string }) => void;
+  onAddCondition: (condition: {
+    name: string;
+    description?: string;
+    source?: 'player-sync' | 'dm';
+  }) => void;
   onRemoveCondition: (conditionId: string) => void;
   onUseAbility: (abilityId: string) => void;
   onRestoreAbility: (abilityId: string) => void;
@@ -71,6 +75,7 @@ export function EntityCardExpanded({
   const [showStatBlock, setShowStatBlock] = useState(false);
   const [editingMaxHp, setEditingMaxHp] = useState(false);
   const [maxHpInput, setMaxHpInput] = useState('');
+  const [customEffectInput, setCustomEffectInput] = useState('');
 
   const isPlayer = entity.type === 'player';
   const isPlayerOwned = isPlayer || !!entity.summonOwnerId;
@@ -92,7 +97,7 @@ export function EntityCardExpanded({
   };
 
   const handleAddCondition = (name: string) => {
-    onAddCondition({ name });
+    onAddCondition({ name, source: 'dm' });
   };
 
   const isLair = entity.type === 'lair';
@@ -508,7 +513,7 @@ export function EntityCardExpanded({
       )}
 
       {/* Conditions quick-add */}
-      <div className="space-y-1">
+      <div className="space-y-2">
         <h4 className="text-heading text-xs font-semibold tracking-wider uppercase">
           Conditions
         </h4>
@@ -538,6 +543,43 @@ export function EntityCardExpanded({
               </button>
             );
           })}
+        </div>
+
+        {/* Custom effect input */}
+        <div className="flex items-center gap-1.5">
+          <input
+            type="text"
+            value={customEffectInput}
+            onChange={e => setCustomEffectInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && customEffectInput.trim()) {
+                onAddCondition({
+                  name: customEffectInput.trim(),
+                  description: 'Custom effect',
+                  source: 'dm',
+                });
+                setCustomEffectInput('');
+              }
+            }}
+            placeholder="Custom effect (e.g. Bane, Hex)..."
+            className="bg-surface-raised text-body placeholder:text-faint flex-1 rounded px-2 py-1 text-xs shadow-sm"
+          />
+          <button
+            onClick={() => {
+              if (customEffectInput.trim()) {
+                onAddCondition({
+                  name: customEffectInput.trim(),
+                  description: 'Custom effect',
+                  source: 'dm',
+                });
+                setCustomEffectInput('');
+              }
+            }}
+            disabled={!customEffectInput.trim()}
+            className="bg-accent-purple-bg text-accent-purple-text rounded px-2 py-1 text-xs font-medium transition-colors hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            + Add
+          </button>
         </div>
       </div>
 
