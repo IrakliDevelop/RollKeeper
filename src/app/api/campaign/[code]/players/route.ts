@@ -50,6 +50,8 @@ export async function GET(
           players.push(parsed);
         }
       }
+
+      players.sort((a, b) => a.playerId.localeCompare(b.playerId));
     }
 
     if (campaignRaw) {
