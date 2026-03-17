@@ -69,6 +69,17 @@ export interface Language {
   updatedAt: string;
 }
 
+// Character sense (darkvision, blindsight, etc.)
+export interface CharacterSense {
+  id: string;
+  name: string; // e.g., "Darkvision", "Blindsight"
+  range: number; // Range in feet
+  source?: string; // e.g., "Racial", "Class Feature", "Spell"
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Saving throw proficiency
 export interface SavingThrowProficiency {
   proficient: boolean;
@@ -652,6 +663,14 @@ export interface CharacterState {
 
   // Conditions and diseases
   conditionsAndDiseases: ConditionsDiseasesState;
+
+  // Defenses
+  damageImmunities: string[];
+  damageResistances: string[];
+  conditionImmunities: string[];
+
+  // Senses
+  senses: CharacterSense[];
 
   // Class Features
   jackOfAllTrades: boolean; // Bard feature: add half proficiency to non-proficient skills

@@ -17,6 +17,10 @@ import {
   Minus,
   Plus,
   MessageSquare,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldOff,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import {
@@ -338,64 +342,64 @@ export function PlayerDetailDialog({
             </div>
 
             <div className="grid gap-6 lg:grid-cols-2">
-              {/* ── Skills ── */}
-              <div>
-                <SectionTitle icon={<Scroll size={14} />}>Skills</SectionTitle>
-                <div className="bg-surface-secondary rounded-lg p-3">
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-                    {SKILL_ENTRIES.map(({ key, ability }) => {
-                      const skill =
-                        char.skills?.[key as keyof typeof char.skills];
-                      const isProficient = skill?.proficient ?? false;
-                      const isExpertise = skill?.expertise ?? false;
-                      const abilityScore =
-                        char.abilities?.[
-                          ability as keyof typeof char.abilities
-                        ] ?? 10;
-                      const abilityMod = calculateModifier(abilityScore);
+              {/* ── Left Column: Skills + Encumbrance ── */}
+              <div className="space-y-4">
+                <div>
+                  <SectionTitle icon={<Scroll size={14} />}>
+                    Skills
+                  </SectionTitle>
+                  <div className="bg-surface-secondary rounded-lg p-3">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                      {SKILL_ENTRIES.map(({ key, ability }) => {
+                        const skill =
+                          char.skills?.[key as keyof typeof char.skills];
+                        const isProficient = skill?.proficient ?? false;
+                        const isExpertise = skill?.expertise ?? false;
+                        const abilityScore =
+                          char.abilities?.[
+                            ability as keyof typeof char.abilities
+                          ] ?? 10;
+                        const abilityMod = calculateModifier(abilityScore);
 
-                      let totalMod = abilityMod + (skill?.customModifier ?? 0);
-                      if (isExpertise) {
-                        totalMod += profBonus * 2;
-                      } else if (isProficient) {
-                        totalMod += profBonus;
-                      } else if (char.jackOfAllTrades) {
-                        totalMod += Math.floor(profBonus / 2);
-                      }
+                        let totalMod =
+                          abilityMod + (skill?.customModifier ?? 0);
+                        if (isExpertise) {
+                          totalMod += profBonus * 2;
+                        } else if (isProficient) {
+                          totalMod += profBonus;
+                        } else if (char.jackOfAllTrades) {
+                          totalMod += Math.floor(profBonus / 2);
+                        }
 
-                      return (
-                        <div
-                          key={key}
-                          className="flex items-center justify-between py-0.5 text-xs"
-                        >
-                          <span className="text-body flex items-center gap-1">
-                            {isExpertise && (
-                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-yellow-500" />
-                            )}
-                            {isProficient && !isExpertise && (
-                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
-                            )}
-                            {!isProficient && !isExpertise && (
-                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-transparent" />
-                            )}
-                            {formatSkillName(key)}
-                            <span className="text-faint">
-                              ({ABILITY_LABELS[ability]})
+                        return (
+                          <div
+                            key={key}
+                            className="flex items-center justify-between py-0.5 text-xs"
+                          >
+                            <span className="text-body flex items-center gap-1">
+                              {isExpertise && (
+                                <span className="inline-block h-1.5 w-1.5 rounded-full bg-yellow-500" />
+                              )}
+                              {isProficient && !isExpertise && (
+                                <span className="inline-block h-1.5 w-1.5 rounded-full bg-green-500" />
+                              )}
+                              {!isProficient && !isExpertise && (
+                                <span className="inline-block h-1.5 w-1.5 rounded-full bg-transparent" />
+                              )}
+                              {formatSkillName(key)}
+                              <span className="text-faint">
+                                ({ABILITY_LABELS[ability]})
+                              </span>
                             </span>
-                          </span>
-                          <span className="text-heading font-medium tabular-nums">
-                            {formatMod(totalMod)}
-                          </span>
-                        </div>
-                      );
-                    })}
+                            <span className="text-heading font-medium tabular-nums">
+                              {formatMod(totalMod)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              {/* ── Right Column ── */}
-              <div className="space-y-4">
-                <ConditionsSection char={char} />
 
                 {/* Encumbrance */}
                 <div>
@@ -422,6 +426,13 @@ export function PlayerDetailDialog({
                 </div>
 
                 <CurrencySection char={char} />
+              </div>
+
+              {/* ── Right Column: Conditions, Defenses, Senses, Attunement ── */}
+              <div className="space-y-4">
+                <ConditionsSection char={char} />
+                <DefensesSection char={char} />
+                <SensesSection char={char} />
 
                 {attunement && (
                   <div>
@@ -505,6 +516,92 @@ function ConditionsSection({ char }: { char: CharacterState }) {
         {diseases.map(d => (
           <Badge key={d.id} variant="danger" size="sm">
             {d.name}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DefensesSection({ char }: { char: CharacterState }) {
+  const resistances = char.damageResistances ?? [];
+  const immunities = char.damageImmunities ?? [];
+  const conditionImmunities = char.conditionImmunities ?? [];
+
+  if (
+    resistances.length === 0 &&
+    immunities.length === 0 &&
+    conditionImmunities.length === 0
+  )
+    return null;
+
+  return (
+    <div>
+      <SectionTitle icon={<ShieldCheck size={14} />}>Defenses</SectionTitle>
+      <div className="space-y-2">
+        {resistances.length > 0 && (
+          <div>
+            <div className="text-muted mb-1 flex items-center gap-1 text-[10px] font-bold uppercase">
+              <ShieldAlert size={10} />
+              Resistances
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {resistances.map(r => (
+                <Badge key={r} variant="warning" size="sm">
+                  {r}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+        {immunities.length > 0 && (
+          <div>
+            <div className="text-muted mb-1 flex items-center gap-1 text-[10px] font-bold uppercase">
+              <ShieldCheck size={10} />
+              Damage Immunities
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {immunities.map(i => (
+                <Badge key={i} variant="success" size="sm">
+                  {i}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+        {conditionImmunities.length > 0 && (
+          <div>
+            <div className="text-muted mb-1 flex items-center gap-1 text-[10px] font-bold uppercase">
+              <ShieldOff size={10} />
+              Condition Immunities
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {conditionImmunities.map(c => (
+                <Badge key={c} variant="info" size="sm">
+                  {c}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SensesSection({ char }: { char: CharacterState }) {
+  const senses = char.senses ?? [];
+
+  if (senses.length === 0) return null;
+
+  return (
+    <div>
+      <SectionTitle icon={<Eye size={14} />}>Senses</SectionTitle>
+      <div className="flex flex-wrap gap-1.5">
+        {senses.map(s => (
+          <Badge key={s.id} variant="info" size="sm">
+            {s.name} {s.range} ft.
+            {s.source && <span className="ml-1 opacity-70">({s.source})</span>}
           </Badge>
         ))}
       </div>

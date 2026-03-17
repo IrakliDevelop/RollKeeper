@@ -120,6 +120,12 @@ export interface EncounterEntity {
   deathSaves?: { successes: number; failures: number; isStabilized: boolean };
   hasUsedReaction?: boolean; // Whether player has used their reaction this round
 
+  // Player-synced defenses & senses
+  damageResistances?: string[];
+  damageImmunities?: string[];
+  conditionImmunities?: string[];
+  senses?: Array<{ name: string; range: number; source?: string }>;
+
   // DM condition authority: player-synced conditions the DM explicitly removed
   suppressedConditions?: string[];
 

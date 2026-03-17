@@ -76,6 +76,15 @@ export function mergePlayerSyncData(
   );
   const mergedConditions = [...uniqueDmConditions, ...playerConditions];
 
+  const damageResistances = char.damageResistances ?? [];
+  const damageImmunities = char.damageImmunities ?? [];
+  const conditionImmunities = char.conditionImmunities ?? [];
+  const senses = (char.senses ?? []).map(s => ({
+    name: s.name,
+    range: s.range,
+    source: s.source,
+  }));
+
   return {
     currentHp,
     maxHp,
@@ -89,6 +98,13 @@ export function mergePlayerSyncData(
     conditions: mergedConditions,
     suppressedConditions:
       updatedSuppressed.length > 0 ? updatedSuppressed : undefined,
+    damageResistances:
+      damageResistances.length > 0 ? damageResistances : undefined,
+    damageImmunities:
+      damageImmunities.length > 0 ? damageImmunities : undefined,
+    conditionImmunities:
+      conditionImmunities.length > 0 ? conditionImmunities : undefined,
+    senses: senses.length > 0 ? senses : undefined,
   };
 }
 
@@ -136,6 +152,27 @@ export function hasPlayerDataChanged(
       .join(',');
     if (currentNames !== updateNames) return true;
   }
+
+  // Compare defenses & senses
+  const arraysEqual = (a?: string[], b?: string[]) =>
+    (a ?? []).sort().join(',') !== (b ?? []).sort().join(',');
+  if (arraysEqual(updates.damageResistances, entity.damageResistances))
+    return true;
+  if (arraysEqual(updates.damageImmunities, entity.damageImmunities))
+    return true;
+  if (arraysEqual(updates.conditionImmunities, entity.conditionImmunities))
+    return true;
+  if (
+    (updates.senses ?? [])
+      .map(s => `${s.name}:${s.range}`)
+      .sort()
+      .join(',') !==
+    (entity.senses ?? [])
+      .map(s => `${s.name}:${s.range}`)
+      .sort()
+      .join(',')
+  )
+    return true;
 
   return false;
 }
