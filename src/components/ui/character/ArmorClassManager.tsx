@@ -4,8 +4,8 @@ import { calculateCharacterArmorClass } from '@/utils/calculations';
 import { Input } from '@/components/ui/forms';
 import { CharacterState } from '@/types/character';
 import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
-import { Info } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Info, Zap } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
 
 interface ArmorClassManagerProps {
   character: CharacterState;
@@ -249,29 +249,104 @@ export default function ArmorClassManager({
           </div>
 
           {/* AC Formula Display */}
-          <div className="text-center">
-            <div className="border-accent-red-border-strong bg-surface-raised text-accent-red-text inline-flex items-center gap-3 rounded-lg border-2 px-6 py-3 text-lg font-medium shadow-sm">
-              <span className="text-xl font-bold">{character.armorClass}</span>
-              <span className="text-accent-red-text-muted text-lg">+</span>
-              <span className="text-xl font-bold">
-                {character.isTempACActive ? character.tempArmorClass : 0}
-              </span>
-              {character.isWearingShield && (
-                <>
-                  <span className="text-accent-red-text-muted text-lg">+</span>
-                  <span className="text-xl font-bold">
-                    {character.shieldBonus}
-                  </span>
-                </>
-              )}
-              <span className="text-accent-red-text-muted text-lg">=</span>
-              <span className="text-accent-red-text text-2xl font-bold">
-                {calculateCharacterArmorClass(character)}
-              </span>
-            </div>
-          </div>
+          <ACFormulaDisplay character={character} />
         </div>
       </div>
     </TooltipProvider>
+  );
+}
+
+// Extracted formula display that accounts for buff effects
+function ACFormulaDisplay({ character }: { character: CharacterState }) {
+  const totalAC = calculateCharacterArmorClass(character);
+
+  const buffBreakdown = useMemo(() => {
+    const activeBuffs = (character.temporaryBuffs || []).filter(
+      b => b.isActive
+    );
+    let additive = 0;
+    let override: { value: number; name: string } | null = null;
+    let floor: { value: number; name: string } | null = null;
+
+    for (const buff of activeBuffs) {
+      for (const effect of buff.effects) {
+        if (effect.targetStat !== 'ac') continue;
+        switch (effect.mode) {
+          case 'add':
+            additive += effect.value;
+            break;
+          case 'set':
+            if (!override || effect.value > override.value) {
+              override = { value: effect.value, name: buff.name };
+            }
+            break;
+          case 'floor':
+            if (!floor || effect.value > floor.value) {
+              floor = { value: effect.value, name: buff.name };
+            }
+            break;
+        }
+      }
+    }
+
+    return { additive, override, floor };
+  }, [character.temporaryBuffs]);
+
+  return (
+    <div className="text-center">
+      <div className="border-accent-red-border-strong bg-surface-raised text-accent-red-text inline-flex flex-wrap items-center justify-center gap-3 rounded-lg border-2 px-6 py-3 text-lg font-medium shadow-sm">
+        {buffBreakdown.override ? (
+          <>
+            <Tooltip content={`${buffBreakdown.override.name} (override)`}>
+              <span className="text-accent-blue-text flex items-center gap-1 text-xl font-bold">
+                <Zap className="h-4 w-4" />
+                {buffBreakdown.override.value}
+              </span>
+            </Tooltip>
+          </>
+        ) : (
+          <>
+            <span className="text-xl font-bold">{character.armorClass}</span>
+            {character.isTempACActive && character.tempArmorClass > 0 && (
+              <>
+                <span className="text-accent-red-text-muted text-lg">+</span>
+                <span className="text-xl font-bold">
+                  {character.tempArmorClass}
+                </span>
+              </>
+            )}
+          </>
+        )}
+        {character.isWearingShield && (
+          <>
+            <span className="text-accent-red-text-muted text-lg">+</span>
+            <span className="text-xl font-bold">{character.shieldBonus}</span>
+          </>
+        )}
+        {buffBreakdown.additive !== 0 && (
+          <>
+            <span className="text-accent-red-text-muted text-lg">
+              {buffBreakdown.additive > 0 ? '+' : '−'}
+            </span>
+            <Tooltip content="From temporary buffs">
+              <span className="text-accent-blue-text flex items-center gap-1 text-xl font-bold">
+                <Zap className="h-4 w-4" />
+                {Math.abs(buffBreakdown.additive)}
+              </span>
+            </Tooltip>
+          </>
+        )}
+        <span className="text-accent-red-text-muted text-lg">=</span>
+        <span className="text-accent-red-text text-2xl font-bold">
+          {totalAC}
+        </span>
+      </div>
+      {buffBreakdown.floor && (
+        <div className="text-accent-blue-text mt-2 flex items-center justify-center gap-1 text-xs">
+          <Zap className="h-3 w-3" />
+          Min AC {buffBreakdown.floor.value} ({buffBreakdown.floor.name})
+        </div>
+      )}
+    </div>
   );
 }

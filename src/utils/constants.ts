@@ -550,6 +550,9 @@ export const DEFAULT_CHARACTER_STATE = {
   // Senses
   senses: [] as import('@/types/character').CharacterSense[],
 
+  // Temporary Buffs
+  temporaryBuffs: [] as import('@/types/character').TemporaryBuff[],
+
   // Class Features
   jackOfAllTrades: false, // Bard feature: add half proficiency to non-proficient skills
   languages: [], // Known languages

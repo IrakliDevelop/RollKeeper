@@ -139,17 +139,120 @@ export const calculateTotalArmorClass = (
 };
 
 /**
- * Calculate total armor class from character state
+ * Calculate total armor class from character state, including temporary buff effects.
+ * Buff modes:
+ *   - 'add'   → additive bonus on top of base AC
+ *   - 'set'   → replaces base AC entirely (highest override wins), additive buffs still stack
+ *   - 'floor' → AC cannot be lower than this value (Barkskin-style minimum)
  */
 export const calculateCharacterArmorClass = (
   character: CharacterState
 ): number => {
-  return calculateTotalArmorClass(
+  const baseAC = calculateTotalArmorClass(
     character.armorClass,
     character.isTempACActive ? character.tempArmorClass : 0,
     character.isWearingShield,
     character.shieldBonus
   );
+
+  const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
+
+  let additiveTotal = 0;
+  let acOverride: number | null = null;
+  let acFloor = -Infinity;
+
+  for (const buff of activeBuffs) {
+    for (const effect of buff.effects) {
+      if (effect.targetStat !== 'ac') continue;
+      switch (effect.mode) {
+        case 'add':
+          additiveTotal += effect.value;
+          break;
+        case 'set':
+          if (acOverride === null || effect.value > acOverride) {
+            acOverride = effect.value;
+          }
+          break;
+        case 'floor':
+          if (effect.value > acFloor) {
+            acFloor = effect.value;
+          }
+          break;
+      }
+    }
+  }
+
+  let totalAC: number;
+  if (acOverride !== null) {
+    // Override replaces base AC; additive buffs and shield still stack
+    totalAC =
+      acOverride +
+      additiveTotal +
+      (character.isWearingShield ? character.shieldBonus : 0);
+  } else {
+    totalAC = baseAC + additiveTotal;
+  }
+
+  if (acFloor > -Infinity) {
+    totalAC = Math.max(totalAC, acFloor);
+  }
+
+  return totalAC;
+};
+
+/**
+ * Get the total max-HP bonus from active temporary buffs (e.g. Aid spell).
+ */
+export const getBuffMaxHPBonus = (character: CharacterState): number => {
+  const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
+  let bonus = 0;
+  for (const buff of activeBuffs) {
+    for (const effect of buff.effects) {
+      if (effect.targetStat === 'maxHp' && effect.mode === 'add') {
+        bonus += effect.value;
+      }
+    }
+  }
+  return bonus;
+};
+
+/**
+ * Get the total speed bonus from active temporary buffs.
+ */
+export const getBuffSpeedBonus = (character: CharacterState): number => {
+  const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
+  let bonus = 0;
+  for (const buff of activeBuffs) {
+    for (const effect of buff.effects) {
+      if (effect.targetStat === 'speed' && effect.mode === 'add') {
+        bonus += effect.value;
+      }
+    }
+  }
+  return bonus;
+};
+
+/**
+ * Get the saving throw bonus from active temporary buffs for a specific ability.
+ */
+export const getBuffSavingThrowBonus = (
+  character: CharacterState,
+  ability: AbilityName
+): number => {
+  const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
+  let bonus = 0;
+  for (const buff of activeBuffs) {
+    for (const effect of buff.effects) {
+      if (
+        effect.targetStat === 'savingThrow' &&
+        effect.mode === 'add' &&
+        (!effect.targetAbility || effect.targetAbility === ability)
+      ) {
+        bonus += effect.value;
+      }
+    }
+  }
+  return bonus;
 };
 
 /**
