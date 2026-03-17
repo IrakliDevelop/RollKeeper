@@ -23,6 +23,7 @@ import {
   ToolProficiency,
   Language,
   AbilityName,
+  TemporaryBuff,
 } from '@/types/character';
 import { ProcessedSpell } from '@/types/spells';
 import {
@@ -257,6 +258,10 @@ function migrateCharacterData(character: unknown): CharacterState {
     // Ensure senses array exists
     if (!Array.isArray(result.senses)) {
       result.senses = [];
+    }
+    // Ensure temporary buffs array exists
+    if (!Array.isArray(result.temporaryBuffs)) {
+      result.temporaryBuffs = [];
     }
     return result;
   }
@@ -573,6 +578,15 @@ interface CharacterStore {
     updates: Partial<import('@/types/character').CharacterSense>
   ) => void;
   removeSense: (id: string) => void;
+
+  // Temporary buffs management
+  addBuff: (
+    buff: Omit<TemporaryBuff, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
+  updateBuff: (id: string, updates: Partial<TemporaryBuff>) => void;
+  deleteBuff: (id: string) => void;
+  toggleBuff: (id: string) => void;
+  clearAllBuffs: () => void;
 
   // Rest management (centralized)
   takeShortRest: () => void; // Resets all short rest abilities, pact magic, reaction
@@ -3263,6 +3277,116 @@ export const useCharacterStore = create<CharacterStore>()(
         }));
       },
 
+      // Temporary buffs management
+      addBuff: buff => {
+        const now = new Date().toISOString();
+        const newBuff: TemporaryBuff = {
+          ...buff,
+          id: `buff-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          createdAt: now,
+          updatedAt: now,
+        };
+        set(state => ({
+          character: {
+            ...state.character,
+            temporaryBuffs: [
+              ...(state.character.temporaryBuffs || []),
+              newBuff,
+            ],
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving' as const,
+        }));
+      },
+
+      updateBuff: (id, updates) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            temporaryBuffs: (state.character.temporaryBuffs || []).map(b =>
+              b.id === id
+                ? { ...b, ...updates, updatedAt: new Date().toISOString() }
+                : b
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving' as const,
+        }));
+      },
+
+      deleteBuff: id => {
+        set(state => ({
+          character: {
+            ...state.character,
+            temporaryBuffs: (state.character.temporaryBuffs || []).filter(
+              b => b.id !== id
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving' as const,
+        }));
+      },
+
+      toggleBuff: id => {
+        set(state => {
+          const buffs = state.character.temporaryBuffs || [];
+          const buff = buffs.find(b => b.id === id);
+          if (!buff) return state;
+
+          const nowActive = !buff.isActive;
+          const updatedBuffs = buffs.map(b =>
+            b.id === id
+              ? {
+                  ...b,
+                  isActive: nowActive,
+                  updatedAt: new Date().toISOString(),
+                }
+              : b
+          );
+
+          // Handle temp HP grant effects
+          let hitPoints = { ...state.character.hitPoints };
+          for (const effect of buff.effects) {
+            if (effect.targetStat === 'tempHp' && effect.mode === 'grant') {
+              if (nowActive) {
+                // Grant temp HP (take the higher per D&D rules)
+                hitPoints = {
+                  ...hitPoints,
+                  temporary: Math.max(hitPoints.temporary, effect.value),
+                };
+              } else {
+                // Remove granted temp HP (if it hasn't been reduced below the grant amount)
+                hitPoints = {
+                  ...hitPoints,
+                  temporary: Math.max(0, hitPoints.temporary - effect.value),
+                };
+              }
+            }
+          }
+
+          return {
+            character: {
+              ...state.character,
+              temporaryBuffs: updatedBuffs,
+              hitPoints,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
+          };
+        });
+      },
+
+      clearAllBuffs: () => {
+        set(state => ({
+          character: {
+            ...state.character,
+            temporaryBuffs: [],
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving' as const,
+        }));
+      },
+
       // Rest management (centralized)
       takeShortRest: () => {
         set(state => {
@@ -3461,6 +3585,17 @@ export const useCharacterStore = create<CharacterStore>()(
             ? { ...character.bardicInspiration, usesExpended: 0 }
             : undefined;
 
+          // Deactivate all temporary buffs (preserve them for re-enabling)
+          const deactivatedBuffs = (character.temporaryBuffs || []).map(buff =>
+            buff.isActive
+              ? {
+                  ...buff,
+                  isActive: false,
+                  updatedAt: new Date().toISOString(),
+                }
+              : buff
+          );
+
           // Reset summons HP to max, clear temp HP and conditions
           const resetSummons = character.summons?.map(summon => ({
             ...summon,
@@ -3489,6 +3624,7 @@ export const useCharacterStore = create<CharacterStore>()(
               reaction: resetReaction,
               isTempACActive: resetIsTempACActive,
               bardicInspiration: resetBardicInspiration,
+              temporaryBuffs: deactivatedBuffs,
               summons: resetSummons,
               daysSpent: (character.daysSpent || 0) + 1,
             },

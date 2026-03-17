@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { RotateCcw, Plus, X, Bird, Mountain, Waves } from 'lucide-react';
-import { formatModifier } from '@/utils/calculations';
+import { RotateCcw, Plus, X, Bird, Mountain, Waves, Zap } from 'lucide-react';
+import { formatModifier, getBuffSpeedBonus } from '@/utils/calculations';
 import { Button, Input, Switch } from '@/components/ui/forms';
 import { CharacterState } from '@/types/character';
 
@@ -90,7 +90,10 @@ export default function CombatStats({
 
         {/* Speed */}
         <div className="text-center">
-          <div className="border-accent-green-border bg-accent-green-bg flex h-20 flex-col justify-center rounded-lg border-2 p-3">
+          <div
+            className="border-accent-green-border bg-accent-green-bg flex flex-col justify-center rounded-lg border-2 p-3"
+            style={{ minHeight: '5rem' }}
+          >
             <div className="text-accent-green-text mb-1 flex items-center justify-center gap-1 text-xs font-medium">
               SPEED
               <Button
@@ -113,6 +116,14 @@ export default function CombatStats({
               onChange={e => onUpdateSpeed(parseInt(e.target.value) || 30)}
               className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-xl font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
+            {getBuffSpeedBonus(character) !== 0 && (
+              <div className="text-accent-blue-text mt-0.5 flex items-center justify-center gap-1 text-xs font-medium">
+                <Zap size={10} />
+                Effective: {character.speed + getBuffSpeedBonus(character)}ft (
+                {getBuffSpeedBonus(character) > 0 ? '+' : ''}
+                {getBuffSpeedBonus(character)})
+              </div>
+            )}
           </div>
         </div>
       </div>

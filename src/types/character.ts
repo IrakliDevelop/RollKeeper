@@ -672,6 +672,9 @@ export interface CharacterState {
   // Senses
   senses: CharacterSense[];
 
+  // Temporary Buffs
+  temporaryBuffs: TemporaryBuff[];
+
   // Class Features
   jackOfAllTrades: boolean; // Bard feature: add half proficiency to non-proficient skills
 
@@ -812,6 +815,47 @@ export interface ProcessedStatus {
   name: string;
   source: string;
   description: string;
+}
+
+// ========================================
+// TEMPORARY BUFFS
+// ========================================
+
+// Which stat a buff effect targets
+export type BuffTargetStat =
+  | 'ac'
+  | 'maxHp'
+  | 'tempHp'
+  | 'speed'
+  | 'savingThrow'
+  | 'attackBonus';
+
+// How the buff modifies the stat
+export type BuffMode =
+  | 'add' // +N to stat (Haste: +2 AC, Aid: +5 max HP)
+  | 'set' // Set stat to a value (Mage Armor: AC = 13 + DEX)
+  | 'floor' // Minimum value (Barkskin: AC can't be less than 16)
+  | 'grant'; // Grant a flat value (Wild Shape temp HP)
+
+// A single effect within a buff
+export interface BuffEffect {
+  id: string;
+  targetStat: BuffTargetStat;
+  mode: BuffMode;
+  value: number;
+  targetAbility?: AbilityName; // For savingThrow target: which ability
+  description?: string;
+}
+
+// A complete buff with one or more effects
+export interface TemporaryBuff {
+  id: string;
+  name: string;
+  source?: string;
+  effects: BuffEffect[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Utility functions for extended features

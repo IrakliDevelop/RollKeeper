@@ -3,6 +3,7 @@ import { Angry } from 'lucide-react';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { PlayerCalendarView } from '@/components/ui/calendar/PlayerCalendarView';
 import ConditionsDiseasesManager from '@/components/ui/game/ConditionsDiseasesManager';
+import TemporaryBuffsManager from '@/components/ui/game/TemporaryBuffsManager';
 import DefensesAndSenses from '@/components/ui/game/DefensesAndSenses';
 import CharacterBackgroundEditor from '@/components/ui/character/CharacterBackgroundEditor';
 import FeaturesTraitsManager from '@/components/ui/game/FeaturesTraitsManager';
@@ -769,7 +770,7 @@ function CharacterTabContent({
 
 const COMBAT_SUB_TABS = [
   { id: 'player', label: 'Player', icon: '🗡️' },
-  { id: 'defenses', label: 'Defenses', icon: '🛡️' },
+  { id: 'defenses', label: 'Defenses & Buffs', icon: '🛡️' },
   { id: 'summons', label: 'Summons', icon: '🐾' },
 ] as const;
 
@@ -921,15 +922,26 @@ function CombatTabContent({
       )}
 
       {activeSubTab === 'defenses' && (
-        <ErrorBoundary
-          fallback={
-            <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-              <p className="text-muted">Unable to load defenses and senses</p>
-            </div>
-          }
-        >
-          <DefensesAndSenses />
-        </ErrorBoundary>
+        <div className="space-y-6">
+          <ErrorBoundary
+            fallback={
+              <div className="border-accent-blue-border bg-surface-raised rounded-lg border p-4 shadow">
+                <p className="text-muted">Unable to load temporary buffs</p>
+              </div>
+            }
+          >
+            <TemporaryBuffsManager />
+          </ErrorBoundary>
+          <ErrorBoundary
+            fallback={
+              <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                <p className="text-muted">Unable to load defenses and senses</p>
+              </div>
+            }
+          >
+            <DefensesAndSenses />
+          </ErrorBoundary>
+        </div>
       )}
 
       {activeSubTab === 'summons' && (

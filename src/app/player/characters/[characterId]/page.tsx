@@ -165,6 +165,8 @@ export default function CharacterSheet() {
     addToolProficiency,
     updateToolProficiency,
     deleteToolProficiency,
+    // Temporary buffs
+    toggleBuff,
     // Campaign tracking
     updateDaysSpent,
     incrementDaysSpent,
@@ -726,6 +728,16 @@ export default function CharacterSheet() {
                     ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }, 150);
               }}
+              onNavigateToBuffs={() => {
+                switchToTab('combat');
+              }}
+              onNavigateToCombat={() => {
+                switchToTab('combat');
+              }}
+              onNavigateToSpells={() => {
+                switchToTab('spells');
+              }}
+              onToggleBuff={toggleBuff}
               onUpdateCharacter={updateCharacter}
             />
 
