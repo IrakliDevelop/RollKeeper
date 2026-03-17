@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogBody,
-} from '@/components/ui/feedback/dialog-new';
+} from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { EncounterEntity, CampaignNPC } from '@/types/encounter';

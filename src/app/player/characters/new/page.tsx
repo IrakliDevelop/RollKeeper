@@ -30,7 +30,7 @@ import {
   DialogDescription,
   DialogBody,
   DialogTrigger,
-} from '@/components/ui/feedback/dialog-new';
+} from '@/components/ui/feedback/dialog';
 import { ProcessedRace } from '@/utils/raceDataLoader';
 import { ProcessedClass } from '@/types/classes';
 import {

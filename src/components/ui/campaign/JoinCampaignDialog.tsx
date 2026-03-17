@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '@/components/ui/feedback/dialog-new';
+} from '@/components/ui/feedback/dialog';
 import { PlayerCharacter } from '@/store/playerStore';
 
 interface JoinCampaignDialogProps {

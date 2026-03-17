@@ -10,7 +10,14 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { Spell, SpellSlots, ConcentrationState } from '@/types/character';
-import { Modal } from '@/components/ui/feedback/Modal';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+  DialogFooter,
+} from '@/components/ui/feedback/dialog';
 
 interface SpellCastModalProps {
   isOpen: boolean;
@@ -82,8 +89,6 @@ export function SpellCastModal({
     availableLevels.length,
   ]);
 
-  if (!isOpen) return null;
-
   const isConcentrationSpell = spell.concentration;
   const alreadyConcentrating = concentration.isConcentrating;
   const concentrationWarning = isConcentrationSpell && alreadyConcentrating;
@@ -133,370 +138,383 @@ export function SpellCastModal({
       availableLevels.includes(selectedLevel));
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={handleClose}
-      title="Cast Spell"
-      size="md"
-      closeOnBackdropClick={true}
+    <Dialog
+      open={isOpen}
+      onOpenChange={open => {
+        if (!open) handleClose();
+      }}
     >
-      <div className="space-y-4">
-        {/* Spell Info */}
-        <div className="text-center">
-          <div className="mb-2 flex items-center justify-center gap-2">
-            <Sparkles className="text-purple-600" size={20} />
-          </div>
-          <h3 className="mb-1 text-xl font-bold text-purple-900">
-            {spell.name}
-          </h3>
-          <div className="flex items-center justify-center gap-2 text-sm text-purple-600">
-            <span>{spell.school}</span>
-            <span>&bull;</span>
-            <span>
-              {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
-            </span>
-            {spell.concentration && (
-              <>
-                <span>&bull;</span>
-                <span className="font-medium text-orange-600">
-                  Concentration
-                </span>
-              </>
-            )}
-            {spell.ritual && (
-              <>
-                <span>&bull;</span>
-                <span className="font-medium text-blue-600">Ritual</span>
-              </>
-            )}
-          </div>
-          {spell.castingSource && (
-            <div className="mt-1 text-xs text-purple-500">
-              Source: {spell.castingSource}
-            </div>
-          )}
-        </div>
-
-        {/* Concentration Warning */}
-        {concentrationWarning && (
-          <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-            <AlertTriangle
-              className="mt-0.5 flex-shrink-0 text-amber-600"
-              size={16}
-            />
-            <div className="text-sm">
-              <p className="mb-1 font-medium text-amber-800">
-                Concentration Warning
-              </p>
-              <p className="text-amber-700">
-                You are currently concentrating on{' '}
-                <span className="font-medium">{concentration.spellName}</span>.
-                Casting this spell will end your concentration on the previous
-                spell.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Reaction Warning */}
-        {reactionWarning && (
-          <div className="bg-accent-red-bg border-accent-red-border-strong flex items-start gap-3 rounded-lg border-2 p-3">
-            <ClockAlert
-              className="text-accent-red-text mt-0.5 flex-shrink-0"
-              size={16}
-            />
-            <div className="flex-1 text-sm">
-              <p className="text-accent-red-text mb-1 font-medium">
-                Reaction Already Used
-              </p>
-              <p className="text-accent-red-text">
-                You&apos;ve already used your reaction this round. You typically
-                can&apos;t cast this spell until your reaction resets on your
-                next turn.
-              </p>
-              {onResetReaction && (
-                <button
-                  onClick={onResetReaction}
-                  className="border-accent-red-border-strong text-accent-red-text hover:bg-accent-red-text mt-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors hover:text-white"
-                >
-                  Reset Reaction
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Cantrip Cast */}
-        {spell.level === 0 ? (
-          <div className="text-center">
-            <p className="mb-4 text-sm text-gray-600">
-              Cantrips don&apos;t use spell slots.
-            </p>
-            <div className="mb-4 rounded-lg border-2 border-purple-300 bg-purple-50 p-3">
-              <div className="flex items-center justify-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-purple-500"></div>
-                <span className="font-medium text-purple-900">
-                  Cantrip Selected
-                </span>
+      <DialogContent size="md">
+        <DialogHeader>
+          <DialogTitle>Cast Spell</DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          <div className="space-y-4">
+            {/* Spell Info */}
+            <div className="text-center">
+              <div className="mb-2 flex items-center justify-center gap-2">
+                <Sparkles className="text-purple-600" size={20} />
               </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Free Cast Option */}
-            {hasFreeCasting && (
-              <div>
-                <h4 className="mb-3 font-medium text-gray-900">
-                  {isAtWill ? 'At-Will Casting:' : 'Innate Casting:'}
-                </h4>
-                <button
-                  onClick={handleSelectFreecast}
-                  disabled={!canFreecast}
-                  className={`flex w-full items-center justify-between rounded-lg border-2 p-3 transition-all duration-200 ${
-                    useFreecast
-                      ? 'border-emerald-500 bg-emerald-100 shadow-md'
-                      : canFreecast
-                        ? 'border-emerald-300 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100'
-                        : 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`flex h-6 w-6 items-center justify-center rounded-full ${
-                        useFreecast
-                          ? 'bg-emerald-600 text-white'
-                          : canFreecast
-                            ? 'bg-emerald-400 text-white'
-                            : 'bg-gray-300 text-gray-500'
-                      }`}
-                    >
-                      {isAtWill ? <Infinity size={14} /> : <Zap size={14} />}
-                    </div>
-                    <span
-                      className={`font-medium ${
-                        useFreecast
-                          ? 'text-emerald-900'
-                          : canFreecast
-                            ? 'text-emerald-800'
-                            : 'text-gray-500'
-                      }`}
-                    >
-                      Cast free (no slot)
-                      {isAtWill && (
-                        <span className="ml-1 text-emerald-600">
-                          &mdash; At Will
-                        </span>
-                      )}
+              <h3 className="mb-1 text-xl font-bold text-purple-900">
+                {spell.name}
+              </h3>
+              <div className="flex items-center justify-center gap-2 text-sm text-purple-600">
+                <span>{spell.school}</span>
+                <span>&bull;</span>
+                <span>
+                  {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
+                </span>
+                {spell.concentration && (
+                  <>
+                    <span>&bull;</span>
+                    <span className="font-medium text-orange-600">
+                      Concentration
                     </span>
-                  </div>
-                  <span
-                    className={`text-sm ${
-                      useFreecast
-                        ? 'text-emerald-700'
-                        : canFreecast
-                          ? 'text-emerald-600'
-                          : 'text-gray-400'
-                    }`}
-                  >
-                    {isAtWill
-                      ? 'Unlimited'
-                      : `${freeCastsRemaining}/${spell.freeCastMax} remaining`}
-                  </span>
-                </button>
-                {isInnate && freeCastsRemaining <= 0 && (
-                  <p className="mt-1.5 text-xs text-gray-500">
-                    Free casts exhausted. Use a spell slot or take a long rest.
-                  </p>
+                  </>
+                )}
+                {spell.ritual && (
+                  <>
+                    <span>&bull;</span>
+                    <span className="font-medium text-blue-600">Ritual</span>
+                  </>
                 )}
               </div>
+              {spell.castingSource && (
+                <div className="mt-1 text-xs text-purple-500">
+                  Source: {spell.castingSource}
+                </div>
+              )}
+            </div>
+
+            {/* Concentration Warning */}
+            {concentrationWarning && (
+              <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <AlertTriangle
+                  className="mt-0.5 flex-shrink-0 text-amber-600"
+                  size={16}
+                />
+                <div className="text-sm">
+                  <p className="mb-1 font-medium text-amber-800">
+                    Concentration Warning
+                  </p>
+                  <p className="text-amber-700">
+                    You are currently concentrating on{' '}
+                    <span className="font-medium">
+                      {concentration.spellName}
+                    </span>
+                    . Casting this spell will end your concentration on the
+                    previous spell.
+                  </p>
+                </div>
+              </div>
             )}
 
-            {/* Ritual Casting Option */}
-            {canRitual && (
-              <div>
-                <h4 className="mb-3 font-medium text-gray-900">
-                  Ritual Casting:
-                </h4>
-                <button
-                  onClick={handleSelectRitual}
-                  className={`flex w-full items-center justify-between rounded-lg border-2 p-3 transition-all duration-200 ${
-                    useRitual
-                      ? 'border-blue-500 bg-blue-100 shadow-md'
-                      : 'border-blue-300 bg-blue-50 hover:border-blue-400 hover:bg-blue-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`flex h-6 w-6 items-center justify-center rounded-full ${
-                        useRitual
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-blue-400 text-white'
-                      }`}
+            {/* Reaction Warning */}
+            {reactionWarning && (
+              <div className="bg-accent-red-bg border-accent-red-border-strong flex items-start gap-3 rounded-lg border-2 p-3">
+                <ClockAlert
+                  className="text-accent-red-text mt-0.5 flex-shrink-0"
+                  size={16}
+                />
+                <div className="flex-1 text-sm">
+                  <p className="text-accent-red-text mb-1 font-medium">
+                    Reaction Already Used
+                  </p>
+                  <p className="text-accent-red-text">
+                    You&apos;ve already used your reaction this round. You
+                    typically can&apos;t cast this spell until your reaction
+                    resets on your next turn.
+                  </p>
+                  {onResetReaction && (
+                    <button
+                      onClick={onResetReaction}
+                      className="border-accent-red-border-strong text-accent-red-text hover:bg-accent-red-text mt-2 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors hover:text-white"
                     >
-                      <BookOpen size={14} />
-                    </div>
-                    <span
-                      className={`font-medium ${
-                        useRitual ? 'text-blue-900' : 'text-blue-800'
-                      }`}
-                    >
-                      Cast as Ritual (no slot)
+                      Reset Reaction
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Cantrip Cast */}
+            {spell.level === 0 ? (
+              <div className="text-center">
+                <p className="mb-4 text-sm text-gray-600">
+                  Cantrips don&apos;t use spell slots.
+                </p>
+                <div className="mb-4 rounded-lg border-2 border-purple-300 bg-purple-50 p-3">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="h-3 w-3 rounded-full bg-purple-500"></div>
+                    <span className="font-medium text-purple-900">
+                      Cantrip Selected
                     </span>
                   </div>
-                  <span
-                    className={`text-sm ${
-                      useRitual ? 'text-blue-700' : 'text-blue-600'
-                    }`}
-                  >
-                    +10 min casting time
-                  </span>
-                </button>
-              </div>
-            )}
-
-            {/* Slot-Based Casting */}
-            {availableLevels.length === 0 && !canFreecast && !canRitual ? (
-              <div className="py-4 text-center">
-                <p className="mb-2 text-gray-600">
-                  No available spell slots to cast this spell.
-                </p>
-                <p className="text-sm text-gray-500">
-                  You need at least a level {spell.level} spell slot.
-                </p>
+                </div>
               </div>
             ) : (
-              availableLevels.length > 0 && (
-                <div>
-                  <h4 className="mb-3 font-medium text-gray-900">
-                    {hasFreeCasting || canRitual
-                      ? 'Or use a spell slot:'
-                      : 'Choose spell slot level:'}
-                  </h4>
-                  <div className="space-y-2">
-                    {availableLevels.map(level => {
-                      const slot = spellSlots[level as keyof SpellSlots];
-                      const available = slot.max - slot.used;
-                      const isMinLevel = level === spell.level;
-                      const isSelected =
-                        !useFreecast && selectedLevel === level;
-
-                      return (
-                        <button
-                          key={level}
-                          onClick={() => handleSelectSlot(level)}
-                          className={`flex w-full items-center justify-between rounded-lg border-2 p-3 transition-all duration-200 ${
-                            isSelected
-                              ? 'border-purple-500 bg-purple-100 shadow-md'
-                              : isMinLevel
-                                ? 'border-purple-300 bg-purple-50 hover:border-purple-400 hover:bg-purple-100'
-                                : 'border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100'
+              <>
+                {/* Free Cast Option */}
+                {hasFreeCasting && (
+                  <div>
+                    <h4 className="mb-3 font-medium text-gray-900">
+                      {isAtWill ? 'At-Will Casting:' : 'Innate Casting:'}
+                    </h4>
+                    <button
+                      onClick={handleSelectFreecast}
+                      disabled={!canFreecast}
+                      className={`flex w-full items-center justify-between rounded-lg border-2 p-3 transition-all duration-200 ${
+                        useFreecast
+                          ? 'border-emerald-500 bg-emerald-100 shadow-md'
+                          : canFreecast
+                            ? 'border-emerald-300 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100'
+                            : 'cursor-not-allowed border-gray-200 bg-gray-50 opacity-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`flex h-6 w-6 items-center justify-center rounded-full ${
+                            useFreecast
+                              ? 'bg-emerald-600 text-white'
+                              : canFreecast
+                                ? 'bg-emerald-400 text-white'
+                                : 'bg-gray-300 text-gray-500'
                           }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <div
-                              className={`h-3 w-3 rounded-full ${
+                          {isAtWill ? (
+                            <Infinity size={14} />
+                          ) : (
+                            <Zap size={14} />
+                          )}
+                        </div>
+                        <span
+                          className={`font-medium ${
+                            useFreecast
+                              ? 'text-emerald-900'
+                              : canFreecast
+                                ? 'text-emerald-800'
+                                : 'text-gray-500'
+                          }`}
+                        >
+                          Cast free (no slot)
+                          {isAtWill && (
+                            <span className="ml-1 text-emerald-600">
+                              &mdash; At Will
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <span
+                        className={`text-sm ${
+                          useFreecast
+                            ? 'text-emerald-700'
+                            : canFreecast
+                              ? 'text-emerald-600'
+                              : 'text-gray-400'
+                        }`}
+                      >
+                        {isAtWill
+                          ? 'Unlimited'
+                          : `${freeCastsRemaining}/${spell.freeCastMax} remaining`}
+                      </span>
+                    </button>
+                    {isInnate && freeCastsRemaining <= 0 && (
+                      <p className="mt-1.5 text-xs text-gray-500">
+                        Free casts exhausted. Use a spell slot or take a long
+                        rest.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Ritual Casting Option */}
+                {canRitual && (
+                  <div>
+                    <h4 className="mb-3 font-medium text-gray-900">
+                      Ritual Casting:
+                    </h4>
+                    <button
+                      onClick={handleSelectRitual}
+                      className={`flex w-full items-center justify-between rounded-lg border-2 p-3 transition-all duration-200 ${
+                        useRitual
+                          ? 'border-blue-500 bg-blue-100 shadow-md'
+                          : 'border-blue-300 bg-blue-50 hover:border-blue-400 hover:bg-blue-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`flex h-6 w-6 items-center justify-center rounded-full ${
+                            useRitual
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-blue-400 text-white'
+                          }`}
+                        >
+                          <BookOpen size={14} />
+                        </div>
+                        <span
+                          className={`font-medium ${
+                            useRitual ? 'text-blue-900' : 'text-blue-800'
+                          }`}
+                        >
+                          Cast as Ritual (no slot)
+                        </span>
+                      </div>
+                      <span
+                        className={`text-sm ${
+                          useRitual ? 'text-blue-700' : 'text-blue-600'
+                        }`}
+                      >
+                        +10 min casting time
+                      </span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Slot-Based Casting */}
+                {availableLevels.length === 0 && !canFreecast && !canRitual ? (
+                  <div className="py-4 text-center">
+                    <p className="mb-2 text-gray-600">
+                      No available spell slots to cast this spell.
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      You need at least a level {spell.level} spell slot.
+                    </p>
+                  </div>
+                ) : (
+                  availableLevels.length > 0 && (
+                    <div>
+                      <h4 className="mb-3 font-medium text-gray-900">
+                        {hasFreeCasting || canRitual
+                          ? 'Or use a spell slot:'
+                          : 'Choose spell slot level:'}
+                      </h4>
+                      <div className="space-y-2">
+                        {availableLevels.map(level => {
+                          const slot = spellSlots[level as keyof SpellSlots];
+                          const available = slot.max - slot.used;
+                          const isMinLevel = level === spell.level;
+                          const isSelected =
+                            !useFreecast && selectedLevel === level;
+
+                          return (
+                            <button
+                              key={level}
+                              onClick={() => handleSelectSlot(level)}
+                              className={`flex w-full items-center justify-between rounded-lg border-2 p-3 transition-all duration-200 ${
                                 isSelected
-                                  ? 'bg-purple-600'
+                                  ? 'border-purple-500 bg-purple-100 shadow-md'
                                   : isMinLevel
-                                    ? 'bg-purple-400'
-                                    : 'bg-slate-400'
-                              }`}
-                            ></div>
-                            <span
-                              className={`font-medium ${
-                                isSelected
-                                  ? 'text-purple-900'
-                                  : isMinLevel
-                                    ? 'text-purple-800'
-                                    : 'text-slate-700'
+                                    ? 'border-purple-300 bg-purple-50 hover:border-purple-400 hover:bg-purple-100'
+                                    : 'border-slate-300 bg-slate-50 hover:border-slate-400 hover:bg-slate-100'
                               }`}
                             >
-                              Level {level}
-                              {isMinLevel && (
-                                <span
-                                  className={
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className={`h-3 w-3 rounded-full ${
                                     isSelected
-                                      ? 'text-purple-700'
-                                      : 'text-purple-600'
-                                  }
+                                      ? 'bg-purple-600'
+                                      : isMinLevel
+                                        ? 'bg-purple-400'
+                                        : 'bg-slate-400'
+                                  }`}
+                                ></div>
+                                <span
+                                  className={`font-medium ${
+                                    isSelected
+                                      ? 'text-purple-900'
+                                      : isMinLevel
+                                        ? 'text-purple-800'
+                                        : 'text-slate-700'
+                                  }`}
                                 >
-                                  {' '}
-                                  (Base Level)
+                                  Level {level}
+                                  {isMinLevel && (
+                                    <span
+                                      className={
+                                        isSelected
+                                          ? 'text-purple-700'
+                                          : 'text-purple-600'
+                                      }
+                                    >
+                                      {' '}
+                                      (Base Level)
+                                    </span>
+                                  )}
                                 </span>
-                              )}
-                            </span>
-                          </div>
-                          <span
-                            className={`text-sm ${
-                              isSelected
-                                ? 'text-purple-700'
-                                : isMinLevel
-                                  ? 'text-purple-600'
-                                  : 'text-slate-600'
-                            }`}
-                          >
-                            {available}/{slot.max} available
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )
+                              </div>
+                              <span
+                                className={`text-sm ${
+                                  isSelected
+                                    ? 'text-purple-700'
+                                    : isMinLevel
+                                      ? 'text-purple-600'
+                                      : 'text-slate-600'
+                                }`}
+                              >
+                                {available}/{slot.max} available
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )
+                )}
+
+                {/* Higher Level Effects */}
+                {spell.higherLevel &&
+                  selectedLevel &&
+                  !useFreecast &&
+                  selectedLevel > spell.level && (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                      <h5 className="mb-2 font-medium text-blue-900">
+                        At Higher Levels
+                      </h5>
+                      <p className="text-sm text-blue-800">
+                        {spell.higherLevel}
+                      </p>
+                    </div>
+                  )}
+              </>
             )}
-
-            {/* Higher Level Effects */}
-            {spell.higherLevel &&
-              selectedLevel &&
-              !useFreecast &&
-              selectedLevel > spell.level && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-                  <h5 className="mb-2 font-medium text-blue-900">
-                    At Higher Levels
-                  </h5>
-                  <p className="text-sm text-blue-800">{spell.higherLevel}</p>
-                </div>
-              )}
-          </>
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-between gap-3 border-t border-gray-200 p-4">
-        <button
-          onClick={handleClose}
-          className="px-4 py-2 text-gray-600 transition-colors hover:text-gray-800"
-        >
-          Cancel
-        </button>
-
-        {canCast && (
+          </div>
+        </DialogBody>
+        <DialogFooter className="flex items-center justify-between gap-3 border-t border-gray-200 p-4">
           <button
-            onClick={handleCast}
-            className={`rounded-lg px-6 py-2 font-medium text-white shadow-md transition-all duration-200 hover:shadow-lg ${
-              useRitual
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
-                : useFreecast
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
-                  : 'bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'
-            }`}
+            onClick={handleClose}
+            className="px-4 py-2 text-gray-600 transition-colors hover:text-gray-800"
           >
-            {useRitual
-              ? `Cast ${spell.name} as Ritual`
-              : useFreecast
-                ? `Cast Free ${spell.name}`
-                : `Cast ${spell.name}`}
-            {selectedLevel !== null &&
-              selectedLevel > 0 &&
-              !useFreecast &&
-              !useRitual && (
-                <span className="ml-1 text-purple-200">
-                  (Level {selectedLevel})
-                </span>
-              )}
+            Cancel
           </button>
-        )}
-      </div>
-    </Modal>
+
+          {canCast && (
+            <button
+              onClick={handleCast}
+              className={`rounded-lg px-6 py-2 font-medium text-white shadow-md transition-all duration-200 hover:shadow-lg ${
+                useRitual
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+                  : useFreecast
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
+                    : 'bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'
+              }`}
+            >
+              {useRitual
+                ? `Cast ${spell.name} as Ritual`
+                : useFreecast
+                  ? `Cast Free ${spell.name}`
+                  : `Cast ${spell.name}`}
+              {selectedLevel !== null &&
+                selectedLevel > 0 &&
+                !useFreecast &&
+                !useRitual && (
+                  <span className="ml-1 text-purple-200">
+                    (Level {selectedLevel})
+                  </span>
+                )}
+            </button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

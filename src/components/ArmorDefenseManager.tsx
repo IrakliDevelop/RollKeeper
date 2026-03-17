@@ -4,7 +4,14 @@ import React, { useState } from 'react';
 import { ArmorItem, ArmorCategory, ArmorType } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Edit2, Trash2, Shield, CheckCircle } from 'lucide-react';
-import { Modal } from '@/components/ui/feedback/Modal';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+  DialogFooter,
+} from '@/components/ui/feedback/dialog';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -298,245 +305,257 @@ export default function ArmorDefenseManager() {
       )}
 
       {/* Add/Edit Form */}
-      <Modal
-        isOpen={showForm}
-        onClose={resetForm}
-        title={editingId ? 'Edit Armor' : 'Add Armor'}
-        size="lg"
-        closeOnBackdropClick={true}
+      <Dialog
+        open={showForm}
+        onOpenChange={open => {
+          if (!open) resetForm();
+        }}
       >
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Database search (when not editing) */}
-          {!editingId && (
-            <div className="space-y-4">
-              <ArmorAutocomplete
-                items={armorDb}
-                onSelect={handleArmorDbSelect}
-                loading={armorDbLoading}
-              />
-            </div>
-          )}
+        <DialogContent size="lg">
+          <DialogHeader>
+            <DialogTitle>{editingId ? 'Edit Armor' : 'Add Armor'}</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Database search (when not editing) */}
+              {!editingId && (
+                <div className="space-y-4">
+                  <ArmorAutocomplete
+                    items={armorDb}
+                    onSelect={handleArmorDbSelect}
+                    loading={armorDbLoading}
+                  />
+                </div>
+              )}
 
-          {/* Section: Basic Information */}
-          <div className="space-y-4">
-            <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
-              Basic Information
-            </h4>
+              {/* Section: Basic Information */}
+              <div className="space-y-4">
+                <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+                  Basic Information
+                </h4>
 
-            <Input
-              label="Name"
-              value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., Chain Mail, Leather Armor +1"
-              required
-            />
+                <Input
+                  label="Name"
+                  value={formData.name}
+                  onChange={e =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  placeholder="e.g., Chain Mail, Leather Armor +1"
+                  required
+                />
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Category
-                </label>
-                <SelectField
-                  value={formData.category}
-                  onValueChange={value => {
-                    const category = value as ArmorCategory;
-                    const firstType = ARMOR_TYPES[category][0];
-                    setFormData({ ...formData, category });
-                    handleTypeChange(firstType);
-                  }}
-                >
-                  {ARMOR_CATEGORIES.map(category => (
-                    <SelectItem key={category} value={category}>
-                      {category.charAt(0).toUpperCase() + category.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectField>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Category
+                    </label>
+                    <SelectField
+                      value={formData.category}
+                      onValueChange={value => {
+                        const category = value as ArmorCategory;
+                        const firstType = ARMOR_TYPES[category][0];
+                        setFormData({ ...formData, category });
+                        handleTypeChange(firstType);
+                      }}
+                    >
+                      {ARMOR_CATEGORIES.map(category => (
+                        <SelectItem key={category} value={category}>
+                          {category.charAt(0).toUpperCase() + category.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectField>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Type
+                    </label>
+                    <SelectField
+                      value={formData.type}
+                      onValueChange={value =>
+                        handleTypeChange(value as ArmorType)
+                      }
+                    >
+                      {ARMOR_TYPES[formData.category].map(type => (
+                        <SelectItem key={type} value={type}>
+                          {type.charAt(0).toUpperCase() +
+                            type.slice(1).replace('-', ' ')}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectField>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Type
-                </label>
-                <SelectField
-                  value={formData.type}
-                  onValueChange={value => handleTypeChange(value as ArmorType)}
-                >
-                  {ARMOR_TYPES[formData.category].map(type => (
-                    <SelectItem key={type} value={type}>
-                      {type.charAt(0).toUpperCase() +
-                        type.slice(1).replace('-', ' ')}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="custom">Custom</SelectItem>
-                </SelectField>
-              </div>
-            </div>
-          </div>
+              {/* Section: Armor Stats */}
+              <div className="space-y-4">
+                <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+                  Armor Stats
+                </h4>
 
-          {/* Section: Armor Stats */}
-          <div className="space-y-4">
-            <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
-              Armor Stats
-            </h4>
-
-            <div className="grid grid-cols-3 gap-4">
-              <Input
-                label="Base AC"
-                type="number"
-                value={formData.baseAC.toString()}
-                onChange={e =>
-                  setFormData({
-                    ...formData,
-                    baseAC: parseInt(e.target.value) || 10,
-                  })
-                }
-                min={10}
-                max={30}
-              />
-
-              <Input
-                label="Max Dex Bonus"
-                type="number"
-                value={formData.maxDexBonus?.toString() || ''}
-                onChange={e =>
-                  setFormData({
-                    ...formData,
-                    maxDexBonus: e.target.value
-                      ? parseInt(e.target.value)
-                      : undefined,
-                  })
-                }
-                placeholder="Unlimited"
-                min={0}
-                max={10}
-              />
-
-              <Input
-                label="Enhancement"
-                type="number"
-                value={formData.enhancementBonus.toString()}
-                onChange={e =>
-                  setFormData({
-                    ...formData,
-                    enhancementBonus: parseInt(e.target.value) || 0,
-                  })
-                }
-                min={0}
-                max={3}
-              />
-            </div>
-          </div>
-
-          {/* Section: Description */}
-          <div className="space-y-4">
-            <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
-              Description
-            </h4>
-
-            <div>
-              <label className="text-body mb-2 block text-sm font-medium">
-                Special Properties
-              </label>
-              <RichTextEditor
-                content={formData.description}
-                onChange={content =>
-                  setFormData(prev => ({ ...prev, description: content }))
-                }
-                placeholder="Special properties, abilities, or description..."
-              />
-            </div>
-          </div>
-
-          {/* Section: Properties */}
-          <div className="space-y-4">
-            <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
-              Properties
-            </h4>
-
-            <div className="flex flex-wrap gap-4">
-              <label className="flex cursor-pointer items-center gap-2">
-                <Checkbox
-                  checked={formData.isEquipped}
-                  onCheckedChange={checked =>
-                    setFormData({ ...formData, isEquipped: checked as boolean })
-                  }
-                />
-                <span className="text-sm font-medium text-gray-800">
-                  Currently Equipped
-                </span>
-              </label>
-
-              <label className="flex cursor-pointer items-center gap-2">
-                <Checkbox
-                  checked={formData.stealthDisadvantage}
-                  onCheckedChange={checked =>
-                    setFormData({
-                      ...formData,
-                      stealthDisadvantage: checked as boolean,
-                    })
-                  }
-                />
-                <span className="text-sm font-medium text-gray-800">
-                  Stealth Disadvantage
-                </span>
-              </label>
-
-              <label className="flex cursor-pointer items-center gap-2">
-                <Checkbox
-                  checked={formData.requiresAttunement}
-                  onCheckedChange={checked =>
-                    setFormData({
-                      ...formData,
-                      requiresAttunement: checked as boolean,
-                      isAttuned: checked ? formData.isAttuned : false,
-                    })
-                  }
-                />
-                <span className="text-sm font-medium text-gray-800">
-                  Requires Attunement
-                </span>
-              </label>
-
-              {formData.requiresAttunement && (
-                <label className="flex cursor-pointer items-center gap-2">
-                  <Checkbox
-                    checked={formData.isAttuned}
-                    onCheckedChange={checked =>
+                <div className="grid grid-cols-3 gap-4">
+                  <Input
+                    label="Base AC"
+                    type="number"
+                    value={formData.baseAC.toString()}
+                    onChange={e =>
                       setFormData({
                         ...formData,
-                        isAttuned: checked as boolean,
+                        baseAC: parseInt(e.target.value) || 10,
                       })
                     }
+                    min={10}
+                    max={30}
                   />
-                  <span className="text-sm font-medium text-gray-800">
-                    Attuned
-                  </span>
-                </label>
-              )}
-            </div>
-          </div>
 
-          {/* Form Actions */}
-          <div className="flex justify-end gap-3 border-t-2 border-gray-200 pt-4">
-            <Button
-              type="button"
-              onClick={resetForm}
-              variant="outline"
-              size="md"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              size="md"
-              className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
-            >
-              {editingId ? 'Update' : 'Add'} Armor
-            </Button>
-          </div>
-        </form>
-      </Modal>
+                  <Input
+                    label="Max Dex Bonus"
+                    type="number"
+                    value={formData.maxDexBonus?.toString() || ''}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        maxDexBonus: e.target.value
+                          ? parseInt(e.target.value)
+                          : undefined,
+                      })
+                    }
+                    placeholder="Unlimited"
+                    min={0}
+                    max={10}
+                  />
+
+                  <Input
+                    label="Enhancement"
+                    type="number"
+                    value={formData.enhancementBonus.toString()}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        enhancementBonus: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    min={0}
+                    max={3}
+                  />
+                </div>
+              </div>
+
+              {/* Section: Description */}
+              <div className="space-y-4">
+                <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+                  Description
+                </h4>
+
+                <div>
+                  <label className="text-body mb-2 block text-sm font-medium">
+                    Special Properties
+                  </label>
+                  <RichTextEditor
+                    content={formData.description}
+                    onChange={content =>
+                      setFormData(prev => ({ ...prev, description: content }))
+                    }
+                    placeholder="Special properties, abilities, or description..."
+                  />
+                </div>
+              </div>
+
+              {/* Section: Properties */}
+              <div className="space-y-4">
+                <h4 className="border-b-2 border-gray-200 pb-2 text-sm font-bold tracking-wide text-gray-800 uppercase">
+                  Properties
+                </h4>
+
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <Checkbox
+                      checked={formData.isEquipped}
+                      onCheckedChange={checked =>
+                        setFormData({
+                          ...formData,
+                          isEquipped: checked as boolean,
+                        })
+                      }
+                    />
+                    <span className="text-sm font-medium text-gray-800">
+                      Currently Equipped
+                    </span>
+                  </label>
+
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <Checkbox
+                      checked={formData.stealthDisadvantage}
+                      onCheckedChange={checked =>
+                        setFormData({
+                          ...formData,
+                          stealthDisadvantage: checked as boolean,
+                        })
+                      }
+                    />
+                    <span className="text-sm font-medium text-gray-800">
+                      Stealth Disadvantage
+                    </span>
+                  </label>
+
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <Checkbox
+                      checked={formData.requiresAttunement}
+                      onCheckedChange={checked =>
+                        setFormData({
+                          ...formData,
+                          requiresAttunement: checked as boolean,
+                          isAttuned: checked ? formData.isAttuned : false,
+                        })
+                      }
+                    />
+                    <span className="text-sm font-medium text-gray-800">
+                      Requires Attunement
+                    </span>
+                  </label>
+
+                  {formData.requiresAttunement && (
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <Checkbox
+                        checked={formData.isAttuned}
+                        onCheckedChange={checked =>
+                          setFormData({
+                            ...formData,
+                            isAttuned: checked as boolean,
+                          })
+                        }
+                      />
+                      <span className="text-sm font-medium text-gray-800">
+                        Attuned
+                      </span>
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter className="flex justify-end gap-3 border-t-2 border-gray-200 pt-4">
+                <Button
+                  type="button"
+                  onClick={resetForm}
+                  variant="outline"
+                  size="md"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                >
+                  {editingId ? 'Update' : 'Add'} Armor
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

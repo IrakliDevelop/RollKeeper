@@ -84,7 +84,7 @@ import {
   DialogBody,
   DialogFooter,
   DialogTrigger,
-} from '@/components/ui/feedback/dialog-new';
+} from '@/components/ui/feedback/dialog';
 ```
 
 ### Design Tokens
@@ -238,4 +238,4 @@ import type { Player } from '@/types';
 ❌ **Don't** mix business logic with UI rendering
 ❌ **Don't** ignore ESLint warnings - fix or explicitly disable with comment
 ❌ **Don't** hardcode colors/spacing - use design tokens
-❌ **Don't** use the legacy `Modal` component - use `Dialog` from dialog-new
+❌ **Don't** use the legacy `Modal` component - use `Dialog` from `@/components/ui/feedback/dialog`

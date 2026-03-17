@@ -21,7 +21,7 @@ import {
   DialogTitle,
   DialogBody,
   DialogFooter,
-} from '@/components/ui/feedback/dialog-new';
+} from '@/components/ui/feedback/dialog';
 import { Badge } from '@/components/ui/layout/badge';
 import { Button } from '@/components/ui/forms/button';
 import { Card, CardContent } from '@/components/ui/layout/card';

@@ -11,7 +11,13 @@ import {
 } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import { Plus, Sword, Wand2 } from 'lucide-react';
-import { Modal } from '@/components/ui/feedback/Modal';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+} from '@/components/ui/feedback/dialog';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { Button } from '@/components/ui/forms/button';
 import { WeaponForm, MagicItemForm } from './equipment';
@@ -398,172 +404,176 @@ export default function EquipmentModal({
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={handleCloseModal}
-      title={`⚔️ Equipment & Magic Items (Attunement: ${totalAttuned}/${character.attunementSlots.max})`}
-      size="xl"
-      closeOnBackdropClick={true}
+    <Dialog
+      open={isOpen}
+      onOpenChange={open => {
+        if (!open) handleCloseModal();
+      }}
     >
-      {/* Show forms if active, otherwise show main content */}
-      {showWeaponForm ? (
-        <div className="space-y-4">
-          <h3 className="text-heading text-xl font-bold">
-            {editingWeapon ? 'Edit Weapon' : 'Add Weapon'}
-          </h3>
-
-          <WeaponForm
-            formData={weaponForm}
-            setFormData={setWeaponForm}
-            onSubmit={handleWeaponSubmit}
-            onCancel={() => {
-              setShowWeaponForm(false);
-              setEditingWeapon(null);
-              setWeaponForm(initialWeaponData);
-            }}
-            isEditing={!!editingWeapon}
-            autocompleteSlot={
-              <WeaponAutocomplete
-                items={weaponsDb}
-                onSelect={handleWeaponDbSelect}
-                loading={weaponsLoading}
-              />
-            }
-          />
-        </div>
-      ) : showMagicItemForm ? (
-        <div className="space-y-4">
-          <h3 className="text-heading text-xl font-bold">
-            {editingMagicItem ? 'Edit Magic Item' : 'Add Magic Item'}
-          </h3>
-
-          <MagicItemForm
-            formData={magicItemForm}
-            setFormData={setMagicItemForm}
-            onSubmit={handleMagicItemSubmit}
-            onCancel={() => {
-              setShowMagicItemForm(false);
-              setEditingMagicItem(null);
-              setMagicItemForm(initialMagicItemData);
-            }}
-            isEditing={!!editingMagicItem}
-            autocompleteSlot={
-              <MagicItemAutocomplete
-                items={magicItemsDb}
-                onSelect={handleMagicItemSelect}
-                loading={magicItemsLoading}
-              />
-            }
-          />
-        </div>
-      ) : (
-        // Main equipment view
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Weapons Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-heading flex items-center gap-2 text-xl font-bold">
-                <Sword className="h-5 w-5" />
-                Weapons ({character.weapons.length})
+      <DialogContent size="xl">
+        <DialogHeader>
+          <DialogTitle>{`⚔️ Equipment & Magic Items (Attunement: ${totalAttuned}/${character.attunementSlots.max})`}</DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          {/* Show forms if active, otherwise show main content */}
+          {showWeaponForm ? (
+            <div className="space-y-4">
+              <h3 className="text-heading text-xl font-bold">
+                {editingWeapon ? 'Edit Weapon' : 'Add Weapon'}
               </h3>
-              <Button
-                onClick={() => setShowWeaponForm(true)}
-                variant="primary"
-                size="md"
-                leftIcon={<Plus size={16} />}
-                className="bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
-              >
-                Add Weapon
-              </Button>
-            </div>
 
-            <div className="space-y-3">
-              {character.weapons.length === 0 ? (
-                <div className="text-muted py-8 text-center">
-                  <Sword className="text-faint mx-auto mb-2 h-12 w-12" />
-                  <p>No weapons added yet</p>
+              <WeaponForm
+                formData={weaponForm}
+                setFormData={setWeaponForm}
+                onSubmit={handleWeaponSubmit}
+                onCancel={() => {
+                  setShowWeaponForm(false);
+                  setEditingWeapon(null);
+                  setWeaponForm(initialWeaponData);
+                }}
+                isEditing={!!editingWeapon}
+                autocompleteSlot={
+                  <WeaponAutocomplete
+                    items={weaponsDb}
+                    onSelect={handleWeaponDbSelect}
+                    loading={weaponsLoading}
+                  />
+                }
+              />
+            </div>
+          ) : showMagicItemForm ? (
+            <div className="space-y-4">
+              <h3 className="text-heading text-xl font-bold">
+                {editingMagicItem ? 'Edit Magic Item' : 'Add Magic Item'}
+              </h3>
+
+              <MagicItemForm
+                formData={magicItemForm}
+                setFormData={setMagicItemForm}
+                onSubmit={handleMagicItemSubmit}
+                onCancel={() => {
+                  setShowMagicItemForm(false);
+                  setEditingMagicItem(null);
+                  setMagicItemForm(initialMagicItemData);
+                }}
+                isEditing={!!editingMagicItem}
+                autocompleteSlot={
+                  <MagicItemAutocomplete
+                    items={magicItemsDb}
+                    onSelect={handleMagicItemSelect}
+                    loading={magicItemsLoading}
+                  />
+                }
+              />
+            </div>
+          ) : (
+            // Main equipment view
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {/* Weapons Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-heading flex items-center gap-2 text-xl font-bold">
+                    <Sword className="h-5 w-5" />
+                    Weapons ({character.weapons.length})
+                  </h3>
+                  <Button
+                    onClick={() => setShowWeaponForm(true)}
+                    variant="primary"
+                    size="md"
+                    leftIcon={<Plus size={16} />}
+                    className="bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                  >
+                    Add Weapon
+                  </Button>
                 </div>
-              ) : (
-                <DragDropList
-                  items={character.weapons}
-                  onReorder={reorderWeapons}
-                  keyExtractor={weapon => weapon.id}
-                  className="space-y-3"
-                  showDragHandle={true}
-                  dragHandlePosition="left"
-                  renderItem={weapon => (
-                    <WeaponCard
-                      weapon={weapon}
-                      onEdit={handleEditWeapon}
-                      onDelete={deleteWeapon}
-                      onToggleEquip={equipWeapon}
-                      onExpendWeaponChargePoolAbility={
-                        expendWeaponChargePoolAbility
-                      }
-                      onRestoreWeaponChargePool={restoreWeaponChargePool}
-                      onSetWeaponChargePoolUsed={setWeaponChargePoolUsed}
+
+                <div className="space-y-3">
+                  {character.weapons.length === 0 ? (
+                    <div className="text-muted py-8 text-center">
+                      <Sword className="text-faint mx-auto mb-2 h-12 w-12" />
+                      <p>No weapons added yet</p>
+                    </div>
+                  ) : (
+                    <DragDropList
+                      items={character.weapons}
+                      onReorder={reorderWeapons}
+                      keyExtractor={weapon => weapon.id}
+                      className="space-y-3"
+                      showDragHandle={true}
+                      dragHandlePosition="left"
+                      renderItem={weapon => (
+                        <WeaponCard
+                          weapon={weapon}
+                          onEdit={handleEditWeapon}
+                          onDelete={deleteWeapon}
+                          onToggleEquip={equipWeapon}
+                          onExpendWeaponChargePoolAbility={
+                            expendWeaponChargePoolAbility
+                          }
+                          onRestoreWeaponChargePool={restoreWeaponChargePool}
+                          onSetWeaponChargePoolUsed={setWeaponChargePoolUsed}
+                        />
+                      )}
                     />
                   )}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Magic Items Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-heading flex items-center gap-2 text-xl font-bold">
-                <Wand2 className="h-5 w-5" />
-                Magic Items ({character.magicItems.length})
-              </h3>
-              <Button
-                onClick={() => setShowMagicItemForm(true)}
-                variant="primary"
-                size="md"
-                leftIcon={<Plus size={16} />}
-                className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
-              >
-                Add Magic Item
-              </Button>
-            </div>
-
-            <div className="space-y-3">
-              {character.magicItems.length === 0 ? (
-                <div className="text-muted py-8 text-center">
-                  <Wand2 className="text-faint mx-auto mb-2 h-12 w-12" />
-                  <p>No magic items added yet</p>
                 </div>
-              ) : (
-                <DragDropList
-                  items={character.magicItems}
-                  onReorder={reorderMagicItems}
-                  keyExtractor={item => item.id}
-                  className="space-y-3"
-                  showDragHandle={true}
-                  dragHandlePosition="left"
-                  renderItem={item => (
-                    <MagicItemCard
-                      item={item}
-                      characterLevel={character.level}
-                      onEdit={handleEditMagicItem}
-                      onDelete={deleteMagicItem}
-                      onToggleAttunement={handleAttunement}
-                      onExpendCharge={expendMagicItemCharge}
-                      onRestoreCharge={restoreMagicItemCharge}
-                      onExpendChargePoolAbility={expendChargePoolAbility}
-                      onRestoreChargePool={restoreChargePool}
-                      onSetChargePoolUsed={setChargePoolUsed}
+              </div>
+
+              {/* Magic Items Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-heading flex items-center gap-2 text-xl font-bold">
+                    <Wand2 className="h-5 w-5" />
+                    Magic Items ({character.magicItems.length})
+                  </h3>
+                  <Button
+                    onClick={() => setShowMagicItemForm(true)}
+                    variant="primary"
+                    size="md"
+                    leftIcon={<Plus size={16} />}
+                    className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+                  >
+                    Add Magic Item
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  {character.magicItems.length === 0 ? (
+                    <div className="text-muted py-8 text-center">
+                      <Wand2 className="text-faint mx-auto mb-2 h-12 w-12" />
+                      <p>No magic items added yet</p>
+                    </div>
+                  ) : (
+                    <DragDropList
+                      items={character.magicItems}
+                      onReorder={reorderMagicItems}
+                      keyExtractor={item => item.id}
+                      className="space-y-3"
+                      showDragHandle={true}
+                      dragHandlePosition="left"
+                      renderItem={item => (
+                        <MagicItemCard
+                          item={item}
+                          characterLevel={character.level}
+                          onEdit={handleEditMagicItem}
+                          onDelete={deleteMagicItem}
+                          onToggleAttunement={handleAttunement}
+                          onExpendCharge={expendMagicItemCharge}
+                          onRestoreCharge={restoreMagicItemCharge}
+                          onExpendChargePoolAbility={expendChargePoolAbility}
+                          onRestoreChargePool={restoreChargePool}
+                          onSetChargePoolUsed={setChargePoolUsed}
+                        />
+                      )}
                     />
                   )}
-                />
-              )}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
-    </Modal>
+          )}
+        </DialogBody>
+      </DialogContent>
+    </Dialog>
   );
 }

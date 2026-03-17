@@ -11,7 +11,7 @@ import {
   DialogDescription,
   DialogBody,
   DialogFooter,
-} from '@/components/ui/feedback/dialog-new';
+} from '@/components/ui/feedback/dialog';
 
 type RestType = 'short' | 'long';
 

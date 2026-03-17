@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { EquippedWeapons } from '@/components/EquippedWeapons';
-import { EnhancedQuickSpells } from '@/components/EnhancedQuickSpells';
+import { QuickSpells } from '@/components/QuickSpells';
 import { ConcentrationTracker } from '@/components/ui/character';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
@@ -202,7 +202,7 @@ export default function ActionsSection({
             </div>
           }
         >
-          <EnhancedQuickSpells
+          <QuickSpells
             showAttackRoll={showAttackRoll}
             showSavingThrow={showSavingThrow}
             showDamageRoll={showDamageRoll}

@@ -9,7 +9,7 @@ import NotesManager from '@/components/ui/game/NotesManager';
 import InventoryManager from '@/components/ui/game/InventoryManager';
 import CurrencyManager from '@/components/ui/game/CurrencyManager';
 import { SpellcastingStats } from '@/components/SpellcastingStats';
-import { EnhancedSpellManagement } from '@/components/EnhancedSpellManagement';
+import { SpellManagement } from '@/components/SpellManagement';
 import { WeaponsTab } from '@/components/ui/character/equipment/WeaponsTab';
 import { MagicItemsTab } from '@/components/ui/character/equipment/MagicItemsTab';
 import { ArmorTab } from '@/components/ui/character/equipment/ArmorTab';
@@ -454,7 +454,7 @@ export function createTabbedSheetConfig(
               </div>
             }
           >
-            <EnhancedSpellManagement />
+            <SpellManagement />
           </ErrorBoundary>
         </div>
       ),

@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogBody,
   DialogFooter,
-} from '@/components/ui/feedback/dialog-new';
+} from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';

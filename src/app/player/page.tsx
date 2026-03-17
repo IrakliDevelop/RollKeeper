@@ -18,7 +18,6 @@ import {
   ChevronDown,
   ChevronUp,
   TrendingUp,
-  LayoutGrid,
   Link2,
 } from 'lucide-react';
 import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
@@ -630,38 +629,6 @@ export default function PlayerDashboardPage() {
                       className="peer sr-only"
                     />
                     <div className="peer bg-divider-strong after:border-divider-strong dark:after:bg-surface-raised h-6 w-11 rounded-full peer-checked:bg-amber-500 peer-focus:ring-2 peer-focus:ring-amber-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
-                  </label>
-                </div>
-
-                {/* Tabbed Layout Toggle */}
-                <div className="border-divider bg-surface-secondary flex items-center justify-between rounded-lg border p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-accent-blue-bg flex h-10 w-10 items-center justify-center rounded-lg">
-                      <LayoutGrid className="text-accent-blue-text-muted h-5 w-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-heading font-medium">
-                        Tabbed Character Sheet
-                      </h4>
-                      <p className="text-muted text-sm">
-                        Modern tabbed interface — quickly switch between
-                        sections without scrolling
-                      </p>
-                    </div>
-                  </div>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input
-                      type="checkbox"
-                      checked={settings?.enableTabbedLayout ?? false}
-                      onChange={e =>
-                        updateSettings({
-                          enableTabbedLayout: e.target.checked,
-                          hasSeenLayoutPrompt: true,
-                        })
-                      }
-                      className="peer sr-only"
-                    />
-                    <div className="peer bg-divider-strong after:border-divider-strong dark:after:bg-surface-raised h-6 w-11 rounded-full peer-checked:bg-blue-500 peer-focus:ring-2 peer-focus:ring-blue-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
                   </label>
                 </div>
 
