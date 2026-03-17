@@ -244,6 +244,20 @@ function migrateCharacterData(character: unknown): CharacterState {
     if (!Array.isArray(result.summons)) {
       result.summons = [];
     }
+    // Ensure defenses arrays exist
+    if (!Array.isArray(result.damageImmunities)) {
+      result.damageImmunities = [];
+    }
+    if (!Array.isArray(result.damageResistances)) {
+      result.damageResistances = [];
+    }
+    if (!Array.isArray(result.conditionImmunities)) {
+      result.conditionImmunities = [];
+    }
+    // Ensure senses array exists
+    if (!Array.isArray(result.senses)) {
+      result.senses = [];
+    }
     return result;
   }
 
@@ -538,6 +552,27 @@ interface CharacterStore {
     updates: Partial<ToolProficiency>
   ) => void;
   deleteToolProficiency: (id: string) => void;
+
+  // Damage immunities / resistances / condition immunities
+  addDamageImmunity: (type: string) => void;
+  removeDamageImmunity: (type: string) => void;
+  addDamageResistance: (type: string) => void;
+  removeDamageResistance: (type: string) => void;
+  addConditionImmunity: (condition: string) => void;
+  removeConditionImmunity: (condition: string) => void;
+
+  // Senses
+  addSense: (
+    sense: Omit<
+      import('@/types/character').CharacterSense,
+      'id' | 'createdAt' | 'updatedAt'
+    >
+  ) => void;
+  updateSense: (
+    id: string,
+    updates: Partial<import('@/types/character').CharacterSense>
+  ) => void;
+  removeSense: (id: string) => void;
 
   // Rest management (centralized)
   takeShortRest: () => void; // Resets all short rest abilities, pact magic, reaction
@@ -3089,6 +3124,142 @@ export const useCharacterStore = create<CharacterStore>()(
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving',
+        }));
+      },
+
+      // Damage immunities
+      addDamageImmunity: (type: string) => {
+        set(state => {
+          const current = state.character.damageImmunities || [];
+          if (current.includes(type)) return state;
+          return {
+            character: {
+              ...state.character,
+              damageImmunities: [...current, type],
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
+          };
+        });
+      },
+      removeDamageImmunity: (type: string) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            damageImmunities: (state.character.damageImmunities || []).filter(
+              t => t !== type
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving' as const,
+        }));
+      },
+
+      // Damage resistances
+      addDamageResistance: (type: string) => {
+        set(state => {
+          const current = state.character.damageResistances || [];
+          if (current.includes(type)) return state;
+          return {
+            character: {
+              ...state.character,
+              damageResistances: [...current, type],
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
+          };
+        });
+      },
+      removeDamageResistance: (type: string) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            damageResistances: (state.character.damageResistances || []).filter(
+              t => t !== type
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving' as const,
+        }));
+      },
+
+      // Condition immunities
+      addConditionImmunity: (condition: string) => {
+        set(state => {
+          const current = state.character.conditionImmunities || [];
+          if (current.includes(condition)) return state;
+          return {
+            character: {
+              ...state.character,
+              conditionImmunities: [...current, condition],
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
+          };
+        });
+      },
+      removeConditionImmunity: (condition: string) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            conditionImmunities: (
+              state.character.conditionImmunities || []
+            ).filter(c => c !== condition),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving' as const,
+        }));
+      },
+
+      // Senses management
+      addSense: (
+        sense: Omit<
+          import('@/types/character').CharacterSense,
+          'id' | 'createdAt' | 'updatedAt'
+        >
+      ) => {
+        set(state => {
+          const newSense: import('@/types/character').CharacterSense = {
+            ...sense,
+            id: generateId(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          return {
+            character: {
+              ...state.character,
+              senses: [...(state.character.senses || []), newSense],
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
+          };
+        });
+      },
+      updateSense: (
+        id: string,
+        updates: Partial<import('@/types/character').CharacterSense>
+      ) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            senses: (state.character.senses || []).map(s =>
+              s.id === id
+                ? { ...s, ...updates, updatedAt: new Date().toISOString() }
+                : s
+            ),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving' as const,
+        }));
+      },
+      removeSense: (id: string) => {
+        set(state => ({
+          character: {
+            ...state.character,
+            senses: (state.character.senses || []).filter(s => s.id !== id),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving' as const,
         }));
       },
 

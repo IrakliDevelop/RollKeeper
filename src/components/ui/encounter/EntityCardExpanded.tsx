@@ -12,6 +12,10 @@ import {
   BookOpen,
   ChevronDown,
   ChevronUp,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldOff,
+  Eye,
 } from 'lucide-react';
 import { EncounterEntity } from '@/types/encounter';
 import { HPBar } from '@/components/shared/combat/HPBar';
@@ -251,6 +255,9 @@ export function EntityCardExpanded({
           )}
         </div>
       )}
+
+      {/* Player Defenses & Senses (synced from character sheet) */}
+      {isPlayer && <PlayerDefensesSenses entity={entity} />}
 
       {/* Monster Stat Block Toggle */}
       {entity.monsterStatBlock && (
@@ -594,6 +601,90 @@ export function EntityCardExpanded({
           Remove
         </Button>
       </div>
+    </div>
+  );
+}
+
+function PlayerDefensesSenses({ entity }: { entity: EncounterEntity }) {
+  const resistances = entity.damageResistances ?? [];
+  const immunities = entity.damageImmunities ?? [];
+  const condImmunities = entity.conditionImmunities ?? [];
+  const senses = entity.senses ?? [];
+
+  if (
+    resistances.length === 0 &&
+    immunities.length === 0 &&
+    condImmunities.length === 0 &&
+    senses.length === 0
+  )
+    return null;
+
+  return (
+    <div className="space-y-2">
+      {resistances.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-muted flex items-center gap-1 text-[10px] font-bold uppercase">
+            <ShieldAlert size={10} />
+            Resist
+          </span>
+          {resistances.map(r => (
+            <span
+              key={r}
+              className="border-accent-amber-border bg-accent-amber-bg text-accent-amber-text rounded border px-1.5 py-0.5 text-[10px] font-medium"
+            >
+              {r}
+            </span>
+          ))}
+        </div>
+      )}
+      {immunities.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-muted flex items-center gap-1 text-[10px] font-bold uppercase">
+            <ShieldCheck size={10} />
+            Immune
+          </span>
+          {immunities.map(i => (
+            <span
+              key={i}
+              className="border-accent-emerald-border bg-accent-emerald-bg text-accent-emerald-text rounded border px-1.5 py-0.5 text-[10px] font-medium"
+            >
+              {i}
+            </span>
+          ))}
+        </div>
+      )}
+      {condImmunities.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-muted flex items-center gap-1 text-[10px] font-bold uppercase">
+            <ShieldOff size={10} />
+            Cond. Immune
+          </span>
+          {condImmunities.map(c => (
+            <span
+              key={c}
+              className="border-accent-purple-border bg-accent-purple-bg text-accent-purple-text rounded border px-1.5 py-0.5 text-[10px] font-medium"
+            >
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
+      {senses.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-muted flex items-center gap-1 text-[10px] font-bold uppercase">
+            <Eye size={10} />
+            Senses
+          </span>
+          {senses.map(s => (
+            <span
+              key={`${s.name}-${s.range}`}
+              className="border-accent-blue-border bg-accent-blue-bg text-accent-blue-text rounded border px-1.5 py-0.5 text-[10px] font-medium"
+            >
+              {s.name} {s.range} ft.
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

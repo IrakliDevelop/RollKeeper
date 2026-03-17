@@ -9,6 +9,7 @@ import {
   Search,
   Trash2,
   Activity,
+  X,
 } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
 import {
@@ -374,7 +375,13 @@ export default function ConditionsDiseasesManager() {
                   onClick={() => setShowAddPanel(!showAddPanel)}
                   variant={showAddPanel ? 'outline' : 'primary'}
                   size="sm"
-                  leftIcon={<Plus className="h-4 w-4" />}
+                  leftIcon={
+                    showAddPanel ? (
+                      <X className="h-4 w-4" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )
+                  }
                   className={
                     showAddPanel
                       ? ''

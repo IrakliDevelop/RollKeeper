@@ -3,6 +3,7 @@ import { Angry } from 'lucide-react';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { PlayerCalendarView } from '@/components/ui/calendar/PlayerCalendarView';
 import ConditionsDiseasesManager from '@/components/ui/game/ConditionsDiseasesManager';
+import DefensesAndSenses from '@/components/ui/game/DefensesAndSenses';
 import CharacterBackgroundEditor from '@/components/ui/character/CharacterBackgroundEditor';
 import FeaturesTraitsManager from '@/components/ui/game/FeaturesTraitsManager';
 import NotesManager from '@/components/ui/game/NotesManager';
@@ -768,6 +769,7 @@ function CharacterTabContent({
 
 const COMBAT_SUB_TABS = [
   { id: 'player', label: 'Player', icon: '🗡️' },
+  { id: 'defenses', label: 'Defenses', icon: '🛡️' },
   { id: 'summons', label: 'Summons', icon: '🐾' },
 ] as const;
 
@@ -916,6 +918,18 @@ function CombatTabContent({
             </ErrorBoundary>
           </div>
         </div>
+      )}
+
+      {activeSubTab === 'defenses' && (
+        <ErrorBoundary
+          fallback={
+            <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+              <p className="text-muted">Unable to load defenses and senses</p>
+            </div>
+          }
+        >
+          <DefensesAndSenses />
+        </ErrorBoundary>
       )}
 
       {activeSubTab === 'summons' && (

@@ -542,6 +542,14 @@ export const DEFAULT_CHARACTER_STATE = {
     exhaustionVariant: '2024' as const, // Default to 2024 rules
   },
 
+  // Defenses
+  damageImmunities: [] as string[],
+  damageResistances: [] as string[],
+  conditionImmunities: [] as string[],
+
+  // Senses
+  senses: [] as import('@/types/character').CharacterSense[],
+
   // Class Features
   jackOfAllTrades: false, // Bard feature: add half proficiency to non-proficient skills
   languages: [], // Known languages
