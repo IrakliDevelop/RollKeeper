@@ -15,7 +15,13 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
-import { Modal } from '@/components/ui/feedback/Modal';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+} from '@/components/ui/feedback/dialog';
 import { calculateMagicItemChargeMax } from '@/utils/calculations';
 
 interface MagicItemCardProps {
@@ -436,173 +442,187 @@ export function MagicItemCard({
 
       {/* Charge Detail Modal */}
       {selectedCharge && (
-        <Modal
-          isOpen={true}
-          onClose={() => setSelectedCharge(null)}
-          title={selectedCharge.name || 'Charge Ability'}
-          size="sm"
+        <Dialog
+          open={true}
+          onOpenChange={open => {
+            if (!open) setSelectedCharge(null);
+          }}
         >
-          <div className="space-y-4">
-            {/* Item name */}
-            <div className="text-muted text-sm">
-              From: <span className="text-body font-medium">{item.name}</span>
-            </div>
-
-            {/* Description */}
-            {selectedCharge.description ? (
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <div
-                  dangerouslySetInnerHTML={{
-                    __html: selectedCharge.description,
-                  }}
-                  className="text-body"
-                />
-              </div>
-            ) : (
-              <p className="text-muted text-sm italic">
-                No description provided.
-              </p>
-            )}
-
-            {/* Charges info */}
-            <div className="border-accent-purple-border bg-accent-purple-bg rounded-lg border p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-body text-sm font-medium">Charges</span>
-                <div className="text-muted flex items-center gap-1 text-xs">
-                  {getRestTypeIcon(selectedCharge.restType)}
-                  <span className="capitalize">
-                    Recharges{' '}
-                    {selectedCharge.restType === 'dawn'
-                      ? 'at dawn'
-                      : `on ${selectedCharge.restType} rest`}
-                  </span>
+          <DialogContent size="sm">
+            <DialogHeader>
+              <DialogTitle>
+                {selectedCharge.name || 'Charge Ability'}
+              </DialogTitle>
+            </DialogHeader>
+            <DialogBody>
+              <div className="space-y-4">
+                {/* Item name */}
+                <div className="text-muted text-sm">
+                  From:{' '}
+                  <span className="text-body font-medium">{item.name}</span>
                 </div>
-              </div>
 
-              {/* Charge adjustment controls */}
-              {(() => {
-                const maxCharges = calculateMagicItemChargeMax(
-                  selectedCharge,
-                  characterLevel
-                );
-                const usedCharges = selectedCharge.usedCharges || 0;
-                const chargesRemaining = maxCharges - usedCharges;
-                const isExhausted = chargesRemaining <= 0;
-                const isFull = usedCharges <= 0;
-
-                return (
-                  <div className="flex items-center justify-center gap-3">
-                    <Button
-                      onClick={() => {
-                        onRestoreCharge(item.id, selectedCharge.id);
-                        // Update local state
-                        setSelectedCharge(prev =>
-                          prev
-                            ? {
-                                ...prev,
-                                usedCharges: Math.max(
-                                  0,
-                                  (prev.usedCharges || 0) - 1
-                                ),
-                              }
-                            : null
-                        );
-                      }}
-                      variant="outline"
-                      size="sm"
-                      disabled={isFull}
-                      leftIcon={<Plus size={14} />}
-                      className="border-accent-green-border text-accent-green-text-muted hover:bg-accent-green-bg"
-                    >
-                      Restore
-                    </Button>
-
-                    <div className="text-center">
-                      <span
-                        className={`text-2xl font-bold ${
-                          isExhausted
-                            ? 'text-accent-red-text-muted'
-                            : chargesRemaining <= 1
-                              ? 'text-accent-orange-text-muted'
-                              : 'text-accent-purple-text-muted'
-                        }`}
-                      >
-                        {chargesRemaining}
-                      </span>
-                      <span className="text-muted text-lg">/{maxCharges}</span>
-                    </div>
-
-                    <Button
-                      onClick={() => {
-                        onExpendCharge(item.id, selectedCharge.id);
-                        // Update local state
-                        const max = calculateMagicItemChargeMax(
-                          selectedCharge,
-                          characterLevel
-                        );
-                        setSelectedCharge(prev =>
-                          prev
-                            ? {
-                                ...prev,
-                                usedCharges: Math.min(
-                                  max,
-                                  (prev.usedCharges || 0) + 1
-                                ),
-                              }
-                            : null
-                        );
-                      }}
-                      variant="outline"
-                      size="sm"
-                      disabled={isExhausted}
-                      leftIcon={<Minus size={14} />}
-                      className="border-accent-red-border text-accent-red-text-muted hover:bg-accent-red-bg"
-                    >
-                      Use
-                    </Button>
-                  </div>
-                );
-              })()}
-
-              {/* Progress bar */}
-              {(() => {
-                const maxCharges = calculateMagicItemChargeMax(
-                  selectedCharge,
-                  characterLevel
-                );
-                const chargesRemaining =
-                  maxCharges - (selectedCharge.usedCharges || 0);
-                const isExhausted = chargesRemaining <= 0;
-
-                return maxCharges > 1 ? (
-                  <div className="bg-surface-hover mt-3 h-2 w-full rounded-full">
+                {/* Description */}
+                {selectedCharge.description ? (
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
                     <div
-                      className={`h-2 rounded-full transition-all duration-300 ${
-                        isExhausted
-                          ? 'bg-accent-red-bg-strong'
-                          : chargesRemaining <= 1
-                            ? 'bg-accent-orange-bg-strong'
-                            : 'bg-accent-purple-bg-strong'
-                      }`}
-                      style={{
-                        width: `${(chargesRemaining / maxCharges) * 100}%`,
+                      dangerouslySetInnerHTML={{
+                        __html: selectedCharge.description,
                       }}
+                      className="text-body"
                     />
                   </div>
-                ) : null;
-              })()}
-            </div>
+                ) : (
+                  <p className="text-muted text-sm italic">
+                    No description provided.
+                  </p>
+                )}
 
-            {/* Proficiency scaling info */}
-            {selectedCharge.scaleWithProficiency && (
-              <p className="text-muted text-xs">
-                <Info size={12} className="mr-1 inline" />
-                Scales with proficiency bonus (×
-                {selectedCharge.proficiencyMultiplier || 1})
-              </p>
-            )}
-          </div>
-        </Modal>
+                {/* Charges info */}
+                <div className="border-accent-purple-border bg-accent-purple-bg rounded-lg border p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-body text-sm font-medium">
+                      Charges
+                    </span>
+                    <div className="text-muted flex items-center gap-1 text-xs">
+                      {getRestTypeIcon(selectedCharge.restType)}
+                      <span className="capitalize">
+                        Recharges{' '}
+                        {selectedCharge.restType === 'dawn'
+                          ? 'at dawn'
+                          : `on ${selectedCharge.restType} rest`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Charge adjustment controls */}
+                  {(() => {
+                    const maxCharges = calculateMagicItemChargeMax(
+                      selectedCharge,
+                      characterLevel
+                    );
+                    const usedCharges = selectedCharge.usedCharges || 0;
+                    const chargesRemaining = maxCharges - usedCharges;
+                    const isExhausted = chargesRemaining <= 0;
+                    const isFull = usedCharges <= 0;
+
+                    return (
+                      <div className="flex items-center justify-center gap-3">
+                        <Button
+                          onClick={() => {
+                            onRestoreCharge(item.id, selectedCharge.id);
+                            // Update local state
+                            setSelectedCharge(prev =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    usedCharges: Math.max(
+                                      0,
+                                      (prev.usedCharges || 0) - 1
+                                    ),
+                                  }
+                                : null
+                            );
+                          }}
+                          variant="outline"
+                          size="sm"
+                          disabled={isFull}
+                          leftIcon={<Plus size={14} />}
+                          className="border-accent-green-border text-accent-green-text-muted hover:bg-accent-green-bg"
+                        >
+                          Restore
+                        </Button>
+
+                        <div className="text-center">
+                          <span
+                            className={`text-2xl font-bold ${
+                              isExhausted
+                                ? 'text-accent-red-text-muted'
+                                : chargesRemaining <= 1
+                                  ? 'text-accent-orange-text-muted'
+                                  : 'text-accent-purple-text-muted'
+                            }`}
+                          >
+                            {chargesRemaining}
+                          </span>
+                          <span className="text-muted text-lg">
+                            /{maxCharges}
+                          </span>
+                        </div>
+
+                        <Button
+                          onClick={() => {
+                            onExpendCharge(item.id, selectedCharge.id);
+                            // Update local state
+                            const max = calculateMagicItemChargeMax(
+                              selectedCharge,
+                              characterLevel
+                            );
+                            setSelectedCharge(prev =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    usedCharges: Math.min(
+                                      max,
+                                      (prev.usedCharges || 0) + 1
+                                    ),
+                                  }
+                                : null
+                            );
+                          }}
+                          variant="outline"
+                          size="sm"
+                          disabled={isExhausted}
+                          leftIcon={<Minus size={14} />}
+                          className="border-accent-red-border text-accent-red-text-muted hover:bg-accent-red-bg"
+                        >
+                          Use
+                        </Button>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Progress bar */}
+                  {(() => {
+                    const maxCharges = calculateMagicItemChargeMax(
+                      selectedCharge,
+                      characterLevel
+                    );
+                    const chargesRemaining =
+                      maxCharges - (selectedCharge.usedCharges || 0);
+                    const isExhausted = chargesRemaining <= 0;
+
+                    return maxCharges > 1 ? (
+                      <div className="bg-surface-hover mt-3 h-2 w-full rounded-full">
+                        <div
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            isExhausted
+                              ? 'bg-accent-red-bg-strong'
+                              : chargesRemaining <= 1
+                                ? 'bg-accent-orange-bg-strong'
+                                : 'bg-accent-purple-bg-strong'
+                          }`}
+                          style={{
+                            width: `${(chargesRemaining / maxCharges) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+
+                {/* Proficiency scaling info */}
+                {selectedCharge.scaleWithProficiency && (
+                  <p className="text-muted text-xs">
+                    <Info size={12} className="mr-1 inline" />
+                    Scales with proficiency bonus (×
+                    {selectedCharge.proficiencyMultiplier || 1})
+                  </p>
+                )}
+              </div>
+            </DialogBody>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );

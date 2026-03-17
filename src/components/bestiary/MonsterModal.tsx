@@ -6,7 +6,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogBody,
-} from '@/components/ui/feedback/dialog-new';
+} from '@/components/ui/feedback/dialog';
 import { Badge } from '@/components/ui/layout/badge';
 import { Card, CardContent } from '@/components/ui/layout/card';
 import { getCRColor, formatSize, formatAlignment } from '@/utils/bestiaryUtils';

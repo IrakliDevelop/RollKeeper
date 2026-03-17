@@ -126,8 +126,8 @@ import { Autocomplete } from '@/components/ui/forms/Autocomplete';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/layout/card';
 import { Badge } from '@/components/ui/layout/badge';
 
-// Feedback / overlays — use dialog-new, NOT the legacy Modal
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter, DialogTrigger } from '@/components/ui/feedback/dialog-new';
+// Feedback / overlays
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter, DialogTrigger } from '@/components/ui/feedback/dialog';
 
 // Design tokens
 import { colors, spacing, fontSize, shadows, borderRadius } from '@/components/ui/primitives';
@@ -175,4 +175,4 @@ Use `Button` with `variant`: `primary | secondary | success | danger | warning |
 - Direct state mutation — always use immutable updates
 - `useEffect` data fetching without cleanup
 - Hardcoded colors/spacing — use design tokens
-- The legacy `Modal` component — use `Dialog` from `dialog-new`
+- The legacy `Modal` component — use `Dialog` from `@/components/ui/feedback/dialog`

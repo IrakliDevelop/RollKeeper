@@ -18,7 +18,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/feedback/dialog-new';
+} from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
 
 const EMPTY_SAVED_CREATURES: SavedCreature[] = [];

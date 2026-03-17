@@ -25,7 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogBody,
-} from '@/components/ui/feedback/dialog-new';
+} from '@/components/ui/feedback/dialog';
 import { Badge } from '@/components/ui/layout/badge';
 import { CampaignPlayerData } from '@/types/campaign';
 import { CharacterState } from '@/types/character';

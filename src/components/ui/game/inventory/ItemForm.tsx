@@ -3,7 +3,14 @@
 import React, { useState } from 'react';
 import { MagicItemRarity, MagicItemCategory } from '@/types/character';
 import { X } from 'lucide-react';
-import { Modal } from '@/components/ui/feedback/Modal';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+  DialogFooter,
+} from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { Input } from '@/components/ui/forms/input';
@@ -144,304 +151,324 @@ export function ItemForm({
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={isEditing ? 'Edit Item' : 'Add Item'}
-      size="lg"
-      closeOnBackdropClick={true}
+    <Dialog
+      open={isOpen}
+      onOpenChange={open => {
+        if (!open) onClose();
+      }}
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Autocomplete Section */}
-        {databaseItems.length > 0 && (
-          <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border-2 p-4">
-            <ItemAutocomplete
-              items={databaseItems}
-              onSelect={handleItemSelect}
-              loading={itemsLoading}
-              placeholder="Search D&D items to auto-fill..."
-            />
-          </div>
-        )}
+      <DialogContent size="lg">
+        <DialogHeader>
+          <DialogTitle>{isEditing ? 'Edit Item' : 'Add Item'}</DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Autocomplete Section */}
+            {databaseItems.length > 0 && (
+              <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border-2 p-4">
+                <ItemAutocomplete
+                  items={databaseItems}
+                  onSelect={handleItemSelect}
+                  loading={itemsLoading}
+                  placeholder="Search D&D items to auto-fill..."
+                />
+              </div>
+            )}
 
-        {/* Section: Basic Information */}
-        <div className="space-y-4">
-          <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-            Basic Information
-          </h4>
+            {/* Section: Basic Information */}
+            <div className="space-y-4">
+              <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+                Basic Information
+              </h4>
 
-          <Input
-            label="Name"
-            value={formData.name}
-            onChange={e => setFormData({ ...formData, name: e.target.value })}
-            placeholder="e.g., Rope (50 feet), Healing Potion"
-            required
-          />
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-body mb-2 block text-sm font-medium">
-                Category
-              </label>
-              <SelectField
-                value={formData.category}
-                onValueChange={value =>
-                  setFormData({ ...formData, category: value })
+              <Input
+                label="Name"
+                value={formData.name}
+                onChange={e =>
+                  setFormData({ ...formData, name: e.target.value })
                 }
-              >
-                {ITEM_CATEGORIES.map(category => (
-                  <SelectItem key={category} value={category}>
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectField>
-            </div>
+                placeholder="e.g., Rope (50 feet), Healing Potion"
+                required
+              />
 
-            <Input
-              label="Quantity"
-              type="number"
-              value={formData.quantity > 0 ? formData.quantity.toString() : ''}
-              onChange={e =>
-                setFormData({
-                  ...formData,
-                  quantity:
-                    e.target.value === '' ? 0 : parseInt(e.target.value) || 0,
-                })
-              }
-              min={1}
-              required
-            />
-          </div>
-        </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-body mb-2 block text-sm font-medium">
+                    Category
+                  </label>
+                  <SelectField
+                    value={formData.category}
+                    onValueChange={value =>
+                      setFormData({ ...formData, category: value })
+                    }
+                  >
+                    {ITEM_CATEGORIES.map(category => (
+                      <SelectItem key={category} value={category}>
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
+                </div>
 
-        {/* Section: Item Classification */}
-        <div className="space-y-4">
-          <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-            Item Classification
-          </h4>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-body mb-2 block text-sm font-medium">
-                Rarity
-              </label>
-              <SelectField
-                value={formData.rarity || 'none'}
-                onValueChange={value =>
-                  setFormData({
-                    ...formData,
-                    rarity:
-                      value === 'none' ? undefined : (value as MagicItemRarity),
-                  })
-                }
-              >
-                <SelectItem value="none">None/Standard</SelectItem>
-                {ITEM_RARITIES.map(rarity => (
-                  <SelectItem key={rarity} value={rarity}>
-                    {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectField>
-            </div>
-
-            <div>
-              <label className="text-body mb-2 block text-sm font-medium">
-                Type
-              </label>
-              <SelectField
-                value={formData.type || 'none'}
-                onValueChange={value =>
-                  setFormData({
-                    ...formData,
-                    type:
-                      value === 'none'
-                        ? undefined
-                        : (value as MagicItemCategory),
-                  })
-                }
-              >
-                <SelectItem value="none">Standard Item</SelectItem>
-                {ITEM_TYPES.map(type => (
-                  <SelectItem key={type} value={type}>
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectField>
-            </div>
-          </div>
-        </div>
-
-        {/* Section: Location */}
-        <div className="space-y-4">
-          <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-            Location
-          </h4>
-
-          <div className="space-y-3">
-            <div>
-              <label className="text-body mb-2 block text-sm font-medium">
-                Where is this item stored?
-              </label>
-              <SelectField
-                value={showCustomLocation ? 'custom' : formData.location}
-                onValueChange={value => {
-                  if (value === 'custom') {
-                    setShowCustomLocation(true);
-                  } else {
-                    setShowCustomLocation(false);
-                    setFormData({ ...formData, location: value });
-                  }
-                }}
-              >
-                {availableLocations.map(location => (
-                  <SelectItem key={location} value={location}>
-                    {location}
-                  </SelectItem>
-                ))}
-                <SelectItem value="custom">Custom Location...</SelectItem>
-              </SelectField>
-            </div>
-
-            {showCustomLocation && (
-              <div className="flex items-center gap-2">
                 <Input
-                  value={customLocation}
-                  onChange={e => setCustomLocation(e.target.value)}
-                  placeholder="Enter custom location..."
+                  label="Quantity"
+                  type="number"
+                  value={
+                    formData.quantity > 0 ? formData.quantity.toString() : ''
+                  }
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      quantity:
+                        e.target.value === ''
+                          ? 0
+                          : parseInt(e.target.value) || 0,
+                    })
+                  }
+                  min={1}
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Section: Item Classification */}
+            <div className="space-y-4">
+              <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+                Item Classification
+              </h4>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-body mb-2 block text-sm font-medium">
+                    Rarity
+                  </label>
+                  <SelectField
+                    value={formData.rarity || 'none'}
+                    onValueChange={value =>
+                      setFormData({
+                        ...formData,
+                        rarity:
+                          value === 'none'
+                            ? undefined
+                            : (value as MagicItemRarity),
+                      })
+                    }
+                  >
+                    <SelectItem value="none">None/Standard</SelectItem>
+                    {ITEM_RARITIES.map(rarity => (
+                      <SelectItem key={rarity} value={rarity}>
+                        {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
+                </div>
+
+                <div>
+                  <label className="text-body mb-2 block text-sm font-medium">
+                    Type
+                  </label>
+                  <SelectField
+                    value={formData.type || 'none'}
+                    onValueChange={value =>
+                      setFormData({
+                        ...formData,
+                        type:
+                          value === 'none'
+                            ? undefined
+                            : (value as MagicItemCategory),
+                      })
+                    }
+                  >
+                    <SelectItem value="none">Standard Item</SelectItem>
+                    {ITEM_TYPES.map(type => (
+                      <SelectItem key={type} value={type}>
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
+                </div>
+              </div>
+            </div>
+
+            {/* Section: Location */}
+            <div className="space-y-4">
+              <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+                Location
+              </h4>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-body mb-2 block text-sm font-medium">
+                    Where is this item stored?
+                  </label>
+                  <SelectField
+                    value={showCustomLocation ? 'custom' : formData.location}
+                    onValueChange={value => {
+                      if (value === 'custom') {
+                        setShowCustomLocation(true);
+                      } else {
+                        setShowCustomLocation(false);
+                        setFormData({ ...formData, location: value });
+                      }
+                    }}
+                  >
+                    {availableLocations.map(location => (
+                      <SelectItem key={location} value={location}>
+                        {location}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="custom">Custom Location...</SelectItem>
+                  </SelectField>
+                </div>
+
+                {showCustomLocation && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={customLocation}
+                      onChange={e => setCustomLocation(e.target.value)}
+                      placeholder="Enter custom location..."
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setShowCustomLocation(false);
+                        setCustomLocation('');
+                      }}
+                      variant="outline"
+                      size="md"
+                    >
+                      <X size={16} />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Section: Item Details */}
+            <div className="space-y-4">
+              <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+                Item Details
+              </h4>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="Weight (lbs)"
+                  type="number"
+                  step="0.001"
+                  value={formData.weight?.toString() || ''}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      weight: e.target.value
+                        ? parseFloat(e.target.value)
+                        : undefined,
+                    })
+                  }
+                  placeholder="Per item"
+                  min={0}
+                />
+
+                <Input
+                  label="Value (cp)"
+                  type="number"
+                  value={formData.value?.toString() || ''}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      value: e.target.value
+                        ? parseInt(e.target.value)
+                        : undefined,
+                    })
+                  }
+                  placeholder="Per item"
+                  min={0}
+                />
+              </div>
+
+              <Textarea
+                label="Description"
+                value={formData.description}
+                onChange={e =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                rows={3}
+                placeholder="Item description, properties, or notes..."
+              />
+            </div>
+
+            {/* Section: Tags */}
+            <div className="space-y-4">
+              <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+                Tags
+              </h4>
+
+              <div className="flex gap-2">
+                <Input
+                  value={tagInput}
+                  onChange={e => setTagInput(e.target.value)}
+                  placeholder="Add tag..."
                   className="flex-1"
+                  onKeyPress={e =>
+                    e.key === 'Enter' && (e.preventDefault(), addTag())
+                  }
                 />
                 <Button
                   type="button"
-                  onClick={() => {
-                    setShowCustomLocation(false);
-                    setCustomLocation('');
-                  }}
-                  variant="outline"
-                  size="md"
-                >
-                  <X size={16} />
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Section: Item Details */}
-        <div className="space-y-4">
-          <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-            Item Details
-          </h4>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Weight (lbs)"
-              type="number"
-              step="0.001"
-              value={formData.weight?.toString() || ''}
-              onChange={e =>
-                setFormData({
-                  ...formData,
-                  weight: e.target.value
-                    ? parseFloat(e.target.value)
-                    : undefined,
-                })
-              }
-              placeholder="Per item"
-              min={0}
-            />
-
-            <Input
-              label="Value (cp)"
-              type="number"
-              value={formData.value?.toString() || ''}
-              onChange={e =>
-                setFormData({
-                  ...formData,
-                  value: e.target.value ? parseInt(e.target.value) : undefined,
-                })
-              }
-              placeholder="Per item"
-              min={0}
-            />
-          </div>
-
-          <Textarea
-            label="Description"
-            value={formData.description}
-            onChange={e =>
-              setFormData({ ...formData, description: e.target.value })
-            }
-            rows={3}
-            placeholder="Item description, properties, or notes..."
-          />
-        </div>
-
-        {/* Section: Tags */}
-        <div className="space-y-4">
-          <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-            Tags
-          </h4>
-
-          <div className="flex gap-2">
-            <Input
-              value={tagInput}
-              onChange={e => setTagInput(e.target.value)}
-              placeholder="Add tag..."
-              className="flex-1"
-              onKeyPress={e =>
-                e.key === 'Enter' && (e.preventDefault(), addTag())
-              }
-            />
-            <Button
-              type="button"
-              onClick={addTag}
-              variant="primary"
-              size="md"
-              className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
-            >
-              Add
-            </Button>
-          </div>
-
-          {formData.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {formData.tags.map((tag, index) => (
-                <Badge
-                  key={index}
+                  onClick={addTag}
                   variant="primary"
                   size="md"
-                  className="group"
+                  className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
                 >
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(index)}
-                    className="text-accent-purple-text-muted hover:text-accent-purple-text ml-1"
-                  >
-                    ×
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
+                  Add
+                </Button>
+              </div>
 
-        {/* Form Actions - sticky at bottom */}
-        <div className="bg-surface-raised border-divider sticky -bottom-6 -mx-6 -mb-6 flex justify-end gap-3 border-t-2 px-6 py-4">
-          <Button type="button" onClick={onClose} variant="outline" size="md">
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            size="md"
-            disabled={!formData.name.trim()}
-            className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
-          >
-            {isEditing ? 'Update' : 'Add'} Item
-          </Button>
-        </div>
-      </form>
-    </Modal>
+              {formData.tags.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {formData.tags.map((tag, index) => (
+                    <Badge
+                      key={index}
+                      variant="primary"
+                      size="md"
+                      className="group"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(index)}
+                        className="text-accent-purple-text-muted hover:text-accent-purple-text ml-1"
+                      >
+                        ×
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="bg-surface-raised border-divider sticky -bottom-6 -mx-6 -mb-6 flex justify-end gap-3 border-t-2 px-6 py-4">
+              <Button
+                type="button"
+                onClick={onClose}
+                variant="outline"
+                size="md"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                disabled={!formData.name.trim()}
+                className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+              >
+                {isEditing ? 'Update' : 'Add'} Item
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogBody>
+      </DialogContent>
+    </Dialog>
   );
 }

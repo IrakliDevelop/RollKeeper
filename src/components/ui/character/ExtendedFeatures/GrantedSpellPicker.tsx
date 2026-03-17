@@ -10,7 +10,13 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ProcessedSpell } from '@/types/spells';
 import { Spell } from '@/types/character';
-import { Modal } from '@/components/ui/feedback';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+} from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms';
 import { cn } from '@/utils/cn';
 import {
@@ -93,54 +99,61 @@ export default function GrantedSpellPicker({
   const showGroupPicker = hasGroups && !selectedGroup;
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Feat Grants Spells"
-      size="lg"
+    <Dialog
+      open={isOpen}
+      onOpenChange={open => {
+        if (!open) onClose();
+      }}
     >
-      <div className="space-y-6">
-        <div className="border-accent-purple-border bg-accent-purple-bg flex items-start gap-3 rounded-lg border p-4">
-          <Sparkles className="text-accent-purple-text mt-0.5 h-5 w-5 shrink-0" />
-          <div>
-            <p className="text-heading text-sm font-medium">
-              <strong>{featName}</strong> grants spells to your character.
-            </p>
-            <p className="text-muted mt-1 text-xs">
-              {showGroupPicker
-                ? 'First, choose which spell list you want to pick from.'
-                : 'Review the spells below and confirm which to add to your spell list.'}
-            </p>
-          </div>
-        </div>
+      <DialogContent size="lg">
+        <DialogHeader>
+          <DialogTitle>Feat Grants Spells</DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          <div className="space-y-6">
+            <div className="border-accent-purple-border bg-accent-purple-bg flex items-start gap-3 rounded-lg border p-4">
+              <Sparkles className="text-accent-purple-text mt-0.5 h-5 w-5 shrink-0" />
+              <div>
+                <p className="text-heading text-sm font-medium">
+                  <strong>{featName}</strong> grants spells to your character.
+                </p>
+                <p className="text-muted mt-1 text-xs">
+                  {showGroupPicker
+                    ? 'First, choose which spell list you want to pick from.'
+                    : 'Review the spells below and confirm which to add to your spell list.'}
+                </p>
+              </div>
+            </div>
 
-        {showGroupPicker ? (
-          <GroupPickerView
-            groups={parsed.groups!}
-            onSelect={setSelectedGroup}
-          />
-        ) : (
-          <SpellSelectionView
-            parsed={activeParsed}
-            featName={featName}
-            allSpells={allSpells}
-            spellsLoading={spellsLoading}
-            onConfirm={onConfirm}
-            onClose={onClose}
-            onBack={hasGroups ? () => setSelectedGroup(null) : undefined}
-            selectedGroupName={selectedGroup?.name}
-          />
-        )}
+            {showGroupPicker ? (
+              <GroupPickerView
+                groups={parsed.groups!}
+                onSelect={setSelectedGroup}
+              />
+            ) : (
+              <SpellSelectionView
+                parsed={activeParsed}
+                featName={featName}
+                allSpells={allSpells}
+                spellsLoading={spellsLoading}
+                onConfirm={onConfirm}
+                onClose={onClose}
+                onBack={hasGroups ? () => setSelectedGroup(null) : undefined}
+                selectedGroupName={selectedGroup?.name}
+              />
+            )}
 
-        {showGroupPicker && (
-          <div className="border-divider flex justify-end border-t pt-4">
-            <Button variant="outline" onClick={onClose}>
-              Skip
-            </Button>
+            {showGroupPicker && (
+              <div className="border-divider flex justify-end border-t pt-4">
+                <Button variant="outline" onClick={onClose}>
+                  Skip
+                </Button>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    </Modal>
+        </DialogBody>
+      </DialogContent>
+    </Dialog>
   );
 }
 
