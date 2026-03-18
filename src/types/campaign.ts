@@ -22,4 +22,5 @@ export interface CampaignInfo {
   customCounterLabel?: string;
   playerCounters?: Record<string, number>; // playerId → counter value
   playerColors?: Record<string, string>; // playerCharacterId → color hex
+  bannerUrl?: string; // S3 URL for campaign banner image
 }

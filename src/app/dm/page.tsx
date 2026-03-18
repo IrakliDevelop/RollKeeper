@@ -18,11 +18,13 @@ import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { CreateCampaignDialog } from '@/components/ui/campaign/CreateCampaignDialog';
+import { BannerUpload } from '@/components/ui/campaign/BannerUpload';
 import { useHydration } from '@/hooks/useHydration';
 import { CampaignInfo } from '@/types/campaign';
 
 export default function DmDashboardPage() {
-  const { dmId, campaigns, addCampaign, removeCampaign } = useDmStore();
+  const { dmId, campaigns, addCampaign, removeCampaign, updateCampaign } =
+    useDmStore();
   const hasHydrated = useHydration();
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -255,6 +257,9 @@ export default function DmDashboardPage() {
                 onCopyCode={handleCopyCode}
                 onDelete={handleDeleteCampaign}
                 onExport={handleExportCampaign}
+                onBannerChange={url =>
+                  updateCampaign(campaign.code, { bannerUrl: url })
+                }
               />
             ))}
           </div>
@@ -278,6 +283,7 @@ function CampaignCard({
   onCopyCode,
   onDelete,
   onExport,
+  onBannerChange,
 }: {
   campaign: CampaignInfo;
   playerCount: number;
@@ -285,9 +291,16 @@ function CampaignCard({
   onCopyCode: (code: string) => void;
   onDelete: (campaign: CampaignInfo) => void;
   onExport: (campaign: CampaignInfo) => void;
+  onBannerChange: (url: string | undefined) => void;
 }) {
   return (
     <div className="border-accent-purple-border bg-surface-raised hover:bg-surface-secondary rounded-lg border-2 shadow-md transition-all hover:shadow-xl">
+      <BannerUpload
+        bannerUrl={campaign.bannerUrl}
+        campaignCode={campaign.code}
+        onBannerChange={onBannerChange}
+        variant="card"
+      />
       <div className="p-6">
         <div className="mb-4">
           <h3 className="text-heading mb-2 text-xl font-semibold">
