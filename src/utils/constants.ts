@@ -637,3 +637,5 @@ export const APP_VERSION = '1.0.0';
 // Avatar upload settings
 export const MAX_AVATAR_SIZE_MB = 5; // Maximum avatar file size in megabytes
 export const MAX_AVATAR_SIZE_BYTES = MAX_AVATAR_SIZE_MB * 1024 * 1024;
+export const MAX_BANNER_SIZE_MB = 10; // Maximum banner file size in megabytes
+export const MAX_BANNER_SIZE_BYTES = MAX_BANNER_SIZE_MB * 1024 * 1024;

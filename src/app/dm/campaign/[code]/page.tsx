@@ -25,6 +25,7 @@ import { NPCSection } from '@/components/ui/campaign/NPCSection';
 import { useCampaignSync } from '@/hooks/useCampaignSync';
 import { useDmCounterSync } from '@/hooks/useDmCounterSync';
 import { useDmStore } from '@/store/dmStore';
+import { BannerUpload } from '@/components/ui/campaign/BannerUpload';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import { CampaignPlayerData } from '@/types/campaign';
 
@@ -32,8 +33,13 @@ export default function CampaignViewPage() {
   const params = useParams();
   const code = params.code as string;
 
-  const { dmId, getCampaign, setCustomCounterLabel, adjustPlayerCounter } =
-    useDmStore();
+  const {
+    dmId,
+    getCampaign,
+    setCustomCounterLabel,
+    adjustPlayerCounter,
+    updateCampaign,
+  } = useDmStore();
   const localCampaign = getCampaign(code);
 
   const { players, campaignName, loading, error, lastFetched, refresh } =
@@ -140,7 +146,10 @@ export default function CampaignViewPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Link href={`/dm/campaign/${code}/calendar`}>
+              <Link
+                href={`/dm/campaign/${code}/calendar`}
+                className="lg:hidden"
+              >
                 <Button
                   variant="secondary"
                   size="sm"
@@ -149,7 +158,10 @@ export default function CampaignViewPage() {
                   Calendar
                 </Button>
               </Link>
-              <Link href={`/dm/campaign/${code}/encounters`}>
+              <Link
+                href={`/dm/campaign/${code}/encounters`}
+                className="lg:hidden"
+              >
                 <Button
                   variant="secondary"
                   size="sm"
@@ -192,6 +204,58 @@ export default function CampaignViewPage() {
           >
             Refresh Now
           </Button>
+        </div>
+      </div>
+
+      {/* Campaign Banner with Side Panels */}
+      <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+        <div className="flex items-stretch gap-4">
+          {/* Players */}
+          <div className="border-accent-blue-border bg-accent-blue-bg hidden flex-col items-center justify-center gap-2 rounded-lg border-2 px-4 py-4 lg:flex lg:w-44">
+            <Users size={22} className="text-accent-blue-text-muted" />
+            <div className="text-muted text-xs font-medium tracking-wider uppercase">
+              Players
+            </div>
+            <div className="text-heading text-2xl font-bold">
+              {players.length}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
+              <span className="text-muted text-xs">Live</span>
+            </div>
+          </div>
+
+          {/* Banner */}
+          <div className="min-w-0 flex-1 lg:max-w-2xl">
+            <BannerUpload
+              bannerUrl={localCampaign?.bannerUrl}
+              campaignCode={code}
+              onBannerChange={url => updateCampaign(code, { bannerUrl: url })}
+              variant="hero"
+            />
+          </div>
+
+          {/* Calendar */}
+          <Link
+            href={`/dm/campaign/${code}/calendar`}
+            className="border-accent-amber-border bg-accent-amber-bg hover:bg-accent-amber-bg-strong hidden flex-col items-center justify-center gap-2 rounded-lg border-2 px-4 py-4 transition-colors lg:flex lg:w-44"
+          >
+            <CalendarDays size={28} className="text-accent-amber-text-muted" />
+            <div className="text-accent-amber-text text-sm font-semibold">
+              Calendar
+            </div>
+          </Link>
+
+          {/* Encounters */}
+          <Link
+            href={`/dm/campaign/${code}/encounters`}
+            className="border-accent-red-border bg-accent-red-bg hover:bg-accent-red-bg-strong hidden flex-col items-center justify-center gap-2 rounded-lg border-2 px-4 py-4 transition-colors lg:flex lg:w-44"
+          >
+            <Swords size={28} className="text-accent-red-text-muted" />
+            <div className="text-accent-red-text text-sm font-semibold">
+              Encounters
+            </div>
+          </Link>
         </div>
       </div>
 

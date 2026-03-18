@@ -3,7 +3,11 @@
  * Handles avatar uploads to AWS S3
  */
 
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3';
 
 // Validate required environment variables before initializing S3 client
 function getRequiredEnvVar(name: string): string {
@@ -51,7 +55,7 @@ export async function uploadAvatarToS3(
 
   try {
     await s3Client.send(command);
-    
+
     const url = `https://${BUCKET_NAME}.s3.${AWS_S3_REGION}.amazonaws.com/${key}`;
     return url;
   } catch (error) {
@@ -71,7 +75,7 @@ export async function deleteAvatarFromS3(fileUrl: string): Promise<void> {
     if (urlParts.length < 2) {
       throw new Error('Invalid S3 URL');
     }
-    
+
     const key = urlParts[1];
 
     const command = new DeleteObjectCommand({
@@ -87,12 +91,47 @@ export async function deleteAvatarFromS3(fileUrl: string): Promise<void> {
 }
 
 /**
+ * Upload a campaign banner image to S3
+ * @param file - The image file buffer
+ * @param fileName - Unique filename for the image
+ * @param contentType - MIME type of the image
+ * @returns The public URL of the uploaded image
+ */
+export async function uploadBannerToS3(
+  file: Buffer,
+  fileName: string,
+  contentType: string
+): Promise<string> {
+  const key = `campaign-banners/${fileName}`;
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    Body: file,
+    ContentType: contentType,
+  });
+
+  try {
+    await s3Client.send(command);
+
+    const url = `https://${BUCKET_NAME}.s3.${AWS_S3_REGION}.amazonaws.com/${key}`;
+    return url;
+  } catch (error) {
+    console.error('Error uploading banner to S3:', error);
+    throw new Error('Failed to upload banner to S3');
+  }
+}
+
+/**
  * Generate a unique filename for an avatar
  * @param characterId - The character's unique ID
  * @param originalName - Original filename (for extension)
  * @returns A unique filename
  */
-export function generateAvatarFileName(characterId: string, originalName: string): string {
+export function generateAvatarFileName(
+  characterId: string,
+  originalName: string
+): string {
   const timestamp = Date.now();
   const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
   let extension = originalName.split('.').pop() || '';
@@ -103,3 +142,22 @@ export function generateAvatarFileName(characterId: string, originalName: string
   return `${characterId}-${timestamp}.${extension}`;
 }
 
+/**
+ * Generate a unique filename for a campaign banner
+ * @param campaignCode - The campaign code
+ * @param originalName - Original filename (for extension)
+ * @returns A unique filename
+ */
+export function generateBannerFileName(
+  campaignCode: string,
+  originalName: string
+): string {
+  const timestamp = Date.now();
+  const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+  let extension = originalName.split('.').pop() || '';
+  extension = extension.toLowerCase();
+  if (!allowedExtensions.includes(extension)) {
+    extension = 'jpg';
+  }
+  return `${campaignCode}-${timestamp}.${extension}`;
+}
