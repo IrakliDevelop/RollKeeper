@@ -176,7 +176,7 @@ export function PartyHPSidebar({
   if (!campaignCode) return null;
 
   return (
-    <div className="fixed top-1/2 left-0 z-30 hidden -translate-y-1/2 lg:flex">
+    <div className="fixed top-1/2 left-0 z-[55] hidden -translate-y-1/2 lg:flex">
       {/* Panel Wrapper — collapses width when closed */}
       <div
         className="overflow-hidden transition-[width] duration-300 ease-in-out"
