@@ -251,7 +251,7 @@ export default function CharacterHUD({
             </button>
           )}
           <span className="min-w-[48px] text-center text-sm font-medium">
-            Day {calendarDays ?? character.daysSpent ?? 0}
+            Day {(calendarDays ?? character.daysSpent ?? 0) + 1}
           </span>
           {calendarDays == null && (
             <button
