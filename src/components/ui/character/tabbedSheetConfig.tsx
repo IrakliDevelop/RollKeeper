@@ -32,7 +32,6 @@ import { ExtendedFeaturesSection } from '@/components/ui/character/ExtendedFeatu
 import ToolProficienciesSection from '@/components/ui/character/ToolProficienciesSection';
 import TraitTracker from '@/components/ui/character/TraitTracker';
 import HeroicInspirationTracker from '@/components/ui/character/HeroicInspirationTracker';
-import BardicInspirationTracker from '@/components/ui/character/BardicInspirationTracker';
 import Languages from '@/components/ui/character/LanguagesAndProficiencies';
 import { SummonsSubTab } from '@/components/ui/character/summons';
 import { ToastData } from '@/components/ui/feedback/Toast';
@@ -261,6 +260,10 @@ export function createTabbedSheetConfig(
             animateRoll={params.animateRoll}
             switchToTab={params.switchToTab}
             onStopConcentration={params.stopConcentration}
+            isBard={hasHydrated && isBard}
+            onUseBardicInspiration={params.useBardicInspiration}
+            onRestoreBardicInspiration={params.restoreBardicInspiration}
+            onResetBardicInspiration={params.resetBardicInspiration}
           />
           {characterHasSpells && (
             <SpellSlotTracker
@@ -486,8 +489,6 @@ export function createTabbedSheetConfig(
           character={character}
           totalLevel={totalLevel}
           proficiencyBonus={proficiencyBonus}
-          hasHydrated={hasHydrated}
-          isBard={isBard}
           params={params}
           customCounter={params.customCounter}
         />
@@ -1006,16 +1007,12 @@ function FeaturesTabContent({
   character,
   totalLevel,
   proficiencyBonus,
-  hasHydrated,
-  isBard,
   params,
   customCounter,
 }: {
   character: CharacterState;
   totalLevel: number;
   proficiencyBonus: number;
-  hasHydrated: boolean;
-  isBard: boolean;
   params: TabbedSheetConfigParams;
   customCounter?: { label: string; value: number } | null;
 }) {
@@ -1080,17 +1077,6 @@ function FeaturesTabContent({
             onUseInspiration={params.useHeroicInspiration}
             onResetInspiration={params.resetHeroicInspiration}
           />
-          {hasHydrated && isBard && (
-            <BardicInspirationTracker
-              bardicInspiration={
-                character.bardicInspiration ?? { usesExpended: 0 }
-              }
-              character={character}
-              onUseInspiration={params.useBardicInspiration}
-              onRestoreInspiration={params.restoreBardicInspiration}
-              onResetInspiration={params.resetBardicInspiration}
-            />
-          )}
           {customCounter && customCounter.value > 0 && (
             <DmCustomCounterDisplay
               label={customCounter.label}

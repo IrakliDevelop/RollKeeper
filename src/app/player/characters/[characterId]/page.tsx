@@ -729,6 +729,8 @@ export default function CharacterSheet() {
               }
               onToggleInspiration={handleToggleInspiration}
               onToggleReaction={toggleReaction}
+              onUseBardicInspiration={useBardicInspiration}
+              onRestoreBardicInspiration={restoreBardicInspiration}
               onStopConcentration={stopConcentration}
               onNavigateToConditions={() => {
                 switchToTab('conditions');

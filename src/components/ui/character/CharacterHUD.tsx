@@ -19,10 +19,14 @@ import {
   Bird,
   Mountain,
   Waves,
+  Music,
+  Wand2,
 } from 'lucide-react';
 import { CharacterState } from '@/types/character';
 import {
   calculateCharacterArmorClass,
+  calculateModifier,
+  calculateSpellAttackBonus,
   calculateSpellSaveDC,
   formatModifier,
   getProficiencyBonus,
@@ -38,6 +42,8 @@ interface CharacterHUDProps {
   onDecrementDays: () => void;
   onToggleInspiration: () => void;
   onToggleReaction: () => void;
+  onUseBardicInspiration?: () => void;
+  onRestoreBardicInspiration?: () => void;
   onStopConcentration: () => void;
   onNavigateToConditions?: () => void;
   onNavigateToBuffs?: () => void;
@@ -56,6 +62,8 @@ export default function CharacterHUD({
   onDecrementDays,
   onToggleInspiration,
   onToggleReaction,
+  onUseBardicInspiration,
+  onRestoreBardicInspiration,
   onStopConcentration,
   onNavigateToConditions,
   onNavigateToBuffs,
@@ -68,6 +76,7 @@ export default function CharacterHUD({
   const proficiencyBonus = getProficiencyBonus(totalLevel);
   const totalAC = calculateCharacterArmorClass(character);
   const spellSaveDC = calculateSpellSaveDC(character);
+  const spellAttackBonus = calculateSpellAttackBonus(character);
   const initiativeModifier = character.initiative.isOverridden
     ? character.initiative.value
     : Math.floor((character.abilities.dexterity - 10) / 2);
@@ -85,6 +94,20 @@ export default function CharacterHUD({
   const inspirationCount = character.heroicInspiration?.count || 0;
   const hasInspiration = inspirationCount > 0;
   const hasUsedReaction = character.reaction?.hasUsedReaction ?? false;
+
+  // Bardic Inspiration (bard only)
+  const isBard =
+    character.classes?.some(c => c.className.toLowerCase() === 'bard') ||
+    character.class?.name?.toLowerCase() === 'bard';
+  const bardicMaxUses = isBard
+    ? Math.max(1, calculateModifier(character.abilities.charisma))
+    : 0;
+  const bardicUsesRemaining = isBard
+    ? Math.max(
+        0,
+        bardicMaxUses - (character.bardicInspiration?.usesExpended ?? 0)
+      )
+    : 0;
 
   const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
   const activeBuffCount = activeBuffs.length;
@@ -166,6 +189,16 @@ export default function CharacterHUD({
             value={formatModifier(proficiencyBonus)}
             label="Prof"
           />
+
+          {/* Spell Attack - conditional */}
+          {spellAttackBonus !== null && (
+            <StatChip
+              icon={<Wand2 className="h-5 w-5 text-indigo-500" />}
+              value={formatModifier(spellAttackBonus)}
+              label="Atk"
+              onClick={onNavigateToSpells}
+            />
+          )}
 
           {/* Spell Save DC - conditional */}
           {spellSaveDC !== null && (
@@ -291,6 +324,32 @@ export default function CharacterHUD({
             </span>
           )}
         </button>
+
+        {/* Bardic Inspiration (Bard only) */}
+        {isBard && onUseBardicInspiration && onRestoreBardicInspiration && (
+          <button
+            onClick={
+              bardicUsesRemaining > 0
+                ? onUseBardicInspiration
+                : onRestoreBardicInspiration
+            }
+            className={`relative rounded-lg border px-2.5 py-2 transition-colors ${
+              bardicUsesRemaining > 0
+                ? 'border-indigo-400 bg-indigo-50 text-indigo-600 dark:border-indigo-600 dark:bg-indigo-950 dark:text-indigo-400'
+                : 'border-divider text-muted hover:bg-surface-hover hover:text-indigo-600'
+            }`}
+            title={
+              bardicUsesRemaining > 0
+                ? `Expend Bardic Inspiration (${bardicUsesRemaining}/${bardicMaxUses})`
+                : `Restore Bardic Inspiration (0/${bardicMaxUses})`
+            }
+          >
+            <Music className="h-4 w-4" />
+            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-indigo-500 px-0.5 text-[10px] font-bold text-white dark:bg-indigo-400 dark:text-indigo-950">
+              {bardicUsesRemaining}
+            </span>
+          </button>
+        )}
 
         {/* Reaction Toggle */}
         <button

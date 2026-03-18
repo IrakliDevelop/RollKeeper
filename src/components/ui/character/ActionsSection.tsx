@@ -8,6 +8,7 @@ import { QuickSpells } from '@/components/QuickSpells';
 import { ConcentrationTracker } from '@/components/ui/character';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
+import BardicInspirationTracker from '@/components/ui/character/BardicInspirationTracker';
 import { CharacterState } from '@/types/character';
 
 interface ActionsSectionProps {
@@ -34,6 +35,10 @@ interface ActionsSectionProps {
   animateRoll?: (notation: string) => Promise<unknown>;
   switchToTab: (tabId: string) => void;
   onStopConcentration: () => void;
+  isBard?: boolean;
+  onUseBardicInspiration?: () => void;
+  onRestoreBardicInspiration?: () => void;
+  onResetBardicInspiration?: () => void;
 }
 
 // Simple collapsible component for subsections
@@ -108,6 +113,10 @@ export default function ActionsSection({
   animateRoll,
   switchToTab,
   onStopConcentration,
+  isBard,
+  onUseBardicInspiration,
+  onRestoreBardicInspiration,
+  onResetBardicInspiration,
 }: ActionsSectionProps) {
   const equippedWeapons = character.weapons.filter(weapon => weapon.isEquipped);
   const actionSpells = character.spells.filter(
@@ -153,6 +162,22 @@ export default function ActionsSection({
             animateRoll={animateRoll}
           />
         </ErrorBoundary>
+        {isBard &&
+          onUseBardicInspiration &&
+          onRestoreBardicInspiration &&
+          onResetBardicInspiration && (
+            <div className="border-divider mt-4 border-t pt-4">
+              <BardicInspirationTracker
+                bardicInspiration={
+                  character.bardicInspiration ?? { usesExpended: 0 }
+                }
+                character={character}
+                onUseInspiration={onUseBardicInspiration}
+                onRestoreInspiration={onRestoreBardicInspiration}
+                onResetInspiration={onResetBardicInspiration}
+              />
+            </div>
+          )}
       </CollapsibleSubsection>
 
       {/* Quick Spells - Collapsible */}
