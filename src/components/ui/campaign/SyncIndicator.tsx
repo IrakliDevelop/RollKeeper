@@ -8,6 +8,7 @@ import {
   Link2Off,
   Wifi,
   WifiOff,
+  Heart,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import { Switch } from '@/components/ui/forms/switch';
@@ -25,6 +26,8 @@ interface SyncIndicatorProps {
   onToggleAutoSync: () => void;
   onLeaveCampaign: () => void;
   characterData: CharacterState;
+  shareHpWithParty: boolean;
+  onToggleShareHp: () => void;
 }
 
 function formatSyncTime(dateString: string | null): string {
@@ -63,6 +66,8 @@ export function SyncIndicator({
   onToggleAutoSync,
   onLeaveCampaign,
   characterData,
+  shareHpWithParty,
+  onToggleShareHp,
 }: SyncIndicatorProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [displayTime, setDisplayTime] = useState(formatSyncTime(lastSyncedAt));
@@ -154,6 +159,21 @@ export function SyncIndicator({
                 Sync Now
               </Button>
             )}
+
+            {/* Share HP with party toggle */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Heart
+                  size={14}
+                  className={shareHpWithParty ? 'text-red-500' : 'text-muted'}
+                />
+                <span className="text-heading text-sm">Share HP</span>
+              </div>
+              <Switch
+                checked={shareHpWithParty}
+                onCheckedChange={onToggleShareHp}
+              />
+            </div>
 
             {/* Leave campaign */}
             <button

@@ -595,6 +595,7 @@ interface CharacterStore {
   // Campaign tracking
   updateDaysSpent: (days: number) => void; // Set days spent directly
   incrementDaysSpent: (amount?: number) => void; // Add days (default: 1)
+  toggleShareHpWithParty: () => void; // Toggle HP sharing with party members
 
   updateCharacterBackground: (updates: Partial<CharacterBackground>) => void;
 
@@ -3344,22 +3345,73 @@ export const useCharacterStore = create<CharacterStore>()(
               : b
           );
 
-          // Handle temp HP grant effects
+          // Handle side effects of toggling
           let hitPoints = { ...state.character.hitPoints };
+          let damageResistances = [
+            ...(state.character.damageResistances || []),
+          ];
+          let damageImmunities = [...(state.character.damageImmunities || [])];
+          let conditionImmunities = [
+            ...(state.character.conditionImmunities || []),
+          ];
+
           for (const effect of buff.effects) {
             if (effect.targetStat === 'tempHp' && effect.mode === 'grant') {
               if (nowActive) {
-                // Grant temp HP (take the higher per D&D rules)
                 hitPoints = {
                   ...hitPoints,
                   temporary: Math.max(hitPoints.temporary, effect.value),
                 };
               } else {
-                // Remove granted temp HP (if it hasn't been reduced below the grant amount)
                 hitPoints = {
                   ...hitPoints,
                   temporary: Math.max(0, hitPoints.temporary - effect.value),
                 };
+              }
+            }
+
+            if (
+              effect.targetStat === 'damageResistance' &&
+              effect.targetDamageType
+            ) {
+              if (nowActive) {
+                if (!damageResistances.includes(effect.targetDamageType)) {
+                  damageResistances.push(effect.targetDamageType);
+                }
+              } else {
+                damageResistances = damageResistances.filter(
+                  r => r !== effect.targetDamageType
+                );
+              }
+            }
+
+            if (
+              effect.targetStat === 'damageImmunity' &&
+              effect.targetDamageType
+            ) {
+              if (nowActive) {
+                if (!damageImmunities.includes(effect.targetDamageType)) {
+                  damageImmunities.push(effect.targetDamageType);
+                }
+              } else {
+                damageImmunities = damageImmunities.filter(
+                  r => r !== effect.targetDamageType
+                );
+              }
+            }
+
+            if (
+              effect.targetStat === 'conditionImmunity' &&
+              effect.targetCondition
+            ) {
+              if (nowActive) {
+                if (!conditionImmunities.includes(effect.targetCondition)) {
+                  conditionImmunities.push(effect.targetCondition);
+                }
+              } else {
+                conditionImmunities = conditionImmunities.filter(
+                  c => c !== effect.targetCondition
+                );
               }
             }
           }
@@ -3369,6 +3421,9 @@ export const useCharacterStore = create<CharacterStore>()(
               ...state.character,
               temporaryBuffs: updatedBuffs,
               hitPoints,
+              damageResistances,
+              damageImmunities,
+              conditionImmunities,
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving' as const,
@@ -3651,6 +3706,17 @@ export const useCharacterStore = create<CharacterStore>()(
           character: {
             ...state.character,
             daysSpent: Math.max(0, (state.character.daysSpent || 0) + amount),
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving' as SaveStatus,
+        }));
+      },
+
+      toggleShareHpWithParty: () => {
+        set(state => ({
+          character: {
+            ...state.character,
+            shareHpWithParty: !(state.character.shareHpWithParty ?? true),
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving' as SaveStatus,

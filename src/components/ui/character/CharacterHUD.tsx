@@ -82,7 +82,8 @@ export default function CharacterHUD({
     (character.conditionsAndDiseases?.activeDiseases?.length || 0);
 
   const isConcentrating = character.concentration?.isConcentrating;
-  const hasInspiration = (character.heroicInspiration?.count || 0) > 0;
+  const inspirationCount = character.heroicInspiration?.count || 0;
+  const hasInspiration = inspirationCount > 0;
   const hasUsedReaction = character.reaction?.hasUsedReaction ?? false;
 
   const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
@@ -270,18 +271,25 @@ export default function CharacterHUD({
         {/* Heroic Inspiration */}
         <button
           onClick={onToggleInspiration}
-          className={`rounded-lg border px-2.5 py-2 transition-colors ${
+          className={`relative rounded-lg border px-2.5 py-2 transition-colors ${
             hasInspiration
               ? 'border-amber-400 bg-amber-50 text-amber-600 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-400'
               : 'border-divider text-muted hover:bg-surface-hover hover:text-amber-600'
           }`}
           title={
-            hasInspiration ? 'Use Heroic Inspiration' : 'Add Heroic Inspiration'
+            hasInspiration
+              ? `Use Heroic Inspiration (${inspirationCount} available)`
+              : 'Add Heroic Inspiration'
           }
         >
           <Sparkles
             className={`h-4 w-4 ${hasInspiration ? 'fill-current' : ''}`}
           />
+          {inspirationCount > 1 && (
+            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-amber-500 px-0.5 text-[10px] font-bold text-white dark:bg-amber-400 dark:text-amber-950">
+              {inspirationCount}
+            </span>
+          )}
         </button>
 
         {/* Reaction Toggle */}

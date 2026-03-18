@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/layout/badge';
 import { Input } from '@/components/ui/forms/input';
 import { Switch } from '@/components/ui/forms/switch';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { Autocomplete } from '@/components/ui/forms/Autocomplete';
 
 // ============================================================
 // CONSTANTS
@@ -35,6 +36,9 @@ const TARGET_STAT_OPTIONS: { value: BuffTargetStat; label: string }[] = [
   { value: 'speed', label: 'Speed' },
   { value: 'savingThrow', label: 'Saving Throw' },
   { value: 'attackBonus', label: 'Attack Bonus' },
+  { value: 'damageResistance', label: 'Damage Resistance' },
+  { value: 'damageImmunity', label: 'Damage Immunity' },
+  { value: 'conditionImmunity', label: 'Condition Immunity' },
 ];
 
 const MODE_OPTIONS: Record<
@@ -51,7 +55,44 @@ const MODE_OPTIONS: Record<
   speed: [{ value: 'add', label: 'Bonus (+/-)' }],
   savingThrow: [{ value: 'add', label: 'Bonus (+/-)' }],
   attackBonus: [{ value: 'add', label: 'Bonus (+/-)' }],
+  damageResistance: [{ value: 'grant', label: 'Grant' }],
+  damageImmunity: [{ value: 'grant', label: 'Grant' }],
+  conditionImmunity: [{ value: 'grant', label: 'Grant' }],
 };
+
+const DAMAGE_TYPE_OPTIONS = [
+  { value: 'acid', label: 'Acid' },
+  { value: 'bludgeoning', label: 'Bludgeoning' },
+  { value: 'cold', label: 'Cold' },
+  { value: 'fire', label: 'Fire' },
+  { value: 'force', label: 'Force' },
+  { value: 'lightning', label: 'Lightning' },
+  { value: 'necrotic', label: 'Necrotic' },
+  { value: 'piercing', label: 'Piercing' },
+  { value: 'poison', label: 'Poison' },
+  { value: 'psychic', label: 'Psychic' },
+  { value: 'radiant', label: 'Radiant' },
+  { value: 'slashing', label: 'Slashing' },
+  { value: 'thunder', label: 'Thunder' },
+];
+
+const CONDITION_TYPE_OPTIONS = [
+  { value: 'Blinded', label: 'Blinded' },
+  { value: 'Charmed', label: 'Charmed' },
+  { value: 'Deafened', label: 'Deafened' },
+  { value: 'Exhaustion', label: 'Exhaustion' },
+  { value: 'Frightened', label: 'Frightened' },
+  { value: 'Grappled', label: 'Grappled' },
+  { value: 'Incapacitated', label: 'Incapacitated' },
+  { value: 'Invisible', label: 'Invisible' },
+  { value: 'Paralyzed', label: 'Paralyzed' },
+  { value: 'Petrified', label: 'Petrified' },
+  { value: 'Poisoned', label: 'Poisoned' },
+  { value: 'Prone', label: 'Prone' },
+  { value: 'Restrained', label: 'Restrained' },
+  { value: 'Stunned', label: 'Stunned' },
+  { value: 'Unconscious', label: 'Unconscious' },
+];
 
 const ABILITY_OPTIONS: { value: AbilityName; label: string }[] = [
   { value: 'strength', label: 'Strength' },
@@ -173,6 +214,93 @@ const PRESET_BUFFS: PresetBuff[] = [
       },
     ],
   },
+  {
+    name: 'Rage',
+    source: 'Class Feature',
+    effects: [
+      {
+        targetStat: 'damageResistance',
+        mode: 'grant',
+        value: 0,
+        targetDamageType: 'bludgeoning',
+        description: 'Resistance to bludgeoning',
+      },
+      {
+        targetStat: 'damageResistance',
+        mode: 'grant',
+        value: 0,
+        targetDamageType: 'piercing',
+        description: 'Resistance to piercing',
+      },
+      {
+        targetStat: 'damageResistance',
+        mode: 'grant',
+        value: 0,
+        targetDamageType: 'slashing',
+        description: 'Resistance to slashing',
+      },
+    ],
+  },
+  {
+    name: 'Protection from Poison',
+    source: 'Spell',
+    effects: [
+      {
+        targetStat: 'damageResistance',
+        mode: 'grant',
+        value: 0,
+        targetDamageType: 'poison',
+        description: 'Resistance to poison damage',
+      },
+      {
+        targetStat: 'conditionImmunity',
+        mode: 'grant',
+        value: 0,
+        targetCondition: 'Poisoned',
+        description: 'Immune to poisoned condition',
+      },
+    ],
+  },
+  {
+    name: 'Protection from Energy',
+    source: 'Spell',
+    effects: [
+      {
+        targetStat: 'damageResistance',
+        mode: 'grant',
+        value: 0,
+        targetDamageType: 'fire',
+        description: 'Resistance to chosen energy type (change as needed)',
+      },
+    ],
+  },
+  {
+    name: "Heroes' Feast",
+    source: 'Spell',
+    effects: [
+      {
+        targetStat: 'conditionImmunity',
+        mode: 'grant',
+        value: 0,
+        targetCondition: 'Frightened',
+        description: 'Immune to frightened',
+      },
+      {
+        targetStat: 'conditionImmunity',
+        mode: 'grant',
+        value: 0,
+        targetCondition: 'Poisoned',
+        description: 'Immune to poisoned',
+      },
+      {
+        targetStat: 'damageImmunity',
+        mode: 'grant',
+        value: 0,
+        targetDamageType: 'poison',
+        description: 'Immune to poison damage',
+      },
+    ],
+  },
 ];
 
 // ============================================================
@@ -180,6 +308,17 @@ const PRESET_BUFFS: PresetBuff[] = [
 // ============================================================
 
 function getEffectLabel(effect: BuffEffect): string {
+  // Special labels for resistance/immunity effects
+  if (effect.targetStat === 'damageResistance' && effect.targetDamageType) {
+    return `Resist ${effect.targetDamageType}`;
+  }
+  if (effect.targetStat === 'damageImmunity' && effect.targetDamageType) {
+    return `Immune ${effect.targetDamageType}`;
+  }
+  if (effect.targetStat === 'conditionImmunity' && effect.targetCondition) {
+    return `Immune ${effect.targetCondition}`;
+  }
+
   const statLabels: Record<BuffTargetStat, string> = {
     ac: 'AC',
     maxHp: 'Max HP',
@@ -187,6 +326,9 @@ function getEffectLabel(effect: BuffEffect): string {
     speed: 'Speed',
     savingThrow: 'Save',
     attackBonus: 'Atk',
+    damageResistance: 'Resist',
+    damageImmunity: 'Immune',
+    conditionImmunity: 'Cond. Immune',
   };
   const stat = statLabels[effect.targetStat];
 
@@ -220,6 +362,12 @@ function getEffectBadgeVariant(
       return 'info';
     case 'attackBonus':
       return 'danger';
+    case 'damageResistance':
+      return 'warning';
+    case 'damageImmunity':
+      return 'danger';
+    case 'conditionImmunity':
+      return 'success';
     default:
       return 'neutral';
   }
@@ -297,8 +445,16 @@ interface EffectFormRow {
   mode: BuffMode;
   value: string;
   targetAbility: AbilityName | '';
+  targetDamageType: string;
+  targetCondition: string;
   description: string;
 }
+
+const GRANT_ONLY_STATS: BuffTargetStat[] = [
+  'damageResistance',
+  'damageImmunity',
+  'conditionImmunity',
+];
 
 function createEmptyEffect(): EffectFormRow {
   return {
@@ -307,6 +463,8 @@ function createEmptyEffect(): EffectFormRow {
     mode: 'add',
     value: '',
     targetAbility: '',
+    targetDamageType: '',
+    targetCondition: '',
     description: '',
   };
 }
@@ -331,11 +489,19 @@ function AddBuffForm({
         prev.map((e, i) => {
           if (i !== idx) return e;
           const modes = MODE_OPTIONS[newTarget];
+          const isGrantOnly = GRANT_ONLY_STATS.includes(newTarget);
           return {
             ...e,
             targetStat: newTarget,
             mode: modes[0]?.value || 'add',
+            value: isGrantOnly ? '0' : '',
             targetAbility: newTarget === 'savingThrow' ? 'strength' : '',
+            targetDamageType:
+              newTarget === 'damageResistance' || newTarget === 'damageImmunity'
+                ? 'fire'
+                : '',
+            targetCondition:
+              newTarget === 'conditionImmunity' ? 'Frightened' : '',
           };
         })
       );
@@ -382,6 +548,8 @@ function AddBuffForm({
         mode: e.mode,
         value: e.value.toString(),
         targetAbility: '',
+        targetDamageType: e.targetDamageType || '',
+        targetCondition: e.targetCondition || '',
         description: e.description || '',
       }))
     );
@@ -391,7 +559,18 @@ function AddBuffForm({
   const isValid = useMemo(() => {
     if (!name.trim()) return false;
     if (effects.length === 0) return false;
-    return effects.every(e => e.value !== '' && !isNaN(Number(e.value)));
+    return effects.every(e => {
+      if (
+        e.targetStat === 'damageResistance' ||
+        e.targetStat === 'damageImmunity'
+      ) {
+        return !!e.targetDamageType;
+      }
+      if (e.targetStat === 'conditionImmunity') {
+        return !!e.targetCondition;
+      }
+      return e.value !== '' && !isNaN(Number(e.value));
+    });
   }, [name, effects]);
 
   const handleSubmit = useCallback(() => {
@@ -404,6 +583,16 @@ function AddBuffForm({
       targetAbility:
         e.targetStat === 'savingThrow' && e.targetAbility
           ? (e.targetAbility as AbilityName)
+          : undefined,
+      targetDamageType:
+        (e.targetStat === 'damageResistance' ||
+          e.targetStat === 'damageImmunity') &&
+        e.targetDamageType
+          ? e.targetDamageType
+          : undefined,
+      targetCondition:
+        e.targetStat === 'conditionImmunity' && e.targetCondition
+          ? e.targetCondition
           : undefined,
       description: e.description || undefined,
     }));
@@ -463,35 +652,31 @@ function AddBuffForm({
             className="border-divider bg-surface-raised rounded-lg border p-3"
           >
             <div className="flex flex-wrap items-end gap-2">
-              <div className="min-w-[120px] flex-1">
+              <div className="min-w-[150px] flex-1">
                 <label className="text-muted mb-1 block text-xs">Stat</label>
-                <SelectField
+                <Autocomplete
+                  options={TARGET_STAT_OPTIONS}
                   value={effect.targetStat}
-                  onValueChange={v =>
-                    handleTargetChange(idx, v as BuffTargetStat)
-                  }
-                >
-                  {TARGET_STAT_OPTIONS.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectField>
+                  onChange={v => handleTargetChange(idx, v as BuffTargetStat)}
+                  placeholder="Search stats..."
+                />
               </div>
 
-              <div className="min-w-[110px] flex-1">
-                <label className="text-muted mb-1 block text-xs">Mode</label>
-                <SelectField
-                  value={effect.mode}
-                  onValueChange={v => handleModeChange(idx, v as BuffMode)}
-                >
-                  {MODE_OPTIONS[effect.targetStat].map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectField>
-              </div>
+              {!GRANT_ONLY_STATS.includes(effect.targetStat) && (
+                <div className="min-w-[110px] flex-1">
+                  <label className="text-muted mb-1 block text-xs">Mode</label>
+                  <SelectField
+                    value={effect.mode}
+                    onValueChange={v => handleModeChange(idx, v as BuffMode)}
+                  >
+                    {MODE_OPTIONS[effect.targetStat].map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
+                </div>
+              )}
 
               {effect.targetStat === 'savingThrow' && (
                 <div className="min-w-[110px] flex-1">
@@ -513,15 +698,58 @@ function AddBuffForm({
                 </div>
               )}
 
-              <div className="w-20">
-                <label className="text-muted mb-1 block text-xs">Value</label>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={effect.value}
-                  onChange={e => handleValueChange(idx, e.target.value)}
-                />
-              </div>
+              {(effect.targetStat === 'damageResistance' ||
+                effect.targetStat === 'damageImmunity') && (
+                <div className="min-w-[130px] flex-1">
+                  <label className="text-muted mb-1 block text-xs">
+                    Damage Type
+                  </label>
+                  <Autocomplete
+                    options={DAMAGE_TYPE_OPTIONS}
+                    value={effect.targetDamageType}
+                    onChange={v =>
+                      setEffects(prev =>
+                        prev.map((e, i) =>
+                          i === idx ? { ...e, targetDamageType: v } : e
+                        )
+                      )
+                    }
+                    placeholder="Search damage..."
+                  />
+                </div>
+              )}
+
+              {effect.targetStat === 'conditionImmunity' && (
+                <div className="min-w-[130px] flex-1">
+                  <label className="text-muted mb-1 block text-xs">
+                    Condition
+                  </label>
+                  <Autocomplete
+                    options={CONDITION_TYPE_OPTIONS}
+                    value={effect.targetCondition}
+                    onChange={v =>
+                      setEffects(prev =>
+                        prev.map((e, i) =>
+                          i === idx ? { ...e, targetCondition: v } : e
+                        )
+                      )
+                    }
+                    placeholder="Search conditions..."
+                  />
+                </div>
+              )}
+
+              {!GRANT_ONLY_STATS.includes(effect.targetStat) && (
+                <div className="w-20">
+                  <label className="text-muted mb-1 block text-xs">Value</label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={effect.value}
+                    onChange={e => handleValueChange(idx, e.target.value)}
+                  />
+                </div>
+              )}
 
               {effects.length > 1 && (
                 <Button
