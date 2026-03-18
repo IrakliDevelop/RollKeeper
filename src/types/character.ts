@@ -683,6 +683,7 @@ export interface CharacterState {
   toolProficiencies: ToolProficiency[];
 
   daysSpent: number; // Number of in-game days spent in the campaign
+  shareHpWithParty?: boolean; // Whether to share HP with party members (default true)
 
   // Summons (familiars, summoned creatures)
   summons?: Summon[];
@@ -828,7 +829,10 @@ export type BuffTargetStat =
   | 'tempHp'
   | 'speed'
   | 'savingThrow'
-  | 'attackBonus';
+  | 'attackBonus'
+  | 'damageResistance'
+  | 'damageImmunity'
+  | 'conditionImmunity';
 
 // How the buff modifies the stat
 export type BuffMode =
@@ -844,6 +848,8 @@ export interface BuffEffect {
   mode: BuffMode;
   value: number;
   targetAbility?: AbilityName; // For savingThrow target: which ability
+  targetDamageType?: string; // For damageResistance/damageImmunity: which damage type
+  targetCondition?: string; // For conditionImmunity: which condition
   description?: string;
 }
 

@@ -8,6 +8,7 @@ import { useCharacterStore } from '@/store/characterStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { usePlayerSync } from '@/hooks/usePlayerSync';
 import { SyncIndicator } from '@/components/ui/campaign/SyncIndicator';
+import { PartyHPSidebar } from '@/components/ui/campaign/PartyHPSidebar';
 import { DmMessageNotification } from '@/components/ui/campaign/DmMessageNotification';
 import { DmEffectsNotification } from '@/components/ui/campaign/DmEffectsNotification';
 import { DmCounterNotification } from '@/components/ui/campaign/DmCounterNotification';
@@ -170,6 +171,7 @@ export default function CharacterSheet() {
     // Campaign tracking
     updateDaysSpent,
     incrementDaysSpent,
+    toggleShareHpWithParty,
     // Easter egg animations
     showDeathAnimation,
     clearDeathAnimation,
@@ -635,6 +637,12 @@ export default function CharacterSheet() {
     <ErrorBoundary>
       <NavigationContext.Provider value={{ switchToTab }}>
         <div className="relative min-h-screen bg-gradient-to-br from-[var(--gradient-page-from)] via-[var(--gradient-page-via)] to-[var(--gradient-page-to)]">
+          {/* Party HP Sidebar */}
+          <PartyHPSidebar
+            campaignCode={playerSync.campaignCode ?? null}
+            currentCharacterId={characterId}
+          />
+
           {/* Header */}
           <CharacterSheetHeader
             characterId={characterId}
@@ -668,6 +676,8 @@ export default function CharacterSheet() {
                 onToggleAutoSync={playerSync.toggleAutoSync}
                 onLeaveCampaign={playerSync.leaveCampaign}
                 characterData={character}
+                shareHpWithParty={character.shareHpWithParty ?? true}
+                onToggleShareHp={toggleShareHpWithParty}
               />
             }
           />
