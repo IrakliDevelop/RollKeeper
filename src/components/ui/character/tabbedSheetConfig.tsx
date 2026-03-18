@@ -680,7 +680,7 @@ function CharacterTabContent({
               <div className="text-body flex items-center gap-2 text-sm">
                 <span className="border-accent-amber-border text-accent-amber-text inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] px-3 py-1 font-medium shadow-sm">
                   <span className="text-base">📅</span>
-                  Campaign Day {days}
+                  Campaign Day {days + 1}
                 </span>
                 <span className="text-faint">•</span>
                 <span className="text-muted">
