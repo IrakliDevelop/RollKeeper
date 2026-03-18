@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import Image from 'next/image';
-import { Upload, X, ImageIcon } from 'lucide-react';
+import { Upload, X, ImageIcon, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/forms';
 import { cn } from '@/utils/cn';
 import { MAX_BANNER_SIZE_MB, MAX_BANNER_SIZE_BYTES } from '@/utils/constants';
@@ -27,6 +27,7 @@ export function BannerUpload({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const handleFileSelect = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -72,6 +73,7 @@ export function BannerUpload({
       }
 
       onBannerChange(url);
+      setIsEditing(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload banner');
     } finally {
@@ -92,12 +94,14 @@ export function BannerUpload({
     }
     onBannerChange(undefined);
     setError(null);
+    setIsEditing(false);
   };
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
 
+  // Card variant — compact banner for campaign cards, no edit controls
   if (variant === 'card') {
     return (
       <div className={cn('relative', className)}>
@@ -115,58 +119,20 @@ export function BannerUpload({
                 <div className="h-6 w-6 animate-spin rounded-full border-3 border-white border-t-transparent" />
               </div>
             )}
-            {editable && !isLoading && (
-              <div className="absolute top-2 right-2 flex gap-1">
-                <button
-                  onClick={handleUploadClick}
-                  className="bg-surface/80 text-body hover:bg-surface rounded-full p-1.5 shadow-md backdrop-blur-sm transition-colors"
-                  title="Change banner"
-                >
-                  <Upload size={12} />
-                </button>
-                <button
-                  onClick={handleRemoveBanner}
-                  className="rounded-full bg-red-500/80 p-1.5 text-white shadow-md backdrop-blur-sm transition-colors hover:bg-red-600"
-                  title="Remove banner"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            )}
           </div>
-        ) : editable ? (
-          <button
-            onClick={handleUploadClick}
-            className="bg-surface-secondary hover:bg-surface-elevated border-divider flex h-20 w-full items-center justify-center gap-2 rounded-t-lg border-b transition-colors"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <>
-                <ImageIcon size={16} className="text-muted" />
-                <span className="text-muted text-xs">Add banner</span>
-              </>
-            )}
-          </button>
-        ) : null}
-        {editable && (
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-        )}
-        {error && (
-          <p className="text-accent-red-text px-3 pt-1 text-xs">{error}</p>
+        ) : (
+          <div className="bg-surface-secondary border-divider flex h-28 w-full items-center justify-center gap-2 rounded-t-lg border-b">
+            <ImageIcon size={14} className="text-faint" />
+            <span className="text-faint text-xs">
+              Add a banner from the campaign dashboard
+            </span>
+          </div>
         )}
       </div>
     );
   }
 
-  // Hero variant — full-width banner for campaign dashboard
+  // Hero variant — full-width banner for campaign dashboard with edit mode
   return (
     <div className={cn('relative h-full', className)}>
       {bannerUrl ? (
@@ -183,24 +149,41 @@ export function BannerUpload({
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-white border-t-transparent" />
             </div>
           )}
-          {editable && !isLoading && (
-            <div className="absolute top-3 right-3 flex gap-2">
+          {editable && !isLoading && !isEditing && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="bg-surface/60 text-body hover:bg-surface/80 absolute top-3 right-3 rounded-full p-2 shadow-md backdrop-blur-sm transition-colors"
+              title="Edit banner"
+            >
+              <Pencil size={14} />
+            </button>
+          )}
+          {editable && !isLoading && isEditing && (
+            <div className="absolute inset-0 flex items-center justify-center gap-3 bg-black/40">
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={handleUploadClick}
                 leftIcon={<Upload size={14} />}
-                className="bg-surface/80 backdrop-blur-sm"
               >
                 Change
               </Button>
-              <button
+              <Button
+                variant="danger"
+                size="sm"
                 onClick={handleRemoveBanner}
-                className="rounded-full bg-red-500/80 p-2 text-white shadow-md backdrop-blur-sm transition-colors hover:bg-red-600"
-                title="Remove banner"
+                leftIcon={<X size={14} />}
               >
-                <X size={14} />
-              </button>
+                Remove
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEditing(false)}
+                className="text-white hover:bg-white/20"
+              >
+                Cancel
+              </Button>
             </div>
           )}
         </div>
