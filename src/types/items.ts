@@ -104,6 +104,7 @@ export interface ProcessedWeapon {
   weaponCategory: string;
   rarity: string;
   weight?: number;
+  value?: number; // In copper pieces
   description: string;
   requiresAttunement: boolean;
   attunementRequirement?: string;
@@ -129,6 +130,7 @@ export interface ProcessedArmor {
   category: ArmorCategory;
   rarity: string;
   weight?: number;
+  value?: number; // In copper pieces
   description: string;
   requiresAttunement: boolean;
   attunementRequirement?: string;

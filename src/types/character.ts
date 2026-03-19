@@ -379,6 +379,7 @@ export interface Weapon {
   enhancementBonus: number;
   attackBonus?: number;
   damageBonus?: number;
+  abilityOverride?: AbilityName; // Override ability for attack/damage (e.g., CHA for Pact of the Blade)
   properties: string[];
   description?: string;
   range?: {
@@ -393,6 +394,8 @@ export interface Weapon {
   chargePool?: ChargePool;
   bonusSpellAttack?: number;
   bonusSpellSaveDc?: number;
+  weight?: number;
+  value?: number; // In copper pieces
   createdAt: string;
   updatedAt: string;
 }

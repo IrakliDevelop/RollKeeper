@@ -3,6 +3,7 @@
 import React from 'react';
 import { useCharacterStore } from '@/store/characterStore';
 import { InventoryManager as SharedInventoryManager } from '@/components/shared/character';
+import { calculateTotalWeight, calculateTotalValue } from '@/utils/encumbrance';
 
 export default function InventoryManager() {
   const {
@@ -13,6 +14,7 @@ export default function InventoryManager() {
     updateItemQuantity,
     reorderInventoryItems,
   } = useCharacterStore();
+
   return (
     <div className="space-y-6">
       <SharedInventoryManager
@@ -22,6 +24,8 @@ export default function InventoryManager() {
         onDeleteItem={deleteInventoryItem}
         onQuantityChange={updateItemQuantity}
         onReorderItems={reorderInventoryItems}
+        overrideTotalWeight={calculateTotalWeight(character)}
+        overrideTotalValue={calculateTotalValue(character)}
         readonly={false}
         compact={false}
         hideAddButton={false}
