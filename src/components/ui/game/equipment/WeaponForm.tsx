@@ -6,6 +6,7 @@ import {
   WeaponType,
   DamageType,
   WeaponDamage,
+  AbilityName,
 } from '@/types/character';
 import { Plus, Trash2, Sparkles, Zap, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
@@ -36,6 +37,7 @@ export interface WeaponFormData {
   enhancementBonus: number;
   attackBonus?: number;
   damageBonus?: number;
+  abilityOverride?: AbilityName;
   properties: string[];
   description?: string;
   range?: {
@@ -50,6 +52,8 @@ export interface WeaponFormData {
   chargePool?: ChargePoolFormData;
   bonusSpellAttack?: number;
   bonusSpellSaveDc?: number;
+  weight?: number;
+  value?: number;
 }
 
 interface WeaponFormProps {
@@ -212,6 +216,31 @@ export function WeaponForm({
             }
             min={0}
             max={3}
+          />
+          <Input
+            label="Weight (lb)"
+            type="number"
+            value={(formData.weight ?? '').toString()}
+            onChange={e =>
+              setFormData({
+                ...formData,
+                weight: e.target.value ? parseFloat(e.target.value) : undefined,
+              })
+            }
+            min={0}
+            step={0.1}
+          />
+          <Input
+            label="Value (cp)"
+            type="number"
+            value={(formData.value ?? '').toString()}
+            onChange={e =>
+              setFormData({
+                ...formData,
+                value: e.target.value ? parseInt(e.target.value) : undefined,
+              })
+            }
+            min={0}
           />
         </div>
       </div>
@@ -380,6 +409,37 @@ export function WeaponForm({
               </span>
             </label>
           ))}
+        </div>
+
+        {/* Ability Override */}
+        <div>
+          <label className="text-body mb-2 block text-sm font-medium">
+            Ability Score Override
+          </label>
+          <SelectField
+            value={formData.abilityOverride || 'default'}
+            onValueChange={value =>
+              setFormData({
+                ...formData,
+                abilityOverride:
+                  value === 'default' ? undefined : (value as AbilityName),
+              })
+            }
+          >
+            <SelectItem value="default">
+              Default (STR / DEX / Finesse)
+            </SelectItem>
+            <SelectItem value="strength">Strength</SelectItem>
+            <SelectItem value="dexterity">Dexterity</SelectItem>
+            <SelectItem value="constitution">Constitution</SelectItem>
+            <SelectItem value="intelligence">Intelligence</SelectItem>
+            <SelectItem value="wisdom">Wisdom</SelectItem>
+            <SelectItem value="charisma">Charisma</SelectItem>
+          </SelectField>
+          <p className="text-muted mt-1 text-xs">
+            Override for features like Pact of the Blade (CHA) or Bladesinging
+            (INT)
+          </p>
         </div>
       </div>
 

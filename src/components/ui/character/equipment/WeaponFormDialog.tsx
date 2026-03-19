@@ -107,6 +107,7 @@ export function WeaponFormDialog({
         enhancementBonus: editingWeapon.enhancementBonus,
         attackBonus: editingWeapon.attackBonus || 0,
         damageBonus: editingWeapon.damageBonus || 0,
+        abilityOverride: editingWeapon.abilityOverride,
         properties: editingWeapon.properties,
         description: editingWeapon.description || '',
         range: editingWeapon.range || { normal: 5 },
@@ -118,6 +119,8 @@ export function WeaponFormDialog({
         chargePool: chargePoolData,
         bonusSpellAttack: editingWeapon.bonusSpellAttack,
         bonusSpellSaveDc: editingWeapon.bonusSpellSaveDc,
+        weight: editingWeapon.weight,
+        value: editingWeapon.value,
       });
     } else {
       setFormData(initialWeaponData);

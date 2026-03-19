@@ -411,6 +411,11 @@ export const getWeaponAbilityModifier = (
   character: CharacterState,
   weapon: Weapon
 ): number => {
+  // Ability override (e.g., CHA for Pact of the Blade, INT for Bladesinging)
+  if (weapon.abilityOverride) {
+    return calculateModifier(character.abilities[weapon.abilityOverride]);
+  }
+
   // Finesse weapons can use DEX or STR (we'll use the higher one)
   if (weapon.weaponType.includes('finesse')) {
     return Math.max(

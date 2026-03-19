@@ -59,6 +59,10 @@ interface InventoryManagerProps {
   onQuantityChange?: (id: string, quantity: number) => void;
   onReorderItems?: (sourceIndex: number, destinationIndex: number) => void;
 
+  // When provided, overrides internal weight/value calculation in Quick Stats
+  overrideTotalWeight?: number;
+  overrideTotalValue?: number;
+
   // Display options
   readonly?: boolean;
   compact?: boolean;
@@ -78,6 +82,8 @@ export function InventoryManager({
   onDeleteItem,
   onQuantityChange,
   onReorderItems,
+  overrideTotalWeight,
+  overrideTotalValue,
   readonly = false,
   compact = false,
   hideAddButton = false,
@@ -185,17 +191,21 @@ export function InventoryManager({
       (sum, item) => sum + item.quantity,
       0
     );
-    const totalWeight = filteredItems.reduce(
-      (sum, item) => sum + (item.weight || 0) * item.quantity,
-      0
-    );
-    const totalValue = filteredItems.reduce(
-      (sum, item) => sum + (item.value || 0) * item.quantity,
-      0
-    );
+    const totalWeight =
+      overrideTotalWeight ??
+      filteredItems.reduce(
+        (sum, item) => sum + (item.weight || 0) * item.quantity,
+        0
+      );
+    const totalValue =
+      overrideTotalValue ??
+      filteredItems.reduce(
+        (sum, item) => sum + (item.value || 0) * item.quantity,
+        0
+      );
 
     return { totalItems, totalWeight, totalValue };
-  }, [filteredItems]);
+  }, [filteredItems, overrideTotalWeight, overrideTotalValue]);
 
   const handleEditItem = (item: InventoryItem) => {
     setViewingItem(null);

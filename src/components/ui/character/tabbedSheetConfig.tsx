@@ -41,6 +41,7 @@ import {
   calculateCarryingCapacity,
   calculateSpellSaveDC,
 } from '@/utils/calculations';
+import { calculateTotalWeight } from '@/utils/encumbrance';
 import {
   CharacterState,
   RichTextContent,
@@ -330,16 +331,7 @@ export function createTabbedSheetConfig(
               }
               proficiencyBonus={proficiencyBonus}
               carryingCapacity={calculateCarryingCapacity(character)}
-              currentWeight={
-                character.inventoryItems.reduce(
-                  (sum, item) => sum + (item.weight || 0) * item.quantity,
-                  0
-                ) +
-                (character.armorItems?.reduce(
-                  (sum, item) => sum + (item.weight || 0),
-                  0
-                ) || 0)
-              }
+              currentWeight={calculateTotalWeight(character)}
               itemCount={character.inventoryItems.length}
               spellAttackBonus={calculateSpellAttackBonus(character)}
               spellSaveDC={calculateSpellSaveDC(character)}
