@@ -208,6 +208,22 @@ export default function CharacterSheet() {
     useSharedCampaignState(playerSync.campaignCode, characterId);
   const sharedCalendar = sharedState?.calendar ?? null;
 
+  // Auto-save DM messages to notes on arrival so they're never lost
+  const savedMessageIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const messages = sharedState?.messages ?? [];
+    for (const msg of messages) {
+      if (!savedMessageIdsRef.current.has(msg.id)) {
+        savedMessageIdsRef.current.add(msg.id);
+        addNote({
+          title: `[DM] ${msg.title}`,
+          content: msg.content,
+          category: 'note',
+        });
+      }
+    }
+  }, [sharedState?.messages, addNote]);
+
   // Latch DM effects into local state for the notification toast before
   // acknowledgment clears them from shared state.
   const [pendingEffectToasts, setPendingEffectToasts] = useState<DmEffect[]>(
@@ -776,20 +792,9 @@ export default function CharacterSheet() {
               <DmMessageNotification
                 messages={sharedState!.messages}
                 onAccept={msg => {
-                  addNote({
-                    title: `[DM] ${msg.title}`,
-                    content: msg.content,
-                    category: 'note',
-                  });
                   acknowledgeMessage(msg.id);
                   switchToTab('character');
                   setCharacterSubTab('notes');
-                  addToast({
-                    type: 'success',
-                    title: 'Message saved',
-                    message: `"${msg.title}" has been added to your notes`,
-                    duration: 4000,
-                  });
                 }}
                 onDismiss={messageId => {
                   acknowledgeMessage(messageId);
