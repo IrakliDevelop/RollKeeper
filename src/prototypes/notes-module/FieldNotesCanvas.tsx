@@ -9,6 +9,7 @@ import {
   ArrowTool,
   NoteTool,
   ImageTool,
+  AutoSave,
   type Tool,
   type ToolName,
   type Viewport,
@@ -305,6 +306,11 @@ export default function FieldNotesCanvasPage({
   const [viewingNote, setViewingNote] = useState<ProtoNote | null>(null);
   const [editingNote, setEditingNote] = useState<ProtoNote | null>(null);
   const [placedNotes, setPlacedNotes] = useState<PlacedNote[]>([]);
+  const [pencilColor, setPencilColor] = useState('#334155');
+  const [pencilWidth, setPencilWidth] = useState(2);
+  const [arrowColor, setArrowColor] = useState('#334155');
+  const [noteColor, setNoteColor] = useState('#fef08a');
+  const autoSaveRef = useRef<AutoSave | null>(null);
 
   const {
     notes,
@@ -350,7 +356,52 @@ export default function FieldNotesCanvasPage({
       setCanUndo(vp.history.canUndo);
       setCanRedo(vp.history.canRedo);
     });
+
+    // AutoSave — persist canvas to localStorage
+    const autoSave = new AutoSave(vp.store, vp.camera, {
+      key: 'fieldnotes-canvas-autosave',
+      debounceMs: 1000,
+    });
+    const saved = autoSave.load();
+    if (saved) {
+      vp.loadState(saved);
+      setElementCount(vp.store.count);
+    }
+    autoSave.start();
+    autoSaveRef.current = autoSave;
   }, []);
+
+  // Cleanup AutoSave on unmount
+  useEffect(() => {
+    return () => {
+      autoSaveRef.current?.stop();
+    };
+  }, []);
+
+  // Sync pencil options when color/width change
+  useEffect(() => {
+    const vp = canvasRef.current?.viewport;
+    if (!vp) return;
+    const pencil = vp.toolManager.getTool<PencilTool>('pencil');
+    pencil?.setOptions({ color: pencilColor, width: pencilWidth });
+    vp.requestRender();
+  }, [pencilColor, pencilWidth]);
+
+  // Sync arrow color
+  useEffect(() => {
+    const vp = canvasRef.current?.viewport;
+    if (!vp) return;
+    const arrow = vp.toolManager.getTool<ArrowTool>('arrow');
+    arrow?.setOptions({ color: arrowColor });
+  }, [arrowColor]);
+
+  // Sync note background color
+  useEffect(() => {
+    const vp = canvasRef.current?.viewport;
+    if (!vp) return;
+    const note = vp.toolManager.getTool<NoteTool>('note');
+    note?.setOptions({ backgroundColor: noteColor });
+  }, [noteColor]);
 
   // ─── Viewport helpers (imperatively via ref) ──────────
 
@@ -482,6 +533,7 @@ export default function FieldNotesCanvasPage({
     if (!confirm('Clear all elements from the canvas?')) return;
     vp.store.clear();
     setPlacedNotes([]);
+    autoSaveRef.current?.clear();
     vp.requestRender();
   }, []);
 
@@ -804,6 +856,122 @@ export default function FieldNotesCanvasPage({
           </button>
         </div>
       </div>
+
+      {/* Tool Options Bar (contextual) */}
+      {(activeTool === 'pencil' ||
+        activeTool === 'arrow' ||
+        activeTool === 'note') && (
+        <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-1.5">
+          {/* Color swatches */}
+          <span className="text-xs font-medium text-slate-500">Color</span>
+          <div className="flex items-center gap-1">
+            {[
+              '#334155',
+              '#ef4444',
+              '#f97316',
+              '#eab308',
+              '#22c55e',
+              '#3b82f6',
+              '#8b5cf6',
+              '#ec4899',
+              '#ffffff',
+            ].map(color => {
+              const isActive =
+                activeTool === 'note'
+                  ? noteColor === color
+                  : activeTool === 'arrow'
+                    ? arrowColor === color
+                    : pencilColor === color;
+              return (
+                <button
+                  key={color}
+                  onClick={() => {
+                    if (activeTool === 'pencil') setPencilColor(color);
+                    else if (activeTool === 'arrow') setArrowColor(color);
+                    else if (activeTool === 'note') setNoteColor(color);
+                  }}
+                  className={`h-6 w-6 rounded-full border-2 transition-transform ${
+                    isActive
+                      ? 'scale-110 border-indigo-500'
+                      : 'border-slate-300 hover:scale-105'
+                  }`}
+                  style={{
+                    backgroundColor: color,
+                    boxShadow:
+                      color === '#ffffff' ? 'inset 0 0 0 1px #e2e8f0' : 'none',
+                  }}
+                  title={color}
+                />
+              );
+            })}
+            {/* Custom color picker */}
+            <label className="relative h-6 w-6 cursor-pointer">
+              <input
+                type="color"
+                value={
+                  activeTool === 'note'
+                    ? noteColor
+                    : activeTool === 'arrow'
+                      ? arrowColor
+                      : pencilColor
+                }
+                onChange={e => {
+                  if (activeTool === 'pencil') setPencilColor(e.target.value);
+                  else if (activeTool === 'arrow')
+                    setArrowColor(e.target.value);
+                  else if (activeTool === 'note') setNoteColor(e.target.value);
+                }}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+              <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-dashed border-slate-300 text-xs text-slate-400 hover:border-slate-400">
+                +
+              </div>
+            </label>
+          </div>
+
+          {/* Brush size slider (pencil only) */}
+          {activeTool === 'pencil' && (
+            <>
+              <div className="mx-1 h-6 w-px bg-slate-200" />
+              <span className="text-xs font-medium text-slate-500">Size</span>
+              <input
+                type="range"
+                min={1}
+                max={20}
+                value={pencilWidth}
+                onChange={e => setPencilWidth(Number(e.target.value))}
+                className="h-1.5 w-28 cursor-pointer accent-indigo-600"
+              />
+              <span className="min-w-[28px] text-xs text-slate-500 tabular-nums">
+                {pencilWidth}px
+              </span>
+              {/* Quick size presets */}
+              <div className="flex items-center gap-1">
+                {[1, 3, 6, 12].map(size => (
+                  <button
+                    key={size}
+                    onClick={() => setPencilWidth(size)}
+                    className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors ${
+                      pencilWidth === size
+                        ? 'bg-indigo-100 text-indigo-700'
+                        : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                    }`}
+                    title={`${size}px`}
+                  >
+                    <div
+                      className="rounded-full bg-current"
+                      style={{
+                        width: Math.min(size + 2, 14),
+                        height: Math.min(size + 2, 14),
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Main area: Sidebar + Canvas */}
       <div className="flex flex-1 overflow-hidden">
