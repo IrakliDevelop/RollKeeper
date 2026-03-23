@@ -60,9 +60,8 @@ import {
   Plus,
   ChevronUp,
   ChevronDown,
-  PanelRightClose,
-  PanelRightOpen,
   Loader2,
+  Scissors,
 } from 'lucide-react';
 import {
   useProtoNotesStore,
@@ -310,6 +309,11 @@ interface FieldNotesCanvasProps {
   className?: string;
 }
 
+/** Viewport exposes historyRecorder at runtime for batched store ops (same as keyboard Delete). */
+type ViewportHistoryAccess = {
+  historyRecorder: { begin: () => void; commit: () => void };
+};
+
 export default function FieldNotesCanvasPage({
   className = '',
 }: FieldNotesCanvasProps) {
@@ -345,6 +349,7 @@ export default function FieldNotesCanvasPage({
   const [renamingLayerId, setRenamingLayerId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [imageUploading, setImageUploading] = useState(false);
+  const [canvasSelectionCount, setCanvasSelectionCount] = useState(0);
   const autoSaveRef = useRef<AutoSave | null>(null);
 
   const {
@@ -406,6 +411,29 @@ export default function FieldNotesCanvasPage({
     };
     vp.layerManager.on('change', syncLayers);
     syncLayers();
+
+    const syncCanvasSelection = () => {
+      const selectTool = vp.toolManager.getTool<SelectTool>('select');
+      if (!selectTool || vp.toolManager.activeTool?.name !== 'select') {
+        setCanvasSelectionCount(0);
+        return;
+      }
+      const n = selectTool.selectedIds.filter(id =>
+        vp.store.getById(id)
+      ).length;
+      setCanvasSelectionCount(n);
+    };
+
+    const wrapper = vp.domLayer.parentElement;
+    if (wrapper) {
+      const onPointer = () => syncCanvasSelection();
+      wrapper.addEventListener('pointerdown', onPointer, { passive: true });
+      wrapper.addEventListener('pointerup', onPointer, { passive: true });
+      wrapper.addEventListener('pointercancel', onPointer, { passive: true });
+    }
+    vp.toolManager.onChange(syncCanvasSelection);
+    vp.store.on('remove', syncCanvasSelection);
+    syncCanvasSelection();
 
     // AutoSave — persist canvas + layers to localStorage
     const autoSave = new AutoSave(vp.store, vp.camera, {
@@ -598,6 +626,24 @@ export default function FieldNotesCanvasPage({
       reader.readAsText(file);
     };
     input.click();
+  }, []);
+
+  const handleDeleteSelected = useCallback(() => {
+    const vp = getVp();
+    if (!vp) return;
+    if (vp.toolManager.activeTool?.name !== 'select') return;
+    const selectTool = vp.toolManager.getTool<SelectTool>('select');
+    if (!selectTool) return;
+    const ids = selectTool.selectedIds.filter(id => vp.store.getById(id));
+    if (ids.length === 0) return;
+    const { historyRecorder } = vp as unknown as ViewportHistoryAccess;
+    historyRecorder.begin();
+    for (const id of ids) {
+      vp.store.remove(id);
+    }
+    historyRecorder.commit();
+    vp.requestRender();
+    setCanvasSelectionCount(0);
   }, []);
 
   const handleClear = useCallback(() => {
@@ -945,10 +991,25 @@ export default function FieldNotesCanvasPage({
           >
             <Upload size={16} />
           </button>
+
+          <div className="mx-1 h-6 w-px bg-slate-200" />
+
           <button
+            type="button"
+            onClick={handleDeleteSelected}
+            disabled={canvasSelectionCount === 0}
+            className="rounded-md p-2 text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-500"
+            title="Remove selected element(s) (Select tool). Same as Delete/Backspace."
+            aria-label="Remove selected canvas elements"
+          >
+            <Scissors size={16} />
+          </button>
+          <button
+            type="button"
             onClick={handleClear}
             className="rounded-md p-2 text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
-            title="Clear Canvas"
+            title="Clear entire canvas (all elements)"
+            aria-label="Clear entire canvas"
           >
             <Trash2 size={16} />
           </button>
