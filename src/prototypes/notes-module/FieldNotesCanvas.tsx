@@ -62,6 +62,7 @@ import {
   ChevronDown,
   PanelRightClose,
   PanelRightOpen,
+  Loader2,
 } from 'lucide-react';
 import {
   useProtoNotesStore,
@@ -343,6 +344,7 @@ export default function FieldNotesCanvasPage({
   const [activeLayerId, setActiveLayerId] = useState('');
   const [renamingLayerId, setRenamingLayerId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
   const autoSaveRef = useRef<AutoSave | null>(null);
 
   const {
@@ -507,34 +509,57 @@ export default function FieldNotesCanvasPage({
   }, []);
 
   const handleImageFileSelect = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       const vp = getVp();
       if (!file || !vp) return;
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result !== 'string') return;
-        const img = new window.Image();
-        img.onload = () => {
-          const maxDim = 400;
-          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-          const w = Math.round(img.width * scale);
-          const h = Math.round(img.height * scale);
-          const center = vp.camera.screenToWorld({
-            x: vp.domLayer.clientWidth / 2,
-            y: vp.domLayer.clientHeight / 2,
-          });
-          vp.addImage(
-            reader.result as string,
-            { x: center.x - w / 2, y: center.y - h / 2 },
-            { w, h }
-          );
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
       e.target.value = '';
+
+      setImageUploading(true);
+
+      // Upload to S3 first so we store a URL, not base64
+      let src: string;
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('assetId', `canvas-${Date.now()}`);
+        const res = await fetch('/api/assets/upload', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!res.ok) throw new Error('Upload failed');
+        const data = await res.json();
+        src = data.url;
+      } catch {
+        // S3 not configured — fall back to base64
+        src = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const maxDim = 400;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const center = vp.camera.screenToWorld({
+          x: vp.domLayer.clientWidth / 2,
+          y: vp.domLayer.clientHeight / 2,
+        });
+        vp.addImage(
+          src,
+          { x: center.x - w / 2, y: center.y - h / 2 },
+          { w, h }
+        );
+        setImageUploading(false);
+      };
+      img.onerror = () => setImageUploading(false);
+      img.src = src;
     },
     []
   );
@@ -1345,6 +1370,16 @@ export default function FieldNotesCanvasPage({
                   </button>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Image upload overlay */}
+        {imageUploading && (
+          <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center">
+            <div className="pointer-events-auto flex items-center gap-2 rounded-lg bg-slate-800/80 px-4 py-2.5 text-sm text-white shadow-lg">
+              <Loader2 size={16} className="animate-spin" />
+              Uploading image…
             </div>
           </div>
         )}
