@@ -9,9 +9,13 @@ import {
   ArrowTool,
   NoteTool,
   ImageTool,
+  TextTool,
+  ShapeTool,
   AutoSave,
   type Tool,
   type ToolName,
+  type ShapeKind,
+  type Layer,
   type Viewport,
 } from '@fieldnotes/core';
 import {
@@ -27,6 +31,9 @@ import {
   ArrowUpRight,
   StickyNote,
   Image as ImageIcon,
+  Type,
+  Shapes,
+  Grid3X3,
   Undo2,
   Redo2,
   Download,
@@ -34,7 +41,6 @@ import {
   Trash2,
   ZoomIn,
   ZoomOut,
-  Code,
   PanelLeftClose,
   PanelLeftOpen,
   BookOpen,
@@ -47,6 +53,15 @@ import {
   X,
   Edit3,
   Eye,
+  EyeOff,
+  Lock,
+  Unlock,
+  Layers,
+  Plus,
+  ChevronUp,
+  ChevronDown,
+  PanelRightClose,
+  PanelRightOpen,
 } from 'lucide-react';
 import {
   useProtoNotesStore,
@@ -63,6 +78,8 @@ const TOOL_DEFS: { name: ToolName; icon: typeof Hand; label: string }[] = [
   { name: 'eraser', icon: Eraser, label: 'Eraser' },
   { name: 'arrow', icon: ArrowUpRight, label: 'Arrow' },
   { name: 'note', icon: StickyNote, label: 'Sticky Note' },
+  { name: 'text', icon: Type, label: 'Text' },
+  { name: 'shape', icon: Shapes, label: 'Shape' },
   { name: 'image', icon: ImageIcon, label: 'Image' },
 ];
 
@@ -310,6 +327,22 @@ export default function FieldNotesCanvasPage({
   const [pencilWidth, setPencilWidth] = useState(2);
   const [arrowColor, setArrowColor] = useState('#334155');
   const [noteColor, setNoteColor] = useState('#fef08a');
+  const [noteTextColor, setNoteTextColor] = useState('#334155');
+  const [textColor, setTextColor] = useState('#334155');
+  const [textFontSize, setTextFontSize] = useState(16);
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>(
+    'left'
+  );
+  const [shapeKind, setShapeKind] = useState<ShapeKind>('rectangle');
+  const [shapeStrokeColor, setShapeStrokeColor] = useState('#334155');
+  const [shapeStrokeWidth, setShapeStrokeWidth] = useState(2);
+  const [shapeFillColor, setShapeFillColor] = useState('transparent');
+  const [snapToGrid, setSnapToGrid] = useState(false);
+  const [layersPanelOpen, setLayersPanelOpen] = useState(false);
+  const [layers, setLayers] = useState<Layer[]>([]);
+  const [activeLayerId, setActiveLayerId] = useState('');
+  const [renamingLayerId, setRenamingLayerId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const autoSaveRef = useRef<AutoSave | null>(null);
 
   const {
@@ -339,7 +372,14 @@ export default function FieldNotesCanvasPage({
       new PencilTool({ color: '#334155', width: 2 }),
       new EraserTool({ radius: 12 }),
       new ArrowTool({ color: '#334155', width: 2 }),
-      new NoteTool({ backgroundColor: '#fef08a' }),
+      new NoteTool({ backgroundColor: '#fef08a', textColor: '#334155' }),
+      new TextTool({ fontSize: 16, color: '#334155', textAlign: 'left' }),
+      new ShapeTool({
+        shape: 'rectangle',
+        strokeColor: '#334155',
+        strokeWidth: 2,
+        fillColor: 'transparent',
+      }),
       new ImageTool(),
     ],
     []
@@ -357,10 +397,19 @@ export default function FieldNotesCanvasPage({
       setCanRedo(vp.history.canRedo);
     });
 
-    // AutoSave — persist canvas to localStorage
+    // Sync layer state
+    const syncLayers = () => {
+      setLayers([...vp.layerManager.getLayers()]);
+      setActiveLayerId(vp.layerManager.activeLayerId);
+    };
+    vp.layerManager.on('change', syncLayers);
+    syncLayers();
+
+    // AutoSave — persist canvas + layers to localStorage
     const autoSave = new AutoSave(vp.store, vp.camera, {
       key: 'fieldnotes-canvas-autosave',
       debounceMs: 1000,
+      layerManager: vp.layerManager,
     });
     const saved = autoSave.load();
     if (saved) {
@@ -371,7 +420,7 @@ export default function FieldNotesCanvasPage({
     autoSaveRef.current = autoSave;
   }, []);
 
-  // Cleanup AutoSave on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       autoSaveRef.current?.stop();
@@ -395,13 +444,34 @@ export default function FieldNotesCanvasPage({
     arrow?.setOptions({ color: arrowColor });
   }, [arrowColor]);
 
-  // Sync note background color
+  // Sync note options
   useEffect(() => {
     const vp = canvasRef.current?.viewport;
     if (!vp) return;
     const note = vp.toolManager.getTool<NoteTool>('note');
-    note?.setOptions({ backgroundColor: noteColor });
-  }, [noteColor]);
+    note?.setOptions({ backgroundColor: noteColor, textColor: noteTextColor });
+  }, [noteColor, noteTextColor]);
+
+  // Sync text tool options
+  useEffect(() => {
+    const vp = canvasRef.current?.viewport;
+    if (!vp) return;
+    const text = vp.toolManager.getTool<TextTool>('text');
+    text?.setOptions({ color: textColor, fontSize: textFontSize, textAlign });
+  }, [textColor, textFontSize, textAlign]);
+
+  // Sync shape tool options
+  useEffect(() => {
+    const vp = canvasRef.current?.viewport;
+    if (!vp) return;
+    const shape = vp.toolManager.getTool<ShapeTool>('shape');
+    shape?.setOptions({
+      shape: shapeKind,
+      strokeColor: shapeStrokeColor,
+      strokeWidth: shapeStrokeWidth,
+      fillColor: shapeFillColor,
+    });
+  }, [shapeKind, shapeStrokeColor, shapeStrokeWidth, shapeFillColor]);
 
   // ─── Viewport helpers (imperatively via ref) ──────────
 
@@ -468,28 +538,6 @@ export default function FieldNotesCanvasPage({
     },
     []
   );
-
-  const handleAddHtml = useCallback(() => {
-    const vp = getVp();
-    if (!vp) return;
-
-    const el = document.createElement('div');
-    el.style.cssText =
-      'padding:16px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:12px;color:white;font-family:system-ui;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.15);';
-    el.innerHTML = `
-      <div style="font-weight:700;margin-bottom:8px;font-size:16px;">Custom HTML Element</div>
-      <p style="margin:0;opacity:0.9;">This is a raw DOM element on the canvas.</p>
-      <button style="margin-top:12px;padding:6px 14px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);border-radius:6px;color:white;cursor:pointer;font-size:13px;"
-        onclick="this.textContent=this.textContent==='Clicked!'?'Click me':'Clicked!'">
-        Click me
-      </button>
-    `;
-    const center = vp.camera.screenToWorld({
-      x: vp.domLayer.clientWidth / 2,
-      y: vp.domLayer.clientHeight / 2,
-    });
-    vp.addHtmlElement(el, center, { w: 280, h: 140 });
-  }, []);
 
   const handleExport = useCallback(() => {
     const vp = getVp();
@@ -753,16 +801,6 @@ export default function FieldNotesCanvasPage({
               <Icon size={18} />
             </button>
           ))}
-
-          <div className="mx-2 h-6 w-px bg-slate-200" />
-
-          <button
-            onClick={handleAddHtml}
-            className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
-            title="Add HTML Element"
-          >
-            <Code size={18} />
-          </button>
         </div>
 
         {/* Center: Undo/Redo */}
@@ -834,6 +872,41 @@ export default function FieldNotesCanvasPage({
           <div className="mx-2 h-6 w-px bg-slate-200" />
 
           <button
+            onClick={() => {
+              const vp = getVp();
+              if (!vp) return;
+              const next = !snapToGrid;
+              vp.setSnapToGrid(next);
+              setSnapToGrid(next);
+              vp.requestRender();
+            }}
+            className={`rounded-md p-2 transition-colors ${
+              snapToGrid
+                ? 'bg-indigo-100 text-indigo-700'
+                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+            }`}
+            title={snapToGrid ? 'Snap to Grid: On' : 'Snap to Grid: Off'}
+          >
+            <Grid3X3 size={16} />
+          </button>
+
+          <div className="mx-2 h-6 w-px bg-slate-200" />
+
+          <button
+            onClick={() => setLayersPanelOpen(prev => !prev)}
+            className={`rounded-md p-2 transition-colors ${
+              layersPanelOpen
+                ? 'bg-indigo-100 text-indigo-700'
+                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+            }`}
+            title={layersPanelOpen ? 'Hide Layers' : 'Show Layers'}
+          >
+            <Layers size={16} />
+          </button>
+
+          <div className="mx-2 h-6 w-px bg-slate-200" />
+
+          <button
             onClick={handleExport}
             className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
             title="Export JSON"
@@ -860,10 +933,46 @@ export default function FieldNotesCanvasPage({
       {/* Tool Options Bar (contextual) */}
       {(activeTool === 'pencil' ||
         activeTool === 'arrow' ||
-        activeTool === 'note') && (
-        <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-1.5">
-          {/* Color swatches */}
-          <span className="text-xs font-medium text-slate-500">Color</span>
+        activeTool === 'note' ||
+        activeTool === 'text' ||
+        activeTool === 'shape') && (
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-1.5">
+          {/* Shape kind toggle (shape only) */}
+          {activeTool === 'shape' && (
+            <>
+              <span className="text-xs font-medium text-slate-500">Shape</span>
+              <div className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-white p-0.5">
+                {(
+                  [
+                    { value: 'rectangle', label: 'Rectangle' },
+                    { value: 'ellipse', label: 'Ellipse' },
+                  ] as const
+                ).map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setShapeKind(value)}
+                    className={`rounded px-2 py-1 text-xs transition-colors ${
+                      shapeKind === value
+                        ? 'bg-indigo-100 font-semibold text-indigo-700'
+                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="mx-1 h-6 w-px bg-slate-200" />
+            </>
+          )}
+
+          {/* Color swatches — stroke color for shapes, bg for notes, color for others */}
+          <span className="text-xs font-medium text-slate-500">
+            {activeTool === 'shape'
+              ? 'Stroke'
+              : activeTool === 'note'
+                ? 'Background'
+                : 'Color'}
+          </span>
           <div className="flex items-center gap-1">
             {[
               '#334155',
@@ -876,17 +985,24 @@ export default function FieldNotesCanvasPage({
               '#ec4899',
               '#ffffff',
             ].map(color => {
-              const isActive =
-                activeTool === 'note'
-                  ? noteColor === color
-                  : activeTool === 'arrow'
-                    ? arrowColor === color
-                    : pencilColor === color;
+              const activeColor =
+                activeTool === 'shape'
+                  ? shapeStrokeColor
+                  : activeTool === 'text'
+                    ? textColor
+                    : activeTool === 'note'
+                      ? noteColor
+                      : activeTool === 'arrow'
+                        ? arrowColor
+                        : pencilColor;
+              const isActive = activeColor === color;
               return (
                 <button
                   key={color}
                   onClick={() => {
-                    if (activeTool === 'pencil') setPencilColor(color);
+                    if (activeTool === 'shape') setShapeStrokeColor(color);
+                    else if (activeTool === 'text') setTextColor(color);
+                    else if (activeTool === 'pencil') setPencilColor(color);
                     else if (activeTool === 'arrow') setArrowColor(color);
                     else if (activeTool === 'note') setNoteColor(color);
                   }}
@@ -904,19 +1020,26 @@ export default function FieldNotesCanvasPage({
                 />
               );
             })}
-            {/* Custom color picker */}
             <label className="relative h-6 w-6 cursor-pointer">
               <input
                 type="color"
                 value={
-                  activeTool === 'note'
-                    ? noteColor
-                    : activeTool === 'arrow'
-                      ? arrowColor
-                      : pencilColor
+                  activeTool === 'shape'
+                    ? shapeStrokeColor
+                    : activeTool === 'text'
+                      ? textColor
+                      : activeTool === 'note'
+                        ? noteColor
+                        : activeTool === 'arrow'
+                          ? arrowColor
+                          : pencilColor
                 }
                 onChange={e => {
-                  if (activeTool === 'pencil') setPencilColor(e.target.value);
+                  if (activeTool === 'shape')
+                    setShapeStrokeColor(e.target.value);
+                  else if (activeTool === 'text') setTextColor(e.target.value);
+                  else if (activeTool === 'pencil')
+                    setPencilColor(e.target.value);
                   else if (activeTool === 'arrow')
                     setArrowColor(e.target.value);
                   else if (activeTool === 'note') setNoteColor(e.target.value);
@@ -928,6 +1051,134 @@ export default function FieldNotesCanvasPage({
               </div>
             </label>
           </div>
+
+          {/* Note text color */}
+          {activeTool === 'note' && (
+            <>
+              <div className="mx-1 h-6 w-px bg-slate-200" />
+              <span className="text-xs font-medium text-slate-500">Text</span>
+              <div className="flex items-center gap-1">
+                {[
+                  '#334155',
+                  '#1e293b',
+                  '#ef4444',
+                  '#16a34a',
+                  '#2563eb',
+                  '#7c3aed',
+                  '#ffffff',
+                ].map(color => (
+                  <button
+                    key={color}
+                    onClick={() => setNoteTextColor(color)}
+                    className={`h-6 w-6 rounded-full border-2 transition-transform ${
+                      noteTextColor === color
+                        ? 'scale-110 border-indigo-500'
+                        : 'border-slate-300 hover:scale-105'
+                    }`}
+                    style={{
+                      backgroundColor: color,
+                      boxShadow:
+                        color === '#ffffff'
+                          ? 'inset 0 0 0 1px #e2e8f0'
+                          : 'none',
+                    }}
+                    title={color}
+                  />
+                ))}
+                <label className="relative h-6 w-6 cursor-pointer">
+                  <input
+                    type="color"
+                    value={noteTextColor}
+                    onChange={e => setNoteTextColor(e.target.value)}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  />
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-dashed border-slate-300 text-xs text-slate-400 hover:border-slate-400">
+                    +
+                  </div>
+                </label>
+              </div>
+            </>
+          )}
+
+          {/* Shape fill color */}
+          {activeTool === 'shape' && (
+            <>
+              <div className="mx-1 h-6 w-px bg-slate-200" />
+              <span className="text-xs font-medium text-slate-500">Fill</span>
+              <div className="flex items-center gap-1">
+                {/* No fill option */}
+                <button
+                  onClick={() => setShapeFillColor('transparent')}
+                  className={`flex h-6 w-6 items-center justify-center rounded-full border-2 transition-transform ${
+                    shapeFillColor === 'transparent'
+                      ? 'scale-110 border-indigo-500'
+                      : 'border-slate-300 hover:scale-105'
+                  }`}
+                  title="No fill"
+                >
+                  <X size={10} className="text-slate-400" />
+                </button>
+                {[
+                  '#334155',
+                  '#fecaca',
+                  '#fed7aa',
+                  '#fef08a',
+                  '#bbf7d0',
+                  '#bfdbfe',
+                  '#ddd6fe',
+                  '#fbcfe8',
+                  '#ffffff',
+                ].map(color => (
+                  <button
+                    key={color}
+                    onClick={() => setShapeFillColor(color)}
+                    className={`h-6 w-6 rounded-full border-2 transition-transform ${
+                      shapeFillColor === color
+                        ? 'scale-110 border-indigo-500'
+                        : 'border-slate-300 hover:scale-105'
+                    }`}
+                    style={{
+                      backgroundColor: color,
+                      boxShadow:
+                        color === '#ffffff'
+                          ? 'inset 0 0 0 1px #e2e8f0'
+                          : 'none',
+                    }}
+                    title={color}
+                  />
+                ))}
+                <label className="relative h-6 w-6 cursor-pointer">
+                  <input
+                    type="color"
+                    value={
+                      shapeFillColor === 'transparent'
+                        ? '#ffffff'
+                        : shapeFillColor
+                    }
+                    onChange={e => setShapeFillColor(e.target.value)}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  />
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-dashed border-slate-300 text-xs text-slate-400 hover:border-slate-400">
+                    +
+                  </div>
+                </label>
+              </div>
+
+              <div className="mx-1 h-6 w-px bg-slate-200" />
+              <span className="text-xs font-medium text-slate-500">Width</span>
+              <input
+                type="range"
+                min={1}
+                max={12}
+                value={shapeStrokeWidth}
+                onChange={e => setShapeStrokeWidth(Number(e.target.value))}
+                className="h-1.5 w-20 cursor-pointer accent-indigo-600"
+              />
+              <span className="min-w-[28px] text-xs text-slate-500 tabular-nums">
+                {shapeStrokeWidth}px
+              </span>
+            </>
+          )}
 
           {/* Brush size slider (pencil only) */}
           {activeTool === 'pencil' && (
@@ -945,7 +1196,6 @@ export default function FieldNotesCanvasPage({
               <span className="min-w-[28px] text-xs text-slate-500 tabular-nums">
                 {pencilWidth}px
               </span>
-              {/* Quick size presets */}
               <div className="flex items-center gap-1">
                 {[1, 3, 6, 12].map(size => (
                   <button
@@ -965,6 +1215,65 @@ export default function FieldNotesCanvasPage({
                         height: Math.min(size + 2, 14),
                       }}
                     />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Text tool options: font size + alignment */}
+          {activeTool === 'text' && (
+            <>
+              <div className="mx-1 h-6 w-px bg-slate-200" />
+              <span className="text-xs font-medium text-slate-500">Size</span>
+              <input
+                type="range"
+                min={10}
+                max={72}
+                value={textFontSize}
+                onChange={e => setTextFontSize(Number(e.target.value))}
+                className="h-1.5 w-24 cursor-pointer accent-indigo-600"
+              />
+              <span className="min-w-[32px] text-xs text-slate-500 tabular-nums">
+                {textFontSize}px
+              </span>
+              <div className="flex items-center gap-0.5">
+                {[12, 16, 24, 36, 48].map(size => (
+                  <button
+                    key={size}
+                    onClick={() => setTextFontSize(size)}
+                    className={`rounded-md px-1.5 py-0.5 text-xs transition-colors ${
+                      textFontSize === size
+                        ? 'bg-indigo-100 font-semibold text-indigo-700'
+                        : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mx-1 h-6 w-px bg-slate-200" />
+              <span className="text-xs font-medium text-slate-500">Align</span>
+              <div className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-white p-0.5">
+                {(
+                  [
+                    { value: 'left', label: 'Left' },
+                    { value: 'center', label: 'Center' },
+                    { value: 'right', label: 'Right' },
+                  ] as const
+                ).map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => setTextAlign(value)}
+                    className={`rounded px-2 py-1 text-xs transition-colors ${
+                      textAlign === value
+                        ? 'bg-indigo-100 font-semibold text-indigo-700'
+                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                    }`}
+                    title={label}
+                  >
+                    {label}
                   </button>
                 ))}
               </div>
@@ -1077,6 +1386,198 @@ export default function FieldNotesCanvasPage({
             );
           })}
         </Canvas>
+
+        {/* Layers Panel */}
+        {layersPanelOpen && (
+          <div className="flex w-56 shrink-0 flex-col border-l border-slate-200 bg-white">
+            <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-3">
+              <Layers size={16} className="text-indigo-600" />
+              <h2 className="text-sm font-semibold text-slate-800">Layers</h2>
+              <button
+                onClick={() => {
+                  const vp = getVp();
+                  if (!vp) return;
+                  vp.layerManager.createLayer();
+                  vp.requestRender();
+                }}
+                className="ml-auto rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-indigo-600"
+                title="Add Layer"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {[...layers]
+                .sort((a, b) => b.order - a.order)
+                .map(layer => {
+                  const isActive = layer.id === activeLayerId;
+                  return (
+                    <div
+                      key={layer.id}
+                      onClick={() => {
+                        const vp = getVp();
+                        if (!vp) return;
+                        vp.layerManager.setActiveLayer(layer.id);
+                      }}
+                      className={`group flex items-center gap-1.5 border-b border-slate-50 px-3 py-2 text-sm transition-colors ${
+                        isActive
+                          ? 'bg-indigo-50 text-indigo-900'
+                          : 'cursor-pointer text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {/* Visibility toggle */}
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          const vp = getVp();
+                          if (!vp) return;
+                          vp.layerManager.setLayerVisible(
+                            layer.id,
+                            !layer.visible
+                          );
+                          vp.requestRender();
+                        }}
+                        className={`rounded p-0.5 ${
+                          layer.visible
+                            ? 'text-slate-400 hover:text-slate-600'
+                            : 'text-slate-300 hover:text-slate-500'
+                        }`}
+                        title={layer.visible ? 'Hide' : 'Show'}
+                      >
+                        {layer.visible ? (
+                          <Eye size={13} />
+                        ) : (
+                          <EyeOff size={13} />
+                        )}
+                      </button>
+
+                      {/* Lock toggle */}
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          const vp = getVp();
+                          if (!vp) return;
+                          vp.layerManager.setLayerLocked(
+                            layer.id,
+                            !layer.locked
+                          );
+                          vp.requestRender();
+                        }}
+                        className={`rounded p-0.5 ${
+                          layer.locked
+                            ? 'text-amber-500 hover:text-amber-600'
+                            : 'text-slate-300 hover:text-slate-500'
+                        }`}
+                        title={layer.locked ? 'Unlock' : 'Lock'}
+                      >
+                        {layer.locked ? (
+                          <Lock size={13} />
+                        ) : (
+                          <Unlock size={13} />
+                        )}
+                      </button>
+
+                      {/* Layer name (inline rename) */}
+                      {renamingLayerId === layer.id ? (
+                        <input
+                          type="text"
+                          value={renameValue}
+                          onChange={e => setRenameValue(e.target.value)}
+                          onBlur={() => {
+                            const vp = getVp();
+                            if (vp && renameValue.trim()) {
+                              vp.layerManager.renameLayer(
+                                layer.id,
+                                renameValue.trim()
+                              );
+                            }
+                            setRenamingLayerId(null);
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              (e.target as HTMLInputElement).blur();
+                            } else if (e.key === 'Escape') {
+                              setRenamingLayerId(null);
+                            }
+                          }}
+                          autoFocus
+                          className="min-w-0 flex-1 rounded border border-indigo-300 px-1 py-0.5 text-xs focus:outline-none"
+                          onClick={e => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span
+                          onDoubleClick={e => {
+                            e.stopPropagation();
+                            setRenamingLayerId(layer.id);
+                            setRenameValue(layer.name);
+                          }}
+                          className={`min-w-0 flex-1 truncate text-xs ${
+                            isActive ? 'font-semibold' : ''
+                          } ${!layer.visible ? 'italic opacity-50' : ''}`}
+                          title={`${layer.name} (double-click to rename)`}
+                        >
+                          {layer.name}
+                        </span>
+                      )}
+
+                      {/* Reorder buttons */}
+                      <div className="ml-auto flex opacity-0 group-hover:opacity-100">
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            const vp = getVp();
+                            if (!vp) return;
+                            vp.layerManager.reorderLayer(
+                              layer.id,
+                              layer.order + 1
+                            );
+                            vp.requestRender();
+                          }}
+                          className="rounded p-0.5 text-slate-400 hover:text-slate-600"
+                          title="Move Up"
+                        >
+                          <ChevronUp size={12} />
+                        </button>
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            const vp = getVp();
+                            if (!vp) return;
+                            vp.layerManager.reorderLayer(
+                              layer.id,
+                              layer.order - 1
+                            );
+                            vp.requestRender();
+                          }}
+                          className="rounded p-0.5 text-slate-400 hover:text-slate-600"
+                          title="Move Down"
+                        >
+                          <ChevronDown size={12} />
+                        </button>
+                      </div>
+
+                      {/* Delete button (only if more than 1 layer) */}
+                      {layers.length > 1 && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            const vp = getVp();
+                            if (!vp) return;
+                            vp.layerManager.removeLayer(layer.id);
+                            vp.requestRender();
+                          }}
+                          className="rounded p-0.5 text-slate-300 opacity-0 group-hover:opacity-100 hover:text-red-500"
+                          title="Delete Layer"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
