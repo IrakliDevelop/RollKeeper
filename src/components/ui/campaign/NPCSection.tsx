@@ -2,7 +2,15 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { Plus, Edit3, Trash2, Shield, Heart, Footprints } from 'lucide-react';
+import {
+  Plus,
+  Edit3,
+  Trash2,
+  Shield,
+  Heart,
+  Footprints,
+  Drama,
+} from 'lucide-react';
 import { useNPCStore } from '@/store/npcStore';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -53,7 +61,7 @@ export function NPCSection({ campaignCode }: NPCSectionProps) {
     <div>
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Shield size={20} className="text-muted" />
+          <Drama size={20} className="text-muted" />
           <h2 className="text-heading text-lg font-semibold">
             NPCs ({npcs.length})
           </h2>
@@ -70,7 +78,7 @@ export function NPCSection({ campaignCode }: NPCSectionProps) {
 
       {npcs.length === 0 ? (
         <div className="border-divider bg-surface-secondary rounded-lg border-2 border-dashed p-8 text-center">
-          <Shield size={40} className="text-faint mx-auto mb-3" />
+          <Drama size={40} className="text-faint mx-auto mb-3" />
           <p className="text-muted mb-1 text-sm">No NPCs yet</p>
           <p className="text-faint text-xs">
             Create persistent NPCs to quickly add them to any encounter.
