@@ -639,3 +639,8 @@ export const MAX_AVATAR_SIZE_MB = 5; // Maximum avatar file size in megabytes
 export const MAX_AVATAR_SIZE_BYTES = MAX_AVATAR_SIZE_MB * 1024 * 1024;
 export const MAX_BANNER_SIZE_MB = 10; // Maximum banner file size in megabytes
 export const MAX_BANNER_SIZE_BYTES = MAX_BANNER_SIZE_MB * 1024 * 1024;
+
+/** Maps, notes canvas, and other shared assets uploaded via /api/assets/upload */
+export const MAX_ASSET_UPLOAD_SIZE_MB = 50;
+export const MAX_ASSET_UPLOAD_SIZE_BYTES =
+  MAX_ASSET_UPLOAD_SIZE_MB * 1024 * 1024;

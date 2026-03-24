@@ -14,6 +14,7 @@ import {
   Angry,
   CalendarDays,
   MessageSquare,
+  Map,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -147,6 +148,18 @@ export default function CampaignViewPage() {
             </div>
             <div className="flex items-center gap-3">
               <Link
+                href={`/dm/campaign/${code}/locations`}
+                className="lg:hidden"
+              >
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<Map size={16} />}
+                >
+                  Locations
+                </Button>
+              </Link>
+              <Link
                 href={`/dm/campaign/${code}/calendar`}
                 className="lg:hidden"
               >
@@ -210,20 +223,16 @@ export default function CampaignViewPage() {
       {/* Campaign Banner with Side Panels */}
       <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
         <div className="flex items-stretch gap-4">
-          {/* Players */}
-          <div className="border-accent-blue-border bg-accent-blue-bg hidden flex-col items-center justify-center gap-2 rounded-lg border-2 px-4 py-4 lg:flex lg:w-44">
-            <Users size={22} className="text-accent-blue-text-muted" />
-            <div className="text-muted text-xs font-medium tracking-wider uppercase">
-              Players
+          {/* Locations */}
+          <Link
+            href={`/dm/campaign/${code}/locations`}
+            className="border-accent-emerald-border bg-accent-emerald-bg hover:bg-accent-emerald-bg-strong hidden flex-col items-center justify-center gap-2 rounded-lg border-2 px-4 py-4 transition-colors lg:flex lg:w-44"
+          >
+            <Map size={28} className="text-accent-emerald-text-muted" />
+            <div className="text-accent-emerald-text text-sm font-semibold">
+              Locations
             </div>
-            <div className="text-heading text-2xl font-bold">
-              {players.length}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-              <span className="text-muted text-xs">Live</span>
-            </div>
-          </div>
+          </Link>
 
           {/* Banner */}
           <div className="min-w-0 flex-1 lg:max-w-2xl">

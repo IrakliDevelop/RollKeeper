@@ -40,6 +40,7 @@ import {
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { NavigationContext } from '@/contexts/NavigationContext';
 import { useSimpleDiceRoll } from '@/hooks/useSimpleDiceRoll';
+import { useLocationSync } from '@/hooks/useLocationSync';
 
 import { RollSummary } from '@/types/dice';
 import NotHydrated from '@/components/ui/feedback/NotHydrated';
@@ -202,6 +203,11 @@ export default function CharacterSheet() {
   const tabbedSheetRef = useRef<TabbedCharacterSheetRef>(null);
 
   const playerSync = usePlayerSync({ characterId });
+
+  // Location sync — used to conditionally show Map tab
+  const { locations: syncedLocations } = useLocationSync(
+    playerSync.campaignCode ?? undefined
+  );
 
   // Shared DM calendar state (when in a campaign)
   const { sharedState, acknowledgeMessage, acknowledgeDmEffects } =
@@ -921,6 +927,7 @@ export default function CharacterSheet() {
                 calendarDays={calendarDays}
                 campaignCode={playerSync.campaignCode ?? undefined}
                 customCounter={sharedState?.customCounter}
+                locationCount={syncedLocations.length}
               />
             </main>
 
