@@ -218,7 +218,7 @@ export function useDmLocationEditor(
       vp.store.on('remove', () => setElementCount(vp.store.count));
       vp.store.on('clear', () => setElementCount(0));
 
-      vp.toolManager.onChange(name => setActiveTool(name));
+      vp.toolManager.onChange((name: string) => setActiveTool(name));
       vp.camera.onChange(() => setZoom(vp.camera.zoom));
       vp.history.onChange(() => {
         setCanUndo(vp.history.canUndo);
@@ -240,7 +240,9 @@ export function useDmLocationEditor(
           setSelectedElementId(null);
           return;
         }
-        const ids = selectTool.selectedIds.filter(id => vp.store.getById(id));
+        const ids = selectTool.selectedIds.filter((id: string) =>
+          vp.store.getById(id)
+        );
         setSelectedElementId(ids.length === 1 ? ids[0] : null);
       };
 
@@ -522,7 +524,9 @@ export function useDmLocationEditor(
     if (vp.toolManager.activeTool?.name !== 'select') return;
     const selectTool = vp.toolManager.getTool<SelectTool>('select');
     if (!selectTool) return;
-    const ids = selectTool.selectedIds.filter(id => vp.store.getById(id));
+    const ids = selectTool.selectedIds.filter((id: string) =>
+      vp.store.getById(id)
+    );
     if (ids.length === 0) return;
     const { historyRecorder } = vp as unknown as ViewportHistoryAccess;
     historyRecorder.begin();
