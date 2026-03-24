@@ -1,3 +1,4 @@
+import type React from 'react';
 import type { LocationMap } from '@/types/location';
 
 export interface DmLocationEditorProps {

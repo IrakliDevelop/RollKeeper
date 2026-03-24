@@ -18,6 +18,7 @@ import {
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useLocationStore } from '@/store/locationStore';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
+import type { GridSettings } from '@/types/location';
 
 /** Viewport exposes historyRecorder at runtime for batched store ops */
 type ViewportHistoryAccess = {
@@ -70,6 +71,7 @@ export interface DmLocationEditorState {
   // Grid
   gridEnabled: boolean;
   handleToggleGrid: () => void;
+  handleUpdateGridSettings: (settings: Partial<GridSettings>) => void;
 
   // DM-only
   dmOnlyElements: Record<string, boolean>;
@@ -377,6 +379,35 @@ export function useDmLocationEditor(
     storeUpdateLocation,
   ]);
 
+  const handleUpdateGridSettings = useCallback(
+    (settings: Partial<GridSettings>) => {
+      const vp = getVp();
+      if (!vp || !gridEnabled) return;
+
+      const currentGs = location.gridSettings ?? {
+        gridType: 'square',
+        cellSize: 50,
+        strokeColor: '#94a3b8',
+        strokeWidth: 1,
+        opacity: 0.5,
+      };
+
+      const updatedSettings = { ...currentGs, ...settings };
+      vp.updateGrid(updatedSettings);
+      storeUpdateLocation(campaignCode, location.id, {
+        gridSettings: updatedSettings,
+      });
+    },
+    [
+      getVp,
+      gridEnabled,
+      location.gridSettings,
+      campaignCode,
+      location.id,
+      storeUpdateLocation,
+    ]
+  );
+
   const handleToggleDmOnly = useCallback(() => {
     if (!selectedElementId) return;
     storeToggleDmOnly(campaignCode, location.id, selectedElementId);
@@ -562,6 +593,7 @@ export function useDmLocationEditor(
     setLayersPanelOpen,
     gridEnabled,
     handleToggleGrid,
+    handleUpdateGridSettings,
     dmOnlyElements,
     selectedElementId,
     isDmOnly,
