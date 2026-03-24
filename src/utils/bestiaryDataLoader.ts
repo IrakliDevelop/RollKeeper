@@ -288,6 +288,7 @@ function processMonster(monster: RawMonsterData): ProcessedMonster {
     traits: processTraits(monster.trait),
     actions: processTraits(monster.action),
     reactions: processTraits(monster.reaction),
+    bonusActions: processTraits(monster.bonus),
     legendaryActions: processTraits(monster.legendary),
     source: formatSourceForDisplay(monster.source),
     page: monster.page ?? 0,

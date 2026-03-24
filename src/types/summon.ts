@@ -49,6 +49,8 @@ export interface SavedCreature {
   traits?: Array<{ name: string; text: string }>;
   actions?: Array<{ name: string; text: string }>;
   reactions?: Array<{ name: string; text: string }>;
+  bonusActions?: Array<{ name: string; text: string }>;
+  lairActions?: Array<{ name: string; text: string }>;
   // Metadata
   createdAt: string;
   updatedAt: string;

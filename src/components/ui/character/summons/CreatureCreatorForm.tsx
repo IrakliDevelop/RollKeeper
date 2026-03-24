@@ -100,6 +100,12 @@ export function CreatureCreatorForm({
   const [reactions, setReactions] = useState<NamedText[]>(
     initialCreature?.reactions ?? []
   );
+  const [bonusActions, setBonusActions] = useState<NamedText[]>(
+    initialCreature?.bonusActions ?? []
+  );
+  const [lairActions, setLairActions] = useState<NamedText[]>(
+    initialCreature?.lairActions ?? []
+  );
 
   const handleSubmit = () => {
     if (!name.trim()) return;
@@ -139,6 +145,8 @@ export function CreatureCreatorForm({
       traits: traits.length > 0 ? traits : undefined,
       actions: actions.length > 0 ? actions : undefined,
       reactions: reactions.length > 0 ? reactions : undefined,
+      bonusActions: bonusActions.length > 0 ? bonusActions : undefined,
+      lairActions: lairActions.length > 0 ? lairActions : undefined,
       createdAt: initialCreature?.createdAt ?? now,
       updatedAt: now,
     };
@@ -341,9 +349,19 @@ export function CreatureCreatorForm({
         onChange={setActions}
       />
       <AbilityListEditor
+        label="Bonus Actions"
+        items={bonusActions}
+        onChange={setBonusActions}
+      />
+      <AbilityListEditor
         label="Reactions"
         items={reactions}
         onChange={setReactions}
+      />
+      <AbilityListEditor
+        label="Lair Actions"
+        items={lairActions}
+        onChange={setLairActions}
       />
 
       {/* Submit */}

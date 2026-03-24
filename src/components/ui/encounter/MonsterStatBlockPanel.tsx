@@ -149,8 +149,14 @@ export function MonsterStatBlockPanel({
       {/* Actions */}
       <TraitBlock title="Actions" entries={statBlock.actions} />
 
+      {/* Bonus Actions */}
+      <TraitBlock title="Bonus Actions" entries={statBlock.bonusActions} />
+
       {/* Reactions */}
       <TraitBlock title="Reactions" entries={statBlock.reactions} />
+
+      {/* Lair Actions */}
+      <TraitBlock title="Lair Actions" entries={statBlock.lairActions} />
     </div>
   );
 }

@@ -30,6 +30,7 @@ export interface ProcessedMonster {
   traits?: ProcessedTrait[];
   actions?: ProcessedTrait[];
   reactions?: ProcessedTrait[];
+  bonusActions?: ProcessedTrait[];
   legendaryActions?: ProcessedTrait[];
   source: string;
   page: number;
@@ -103,6 +104,7 @@ export interface RawMonsterData {
   action?: { name: string; entries: string[] }[];
   legendary?: { name: string; entries: string[] }[];
   reaction?: { name: string; entries: string[] }[];
+  bonus?: { name: string; entries: string[] }[];
   legendaryActions?: number;
   conditionImmune?: string[];
   spellcasting?: RawSpellcasting[];
