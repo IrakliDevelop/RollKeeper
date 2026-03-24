@@ -9,6 +9,7 @@ import {
   Footprints,
   BookOpen,
   ScrollText,
+  X,
 } from 'lucide-react';
 import {
   Dialog,
@@ -79,6 +80,7 @@ export function NPCDetailDialog({
   onDelete,
 }: NPCDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('stats');
+  const [showFullImage, setShowFullImage] = useState(false);
 
   if (!npc) return null;
 
@@ -93,11 +95,33 @@ export function NPCDetailDialog({
         <DialogHeader>
           <div className="flex items-start gap-4 pr-16">
             {npc.avatarUrl && (
-              <img
-                src={npc.avatarUrl}
-                alt={npc.name}
-                className="border-divider h-14 w-14 shrink-0 rounded-full border-2 object-cover"
-              />
+              <button
+                type="button"
+                onClick={() => setShowFullImage(true)}
+                className="group relative shrink-0"
+                title="Click to view full image"
+              >
+                <img
+                  src={npc.avatarUrl}
+                  alt={npc.name}
+                  className="border-divider h-14 w-14 rounded-full border-2 object-cover transition-opacity group-hover:opacity-80"
+                />
+                <span className="bg-surface/80 absolute inset-0 flex items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-100">
+                  <svg
+                    className="text-heading h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
+                    />
+                  </svg>
+                </span>
+              </button>
             )}
             <div className="min-w-0 flex-1">
               <DialogTitle className="text-heading text-xl font-bold">
@@ -251,6 +275,31 @@ export function NPCDetailDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {showFullImage && npc.avatarUrl && (
+        <div
+          className="fixed inset-0 z-200 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setShowFullImage(false)}
+        >
+          <button
+            type="button"
+            onClick={() => setShowFullImage(false)}
+            className="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
+            aria-label="Close image"
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <img
+            src={npc.avatarUrl}
+            alt={npc.name}
+            className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          />
+          <p className="absolute bottom-4 text-center text-sm text-white/60">
+            Right-click image to copy or save
+          </p>
+        </div>
+      )}
     </Dialog>
   );
 }
