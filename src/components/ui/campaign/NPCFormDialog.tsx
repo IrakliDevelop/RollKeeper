@@ -70,16 +70,22 @@ function hasSubstantiveStatBlock(
   },
   traits: NamedText[],
   actions: NamedText[],
+  bonusActions: NamedText[],
   reactions: NamedText[],
+  lairActions: NamedText[],
   bestiarySourceId: string | null
 ): boolean {
   const nonDefaultScore = Object.values(scores).some(
     v => v !== DEFAULT_ABILITY
   );
   const hasDetail = Object.values(details).some(v => v.trim() !== '');
-  const hasAbilities = [...traits, ...actions, ...reactions].some(t =>
-    t.name.trim()
-  );
+  const hasAbilities = [
+    ...traits,
+    ...actions,
+    ...bonusActions,
+    ...reactions,
+    ...lairActions,
+  ].some(t => t.name.trim());
   return nonDefaultScore || hasDetail || hasAbilities || !!bestiarySourceId;
 }
 
@@ -136,10 +142,12 @@ export function NPCFormDialog({
   const [languages, setLanguages] = useState('');
   const [cr, setCr] = useState('');
 
-  // Traits / Actions / Reactions
+  // Traits / Actions / Bonus Actions / Reactions / Lair Actions
   const [traits, setTraits] = useState<NamedText[]>([]);
   const [actions, setActions] = useState<NamedText[]>([]);
+  const [bonusActions, setBonusActions] = useState<NamedText[]>([]);
   const [reactions, setReactions] = useState<NamedText[]>([]);
+  const [lairActions, setLairActions] = useState<NamedText[]>([]);
 
   // Lore
   const [showLore, setShowLore] = useState(false);
@@ -189,7 +197,9 @@ export function NPCFormDialog({
         setCr(sb.cr || '');
         setTraits(sb.traits?.map(t => ({ ...t })) ?? []);
         setActions(sb.actions?.map(a => ({ ...a })) ?? []);
+        setBonusActions(sb.bonusActions?.map(b => ({ ...b })) ?? []);
         setReactions(sb.reactions?.map(r => ({ ...r })) ?? []);
+        setLairActions(sb.lairActions?.map(l => ({ ...l })) ?? []);
         const hasDetails =
           sb.saves ||
           sb.skills ||
@@ -241,7 +251,9 @@ export function NPCFormDialog({
     setShowDetails(false);
     setTraits([]);
     setActions([]);
+    setBonusActions([]);
     setReactions([]);
+    setLairActions([]);
   }
 
   function resetAll() {
@@ -326,7 +338,9 @@ export function NPCFormDialog({
     setCr(sb.cr);
     setTraits(sb.traits.map(t => ({ ...t })));
     setActions(sb.actions.map(a => ({ ...a })));
+    setBonusActions(sb.bonusActions.map(b => ({ ...b })));
     setReactions(sb.reactions.map(r => ({ ...r })));
+    setLairActions([]);
     setBestiarySourceId(monster.id);
     setBestiarySourceName(monster.name);
     setBestiaryQuery('');
@@ -419,7 +433,9 @@ export function NPCFormDialog({
         detailFields,
         traits,
         actions,
+        bonusActions,
         reactions,
+        lairActions,
         bestiarySourceId
       )
     ) {
@@ -446,7 +462,9 @@ export function NPCFormDialog({
         passivePerception: 10 + Math.floor((wis - 10) / 2),
         traits: traits.filter(t => t.name.trim()),
         actions: actions.filter(a => a.name.trim()),
+        bonusActions: bonusActions.filter(a => a.name.trim()),
         reactions: reactions.filter(r => r.name.trim()),
+        lairActions: lairActions.filter(a => a.name.trim()),
         cr: cr || '0',
         type: creatureType,
         size,
@@ -790,9 +808,19 @@ export function NPCFormDialog({
               onChange={setActions}
             />
             <AbilityListEditor
+              label="Bonus Actions"
+              items={bonusActions}
+              onChange={setBonusActions}
+            />
+            <AbilityListEditor
               label="Reactions"
               items={reactions}
               onChange={setReactions}
+            />
+            <AbilityListEditor
+              label="Lair Actions"
+              items={lairActions}
+              onChange={setLairActions}
             />
 
             {/* ===== Lore (collapsible) ===== */}

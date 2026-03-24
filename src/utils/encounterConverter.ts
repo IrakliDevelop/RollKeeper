@@ -103,6 +103,23 @@ function buildMonsterAbilities(monster: ProcessedMonster): MonsterAbility[] {
     }
   }
 
+  // Process bonus actions with recharge or per-day
+  for (const bonus of monster.bonusActions ?? []) {
+    const parsed = parseRechargeFromName(bonus.name);
+    if (parsed.usageType !== 'unlimited') {
+      abilities.push({
+        id: generateId(),
+        name: parsed.cleanName,
+        description: bonus.text,
+        usageType: parsed.usageType,
+        rechargeOn: parsed.rechargeOn,
+        maxUses: parsed.usageType === 'per-day' ? 1 : undefined,
+        usedUses: 0,
+        restType: parsed.restType,
+      });
+    }
+  }
+
   return abilities;
 }
 
@@ -206,6 +223,11 @@ export function buildMonsterStatBlock(
       name: r.name,
       text: r.text,
     })),
+    bonusActions: (monster.bonusActions ?? []).map(a => ({
+      name: a.name,
+      text: a.text,
+    })),
+    lairActions: [],
     cr: monster.cr,
     type: typeStr,
     size: monster.size.join(', '),

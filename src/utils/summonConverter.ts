@@ -374,6 +374,14 @@ export async function createSpiritSummon(
           text: resolve(r.text),
         })
       );
+      sb.bonusActions = filterBySubtype(
+        sb.bonusActions,
+        subtype,
+        allSubtypes
+      ).map(b => ({
+        name: b.name,
+        text: resolve(b.text),
+      }));
 
       // Update HP formula to show scaled value
       sb.hpFormula = `${scaledHP} (scaled to level ${castAtLevel})`;
@@ -434,6 +442,8 @@ export async function createSpiritSummon(
           },
         ],
         reactions: [],
+        bonusActions: [],
+        lairActions: [],
         cr: '-',
         type: scaling.spiritName.split(' ')[0].toLowerCase(),
         size: 'Small',
@@ -505,6 +515,8 @@ function savedCreatureToStatBlock(
     traits: creature.traits || [],
     actions: creature.actions || [],
     reactions: creature.reactions || [],
+    bonusActions: creature.bonusActions || [],
+    lairActions: creature.lairActions || [],
     cr: creature.cr || '0',
     type: creature.type,
     size: creature.size,
