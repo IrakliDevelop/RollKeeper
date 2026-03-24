@@ -161,3 +161,47 @@ export function generateBannerFileName(
   }
   return `${campaignCode}-${timestamp}.${extension}`;
 }
+
+/**
+ * Upload an NPC portrait image to S3
+ */
+export async function uploadNpcPortraitToS3(
+  file: Buffer,
+  fileName: string,
+  contentType: string
+): Promise<string> {
+  const key = `npc-portraits/${fileName}`;
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    Body: file,
+    ContentType: contentType,
+  });
+
+  try {
+    await s3Client.send(command);
+    const url = `https://${BUCKET_NAME}.s3.${AWS_S3_REGION}.amazonaws.com/${key}`;
+    return url;
+  } catch (error) {
+    console.error('Error uploading NPC portrait to S3:', error);
+    throw new Error('Failed to upload NPC portrait to S3');
+  }
+}
+
+/**
+ * Generate a unique filename for an NPC portrait
+ */
+export function generateNpcPortraitFileName(
+  npcId: string,
+  originalName: string
+): string {
+  const timestamp = Date.now();
+  const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+  let extension = originalName.split('.').pop() || '';
+  extension = extension.toLowerCase();
+  if (!allowedExtensions.includes(extension)) {
+    extension = 'jpg';
+  }
+  return `${npcId}-${timestamp}.${extension}`;
+}
