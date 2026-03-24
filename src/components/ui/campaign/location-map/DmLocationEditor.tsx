@@ -13,7 +13,6 @@ import {
   X,
 } from 'lucide-react';
 import { FieldNotesCanvas as Canvas } from '@fieldnotes/react';
-import type { CanvasElement } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
 import DmLocationToolbar from './DmLocationToolbar';
 import { useDmLocationEditor } from './DmLocationEditor.hooks';

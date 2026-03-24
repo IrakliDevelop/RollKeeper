@@ -242,6 +242,8 @@ export function useDmLocationEditor(
         try {
           vp.loadJSON(location.canvasState);
           setElementCount(vp.store.count);
+          // Clear stale localStorage data after successful load
+          autoSave.clear();
         } catch {
           // Corrupt state — start fresh
           _initializeBackground(
@@ -487,13 +489,22 @@ export function useDmLocationEditor(
         },
       };
 
-      await fetch(`/api/campaign/${campaignCode}/locations/${location.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        `/api/campaign/${campaignCode}/locations/${location.id}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error(`Sync failed with status ${res.status}`);
+      }
 
       onSyncToPlayers();
+    } catch (error) {
+      console.error('Failed to sync location to players:', error);
     } finally {
       setSyncing(false);
     }
