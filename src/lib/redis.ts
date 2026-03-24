@@ -48,6 +48,14 @@ export function campaignEffectsKey(code: string, playerId: string): string {
   return `campaign:${code}:effects:${playerId}`;
 }
 
+export function campaignLocationsKey(code: string): string {
+  return `campaign:${code}:locations`;
+}
+
+export function campaignLocationKey(code: string, locationId: string): string {
+  return `campaign:${code}:location:${locationId}`;
+}
+
 export async function refreshCampaignTTL(
   redis: Redis,
   code: string
@@ -55,6 +63,7 @@ export async function refreshCampaignTTL(
   await Promise.all([
     redis.expire(campaignKey(code), SLIDING_TTL_SECONDS),
     redis.expire(campaignPlayersKey(code), SLIDING_TTL_SECONDS),
+    redis.expire(campaignLocationsKey(code), SLIDING_TTL_SECONDS),
   ]);
 }
 
