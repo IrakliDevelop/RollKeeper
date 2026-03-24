@@ -82,6 +82,10 @@ export function NPCDetailDialog({
   const [activeTab, setActiveTab] = useState<DetailTab>('stats');
   const [showFullImage, setShowFullImage] = useState(false);
 
+  React.useEffect(() => {
+    if (!open) setShowFullImage(false);
+  }, [open]);
+
   if (!npc) return null;
 
   const statBlock = npc.monsterStatBlock;
