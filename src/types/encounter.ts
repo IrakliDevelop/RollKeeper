@@ -163,15 +163,26 @@ export interface Encounter {
 
 export interface CampaignNPC {
   id: string;
+  campaignCode: string;
   name: string;
   description?: string;
 
-  // Basic stats
+  // Core combat stats
   armorClass: number;
   maxHp: number;
   speed: string;
 
-  // Optional stats
+  // Full stat block (from bestiary import or manual entry)
+  monsterStatBlock?: MonsterStatBlock;
+  bestiarySourceId?: string;
+
+  // Lore (DM-written HTML from rich text editor)
+  loreHtml?: string;
+
+  // Portrait (S3 URL)
+  avatarUrl?: string;
+
+  // Legacy fields (backward compat, superseded by monsterStatBlock when present)
   abilityScores?: {
     str: number;
     dex: number;
@@ -180,15 +191,9 @@ export interface CampaignNPC {
     wis: number;
     cha: number;
   };
-
-  // Optional abilities
   traits?: string[];
   actions?: string[];
 
-  // Visual
-  avatarUrl?: string;
-
-  // Metadata
   createdAt: string;
   updatedAt: string;
 }
