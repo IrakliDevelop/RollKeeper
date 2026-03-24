@@ -46,11 +46,11 @@ export interface SavedCreature {
   languages?: string;
   cr?: string;
   // Abilities
-  traits?: Array<{ name: string; text: string }>;
-  actions?: Array<{ name: string; text: string }>;
-  reactions?: Array<{ name: string; text: string }>;
-  bonusActions?: Array<{ name: string; text: string }>;
-  lairActions?: Array<{ name: string; text: string }>;
+  traits?: Array<{ name: string; text: string; uses?: number }>;
+  actions?: Array<{ name: string; text: string; uses?: number }>;
+  reactions?: Array<{ name: string; text: string; uses?: number }>;
+  bonusActions?: Array<{ name: string; text: string; uses?: number }>;
+  lairActions?: Array<{ name: string; text: string; uses?: number }>;
   // Metadata
   createdAt: string;
   updatedAt: string;

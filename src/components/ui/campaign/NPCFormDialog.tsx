@@ -25,11 +25,15 @@ import { CompactRichTextEditor } from '@/components/ui/forms/CompactRichTextEdit
 import { Badge } from '@/components/ui/layout/badge';
 import { CampaignNPC, MonsterStatBlock } from '@/types/encounter';
 import { ProcessedMonster, CREATURE_TYPES, SIZES } from '@/types/bestiary';
-import { buildMonsterStatBlock } from '@/utils/encounterConverter';
+import {
+  buildMonsterStatBlock,
+  parseRechargeFromName,
+} from '@/utils/encounterConverter';
 
 interface NamedText {
   name: string;
   text: string;
+  uses?: number;
 }
 
 interface NPCFormDialogProps {
@@ -336,10 +340,15 @@ export function NPCFormDialog({
     setSenses(sb.senses);
     setLanguages(sb.languages);
     setCr(sb.cr);
-    setTraits(sb.traits.map(t => ({ ...t })));
-    setActions(sb.actions.map(a => ({ ...a })));
-    setBonusActions(sb.bonusActions.map(b => ({ ...b })));
-    setReactions(sb.reactions.map(r => ({ ...r })));
+    const autoUses = (entry: { name: string; text: string; uses?: number }) => {
+      if (entry.uses !== undefined) return { ...entry };
+      const parsed = parseRechargeFromName(entry.name);
+      return parsed.maxUses ? { ...entry, uses: parsed.maxUses } : { ...entry };
+    };
+    setTraits(sb.traits.map(autoUses));
+    setActions(sb.actions.map(autoUses));
+    setBonusActions(sb.bonusActions.map(autoUses));
+    setReactions(sb.reactions.map(autoUses));
     setLairActions([]);
     setBestiarySourceId(monster.id);
     setBestiarySourceName(monster.name);
@@ -900,6 +909,14 @@ function AbilityListEditor({
     onChange(updated);
   };
 
+  const handleUsesChange = (index: number, value: string) => {
+    const num = value === '' ? undefined : parseInt(value, 10);
+    const updated = items.map((item, i) =>
+      i === index ? { ...item, uses: num } : item
+    );
+    onChange(updated);
+  };
+
   const handleRemove = (index: number) => {
     onChange(items.filter((_, i) => i !== index));
   };
@@ -931,6 +948,15 @@ function AbilityListEditor({
                   onChange={e => handleUpdate(index, 'name', e.target.value)}
                   placeholder={`${label.slice(0, -1)} name`}
                   className="flex-1"
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  value={item.uses ?? ''}
+                  onChange={e => handleUsesChange(index, e.target.value)}
+                  placeholder="Uses"
+                  className="w-18"
+                  title="Uses per day (leave empty for unlimited)"
                 />
                 <button
                   onClick={() => handleRemove(index)}
