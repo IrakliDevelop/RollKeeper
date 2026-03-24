@@ -29,6 +29,11 @@ export function useLocationSync(
   const lastActivityRef = useRef<number>(Date.now());
   const isPausedRef = useRef(false);
 
+  // Cache: locationId → { updatedAt, data }
+  const cacheRef = useRef<
+    Map<string, { updatedAt: string; data: SyncedLocation }>
+  >(new Map());
+
   const isIdle = useCallback(() => {
     return Date.now() - lastActivityRef.current > IDLE_TIMEOUT_MS;
   }, []);
@@ -55,18 +60,36 @@ export function useLocationSync(
   const fetchLocationState = useCallback(
     async (id: string): Promise<SyncedLocation | null> => {
       if (!campaignCode) return null;
+
+      // Check if we have a cached version and if it's still fresh
+      const cached = cacheRef.current.get(id);
+      const metadata = locations.find(l => l.id === id);
+
+      if (cached && metadata && cached.updatedAt === metadata.updatedAt) {
+        return cached.data;
+      }
+
       try {
         const res = await fetch(
           `/api/campaign/${campaignCode}/locations/${id}`
         );
         if (!res.ok) return null;
         const data = await res.json();
-        return data.location ?? null;
+        const location: SyncedLocation | null = data.location ?? null;
+
+        if (location) {
+          cacheRef.current.set(id, {
+            updatedAt: location.updatedAt,
+            data: location,
+          });
+        }
+
+        return location;
       } catch {
         return null;
       }
     },
-    [campaignCode]
+    [campaignCode, locations]
   );
 
   // Track user activity to detect idle

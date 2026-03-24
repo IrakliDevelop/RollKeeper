@@ -4,8 +4,6 @@ import {
   Loader2,
   Layers,
   Plus,
-  ChevronUp,
-  ChevronDown,
   Eye,
   EyeOff,
   Lock,
@@ -71,7 +69,12 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     layersPanelOpen,
     setLayersPanelOpen,
     gridEnabled,
-    handleToggleGrid,
+    gridType,
+    gridCellSize,
+    gridColor,
+    gridOpacity,
+    handleSetGridType,
+    handleUpdateGridSettings,
     selectedElementId,
     isDmOnly,
     handleToggleDmOnly,
@@ -79,6 +82,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     canRedo,
     elementCount,
     syncing,
+    hasUnsyncedChanges,
+    lastSyncedAt,
     imageUploading,
     handleReady,
     handleToolChange,
@@ -87,6 +92,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handleDeleteSelected,
     handleClear,
     handleSyncToPlayers,
+    handleDownloadExport,
     handleImageFileSelect,
   } = useDmLocationEditor(props);
 
@@ -116,7 +122,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     activeTool === 'shape';
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Hidden file input for image upload */}
       <input
         ref={fileInputRef}
@@ -137,9 +143,17 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
         onDelete={handleDeleteSelected}
         onClear={handleClear}
         gridEnabled={gridEnabled}
-        onToggleGrid={handleToggleGrid}
+        gridType={gridType}
+        gridCellSize={gridCellSize}
+        gridColor={gridColor}
+        gridOpacity={gridOpacity}
+        onSetGridType={handleSetGridType}
+        onUpdateGridSettings={handleUpdateGridSettings}
         onSyncToPlayers={handleSyncToPlayers}
+        onDownloadExport={handleDownloadExport}
         syncing={syncing}
+        hasUnsyncedChanges={hasUnsyncedChanges}
+        lastSyncedAt={lastSyncedAt}
         selectedElementId={selectedElementId}
         isDmOnly={isDmOnly}
         onToggleDmOnly={handleToggleDmOnly}
@@ -320,14 +334,25 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
       )}
 
       {/* Canvas + layers panel */}
-      <div className="relative flex flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {/* Canvas */}
         <div className="flex-1 overflow-hidden">
           <Canvas
             ref={canvasRef}
             tools={tools}
+            defaultTool="hand"
+            options={{
+              background: {
+                pattern: 'dots',
+                color: '#cbd5e1',
+                spacing: 24,
+                dotRadius: 1,
+              },
+              camera: { minZoom: 0.1, maxZoom: 5 },
+            }}
             onReady={handleReady}
             className="h-full w-full"
+            style={{ minHeight: 0 }}
           />
         </div>
 
@@ -359,10 +384,9 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             </div>
 
             <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-1.5">
-              {[...layers].reverse().map((layer, reverseIdx) => {
+              {[...layers].reverse().map(layer => {
                 const vp = canvasRef.current?.viewport;
                 const isActive = layer.id === activeLayerId;
-                const realIdx = layers.length - 1 - reverseIdx;
 
                 return (
                   <div
@@ -417,31 +441,19 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                       {layer.name}
                     </span>
 
-                    {/* Reorder */}
-                    <div className="flex shrink-0 flex-col">
+                    {/* Delete layer (only if more than one layer) */}
+                    {layers.length > 1 && (
                       <button
                         onClick={e => {
                           e.stopPropagation();
-                          vp?.layerManager.reorderLayer(layer.id, realIdx + 1);
+                          vp?.layerManager.removeLayer(layer.id);
                         }}
-                        className="text-muted hover:text-body disabled:opacity-30"
-                        disabled={realIdx === layers.length - 1}
-                        title="Move up"
+                        className="text-muted hover:text-accent-red-text shrink-0"
+                        title="Delete layer"
                       >
-                        <ChevronUp size={10} />
+                        <X size={11} />
                       </button>
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          vp?.layerManager.reorderLayer(layer.id, realIdx - 1);
-                        }}
-                        className="text-muted hover:text-body disabled:opacity-30"
-                        disabled={realIdx === 0}
-                        title="Move down"
-                      >
-                        <ChevronDown size={10} />
-                      </button>
-                    </div>
+                    )}
                   </div>
                 );
               })}

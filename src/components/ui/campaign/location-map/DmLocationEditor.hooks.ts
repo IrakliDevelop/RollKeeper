@@ -70,7 +70,11 @@ export interface DmLocationEditorState {
 
   // Grid
   gridEnabled: boolean;
-  handleToggleGrid: () => void;
+  gridType: 'square' | 'hex';
+  gridCellSize: number;
+  gridColor: string;
+  gridOpacity: number;
+  handleSetGridType: (type: 'square' | 'hex' | 'off') => void;
   handleUpdateGridSettings: (settings: Partial<GridSettings>) => void;
 
   // DM-only
@@ -92,9 +96,14 @@ export interface DmLocationEditorState {
   imageUploading: boolean;
   setImageUploading: (v: boolean) => void;
 
+  // Sync status
+  hasUnsyncedChanges: boolean;
+  lastSyncedAt: string | null;
+
   // Handlers
   handleReady: (vp: Viewport) => void;
   handleToolChange: (name: string) => void;
+  handleDownloadExport: () => Promise<void>;
   handleUndo: () => void;
   handleRedo: () => void;
   handleDeleteSelected: () => void;
@@ -134,10 +143,22 @@ export function useDmLocationEditor(
   // Layer state
   const [layers, setLayers] = useState<Layer[]>([]);
   const [activeLayerId, setActiveLayerId] = useState('');
-  const [layersPanelOpen, setLayersPanelOpen] = useState(false);
+  const [layersPanelOpen, setLayersPanelOpen] = useState(true);
 
   // Grid state
   const [gridEnabled, setGridEnabled] = useState(location.gridEnabled);
+  const [gridType, setGridType] = useState<'square' | 'hex'>(
+    location.gridSettings?.gridType ?? 'hex'
+  );
+  const [gridCellSize, setGridCellSize] = useState(
+    location.gridSettings?.cellSize ?? 50
+  );
+  const [gridColor, setGridColor] = useState(
+    location.gridSettings?.strokeColor ?? '#94a3b8'
+  );
+  const [gridOpacity, setGridOpacity] = useState(
+    location.gridSettings?.opacity ?? 0.5
+  );
 
   // DM-only state — pull from store
   const storeGetLocation = useLocationStore(s => s.getLocation);
@@ -164,6 +185,10 @@ export function useDmLocationEditor(
   // Loading states
   const [syncing, setSyncing] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
+
+  // Sync status
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(true);
 
   // Build tools once — no PencilTool or EraserTool for the location editor
   const tools = useMemo<Tool[]>(
@@ -261,18 +286,14 @@ export function useDmLocationEditor(
       autoSaveRef.current = autoSave;
 
       // Wire autosave to also call onSave so parent can persist to store
-      vp.store.on('add', () => {
+      const saveAndMarkDirty = () => {
         const json = vp.exportJSON();
         onSave(json);
-      });
-      vp.store.on('remove', () => {
-        const json = vp.exportJSON();
-        onSave(json);
-      });
-      vp.store.on('update', () => {
-        const json = vp.exportJSON();
-        onSave(json);
-      });
+        setHasUnsyncedChanges(true);
+      };
+      vp.store.on('add', saveAndMarkDirty);
+      vp.store.on('remove', saveAndMarkDirty);
+      vp.store.on('update', saveAndMarkDirty);
     },
     [location, onSave]
   );
@@ -283,13 +304,59 @@ export function useDmLocationEditor(
     mapImageSize: { w: number; h: number }
   ) {
     if (!mapImageUrl) return;
-    vp.addImage(mapImageUrl, { x: 0, y: 0 }, mapImageSize);
-    // Lock the base layer so the background image stays in place
-    const baseLayer = vp.layerManager.getLayers()[0];
-    if (baseLayer) {
-      vp.layerManager.setLayerLocked(baseLayer.id, true);
-    }
-    setElementCount(vp.store.count);
+    // Pre-load the image so the SDK has it in the browser cache before rendering
+    const setupCanvas = () => {
+      vp.addImage(mapImageUrl, { x: 0, y: 0 }, mapImageSize);
+      // Lock the image element itself so arrows won't bind to it
+      const allElements = vp.store.getAll();
+      const bgImage = allElements[allElements.length - 1];
+      if (bgImage) {
+        vp.store.update(bgImage.id, { locked: true });
+      }
+      // Lock the base layer so the background image stays in place
+      const baseLayer = vp.layerManager.getLayers()[0];
+      if (baseLayer) {
+        baseLayer.name = 'Map Background';
+        vp.layerManager.setLayerLocked(baseLayer.id, true);
+      }
+      // Create an annotation layer for the DM to draw on
+      const annotationLayer = vp.layerManager.createLayer('Annotations');
+      vp.layerManager.setActiveLayer(annotationLayer.id);
+      setElementCount(vp.store.count);
+      // Center camera on the map image — moveTo sets the top-left of
+      // the viewport in world coords, so offset by half the screen size
+      const screenW = vp.domLayer.clientWidth;
+      const screenH = vp.domLayer.clientHeight;
+      vp.camera.setZoom(1);
+      vp.camera.moveTo(
+        mapImageSize.w / 2 - screenW / 2,
+        mapImageSize.h / 2 - screenH / 2
+      );
+      vp.requestRender();
+    };
+
+    const setupFallbackLayers = () => {
+      const baseLayer = vp.layerManager.getLayers()[0];
+      if (baseLayer) {
+        baseLayer.name = 'Map Background';
+      }
+      const annotationLayer = vp.layerManager.createLayer('Annotations');
+      vp.layerManager.setActiveLayer(annotationLayer.id);
+    };
+
+    // Try loading with CORS first so exportImage can access pixels.
+    // If CORS fails, retry without — the image still displays on
+    // the canvas, but PNG export will fall back to JSON sync.
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = setupCanvas;
+    img.onerror = () => {
+      const retry = new window.Image();
+      retry.onload = setupCanvas;
+      retry.onerror = setupFallbackLayers;
+      retry.src = mapImageUrl;
+    };
+    img.src = mapImageUrl;
   }
 
   // Cleanup autosave on unmount
@@ -351,51 +418,74 @@ export function useDmLocationEditor(
     [getVp]
   );
 
-  const handleToggleGrid = useCallback(() => {
-    const vp = getVp();
-    if (!vp) return;
+  const handleSetGridType = useCallback(
+    (type: 'square' | 'hex' | 'off') => {
+      const vp = getVp();
+      if (!vp) return;
 
-    if (gridEnabled) {
-      vp.removeGrid();
-      setGridEnabled(false);
-      storeUpdateLocation(campaignCode, location.id, { gridEnabled: false });
-    } else {
-      const gs = location.gridSettings;
-      vp.addGrid({
-        gridType: gs?.gridType ?? 'square',
-        hexOrientation: gs?.hexOrientation,
-        cellSize: gs?.cellSize ?? 50,
-        strokeColor: gs?.strokeColor ?? '#94a3b8',
-        strokeWidth: gs?.strokeWidth ?? 1,
-        opacity: gs?.opacity ?? 0.5,
-      });
+      // Always remove existing grid first
+      if (gridEnabled) {
+        vp.removeGrid();
+      }
+
+      if (type === 'off') {
+        setGridEnabled(false);
+        storeUpdateLocation(campaignCode, location.id, {
+          gridEnabled: false,
+        });
+        return;
+      }
+
+      const settings = {
+        gridType: type,
+        hexOrientation: type === 'hex' ? ('pointy' as const) : undefined,
+        cellSize: gridCellSize,
+        strokeColor: gridColor,
+        strokeWidth: 1,
+        opacity: gridOpacity,
+      };
+      vp.addGrid(settings);
       setGridEnabled(true);
-      storeUpdateLocation(campaignCode, location.id, { gridEnabled: true });
-    }
-  }, [
-    gridEnabled,
-    getVp,
-    campaignCode,
-    location.id,
-    location.gridSettings,
-    storeUpdateLocation,
-  ]);
+      setGridType(type);
+      storeUpdateLocation(campaignCode, location.id, {
+        gridEnabled: true,
+        gridSettings: {
+          ...settings,
+          hexOrientation: settings.hexOrientation ?? 'pointy',
+        },
+      });
+    },
+    [
+      gridEnabled,
+      getVp,
+      campaignCode,
+      location.id,
+      location.gridSettings,
+      storeUpdateLocation,
+    ]
+  );
 
   const handleUpdateGridSettings = useCallback(
     (settings: Partial<GridSettings>) => {
       const vp = getVp();
       if (!vp || !gridEnabled) return;
 
-      const currentGs = location.gridSettings ?? {
-        gridType: 'square',
-        cellSize: 50,
-        strokeColor: '#94a3b8',
+      const currentGs: GridSettings = {
+        gridType,
+        cellSize: gridCellSize,
+        strokeColor: gridColor,
         strokeWidth: 1,
-        opacity: 0.5,
+        opacity: gridOpacity,
       };
 
       const updatedSettings = { ...currentGs, ...settings };
       vp.updateGrid(updatedSettings);
+
+      // Sync local state
+      if (settings.cellSize != null) setGridCellSize(settings.cellSize);
+      if (settings.strokeColor != null) setGridColor(settings.strokeColor);
+      if (settings.opacity != null) setGridOpacity(settings.opacity);
+
       storeUpdateLocation(campaignCode, location.id, {
         gridSettings: updatedSettings,
       });
@@ -403,7 +493,10 @@ export function useDmLocationEditor(
     [
       getVp,
       gridEnabled,
-      location.gridSettings,
+      gridType,
+      gridCellSize,
+      gridColor,
+      gridOpacity,
       campaignCode,
       location.id,
       storeUpdateLocation,
@@ -457,23 +550,60 @@ export function useDmLocationEditor(
     setSyncing(true);
 
     try {
-      const json = vp.exportJSON();
-      const parsed = JSON.parse(json) as {
-        elements: Array<{ id: string }>;
-        [key: string]: unknown;
-      };
-
-      // Filter out DM-only elements
+      // Export canvas as PNG, filtering out DM-only elements
       const currentDmOnly =
         storeGetLocation(campaignCode, location.id)?.dmOnlyElements ?? {};
-      const filteredElements = parsed.elements.filter(
-        (el: { id: string }) => !currentDmOnly[el.id]
-      );
 
-      const filteredState = JSON.stringify({
-        ...parsed,
-        elements: filteredElements,
-      });
+      // Try image export first, fall back to JSON if it fails (e.g. CORS)
+      let snapshotUrl: string | undefined;
+      let filteredState = '';
+
+      let blob: Blob | null = null;
+      try {
+        blob = await vp.exportImage({
+          scale: 2,
+          padding: 0,
+          filter: (el: { id: string }) => !currentDmOnly[el.id],
+        });
+      } catch (error) {
+        console.warn('Failed to export image:', error);
+        // exportImage can throw on tainted canvas (cross-origin images
+        // without CORS). Fall through to JSON fallback.
+      }
+
+      if (blob) {
+        // Upload PNG to S3
+        const assetId = `location-${location.id}-${Date.now()}`;
+        const formData = new FormData();
+        formData.append('file', blob, `${assetId}.png`);
+        formData.append('assetId', assetId);
+
+        const uploadRes = await fetch('/api/assets/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (uploadRes.ok) {
+          const data = (await uploadRes.json()) as { url: string };
+          snapshotUrl = data.url;
+        }
+      }
+
+      // Fall back to JSON canvas state if image export didn't work
+      if (!snapshotUrl) {
+        const json = vp.exportJSON();
+        const parsed = JSON.parse(json) as {
+          elements: Array<{ id: string }>;
+          [key: string]: unknown;
+        };
+        const filteredElements = parsed.elements.filter(
+          (el: { id: string }) => !currentDmOnly[el.id]
+        );
+        filteredState = JSON.stringify({
+          ...parsed,
+          elements: filteredElements,
+        });
+      }
 
       const payload = {
         dmId,
@@ -482,6 +612,7 @@ export function useDmLocationEditor(
           name: location.name,
           mapImageUrl: location.mapImageUrl,
           mapImageSize: location.mapImageSize,
+          snapshotUrl,
           canvasState: filteredState,
           gridEnabled,
           gridSettings: location.gridSettings,
@@ -502,6 +633,8 @@ export function useDmLocationEditor(
         throw new Error(`Sync failed with status ${res.status}`);
       }
 
+      setLastSyncedAt(new Date().toISOString());
+      setHasUnsyncedChanges(false);
       onSyncToPlayers();
     } catch (error) {
       console.error('Failed to sync location to players:', error);
@@ -517,6 +650,32 @@ export function useDmLocationEditor(
     storeGetLocation,
     onSyncToPlayers,
   ]);
+
+  const handleDownloadExport = useCallback(async () => {
+    const vp = getVp();
+    if (!vp) return;
+    const currentDmOnly =
+      storeGetLocation(campaignCode, location.id)?.dmOnlyElements ?? {};
+    try {
+      const blob = await vp.exportImage({
+        scale: 2,
+        padding: 0,
+        filter: (el: { id: string }) => !currentDmOnly[el.id],
+      });
+      if (!blob) {
+        console.warn('Export returned null');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${location.name || 'map'}-export.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed:', err);
+    }
+  }, [getVp, campaignCode, location.id, location.name, storeGetLocation]);
 
   const handleImageFileSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -603,7 +762,11 @@ export function useDmLocationEditor(
     layersPanelOpen,
     setLayersPanelOpen,
     gridEnabled,
-    handleToggleGrid,
+    gridType,
+    gridCellSize,
+    gridColor,
+    gridOpacity,
+    handleSetGridType,
     handleUpdateGridSettings,
     dmOnlyElements,
     selectedElementId,
@@ -614,6 +777,8 @@ export function useDmLocationEditor(
     elementCount,
     zoom,
     syncing,
+    hasUnsyncedChanges,
+    lastSyncedAt,
     imageUploading,
     setImageUploading,
     handleReady,
@@ -623,6 +788,7 @@ export function useDmLocationEditor(
     handleDeleteSelected,
     handleClear,
     handleSyncToPlayers,
+    handleDownloadExport,
     handleImageFileSelect,
   };
 }

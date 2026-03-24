@@ -35,7 +35,8 @@ export interface SyncedLocation {
   name: string;
   mapImageUrl: string;
   mapImageSize: { w: number; h: number };
-  canvasState: string; // filtered — no dmOnly elements
+  snapshotUrl?: string; // Rendered PNG of the canvas (no dmOnly elements)
+  canvasState: string; // filtered — no dmOnly elements (legacy, empty when snapshot used)
   gridEnabled: boolean;
   gridSettings?: GridSettings;
   updatedAt: string;

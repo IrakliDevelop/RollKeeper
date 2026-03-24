@@ -49,18 +49,13 @@ export default function LocationEditorPage() {
     });
   }
 
-  async function handleSyncToPlayers() {
-    try {
-      await fetch(`/api/campaign/${code}/locations/${id}/sync`, {
-        method: 'POST',
-      });
-    } catch {
-      // sync errors are non-critical; the editor toolbar handles UI feedback
-    }
+  function handleSyncToPlayers() {
+    // The editor's internal hook handles the actual sync POST.
+    // This callback fires after a successful sync for any page-level side effects.
   }
 
   return (
-    <div className="bg-surface flex min-h-screen flex-col">
+    <div className="bg-surface flex h-screen flex-col overflow-hidden">
       <header className="border-divider bg-surface-secondary border-b shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
@@ -86,7 +81,7 @@ export default function LocationEditorPage() {
         </div>
       </header>
 
-      <main className="flex flex-1 flex-col overflow-hidden">
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <DmLocationEditor
           location={location}
           campaignCode={code}

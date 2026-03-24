@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
-const MAX_FILE_SIZE_MB = 10;
-const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+import {
+  MAX_ASSET_UPLOAD_SIZE_BYTES,
+  MAX_ASSET_UPLOAD_SIZE_MB,
+} from '@/utils/constants';
 
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
@@ -59,9 +61,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
+    if (file.size > MAX_ASSET_UPLOAD_SIZE_BYTES) {
       return NextResponse.json(
-        { error: `File size must be less than ${MAX_FILE_SIZE_MB}MB` },
+        { error: `File size must be less than ${MAX_ASSET_UPLOAD_SIZE_MB}MB` },
         { status: 400 }
       );
     }

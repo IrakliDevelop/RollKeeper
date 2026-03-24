@@ -26,7 +26,7 @@ export default function CampaignLocationsPage() {
   const router = useRouter();
   const code = params.code as string;
   const hasHydrated = useHydration();
-  const { getCampaign } = useDmStore();
+  const { getCampaign, dmId } = useDmStore();
   const campaign = getCampaign(code);
   const { getLocations, addLocation, removeLocation } = useLocationStore();
 
@@ -151,7 +151,7 @@ export default function CampaignLocationsPage() {
                     <DialogTitle>New Location</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleSubmit}>
-                    <DialogBody className="flex flex-col gap-4">
+                    <DialogBody className="flex flex-col gap-4 px-6 pt-4">
                       <div>
                         <label className="text-body mb-1.5 block text-sm font-medium">
                           Location Name
@@ -168,16 +168,47 @@ export default function CampaignLocationsPage() {
                         <label className="text-body mb-1.5 block text-sm font-medium">
                           Map Image
                         </label>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          required
-                          onChange={e =>
-                            setMapFile(e.target.files?.[0] ?? null)
-                          }
-                          className="text-body border-divider bg-surface w-full cursor-pointer rounded-md border px-3 py-2 text-sm file:mr-3 file:cursor-pointer file:rounded file:border-0 file:bg-transparent file:text-sm file:font-medium"
-                        />
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`border-divider bg-surface hover:border-body flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6 transition-colors ${
+                            mapFile ? 'border-accent-emerald-border' : ''
+                          }`}
+                        >
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            required
+                            onChange={e =>
+                              setMapFile(e.target.files?.[0] ?? null)
+                            }
+                            className="hidden"
+                          />
+                          {mapFile ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <Map
+                                size={24}
+                                className="text-accent-emerald-text"
+                              />
+                              <span className="text-body text-sm font-medium">
+                                {mapFile.name}
+                              </span>
+                              <span className="text-muted text-xs">
+                                Click to change
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center gap-1">
+                              <Plus size={24} className="text-muted" />
+                              <span className="text-body text-sm font-medium">
+                                Choose an image
+                              </span>
+                              <span className="text-muted text-xs">
+                                PNG, JPG, or WebP
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       {uploadError && (
                         <p className="text-accent-red-text text-sm">
@@ -185,7 +216,7 @@ export default function CampaignLocationsPage() {
                         </p>
                       )}
                     </DialogBody>
-                    <DialogFooter>
+                    <DialogFooter className="mt-4">
                       <Button
                         type="button"
                         variant="ghost"
@@ -227,7 +258,17 @@ export default function CampaignLocationsPage() {
                 key={location.id}
                 location={location}
                 campaignCode={code}
-                onDelete={id => removeLocation(code, id)}
+                onDelete={id => {
+                  removeLocation(code, id);
+                  // Also remove from Redis so players no longer see it
+                  fetch(`/api/campaign/${code}/locations/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dmId }),
+                  }).catch(() => {
+                    // Best-effort — local delete already happened
+                  });
+                }}
               />
             ))}
           </div>
