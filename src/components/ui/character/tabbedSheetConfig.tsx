@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Angry } from 'lucide-react';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { PlayerCalendarView } from '@/components/ui/calendar/PlayerCalendarView';
+import PlayerLocationView from '@/components/ui/campaign/location-map/PlayerLocationView';
 import ConditionsDiseasesManager from '@/components/ui/game/ConditionsDiseasesManager';
 import TemporaryBuffsManager from '@/components/ui/game/TemporaryBuffsManager';
 import DefensesAndSenses from '@/components/ui/game/DefensesAndSenses';
@@ -223,6 +224,7 @@ export interface TabbedSheetConfigParams {
   calendarDays?: number | null;
   campaignCode?: string;
   customCounter?: { label: string; value: number } | null;
+  locationCount?: number;
 }
 
 export function createTabbedSheetConfig(
@@ -517,6 +519,29 @@ export function createTabbedSheetConfig(
       ),
     },
   ];
+
+  // Tab 9: Map (conditional — only shown when campaign has at least one synced location)
+  if (params.locationCount && params.locationCount > 0) {
+    tabs.push({
+      id: 'map',
+      label: 'Map',
+      icon: '🗺️',
+      content: (
+        <ErrorBoundary
+          fallback={
+            <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+              <p className="text-muted">Unable to load map</p>
+            </div>
+          }
+        >
+          <PlayerLocationView
+            characterId={character.id}
+            campaignCode={params.campaignCode}
+          />
+        </ErrorBoundary>
+      ),
+    });
+  }
 
   return tabs;
 }
