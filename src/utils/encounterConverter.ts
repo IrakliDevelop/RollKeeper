@@ -16,10 +16,11 @@ function generateId(): string {
  * Examples: "Fire Breath {@recharge 5}" → rechargeOn: 5
  *           "Animate Chains (Recharges after a Short or Long Rest)" → restType: 'short'
  */
-function parseRechargeFromName(name: string): {
+export function parseRechargeFromName(name: string): {
   cleanName: string;
   usageType: MonsterAbility['usageType'];
   rechargeOn?: number;
+  maxUses?: number;
   restType?: 'short' | 'long';
 } {
   // {@recharge N} pattern
@@ -54,12 +55,13 @@ function parseRechargeFromName(name: string): {
     };
   }
 
-  // "(X/Day)" pattern
-  const perDayMatch = name.match(/\((\d+)\/Day\)/i);
+  // "(X/Day)" pattern — also handles "(X/Day, or Y/Day in Lair)" variants
+  const perDayMatch = name.match(/\((\d+)\/Day(?:[^)]*)?\)/i);
   if (perDayMatch) {
     return {
       cleanName: name.replace(perDayMatch[0], '').trim(),
       usageType: 'per-day',
+      maxUses: parseInt(perDayMatch[1], 10),
     };
   }
 
@@ -69,54 +71,74 @@ function parseRechargeFromName(name: string): {
 function buildMonsterAbilities(monster: ProcessedMonster): MonsterAbility[] {
   const abilities: MonsterAbility[] = [];
 
-  // Process traits with recharge or per-day
-  for (const trait of monster.traits ?? []) {
-    const parsed = parseRechargeFromName(trait.name);
+  const sources = [
+    ...(monster.traits ?? []),
+    ...(monster.actions ?? []),
+    ...(monster.bonusActions ?? []),
+  ];
+
+  for (const entry of sources) {
+    const parsed = parseRechargeFromName(entry.name);
     if (parsed.usageType !== 'unlimited') {
       abilities.push({
         id: generateId(),
         name: parsed.cleanName,
-        description: trait.text,
+        description: entry.text,
         usageType: parsed.usageType,
         rechargeOn: parsed.rechargeOn,
-        maxUses: parsed.usageType === 'per-day' ? 1 : undefined,
+        maxUses: parsed.maxUses,
         usedUses: 0,
         restType: parsed.restType,
       });
     }
   }
 
-  // Process actions with recharge or per-day
-  for (const action of monster.actions ?? []) {
-    const parsed = parseRechargeFromName(action.name);
-    if (parsed.usageType !== 'unlimited') {
-      abilities.push({
-        id: generateId(),
-        name: parsed.cleanName,
-        description: action.text,
-        usageType: parsed.usageType,
-        rechargeOn: parsed.rechargeOn,
-        maxUses: parsed.usageType === 'per-day' ? 1 : undefined,
-        usedUses: 0,
-        restType: parsed.restType,
-      });
-    }
-  }
+  return abilities;
+}
 
-  // Process bonus actions with recharge or per-day
-  for (const bonus of monster.bonusActions ?? []) {
-    const parsed = parseRechargeFromName(bonus.name);
-    if (parsed.usageType !== 'unlimited') {
+/**
+ * Build trackable abilities from a MonsterStatBlock (for NPCs added to combat).
+ * Uses the optional `uses` field on entries as manual override, falls back to name parsing.
+ */
+export function buildAbilitiesFromStatBlock(
+  statBlock: MonsterStatBlock
+): MonsterAbility[] {
+  const abilities: MonsterAbility[] = [];
+
+  const sources = [
+    ...(statBlock.traits ?? []),
+    ...(statBlock.actions ?? []),
+    ...(statBlock.bonusActions ?? []),
+  ];
+
+  for (const entry of sources) {
+    if (entry.uses !== undefined && entry.uses > 0) {
+      const parsed = parseRechargeFromName(entry.name);
       abilities.push({
         id: generateId(),
         name: parsed.cleanName,
-        description: bonus.text,
-        usageType: parsed.usageType,
+        description: entry.text,
+        usageType:
+          parsed.usageType !== 'unlimited' ? parsed.usageType : 'per-day',
         rechargeOn: parsed.rechargeOn,
-        maxUses: parsed.usageType === 'per-day' ? 1 : undefined,
+        maxUses: entry.uses,
         usedUses: 0,
         restType: parsed.restType,
       });
+    } else {
+      const parsed = parseRechargeFromName(entry.name);
+      if (parsed.usageType !== 'unlimited') {
+        abilities.push({
+          id: generateId(),
+          name: parsed.cleanName,
+          description: entry.text,
+          usageType: parsed.usageType,
+          rechargeOn: parsed.rechargeOn,
+          maxUses: parsed.maxUses,
+          usedUses: 0,
+          restType: parsed.restType,
+        });
+      }
     }
   }
 

@@ -59,11 +59,11 @@ export interface MonsterStatBlock {
   conditionImmunities: string[];
   senses: string;
   passivePerception: number;
-  traits: Array<{ name: string; text: string }>;
-  actions: Array<{ name: string; text: string }>;
-  reactions: Array<{ name: string; text: string }>;
-  bonusActions: Array<{ name: string; text: string }>;
-  lairActions: Array<{ name: string; text: string }>;
+  traits: Array<{ name: string; text: string; uses?: number }>;
+  actions: Array<{ name: string; text: string; uses?: number }>;
+  reactions: Array<{ name: string; text: string; uses?: number }>;
+  bonusActions: Array<{ name: string; text: string; uses?: number }>;
+  lairActions: Array<{ name: string; text: string; uses?: number }>;
   cr: string;
   type: string;
   size: string;

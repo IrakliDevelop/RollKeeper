@@ -29,6 +29,7 @@ const CREATURE_TYPES = [
 interface NamedText {
   name: string;
   text: string;
+  uses?: number;
 }
 
 interface CreatureCreatorFormProps {
@@ -402,6 +403,14 @@ function AbilityListEditor({
     onChange(updated);
   };
 
+  const handleUsesChange = (index: number, value: string) => {
+    const num = value === '' ? undefined : parseInt(value, 10);
+    const updated = items.map((item, i) =>
+      i === index ? { ...item, uses: num } : item
+    );
+    onChange(updated);
+  };
+
   const handleRemove = (index: number) => {
     onChange(items.filter((_, i) => i !== index));
   };
@@ -433,6 +442,15 @@ function AbilityListEditor({
                   onChange={e => handleUpdate(index, 'name', e.target.value)}
                   placeholder={`${label.slice(0, -1)} name`}
                   className="flex-1"
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  value={item.uses ?? ''}
+                  onChange={e => handleUsesChange(index, e.target.value)}
+                  placeholder="Uses"
+                  className="w-18"
+                  title="Uses per day (leave empty for unlimited)"
                 />
                 <button
                   onClick={() => handleRemove(index)}

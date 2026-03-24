@@ -23,7 +23,10 @@ import { Input } from '@/components/ui/forms/input';
 import { EncounterEntity, CampaignNPC } from '@/types/encounter';
 import { ProcessedMonster } from '@/types/bestiary';
 import { useNPCStore } from '@/store/npcStore';
-import { monsterToEncounterEntity } from '@/utils/encounterConverter';
+import {
+  monsterToEncounterEntity,
+  buildAbilitiesFromStatBlock,
+} from '@/utils/encounterConverter';
 
 interface AddEntityDialogProps {
   open: boolean;
@@ -184,6 +187,10 @@ export function AddEntityDialog({
   };
 
   const handleAddNpc = (npc: CampaignNPC) => {
+    const abilities = npc.monsterStatBlock
+      ? buildAbilitiesFromStatBlock(npc.monsterStatBlock)
+      : [];
+
     onAddEntity({
       type: 'npc',
       name: npc.name,
@@ -200,6 +207,7 @@ export function AddEntityDialog({
       conditions: [],
       isHidden: false,
       monsterStatBlock: npc.monsterStatBlock,
+      abilities,
     });
   };
 

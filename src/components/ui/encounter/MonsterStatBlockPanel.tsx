@@ -38,7 +38,7 @@ function TraitBlock({
   title: string;
   entries: Array<{ name: string; text: string }>;
 }) {
-  if (entries.length === 0) return null;
+  if (!entries || entries.length === 0) return null;
   return (
     <div className="space-y-2">
       <h5 className="text-heading border-divider border-b pb-1 text-xs font-semibold tracking-wider uppercase">
