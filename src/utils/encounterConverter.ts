@@ -178,7 +178,7 @@ function abilityModifier(score: number): number {
 /**
  * Build a full stat block from a ProcessedMonster for display in the encounter tracker.
  */
-function buildMonsterStatBlock(
+export function buildMonsterStatBlock(
   monster: ProcessedMonster,
   overrides?: MonsterOverrides
 ): MonsterStatBlock {
