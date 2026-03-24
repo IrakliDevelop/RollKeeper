@@ -95,7 +95,8 @@ export function AddEntityDialog({
   const [npcSpeed, setNpcSpeed] = useState('30 ft.');
   const [npcDescription, setNpcDescription] = useState('');
 
-  const { npcs: storedNpcs, createNPC, deleteNPC } = useNPCStore();
+  const { getNPCsForCampaign, createNPC, deleteNPC } = useNPCStore();
+  const storedNpcs = campaignCode ? getNPCsForCampaign(campaignCode) : [];
   const allNpcs = [
     ...npcs,
     ...storedNpcs.filter(sn => !npcs.some(n => n.id === sn.id)),
@@ -187,21 +188,24 @@ export function AddEntityDialog({
       type: 'npc',
       name: npc.name,
       initiative: null,
-      initiativeModifier: npc.abilityScores
-        ? Math.floor((npc.abilityScores.dex - 10) / 2)
-        : 0,
+      initiativeModifier: npc.monsterStatBlock
+        ? Math.floor((npc.monsterStatBlock.dex - 10) / 2)
+        : npc.abilityScores
+          ? Math.floor((npc.abilityScores.dex - 10) / 2)
+          : 0,
       currentHp: npc.maxHp,
       maxHp: npc.maxHp,
       tempHp: 0,
       armorClass: npc.armorClass,
       conditions: [],
       isHidden: false,
+      monsterStatBlock: npc.monsterStatBlock,
     });
   };
 
   const handleCreateNpc = () => {
-    if (!npcName.trim()) return;
-    createNPC({
+    if (!npcName.trim() || !campaignCode) return;
+    createNPC(campaignCode, {
       name: npcName.trim(),
       maxHp: parseInt(npcHp) || 10,
       armorClass: parseInt(npcAc) || 10,
@@ -567,8 +571,11 @@ export function AddEntityDialog({
                         </button>
                         <button
                           onClick={() => {
-                            if (confirm(`Delete "${npc.name}"?`))
-                              deleteNPC(npc.id);
+                            if (
+                              confirm(`Delete "${npc.name}"?`) &&
+                              campaignCode
+                            )
+                              deleteNPC(campaignCode, npc.id);
                           }}
                           className="text-muted hover:text-accent-red-text shrink-0 p-2.5 transition-colors"
                           title="Delete NPC"

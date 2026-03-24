@@ -62,7 +62,8 @@ export function EncounterView({
     setInitiative,
   } = useEncounterStore();
 
-  const { npcs } = useNPCStore();
+  const { getNPCsForCampaign } = useNPCStore();
+  const npcs = getNPCsForCampaign(campaignCode);
 
   const { dmId, adjustPlayerCounter, setPlayerColor } = useDmStore();
   const campaign = useDmStore(state => state.getCampaign(campaignCode));
