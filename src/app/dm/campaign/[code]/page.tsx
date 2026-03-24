@@ -404,7 +404,7 @@ export default function CampaignViewPage() {
         )}
 
         {/* NPC Management — always visible */}
-        {!loading && !error && <NPCSection />}
+        {!loading && !error && <NPCSection campaignCode={code} />}
       </main>
 
       {/* Player Detail Dialog */}
