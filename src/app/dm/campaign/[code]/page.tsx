@@ -15,6 +15,7 @@ import {
   CalendarDays,
   MessageSquare,
   Map,
+  LayoutGrid,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -183,6 +184,18 @@ export default function CampaignViewPage() {
                   Encounters
                 </Button>
               </Link>
+              <Link
+                href={`/dm/campaign/${code}/battlemaps`}
+                className="lg:hidden"
+              >
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<LayoutGrid size={16} />}
+                >
+                  Battle Maps
+                </Button>
+              </Link>
               <ThemeToggle showSystemOption />
             </div>
           </div>
@@ -263,6 +276,17 @@ export default function CampaignViewPage() {
             <Swords size={28} className="text-accent-red-text-muted" />
             <div className="text-accent-red-text text-sm font-semibold">
               Encounters
+            </div>
+          </Link>
+
+          {/* Battle Maps */}
+          <Link
+            href={`/dm/campaign/${code}/battlemaps`}
+            className="border-accent-orange-border bg-accent-orange-bg hidden flex-col items-center justify-center gap-2 rounded-lg border-2 px-4 py-4 transition-colors hover:shadow-md lg:flex lg:w-44"
+          >
+            <LayoutGrid size={28} className="text-accent-orange-text-muted" />
+            <div className="text-accent-orange-text text-sm font-semibold">
+              Battle Maps
             </div>
           </Link>
         </div>

@@ -2,12 +2,23 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Swords, Trash2, Clock, Users, Play, Square } from 'lucide-react';
+import {
+  Plus,
+  Swords,
+  Trash2,
+  Clock,
+  Users,
+  Play,
+  Square,
+  Map as MapIcon,
+} from 'lucide-react';
 import { useEncounterStore } from '@/store/encounterStore';
+import { useBattleMapStore } from '@/store/battleMapStore';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
 import { Encounter } from '@/types/encounter';
+import type { BattleMap } from '@/types/battlemap';
 
 interface EncounterListProps {
   campaignCode: string;
@@ -15,6 +26,16 @@ interface EncounterListProps {
 
 export function EncounterList({ campaignCode }: EncounterListProps) {
   const { encounters, createEncounter, deleteEncounter } = useEncounterStore();
+  const battleMaps = useBattleMapStore(s => s.getBattleMaps)(campaignCode);
+  const encounterToMap = React.useMemo(() => {
+    const map = new globalThis.Map<string, BattleMap>();
+    for (const bm of battleMaps) {
+      for (const eid of bm.linkedEncounterIds) {
+        map.set(eid, bm);
+      }
+    }
+    return map;
+  }, [battleMaps]);
   const [newName, setNewName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
@@ -91,6 +112,7 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
               key={encounter.id}
               encounter={encounter}
               campaignCode={campaignCode}
+              linkedBattleMap={encounterToMap.get(encounter.id)}
               onDelete={() => {
                 if (
                   confirm(`Delete "${encounter.name}"? This cannot be undone.`)
@@ -109,10 +131,12 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
 function EncounterCard({
   encounter,
   campaignCode,
+  linkedBattleMap,
   onDelete,
 }: {
   encounter: Encounter;
   campaignCode: string;
+  linkedBattleMap?: BattleMap;
   onDelete: () => void;
 }) {
   const monsterCount = encounter.entities.filter(
@@ -176,6 +200,17 @@ function EncounterCard({
           <Clock size={10} />
           {new Date(encounter.updatedAt).toLocaleDateString()}
         </div>
+
+        {linkedBattleMap && (
+          <Link
+            href={`/dm/campaign/${campaignCode}/battlemaps/${linkedBattleMap.id}`}
+            onClick={e => e.stopPropagation()}
+            className="text-accent-orange-text hover:text-accent-orange-text mb-3 flex items-center gap-1.5 text-xs font-medium"
+          >
+            <MapIcon size={12} />
+            Map: {linkedBattleMap.name}
+          </Link>
+        )}
 
         <div className="flex items-center gap-2">
           <Link
