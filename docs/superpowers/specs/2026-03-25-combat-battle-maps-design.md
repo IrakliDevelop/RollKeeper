@@ -1,7 +1,7 @@
 # Combat Battle Maps — Design Spec
 
 **Date:** 2026-03-25
-**Status:** Draft
+**Status:** Approved
 
 ## Overview
 
@@ -37,6 +37,17 @@ interface BattleMap {
 }
 ```
 
+### BattleMapMetadata (lightweight reference for lists)
+
+```typescript
+interface BattleMapMetadata {
+  id: string;
+  name: string;
+  mapImageUrl: string;
+  updatedAt: string;
+}
+```
+
 ### SyncedBattleMap (sent to TV display via BroadcastChannel + Redis)
 
 ```typescript
@@ -55,8 +66,17 @@ interface SyncedBattleMap {
 
 ### Storage
 
-- **Local:** `battleMapStore` — Zustand + localStorage (key: `rollkeeper-battlemap-data`), campaign-scoped, same structure as `locationStore`
+- **Local:** `battleMapStore` — Zustand + localStorage (key: `rollkeeper-battlemap-data`), campaign-scoped, same nested structure as `locationStore`
 - **Remote:** Redis key `campaign:{code}:battlemap:{id}` — stores `SyncedBattleMap` JSON, sliding TTL (same as locations)
+- **Redis key helpers** (add to `src/lib/redis.ts`):
+  - `campaignBattleMapsKey(code)` — metadata list key
+  - `campaignBattleMapKey(code, id)` — individual battle map key
+  - Update `refreshCampaignTTL()` to include battle map keys
+- **Types file:** `src/types/battlemap.ts` — all three interfaces above plus reuse `GridSettings` from `location.ts`
+
+### Prerequisites
+
+- Add `getEncountersByCampaign(campaignCode: string): Encounter[]` to `encounterStore` — filters encounters by `campaignCode` field. Required for the encounter linking dropdown.
 
 ## Routes
 
