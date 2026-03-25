@@ -17,6 +17,7 @@ import {
 } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useLocationStore } from '@/store/locationStore';
+import { useBattleMapStore } from '@/store/battleMapStore';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
 import type { GridSettings } from '@/types/location';
 
@@ -26,6 +27,9 @@ type ViewportHistoryAccess = {
 };
 
 export interface DmLocationEditorState {
+  // Mode
+  mode: 'location' | 'battlemap';
+
   // Refs
   canvasRef: React.RefObject<FieldNotesCanvasRef | null>;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
@@ -112,12 +116,14 @@ export interface DmLocationEditorState {
   handleImageFileSelect: (
     e: React.ChangeEvent<HTMLInputElement>
   ) => Promise<void>;
+  handleOpenTvDisplay: () => void;
 }
 
 export function useDmLocationEditor(
   props: DmLocationEditorProps
 ): DmLocationEditorState {
   const { location, campaignCode, dmId, onSave, onSyncToPlayers } = props;
+  const mode = props.mode ?? 'location';
 
   const canvasRef = useRef<FieldNotesCanvasRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -160,10 +166,22 @@ export function useDmLocationEditor(
     location.gridSettings?.opacity ?? 0.5
   );
 
-  // DM-only state — pull from store
-  const storeGetLocation = useLocationStore(s => s.getLocation);
-  const storeToggleDmOnly = useLocationStore(s => s.toggleDmOnly);
-  const storeUpdateLocation = useLocationStore(s => s.updateLocation);
+  // DM-only state — pull from store (call both hooks unconditionally for React rules)
+  const locationStoreGetLoc = useLocationStore(s => s.getLocation);
+  const locationStoreToggle = useLocationStore(s => s.toggleDmOnly);
+  const locationStoreUpdate = useLocationStore(s => s.updateLocation);
+
+  const battleMapStoreGetBm = useBattleMapStore(s => s.getBattleMap);
+  const battleMapStoreToggle = useBattleMapStore(s => s.toggleDmOnly);
+  const battleMapStoreUpdate = useBattleMapStore(s => s.updateBattleMap);
+
+  // Pick the right store based on mode
+  const storeGetLocation =
+    mode === 'battlemap' ? battleMapStoreGetBm : locationStoreGetLoc;
+  const storeToggleDmOnly =
+    mode === 'battlemap' ? battleMapStoreToggle : locationStoreToggle;
+  const storeUpdateLocation =
+    mode === 'battlemap' ? battleMapStoreUpdate : locationStoreUpdate;
   const currentLocation = storeGetLocation(campaignCode, location.id);
   const dmOnlyElements = currentLocation?.dmOnlyElements ?? {};
   const [selectedElementId, setSelectedElementId] = useState<string | null>(
@@ -609,29 +627,47 @@ export function useDmLocationEditor(
         });
       }
 
-      const payload = {
-        dmId,
-        location: {
-          id: location.id,
-          name: location.name,
-          mapImageUrl: location.mapImageUrl,
-          mapImageSize: location.mapImageSize,
-          snapshotUrl,
-          canvasState: filteredState,
-          gridEnabled,
-          gridSettings: location.gridSettings,
-          updatedAt: new Date().toISOString(),
-        },
+      const syncData = {
+        id: location.id,
+        name: location.name,
+        mapImageUrl: location.mapImageUrl,
+        mapImageSize: location.mapImageSize,
+        snapshotUrl,
+        canvasState: filteredState,
+        gridEnabled,
+        gridSettings: location.gridSettings,
+        updatedAt: new Date().toISOString(),
       };
 
-      const res = await fetch(
-        `/api/campaign/${campaignCode}/locations/${location.id}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+      // In battlemap mode, broadcast locally for instant TV display updates
+      if (mode === 'battlemap') {
+        try {
+          const channel = new BroadcastChannel(
+            `battlemap:${campaignCode}:${location.id}`
+          );
+          channel.postMessage(syncData);
+          channel.close();
+        } catch {
+          // BroadcastChannel not supported — Redis fallback handles it
         }
-      );
+      }
+
+      const payloadKey = mode === 'battlemap' ? 'battleMap' : 'location';
+      const payload = {
+        dmId,
+        [payloadKey]: syncData,
+      };
+
+      const endpoint =
+        mode === 'battlemap'
+          ? `/api/campaign/${campaignCode}/battlemaps/${location.id}`
+          : `/api/campaign/${campaignCode}/locations/${location.id}`;
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
       if (!res.ok) {
         throw new Error(`Sync failed with status ${res.status}`);
@@ -651,6 +687,7 @@ export function useDmLocationEditor(
     dmId,
     location,
     gridEnabled,
+    mode,
     storeGetLocation,
     onSyncToPlayers,
   ]);
@@ -736,7 +773,15 @@ export function useDmLocationEditor(
     [getVp]
   );
 
+  const handleOpenTvDisplay = useCallback(() => {
+    window.open(
+      `/dm/campaign/${campaignCode}/battlemaps/${location.id}/display`,
+      '_blank'
+    );
+  }, [campaignCode, location.id]);
+
   return {
+    mode,
     canvasRef,
     fileInputRef,
     tools,
@@ -794,5 +839,6 @@ export function useDmLocationEditor(
     handleSyncToPlayers,
     handleDownloadExport,
     handleImageFileSelect,
+    handleOpenTvDisplay,
   };
 }
