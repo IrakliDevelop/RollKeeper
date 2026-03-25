@@ -94,6 +94,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handleSyncToPlayers,
     handleDownloadExport,
     handleImageFileSelect,
+    mode,
+    handleOpenTvDisplay,
   } = useDmLocationEditor(props);
 
   // Determine the active primary color for the contextual color picker
@@ -157,6 +159,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
         selectedElementId={selectedElementId}
         isDmOnly={isDmOnly}
         onToggleDmOnly={handleToggleDmOnly}
+        mode={mode}
+        onOpenTvDisplay={handleOpenTvDisplay}
       />
 
       {/* Contextual options bar */}
