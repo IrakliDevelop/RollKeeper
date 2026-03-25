@@ -15,6 +15,9 @@ import { Button } from '@/components/ui/forms/button';
 import DmLocationToolbar from './DmLocationToolbar';
 import { useDmLocationEditor } from './DmLocationEditor.hooks';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
+import { useBattleMapStore } from '@/store/battleMapStore';
+import type { BattleMap } from '@/types/battlemap';
+import EncounterLinkingPanel from '../battle-map/EncounterLinkingPanel';
 
 const COLOR_SWATCHES = [
   '#334155',
@@ -39,6 +42,9 @@ const NOTE_TEXT_COLORS = [
 ];
 
 export default function DmLocationEditor(props: DmLocationEditorProps) {
+  const linkEncounter = useBattleMapStore(s => s.linkEncounter);
+  const unlinkEncounter = useBattleMapStore(s => s.unlinkEncounter);
+
   const {
     canvasRef,
     fileInputRef,
@@ -467,6 +473,21 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             <div className="border-divider text-muted border-t px-3 py-2 text-xs">
               {elementCount} element{elementCount !== 1 ? 's' : ''}
             </div>
+
+            {mode === 'battlemap' && (
+              <EncounterLinkingPanel
+                campaignCode={props.campaignCode}
+                linkedEncounterIds={
+                  (props.location as BattleMap).linkedEncounterIds ?? []
+                }
+                onLink={id =>
+                  linkEncounter(props.campaignCode, props.location.id, id)
+                }
+                onUnlink={id =>
+                  unlinkEncounter(props.campaignCode, props.location.id, id)
+                }
+              />
+            )}
           </div>
         )}
 
