@@ -10,6 +10,11 @@ import {
   BookOpen,
   ScrollText,
   X,
+  Package,
+  Plus,
+  Minus,
+  Scale,
+  Coins,
 } from 'lucide-react';
 import {
   Dialog,
@@ -20,10 +25,20 @@ import {
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
+import { Badge } from '@/components/ui/layout/badge';
 import { MonsterStatBlockPanel } from '@/components/ui/encounter/MonsterStatBlockPanel';
-import type { CampaignNPC } from '@/types/encounter';
+import { NPCStatBlockExport } from './NPCStatBlockExport';
+import {
+  ItemForm,
+  initialInventoryFormData,
+} from '@/components/ui/game/inventory/ItemForm';
+import type { InventoryFormData } from '@/components/ui/game/inventory/ItemForm';
+import { useItemsData } from '@/hooks/useItemsData';
+import { useMagicItemsData } from '@/hooks/useMagicItemsData';
+import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
+import { formatCurrencyFromCopper } from '@/utils/currency';
 
-type DetailTab = 'stats' | 'lore';
+type DetailTab = 'stats' | 'inventory' | 'lore';
 
 interface NPCDetailDialogProps {
   npc: CampaignNPC | null;
@@ -31,6 +46,7 @@ interface NPCDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   onEdit: (npc: CampaignNPC) => void;
   onDelete: (npc: CampaignNPC) => void;
+  onUpdateInventory?: (npcId: string, inventory: NPCInventoryItem[]) => void;
 }
 
 const ABILITY_LABELS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const;
@@ -72,19 +88,379 @@ function AbilityScoreGrid({
   );
 }
 
+function ExtraStatsBadges({ npc }: { npc: CampaignNPC }) {
+  const hasExtras =
+    npc.proficiencyBonus !== undefined ||
+    npc.hitDice !== undefined ||
+    npc.passivePerception !== undefined ||
+    npc.passiveInsight !== undefined ||
+    npc.passiveInvestigation !== undefined;
+
+  if (!hasExtras) return null;
+
+  const passiveParts: string[] = [];
+  if (npc.passivePerception !== undefined)
+    passiveParts.push(`PP ${npc.passivePerception}`);
+  if (npc.passiveInsight !== undefined)
+    passiveParts.push(`PI ${npc.passiveInsight}`);
+  if (npc.passiveInvestigation !== undefined)
+    passiveParts.push(`PIv ${npc.passiveInvestigation}`);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {npc.proficiencyBonus !== undefined && (
+        <span className="bg-surface-secondary text-muted rounded-full px-2.5 py-0.5 text-xs font-medium">
+          PB{' '}
+          <span className="text-heading font-semibold">
+            {npc.proficiencyBonus >= 0
+              ? `+${npc.proficiencyBonus}`
+              : `${npc.proficiencyBonus}`}
+          </span>
+        </span>
+      )}
+      {npc.hitDice !== undefined && (
+        <span className="bg-surface-secondary text-muted rounded-full px-2.5 py-0.5 text-xs font-medium">
+          HD{' '}
+          <span className="text-heading font-semibold">
+            {npc.hitDice.current}/{npc.hitDice.max} {npc.hitDice.dieType}
+          </span>
+        </span>
+      )}
+      {passiveParts.length > 0 && (
+        <span className="bg-surface-secondary text-muted rounded-full px-2.5 py-0.5 text-xs font-medium">
+          <span className="text-heading font-semibold">
+            {passiveParts.join(' · ')}
+          </span>
+        </span>
+      )}
+    </div>
+  );
+}
+
+const RARITY_VARIANTS: Record<
+  string,
+  'neutral' | 'info' | 'success' | 'warning' | 'danger'
+> = {
+  common: 'neutral',
+  uncommon: 'success',
+  rare: 'info',
+  'very rare': 'warning',
+  legendary: 'danger',
+  artifact: 'danger',
+};
+
+const CATEGORY_ICON: Record<string, string> = {
+  weapon: '⚔️',
+  armor: '🛡️',
+  tool: '🔧',
+  misc: '📦',
+  magic: '✨',
+  consumable: '🧪',
+  treasure: '💎',
+};
+
+const RARITY_BORDER: Record<string, string> = {
+  common: 'border-divider',
+  uncommon: 'border-accent-emerald-border',
+  rare: 'border-accent-blue-border',
+  'very rare': 'border-accent-purple-border',
+  legendary: 'border-accent-amber-border',
+  artifact: 'border-accent-red-border',
+};
+
+function InventoryItemCard({
+  item,
+  onRemove,
+  onClick,
+  onQuantityChange,
+}: {
+  item: NPCInventoryItem;
+  onRemove?: () => void;
+  onClick?: () => void;
+  onQuantityChange?: (quantity: number) => void;
+}) {
+  const borderClass =
+    (item.rarity && RARITY_BORDER[item.rarity]) || 'border-divider';
+  const icon = (item.category && CATEGORY_ICON[item.category]) || '📦';
+
+  return (
+    <div
+      className={`bg-surface-raised flex overflow-hidden rounded-lg border-2 ${borderClass} ${onClick ? 'cursor-pointer transition-shadow hover:shadow-md' : ''}`}
+      onClick={onClick}
+    >
+      {/* Full-height icon strip */}
+      <div className="bg-surface-secondary border-divider flex w-9 shrink-0 items-center justify-center self-stretch border-r-2 text-base">
+        {icon}
+      </div>
+      {/* Content */}
+      <div className="min-w-0 flex-1 px-2 py-1.5">
+        <div className="flex items-center justify-between gap-1">
+          <span
+            className="text-heading truncate text-xs font-bold"
+            title={item.name}
+          >
+            {item.name}
+          </span>
+          <div
+            className="flex shrink-0 items-center"
+            onClick={e => e.stopPropagation()}
+          >
+            {onRemove && (
+              <button
+                onClick={onRemove}
+                className="text-muted hover:text-accent-red-text p-0.5 transition-colors"
+                title="Remove"
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+        {/* Meta badges + quantity controls */}
+        <div
+          className="mt-0.5 flex flex-wrap items-center gap-1"
+          onClick={e => e.stopPropagation()}
+        >
+          {onQuantityChange ? (
+            <span className="bg-surface-secondary inline-flex items-center gap-0.5 rounded px-0.5 text-[10px] font-medium">
+              <button
+                onClick={() => onQuantityChange(Math.max(0, item.quantity - 1))}
+                className="text-muted hover:text-accent-red-text rounded p-0.5 transition-colors disabled:opacity-30"
+                disabled={item.quantity <= 0}
+                title="Decrease"
+              >
+                <Minus size={10} />
+              </button>
+              <span className="text-heading min-w-[1rem] text-center font-bold">
+                {item.quantity}
+              </span>
+              <button
+                onClick={() => onQuantityChange(item.quantity + 1)}
+                className="text-muted hover:text-accent-emerald-text rounded p-0.5 transition-colors"
+                title="Increase"
+              >
+                <Plus size={10} />
+              </button>
+            </span>
+          ) : item.quantity > 1 ? (
+            <span className="bg-surface-secondary text-muted rounded px-1 text-[10px] font-medium">
+              ×{item.quantity}
+            </span>
+          ) : null}
+          {item.rarity && item.rarity !== 'none' && (
+            <Badge
+              variant={RARITY_VARIANTS[item.rarity] || 'neutral'}
+              size="sm"
+            >
+              {item.rarity}
+            </Badge>
+          )}
+          {item.equipped && (
+            <Badge variant="success" size="sm">
+              Eq
+            </Badge>
+          )}
+          {item.weight !== undefined && (
+            <span className="text-faint text-[10px]">{item.weight}lb</span>
+          )}
+          {item.value !== undefined && (
+            <span className="text-faint text-[10px]">
+              {formatCurrencyFromCopper(item.value)}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NPCItemViewModal({
+  item,
+  onClose,
+}: {
+  item: NPCInventoryItem | null;
+  onClose: () => void;
+}) {
+  if (!item) return null;
+
+  const totalWeight = item.weight
+    ? parseFloat((item.weight * item.quantity).toFixed(2))
+    : undefined;
+  const totalValue = item.value
+    ? parseFloat((item.value * item.quantity).toFixed(2))
+    : undefined;
+
+  return (
+    <Dialog open={!!item} onOpenChange={open => !open && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5 text-purple-600" />
+            {item.name}
+            {item.equipped && (
+              <Badge variant="success" size="sm">
+                Equipped
+              </Badge>
+            )}
+          </DialogTitle>
+        </DialogHeader>
+
+        <DialogBody className="space-y-4">
+          {/* Rarity and Type */}
+          {(item.rarity || item.type) && (
+            <div className="flex flex-wrap gap-2">
+              {item.rarity && (
+                <Badge
+                  variant={RARITY_VARIANTS[item.rarity] || 'neutral'}
+                  size="md"
+                >
+                  {item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)}
+                </Badge>
+              )}
+              {item.type && (
+                <Badge variant="info" size="md">
+                  {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {/* Details Grid */}
+          <div className="bg-surface-secondary rounded-lg p-4">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              {item.category && (
+                <div>
+                  <span className="text-muted text-xs font-medium uppercase">
+                    Category
+                  </span>
+                  <p className="text-heading mt-0.5 font-medium capitalize">
+                    {item.category}
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <span className="text-muted text-xs font-medium uppercase">
+                  Quantity
+                </span>
+                <p className="text-heading mt-0.5 font-bold">{item.quantity}</p>
+              </div>
+
+              {item.weight !== undefined && (
+                <div>
+                  <span className="text-muted text-xs font-medium uppercase">
+                    Weight
+                  </span>
+                  <p className="text-heading mt-0.5 flex items-center gap-1 font-medium">
+                    <Scale className="h-3 w-3" />
+                    {item.weight} lbs each
+                    {item.quantity > 1 && totalWeight !== undefined && (
+                      <span className="text-muted">
+                        ({totalWeight} lbs total)
+                      </span>
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {item.value !== undefined && (
+                <div>
+                  <span className="text-muted text-xs font-medium uppercase">
+                    Value
+                  </span>
+                  <p className="text-heading mt-0.5 flex items-center gap-1 font-medium">
+                    <Coins className="h-3 w-3" />
+                    {formatCurrencyFromCopper(item.value)} each
+                    {item.quantity > 1 && totalValue !== undefined && (
+                      <span className="text-muted">
+                        ({formatCurrencyFromCopper(totalValue)} total)
+                      </span>
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Description */}
+          {item.description && (
+            <div>
+              <h4 className="text-heading mb-1.5 text-sm font-semibold">
+                Description
+              </h4>
+              <div
+                className="prose prose-sm text-body max-w-none leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: item.description }}
+              />
+            </div>
+          )}
+        </DialogBody>
+
+        <DialogFooter>
+          <Button onClick={onClose} variant="ghost" size="sm">
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function NPCDetailDialog({
   npc,
   open,
   onOpenChange,
   onEdit,
   onDelete,
+  onUpdateInventory,
 }: NPCDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('stats');
   const [showFullImage, setShowFullImage] = useState(false);
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [viewingItem, setViewingItem] = useState<NPCInventoryItem | null>(null);
+
+  const { items: dbItems, loading: dbItemsLoading } = useItemsData();
+  const { items: dbMagicItems } = useMagicItemsData();
 
   React.useEffect(() => {
-    if (!open) setShowFullImage(false);
+    if (!open) {
+      setShowFullImage(false);
+      setShowAddItem(false);
+      setViewingItem(null);
+    }
   }, [open]);
+
+  const handleAddItem = (data: InventoryFormData) => {
+    if (!npc || !onUpdateInventory) return;
+    const newItem: NPCInventoryItem = {
+      id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      name: data.name,
+      quantity: data.quantity,
+      category: data.category,
+      weight: data.weight,
+      value: data.value,
+      rarity: data.rarity,
+      description: data.description || undefined,
+      type: data.type,
+    };
+    const updated = [...(npc.inventory ?? []), newItem];
+    onUpdateInventory(npc.id, updated);
+    setShowAddItem(false);
+  };
+
+  const handleRemoveItem = (itemId: string) => {
+    if (!npc || !onUpdateInventory) return;
+    const updated = (npc.inventory ?? []).filter(i => i.id !== itemId);
+    onUpdateInventory(npc.id, updated);
+  };
+
+  const handleQuantityChange = (itemId: string, quantity: number) => {
+    if (!npc || !onUpdateInventory) return;
+    const updated = (npc.inventory ?? []).map(i =>
+      i.id === itemId ? { ...i, quantity } : i
+    );
+    onUpdateInventory(npc.id, updated);
+  };
 
   if (!npc) return null;
 
@@ -93,9 +469,28 @@ export function NPCDetailDialog({
     ? `${statBlock.size} ${statBlock.type}${statBlock.cr ? ` — CR ${statBlock.cr}` : ''}`
     : null;
 
+  const tabs: Array<{ key: DetailTab; icon: React.ReactNode; label: string }> =
+    [
+      {
+        key: 'stats',
+        icon: <ScrollText className="h-3.5 w-3.5" />,
+        label: 'Stat Block',
+      },
+      {
+        key: 'inventory',
+        icon: <Package className="h-3.5 w-3.5" />,
+        label: 'Inventory',
+      },
+      {
+        key: 'lore',
+        icon: <BookOpen className="h-3.5 w-3.5" />,
+        label: 'Lore',
+      },
+    ];
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <div className="flex items-start gap-4 pr-16">
             {npc.avatarUrl && (
@@ -164,37 +559,31 @@ export function NPCDetailDialog({
 
         {/* Tab bar */}
         <div className="bg-surface-secondary flex rounded-lg p-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab('stats')}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              activeTab === 'stats'
-                ? 'bg-surface-raised text-heading shadow-sm'
-                : 'text-muted hover:text-body'
-            }`}
-          >
-            <ScrollText className="h-3.5 w-3.5" />
-            Stat Block
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('lore')}
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              activeTab === 'lore'
-                ? 'bg-surface-raised text-heading shadow-sm'
-                : 'text-muted hover:text-body'
-            }`}
-          >
-            <BookOpen className="h-3.5 w-3.5" />
-            Lore
-          </button>
+          {tabs.map(tab => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === tab.key
+                  ? 'bg-surface-raised text-heading shadow-sm'
+                  : 'text-muted hover:text-body'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         <DialogBody>
           {activeTab === 'stats' && (
             <div className="space-y-4">
               {statBlock ? (
-                <MonsterStatBlockPanel statBlock={statBlock} />
+                <>
+                  <MonsterStatBlockPanel statBlock={statBlock} />
+                  <ExtraStatsBadges npc={npc} />
+                </>
               ) : (
                 <>
                   {/* Basic stats row */}
@@ -222,6 +611,8 @@ export function NPCDetailDialog({
                     </div>
                   </div>
 
+                  <ExtraStatsBadges npc={npc} />
+
                   {npc.abilityScores && (
                     <AbilityScoreGrid scores={npc.abilityScores} />
                   )}
@@ -230,6 +621,49 @@ export function NPCDetailDialog({
                     <p className="text-body text-sm">{npc.description}</p>
                   )}
                 </>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'inventory' && (
+            <div>
+              {npc.inventory && npc.inventory.length > 0 ? (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {npc.inventory.map(item => (
+                    <InventoryItemCard
+                      key={item.id}
+                      item={item}
+                      onClick={() => setViewingItem(item)}
+                      onRemove={
+                        onUpdateInventory
+                          ? () => handleRemoveItem(item.id)
+                          : undefined
+                      }
+                      onQuantityChange={
+                        onUpdateInventory
+                          ? qty => handleQuantityChange(item.id, qty)
+                          : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Package className="text-faint mb-3 h-10 w-10" />
+                  <p className="text-muted text-sm">No inventory items</p>
+                </div>
+              )}
+              {onUpdateInventory && (
+                <div className="mt-3">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowAddItem(true)}
+                  >
+                    <Plus className="mr-1.5 h-4 w-4" />
+                    Add Item
+                  </Button>
+                </div>
               )}
             </div>
           )}
@@ -262,21 +696,26 @@ export function NPCDetailDialog({
           )}
         </DialogBody>
 
-        <DialogFooter>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              onEdit(npc);
-              onOpenChange(false);
-            }}
-          >
-            <Edit3 className="mr-1.5 h-4 w-4" />
-            Edit
-          </Button>
-          <Button variant="danger" onClick={() => onDelete(npc)}>
-            <Trash2 className="mr-1.5 h-4 w-4" />
-            Delete
-          </Button>
+        <DialogFooter className="!flex-row !justify-between">
+          <div className="flex gap-2">
+            {statBlock && <NPCStatBlockExport npc={npc} />}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                onEdit(npc);
+                onOpenChange(false);
+              }}
+            >
+              <Edit3 className="mr-1.5 h-4 w-4" />
+              Edit
+            </Button>
+            <Button variant="danger" onClick={() => onDelete(npc)}>
+              <Trash2 className="mr-1.5 h-4 w-4" />
+              Delete
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
 
@@ -304,6 +743,25 @@ export function NPCDetailDialog({
           </p>
         </div>
       )}
+
+      {/* Stacked Item View modal */}
+      <NPCItemViewModal
+        item={viewingItem}
+        onClose={() => setViewingItem(null)}
+      />
+
+      {/* Stacked Add Item modal */}
+      <ItemForm
+        isOpen={showAddItem}
+        onClose={() => setShowAddItem(false)}
+        onSubmit={handleAddItem}
+        initialData={initialInventoryFormData}
+        availableLocations={[]}
+        isEditing={false}
+        databaseItems={dbItems}
+        databaseMagicItems={dbMagicItems}
+        itemsLoading={dbItemsLoading}
+      />
     </Dialog>
   );
 }

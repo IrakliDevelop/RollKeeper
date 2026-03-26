@@ -14,9 +14,9 @@ import {
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { Input } from '@/components/ui/forms/input';
-import { Textarea } from '@/components/ui/forms/textarea';
+import { CompactRichTextEditor } from '@/components/ui/forms/CompactRichTextEditor';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
-import { ProcessedItem } from '@/types/items';
+import { ProcessedItem, ProcessedMagicItem } from '@/types/items';
 import { ItemAutocomplete } from '@/components/ui/forms/ItemAutocomplete';
 import { convertProcessedItemToFormData } from '@/utils/itemConversion';
 
@@ -73,6 +73,7 @@ interface ItemFormProps {
   availableLocations: string[];
   isEditing: boolean;
   databaseItems?: ProcessedItem[];
+  databaseMagicItems?: ProcessedMagicItem[];
   itemsLoading?: boolean;
 }
 
@@ -97,6 +98,7 @@ export function ItemForm({
   availableLocations,
   isEditing,
   databaseItems = [],
+  databaseMagicItems,
   itemsLoading = false,
 }: ItemFormProps) {
   const [formData, setFormData] = useState<InventoryFormData>(initialData);
@@ -168,6 +170,7 @@ export function ItemForm({
               <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border-2 p-4">
                 <ItemAutocomplete
                   items={databaseItems}
+                  magicItems={databaseMagicItems}
                   onSelect={handleItemSelect}
                   loading={itemsLoading}
                   placeholder="Search D&D items to auto-fill..."
@@ -386,15 +389,18 @@ export function ItemForm({
                 />
               </div>
 
-              <Textarea
-                label="Description"
-                value={formData.description}
-                onChange={e =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                rows={3}
-                placeholder="Item description, properties, or notes..."
-              />
+              <div>
+                <label className="text-body mb-2 block text-sm font-medium">
+                  Description
+                </label>
+                <CompactRichTextEditor
+                  content={formData.description}
+                  onChange={value =>
+                    setFormData({ ...formData, description: value })
+                  }
+                  placeholder="Item description, properties, or notes..."
+                />
+              </div>
             </div>
 
             {/* Section: Tags */}

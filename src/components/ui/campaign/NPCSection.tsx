@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Image from 'next/image';
 import {
   Plus,
@@ -10,11 +10,18 @@ import {
   Heart,
   Footprints,
   Drama,
+  ChevronDown,
+  ChevronRight,
+  Search,
+  Tag,
+  Eye,
+  Lightbulb,
 } from 'lucide-react';
 import { useNPCStore } from '@/store/npcStore';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
-import { CampaignNPC } from '@/types/encounter';
+import { Input } from '@/components/ui/forms/input';
+import { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
 import { NPCFormDialog } from './NPCFormDialog';
 import { NPCDetailDialog } from './NPCDetailDialog';
 
@@ -29,6 +36,11 @@ export function NPCSection({ campaignCode }: NPCSectionProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingNpc, setEditingNpc] = useState<CampaignNPC | null>(null);
   const [selectedNpc, setSelectedNpc] = useState<CampaignNPC | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    new Set()
+  );
 
   const handleCreate = () => {
     setEditingNpc(null);
@@ -56,6 +68,98 @@ export function NPCSection({ campaignCode }: NPCSectionProps) {
       setSelectedNpc(null);
     }
   };
+
+  const handleUpdateInventory = (
+    npcId: string,
+    inventory: NPCInventoryItem[]
+  ) => {
+    updateNPC(campaignCode, npcId, { inventory });
+    // Update selectedNpc snapshot so the detail dialog reflects the change
+    setSelectedNpc(prev =>
+      prev && prev.id === npcId ? { ...prev, inventory } : prev
+    );
+  };
+
+  const handleTagToggle = (tag: string) => {
+    setActiveTags(prev => {
+      const next = new Set(prev);
+      if (next.has(tag)) {
+        next.delete(tag);
+      } else {
+        next.add(tag);
+      }
+      return next;
+    });
+  };
+
+  const handleGroupToggle = (groupName: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupName)) {
+        next.delete(groupName);
+      } else {
+        next.add(groupName);
+      }
+      return next;
+    });
+  };
+
+  // Collect all unique tags across all NPCs
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    npcs.forEach(npc => {
+      npc.tags?.forEach(tag => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  }, [npcs]);
+
+  // Filter NPCs by search query and active tags
+  const filteredNpcs = useMemo(() => {
+    return npcs.filter(npc => {
+      const matchesSearch =
+        searchQuery.trim() === '' ||
+        npc.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesTags =
+        activeTags.size === 0 ||
+        Array.from(activeTags).every(tag => npc.tags?.includes(tag));
+      return matchesSearch && matchesTags;
+    });
+  }, [npcs, searchQuery, activeTags]);
+
+  // Group filtered NPCs
+  const groups = useMemo(() => {
+    const groupMap = new Map<string, CampaignNPC[]>();
+    const ungrouped: CampaignNPC[] = [];
+
+    filteredNpcs.forEach(npc => {
+      if (npc.group) {
+        const existing = groupMap.get(npc.group) ?? [];
+        existing.push(npc);
+        groupMap.set(npc.group, existing);
+      } else {
+        ungrouped.push(npc);
+      }
+    });
+
+    const result: Array<{
+      name: string;
+      npcs: CampaignNPC[];
+      isUngrouped?: boolean;
+    }> = [];
+    groupMap.forEach((groupNpcs, name) => {
+      result.push({ name, npcs: groupNpcs });
+    });
+    result.sort((a, b) => a.name.localeCompare(b.name));
+
+    if (ungrouped.length > 0) {
+      result.push({ name: 'Ungrouped', npcs: ungrouped, isUngrouped: true });
+    }
+
+    return result;
+  }, [filteredNpcs]);
+
+  // Determine if we should show groups (any NPC has a group)
+  const hasAnyGroup = npcs.some(npc => !!npc.group);
 
   return (
     <div>
@@ -85,17 +189,108 @@ export function NPCSection({ campaignCode }: NPCSectionProps) {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {npcs.map(npc => (
-            <NPCCard
-              key={npc.id}
-              npc={npc}
-              onEdit={() => handleEdit(npc)}
-              onDelete={() => handleDelete(npc)}
-              onClick={() => setSelectedNpc(npc)}
+        <>
+          {/* Search bar */}
+          <div className="mb-3">
+            <Input
+              placeholder="Search NPCs…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              leftIcon={<Search size={14} />}
+              clearable
+              onClear={() => setSearchQuery('')}
+              size="sm"
             />
-          ))}
-        </div>
+          </div>
+
+          {/* Tag filter pills */}
+          {allTags.length > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-1.5">
+              <Tag size={13} className="text-faint shrink-0" />
+              {allTags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => handleTagToggle(tag)}
+                  className={[
+                    'rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
+                    activeTags.has(tag)
+                      ? 'bg-accent-purple-bg text-accent-purple-text border-accent-purple-border'
+                      : 'bg-surface-secondary text-muted border-divider hover:text-body hover:border-divider-strong',
+                  ].join(' ')}
+                >
+                  {tag}
+                </button>
+              ))}
+              {activeTags.size > 0 && (
+                <button
+                  onClick={() => setActiveTags(new Set())}
+                  className="text-faint hover:text-muted ml-1 text-xs underline"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+
+          {filteredNpcs.length === 0 ? (
+            <p className="text-faint py-6 text-center text-sm">
+              No NPCs match your filters.
+            </p>
+          ) : hasAnyGroup ? (
+            /* Grouped layout */
+            <div className="space-y-4">
+              {groups.map(group => (
+                <div key={group.name}>
+                  {/* Group header */}
+                  <button
+                    onClick={() => handleGroupToggle(group.name)}
+                    className="border-divider bg-surface-secondary hover:bg-surface-raised mb-2 flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors"
+                  >
+                    {collapsedGroups.has(group.name) ? (
+                      <ChevronRight size={15} className="text-muted shrink-0" />
+                    ) : (
+                      <ChevronDown size={15} className="text-muted shrink-0" />
+                    )}
+                    <span className="text-heading text-sm font-semibold">
+                      {group.isUngrouped ? 'Ungrouped' : group.name}
+                    </span>
+                    <Badge variant="neutral" size="sm">
+                      {group.npcs.length}
+                    </Badge>
+                  </button>
+
+                  {/* Group NPCs */}
+                  {!collapsedGroups.has(group.name) && (
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                      {group.npcs.map(npc => (
+                        <NPCCard
+                          key={npc.id}
+                          npc={npc}
+                          onEdit={() => handleEdit(npc)}
+                          onDelete={() => handleDelete(npc)}
+                          onClick={() => setSelectedNpc(npc)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Flat layout (no groups defined) */
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredNpcs.map(npc => (
+                <NPCCard
+                  key={npc.id}
+                  npc={npc}
+                  onEdit={() => handleEdit(npc)}
+                  onDelete={() => handleDelete(npc)}
+                  onClick={() => setSelectedNpc(npc)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <NPCFormDialog
@@ -103,6 +298,9 @@ export function NPCSection({ campaignCode }: NPCSectionProps) {
         onOpenChange={setDialogOpen}
         onSave={handleSave}
         editingNpc={editingNpc}
+        existingGroups={[
+          ...new Set(npcs.map(n => n.group).filter((g): g is string => !!g)),
+        ]}
       />
 
       <NPCDetailDialog
@@ -116,6 +314,7 @@ export function NPCSection({ campaignCode }: NPCSectionProps) {
           handleEdit(npc);
         }}
         onDelete={handleDelete}
+        onUpdateInventory={handleUpdateInventory}
       />
     </div>
   );
@@ -133,97 +332,342 @@ function NPCCard({
   onClick: () => void;
 }) {
   const stats = npc.monsterStatBlock;
+  const hasPortrait = !!npc.avatarUrl;
 
   return (
     <div
-      className="border-accent-purple-border bg-surface-raised cursor-pointer rounded-lg border-2 p-4 shadow-sm transition-shadow hover:shadow-md"
+      className="border-accent-purple-border bg-surface-raised cursor-pointer overflow-hidden rounded-lg border-2 shadow-sm transition-shadow hover:shadow-md"
       onClick={onClick}
     >
-      <div className="mb-2 flex items-start justify-between">
-        <div className="flex min-w-0 items-center gap-2.5">
-          {npc.avatarUrl && (
+      {hasPortrait ? (
+        /* Horizontal layout with tall portrait on the left */
+        <div className="flex">
+          {/* Portrait column */}
+          <div className="border-divider relative w-20 shrink-0 self-stretch border-r-2 sm:w-24">
             <Image
-              src={npc.avatarUrl}
+              src={npc.avatarUrl!}
               alt={npc.name}
-              width={40}
-              height={40}
-              className="shrink-0 rounded-full object-cover"
+              fill
+              className="object-cover object-top"
             />
-          )}
-          <div className="min-w-0">
-            <h3 className="text-heading truncate text-base font-semibold">
-              {npc.name}
-            </h3>
-            {stats && (
-              <p className="text-faint truncate text-xs">
-                {stats.size} {stats.type}
-              </p>
+          </div>
+
+          {/* Content column */}
+          <div className="min-w-0 flex-1 p-3">
+            {/* Header row */}
+            <div className="mb-2 flex items-start justify-between gap-1">
+              <div className="min-w-0">
+                <h3 className="text-heading truncate text-sm leading-tight font-semibold">
+                  {npc.name}
+                </h3>
+                {stats && (
+                  <p className="text-faint truncate text-[10px]">
+                    {stats.size} {stats.type}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-0.5">
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    onEdit();
+                  }}
+                  className="text-muted hover:text-body rounded p-1 transition-colors"
+                  title="Edit"
+                >
+                  <Edit3 size={13} />
+                </button>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
+                  className="text-muted hover:text-accent-red-text rounded p-1 transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+
+            {/* CR + Prof badges */}
+            <div className="mb-2 flex flex-wrap gap-1">
+              {stats?.cr != null && (
+                <Badge variant="outline" size="sm" className="text-[10px]">
+                  CR {stats.cr}
+                </Badge>
+              )}
+              {npc.proficiencyBonus != null && (
+                <Badge variant="neutral" size="sm" className="text-[10px]">
+                  Prof +{npc.proficiencyBonus}
+                </Badge>
+              )}
+            </div>
+
+            {/* HP / AC / Speed / PP */}
+            <div className="text-body mb-1 flex flex-wrap gap-2 text-xs">
+              <span className="flex items-center gap-0.5">
+                <Heart size={11} className="text-accent-red-text shrink-0" />
+                {npc.maxHp}
+              </span>
+              {npc.hitDice && (
+                <span className="text-faint text-[10px]">
+                  HD {npc.hitDice.max}
+                  {npc.hitDice.dieType}
+                </span>
+              )}
+              <span className="flex items-center gap-0.5">
+                <Shield size={11} className="text-accent-blue-text shrink-0" />
+                {npc.armorClass}
+              </span>
+              <span className="flex items-center gap-0.5">
+                <Footprints size={11} className="text-muted shrink-0" />
+                {npc.speed}
+              </span>
+            </div>
+
+            {/* Passive scores */}
+            {(npc.passivePerception != null ||
+              npc.passiveInsight != null ||
+              npc.passiveInvestigation != null) && (
+              <div className="bg-surface-secondary mb-1 flex items-center justify-between rounded-md px-2 py-1.5">
+                {npc.passivePerception != null && (
+                  <div
+                    className="flex items-center gap-1"
+                    title="Passive Perception"
+                  >
+                    <Eye size={11} className="text-accent-emerald-text" />
+                    <span className="text-muted text-[9px] tracking-wide uppercase">
+                      PP
+                    </span>
+                    <span className="text-heading text-xs font-bold">
+                      {npc.passivePerception}
+                    </span>
+                  </div>
+                )}
+                {npc.passivePerception != null &&
+                  npc.passiveInsight != null && (
+                    <div className="bg-divider mx-1 h-3 w-px" />
+                  )}
+                {npc.passiveInsight != null && (
+                  <div
+                    className="flex items-center gap-1"
+                    title="Passive Insight"
+                  >
+                    <Lightbulb size={11} className="text-accent-amber-text" />
+                    <span className="text-muted text-[9px] tracking-wide uppercase">
+                      PI
+                    </span>
+                    <span className="text-heading text-xs font-bold">
+                      {npc.passiveInsight}
+                    </span>
+                  </div>
+                )}
+                {(npc.passivePerception != null ||
+                  npc.passiveInsight != null) &&
+                  npc.passiveInvestigation != null && (
+                    <div className="bg-divider mx-1 h-3 w-px" />
+                  )}
+                {npc.passiveInvestigation != null && (
+                  <div
+                    className="flex items-center gap-1"
+                    title="Passive Investigation"
+                  >
+                    <Search size={11} className="text-accent-blue-text" />
+                    <span className="text-muted text-[9px] tracking-wide uppercase">
+                      PIv
+                    </span>
+                    <span className="text-heading text-xs font-bold">
+                      {npc.passiveInvestigation}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tags */}
+            {npc.tags && npc.tags.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {npc.tags.map(tag => (
+                  <span
+                    key={tag}
+                    className="bg-surface-secondary border-divider text-faint rounded-full border px-1.5 py-px text-[9px]"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {stats?.cr != null && (
-            <Badge variant="outline" className="mr-1 text-[10px]">
-              CR {stats.cr}
-            </Badge>
+      ) : (
+        /* Vertical layout (no portrait) */
+        <div className="p-4">
+          {/* Header */}
+          <div className="mb-2 flex items-start justify-between">
+            <div className="min-w-0">
+              <h3 className="text-heading truncate text-base font-semibold">
+                {npc.name}
+              </h3>
+              {stats && (
+                <p className="text-faint truncate text-xs">
+                  {stats.size} {stats.type}
+                </p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                className="text-muted hover:text-body rounded p-1 transition-colors"
+                title="Edit"
+              >
+                <Edit3 size={14} />
+              </button>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="text-muted hover:text-accent-red-text rounded p-1 transition-colors"
+                title="Delete"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* CR + Prof badges */}
+          <div className="mb-2 flex flex-wrap gap-1">
+            {stats?.cr != null && (
+              <Badge variant="outline" size="sm" className="text-[10px]">
+                CR {stats.cr}
+              </Badge>
+            )}
+            {npc.proficiencyBonus != null && (
+              <Badge variant="neutral" size="sm" className="text-[10px]">
+                Prof +{npc.proficiencyBonus}
+              </Badge>
+            )}
+          </div>
+
+          {npc.description && (
+            <p className="text-muted mb-3 line-clamp-2 text-sm">
+              {npc.description}
+            </p>
           )}
-          <button
-            onClick={e => {
-              e.stopPropagation();
-              onEdit();
-            }}
-            className="text-muted hover:text-body rounded p-1 transition-colors"
-            title="Edit"
-          >
-            <Edit3 size={14} />
-          </button>
-          <button
-            onClick={e => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="text-muted hover:text-accent-red-text rounded p-1 transition-colors"
-            title="Delete"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      </div>
 
-      {npc.description && (
-        <p className="text-muted mb-3 line-clamp-2 text-sm">
-          {npc.description}
-        </p>
-      )}
+          {/* HP / AC / Speed */}
+          <div className="text-body flex flex-wrap gap-3 text-sm">
+            <span className="flex items-center gap-1">
+              <Heart size={12} className="text-accent-red-text" />
+              {npc.maxHp} HP
+            </span>
+            {npc.hitDice && (
+              <span className="text-faint text-xs">
+                HD {npc.hitDice.max}
+                {npc.hitDice.dieType}
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <Shield size={12} className="text-accent-blue-text" />
+              AC {npc.armorClass}
+            </span>
+            <span className="flex items-center gap-1">
+              <Footprints size={12} className="text-muted" />
+              {npc.speed}
+            </span>
+          </div>
 
-      <div className="text-body flex flex-wrap gap-3 text-sm">
-        <span className="flex items-center gap-1">
-          <Heart size={12} className="text-accent-red-text" />
-          {npc.maxHp} HP
-        </span>
-        <span className="flex items-center gap-1">
-          <Shield size={12} className="text-accent-blue-text" />
-          AC {npc.armorClass}
-        </span>
-        <span className="flex items-center gap-1">
-          <Footprints size={12} className="text-muted" />
-          {npc.speed}
-        </span>
-      </div>
+          {/* Passive scores */}
+          {(npc.passivePerception != null ||
+            npc.passiveInsight != null ||
+            npc.passiveInvestigation != null) && (
+            <div className="bg-surface-secondary mt-2 flex items-center justify-between rounded-lg px-3 py-2">
+              {npc.passivePerception != null && (
+                <div
+                  className="flex items-center gap-1.5"
+                  title="Passive Perception"
+                >
+                  <Eye size={13} className="text-accent-emerald-text" />
+                  <span className="text-muted text-[10px] tracking-wide uppercase">
+                    Perception
+                  </span>
+                  <span className="text-heading text-sm font-bold">
+                    {npc.passivePerception}
+                  </span>
+                </div>
+              )}
+              {npc.passivePerception != null && npc.passiveInsight != null && (
+                <div className="bg-divider h-4 w-px" />
+              )}
+              {npc.passiveInsight != null && (
+                <div
+                  className="flex items-center gap-1.5"
+                  title="Passive Insight"
+                >
+                  <Lightbulb size={13} className="text-accent-amber-text" />
+                  <span className="text-muted text-[10px] tracking-wide uppercase">
+                    Insight
+                  </span>
+                  <span className="text-heading text-sm font-bold">
+                    {npc.passiveInsight}
+                  </span>
+                </div>
+              )}
+              {(npc.passivePerception != null || npc.passiveInsight != null) &&
+                npc.passiveInvestigation != null && (
+                  <div className="bg-divider h-4 w-px" />
+                )}
+              {npc.passiveInvestigation != null && (
+                <div
+                  className="flex items-center gap-1.5"
+                  title="Passive Investigation"
+                >
+                  <Search size={13} className="text-accent-blue-text" />
+                  <span className="text-muted text-[10px] tracking-wide uppercase">
+                    Investigation
+                  </span>
+                  <span className="text-heading text-sm font-bold">
+                    {npc.passiveInvestigation}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
-      {npc.abilityScores && (
-        <div className="mt-3 grid grid-cols-6 gap-1">
-          {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(
-            ability => (
-              <div key={ability} className="text-center">
-                <span className="text-faint block text-[9px] font-medium uppercase">
-                  {ability}
+          {/* Ability scores */}
+          {npc.abilityScores && (
+            <div className="mt-3 grid grid-cols-6 gap-1">
+              {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(
+                ability => (
+                  <div key={ability} className="text-center">
+                    <span className="text-faint block text-[9px] font-medium uppercase">
+                      {ability}
+                    </span>
+                    <span className="text-body text-xs font-medium">
+                      {npc.abilityScores![ability]}
+                    </span>
+                  </div>
+                )
+              )}
+            </div>
+          )}
+
+          {/* Tags */}
+          {npc.tags && npc.tags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {npc.tags.map(tag => (
+                <span
+                  key={tag}
+                  className="bg-surface-secondary border-divider text-faint rounded-full border px-1.5 py-px text-[9px]"
+                >
+                  {tag}
                 </span>
-                <span className="text-body text-xs font-medium">
-                  {npc.abilityScores![ability]}
-                </span>
-              </div>
-            )
+              ))}
+            </div>
           )}
         </div>
       )}

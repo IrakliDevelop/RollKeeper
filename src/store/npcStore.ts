@@ -25,6 +25,11 @@ interface NPCStoreState {
   deleteNPC: (campaignCode: string, id: string) => void;
   getNPC: (campaignCode: string, id: string) => CampaignNPC | undefined;
   getNPCsForCampaign: (campaignCode: string) => CampaignNPC[];
+  updateDeathSaves: (
+    campaignCode: string,
+    id: string,
+    deathSaves: { successes: number; failures: number }
+  ) => void;
 }
 
 export const useNPCStore = create<NPCStoreState>()(
@@ -90,6 +95,22 @@ export const useNPCStore = create<NPCStoreState>()(
 
       getNPCsForCampaign: campaignCode => {
         return get().npcsByCampaign[campaignCode] ?? [];
+      },
+
+      updateDeathSaves: (campaignCode, id, deathSaves) => {
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(npc =>
+                npc.id === id
+                  ? { ...npc, deathSaves, updatedAt: new Date().toISOString() }
+                  : npc
+              ),
+            },
+          };
+        });
       },
     }),
     {
