@@ -27,6 +27,7 @@ import {
   type InventoryFormData,
 } from '../../ui/game/inventory';
 import { useItemsData } from '@/hooks/useItemsData';
+import { useMagicItemsData } from '@/hooks/useMagicItemsData';
 
 const ITEM_CATEGORIES = [
   'weapon',
@@ -94,6 +95,7 @@ export function InventoryManager({
   className = '',
 }: InventoryManagerProps) {
   const { items: databaseItems, loading: itemsLoading } = useItemsData();
+  const { items: databaseMagicItems } = useMagicItemsData();
   const [showItemForm, setShowItemForm] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [viewingItem, setViewingItem] = useState<InventoryItem | null>(null);
@@ -541,6 +543,7 @@ export function InventoryManager({
         availableLocations={allLocations}
         isEditing={!!editingItem}
         databaseItems={databaseItems}
+        databaseMagicItems={databaseMagicItems}
         itemsLoading={itemsLoading}
       />
 

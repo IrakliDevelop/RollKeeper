@@ -526,8 +526,30 @@ export const useEncounterStore = create<EncounterStoreState>()(
                 }
               }
 
+              const prevHp = currentHp;
               currentHp = Math.max(0, currentHp - remaining);
-              return { ...e, currentHp, tempHp };
+
+              // Init death saves for NPCs when HP drops to 0
+              let deathSaves = e.deathSaves;
+              if (currentHp <= 0 && prevHp > 0 && e.type === 'npc') {
+                const excessDamage = remaining - prevHp;
+                if (excessDamage >= e.maxHp) {
+                  // Massive damage = instant death
+                  deathSaves = {
+                    successes: 0,
+                    failures: 3,
+                    isStabilized: false,
+                  };
+                } else {
+                  deathSaves = {
+                    successes: 0,
+                    failures: 0,
+                    isStabilized: false,
+                  };
+                }
+              }
+
+              return { ...e, currentHp, tempHp, deathSaves };
             }
           ),
         }));
@@ -539,10 +561,15 @@ export const useEncounterStore = create<EncounterStoreState>()(
             state.encounters,
             encounterId,
             entityId,
-            e => ({
-              ...e,
-              currentHp: Math.min(e.maxHp, e.currentHp + amount),
-            })
+            e => {
+              const newHp = Math.min(e.maxHp, e.currentHp + amount);
+              // Clear death saves when healed from 0 HP (NPCs)
+              const deathSaves =
+                e.currentHp <= 0 && newHp > 0 && e.type === 'npc'
+                  ? undefined
+                  : e.deathSaves;
+              return { ...e, currentHp: newHp, deathSaves };
+            }
           ),
         }));
       },

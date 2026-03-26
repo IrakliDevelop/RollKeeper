@@ -10,6 +10,8 @@ import {
   ImageIcon,
   ChevronDown,
   ChevronUp,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import {
   Dialog,
@@ -23,12 +25,21 @@ import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { CompactRichTextEditor } from '@/components/ui/forms/CompactRichTextEditor';
 import { Badge } from '@/components/ui/layout/badge';
-import { CampaignNPC, MonsterStatBlock } from '@/types/encounter';
+import {
+  CampaignNPC,
+  MonsterStatBlock,
+  NPCInventoryItem,
+} from '@/types/encounter';
 import { ProcessedMonster, CREATURE_TYPES, SIZES } from '@/types/bestiary';
+import { ProcessedItem } from '@/types/items';
 import {
   buildMonsterStatBlock,
   parseRechargeFromName,
 } from '@/utils/encounterConverter';
+import { ItemAutocomplete } from '@/components/ui/forms/ItemAutocomplete';
+import { useItemsData } from '@/hooks/useItemsData';
+import { useMagicItemsData } from '@/hooks/useMagicItemsData';
+import { formatCurrencyFromCopper } from '@/utils/currency';
 
 interface NamedText {
   name: string;
@@ -43,13 +54,45 @@ interface NPCFormDialogProps {
     data: Omit<CampaignNPC, 'id' | 'campaignCode' | 'createdAt' | 'updatedAt'>
   ) => void;
   editingNpc?: CampaignNPC | null;
+  existingGroups?: string[];
 }
 
 const DEFAULT_ABILITY = 10;
 
+const DIE_TYPES = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
+
 function abilityMod(score: number): string {
   const mod = Math.floor((score - 10) / 2);
   return mod >= 0 ? `+${mod}` : `${mod}`;
+}
+
+function abilityModNum(score: number): number {
+  return Math.floor((score - 10) / 2);
+}
+
+function crToProficiencyBonus(crStr: string): number {
+  const cr = parseFloat(crStr);
+  if (isNaN(cr)) return 2;
+  if (cr <= 4) return 2;
+  if (cr <= 8) return 3;
+  if (cr <= 12) return 4;
+  if (cr <= 16) return 5;
+  if (cr <= 20) return 6;
+  if (cr <= 24) return 7;
+  if (cr <= 28) return 8;
+  return 9;
+}
+
+function parseHpFormula(
+  formula: string
+): { max: number; dieType: string } | null {
+  const match = formula.match(/(\d+)d(\d+)/);
+  if (!match) return null;
+  return { max: parseInt(match[1], 10), dieType: `d${match[2]}` };
+}
+
+function hasSkillProficiency(skillsStr: string, skillName: string): boolean {
+  return skillsStr.toLowerCase().includes(skillName.toLowerCase());
 }
 
 function hasSubstantiveStatBlock(
@@ -98,7 +141,12 @@ export function NPCFormDialog({
   onOpenChange,
   onSave,
   editingNpc,
+  existingGroups = [],
 }: NPCFormDialogProps) {
+  // Item database for inventory autocomplete
+  const { items: dbItems, loading: dbItemsLoading } = useItemsData();
+  const { items: dbMagicItems } = useMagicItemsData();
+
   // Bestiary search
   const [bestiaryQuery, setBestiaryQuery] = useState('');
   const [bestiaryResults, setBestiaryResults] = useState<ProcessedMonster[]>(
@@ -117,6 +165,11 @@ export function NPCFormDialog({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
 
+  // Group & Tags
+  const [group, setGroup] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+
   // Core stats
   const [size, setSize] = useState('Medium');
   const [creatureType, setCreatureType] = useState('Humanoid');
@@ -125,6 +178,10 @@ export function NPCFormDialog({
   const [hp, setHp] = useState(10);
   const [hpFormula, setHpFormula] = useState('');
   const [speed, setSpeed] = useState('30 ft.');
+
+  // Initiative modifier (manual override)
+  const [initiativeModifier, setInitiativeModifier] = useState(0);
+  const [initiativeOverridden, setInitiativeOverridden] = useState(false);
 
   // Ability scores
   const [str, setStr] = useState(DEFAULT_ABILITY);
@@ -146,6 +203,21 @@ export function NPCFormDialog({
   const [languages, setLanguages] = useState('');
   const [cr, setCr] = useState('');
 
+  // Hit dice
+  const [hitDiceMax, setHitDiceMax] = useState(0);
+  const [hitDieCurrent, setHitDieCurrent] = useState(0);
+  const [hitDieType, setHitDieType] = useState('d8');
+
+  // Proficiency bonus (manual override)
+  const [proficiencyBonus, setProficiencyBonus] = useState(2);
+  const [proficiencyOverridden, setProficiencyOverridden] = useState(false);
+
+  // Passive abilities (manual override)
+  const [passivePerception, setPassivePerception] = useState(10);
+  const [passiveInsight, setPassiveInsight] = useState(10);
+  const [passiveInvestigation, setPassiveInvestigation] = useState(10);
+  const [passivesOverridden, setPassivesOverridden] = useState(false);
+
   // Traits / Actions / Bonus Actions / Reactions / Lair Actions
   const [traits, setTraits] = useState<NamedText[]>([]);
   const [actions, setActions] = useState<NamedText[]>([]);
@@ -153,9 +225,42 @@ export function NPCFormDialog({
   const [reactions, setReactions] = useState<NamedText[]>([]);
   const [lairActions, setLairActions] = useState<NamedText[]>([]);
 
+  // Inventory
+  const [showInventory, setShowInventory] = useState(false);
+  const [inventoryItems, setInventoryItems] = useState<NPCInventoryItem[]>([]);
+
   // Lore
   const [showLore, setShowLore] = useState(false);
   const [loreHtml, setLoreHtml] = useState('');
+
+  // ---------- Auto-calc initiative from DEX ----------
+
+  useEffect(() => {
+    if (!initiativeOverridden) {
+      setInitiativeModifier(abilityModNum(dex));
+    }
+  }, [dex, initiativeOverridden]);
+
+  // ---------- Auto-calc proficiency from CR ----------
+
+  useEffect(() => {
+    if (!proficiencyOverridden) {
+      setProficiencyBonus(crToProficiencyBonus(cr));
+    }
+  }, [cr, proficiencyOverridden]);
+
+  // ---------- Auto-calc passives from ability scores ----------
+
+  useEffect(() => {
+    if (!passivesOverridden) {
+      const wisM = abilityModNum(wis);
+      const intM = abilityModNum(int);
+      const hasPerception = hasSkillProficiency(skills, 'perception');
+      setPassivePerception(10 + wisM + (hasPerception ? proficiencyBonus : 0));
+      setPassiveInsight(10 + wisM);
+      setPassiveInvestigation(10 + intM);
+    }
+  }, [wis, int, skills, proficiencyBonus, passivesOverridden]);
 
   // ---------- Reset / Populate from editingNpc ----------
 
@@ -173,6 +278,54 @@ export function NPCFormDialog({
       setBestiarySourceName(editingNpc.bestiarySourceId ? editingNpc.name : '');
       setLoreHtml(editingNpc.loreHtml ?? '');
       setShowLore(!!editingNpc.loreHtml);
+      setInventoryItems(editingNpc.inventory ?? []);
+      setShowInventory((editingNpc.inventory ?? []).length > 0);
+
+      // Group & tags
+      setGroup(editingNpc.group ?? '');
+      setTags(editingNpc.tags ?? []);
+      setTagInput('');
+
+      // Initiative modifier
+      if (editingNpc.initiativeModifier !== undefined) {
+        setInitiativeModifier(editingNpc.initiativeModifier);
+        setInitiativeOverridden(true);
+      } else {
+        setInitiativeOverridden(false);
+      }
+
+      // Proficiency bonus
+      if (editingNpc.proficiencyBonus !== undefined) {
+        setProficiencyBonus(editingNpc.proficiencyBonus);
+        setProficiencyOverridden(true);
+      } else {
+        setProficiencyOverridden(false);
+      }
+
+      // Passive abilities
+      if (
+        editingNpc.passivePerception !== undefined ||
+        editingNpc.passiveInsight !== undefined ||
+        editingNpc.passiveInvestigation !== undefined
+      ) {
+        setPassivePerception(editingNpc.passivePerception ?? 10);
+        setPassiveInsight(editingNpc.passiveInsight ?? 10);
+        setPassiveInvestigation(editingNpc.passiveInvestigation ?? 10);
+        setPassivesOverridden(true);
+      } else {
+        setPassivesOverridden(false);
+      }
+
+      // Hit dice
+      if (editingNpc.hitDice) {
+        setHitDiceMax(editingNpc.hitDice.max);
+        setHitDieCurrent(editingNpc.hitDice.current);
+        setHitDieType(editingNpc.hitDice.dieType);
+      } else {
+        setHitDiceMax(0);
+        setHitDieCurrent(0);
+        setHitDieType('d8');
+      }
 
       const sb = editingNpc.monsterStatBlock;
       if (sb) {
@@ -258,6 +411,15 @@ export function NPCFormDialog({
     setBonusActions([]);
     setReactions([]);
     setLairActions([]);
+    setHitDiceMax(0);
+    setHitDieCurrent(0);
+    setHitDieType('d8');
+    setProficiencyBonus(2);
+    setProficiencyOverridden(false);
+    setPassivePerception(10);
+    setPassiveInsight(10);
+    setPassiveInvestigation(10);
+    setPassivesOverridden(false);
   }
 
   function resetAll() {
@@ -275,11 +437,41 @@ export function NPCFormDialog({
     setBestiarySourceName('');
     setLoreHtml('');
     setShowLore(false);
+    setInventoryItems([]);
+    setShowInventory(false);
     setBestiaryQuery('');
     setBestiaryResults([]);
+    setGroup('');
+    setTags([]);
+    setTagInput('');
+    setInitiativeModifier(0);
+    setInitiativeOverridden(false);
     resetAbilityScores();
     resetDetailFields();
   }
+
+  // ---------- Tag handling ----------
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addTag(tagInput);
+    } else if (e.key === 'Backspace' && tagInput === '' && tags.length > 0) {
+      setTags(prev => prev.slice(0, -1));
+    }
+  };
+
+  const addTag = (raw: string) => {
+    const trimmed = raw.trim().replace(/,$/, '');
+    if (trimmed && !tags.includes(trimmed)) {
+      setTags(prev => [...prev, trimmed]);
+    }
+    setTagInput('');
+  };
+
+  const removeTag = (tag: string) => {
+    setTags(prev => prev.filter(t => t !== tag));
+  };
 
   // ---------- Bestiary Search ----------
 
@@ -354,6 +546,36 @@ export function NPCFormDialog({
     setBestiarySourceName(monster.name);
     setBestiaryQuery('');
     setBestiaryResults([]);
+
+    // Auto-populate hit dice from hpFormula
+    const parsedHd = parseHpFormula(monster.hpFormula);
+    if (parsedHd) {
+      setHitDiceMax(parsedHd.max);
+      setHitDieCurrent(parsedHd.max);
+      setHitDieType(
+        DIE_TYPES.includes(parsedHd.dieType) ? parsedHd.dieType : 'd8'
+      );
+    }
+
+    // Auto-populate initiative modifier from DEX
+    const dexMod = abilityModNum(sb.dex);
+    setInitiativeModifier(dexMod);
+    setInitiativeOverridden(false);
+
+    // Auto-populate proficiency bonus from CR
+    const prof = crToProficiencyBonus(sb.cr);
+    setProficiencyBonus(prof);
+    setProficiencyOverridden(false);
+
+    // Auto-populate passive perception from stat block
+    if (sb.passivePerception) {
+      setPassivePerception(sb.passivePerception);
+    } else {
+      setPassivePerception(10 + abilityModNum(sb.wis));
+    }
+    setPassiveInsight(10 + abilityModNum(sb.wis));
+    setPassiveInvestigation(10 + abilityModNum(sb.int));
+    setPassivesOverridden(false);
 
     const hasDetails =
       sb.saves ||
@@ -468,7 +690,7 @@ export function NPCFormDialog({
               .filter(Boolean)
           : [],
         senses: senses || '',
-        passivePerception: 10 + Math.floor((wis - 10) / 2),
+        passivePerception: passivePerception,
         traits: traits.filter(t => t.name.trim()),
         actions: actions.filter(a => a.name.trim()),
         bonusActions: bonusActions.filter(a => a.name.trim()),
@@ -493,6 +715,21 @@ export function NPCFormDialog({
       bestiarySourceId: bestiarySourceId ?? undefined,
       loreHtml: loreHtml.trim() || undefined,
       avatarUrl: avatarUrl || undefined,
+      group: group.trim() || undefined,
+      tags: tags.length > 0 ? tags : undefined,
+      hitDice:
+        hitDiceMax > 0
+          ? { max: hitDiceMax, current: hitDieCurrent, dieType: hitDieType }
+          : undefined,
+      initiativeModifier,
+      proficiencyBonus,
+      passivePerception,
+      passiveInsight,
+      passiveInvestigation,
+      inventory:
+        inventoryItems.length > 0
+          ? inventoryItems.filter(item => item.name.trim())
+          : undefined,
     });
     onOpenChange(false);
   };
@@ -627,6 +864,65 @@ export function NPCFormDialog({
               />
             </div>
 
+            {/* ===== Group & Tags ===== */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-heading mb-1.5 block text-sm font-medium">
+                  Group
+                </label>
+                <input
+                  type="text"
+                  list="npc-groups-datalist"
+                  value={group}
+                  onChange={e => setGroup(e.target.value)}
+                  placeholder="e.g. Bandits, Town Guard"
+                  className="bg-surface border-divider text-body placeholder:text-faint w-full rounded-md border px-3 py-2 text-sm focus:ring-1 focus:ring-(--color-accent-purple-border) focus:outline-none"
+                />
+                {existingGroups.length > 0 && (
+                  <datalist id="npc-groups-datalist">
+                    {existingGroups.map(g => (
+                      <option key={g} value={g} />
+                    ))}
+                  </datalist>
+                )}
+              </div>
+
+              <div>
+                <label className="text-heading mb-1.5 block text-sm font-medium">
+                  Tags
+                </label>
+                <div className="border-divider bg-surface flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5">
+                  {tags.map(tag => (
+                    <span
+                      key={tag}
+                      className="bg-accent-purple-bg text-accent-purple-text flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => removeTag(tag)}
+                        className="hover:text-heading transition-colors"
+                        aria-label={`Remove tag ${tag}`}
+                      >
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={e => setTagInput(e.target.value)}
+                    onKeyDown={handleTagKeyDown}
+                    onBlur={() => tagInput.trim() && addTag(tagInput)}
+                    placeholder={
+                      tags.length === 0 ? 'Add tags (Enter or comma)' : ''
+                    }
+                    className="text-body placeholder:text-faint min-w-28 flex-1 bg-transparent text-sm focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* ===== Core Stats ===== */}
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-2">
@@ -677,12 +973,24 @@ export function NPCFormDialog({
                   placeholder="2d8+2"
                 />
               </div>
-              <Input
-                value={speed}
-                onChange={e => setSpeed(e.target.value)}
-                label="Speed"
-                placeholder="30 ft., fly 60 ft."
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  value={speed}
+                  onChange={e => setSpeed(e.target.value)}
+                  label="Speed"
+                  placeholder="30 ft., fly 60 ft."
+                />
+                <Input
+                  type="number"
+                  value={initiativeModifier}
+                  onChange={e => {
+                    setInitiativeModifier(parseInt(e.target.value) || 0);
+                    setInitiativeOverridden(true);
+                  }}
+                  label="Init Mod"
+                  title="Initiative modifier (auto-calculated from DEX, overridable)"
+                />
+              </div>
             </div>
 
             {/* ===== Ability Scores ===== */}
@@ -793,13 +1101,113 @@ export function NPCFormDialog({
                       placeholder="Common, Sylvan"
                     />
                   </div>
-                  <div className="w-24">
+
+                  {/* CR & Proficiency Bonus */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="w-full">
+                      <Input
+                        value={cr}
+                        onChange={e => setCr(e.target.value)}
+                        label="CR"
+                        placeholder="0"
+                      />
+                    </div>
                     <Input
-                      value={cr}
-                      onChange={e => setCr(e.target.value)}
-                      label="CR"
-                      placeholder="0"
+                      type="number"
+                      value={proficiencyBonus}
+                      onChange={e => {
+                        setProficiencyBonus(parseInt(e.target.value) || 2);
+                        setProficiencyOverridden(true);
+                      }}
+                      label="Prof Bonus"
+                      min={2}
+                      max={9}
+                      title="Proficiency bonus (auto-calculated from CR, overridable)"
                     />
+                  </div>
+
+                  {/* Hit Dice */}
+                  <div>
+                    <label className="text-heading mb-1.5 block text-sm font-medium">
+                      Hit Dice
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Input
+                        type="number"
+                        value={hitDiceMax}
+                        onChange={e =>
+                          setHitDiceMax(parseInt(e.target.value) || 0)
+                        }
+                        label="Max"
+                        min={0}
+                        placeholder="8"
+                      />
+                      <SelectField
+                        label="Die Type"
+                        value={hitDieType}
+                        onValueChange={setHitDieType}
+                      >
+                        {DIE_TYPES.map(d => (
+                          <SelectItem key={d} value={d}>
+                            {d}
+                          </SelectItem>
+                        ))}
+                      </SelectField>
+                      <Input
+                        type="number"
+                        value={hitDieCurrent}
+                        onChange={e =>
+                          setHitDieCurrent(parseInt(e.target.value) || 0)
+                        }
+                        label="Current"
+                        min={0}
+                        placeholder="8"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Passive Abilities */}
+                  <div>
+                    <label className="text-heading mb-1.5 block text-sm font-medium">
+                      Passive Abilities
+                      <span className="text-faint ml-1 text-xs font-normal">
+                        (auto-calculated, overridable)
+                      </span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Input
+                        type="number"
+                        value={passivePerception}
+                        onChange={e => {
+                          setPassivePerception(parseInt(e.target.value) || 0);
+                          setPassivesOverridden(true);
+                        }}
+                        label="Passive Perception"
+                        min={1}
+                      />
+                      <Input
+                        type="number"
+                        value={passiveInsight}
+                        onChange={e => {
+                          setPassiveInsight(parseInt(e.target.value) || 0);
+                          setPassivesOverridden(true);
+                        }}
+                        label="Passive Insight"
+                        min={1}
+                      />
+                      <Input
+                        type="number"
+                        value={passiveInvestigation}
+                        onChange={e => {
+                          setPassiveInvestigation(
+                            parseInt(e.target.value) || 0
+                          );
+                          setPassivesOverridden(true);
+                        }}
+                        label="Passive Investigation"
+                        min={1}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -831,6 +1239,169 @@ export function NPCFormDialog({
               items={lairActions}
               onChange={setLairActions}
             />
+
+            {/* ===== Inventory (collapsible) ===== */}
+            <div>
+              <button
+                onClick={() => setShowInventory(v => !v)}
+                className="text-accent-purple-text flex items-center gap-1 text-sm font-medium hover:underline"
+              >
+                {showInventory ? (
+                  <>
+                    <ChevronUp size={14} /> Hide Inventory
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown size={14} /> Add Inventory
+                    {inventoryItems.length > 0 && (
+                      <Badge variant="neutral" size="sm">
+                        {inventoryItems.length}
+                      </Badge>
+                    )}
+                  </>
+                )}
+              </button>
+              {showInventory && (
+                <div className="mt-2 space-y-3">
+                  {/* Item search */}
+                  <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border p-3">
+                    <ItemAutocomplete
+                      items={dbItems}
+                      magicItems={dbMagicItems}
+                      loading={dbItemsLoading}
+                      onSelect={(item: ProcessedItem) => {
+                        setInventoryItems(prev => [
+                          ...prev,
+                          {
+                            id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                            name: item.name,
+                            quantity: 1,
+                            category: item.category,
+                            weight: item.weight,
+                            value: item.value,
+                            rarity:
+                              item.rarity !== 'none' ? item.rarity : undefined,
+                            description: item.description,
+                            type: item.rawType,
+                          },
+                        ]);
+                      }}
+                      placeholder="Search items database..."
+                    />
+                  </div>
+
+                  {/* Item list */}
+                  {inventoryItems.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className="border-divider bg-surface-raised rounded-lg border p-3"
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={item.name}
+                              onChange={e => {
+                                const updated = [...inventoryItems];
+                                updated[index] = {
+                                  ...item,
+                                  name: e.target.value,
+                                };
+                                setInventoryItems(updated);
+                              }}
+                              placeholder="Item name"
+                              className="flex-1"
+                            />
+                            <input
+                              type="number"
+                              min={1}
+                              value={item.quantity}
+                              onChange={e => {
+                                const updated = [...inventoryItems];
+                                updated[index] = {
+                                  ...item,
+                                  quantity: parseInt(e.target.value) || 1,
+                                };
+                                setInventoryItems(updated);
+                              }}
+                              className="bg-surface border-divider text-heading w-16 rounded border px-2 py-1.5 text-center text-sm"
+                              title="Quantity"
+                            />
+                            <button
+                              onClick={() =>
+                                setInventoryItems(
+                                  inventoryItems.filter((_, i) => i !== index)
+                                )
+                              }
+                              className="text-muted hover:text-accent-red-text shrink-0 p-1 transition-colors"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          {/* Details row */}
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                            {item.category && (
+                              <span className="text-muted capitalize">
+                                {item.category}
+                              </span>
+                            )}
+                            {item.rarity && item.rarity !== 'none' && (
+                              <span className="text-accent-amber-text capitalize">
+                                {item.rarity}
+                              </span>
+                            )}
+                            {item.weight !== undefined && (
+                              <span className="text-muted">
+                                {item.weight} lbs
+                              </span>
+                            )}
+                            {item.value !== undefined && (
+                              <span className="text-muted">
+                                {formatCurrencyFromCopper(item.value)}
+                              </span>
+                            )}
+                            <label className="text-muted ml-auto flex items-center gap-1">
+                              <input
+                                type="checkbox"
+                                checked={item.equipped ?? false}
+                                onChange={e => {
+                                  const updated = [...inventoryItems];
+                                  updated[index] = {
+                                    ...item,
+                                    equipped: e.target.checked,
+                                  };
+                                  setInventoryItems(updated);
+                                }}
+                                className="rounded"
+                              />
+                              Equipped
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Manual add */}
+                  <button
+                    onClick={() =>
+                      setInventoryItems([
+                        ...inventoryItems,
+                        {
+                          id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                          name: '',
+                          quantity: 1,
+                        },
+                      ])
+                    }
+                    className="text-accent-purple-text flex items-center gap-1 text-xs font-medium opacity-80 hover:opacity-100"
+                  >
+                    <Plus size={12} />
+                    Add Item Manually
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* ===== Lore (collapsible) ===== */}
             <div>
@@ -921,6 +1492,20 @@ function AbilityListEditor({
     onChange(items.filter((_, i) => i !== index));
   };
 
+  const handleMoveUp = (index: number) => {
+    if (index <= 0) return;
+    const updated = [...items];
+    [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+    onChange(updated);
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index >= items.length - 1) return;
+    const updated = [...items];
+    [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+    onChange(updated);
+  };
+
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between">
@@ -943,6 +1528,25 @@ function AbilityListEditor({
               className="border-divider bg-surface-raised rounded-lg border p-2"
             >
               <div className="mb-1 flex items-center gap-2">
+                {/* Reorder buttons */}
+                <div className="flex shrink-0 flex-col">
+                  <button
+                    onClick={() => handleMoveUp(index)}
+                    disabled={index === 0}
+                    className="text-muted hover:text-heading disabled:text-faint p-0.5 transition-colors disabled:cursor-not-allowed"
+                    title="Move up"
+                  >
+                    <ArrowUp size={12} />
+                  </button>
+                  <button
+                    onClick={() => handleMoveDown(index)}
+                    disabled={index === items.length - 1}
+                    className="text-muted hover:text-heading disabled:text-faint p-0.5 transition-colors disabled:cursor-not-allowed"
+                    title="Move down"
+                  >
+                    <ArrowDown size={12} />
+                  </button>
+                </div>
                 <Input
                   value={item.name}
                   onChange={e => handleUpdate(index, 'name', e.target.value)}

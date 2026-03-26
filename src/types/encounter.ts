@@ -117,6 +117,9 @@ export interface EncounterEntity {
   }>;
   regionalEffects?: string[];
 
+  // NPC hit dice (for short rest healing in encounters)
+  hitDice?: { current: number; max: number; dieType: string };
+
   // Player-synced (read-only for DM)
   inspirationCount?: number; // Heroic inspiration dice from player
   deathSaves?: { successes: number; failures: number; isStabilized: boolean };
@@ -163,6 +166,19 @@ export interface Encounter {
   updatedAt: string;
 }
 
+export interface NPCInventoryItem {
+  id: string;
+  name: string;
+  quantity: number;
+  description?: string;
+  equipped?: boolean;
+  type?: string; // weapon, armor, potion, wondrous, etc.
+  category?: string; // weapon, armor, tool, consumable, treasure, misc
+  weight?: number; // per item in lbs
+  value?: number; // per item in copper pieces
+  rarity?: string; // common, uncommon, rare, very rare, legendary, artifact
+}
+
 export interface CampaignNPC {
   id: string;
   campaignCode: string;
@@ -183,6 +199,30 @@ export interface CampaignNPC {
 
   // Portrait (S3 URL)
   avatarUrl?: string;
+
+  // Grouping & organization
+  group?: string;
+  tags?: string[];
+
+  // Hit dice
+  hitDice?: { current: number; max: number; dieType: string };
+
+  // Death saves (for encounter tracking)
+  deathSaves?: { successes: number; failures: number };
+
+  // Initiative modifier (defaults to DEX modifier when not set)
+  initiativeModifier?: number;
+
+  // Proficiency bonus (auto-calculated from CR, overridable)
+  proficiencyBonus?: number;
+
+  // Inventory
+  inventory?: NPCInventoryItem[];
+
+  // Passive abilities
+  passivePerception?: number;
+  passiveInsight?: number;
+  passiveInvestigation?: number;
 
   // Legacy fields (backward compat, superseded by monsterStatBlock when present)
   abilityScores?: {

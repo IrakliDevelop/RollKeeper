@@ -195,11 +195,14 @@ export function AddEntityDialog({
       type: 'npc',
       name: npc.name,
       initiative: null,
-      initiativeModifier: npc.monsterStatBlock
-        ? Math.floor((npc.monsterStatBlock.dex - 10) / 2)
-        : npc.abilityScores
-          ? Math.floor((npc.abilityScores.dex - 10) / 2)
-          : 0,
+      initiativeModifier:
+        npc.initiativeModifier != null
+          ? npc.initiativeModifier
+          : npc.monsterStatBlock
+            ? Math.floor((npc.monsterStatBlock.dex - 10) / 2)
+            : npc.abilityScores
+              ? Math.floor((npc.abilityScores.dex - 10) / 2)
+              : 0,
       currentHp: npc.maxHp,
       maxHp: npc.maxHp,
       tempHp: 0,
@@ -208,6 +211,7 @@ export function AddEntityDialog({
       isHidden: false,
       monsterStatBlock: npc.monsterStatBlock,
       abilities,
+      hitDice: npc.hitDice ? { ...npc.hitDice } : undefined,
     });
   };
 

@@ -407,9 +407,9 @@ export function EntityCard({
     ? TYPE_STYLES.player
     : (TYPE_STYLES[entity.type] ?? TYPE_STYLES.monster);
   const isDown = entity.currentHp <= 0 && entity.type !== 'lair';
-  const isPlayerDead =
-    entity.type === 'player' && entity.deathSaves?.failures === 3;
-  const isDead = entity.type === 'player' ? isPlayerDead : isDown;
+  const hasDeathSaves = entity.type === 'player' || entity.type === 'npc';
+  const isDeathSaveDead = hasDeathSaves && entity.deathSaves?.failures === 3;
+  const isDead = hasDeathSaves ? isDeathSaveDead : isDown;
 
   return (
     <div
@@ -564,6 +564,14 @@ export function EntityCard({
                 {entity.concentrationSpell}
               </span>
             )}
+            {entity.type === 'npc' && entity.hitDice && (
+              <span
+                className="bg-accent-purple-bg text-accent-purple-text inline-flex shrink-0 items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                title={`Hit Dice: ${entity.hitDice.current}/${entity.hitDice.max} ${entity.hitDice.dieType}`}
+              >
+                HD {entity.hitDice.current}/{entity.hitDice.max}
+              </span>
+            )}
           </div>
 
           {/* HP Bar (skip for lair entities, optionally hidden for players) */}
@@ -579,8 +587,8 @@ export function EntityCard({
               />
             ))}
 
-          {/* Death Saving Throws (players at 0 HP) */}
-          {entity.type === 'player' &&
+          {/* Death Saving Throws (players & NPCs at 0 HP) */}
+          {(entity.type === 'player' || entity.type === 'npc') &&
             entity.currentHp <= 0 &&
             entity.deathSaves && (
               <div className="mt-1 flex items-center gap-2">
@@ -597,43 +605,120 @@ export function EntityCard({
                   <>
                     <div
                       className="flex items-center gap-1.5"
-                      title="Death save successes"
+                      title="Death save successes — click to toggle"
                     >
                       <span className="text-xs font-semibold text-green-600 dark:text-green-400">
                         S
                       </span>
-                      {[1, 2, 3].map(i => (
-                        <span
-                          key={`s-${i}`}
-                          className={`h-3.5 w-3.5 rounded-full border-2 ${
-                            i <= entity.deathSaves!.successes
-                              ? 'border-green-500 bg-green-500'
-                              : 'border-divider bg-surface-raised'
-                          }`}
-                        />
-                      ))}
+                      {[1, 2, 3].map(i => {
+                        const filled = i <= entity.deathSaves!.successes;
+                        const isNpc = entity.type === 'npc';
+                        return (
+                          <span
+                            key={`s-${i}`}
+                            role={isNpc ? 'button' : undefined}
+                            tabIndex={isNpc ? 0 : undefined}
+                            onClick={
+                              isNpc
+                                ? e => {
+                                    e.stopPropagation();
+                                    const newSuccesses = filled ? i - 1 : i;
+                                    const isStabilized = newSuccesses >= 3;
+                                    onUpdate({
+                                      deathSaves: {
+                                        ...entity.deathSaves!,
+                                        successes: newSuccesses,
+                                        isStabilized,
+                                      },
+                                    });
+                                  }
+                                : undefined
+                            }
+                            className={`h-3.5 w-3.5 rounded-full border-2 ${
+                              filled
+                                ? 'border-green-500 bg-green-500'
+                                : 'border-divider bg-surface-raised'
+                            }${isNpc ? 'cursor-pointer hover:border-green-400' : ''}`}
+                          />
+                        );
+                      })}
                     </div>
                     <div
                       className="flex items-center gap-1.5"
-                      title="Death save failures"
+                      title="Death save failures — click to toggle"
                     >
                       <span className="text-xs font-semibold text-red-500 dark:text-red-400">
                         F
                       </span>
-                      {[1, 2, 3].map(i => (
-                        <span
-                          key={`f-${i}`}
-                          className={`h-3.5 w-3.5 rounded-full border-2 ${
-                            i <= entity.deathSaves!.failures
-                              ? 'border-red-500 bg-red-500'
-                              : 'border-divider bg-surface-raised'
-                          }`}
-                        />
-                      ))}
+                      {[1, 2, 3].map(i => {
+                        const filled = i <= entity.deathSaves!.failures;
+                        const isNpc = entity.type === 'npc';
+                        return (
+                          <span
+                            key={`f-${i}`}
+                            role={isNpc ? 'button' : undefined}
+                            tabIndex={isNpc ? 0 : undefined}
+                            onClick={
+                              isNpc
+                                ? e => {
+                                    e.stopPropagation();
+                                    const newFailures = filled ? i - 1 : i;
+                                    onUpdate({
+                                      deathSaves: {
+                                        ...entity.deathSaves!,
+                                        failures: newFailures,
+                                      },
+                                    });
+                                  }
+                                : undefined
+                            }
+                            className={`h-3.5 w-3.5 rounded-full border-2 ${
+                              filled
+                                ? 'border-red-500 bg-red-500'
+                                : 'border-divider bg-surface-raised'
+                            }${isNpc ? 'cursor-pointer hover:border-red-400' : ''}`}
+                          />
+                        );
+                      })}
                     </div>
                   </>
                 )}
               </div>
+            )}
+
+          {/* Spend Hit Die (NPCs with remaining hit dice, not at 0 HP) */}
+          {entity.type === 'npc' &&
+            entity.hitDice &&
+            entity.hitDice.current > 0 &&
+            entity.currentHp > 0 &&
+            entity.currentHp < entity.maxHp && (
+              <button
+                className="text-accent-purple-text bg-accent-purple-bg hover:bg-accent-purple-bg-strong mt-1 flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors"
+                title={`Spend 1${entity.hitDice.dieType} + CON mod to heal`}
+                onClick={e => {
+                  e.stopPropagation();
+                  const hd = entity.hitDice!;
+                  // Roll the hit die
+                  const dieMax = parseInt(hd.dieType.replace('d', ''), 10);
+                  const roll = Math.floor(Math.random() * dieMax) + 1;
+                  // Get CON modifier from stat block if available
+                  const conMod = entity.monsterStatBlock
+                    ? Math.floor((entity.monsterStatBlock.con - 10) / 2)
+                    : 0;
+                  const healing = Math.max(1, roll + conMod);
+                  const newHp = Math.min(
+                    entity.maxHp,
+                    entity.currentHp + healing
+                  );
+                  onUpdate({
+                    currentHp: newHp,
+                    hitDice: { ...hd, current: hd.current - 1 },
+                  });
+                }}
+              >
+                <Plus size={10} />
+                Spend Hit Die ({entity.hitDice.dieType})
+              </button>
             )}
 
           {/* Lair actions quick display */}
