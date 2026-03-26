@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Swords, Plus } from 'lucide-react';
+import { ArrowLeft, Map, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -129,7 +129,7 @@ export default function CampaignBattleMapsPage() {
                 </Button>
               </Link>
               <div className="ml-6 flex items-center">
-                <Swords className="text-accent-orange-text mr-3 h-6 w-6" />
+                <Map className="text-accent-orange-text mr-3 h-6 w-6" />
                 <h1 className="text-heading text-xl font-bold">Battle Maps</h1>
               </div>
             </div>
@@ -184,7 +184,7 @@ export default function CampaignBattleMapsPage() {
                           />
                           {mapFile ? (
                             <div className="flex flex-col items-center gap-1">
-                              <Swords
+                              <Map
                                 size={24}
                                 className="text-accent-orange-text"
                               />
@@ -243,7 +243,7 @@ export default function CampaignBattleMapsPage() {
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {battleMaps.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <Swords className="text-muted mb-4 h-12 w-12" />
+            <Map className="text-muted mb-4 h-12 w-12" />
             <p className="text-heading mb-1 text-lg font-semibold">
               No battle maps yet
             </p>

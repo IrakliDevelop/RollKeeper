@@ -33,4 +33,5 @@ export interface DmLocationToolbarProps {
   lastSyncedAt: string | null;
   mode?: EditorMode;
   onOpenTvDisplay?: () => void;
+  onFitToMap?: () => void;
 }

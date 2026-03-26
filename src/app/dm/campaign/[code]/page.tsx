@@ -15,7 +15,7 @@ import {
   CalendarDays,
   MessageSquare,
   Map,
-  LayoutGrid,
+  MapPinned,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -155,7 +155,7 @@ export default function CampaignViewPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  leftIcon={<Map size={16} />}
+                  leftIcon={<MapPinned size={16} />}
                 >
                   Locations
                 </Button>
@@ -191,7 +191,7 @@ export default function CampaignViewPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  leftIcon={<LayoutGrid size={16} />}
+                  leftIcon={<Map size={16} />}
                 >
                   Battle Maps
                 </Button>
@@ -242,7 +242,7 @@ export default function CampaignViewPage() {
               href={`/dm/campaign/${code}/locations`}
               className="border-accent-emerald-border bg-accent-emerald-bg hover:bg-accent-emerald-bg-strong flex flex-1 flex-col items-center justify-center gap-1.5 rounded-lg border-2 px-4 py-2 transition-colors"
             >
-              <Map size={22} className="text-accent-emerald-text-muted" />
+              <MapPinned size={22} className="text-accent-emerald-text-muted" />
               <div className="text-accent-emerald-text text-sm font-semibold">
                 Locations
               </div>
@@ -251,7 +251,7 @@ export default function CampaignViewPage() {
               href={`/dm/campaign/${code}/battlemaps`}
               className="border-accent-orange-border bg-accent-orange-bg flex flex-1 flex-col items-center justify-center gap-1.5 rounded-lg border-2 px-4 py-2 transition-colors hover:shadow-md"
             >
-              <LayoutGrid size={22} className="text-accent-orange-text-muted" />
+              <Map size={22} className="text-accent-orange-text-muted" />
               <div className="text-accent-orange-text text-sm font-semibold">
                 Battle Maps
               </div>

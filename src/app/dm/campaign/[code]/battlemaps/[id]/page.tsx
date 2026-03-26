@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Swords } from 'lucide-react';
+import { ArrowLeft, Map } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
@@ -72,7 +72,7 @@ export default function BattleMapEditorPage() {
                 </Button>
               </Link>
               <div className="ml-6 flex items-center">
-                <Swords className="text-accent-orange-text mr-3 h-6 w-6" />
+                <Map className="text-accent-orange-text mr-3 h-6 w-6" />
                 <h1 className="text-heading text-xl font-bold">
                   {battleMap.name}
                 </h1>

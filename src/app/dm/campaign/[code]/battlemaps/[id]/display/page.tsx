@@ -103,6 +103,10 @@ export default function BattleMapDisplayPage() {
   // Keyboard: F for fullscreen
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+        return;
+      }
       if (e.key === 'f' || e.key === 'F') {
         if (!document.fullscreenElement) {
           document.documentElement.requestFullscreen().catch(() => {});
@@ -159,7 +163,7 @@ export default function BattleMapDisplayPage() {
         position: 'fixed',
         inset: 0,
         background: '#000',
-        cursor: 'none',
+        cursor: 'default',
         overflow: 'hidden',
         touchAction: 'none',
         userSelect: 'none',

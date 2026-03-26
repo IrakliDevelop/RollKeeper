@@ -11,12 +11,12 @@ import {
   Undo2,
   Redo2,
   Trash2,
-  Grid3X3,
   Loader2,
   Upload,
   Check,
   AlertCircle,
   ExternalLink,
+  Maximize,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import DmOnlyToggle from './DmOnlyToggle';
@@ -71,6 +71,7 @@ export default function DmLocationToolbar({
   onToggleDmOnly,
   mode,
   onOpenTvDisplay,
+  onFitToMap,
 }: DmLocationToolbarProps) {
   return (
     <div className="border-divider bg-surface-raised flex items-center gap-1 border-b px-2 py-1">
@@ -110,6 +111,14 @@ export default function DmLocationToolbar({
           className="h-8 w-8 p-0"
         >
           <Redo2 size={15} />
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={onFitToMap}
+          title="Fit map to screen"
+          className="h-8 w-8 p-0"
+        >
+          <Maximize size={15} />
         </Button>
         <Button
           variant="ghost"

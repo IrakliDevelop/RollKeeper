@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Map, Plus } from 'lucide-react';
+import { ArrowLeft, MapPinned, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -131,7 +131,7 @@ export default function CampaignLocationsPage() {
                 </Button>
               </Link>
               <div className="ml-6 flex items-center">
-                <Map className="text-accent-emerald-text mr-3 h-6 w-6" />
+                <MapPinned className="text-accent-emerald-text mr-3 h-6 w-6" />
                 <h1 className="text-heading text-xl font-bold">Locations</h1>
               </div>
             </div>
@@ -186,7 +186,7 @@ export default function CampaignLocationsPage() {
                           />
                           {mapFile ? (
                             <div className="flex flex-col items-center gap-1">
-                              <Map
+                              <MapPinned
                                 size={24}
                                 className="text-accent-emerald-text"
                               />
@@ -245,7 +245,7 @@ export default function CampaignLocationsPage() {
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {locations.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <Map className="text-muted mb-4 h-12 w-12" />
+            <MapPinned className="text-muted mb-4 h-12 w-12" />
             <p className="text-heading mb-1 text-lg font-semibold">
               No locations yet
             </p>

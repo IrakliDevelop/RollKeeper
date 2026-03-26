@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Map } from 'lucide-react';
+import { ArrowLeft, MapPinned } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
@@ -70,7 +70,7 @@ export default function LocationEditorPage() {
                 </Button>
               </Link>
               <div className="ml-6 flex items-center">
-                <Map className="text-accent-emerald-text mr-3 h-6 w-6" />
+                <MapPinned className="text-accent-emerald-text mr-3 h-6 w-6" />
                 <h1 className="text-heading text-xl font-bold">
                   {location.name}
                 </h1>
