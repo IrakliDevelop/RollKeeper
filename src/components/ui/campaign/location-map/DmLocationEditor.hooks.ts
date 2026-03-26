@@ -17,8 +17,30 @@ import {
 } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useLocationStore } from '@/store/locationStore';
+import { useBattleMapStore } from '@/store/battleMapStore';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
 import type { GridSettings } from '@/types/location';
+
+/** `_fitCameraToMap` — retry when the viewport has zero size (layout not ready). */
+const FIT_CAMERA_VIEWPORT_RETRY_MAX = 5;
+/** Margin in pixels around the map when fitting to the viewport. */
+const FIT_CAMERA_PADDING_PX = 40;
+/** Do not zoom in beyond 100% (native image resolution). */
+const FIT_CAMERA_MAX_ZOOM = 1;
+/** Camera pan after fit (offsets map from UI chrome, e.g. toolbar). */
+const FIT_CAMERA_PAN_OFFSET_X = 100;
+const FIT_CAMERA_PAN_OFFSET_Y = 0;
+
+/**
+ * Route an S3 URL through our own proxy to avoid CORS canvas tainting.
+ * Non-S3 URLs (e.g. blob: or data:) are returned as-is.
+ */
+function proxyUrl(url: string): string {
+  if (url.includes('.s3.') && url.includes('.amazonaws.com')) {
+    return `/api/assets/proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
 
 /** Viewport exposes historyRecorder at runtime for batched store ops */
 type ViewportHistoryAccess = {
@@ -26,6 +48,9 @@ type ViewportHistoryAccess = {
 };
 
 export interface DmLocationEditorState {
+  // Mode
+  mode: 'location' | 'battlemap';
+
   // Refs
   canvasRef: React.RefObject<FieldNotesCanvasRef | null>;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
@@ -112,12 +137,15 @@ export interface DmLocationEditorState {
   handleImageFileSelect: (
     e: React.ChangeEvent<HTMLInputElement>
   ) => Promise<void>;
+  handleOpenTvDisplay: () => void;
+  handleFitToMap: () => void;
 }
 
 export function useDmLocationEditor(
   props: DmLocationEditorProps
 ): DmLocationEditorState {
   const { location, campaignCode, dmId, onSave, onSyncToPlayers } = props;
+  const mode = props.mode ?? 'location';
 
   const canvasRef = useRef<FieldNotesCanvasRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -160,10 +188,22 @@ export function useDmLocationEditor(
     location.gridSettings?.opacity ?? 0.5
   );
 
-  // DM-only state — pull from store
-  const storeGetLocation = useLocationStore(s => s.getLocation);
-  const storeToggleDmOnly = useLocationStore(s => s.toggleDmOnly);
-  const storeUpdateLocation = useLocationStore(s => s.updateLocation);
+  // DM-only state — pull from store (call both hooks unconditionally for React rules)
+  const locationStoreGetLoc = useLocationStore(s => s.getLocation);
+  const locationStoreToggle = useLocationStore(s => s.toggleDmOnly);
+  const locationStoreUpdate = useLocationStore(s => s.updateLocation);
+
+  const battleMapStoreGetBm = useBattleMapStore(s => s.getBattleMap);
+  const battleMapStoreToggle = useBattleMapStore(s => s.toggleDmOnly);
+  const battleMapStoreUpdate = useBattleMapStore(s => s.updateBattleMap);
+
+  // Pick the right store based on mode
+  const storeGetLocation =
+    mode === 'battlemap' ? battleMapStoreGetBm : locationStoreGetLoc;
+  const storeToggleDmOnly =
+    mode === 'battlemap' ? battleMapStoreToggle : locationStoreToggle;
+  const storeUpdateLocation =
+    mode === 'battlemap' ? battleMapStoreUpdate : locationStoreUpdate;
   const currentLocation = storeGetLocation(campaignCode, location.id);
   const dmOnlyElements = currentLocation?.dmOnlyElements ?? {};
   const [selectedElementId, setSelectedElementId] = useState<string | null>(
@@ -268,7 +308,16 @@ export function useDmLocationEditor(
       if (location.canvasState && location.canvasState.trim().length > 0) {
         try {
           vp.loadJSON(location.canvasState);
+          // Ensure grid is on the background layer so it renders behind annotations
+          const bgLayer = vp.layerManager.getLayers()[0];
+          const gridEls = vp.store.getElementsByType('grid');
+          if (bgLayer) {
+            for (const g of gridEls) {
+              vp.layerManager.moveElementToLayer(g.id, bgLayer.id);
+            }
+          }
           setElementCount(vp.store.count);
+          _fitCameraToMap(vp, location.mapImageSize);
           // Clear stale localStorage data after successful load
           autoSave.clear();
         } catch {
@@ -300,65 +349,87 @@ export function useDmLocationEditor(
     [location, onSave]
   );
 
+  /** Zoom & pan so the map image fills the viewport with a small margin. */
+  function _fitCameraToMap(
+    vp: Viewport,
+    mapImageSize: { w: number; h: number },
+    retries = 0
+  ) {
+    const screenW = vp.domLayer.clientWidth;
+    const screenH = vp.domLayer.clientHeight;
+
+    if (screenW === 0 || screenH === 0) {
+      if (retries < FIT_CAMERA_VIEWPORT_RETRY_MAX) {
+        requestAnimationFrame(() =>
+          _fitCameraToMap(vp, mapImageSize, retries + 1)
+        );
+      }
+      return;
+    }
+
+    const zoom = Math.min(
+      (screenW - FIT_CAMERA_PADDING_PX * 2) / mapImageSize.w,
+      (screenH - FIT_CAMERA_PADDING_PX * 2) / mapImageSize.h,
+      FIT_CAMERA_MAX_ZOOM
+    );
+    vp.camera.setZoom(zoom);
+    vp.camera.moveTo(FIT_CAMERA_PAN_OFFSET_X, FIT_CAMERA_PAN_OFFSET_Y);
+    vp.requestRender();
+  }
+
   function _initializeBackground(
     vp: Viewport,
     mapImageUrl: string,
     mapImageSize: { w: number; h: number }
   ) {
+    // Set up layers synchronously so they're always created on the
+    // active viewport, even if image loading completes asynchronously
+    // on a different (StrictMode-destroyed) viewport.
+    const baseLayer = vp.layerManager.getLayers()[0];
+    if (baseLayer) {
+      vp.layerManager.renameLayer(baseLayer.id, 'Map Background');
+      vp.layerManager.setLayerLocked(baseLayer.id, true);
+    }
+    const annotationLayer = vp.layerManager.createLayer('Annotations');
+    vp.layerManager.setActiveLayer(annotationLayer.id);
+
     if (!mapImageUrl) return;
-    // Pre-load the image so the SDK has it in the browser cache before rendering
-    const setupCanvas = () => {
-      vp.addImage(mapImageUrl, { x: 0, y: 0 }, mapImageSize);
-      // Lock the image element itself so arrows won't bind to it
+
+    // Use proxied URL for addImage so the SDK can render it on canvas
+    // (raw S3 URLs fail silently due to CORS when the SDK loads them)
+    const proxiedForCanvas = proxyUrl(mapImageUrl);
+
+    const addImageToCanvas = () => {
+      vp.addImage(proxiedForCanvas, { x: 0, y: 0 }, mapImageSize);
+      // Lock the image element so arrows won't bind to it
       const allElements = vp.store.getAll();
       const bgImage = allElements[allElements.length - 1];
       if (bgImage) {
         vp.store.update(bgImage.id, { locked: true });
+        // Ensure image is on the background layer
+        if (baseLayer) {
+          vp.layerManager.moveElementToLayer(bgImage.id, baseLayer.id);
+        }
       }
-      // Lock the base layer so the background image stays in place
-      const baseLayer = vp.layerManager.getLayers()[0];
-      if (baseLayer) {
-        baseLayer.name = 'Map Background';
-        vp.layerManager.setLayerLocked(baseLayer.id, true);
-      }
-      // Create an annotation layer for the DM to draw on
-      const annotationLayer = vp.layerManager.createLayer('Annotations');
-      vp.layerManager.setActiveLayer(annotationLayer.id);
       setElementCount(vp.store.count);
-      // Center camera on the map image — moveTo sets the top-left of
-      // the viewport in world coords, so offset by half the screen size
-      const screenW = vp.domLayer.clientWidth;
-      const screenH = vp.domLayer.clientHeight;
-      vp.camera.setZoom(1);
-      vp.camera.moveTo(
-        mapImageSize.w / 2 - screenW / 2,
-        mapImageSize.h / 2 - screenH / 2
-      );
+      _fitCameraToMap(vp, mapImageSize);
       vp.requestRender();
     };
 
-    const setupFallbackLayers = () => {
-      const baseLayer = vp.layerManager.getLayers()[0];
-      if (baseLayer) {
-        baseLayer.name = 'Map Background';
-      }
-      const annotationLayer = vp.layerManager.createLayer('Annotations');
-      vp.layerManager.setActiveLayer(annotationLayer.id);
-    };
-
-    // Try loading with CORS first so exportImage can access pixels.
-    // If CORS fails, retry without — the image still displays on
-    // the canvas, but PNG export will fall back to JSON sync.
+    // Load via our proxy to guarantee same-origin (no CORS tainting).
+    const proxied = proxyUrl(mapImageUrl);
     const img = new window.Image();
     img.crossOrigin = 'anonymous';
-    img.onload = setupCanvas;
+    img.onload = addImageToCanvas;
     img.onerror = () => {
+      // If proxy fails, try direct URL without CORS — image still
+      // displays but PNG export will fall back to JSON sync.
       const retry = new window.Image();
-      retry.onload = setupCanvas;
-      retry.onerror = setupFallbackLayers;
+      retry.onload = addImageToCanvas;
+      retry.onerror = () => {}; // Layers already set up
       retry.src = mapImageUrl;
     };
-    img.src = mapImageUrl;
+    img.src = proxied;
   }
 
   // Cleanup autosave on unmount
@@ -447,6 +518,17 @@ export function useDmLocationEditor(
         opacity: gridOpacity,
       };
       vp.addGrid(settings);
+
+      // Move grid to the background layer so it renders behind annotations
+      const bgLayer = vp.layerManager.getLayers()[0];
+      const gridEls = vp.store.getElementsByType('grid');
+      if (bgLayer) {
+        for (const g of gridEls) {
+          vp.layerManager.moveElementToLayer(g.id, bgLayer.id);
+        }
+      }
+      vp.requestRender();
+
       setGridEnabled(true);
       setGridType(type);
       storeUpdateLocation(campaignCode, location.id, {
@@ -564,22 +646,57 @@ export function useDmLocationEditor(
 
       let blob: Blob | null = null;
       try {
-        blob = await vp.exportImage({
-          scale: 2,
+        // Cap export so the largest dimension stays under 4096px
+        // to avoid massive PNGs on large maps
+        const maxDim = Math.max(
+          location.mapImageSize.w,
+          location.mapImageSize.h
+        );
+        const exportScale = maxDim > 2048 ? 1 : 2;
+        const pngBlob = await vp.exportImage({
+          scale: exportScale,
           padding: 0,
           filter: (el: { id: string }) => !currentDmOnly[el.id],
         });
+
+        // Convert PNG → JPEG for battle map sync (display-only, much smaller)
+        if (pngBlob && mode === 'battlemap') {
+          blob = await new Promise<Blob | null>(resolve => {
+            const img = new window.Image();
+            img.onload = () => {
+              const cvs = document.createElement('canvas');
+              cvs.width = img.width;
+              cvs.height = img.height;
+              const ctx = cvs.getContext('2d');
+              if (!ctx) {
+                resolve(pngBlob);
+                return;
+              }
+              ctx.drawImage(img, 0, 0);
+              cvs.toBlob(
+                jpegBlob => resolve(jpegBlob ?? pngBlob),
+                'image/jpeg',
+                0.85
+              );
+            };
+            img.onerror = () => resolve(pngBlob);
+            img.src = URL.createObjectURL(pngBlob);
+          });
+        } else {
+          blob = pngBlob;
+        }
       } catch (error) {
         console.warn('Failed to export image:', error);
         // exportImage can throw on tainted canvas (cross-origin images
         // without CORS). Fall through to JSON fallback.
       }
 
+      const ext = mode === 'battlemap' ? 'jpg' : 'png';
       if (blob) {
-        // Upload PNG to S3
+        // Upload snapshot to S3
         const assetId = `location-${location.id}-${Date.now()}`;
         const formData = new FormData();
-        formData.append('file', blob, `${assetId}.png`);
+        formData.append('file', blob, `${assetId}.${ext}`);
         formData.append('assetId', assetId);
 
         const uploadRes = await fetch('/api/assets/upload', {
@@ -609,29 +726,47 @@ export function useDmLocationEditor(
         });
       }
 
-      const payload = {
-        dmId,
-        location: {
-          id: location.id,
-          name: location.name,
-          mapImageUrl: location.mapImageUrl,
-          mapImageSize: location.mapImageSize,
-          snapshotUrl,
-          canvasState: filteredState,
-          gridEnabled,
-          gridSettings: location.gridSettings,
-          updatedAt: new Date().toISOString(),
-        },
+      const syncData = {
+        id: location.id,
+        name: location.name,
+        mapImageUrl: location.mapImageUrl,
+        mapImageSize: location.mapImageSize,
+        snapshotUrl,
+        canvasState: filteredState,
+        gridEnabled,
+        gridSettings: location.gridSettings,
+        updatedAt: new Date().toISOString(),
       };
 
-      const res = await fetch(
-        `/api/campaign/${campaignCode}/locations/${location.id}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+      // In battlemap mode, broadcast locally for instant TV display updates
+      if (mode === 'battlemap') {
+        try {
+          const channel = new BroadcastChannel(
+            `battlemap:${campaignCode}:${location.id}`
+          );
+          channel.postMessage(syncData);
+          channel.close();
+        } catch {
+          // BroadcastChannel not supported — Redis fallback handles it
         }
-      );
+      }
+
+      const payloadKey = mode === 'battlemap' ? 'battleMap' : 'location';
+      const payload = {
+        dmId,
+        [payloadKey]: syncData,
+      };
+
+      const endpoint =
+        mode === 'battlemap'
+          ? `/api/campaign/${campaignCode}/battlemaps/${location.id}`
+          : `/api/campaign/${campaignCode}/locations/${location.id}`;
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
       if (!res.ok) {
         throw new Error(`Sync failed with status ${res.status}`);
@@ -651,6 +786,7 @@ export function useDmLocationEditor(
     dmId,
     location,
     gridEnabled,
+    mode,
     storeGetLocation,
     onSyncToPlayers,
   ]);
@@ -661,8 +797,10 @@ export function useDmLocationEditor(
     const currentDmOnly =
       storeGetLocation(campaignCode, location.id)?.dmOnlyElements ?? {};
     try {
+      const maxDim = Math.max(location.mapImageSize.w, location.mapImageSize.h);
+      const exportScale = maxDim > 2048 ? 1 : 2;
       const blob = await vp.exportImage({
-        scale: 2,
+        scale: exportScale,
         padding: 0,
         filter: (el: { id: string }) => !currentDmOnly[el.id],
       });
@@ -679,7 +817,14 @@ export function useDmLocationEditor(
     } catch (err) {
       console.error('Export failed:', err);
     }
-  }, [getVp, campaignCode, location.id, location.name, storeGetLocation]);
+  }, [
+    getVp,
+    campaignCode,
+    location.id,
+    location.name,
+    location.mapImageSize,
+    storeGetLocation,
+  ]);
 
   const handleImageFileSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -712,6 +857,7 @@ export function useDmLocationEditor(
         });
       }
 
+      const proxiedSrc = proxyUrl(src);
       const img = new window.Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
@@ -723,6 +869,8 @@ export function useDmLocationEditor(
           x: vp.domLayer.clientWidth / 2,
           y: vp.domLayer.clientHeight / 2,
         });
+        // Add the original S3 URL to the canvas (not the proxy URL)
+        // so the JSON state stores the canonical URL
         vp.addImage(
           src,
           { x: center.x - w / 2, y: center.y - h / 2 },
@@ -731,12 +879,25 @@ export function useDmLocationEditor(
         setImageUploading(false);
       };
       img.onerror = () => setImageUploading(false);
-      img.src = src;
+      img.src = proxiedSrc;
     },
     [getVp]
   );
 
+  const handleOpenTvDisplay = useCallback(() => {
+    window.open(
+      `/dm/campaign/${campaignCode}/battlemaps/${location.id}/display`,
+      '_blank'
+    );
+  }, [campaignCode, location.id]);
+
+  const handleFitToMap = useCallback(() => {
+    const vp = getVp();
+    if (vp) _fitCameraToMap(vp, location.mapImageSize);
+  }, [getVp, location.mapImageSize]);
+
   return {
+    mode,
     canvasRef,
     fileInputRef,
     tools,
@@ -794,5 +955,7 @@ export function useDmLocationEditor(
     handleSyncToPlayers,
     handleDownloadExport,
     handleImageFileSelect,
+    handleOpenTvDisplay,
+    handleFitToMap,
   };
 }

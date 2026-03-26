@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, MapPinned, Plus } from 'lucide-react';
+import { ArrowLeft, Map, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -16,32 +16,32 @@ import {
   DialogFooter,
   DialogTrigger,
 } from '@/components/ui/feedback/dialog';
-import { LocationListCard } from '@/components/ui/campaign/location-map/LocationListCard';
-import { useLocationStore, generateLocationId } from '@/store/locationStore';
+import { BattleMapListCard } from '@/components/ui/campaign/battle-map/BattleMapListCard';
+import { useBattleMapStore, generateBattleMapId } from '@/store/battleMapStore';
 import { useHydration } from '@/hooks/useHydration';
 import { useDmStore } from '@/store/dmStore';
 
-export default function CampaignLocationsPage() {
+export default function CampaignBattleMapsPage() {
   const params = useParams();
   const router = useRouter();
   const code = params.code as string;
   const hasHydrated = useHydration();
   const { getCampaign, dmId } = useDmStore();
   const campaign = getCampaign(code);
-  const { getLocations, addLocation, removeLocation } = useLocationStore();
+  const { getBattleMaps, addBattleMap, removeBattleMap } = useBattleMapStore();
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [locationName, setLocationName] = useState('');
+  const [mapName, setMapName] = useState('');
   const [mapFile, setMapFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const locations = hasHydrated ? getLocations(code) : [];
+  const battleMaps = hasHydrated ? getBattleMaps(code) : [];
 
   function handleDialogClose(open: boolean) {
     if (!open) {
-      setLocationName('');
+      setMapName('');
       setMapFile(null);
       setUploadError('');
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -51,13 +51,13 @@ export default function CampaignLocationsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!locationName.trim() || !mapFile) return;
+    if (!mapName.trim() || !mapFile) return;
 
     setUploading(true);
     setUploadError('');
 
     try {
-      const assetId = generateLocationId();
+      const assetId = generateBattleMapId();
       const formData = new FormData();
       formData.append('file', mapFile);
       formData.append('assetId', assetId);
@@ -67,13 +67,10 @@ export default function CampaignLocationsPage() {
         body: formData,
       });
 
-      if (!res.ok) {
-        throw new Error('Upload failed');
-      }
+      if (!res.ok) throw new Error('Upload failed');
 
       const { url } = (await res.json()) as { url: string };
 
-      // Get image dimensions
       const { w, h } = await new Promise<{ w: number; h: number }>(
         (resolve, reject) => {
           const img = new Image();
@@ -84,22 +81,23 @@ export default function CampaignLocationsPage() {
         }
       );
 
-      const newId = generateLocationId();
-      addLocation(code, {
+      const newId = generateBattleMapId();
+      addBattleMap(code, {
         id: newId,
         campaignCode: code,
-        name: locationName.trim(),
+        name: mapName.trim(),
         mapImageUrl: url,
         mapImageSize: { w, h },
         canvasState: '',
         dmOnlyElements: {},
         gridEnabled: false,
+        linkedEncounterIds: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
 
       setDialogOpen(false);
-      router.push(`/dm/campaign/${code}/locations/${newId}`);
+      router.push(`/dm/campaign/${code}/battlemaps/${newId}`);
     } catch {
       setUploadError('Failed to upload image. Please try again.');
     } finally {
@@ -131,8 +129,8 @@ export default function CampaignLocationsPage() {
                 </Button>
               </Link>
               <div className="ml-6 flex items-center">
-                <MapPinned className="text-accent-emerald-text mr-3 h-6 w-6" />
-                <h1 className="text-heading text-xl font-bold">Locations</h1>
+                <Map className="text-accent-orange-text mr-3 h-6 w-6" />
+                <h1 className="text-heading text-xl font-bold">Battle Maps</h1>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -143,23 +141,23 @@ export default function CampaignLocationsPage() {
                     size="sm"
                     leftIcon={<Plus size={16} />}
                   >
-                    New Location
+                    New Battle Map
                   </Button>
                 </DialogTrigger>
                 <DialogContent size="sm">
                   <DialogHeader>
-                    <DialogTitle>New Location</DialogTitle>
+                    <DialogTitle>New Battle Map</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleSubmit}>
                     <DialogBody className="flex flex-col gap-4 px-6 pt-4">
                       <div>
                         <label className="text-body mb-1.5 block text-sm font-medium">
-                          Location Name
+                          Battle Map Name
                         </label>
                         <Input
-                          value={locationName}
-                          onChange={e => setLocationName(e.target.value)}
-                          placeholder="e.g. Tavern, Dungeon Level 1"
+                          value={mapName}
+                          onChange={e => setMapName(e.target.value)}
+                          placeholder="e.g. Goblin Ambush, Dragon Lair"
                           required
                           autoFocus
                         />
@@ -171,7 +169,7 @@ export default function CampaignLocationsPage() {
                         <div
                           onClick={() => fileInputRef.current?.click()}
                           className={`border-divider bg-surface hover:border-body flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6 transition-colors ${
-                            mapFile ? 'border-accent-emerald-border' : ''
+                            mapFile ? 'border-accent-orange-border' : ''
                           }`}
                         >
                           <input
@@ -186,9 +184,9 @@ export default function CampaignLocationsPage() {
                           />
                           {mapFile ? (
                             <div className="flex flex-col items-center gap-1">
-                              <MapPinned
+                              <Map
                                 size={24}
-                                className="text-accent-emerald-text"
+                                className="text-accent-orange-text"
                               />
                               <span className="text-body text-sm font-medium">
                                 {mapFile.name}
@@ -228,9 +226,9 @@ export default function CampaignLocationsPage() {
                       <Button
                         type="submit"
                         variant="primary"
-                        disabled={uploading || !locationName.trim() || !mapFile}
+                        disabled={uploading || !mapName.trim() || !mapFile}
                       >
-                        {uploading ? 'Uploading...' : 'Create Location'}
+                        {uploading ? 'Uploading...' : 'Create Battle Map'}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -243,31 +241,28 @@ export default function CampaignLocationsPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {locations.length === 0 ? (
+        {battleMaps.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <MapPinned className="text-muted mb-4 h-12 w-12" />
+            <Map className="text-muted mb-4 h-12 w-12" />
             <p className="text-heading mb-1 text-lg font-semibold">
-              No locations yet
+              No battle maps yet
             </p>
             <p className="text-muted text-sm">Upload a map to get started.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {locations.map(location => (
-              <LocationListCard
-                key={location.id}
-                location={location}
+            {battleMaps.map(bm => (
+              <BattleMapListCard
+                key={bm.id}
+                battleMap={bm}
                 campaignCode={code}
                 onDelete={id => {
-                  removeLocation(code, id);
-                  // Also remove from Redis so players no longer see it
-                  fetch(`/api/campaign/${code}/locations/${id}`, {
+                  removeBattleMap(code, id);
+                  fetch(`/api/campaign/${code}/battlemaps/${id}`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ dmId }),
-                  }).catch(() => {
-                    // Best-effort — local delete already happened
-                  });
+                  }).catch(() => {});
                 }}
               />
             ))}

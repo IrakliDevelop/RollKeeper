@@ -3,20 +3,20 @@
 import React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, MapPinned } from 'lucide-react';
+import { ArrowLeft, Map } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
-import { useLocationStore } from '@/store/locationStore';
+import { useBattleMapStore } from '@/store/battleMapStore';
 import { useHydration } from '@/hooks/useHydration';
 import { useDmStore } from '@/store/dmStore';
 
-export default function LocationEditorPage() {
+export default function BattleMapEditorPage() {
   const params = useParams();
   const code = params.code as string;
   const id = params.id as string;
   const hasHydrated = useHydration();
-  const { getLocation, updateLocation } = useLocationStore();
+  const { getBattleMap, updateBattleMap } = useBattleMapStore();
   const { dmId } = useDmStore();
 
   if (!hasHydrated) {
@@ -27,15 +27,17 @@ export default function LocationEditorPage() {
     );
   }
 
-  const location = getLocation(code, id);
+  const battleMap = getBattleMap(code, id);
 
-  if (!location) {
+  if (!battleMap) {
     return (
       <div className="bg-surface flex min-h-screen flex-col items-center justify-center gap-4">
-        <p className="text-heading text-lg font-semibold">Location not found</p>
-        <Link href={`/dm/campaign/${code}/locations`}>
+        <p className="text-heading text-lg font-semibold">
+          Battle map not found
+        </p>
+        <Link href={`/dm/campaign/${code}/battlemaps`}>
           <Button variant="ghost" leftIcon={<ArrowLeft size={16} />}>
-            Back to Locations
+            Back to Battle Maps
           </Button>
         </Link>
       </div>
@@ -43,7 +45,7 @@ export default function LocationEditorPage() {
   }
 
   function handleSave(canvasState: string) {
-    updateLocation(code, id, {
+    updateBattleMap(code, id, {
       canvasState,
       updatedAt: new Date().toISOString(),
     });
@@ -60,19 +62,19 @@ export default function LocationEditorPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center">
-              <Link href={`/dm/campaign/${code}/locations`}>
+              <Link href={`/dm/campaign/${code}/battlemaps`}>
                 <Button
                   variant="ghost"
                   size="sm"
                   leftIcon={<ArrowLeft size={20} />}
                 >
-                  Locations
+                  Battle Maps
                 </Button>
               </Link>
               <div className="ml-6 flex items-center">
-                <MapPinned className="text-accent-emerald-text mr-3 h-6 w-6" />
+                <Map className="text-accent-orange-text mr-3 h-6 w-6" />
                 <h1 className="text-heading text-xl font-bold">
-                  {location.name}
+                  {battleMap.name}
                 </h1>
               </div>
             </div>
@@ -83,9 +85,10 @@ export default function LocationEditorPage() {
 
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <DmLocationEditor
-          location={location}
+          location={battleMap}
           campaignCode={code}
           dmId={dmId}
+          mode="battlemap"
           onSave={handleSave}
           onSyncToPlayers={handleSyncToPlayers}
         />

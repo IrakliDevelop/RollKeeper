@@ -99,3 +99,4 @@ temp/
 
 *storybook.log
 storybook-static
+.superpowers/

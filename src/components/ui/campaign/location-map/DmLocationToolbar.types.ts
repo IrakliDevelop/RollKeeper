@@ -1,3 +1,5 @@
+import type { EditorMode } from './DmLocationEditor.types';
+
 export interface DmLocationToolbarProps {
   activeTool: string;
   onToolChange: (name: string) => void;
@@ -29,4 +31,7 @@ export interface DmLocationToolbarProps {
   hasUnsyncedChanges: boolean;
   /** ISO timestamp of last successful sync, or null if never synced */
   lastSyncedAt: string | null;
+  mode?: EditorMode;
+  onOpenTvDisplay?: () => void;
+  onFitToMap?: () => void;
 }

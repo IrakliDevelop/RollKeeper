@@ -113,6 +113,9 @@ interface EncounterStoreState {
     actionId: string
   ) => void;
   resetLairActions: (encounterId: string, entityId: string) => void;
+
+  // Queries
+  getEncountersByCampaign: (campaignCode: string) => Encounter[];
 }
 
 // Helper to update an entity within an encounter
@@ -753,6 +756,12 @@ export const useEncounterStore = create<EncounterStoreState>()(
             })
           ),
         }));
+      },
+
+      // Queries
+
+      getEncountersByCampaign: campaignCode => {
+        return get().encounters.filter(e => e.campaignCode === campaignCode);
       },
     }),
     {

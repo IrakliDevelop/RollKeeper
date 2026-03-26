@@ -56,6 +56,17 @@ export function campaignLocationKey(code: string, locationId: string): string {
   return `campaign:${code}:location:${locationId}`;
 }
 
+export function campaignBattleMapsKey(code: string): string {
+  return `campaign:${code}:battlemaps`;
+}
+
+export function campaignBattleMapKey(
+  code: string,
+  battleMapId: string
+): string {
+  return `campaign:${code}:battlemap:${battleMapId}`;
+}
+
 export async function refreshCampaignTTL(
   redis: Redis,
   code: string
@@ -64,6 +75,7 @@ export async function refreshCampaignTTL(
     redis.expire(campaignKey(code), SLIDING_TTL_SECONDS),
     redis.expire(campaignPlayersKey(code), SLIDING_TTL_SECONDS),
     redis.expire(campaignLocationsKey(code), SLIDING_TTL_SECONDS),
+    redis.expire(campaignBattleMapsKey(code), SLIDING_TTL_SECONDS),
   ]);
 }
 

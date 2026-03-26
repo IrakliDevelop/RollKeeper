@@ -11,11 +11,12 @@ import {
   Undo2,
   Redo2,
   Trash2,
-  Grid3X3,
   Loader2,
   Upload,
   Check,
   AlertCircle,
+  ExternalLink,
+  Maximize,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import DmOnlyToggle from './DmOnlyToggle';
@@ -68,6 +69,9 @@ export default function DmLocationToolbar({
   selectedElementId,
   isDmOnly,
   onToggleDmOnly,
+  mode,
+  onOpenTvDisplay,
+  onFitToMap,
 }: DmLocationToolbarProps) {
   return (
     <div className="border-divider bg-surface-raised flex items-center gap-1 border-b px-2 py-1">
@@ -107,6 +111,14 @@ export default function DmLocationToolbar({
           className="h-8 w-8 p-0"
         >
           <Redo2 size={15} />
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={onFitToMap}
+          title="Fit map to screen"
+          className="h-8 w-8 p-0"
+        >
+          <Maximize size={15} />
         </Button>
         <Button
           variant="ghost"
@@ -261,23 +273,35 @@ export default function DmLocationToolbar({
             </span>
           )}
 
+          {mode === 'battlemap' && onOpenTvDisplay && (
+            <Button
+              variant="outline"
+              onClick={onOpenTvDisplay}
+              className="flex items-center gap-1.5 px-3 py-1 text-xs"
+            >
+              <ExternalLink size={13} />
+              Open TV Display
+            </Button>
+          )}
           <Button
-            variant="primary"
+            variant={mode === 'battlemap' ? 'success' : 'primary'}
             onClick={onSyncToPlayers}
             disabled={syncing}
             className="flex items-center gap-1.5 px-3 py-1 text-xs"
           >
             {syncing ? <Loader2 size={13} className="animate-spin" /> : null}
-            Sync to Players
+            {mode === 'battlemap' ? 'Push to Display' : 'Sync to Players'}
           </Button>
-          <Button
-            variant="ghost"
-            onClick={onDownloadExport}
-            title="Download PNG export (debug)"
-            className="h-8 w-8 p-0"
-          >
-            <Upload size={15} className="rotate-180" />
-          </Button>
+          {mode !== 'battlemap' && (
+            <Button
+              variant="ghost"
+              onClick={onDownloadExport}
+              title="Download PNG export (debug)"
+              className="h-8 w-8 p-0"
+            >
+              <Upload size={15} className="rotate-180" />
+            </Button>
+          )}
         </div>
       </div>
     </div>

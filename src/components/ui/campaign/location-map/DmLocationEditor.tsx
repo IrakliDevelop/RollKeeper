@@ -15,6 +15,9 @@ import { Button } from '@/components/ui/forms/button';
 import DmLocationToolbar from './DmLocationToolbar';
 import { useDmLocationEditor } from './DmLocationEditor.hooks';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
+import { useBattleMapStore } from '@/store/battleMapStore';
+import type { BattleMap } from '@/types/battlemap';
+import EncounterLinkingPanel from '../battle-map/EncounterLinkingPanel';
 
 const COLOR_SWATCHES = [
   '#334155',
@@ -39,6 +42,9 @@ const NOTE_TEXT_COLORS = [
 ];
 
 export default function DmLocationEditor(props: DmLocationEditorProps) {
+  const linkEncounter = useBattleMapStore(s => s.linkEncounter);
+  const unlinkEncounter = useBattleMapStore(s => s.unlinkEncounter);
+
   const {
     canvasRef,
     fileInputRef,
@@ -94,6 +100,9 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handleSyncToPlayers,
     handleDownloadExport,
     handleImageFileSelect,
+    mode,
+    handleOpenTvDisplay,
+    handleFitToMap,
   } = useDmLocationEditor(props);
 
   // Determine the active primary color for the contextual color picker
@@ -157,6 +166,9 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
         selectedElementId={selectedElementId}
         isDmOnly={isDmOnly}
         onToggleDmOnly={handleToggleDmOnly}
+        mode={mode}
+        onOpenTvDisplay={handleOpenTvDisplay}
+        onFitToMap={handleFitToMap}
       />
 
       {/* Contextual options bar */}
@@ -387,15 +399,20 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
               {[...layers].reverse().map(layer => {
                 const vp = canvasRef.current?.viewport;
                 const isActive = layer.id === activeLayerId;
+                const isBgLayer = layer.name === 'Map Background';
 
                 return (
                   <div
                     key={layer.id}
-                    onClick={() => vp?.layerManager.setActiveLayer(layer.id)}
-                    className={`flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors ${
-                      isActive
-                        ? 'bg-accent-blue-bg text-accent-blue-text'
-                        : 'text-body hover:bg-surface-secondary'
+                    onClick={() => {
+                      if (!isBgLayer) vp?.layerManager.setActiveLayer(layer.id);
+                    }}
+                    className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors ${
+                      isBgLayer
+                        ? 'text-muted cursor-default opacity-60'
+                        : isActive
+                          ? 'bg-accent-blue-bg text-accent-blue-text cursor-pointer'
+                          : 'text-body hover:bg-surface-secondary cursor-pointer'
                     }`}
                   >
                     {/* Visibility */}
@@ -417,43 +434,49 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                       )}
                     </button>
 
-                    {/* Lock */}
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        vp?.layerManager.setLayerLocked(
-                          layer.id,
-                          !layer.locked
-                        );
-                      }}
-                      title={layer.locked ? 'Unlock layer' : 'Lock layer'}
-                      className="shrink-0"
-                    >
-                      {layer.locked ? (
-                        <Lock size={11} className="text-accent-amber-text" />
-                      ) : (
-                        <Unlock size={11} className="text-muted" />
-                      )}
-                    </button>
+                    {/* Lock (hidden for background layer) */}
+                    {isBgLayer ? (
+                      <Lock size={11} className="text-muted shrink-0" />
+                    ) : (
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          vp?.layerManager.setLayerLocked(
+                            layer.id,
+                            !layer.locked
+                          );
+                        }}
+                        title={layer.locked ? 'Unlock layer' : 'Lock layer'}
+                        className="shrink-0"
+                      >
+                        {layer.locked ? (
+                          <Lock size={11} className="text-accent-amber-text" />
+                        ) : (
+                          <Unlock size={11} className="text-muted" />
+                        )}
+                      </button>
+                    )}
 
                     {/* Name */}
                     <span className="min-w-0 flex-1 truncate">
                       {layer.name}
                     </span>
 
-                    {/* Delete layer (only if more than one layer) */}
-                    {layers.length > 1 && (
-                      <button
-                        onClick={e => {
-                          e.stopPropagation();
-                          vp?.layerManager.removeLayer(layer.id);
-                        }}
-                        className="text-muted hover:text-accent-red-text shrink-0"
-                        title="Delete layer"
-                      >
-                        <X size={11} />
-                      </button>
-                    )}
+                    {/* Delete layer (not for bg layer, and only if more than one non-bg layer) */}
+                    {!isBgLayer &&
+                      layers.filter(l => l.name !== 'Map Background').length >
+                        1 && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            vp?.layerManager.removeLayer(layer.id);
+                          }}
+                          className="text-muted hover:text-accent-red-text shrink-0"
+                          title="Delete layer"
+                        >
+                          <X size={11} />
+                        </button>
+                      )}
                   </div>
                 );
               })}
@@ -463,6 +486,21 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             <div className="border-divider text-muted border-t px-3 py-2 text-xs">
               {elementCount} element{elementCount !== 1 ? 's' : ''}
             </div>
+
+            {mode === 'battlemap' && (
+              <EncounterLinkingPanel
+                campaignCode={props.campaignCode}
+                linkedEncounterIds={
+                  (props.location as BattleMap).linkedEncounterIds ?? []
+                }
+                onLink={id =>
+                  linkEncounter(props.campaignCode, props.location.id, id)
+                }
+                onUnlink={id =>
+                  unlinkEncounter(props.campaignCode, props.location.id, id)
+                }
+              />
+            )}
           </div>
         )}
 
