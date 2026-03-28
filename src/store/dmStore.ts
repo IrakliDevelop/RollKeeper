@@ -24,6 +24,11 @@ interface DmStoreState {
     code: string,
     playerCharacterId: string
   ) => string | undefined;
+  /** Merge-persist DM dashboard section open/close (Players, NPCs on campaign page). */
+  setDmDashboardUi: (
+    code: string,
+    partial: Partial<{ playersSectionOpen: boolean; npcSectionOpen: boolean }>
+  ) => void;
 }
 
 function generateDmId(): string {
@@ -117,6 +122,21 @@ export const useDmStore = create<DmStoreState>()(
       getPlayerColor: (code, playerCharacterId) => {
         const campaign = get().campaigns.find(c => c.code === code);
         return campaign?.playerColors?.[playerCharacterId];
+      },
+
+      setDmDashboardUi: (code, partial) => {
+        set(state => ({
+          campaigns: state.campaigns.map(c => {
+            if (c.code !== code) return c;
+            return {
+              ...c,
+              dmDashboardUi: {
+                ...c.dmDashboardUi,
+                ...partial,
+              },
+            };
+          }),
+        }));
       },
     }),
     {

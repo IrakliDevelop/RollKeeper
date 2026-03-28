@@ -23,4 +23,9 @@ export interface CampaignInfo {
   playerCounters?: Record<string, number>; // playerId → counter value
   playerColors?: Record<string, string>; // playerCharacterId → color hex
   bannerUrl?: string; // S3 URL for campaign banner image
+  /** DM campaign page: collapsible Players / NPCs sections (persisted in localStorage). */
+  dmDashboardUi?: {
+    playersSectionOpen?: boolean;
+    npcSectionOpen?: boolean;
+  };
 }

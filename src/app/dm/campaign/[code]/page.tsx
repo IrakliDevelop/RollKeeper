@@ -16,6 +16,8 @@ import {
   MessageSquare,
   Map,
   MapPinned,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -41,6 +43,7 @@ export default function CampaignViewPage() {
     setCustomCounterLabel,
     adjustPlayerCounter,
     updateCampaign,
+    setDmDashboardUi,
   } = useDmStore();
   const localCampaign = getCampaign(code);
 
@@ -66,6 +69,9 @@ export default function CampaignViewPage() {
   >(null);
   const { toasts, addToast, dismissToast } = useToast();
   const knownPlayerIdsRef = useRef<Set<string>>(new Set());
+
+  const playersSectionOpen =
+    localCampaign?.dmDashboardUi?.playersSectionOpen ?? true;
 
   const customCounterLabel = localCampaign?.customCounterLabel;
 
@@ -345,21 +351,43 @@ export default function CampaignViewPage() {
           <>
             {/* Players header + custom counter config */}
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Users size={20} className="text-muted" />
-                  <h2 className="text-heading text-lg font-semibold">
-                    Players ({players.length})
-                  </h2>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<MessageSquare size={14} />}
-                  onClick={() => setMessageTarget('all')}
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDmDashboardUi(code, {
+                      playersSectionOpen: !playersSectionOpen,
+                    })
+                  }
+                  className="text-muted hover:text-body hover:bg-surface-secondary shrink-0 rounded-md p-1 transition-colors"
+                  aria-expanded={playersSectionOpen}
+                  aria-controls="dm-campaign-players-section"
+                  title={
+                    playersSectionOpen ? 'Collapse players' : 'Expand players'
+                  }
                 >
-                  Message All
-                </Button>
+                  {playersSectionOpen ? (
+                    <ChevronDown size={20} />
+                  ) : (
+                    <ChevronRight size={20} />
+                  )}
+                </button>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+                  <div className="flex items-center gap-2">
+                    <Users size={20} className="text-muted shrink-0" />
+                    <h2 className="text-heading text-lg font-semibold">
+                      Players ({players.length})
+                    </h2>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<MessageSquare size={14} />}
+                    onClick={() => setMessageTarget('all')}
+                  >
+                    Message All
+                  </Button>
+                </div>
               </div>
 
               {/* Custom counter label config */}
@@ -414,25 +442,30 @@ export default function CampaignViewPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {players.map(player => (
-                <PlayerSummaryCard
-                  key={player.playerId}
-                  player={player}
-                  customCounterLabel={customCounterLabel}
-                  counterValue={
-                    localCampaign?.playerCounters?.[player.playerId] ?? 0
-                  }
-                  onAdjustCounter={
-                    customCounterLabel
-                      ? delta =>
-                          adjustPlayerCounter(code, player.playerId, delta)
-                      : undefined
-                  }
-                  onClick={() => setSelectedPlayer(player)}
-                />
-              ))}
-            </div>
+            {playersSectionOpen && (
+              <div
+                id="dm-campaign-players-section"
+                className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+              >
+                {players.map(player => (
+                  <PlayerSummaryCard
+                    key={player.playerId}
+                    player={player}
+                    customCounterLabel={customCounterLabel}
+                    counterValue={
+                      localCampaign?.playerCounters?.[player.playerId] ?? 0
+                    }
+                    onAdjustCounter={
+                      customCounterLabel
+                        ? delta =>
+                            adjustPlayerCounter(code, player.playerId, delta)
+                        : undefined
+                    }
+                    onClick={() => setSelectedPlayer(player)}
+                  />
+                ))}
+              </div>
+            )}
           </>
         )}
 

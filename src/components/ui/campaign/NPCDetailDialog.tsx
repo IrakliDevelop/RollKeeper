@@ -15,6 +15,7 @@ import {
   Minus,
   Scale,
   Coins,
+  Pencil,
 } from 'lucide-react';
 import {
   Dialog,
@@ -37,6 +38,10 @@ import { useItemsData } from '@/hooks/useItemsData';
 import { useMagicItemsData } from '@/hooks/useMagicItemsData';
 import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
 import { formatCurrencyFromCopper } from '@/utils/currency';
+import {
+  npcInventoryItemToFormData,
+  formDataToNpcInventoryPatch,
+} from '@/utils/npcInventoryItemForm';
 
 type DetailTab = 'stats' | 'inventory' | 'lore';
 
@@ -172,11 +177,13 @@ function InventoryItemCard({
   item,
   onRemove,
   onClick,
+  onEdit,
   onQuantityChange,
 }: {
   item: NPCInventoryItem;
   onRemove?: () => void;
   onClick?: () => void;
+  onEdit?: () => void;
   onQuantityChange?: (quantity: number) => void;
 }) {
   const borderClass =
@@ -202,11 +209,22 @@ function InventoryItemCard({
             {item.name}
           </span>
           <div
-            className="flex shrink-0 items-center"
+            className="flex shrink-0 items-center gap-0.5"
             onClick={e => e.stopPropagation()}
           >
+            {onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="text-muted hover:text-accent-blue-text p-0.5 transition-colors"
+                title="Edit item"
+              >
+                <Pencil size={12} />
+              </button>
+            )}
             {onRemove && (
               <button
+                type="button"
                 onClick={onRemove}
                 className="text-muted hover:text-accent-red-text p-0.5 transition-colors"
                 title="Remove"
@@ -277,9 +295,11 @@ function InventoryItemCard({
 function NPCItemViewModal({
   item,
   onClose,
+  onEdit,
 }: {
   item: NPCInventoryItem | null;
   onClose: () => void;
+  onEdit?: () => void;
 }) {
   if (!item) return null;
 
@@ -397,6 +417,12 @@ function NPCItemViewModal({
         </DialogBody>
 
         <DialogFooter>
+          {onEdit && (
+            <Button onClick={onEdit} variant="primary" size="sm">
+              <Pencil className="mr-1.5 h-3.5 w-3.5" />
+              Edit
+            </Button>
+          )}
           <Button onClick={onClose} variant="ghost" size="sm">
             Close
           </Button>
@@ -416,7 +442,9 @@ export function NPCDetailDialog({
 }: NPCDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('stats');
   const [showFullImage, setShowFullImage] = useState(false);
-  const [showAddItem, setShowAddItem] = useState(false);
+  const [inventoryFormOpen, setInventoryFormOpen] = useState(false);
+  const [inventoryFormEditingItem, setInventoryFormEditingItem] =
+    useState<NPCInventoryItem | null>(null);
   const [viewingItem, setViewingItem] = useState<NPCInventoryItem | null>(null);
 
   const { items: dbItems, loading: dbItemsLoading } = useItemsData();
@@ -425,27 +453,37 @@ export function NPCDetailDialog({
   React.useEffect(() => {
     if (!open) {
       setShowFullImage(false);
-      setShowAddItem(false);
+      setInventoryFormOpen(false);
+      setInventoryFormEditingItem(null);
       setViewingItem(null);
     }
   }, [open]);
 
-  const handleAddItem = (data: InventoryFormData) => {
+  const handleInventoryFormSubmit = (data: InventoryFormData) => {
     if (!npc || !onUpdateInventory) return;
-    const newItem: NPCInventoryItem = {
-      id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      name: data.name,
-      quantity: data.quantity,
-      category: data.category,
-      weight: data.weight,
-      value: data.value,
-      rarity: data.rarity,
-      description: data.description || undefined,
-      type: data.type,
-    };
-    const updated = [...(npc.inventory ?? []), newItem];
-    onUpdateInventory(npc.id, updated);
-    setShowAddItem(false);
+    if (inventoryFormEditingItem) {
+      const updated = (npc.inventory ?? []).map(i =>
+        i.id === inventoryFormEditingItem.id
+          ? formDataToNpcInventoryPatch(data, i)
+          : i
+      );
+      onUpdateInventory(npc.id, updated);
+    } else {
+      const newItem: NPCInventoryItem = {
+        id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        name: data.name,
+        quantity: data.quantity,
+        category: data.category,
+        weight: data.weight,
+        value: data.value,
+        rarity: data.rarity,
+        description: data.description || undefined,
+        type: data.type,
+      };
+      onUpdateInventory(npc.id, [...(npc.inventory ?? []), newItem]);
+    }
+    setInventoryFormOpen(false);
+    setInventoryFormEditingItem(null);
   };
 
   const handleRemoveItem = (itemId: string) => {
@@ -634,6 +672,14 @@ export function NPCDetailDialog({
                       key={item.id}
                       item={item}
                       onClick={() => setViewingItem(item)}
+                      onEdit={
+                        onUpdateInventory
+                          ? () => {
+                              setInventoryFormEditingItem(item);
+                              setInventoryFormOpen(true);
+                            }
+                          : undefined
+                      }
                       onRemove={
                         onUpdateInventory
                           ? () => handleRemoveItem(item.id)
@@ -658,7 +704,10 @@ export function NPCDetailDialog({
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => setShowAddItem(true)}
+                    onClick={() => {
+                      setInventoryFormEditingItem(null);
+                      setInventoryFormOpen(true);
+                    }}
                   >
                     <Plus className="mr-1.5 h-4 w-4" />
                     Add Item
@@ -748,16 +797,32 @@ export function NPCDetailDialog({
       <NPCItemViewModal
         item={viewingItem}
         onClose={() => setViewingItem(null)}
+        onEdit={
+          onUpdateInventory && viewingItem
+            ? () => {
+                const v = viewingItem;
+                setViewingItem(null);
+                setInventoryFormEditingItem(v);
+                setInventoryFormOpen(true);
+              }
+            : undefined
+        }
       />
 
-      {/* Stacked Add Item modal */}
       <ItemForm
-        isOpen={showAddItem}
-        onClose={() => setShowAddItem(false)}
-        onSubmit={handleAddItem}
-        initialData={initialInventoryFormData}
+        isOpen={inventoryFormOpen}
+        onClose={() => {
+          setInventoryFormOpen(false);
+          setInventoryFormEditingItem(null);
+        }}
+        onSubmit={handleInventoryFormSubmit}
+        initialData={
+          inventoryFormEditingItem
+            ? npcInventoryItemToFormData(inventoryFormEditingItem)
+            : initialInventoryFormData
+        }
         availableLocations={[]}
-        isEditing={false}
+        isEditing={!!inventoryFormEditingItem}
         databaseItems={dbItems}
         databaseMagicItems={dbMagicItems}
         itemsLoading={dbItemsLoading}

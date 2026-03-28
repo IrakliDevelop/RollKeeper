@@ -106,15 +106,15 @@ export function ItemForm({
   const [customLocation, setCustomLocation] = useState('');
   const [showCustomLocation, setShowCustomLocation] = useState(false);
 
-  // Reset form when initialData changes
+  const initialDataSnapshot = JSON.stringify(initialData);
+
   React.useEffect(() => {
-    if (isOpen) {
-      setFormData(initialData);
-      setTagInput('');
-      setCustomLocation('');
-      setShowCustomLocation(false);
-    }
-  }, [isOpen, initialData]);
+    if (!isOpen) return;
+    setFormData(initialData);
+    setTagInput('');
+    setCustomLocation('');
+    setShowCustomLocation(false);
+  }, [isOpen, initialDataSnapshot]);
 
   const handleItemSelect = (item: ProcessedItem) => {
     setFormData(convertProcessedItemToFormData(item));

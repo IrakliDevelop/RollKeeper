@@ -7,6 +7,7 @@ import {
   X,
   Plus,
   Trash2,
+  Edit3,
   ImageIcon,
   ChevronDown,
   ChevronUp,
@@ -40,6 +41,15 @@ import { ItemAutocomplete } from '@/components/ui/forms/ItemAutocomplete';
 import { useItemsData } from '@/hooks/useItemsData';
 import { useMagicItemsData } from '@/hooks/useMagicItemsData';
 import { formatCurrencyFromCopper } from '@/utils/currency';
+import {
+  ItemForm,
+  initialInventoryFormData,
+} from '@/components/ui/game/inventory/ItemForm';
+import type { InventoryFormData } from '@/components/ui/game/inventory/ItemForm';
+import {
+  npcInventoryItemToFormData,
+  formDataToNpcInventoryPatch,
+} from '@/utils/npcInventoryItemForm';
 
 interface NamedText {
   name: string;
@@ -228,6 +238,10 @@ export function NPCFormDialog({
   // Inventory
   const [showInventory, setShowInventory] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<NPCInventoryItem[]>([]);
+  const [inventoryEditFormOpen, setInventoryEditFormOpen] = useState(false);
+  const [editingInventoryItemId, setEditingInventoryItemId] = useState<
+    string | null
+  >(null);
 
   // Lore
   const [showLore, setShowLore] = useState(false);
@@ -737,724 +751,34 @@ export function NPCFormDialog({
   const canSubmit = name.trim().length > 0;
   const submitLabel = editingNpc ? 'Save Changes' : 'Create NPC';
 
+  const editingInventoryItem = editingInventoryItemId
+    ? inventoryItems.find(i => i.id === editingInventoryItemId)
+    : undefined;
+
+  const handleInventoryEditSubmit = (data: InventoryFormData) => {
+    if (!editingInventoryItemId) return;
+    setInventoryItems(prev =>
+      prev.map(item =>
+        item.id === editingInventoryItemId
+          ? formDataToNpcInventoryPatch(data, item)
+          : item
+      )
+    );
+    setInventoryEditFormOpen(false);
+    setEditingInventoryItemId(null);
+  };
+
   // ---------- Render ----------
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader className="flex flex-col gap-3 space-y-0 pr-10 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <DialogTitle className="shrink-0">
-            {editingNpc ? 'Edit NPC' : 'Create NPC'}
-          </DialogTitle>
-          <div className="flex shrink-0 justify-end gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-            >
-              {submitLabel}
-            </Button>
-          </div>
-        </DialogHeader>
-        <DialogBody className="max-h-[70vh] overflow-y-auto">
-          <div className="space-y-5">
-            {/* ===== Bestiary Import (create only) ===== */}
-            {!editingNpc && (
-              <div className="space-y-2">
-                <div className="relative">
-                  <Search
-                    size={14}
-                    className="text-muted absolute top-1/2 left-3 -translate-y-1/2"
-                  />
-                  <input
-                    type="text"
-                    value={bestiaryQuery}
-                    onChange={e => setBestiaryQuery(e.target.value)}
-                    placeholder="Search bestiary to import..."
-                    className="bg-surface-secondary text-body border-divider placeholder:text-faint w-full rounded-md border py-2 pr-3 pl-9 text-sm focus:ring-1 focus:ring-(--color-accent-purple-border) focus:outline-none"
-                  />
-                  {bestiaryLoading && (
-                    <span className="text-muted absolute top-1/2 right-3 -translate-y-1/2 text-xs">
-                      Searching…
-                    </span>
-                  )}
-                </div>
-
-                {bestiaryResults.length > 0 && (
-                  <div className="border-divider bg-surface-raised max-h-48 overflow-y-auto rounded-md border">
-                    {bestiaryResults.map(m => (
-                      <button
-                        key={m.id}
-                        onClick={() => handleSelectMonster(m)}
-                        className="hover:bg-surface-secondary text-body flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors"
-                      >
-                        <span className="flex-1 font-medium">{m.name}</span>
-                        <span className="text-muted text-xs">CR {m.cr}</span>
-                        <span className="text-faint text-xs">
-                          {typeof m.type === 'string' ? m.type : m.type.type}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {bestiarySourceId && (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">
-                      Imported from: {bestiarySourceName}
-                    </Badge>
-                    <button
-                      onClick={clearBestiarySource}
-                      className="text-muted hover:text-body transition-colors"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ===== Portrait Upload ===== */}
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="border-divider bg-surface-secondary hover:border-accent-purple-border flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-colors"
-              >
-                {avatarUrl ? (
-                  <Image
-                    src={avatarUrl}
-                    alt="NPC portrait"
-                    width={64}
-                    height={64}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <ImageIcon size={24} className="text-muted" />
-                )}
-                {uploadingAvatar && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  </div>
-                )}
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarSelect}
-                className="hidden"
-              />
-              <div className="flex flex-col gap-1">
-                <span className="text-muted text-xs">
-                  {avatarUrl ? 'Portrait uploaded' : 'Click to upload portrait'}
-                </span>
-                {avatarUrl && (
-                  <button
-                    onClick={handleRemoveAvatar}
-                    className="text-accent-red-text text-xs hover:underline"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* ===== Name & Description ===== */}
-            <div className="space-y-3">
-              <Input
-                value={name}
-                onChange={e => setName(e.target.value)}
-                label="Name"
-                placeholder="NPC name"
-                required
-                autoFocus
-              />
-              <Input
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                label="Description"
-                placeholder="Brief description"
-              />
-            </div>
-
-            {/* ===== Group & Tags ===== */}
-            <div className="space-y-3">
-              <div>
-                <label className="text-heading mb-1.5 block text-sm font-medium">
-                  Group
-                </label>
-                <input
-                  type="text"
-                  list="npc-groups-datalist"
-                  value={group}
-                  onChange={e => setGroup(e.target.value)}
-                  placeholder="e.g. Bandits, Town Guard"
-                  className="bg-surface border-divider text-body placeholder:text-faint w-full rounded-md border px-3 py-2 text-sm focus:ring-1 focus:ring-(--color-accent-purple-border) focus:outline-none"
-                />
-                {existingGroups.length > 0 && (
-                  <datalist id="npc-groups-datalist">
-                    {existingGroups.map(g => (
-                      <option key={g} value={g} />
-                    ))}
-                  </datalist>
-                )}
-              </div>
-
-              <div>
-                <label className="text-heading mb-1.5 block text-sm font-medium">
-                  Tags
-                </label>
-                <div className="border-divider bg-surface flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5">
-                  {tags.map(tag => (
-                    <span
-                      key={tag}
-                      className="bg-accent-purple-bg text-accent-purple-text flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium"
-                    >
-                      {tag}
-                      <button
-                        type="button"
-                        onClick={() => removeTag(tag)}
-                        className="hover:text-heading transition-colors"
-                        aria-label={`Remove tag ${tag}`}
-                      >
-                        <X size={10} />
-                      </button>
-                    </span>
-                  ))}
-                  <input
-                    type="text"
-                    value={tagInput}
-                    onChange={e => setTagInput(e.target.value)}
-                    onKeyDown={handleTagKeyDown}
-                    onBlur={() => tagInput.trim() && addTag(tagInput)}
-                    placeholder={
-                      tags.length === 0 ? 'Add tags (Enter or comma)' : ''
-                    }
-                    className="text-body placeholder:text-faint min-w-28 flex-1 bg-transparent text-sm focus:outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* ===== Core Stats ===== */}
-            <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-2">
-                <SelectField label="Size" value={size} onValueChange={setSize}>
-                  {SIZES.map((s: string) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectField>
-                <SelectField
-                  label="Type"
-                  value={creatureType}
-                  onValueChange={setCreatureType}
-                >
-                  {CREATURE_TYPES.map((t: string) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectField>
-                <Input
-                  value={alignment}
-                  onChange={e => setAlignment(e.target.value)}
-                  label="Alignment"
-                  placeholder="Unaligned"
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <Input
-                  type="number"
-                  value={ac}
-                  onChange={e => setAc(parseInt(e.target.value) || 0)}
-                  label="AC"
-                  min={0}
-                />
-                <Input
-                  type="number"
-                  value={hp}
-                  onChange={e => setHp(parseInt(e.target.value) || 1)}
-                  label="HP"
-                  min={1}
-                />
-                <Input
-                  value={hpFormula}
-                  onChange={e => setHpFormula(e.target.value)}
-                  label="HP Formula"
-                  placeholder="2d8+2"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  value={speed}
-                  onChange={e => setSpeed(e.target.value)}
-                  label="Speed"
-                  placeholder="30 ft., fly 60 ft."
-                />
-                <Input
-                  type="number"
-                  value={initiativeModifier}
-                  onChange={e => {
-                    setInitiativeModifier(parseInt(e.target.value) || 0);
-                    setInitiativeOverridden(true);
-                  }}
-                  label="Init Mod"
-                  title="Initiative modifier (auto-calculated from DEX, overridable)"
-                />
-              </div>
-            </div>
-
-            {/* ===== Ability Scores ===== */}
-            <div>
-              <label className="text-heading mb-1.5 block text-sm font-medium">
-                Ability Scores
-              </label>
-              <div className="grid grid-cols-6 gap-2">
-                {(
-                  [
-                    ['STR', str, setStr],
-                    ['DEX', dex, setDex],
-                    ['CON', con, setCon],
-                    ['INT', int, setInt],
-                    ['WIS', wis, setWis],
-                    ['CHA', cha, setCha],
-                  ] as const
-                ).map(([label, value, setter]) => (
-                  <div key={label} className="text-center">
-                    <span className="text-muted block text-[10px] font-medium uppercase">
-                      {label}
-                    </span>
-                    <input
-                      type="number"
-                      value={value}
-                      onChange={e =>
-                        (
-                          setter as React.Dispatch<React.SetStateAction<number>>
-                        )(parseInt(e.target.value) || 0)
-                      }
-                      min={1}
-                      max={30}
-                      className="bg-surface border-divider text-heading w-full rounded border px-1 py-1 text-center text-sm"
-                    />
-                    <span className="text-muted text-[10px]">
-                      {abilityMod(value)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ===== Details (collapsible) ===== */}
-            <div>
-              <button
-                onClick={() => setShowDetails(v => !v)}
-                className="text-accent-purple-text flex items-center gap-1 text-sm font-medium hover:underline"
-              >
-                {showDetails ? (
-                  <>
-                    <ChevronUp size={14} /> Hide Details
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown size={14} /> Show Details
-                  </>
-                )}
-              </button>
-              {showDetails && (
-                <div className="mt-2 space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      value={saves}
-                      onChange={e => setSaves(e.target.value)}
-                      label="Saving Throws"
-                      placeholder="Dex +4, Wis +2"
-                    />
-                    <Input
-                      value={skills}
-                      onChange={e => setSkills(e.target.value)}
-                      label="Skills"
-                      placeholder="Perception +4, Stealth +6"
-                    />
-                    <Input
-                      value={resistances}
-                      onChange={e => setResistances(e.target.value)}
-                      label="Resistances"
-                      placeholder="fire, cold"
-                    />
-                    <Input
-                      value={immunities}
-                      onChange={e => setImmunities(e.target.value)}
-                      label="Immunities"
-                      placeholder="poison"
-                    />
-                    <Input
-                      value={vulnerabilities}
-                      onChange={e => setVulnerabilities(e.target.value)}
-                      label="Vulnerabilities"
-                      placeholder="radiant"
-                    />
-                    <Input
-                      value={conditionImmunities}
-                      onChange={e => setConditionImmunities(e.target.value)}
-                      label="Condition Immunities"
-                      placeholder="poisoned, charmed"
-                    />
-                    <Input
-                      value={senses}
-                      onChange={e => setSenses(e.target.value)}
-                      label="Senses"
-                      placeholder="Darkvision 60 ft."
-                    />
-                    <Input
-                      value={languages}
-                      onChange={e => setLanguages(e.target.value)}
-                      label="Languages"
-                      placeholder="Common, Sylvan"
-                    />
-                  </div>
-
-                  {/* CR & Proficiency Bonus */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="w-full">
-                      <Input
-                        value={cr}
-                        onChange={e => setCr(e.target.value)}
-                        label="CR"
-                        placeholder="0"
-                      />
-                    </div>
-                    <Input
-                      type="number"
-                      value={proficiencyBonus}
-                      onChange={e => {
-                        setProficiencyBonus(parseInt(e.target.value) || 2);
-                        setProficiencyOverridden(true);
-                      }}
-                      label="Prof Bonus"
-                      min={2}
-                      max={9}
-                      title="Proficiency bonus (auto-calculated from CR, overridable)"
-                    />
-                  </div>
-
-                  {/* Hit Dice */}
-                  <div>
-                    <label className="text-heading mb-1.5 block text-sm font-medium">
-                      Hit Dice
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Input
-                        type="number"
-                        value={hitDiceMax}
-                        onChange={e =>
-                          setHitDiceMax(parseInt(e.target.value) || 0)
-                        }
-                        label="Max"
-                        min={0}
-                        placeholder="8"
-                      />
-                      <SelectField
-                        label="Die Type"
-                        value={hitDieType}
-                        onValueChange={setHitDieType}
-                      >
-                        {DIE_TYPES.map(d => (
-                          <SelectItem key={d} value={d}>
-                            {d}
-                          </SelectItem>
-                        ))}
-                      </SelectField>
-                      <Input
-                        type="number"
-                        value={hitDieCurrent}
-                        onChange={e =>
-                          setHitDieCurrent(parseInt(e.target.value) || 0)
-                        }
-                        label="Current"
-                        min={0}
-                        placeholder="8"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Passive Abilities */}
-                  <div>
-                    <label className="text-heading mb-1.5 block text-sm font-medium">
-                      Passive Abilities
-                      <span className="text-faint ml-1 text-xs font-normal">
-                        (auto-calculated, overridable)
-                      </span>
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Input
-                        type="number"
-                        value={passivePerception}
-                        onChange={e => {
-                          setPassivePerception(parseInt(e.target.value) || 0);
-                          setPassivesOverridden(true);
-                        }}
-                        label="Passive Perception"
-                        min={1}
-                      />
-                      <Input
-                        type="number"
-                        value={passiveInsight}
-                        onChange={e => {
-                          setPassiveInsight(parseInt(e.target.value) || 0);
-                          setPassivesOverridden(true);
-                        }}
-                        label="Passive Insight"
-                        min={1}
-                      />
-                      <Input
-                        type="number"
-                        value={passiveInvestigation}
-                        onChange={e => {
-                          setPassiveInvestigation(
-                            parseInt(e.target.value) || 0
-                          );
-                          setPassivesOverridden(true);
-                        }}
-                        label="Passive Investigation"
-                        min={1}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ===== Traits / Actions / Reactions ===== */}
-            <AbilityListEditor
-              label="Traits"
-              items={traits}
-              onChange={setTraits}
-            />
-            <AbilityListEditor
-              label="Actions"
-              items={actions}
-              onChange={setActions}
-            />
-            <AbilityListEditor
-              label="Bonus Actions"
-              items={bonusActions}
-              onChange={setBonusActions}
-            />
-            <AbilityListEditor
-              label="Reactions"
-              items={reactions}
-              onChange={setReactions}
-            />
-            <AbilityListEditor
-              label="Lair Actions"
-              items={lairActions}
-              onChange={setLairActions}
-            />
-
-            {/* ===== Inventory (collapsible) ===== */}
-            <div>
-              <button
-                onClick={() => setShowInventory(v => !v)}
-                className="text-accent-purple-text flex items-center gap-1 text-sm font-medium hover:underline"
-              >
-                {showInventory ? (
-                  <>
-                    <ChevronUp size={14} /> Hide Inventory
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown size={14} /> Add Inventory
-                    {inventoryItems.length > 0 && (
-                      <Badge variant="neutral" size="sm">
-                        {inventoryItems.length}
-                      </Badge>
-                    )}
-                  </>
-                )}
-              </button>
-              {showInventory && (
-                <div className="mt-2 space-y-3">
-                  {/* Item search */}
-                  <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border p-3">
-                    <ItemAutocomplete
-                      items={dbItems}
-                      magicItems={dbMagicItems}
-                      loading={dbItemsLoading}
-                      onSelect={(item: ProcessedItem) => {
-                        setInventoryItems(prev => [
-                          ...prev,
-                          {
-                            id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                            name: item.name,
-                            quantity: 1,
-                            category: item.category,
-                            weight: item.weight,
-                            value: item.value,
-                            rarity:
-                              item.rarity !== 'none' ? item.rarity : undefined,
-                            description: item.description,
-                            type: item.rawType,
-                          },
-                        ]);
-                      }}
-                      placeholder="Search items database..."
-                    />
-                  </div>
-
-                  {/* Item list */}
-                  {inventoryItems.map((item, index) => (
-                    <div
-                      key={item.id}
-                      className="border-divider bg-surface-raised rounded-lg border p-3"
-                    >
-                      <div className="flex items-start gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <Input
-                              value={item.name}
-                              onChange={e => {
-                                const updated = [...inventoryItems];
-                                updated[index] = {
-                                  ...item,
-                                  name: e.target.value,
-                                };
-                                setInventoryItems(updated);
-                              }}
-                              placeholder="Item name"
-                              className="flex-1"
-                            />
-                            <input
-                              type="number"
-                              min={1}
-                              value={item.quantity}
-                              onChange={e => {
-                                const updated = [...inventoryItems];
-                                updated[index] = {
-                                  ...item,
-                                  quantity: parseInt(e.target.value) || 1,
-                                };
-                                setInventoryItems(updated);
-                              }}
-                              className="bg-surface border-divider text-heading w-16 rounded border px-2 py-1.5 text-center text-sm"
-                              title="Quantity"
-                            />
-                            <button
-                              onClick={() =>
-                                setInventoryItems(
-                                  inventoryItems.filter((_, i) => i !== index)
-                                )
-                              }
-                              className="text-muted hover:text-accent-red-text shrink-0 p-1 transition-colors"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                          {/* Details row */}
-                          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
-                            {item.category && (
-                              <span className="text-muted capitalize">
-                                {item.category}
-                              </span>
-                            )}
-                            {item.rarity && item.rarity !== 'none' && (
-                              <span className="text-accent-amber-text capitalize">
-                                {item.rarity}
-                              </span>
-                            )}
-                            {item.weight !== undefined && (
-                              <span className="text-muted">
-                                {item.weight} lbs
-                              </span>
-                            )}
-                            {item.value !== undefined && (
-                              <span className="text-muted">
-                                {formatCurrencyFromCopper(item.value)}
-                              </span>
-                            )}
-                            <label className="text-muted ml-auto flex items-center gap-1">
-                              <input
-                                type="checkbox"
-                                checked={item.equipped ?? false}
-                                onChange={e => {
-                                  const updated = [...inventoryItems];
-                                  updated[index] = {
-                                    ...item,
-                                    equipped: e.target.checked,
-                                  };
-                                  setInventoryItems(updated);
-                                }}
-                                className="rounded"
-                              />
-                              Equipped
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Manual add */}
-                  <button
-                    onClick={() =>
-                      setInventoryItems([
-                        ...inventoryItems,
-                        {
-                          id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                          name: '',
-                          quantity: 1,
-                        },
-                      ])
-                    }
-                    className="text-accent-purple-text flex items-center gap-1 text-xs font-medium opacity-80 hover:opacity-100"
-                  >
-                    <Plus size={12} />
-                    Add Item Manually
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* ===== Lore (collapsible) ===== */}
-            <div>
-              <button
-                onClick={() => setShowLore(v => !v)}
-                className="text-accent-purple-text flex items-center gap-1 text-sm font-medium hover:underline"
-              >
-                {showLore ? (
-                  <>
-                    <ChevronUp size={14} /> Hide Lore
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown size={14} /> Add Lore
-                  </>
-                )}
-              </button>
-              {showLore && (
-                <div className="mt-2">
-                  <CompactRichTextEditor
-                    content={loreHtml}
-                    onChange={setLoreHtml}
-                    placeholder="Write NPC lore, backstory, motivations..."
-                    minHeight="120px"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* ===== Footer (duplicate of header actions for long forms) ===== */}
-            <div className="flex justify-end gap-2 pt-2">
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader className="flex flex-col gap-3 space-y-0 pr-10 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <DialogTitle className="shrink-0">
+              {editingNpc ? 'Edit NPC' : 'Create NPC'}
+            </DialogTitle>
+            <div className="flex shrink-0 justify-end gap-2">
               <Button
                 variant="ghost"
                 size="sm"
@@ -1471,10 +795,761 @@ export function NPCFormDialog({
                 {submitLabel}
               </Button>
             </div>
-          </div>
-        </DialogBody>
-      </DialogContent>
-    </Dialog>
+          </DialogHeader>
+          <DialogBody className="max-h-[70vh] overflow-y-auto">
+            <div className="space-y-5">
+              {/* ===== Bestiary Import (create only) ===== */}
+              {!editingNpc && (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Search
+                      size={14}
+                      className="text-muted absolute top-1/2 left-3 -translate-y-1/2"
+                    />
+                    <input
+                      type="text"
+                      value={bestiaryQuery}
+                      onChange={e => setBestiaryQuery(e.target.value)}
+                      placeholder="Search bestiary to import..."
+                      className="bg-surface-secondary text-body border-divider placeholder:text-faint w-full rounded-md border py-2 pr-3 pl-9 text-sm focus:ring-1 focus:ring-(--color-accent-purple-border) focus:outline-none"
+                    />
+                    {bestiaryLoading && (
+                      <span className="text-muted absolute top-1/2 right-3 -translate-y-1/2 text-xs">
+                        Searching…
+                      </span>
+                    )}
+                  </div>
+
+                  {bestiaryResults.length > 0 && (
+                    <div className="border-divider bg-surface-raised max-h-48 overflow-y-auto rounded-md border">
+                      {bestiaryResults.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => handleSelectMonster(m)}
+                          className="hover:bg-surface-secondary text-body flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors"
+                        >
+                          <span className="flex-1 font-medium">{m.name}</span>
+                          <span className="text-muted text-xs">CR {m.cr}</span>
+                          <span className="text-faint text-xs">
+                            {typeof m.type === 'string' ? m.type : m.type.type}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {bestiarySourceId && (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">
+                        Imported from: {bestiarySourceName}
+                      </Badge>
+                      <button
+                        onClick={clearBestiarySource}
+                        className="text-muted hover:text-body transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ===== Portrait Upload ===== */}
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-divider bg-surface-secondary hover:border-accent-purple-border flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-colors"
+                >
+                  {avatarUrl ? (
+                    <Image
+                      src={avatarUrl}
+                      alt="NPC portrait"
+                      width={64}
+                      height={64}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <ImageIcon size={24} className="text-muted" />
+                  )}
+                  {uploadingAvatar && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    </div>
+                  )}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarSelect}
+                  className="hidden"
+                />
+                <div className="flex flex-col gap-1">
+                  <span className="text-muted text-xs">
+                    {avatarUrl
+                      ? 'Portrait uploaded'
+                      : 'Click to upload portrait'}
+                  </span>
+                  {avatarUrl && (
+                    <button
+                      onClick={handleRemoveAvatar}
+                      className="text-accent-red-text text-xs hover:underline"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* ===== Name & Description ===== */}
+              <div className="space-y-3">
+                <Input
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  label="Name"
+                  placeholder="NPC name"
+                  required
+                  autoFocus
+                />
+                <Input
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  label="Description"
+                  placeholder="Brief description"
+                />
+              </div>
+
+              {/* ===== Group & Tags ===== */}
+              <div className="space-y-3">
+                <div>
+                  <label className="text-heading mb-1.5 block text-sm font-medium">
+                    Group
+                  </label>
+                  <input
+                    type="text"
+                    list="npc-groups-datalist"
+                    value={group}
+                    onChange={e => setGroup(e.target.value)}
+                    placeholder="e.g. Bandits, Town Guard"
+                    className="bg-surface border-divider text-body placeholder:text-faint w-full rounded-md border px-3 py-2 text-sm focus:ring-1 focus:ring-(--color-accent-purple-border) focus:outline-none"
+                  />
+                  {existingGroups.length > 0 && (
+                    <datalist id="npc-groups-datalist">
+                      {existingGroups.map(g => (
+                        <option key={g} value={g} />
+                      ))}
+                    </datalist>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-heading mb-1.5 block text-sm font-medium">
+                    Tags
+                  </label>
+                  <div className="border-divider bg-surface flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5">
+                    {tags.map(tag => (
+                      <span
+                        key={tag}
+                        className="bg-accent-purple-bg text-accent-purple-text flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium"
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => removeTag(tag)}
+                          className="hover:text-heading transition-colors"
+                          aria-label={`Remove tag ${tag}`}
+                        >
+                          <X size={10} />
+                        </button>
+                      </span>
+                    ))}
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={e => setTagInput(e.target.value)}
+                      onKeyDown={handleTagKeyDown}
+                      onBlur={() => tagInput.trim() && addTag(tagInput)}
+                      placeholder={
+                        tags.length === 0 ? 'Add tags (Enter or comma)' : ''
+                      }
+                      className="text-body placeholder:text-faint min-w-28 flex-1 bg-transparent text-sm focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ===== Core Stats ===== */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-2">
+                  <SelectField
+                    label="Size"
+                    value={size}
+                    onValueChange={setSize}
+                  >
+                    {SIZES.map((s: string) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
+                  <SelectField
+                    label="Type"
+                    value={creatureType}
+                    onValueChange={setCreatureType}
+                  >
+                    {CREATURE_TYPES.map((t: string) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectField>
+                  <Input
+                    value={alignment}
+                    onChange={e => setAlignment(e.target.value)}
+                    label="Alignment"
+                    placeholder="Unaligned"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Input
+                    type="number"
+                    value={ac}
+                    onChange={e => setAc(parseInt(e.target.value) || 0)}
+                    label="AC"
+                    min={0}
+                  />
+                  <Input
+                    type="number"
+                    value={hp}
+                    onChange={e => setHp(parseInt(e.target.value) || 1)}
+                    label="HP"
+                    min={1}
+                  />
+                  <Input
+                    value={hpFormula}
+                    onChange={e => setHpFormula(e.target.value)}
+                    label="HP Formula"
+                    placeholder="2d8+2"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    value={speed}
+                    onChange={e => setSpeed(e.target.value)}
+                    label="Speed"
+                    placeholder="30 ft., fly 60 ft."
+                  />
+                  <Input
+                    type="number"
+                    value={initiativeModifier}
+                    onChange={e => {
+                      setInitiativeModifier(parseInt(e.target.value) || 0);
+                      setInitiativeOverridden(true);
+                    }}
+                    label="Init Mod"
+                    title="Initiative modifier (auto-calculated from DEX, overridable)"
+                  />
+                </div>
+              </div>
+
+              {/* ===== Ability Scores ===== */}
+              <div>
+                <label className="text-heading mb-1.5 block text-sm font-medium">
+                  Ability Scores
+                </label>
+                <div className="grid grid-cols-6 gap-2">
+                  {(
+                    [
+                      ['STR', str, setStr],
+                      ['DEX', dex, setDex],
+                      ['CON', con, setCon],
+                      ['INT', int, setInt],
+                      ['WIS', wis, setWis],
+                      ['CHA', cha, setCha],
+                    ] as const
+                  ).map(([label, value, setter]) => (
+                    <div key={label} className="text-center">
+                      <span className="text-muted block text-[10px] font-medium uppercase">
+                        {label}
+                      </span>
+                      <input
+                        type="number"
+                        value={value}
+                        onChange={e =>
+                          (
+                            setter as React.Dispatch<
+                              React.SetStateAction<number>
+                            >
+                          )(parseInt(e.target.value) || 0)
+                        }
+                        min={1}
+                        max={30}
+                        className="bg-surface border-divider text-heading w-full rounded border px-1 py-1 text-center text-sm"
+                      />
+                      <span className="text-muted text-[10px]">
+                        {abilityMod(value)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ===== Details (collapsible) ===== */}
+              <div>
+                <button
+                  onClick={() => setShowDetails(v => !v)}
+                  className="text-accent-purple-text flex items-center gap-1 text-sm font-medium hover:underline"
+                >
+                  {showDetails ? (
+                    <>
+                      <ChevronUp size={14} /> Hide Details
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown size={14} /> Show Details
+                    </>
+                  )}
+                </button>
+                {showDetails && (
+                  <div className="mt-2 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={saves}
+                        onChange={e => setSaves(e.target.value)}
+                        label="Saving Throws"
+                        placeholder="Dex +4, Wis +2"
+                      />
+                      <Input
+                        value={skills}
+                        onChange={e => setSkills(e.target.value)}
+                        label="Skills"
+                        placeholder="Perception +4, Stealth +6"
+                      />
+                      <Input
+                        value={resistances}
+                        onChange={e => setResistances(e.target.value)}
+                        label="Resistances"
+                        placeholder="fire, cold"
+                      />
+                      <Input
+                        value={immunities}
+                        onChange={e => setImmunities(e.target.value)}
+                        label="Immunities"
+                        placeholder="poison"
+                      />
+                      <Input
+                        value={vulnerabilities}
+                        onChange={e => setVulnerabilities(e.target.value)}
+                        label="Vulnerabilities"
+                        placeholder="radiant"
+                      />
+                      <Input
+                        value={conditionImmunities}
+                        onChange={e => setConditionImmunities(e.target.value)}
+                        label="Condition Immunities"
+                        placeholder="poisoned, charmed"
+                      />
+                      <Input
+                        value={senses}
+                        onChange={e => setSenses(e.target.value)}
+                        label="Senses"
+                        placeholder="Darkvision 60 ft."
+                      />
+                      <Input
+                        value={languages}
+                        onChange={e => setLanguages(e.target.value)}
+                        label="Languages"
+                        placeholder="Common, Sylvan"
+                      />
+                    </div>
+
+                    {/* CR & Proficiency Bonus */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="w-full">
+                        <Input
+                          value={cr}
+                          onChange={e => setCr(e.target.value)}
+                          label="CR"
+                          placeholder="0"
+                        />
+                      </div>
+                      <Input
+                        type="number"
+                        value={proficiencyBonus}
+                        onChange={e => {
+                          setProficiencyBonus(parseInt(e.target.value) || 2);
+                          setProficiencyOverridden(true);
+                        }}
+                        label="Prof Bonus"
+                        min={2}
+                        max={9}
+                        title="Proficiency bonus (auto-calculated from CR, overridable)"
+                      />
+                    </div>
+
+                    {/* Hit Dice */}
+                    <div>
+                      <label className="text-heading mb-1.5 block text-sm font-medium">
+                        Hit Dice
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Input
+                          type="number"
+                          value={hitDiceMax}
+                          onChange={e =>
+                            setHitDiceMax(parseInt(e.target.value) || 0)
+                          }
+                          label="Max"
+                          min={0}
+                          placeholder="8"
+                        />
+                        <SelectField
+                          label="Die Type"
+                          value={hitDieType}
+                          onValueChange={setHitDieType}
+                        >
+                          {DIE_TYPES.map(d => (
+                            <SelectItem key={d} value={d}>
+                              {d}
+                            </SelectItem>
+                          ))}
+                        </SelectField>
+                        <Input
+                          type="number"
+                          value={hitDieCurrent}
+                          onChange={e =>
+                            setHitDieCurrent(parseInt(e.target.value) || 0)
+                          }
+                          label="Current"
+                          min={0}
+                          placeholder="8"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Passive Abilities */}
+                    <div>
+                      <label className="text-heading mb-1.5 block text-sm font-medium">
+                        Passive Abilities
+                        <span className="text-faint ml-1 text-xs font-normal">
+                          (auto-calculated, overridable)
+                        </span>
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Input
+                          type="number"
+                          value={passivePerception}
+                          onChange={e => {
+                            setPassivePerception(parseInt(e.target.value) || 0);
+                            setPassivesOverridden(true);
+                          }}
+                          label="Passive Perception"
+                          min={1}
+                        />
+                        <Input
+                          type="number"
+                          value={passiveInsight}
+                          onChange={e => {
+                            setPassiveInsight(parseInt(e.target.value) || 0);
+                            setPassivesOverridden(true);
+                          }}
+                          label="Passive Insight"
+                          min={1}
+                        />
+                        <Input
+                          type="number"
+                          value={passiveInvestigation}
+                          onChange={e => {
+                            setPassiveInvestigation(
+                              parseInt(e.target.value) || 0
+                            );
+                            setPassivesOverridden(true);
+                          }}
+                          label="Passive Investigation"
+                          min={1}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ===== Traits / Actions / Reactions ===== */}
+              <AbilityListEditor
+                label="Traits"
+                items={traits}
+                onChange={setTraits}
+              />
+              <AbilityListEditor
+                label="Actions"
+                items={actions}
+                onChange={setActions}
+              />
+              <AbilityListEditor
+                label="Bonus Actions"
+                items={bonusActions}
+                onChange={setBonusActions}
+              />
+              <AbilityListEditor
+                label="Reactions"
+                items={reactions}
+                onChange={setReactions}
+              />
+              <AbilityListEditor
+                label="Lair Actions"
+                items={lairActions}
+                onChange={setLairActions}
+              />
+
+              {/* ===== Inventory (collapsible) ===== */}
+              <div>
+                <button
+                  onClick={() => setShowInventory(v => !v)}
+                  className="text-accent-purple-text flex items-center gap-1 text-sm font-medium hover:underline"
+                >
+                  {showInventory ? (
+                    <>
+                      <ChevronUp size={14} /> Hide Inventory
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown size={14} /> Add Inventory
+                      {inventoryItems.length > 0 && (
+                        <Badge variant="neutral" size="sm">
+                          {inventoryItems.length}
+                        </Badge>
+                      )}
+                    </>
+                  )}
+                </button>
+                {showInventory && (
+                  <div className="mt-2 space-y-3">
+                    {/* Item search */}
+                    <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border p-3">
+                      <ItemAutocomplete
+                        items={dbItems}
+                        magicItems={dbMagicItems}
+                        loading={dbItemsLoading}
+                        onSelect={(item: ProcessedItem) => {
+                          setInventoryItems(prev => [
+                            ...prev,
+                            {
+                              id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                              name: item.name,
+                              quantity: 1,
+                              category: item.category,
+                              weight: item.weight,
+                              value: item.value,
+                              rarity:
+                                item.rarity !== 'none'
+                                  ? item.rarity
+                                  : undefined,
+                              description: item.description,
+                              type: item.rawType,
+                            },
+                          ]);
+                        }}
+                        placeholder="Search items database..."
+                      />
+                    </div>
+
+                    {/* Item list */}
+                    {inventoryItems.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className="border-divider bg-surface-raised rounded-lg border p-3"
+                      >
+                        <div className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={item.name}
+                                onChange={e => {
+                                  const updated = [...inventoryItems];
+                                  updated[index] = {
+                                    ...item,
+                                    name: e.target.value,
+                                  };
+                                  setInventoryItems(updated);
+                                }}
+                                placeholder="Item name"
+                                className="flex-1"
+                              />
+                              <input
+                                type="number"
+                                min={1}
+                                value={item.quantity}
+                                onChange={e => {
+                                  const updated = [...inventoryItems];
+                                  updated[index] = {
+                                    ...item,
+                                    quantity: parseInt(e.target.value) || 1,
+                                  };
+                                  setInventoryItems(updated);
+                                }}
+                                className="bg-surface border-divider text-heading w-16 rounded border px-2 py-1.5 text-center text-sm"
+                                title="Quantity"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingInventoryItemId(item.id);
+                                  setInventoryEditFormOpen(true);
+                                }}
+                                className="text-muted hover:text-accent-blue-text shrink-0 p-1 transition-colors"
+                                title="Edit item details"
+                              >
+                                <Edit3 size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setInventoryItems(
+                                    inventoryItems.filter((_, i) => i !== index)
+                                  )
+                                }
+                                className="text-muted hover:text-accent-red-text shrink-0 p-1 transition-colors"
+                                title="Remove item"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                            {/* Details row */}
+                            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                              {item.category && (
+                                <span className="text-muted capitalize">
+                                  {item.category}
+                                </span>
+                              )}
+                              {item.rarity && item.rarity !== 'none' && (
+                                <span className="text-accent-amber-text capitalize">
+                                  {item.rarity}
+                                </span>
+                              )}
+                              {item.weight !== undefined && (
+                                <span className="text-muted">
+                                  {item.weight} lbs
+                                </span>
+                              )}
+                              {item.value !== undefined && (
+                                <span className="text-muted">
+                                  {formatCurrencyFromCopper(item.value)}
+                                </span>
+                              )}
+                              <label className="text-muted ml-auto flex items-center gap-1">
+                                <input
+                                  type="checkbox"
+                                  checked={item.equipped ?? false}
+                                  onChange={e => {
+                                    const updated = [...inventoryItems];
+                                    updated[index] = {
+                                      ...item,
+                                      equipped: e.target.checked,
+                                    };
+                                    setInventoryItems(updated);
+                                  }}
+                                  className="rounded"
+                                />
+                                Equipped
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Manual add */}
+                    <button
+                      onClick={() =>
+                        setInventoryItems([
+                          ...inventoryItems,
+                          {
+                            id: `inv-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                            name: '',
+                            quantity: 1,
+                          },
+                        ])
+                      }
+                      className="text-accent-purple-text flex items-center gap-1 text-xs font-medium opacity-80 hover:opacity-100"
+                    >
+                      <Plus size={12} />
+                      Add Item Manually
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* ===== Lore (collapsible) ===== */}
+              <div>
+                <button
+                  onClick={() => setShowLore(v => !v)}
+                  className="text-accent-purple-text flex items-center gap-1 text-sm font-medium hover:underline"
+                >
+                  {showLore ? (
+                    <>
+                      <ChevronUp size={14} /> Hide Lore
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown size={14} /> Add Lore
+                    </>
+                  )}
+                </button>
+                {showLore && (
+                  <div className="mt-2">
+                    <CompactRichTextEditor
+                      content={loreHtml}
+                      onChange={setLoreHtml}
+                      placeholder="Write NPC lore, backstory, motivations..."
+                      minHeight="120px"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* ===== Footer (duplicate of header actions for long forms) ===== */}
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSubmit}
+                  disabled={!canSubmit}
+                >
+                  {submitLabel}
+                </Button>
+              </div>
+            </div>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+
+      <ItemForm
+        isOpen={inventoryEditFormOpen}
+        onClose={() => {
+          setInventoryEditFormOpen(false);
+          setEditingInventoryItemId(null);
+        }}
+        onSubmit={handleInventoryEditSubmit}
+        initialData={
+          editingInventoryItem
+            ? npcInventoryItemToFormData(editingInventoryItem)
+            : initialInventoryFormData
+        }
+        availableLocations={[]}
+        isEditing
+        databaseItems={dbItems}
+        databaseMagicItems={dbMagicItems}
+        itemsLoading={dbItemsLoading}
+      />
+    </>
   );
 }
 
