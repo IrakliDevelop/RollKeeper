@@ -734,13 +734,35 @@ export function NPCFormDialog({
     onOpenChange(false);
   };
 
+  const canSubmit = name.trim().length > 0;
+  const submitLabel = editingNpc ? 'Save Changes' : 'Create NPC';
+
   // ---------- Render ----------
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{editingNpc ? 'Edit NPC' : 'Create NPC'}</DialogTitle>
+        <DialogHeader className="flex flex-col gap-3 space-y-0 pr-10 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <DialogTitle className="shrink-0">
+            {editingNpc ? 'Edit NPC' : 'Create NPC'}
+          </DialogTitle>
+          <div className="flex shrink-0 justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+            >
+              {submitLabel}
+            </Button>
+          </div>
         </DialogHeader>
         <DialogBody className="max-h-[70vh] overflow-y-auto">
           <div className="space-y-5">
@@ -1431,7 +1453,7 @@ export function NPCFormDialog({
               )}
             </div>
 
-            {/* ===== Footer ===== */}
+            {/* ===== Footer (duplicate of header actions for long forms) ===== */}
             <div className="flex justify-end gap-2 pt-2">
               <Button
                 variant="ghost"
@@ -1444,9 +1466,9 @@ export function NPCFormDialog({
                 variant="primary"
                 size="sm"
                 onClick={handleSubmit}
-                disabled={!name.trim()}
+                disabled={!canSubmit}
               >
-                {editingNpc ? 'Save Changes' : 'Create NPC'}
+                {submitLabel}
               </Button>
             </div>
           </div>
