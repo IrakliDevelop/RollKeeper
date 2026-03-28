@@ -390,6 +390,15 @@ function NPCCard({
               </div>
             </div>
 
+            {npc.description?.trim() && (
+              <p
+                className="text-muted mb-2 line-clamp-2 text-xs leading-snug"
+                title={npc.description.trim()}
+              >
+                {npc.description.trim()}
+              </p>
+            )}
+
             {/* CR + Prof badges */}
             <div className="mb-2 flex flex-wrap gap-1">
               {stats?.cr != null && (
@@ -539,6 +548,15 @@ function NPCCard({
             </div>
           </div>
 
+          {npc.description?.trim() && (
+            <p
+              className="text-muted mb-2 line-clamp-2 text-sm leading-snug"
+              title={npc.description.trim()}
+            >
+              {npc.description.trim()}
+            </p>
+          )}
+
           {/* CR + Prof badges */}
           <div className="mb-2 flex flex-wrap gap-1">
             {stats?.cr != null && (
@@ -552,12 +570,6 @@ function NPCCard({
               </Badge>
             )}
           </div>
-
-          {npc.description && (
-            <p className="text-muted mb-3 line-clamp-2 text-sm">
-              {npc.description}
-            </p>
-          )}
 
           {/* HP / AC / Speed */}
           <div className="text-body flex flex-wrap gap-3 text-sm">
