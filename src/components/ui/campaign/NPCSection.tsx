@@ -18,6 +18,7 @@ import {
   Lightbulb,
 } from 'lucide-react';
 import { useNPCStore } from '@/store/npcStore';
+import { useDmStore } from '@/store/dmStore';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { Input } from '@/components/ui/forms/input';
@@ -31,6 +32,9 @@ interface NPCSectionProps {
 
 export function NPCSection({ campaignCode }: NPCSectionProps) {
   const { getNPCsForCampaign, createNPC, updateNPC, deleteNPC } = useNPCStore();
+  const { getCampaign, setDmDashboardUi } = useDmStore();
+  const campaign = getCampaign(campaignCode);
+  const npcSectionOpen = campaign?.dmDashboardUi?.npcSectionOpen ?? true;
   const npcs = getNPCsForCampaign(campaignCode);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -41,7 +45,6 @@ export function NPCSection({ campaignCode }: NPCSectionProps) {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     new Set()
   );
-
   const handleCreate = () => {
     setEditingNpc(null);
     setDialogOpen(true);
@@ -163,12 +166,32 @@ export function NPCSection({ campaignCode }: NPCSectionProps) {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Drama size={20} className="text-muted" />
-          <h2 className="text-heading text-lg font-semibold">
-            NPCs ({npcs.length})
-          </h2>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              setDmDashboardUi(campaignCode, {
+                npcSectionOpen: !npcSectionOpen,
+              })
+            }
+            className="text-muted hover:text-body hover:bg-surface-secondary shrink-0 rounded-md p-1 transition-colors"
+            aria-expanded={npcSectionOpen}
+            aria-controls="dm-campaign-npc-section"
+            title={npcSectionOpen ? 'Collapse NPCs' : 'Expand NPCs'}
+          >
+            {npcSectionOpen ? (
+              <ChevronDown size={20} />
+            ) : (
+              <ChevronRight size={20} />
+            )}
+          </button>
+          <div className="flex min-w-0 items-center gap-2">
+            <Drama size={20} className="text-muted shrink-0" />
+            <h2 className="text-heading text-lg font-semibold">
+              NPCs ({npcs.length})
+            </h2>
+          </div>
         </div>
         <Button
           variant="secondary"
@@ -180,7 +203,7 @@ export function NPCSection({ campaignCode }: NPCSectionProps) {
         </Button>
       </div>
 
-      {npcs.length === 0 ? (
+      {!npcSectionOpen ? null : npcs.length === 0 ? (
         <div className="border-divider bg-surface-secondary rounded-lg border-2 border-dashed p-8 text-center">
           <Drama size={40} className="text-faint mx-auto mb-3" />
           <p className="text-muted mb-1 text-sm">No NPCs yet</p>
@@ -189,7 +212,7 @@ export function NPCSection({ campaignCode }: NPCSectionProps) {
           </p>
         </div>
       ) : (
-        <>
+        <div id="dm-campaign-npc-section">
           {/* Search bar */}
           <div className="mb-3">
             <Input
@@ -290,7 +313,7 @@ export function NPCSection({ campaignCode }: NPCSectionProps) {
               ))}
             </div>
           )}
-        </>
+        </div>
       )}
 
       <NPCFormDialog
@@ -343,7 +366,7 @@ function NPCCard({
         /* Horizontal layout with tall portrait on the left */
         <div className="flex">
           {/* Portrait column */}
-          <div className="border-divider relative w-20 shrink-0 self-stretch border-r-2 sm:w-24">
+          <div className="border-divider relative w-28 shrink-0 self-stretch border-r-2 sm:w-32">
             <Image
               src={npc.avatarUrl!}
               alt={npc.name}
