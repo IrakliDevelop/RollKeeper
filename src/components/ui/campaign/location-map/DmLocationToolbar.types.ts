@@ -1,14 +1,10 @@
 import type { EditorMode } from './DmLocationEditor.types';
 
 export interface DmLocationToolbarProps {
-  activeTool: string;
-  onToolChange: (name: string) => void;
-  canUndo: boolean;
-  canRedo: boolean;
-  onUndo: () => void;
-  onRedo: () => void;
+  onPickImage: () => void;
   onDelete: () => void;
   onClear: () => void;
+  onFitToMap: () => void;
   gridEnabled: boolean;
   gridType: 'square' | 'hex';
   gridCellSize: number;
@@ -33,5 +29,4 @@ export interface DmLocationToolbarProps {
   lastSyncedAt: string | null;
   mode?: EditorMode;
   onOpenTvDisplay?: () => void;
-  onFitToMap?: () => void;
 }

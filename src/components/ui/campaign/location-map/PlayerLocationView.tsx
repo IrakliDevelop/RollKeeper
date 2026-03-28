@@ -3,7 +3,11 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Map as MapIcon, Loader2, X, Maximize2 } from 'lucide-react';
-import { FieldNotesCanvas as Canvas } from '@fieldnotes/react';
+import {
+  FieldNotesCanvas as Canvas,
+  useCamera,
+  ViewportContext,
+} from '@fieldnotes/react';
 import { HandTool, type Viewport } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
@@ -230,6 +234,15 @@ function MapLightbox({ src, onClose }: { src: string; onClose: () => void }) {
   );
 }
 
+function PlayerCanvasZoomBadge() {
+  const { zoom } = useCamera();
+  return (
+    <div className="border-divider bg-surface-raised text-muted pointer-events-none absolute top-2 right-2 z-10 rounded-md border px-2 py-1 text-xs tabular-nums shadow-sm">
+      {Math.round(zoom * 100)}%
+    </div>
+  );
+}
+
 /* ─── Main component ────────────────────────────────────────── */
 
 export default function PlayerLocationView({
@@ -247,6 +260,7 @@ export default function PlayerLocationView({
 
   const canvasRef = useRef<FieldNotesCanvasRef>(null);
   const tools = useMemo(() => [new HandTool()], []);
+  const [playerViewport, setPlayerViewport] = useState<Viewport | null>(null);
 
   const handleSelectLocation = useCallback(
     async (location: LocationMetadata) => {
@@ -285,6 +299,7 @@ export default function PlayerLocationView({
 
   const handleReady = useCallback(
     (vp: Viewport) => {
+      setPlayerViewport(vp);
       if (!canvasState?.canvasState) return;
       const img = new window.Image();
       img.onload = () => {
@@ -312,6 +327,7 @@ export default function PlayerLocationView({
     setSelectedLocation(null);
     setCanvasState(null);
     setCanvasError(false);
+    setPlayerViewport(null);
   }, []);
 
   const hasSnapshot = !!canvasState?.snapshotUrl;
@@ -408,24 +424,27 @@ export default function PlayerLocationView({
                   )}
                 </>
               ) : hasCanvas ? (
-                <div style={{ height: '60vh' }}>
-                  <Canvas
-                    ref={canvasRef}
-                    tools={tools}
-                    defaultTool="hand"
-                    options={{
-                      background: {
-                        pattern: 'dots',
-                        color: '#cbd5e1',
-                        spacing: 24,
-                        dotRadius: 1,
-                      },
-                      camera: { minZoom: 0.1, maxZoom: 5 },
-                    }}
-                    onReady={handleReady}
-                    className="h-full w-full"
-                    style={{ minHeight: 0 }}
-                  />
+                <div className="relative" style={{ height: '60vh' }}>
+                  <ViewportContext.Provider value={playerViewport}>
+                    {playerViewport && <PlayerCanvasZoomBadge />}
+                    <Canvas
+                      ref={canvasRef}
+                      tools={tools}
+                      defaultTool="hand"
+                      options={{
+                        background: {
+                          pattern: 'dots',
+                          color: '#cbd5e1',
+                          spacing: 24,
+                          dotRadius: 1,
+                        },
+                        camera: { minZoom: 0.1, maxZoom: 5 },
+                      }}
+                      onReady={handleReady}
+                      className="h-full w-full"
+                      style={{ minHeight: 0 }}
+                    />
+                  </ViewportContext.Provider>
                 </div>
               ) : (
                 <div className="flex items-center justify-center py-24">

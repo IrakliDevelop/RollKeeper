@@ -18,8 +18,10 @@ import {
   ExternalLink,
   Maximize,
 } from 'lucide-react';
+import { useActiveTool, useHistory } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
 import DmOnlyToggle from './DmOnlyToggle';
+import { useSelectToolSelectionCount } from './useSelectToolSelectionCount';
 import type { DmLocationToolbarProps } from './DmLocationToolbar.types';
 
 const TOOL_DEFS = [
@@ -46,14 +48,10 @@ function formatSyncTime(iso: string): string {
 }
 
 export default function DmLocationToolbar({
-  activeTool,
-  onToolChange,
-  canUndo,
-  canRedo,
-  onUndo,
-  onRedo,
+  onPickImage,
   onDelete,
   onClear,
+  onFitToMap,
   gridEnabled,
   gridType,
   gridCellSize,
@@ -71,8 +69,19 @@ export default function DmLocationToolbar({
   onToggleDmOnly,
   mode,
   onOpenTvDisplay,
-  onFitToMap,
 }: DmLocationToolbarProps) {
+  const [activeTool, setTool] = useActiveTool();
+  const { canUndo, canRedo, undo, redo } = useHistory();
+  const selectionCount = useSelectToolSelectionCount();
+
+  const handleToolClick = (name: string) => {
+    if (name === 'image') {
+      onPickImage();
+      return;
+    }
+    setTool(name);
+  };
+
   return (
     <div className="border-divider bg-surface-raised flex items-center gap-1 border-b px-2 py-1">
       {/* Left group: Tool buttons */}
@@ -81,7 +90,7 @@ export default function DmLocationToolbar({
           <Button
             key={name}
             variant={activeTool === name ? 'primary' : 'ghost'}
-            onClick={() => onToolChange(name)}
+            onClick={() => handleToolClick(name)}
             title={label}
             className="h-8 w-8 p-0"
           >
@@ -96,7 +105,7 @@ export default function DmLocationToolbar({
       <div className="flex items-center gap-0.5">
         <Button
           variant="ghost"
-          onClick={onUndo}
+          onClick={() => undo()}
           disabled={!canUndo}
           title="Undo"
           className="h-8 w-8 p-0"
@@ -105,7 +114,7 @@ export default function DmLocationToolbar({
         </Button>
         <Button
           variant="ghost"
-          onClick={onRedo}
+          onClick={() => redo()}
           disabled={!canRedo}
           title="Redo"
           className="h-8 w-8 p-0"
@@ -123,6 +132,7 @@ export default function DmLocationToolbar({
         <Button
           variant="ghost"
           onClick={onDelete}
+          disabled={selectionCount === 0}
           title="Delete selected"
           className="h-8 w-8 p-0"
         >

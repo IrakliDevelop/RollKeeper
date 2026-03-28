@@ -11,8 +11,6 @@ import {
   ShapeTool,
   AutoSave,
   type Tool,
-  type ShapeKind,
-  type Layer,
   type Viewport,
 } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
@@ -47,6 +45,41 @@ type ViewportHistoryAccess = {
   historyRecorder: { begin: () => void; commit: () => void };
 };
 
+/**
+ * Map + grid must live on a layer-locked background so hit-testing skips them
+ * (see @fieldnotes/core InputHandler / SelectTool + `isLayerLocked`).
+ * Grid elements must also be `locked` so Select cannot drag them (otherwise they
+ * appear to slide when panning/zooming).
+ */
+function pinGridToMapBackgroundLayer(vp: Viewport) {
+  let layers = vp.layerManager.getLayers();
+  if (layers.length === 0) return;
+
+  if (layers.length === 1) {
+    vp.layerManager.createLayer('Annotations');
+    layers = vp.layerManager.getLayers();
+  }
+
+  const bgLayer = layers[0];
+  vp.layerManager.renameLayer(bgLayer.id, 'Map Background');
+
+  if (vp.layerManager.activeLayerId === bgLayer.id) {
+    const fallback = layers.find(l => l.id !== bgLayer.id);
+    if (fallback) {
+      vp.layerManager.setActiveLayer(fallback.id);
+    }
+  }
+
+  vp.layerManager.setLayerLocked(bgLayer.id, true);
+
+  for (const g of vp.store.getElementsByType('grid')) {
+    vp.layerManager.moveElementToLayer(g.id, bgLayer.id);
+    vp.store.update(g.id, { locked: true });
+  }
+
+  vp.requestRender();
+}
+
 export interface DmLocationEditorState {
   // Mode
   mode: 'location' | 'battlemap';
@@ -55,41 +88,12 @@ export interface DmLocationEditorState {
   canvasRef: React.RefObject<FieldNotesCanvasRef | null>;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
 
+  /** Shared with `ViewportContext` for @fieldnotes/react hooks */
+  viewport: Viewport | null;
+
   // Tools
   tools: Tool[];
-  activeTool: string;
 
-  // Tool options — arrow
-  arrowColor: string;
-  setArrowColor: (c: string) => void;
-
-  // Tool options — note
-  noteColor: string;
-  setNoteColor: (c: string) => void;
-  noteTextColor: string;
-  setNoteTextColor: (c: string) => void;
-
-  // Tool options — text
-  textColor: string;
-  setTextColor: (c: string) => void;
-  textFontSize: number;
-  setTextFontSize: (n: number) => void;
-  textAlign: 'left' | 'center' | 'right';
-  setTextAlign: (a: 'left' | 'center' | 'right') => void;
-
-  // Tool options — shape
-  shapeKind: ShapeKind;
-  setShapeKind: (k: ShapeKind) => void;
-  shapeStrokeColor: string;
-  setShapeStrokeColor: (c: string) => void;
-  shapeStrokeWidth: number;
-  setShapeStrokeWidth: (n: number) => void;
-  shapeFillColor: string;
-  setShapeFillColor: (c: string) => void;
-
-  // Layers
-  layers: Layer[];
-  activeLayerId: string;
   layersPanelOpen: boolean;
   setLayersPanelOpen: (open: boolean) => void;
 
@@ -108,14 +112,6 @@ export interface DmLocationEditorState {
   isDmOnly: boolean;
   handleToggleDmOnly: () => void;
 
-  // Undo / redo
-  canUndo: boolean;
-  canRedo: boolean;
-
-  // Counts
-  elementCount: number;
-  zoom: number;
-
   // Loading states
   syncing: boolean;
   imageUploading: boolean;
@@ -127,10 +123,8 @@ export interface DmLocationEditorState {
 
   // Handlers
   handleReady: (vp: Viewport) => void;
-  handleToolChange: (name: string) => void;
+  handlePickImage: () => void;
   handleDownloadExport: () => Promise<void>;
-  handleUndo: () => void;
-  handleRedo: () => void;
   handleDeleteSelected: () => void;
   handleClear: () => void;
   handleSyncToPlayers: () => Promise<void>;
@@ -151,26 +145,8 @@ export function useDmLocationEditor(
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autoSaveRef = useRef<AutoSave | null>(null);
 
-  // Tool state
-  const [activeTool, setActiveTool] = useState('hand');
+  const [viewport, setViewport] = useState<Viewport | null>(null);
 
-  // Tool options
-  const [arrowColor, setArrowColor] = useState('#334155');
-  const [noteColor, setNoteColor] = useState('#fef08a');
-  const [noteTextColor, setNoteTextColor] = useState('#334155');
-  const [textColor, setTextColor] = useState('#334155');
-  const [textFontSize, setTextFontSize] = useState(16);
-  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>(
-    'left'
-  );
-  const [shapeKind, setShapeKind] = useState<ShapeKind>('rectangle');
-  const [shapeStrokeColor, setShapeStrokeColor] = useState('#334155');
-  const [shapeStrokeWidth, setShapeStrokeWidth] = useState(2);
-  const [shapeFillColor, setShapeFillColor] = useState('transparent');
-
-  // Layer state
-  const [layers, setLayers] = useState<Layer[]>([]);
-  const [activeLayerId, setActiveLayerId] = useState('');
   const [layersPanelOpen, setLayersPanelOpen] = useState(true);
 
   // Grid state
@@ -214,14 +190,6 @@ export function useDmLocationEditor(
       ? (dmOnlyElements[selectedElementId] ?? false)
       : false;
 
-  // Undo / redo
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
-
-  // Counts
-  const [elementCount, setElementCount] = useState(0);
-  const [zoom, setZoom] = useState(1);
-
   // Loading states
   const [syncing, setSyncing] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
@@ -253,25 +221,7 @@ export function useDmLocationEditor(
 
   const handleReady = useCallback(
     (vp: Viewport) => {
-      // Store event subscriptions
-      vp.store.on('add', () => setElementCount(vp.store.count));
-      vp.store.on('remove', () => setElementCount(vp.store.count));
-      vp.store.on('clear', () => setElementCount(0));
-
-      vp.toolManager.onChange((name: string) => setActiveTool(name));
-      vp.camera.onChange(() => setZoom(vp.camera.zoom));
-      vp.history.onChange(() => {
-        setCanUndo(vp.history.canUndo);
-        setCanRedo(vp.history.canRedo);
-      });
-
-      // Layer sync
-      const syncLayers = () => {
-        setLayers([...vp.layerManager.getLayers()]);
-        setActiveLayerId(vp.layerManager.activeLayerId);
-      };
-      vp.layerManager.on('change', syncLayers);
-      syncLayers();
+      setViewport(vp);
 
       // Track selected element for DM-only toggle
       const syncSelection = () => {
@@ -308,15 +258,7 @@ export function useDmLocationEditor(
       if (location.canvasState && location.canvasState.trim().length > 0) {
         try {
           vp.loadJSON(location.canvasState);
-          // Ensure grid is on the background layer so it renders behind annotations
-          const bgLayer = vp.layerManager.getLayers()[0];
-          const gridEls = vp.store.getElementsByType('grid');
-          if (bgLayer) {
-            for (const g of gridEls) {
-              vp.layerManager.moveElementToLayer(g.id, bgLayer.id);
-            }
-          }
-          setElementCount(vp.store.count);
+          pinGridToMapBackgroundLayer(vp);
           _fitCameraToMap(vp, location.mapImageSize);
           // Clear stale localStorage data after successful load
           autoSave.clear();
@@ -411,7 +353,6 @@ export function useDmLocationEditor(
           vp.layerManager.moveElementToLayer(bgImage.id, baseLayer.id);
         }
       }
-      setElementCount(vp.store.count);
       _fitCameraToMap(vp, mapImageSize);
       vp.requestRender();
     };
@@ -439,57 +380,11 @@ export function useDmLocationEditor(
     };
   }, []);
 
-  // Sync arrow color
-  useEffect(() => {
-    const vp = getVp();
-    if (!vp) return;
-    const arrow = vp.toolManager.getTool<ArrowTool>('arrow');
-    arrow?.setOptions({ color: arrowColor });
-  }, [arrowColor, getVp]);
-
-  // Sync note options
-  useEffect(() => {
-    const vp = getVp();
-    if (!vp) return;
-    const note = vp.toolManager.getTool<NoteTool>('note');
-    note?.setOptions({ backgroundColor: noteColor, textColor: noteTextColor });
-  }, [noteColor, noteTextColor, getVp]);
-
-  // Sync text tool options
-  useEffect(() => {
-    const vp = getVp();
-    if (!vp) return;
-    const text = vp.toolManager.getTool<TextTool>('text');
-    text?.setOptions({ color: textColor, fontSize: textFontSize, textAlign });
-  }, [textColor, textFontSize, textAlign, getVp]);
-
-  // Sync shape tool options
-  useEffect(() => {
-    const vp = getVp();
-    if (!vp) return;
-    const shape = vp.toolManager.getTool<ShapeTool>('shape');
-    shape?.setOptions({
-      shape: shapeKind,
-      strokeColor: shapeStrokeColor,
-      strokeWidth: shapeStrokeWidth,
-      fillColor: shapeFillColor,
-    });
-  }, [shapeKind, shapeStrokeColor, shapeStrokeWidth, shapeFillColor, getVp]);
+  const handlePickImage = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
 
   // ─── Handlers ────────────────────────────────────────────────
-
-  const handleToolChange = useCallback(
-    (name: string) => {
-      const vp = getVp();
-      if (!vp) return;
-      if (name === 'image') {
-        fileInputRef.current?.click();
-        return;
-      }
-      vp.toolManager.setTool(name, vp.toolContext);
-    },
-    [getVp]
-  );
 
   const handleSetGridType = useCallback(
     (type: 'square' | 'hex' | 'off') => {
@@ -519,15 +414,7 @@ export function useDmLocationEditor(
       };
       vp.addGrid(settings);
 
-      // Move grid to the background layer so it renders behind annotations
-      const bgLayer = vp.layerManager.getLayers()[0];
-      const gridEls = vp.store.getElementsByType('grid');
-      if (bgLayer) {
-        for (const g of gridEls) {
-          vp.layerManager.moveElementToLayer(g.id, bgLayer.id);
-        }
-      }
-      vp.requestRender();
+      pinGridToMapBackgroundLayer(vp);
 
       setGridEnabled(true);
       setGridType(type);
@@ -591,14 +478,6 @@ export function useDmLocationEditor(
     if (!selectedElementId) return;
     storeToggleDmOnly(campaignCode, location.id, selectedElementId);
   }, [selectedElementId, campaignCode, location.id, storeToggleDmOnly]);
-
-  const handleUndo = useCallback(() => {
-    getVp()?.undo();
-  }, [getVp]);
-
-  const handleRedo = useCallback(() => {
-    getVp()?.redo();
-  }, [getVp]);
 
   const handleDeleteSelected = useCallback(() => {
     const vp = getVp();
@@ -900,30 +779,8 @@ export function useDmLocationEditor(
     mode,
     canvasRef,
     fileInputRef,
+    viewport,
     tools,
-    activeTool,
-    arrowColor,
-    setArrowColor,
-    noteColor,
-    setNoteColor,
-    noteTextColor,
-    setNoteTextColor,
-    textColor,
-    setTextColor,
-    textFontSize,
-    setTextFontSize,
-    textAlign,
-    setTextAlign,
-    shapeKind,
-    setShapeKind,
-    shapeStrokeColor,
-    setShapeStrokeColor,
-    shapeStrokeWidth,
-    setShapeStrokeWidth,
-    shapeFillColor,
-    setShapeFillColor,
-    layers,
-    activeLayerId,
     layersPanelOpen,
     setLayersPanelOpen,
     gridEnabled,
@@ -937,19 +794,13 @@ export function useDmLocationEditor(
     selectedElementId,
     isDmOnly,
     handleToggleDmOnly,
-    canUndo,
-    canRedo,
-    elementCount,
-    zoom,
     syncing,
     hasUnsyncedChanges,
     lastSyncedAt,
     imageUploading,
     setImageUploading,
     handleReady,
-    handleToolChange,
-    handleUndo,
-    handleRedo,
+    handlePickImage,
     handleDeleteSelected,
     handleClear,
     handleSyncToPlayers,
