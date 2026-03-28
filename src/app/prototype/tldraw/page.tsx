@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ArrowLeft, AlertTriangle, Hexagon } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Pen } from 'lucide-react';
 
 const TldrawCanvas = dynamic(
   () => import('@/prototypes/notes-module/TldrawCanvas'),
@@ -37,11 +37,11 @@ export default function TldrawPrototypePage() {
               ReactFlow Canvas
             </Link>
             <Link
-              href="/prototype/excalidraw"
+              href="/prototype/fieldnotes"
               className="flex items-center gap-1.5 rounded bg-amber-100 px-2.5 py-1 text-xs text-amber-800 hover:bg-amber-200"
             >
-              <Hexagon size={12} />
-              Excalidraw Canvas
+              <Pen size={12} />
+              FieldNotes Canvas
             </Link>
             <Link
               href="/"

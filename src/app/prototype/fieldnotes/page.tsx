@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { ArrowLeft, AlertTriangle, Pen, Shapes } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Pen } from 'lucide-react';
 
 const FieldNotesCanvas = dynamic(
   () => import('@/prototypes/notes-module/FieldNotesCanvas'),
@@ -42,13 +42,6 @@ export default function FieldNotesPrototypePage() {
             >
               <Pen size={12} />
               tldraw Canvas
-            </Link>
-            <Link
-              href="/prototype/excalidraw"
-              className="flex items-center gap-1.5 rounded bg-indigo-100 px-2.5 py-1 text-xs text-indigo-800 hover:bg-indigo-200"
-            >
-              <Shapes size={12} />
-              Excalidraw Canvas
             </Link>
             <Link
               href="/"
