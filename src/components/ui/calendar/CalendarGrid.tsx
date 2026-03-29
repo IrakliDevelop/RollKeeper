@@ -4,6 +4,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/forms/button';
+import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { MoonPhaseIcon } from './MoonPhaseIcon';
 import type {
   CalendarConfig,
@@ -257,7 +258,14 @@ export function CalendarGrid({
                   key={wd.name}
                   className="text-muted border-divider border-b px-1 py-2 text-center text-xs font-medium"
                 >
-                  {wd.name.slice(0, 3)}
+                  <span className="hidden sm:inline">{wd.name}</span>
+                  <TooltipProvider>
+                    <Tooltip content={wd.name} side="top" delayDuration={150}>
+                      <span className="cursor-default sm:hidden">
+                        {wd.name.slice(0, 3)}
+                      </span>
+                    </Tooltip>
+                  </TooltipProvider>
                 </th>
               ))}
             </tr>
