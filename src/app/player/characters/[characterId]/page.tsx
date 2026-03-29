@@ -179,6 +179,8 @@ export default function CharacterSheet() {
     showLevelUpAnimation,
     levelUpAnimationLevel,
     clearLevelUpAnimation,
+    addInventoryItem,
+    deleteInventoryItem,
   } = useCharacterStore();
 
   // Derive campaign days from local calendar (may be overridden by shared state below)
@@ -210,7 +212,7 @@ export default function CharacterSheet() {
   );
 
   // Shared DM calendar state (when in a campaign)
-  const { sharedState, acknowledgeMessage, acknowledgeDmEffects } =
+  const { sharedState, acknowledgeMessage, acknowledgeDmEffects, acknowledgeTransfers, pendingTransfers, clearPendingTransfer } =
     useSharedCampaignState(playerSync.campaignCode, characterId);
   const sharedCalendar = sharedState?.calendar ?? null;
 
@@ -229,6 +231,37 @@ export default function CharacterSheet() {
       }
     }
   }, [sharedState?.messages, addNote]);
+
+  // Auto-merge incoming item transfers into inventory
+  const processedTransferIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const transfers = sharedState?.transfers ?? [];
+    if (transfers.length === 0) return;
+
+    let added = false;
+    for (const transfer of transfers) {
+      if (processedTransferIdsRef.current.has(transfer.id)) continue;
+      processedTransferIdsRef.current.add(transfer.id);
+
+      addInventoryItem({
+        name: transfer.item.name,
+        category: transfer.item.category || 'misc',
+        quantity: transfer.item.quantity,
+        description: transfer.item.description,
+        weight: transfer.item.weight,
+        value: transfer.item.value,
+        rarity: transfer.item.rarity,
+        type: transfer.item.type,
+        location: transfer.item.location || 'Backpack',
+        tags: transfer.item.tags || [],
+      });
+      added = true;
+    }
+
+    if (added) {
+      acknowledgeTransfers();
+    }
+  }, [sharedState?.transfers, addInventoryItem, acknowledgeTransfers]);
 
   // Latch DM effects into local state for the notification toast before
   // acknowledgment clears them from shared state.
