@@ -16,6 +16,7 @@ import {
   Scale,
   Coins,
   Pencil,
+  Send,
 } from 'lucide-react';
 import {
   Dialog,
@@ -52,6 +53,7 @@ interface NPCDetailDialogProps {
   onEdit: (npc: CampaignNPC) => void;
   onDelete: (npc: CampaignNPC) => void;
   onUpdateInventory?: (npcId: string, inventory: NPCInventoryItem[]) => void;
+  onSendItemToPlayer?: (item: NPCInventoryItem, npcName: string) => void;
 }
 
 const ABILITY_LABELS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const;
@@ -179,12 +181,14 @@ function InventoryItemCard({
   onClick,
   onEdit,
   onQuantityChange,
+  onSend,
 }: {
   item: NPCInventoryItem;
   onRemove?: () => void;
   onClick?: () => void;
   onEdit?: () => void;
   onQuantityChange?: (quantity: number) => void;
+  onSend?: () => void;
 }) {
   const borderClass =
     (item.rarity && RARITY_BORDER[item.rarity]) || 'border-divider';
@@ -212,6 +216,18 @@ function InventoryItemCard({
             className="flex shrink-0 items-center gap-0.5"
             onClick={e => e.stopPropagation()}
           >
+            {onSend && (
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onSend();
+                }}
+                className="text-accent-amber-text-muted hover:bg-accent-amber-bg hover:text-accent-amber-text rounded p-0.5 transition-colors"
+                title="Send to player"
+              >
+                <Send size={12} />
+              </button>
+            )}
             {onEdit && (
               <button
                 type="button"
@@ -439,6 +455,7 @@ export function NPCDetailDialog({
   onEdit,
   onDelete,
   onUpdateInventory,
+  onSendItemToPlayer,
 }: NPCDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('stats');
   const [showFullImage, setShowFullImage] = useState(false);
@@ -688,6 +705,11 @@ export function NPCDetailDialog({
                       onQuantityChange={
                         onUpdateInventory
                           ? qty => handleQuantityChange(item.id, qty)
+                          : undefined
+                      }
+                      onSend={
+                        onSendItemToPlayer
+                          ? () => onSendItemToPlayer(item, npc.name)
                           : undefined
                       }
                     />

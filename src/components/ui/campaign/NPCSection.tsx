@@ -28,9 +28,13 @@ import { NPCDetailDialog } from './NPCDetailDialog';
 
 interface NPCSectionProps {
   campaignCode: string;
+  onSendItemToPlayer?: (item: NPCInventoryItem, npcName: string) => void;
 }
 
-export function NPCSection({ campaignCode }: NPCSectionProps) {
+export function NPCSection({
+  campaignCode,
+  onSendItemToPlayer,
+}: NPCSectionProps) {
   const { getNPCsForCampaign, createNPC, updateNPC, deleteNPC } = useNPCStore();
   const { getCampaign, setDmDashboardUi } = useDmStore();
   const campaign = getCampaign(campaignCode);
@@ -338,6 +342,7 @@ export function NPCSection({ campaignCode }: NPCSectionProps) {
         }}
         onDelete={handleDelete}
         onUpdateInventory={handleUpdateInventory}
+        onSendItemToPlayer={onSendItemToPlayer}
       />
     </div>
   );
