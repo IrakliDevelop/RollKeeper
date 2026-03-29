@@ -10,6 +10,7 @@ import { usePlayerSync } from '@/hooks/usePlayerSync';
 import { SyncIndicator } from '@/components/ui/campaign/SyncIndicator';
 import { PartyHPSidebar } from '@/components/ui/campaign/PartyHPSidebar';
 import { DmMessageNotification } from '@/components/ui/campaign/DmMessageNotification';
+import { ItemTransferNotification } from '@/components/ui/campaign/ItemTransferNotification';
 import { DmEffectsNotification } from '@/components/ui/campaign/DmEffectsNotification';
 import { DmCounterNotification } from '@/components/ui/campaign/DmCounterNotification';
 import { useDmConditionOverrides } from '@/hooks/useDmConditionOverrides';
@@ -212,8 +213,14 @@ export default function CharacterSheet() {
   );
 
   // Shared DM calendar state (when in a campaign)
-  const { sharedState, acknowledgeMessage, acknowledgeDmEffects, acknowledgeTransfers, pendingTransfers, clearPendingTransfer } =
-    useSharedCampaignState(playerSync.campaignCode, characterId);
+  const {
+    sharedState,
+    acknowledgeMessage,
+    acknowledgeDmEffects,
+    acknowledgeTransfers,
+    pendingTransfers,
+    clearPendingTransfer,
+  } = useSharedCampaignState(playerSync.campaignCode, characterId);
   const sharedCalendar = sharedState?.calendar ?? null;
 
   // Auto-save DM messages to notes on arrival so they're never lost
@@ -837,6 +844,17 @@ export default function CharacterSheet() {
                 }}
                 onDismiss={messageId => {
                   acknowledgeMessage(messageId);
+                }}
+              />
+            )}
+
+            {/* Item Transfer Notifications */}
+            {pendingTransfers.length > 0 && (
+              <ItemTransferNotification
+                transfers={pendingTransfers}
+                onDismiss={clearPendingTransfer}
+                onNavigateToInventory={() => {
+                  switchToTab('inventory');
                 }}
               />
             )}
