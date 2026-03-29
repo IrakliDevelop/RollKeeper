@@ -2,7 +2,16 @@
 
 import React from 'react';
 import { InventoryItem, MagicItemRarity } from '@/types/character';
-import { Edit2, Trash2, Plus, Minus, Package, Zap, Eye } from 'lucide-react';
+import {
+  Edit2,
+  Trash2,
+  Plus,
+  Minus,
+  Package,
+  Zap,
+  Eye,
+  Send,
+} from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { formatCurrencyFromCopper } from '@/utils/currency';
@@ -14,6 +23,7 @@ interface ItemCardProps {
   onDelete?: () => void;
   onQuantityChange?: (quantity: number) => void;
   onUse?: () => void;
+  onSend?: (item: InventoryItem) => void;
   compact?: boolean;
 }
 
@@ -47,6 +57,7 @@ export function ItemCard({
   onDelete,
   onQuantityChange,
   onUse,
+  onSend,
   compact = false,
 }: ItemCardProps) {
   const totalWeight = item.weight ? item.weight * item.quantity : undefined;
@@ -84,6 +95,17 @@ export function ItemCard({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-1">
+          {onSend && (
+            <Button
+              onClick={() => onSend(item)}
+              variant="ghost"
+              size="xs"
+              title="Send to player"
+              className="text-accent-amber-text-muted hover:bg-accent-amber-bg hover:text-accent-amber-text h-6 w-6 p-0"
+            >
+              <Send size={14} />
+            </Button>
+          )}
           {onUse && item.category === 'consumable' && !isDepleted && (
             <Button
               onClick={onUse}

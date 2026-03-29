@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Angry } from 'lucide-react';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { PlayerCalendarView } from '@/components/ui/calendar/PlayerCalendarView';
@@ -56,6 +56,7 @@ import {
   ToolProficiency,
   Language,
   Spell,
+  InventoryItem,
 } from '@/types/character';
 
 export interface TabbedSheetConfigParams {
@@ -225,6 +226,7 @@ export interface TabbedSheetConfigParams {
   campaignCode?: string;
   customCounter?: { label: string; value: number } | null;
   locationCount?: number;
+  onSendItem?: (item: InventoryItem) => void;
 }
 
 export function createTabbedSheetConfig(
@@ -236,6 +238,7 @@ export function createTabbedSheetConfig(
     totalLevel,
     proficiencyBonus,
     characterHasSpells,
+    onSendItem,
   } = params;
 
   const isBard =
@@ -464,7 +467,9 @@ export function createTabbedSheetConfig(
       id: 'inventory',
       label: 'Inventory',
       icon: '🎒',
-      content: <InventoryTabContent character={character} />,
+      content: (
+        <InventoryTabContent character={character} onSendItem={onSendItem} />
+      ),
     },
 
     // Tab 6: Features
@@ -556,8 +561,27 @@ const INVENTORY_SUB_TABS = [
 
 type InventorySubTab = (typeof INVENTORY_SUB_TABS)[number]['id'];
 
-function InventoryTabContent({ character }: { character: CharacterState }) {
+// Global setter so external code (e.g. item transfer notification) can switch to items sub-tab
+let inventorySubTabSetter: ((tab: InventorySubTab) => void) | null = null;
+export function setInventorySubTab(tab: InventorySubTab) {
+  inventorySubTabSetter?.(tab);
+}
+
+function InventoryTabContent({
+  character: _character,
+  onSendItem,
+}: {
+  character: CharacterState;
+  onSendItem?: (item: InventoryItem) => void;
+}) {
   const [activeSubTab, setActiveSubTab] = useState<InventorySubTab>('weapons');
+
+  useEffect(() => {
+    inventorySubTabSetter = setActiveSubTab;
+    return () => {
+      inventorySubTabSetter = null;
+    };
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -622,7 +646,7 @@ function InventoryTabContent({ character }: { character: CharacterState }) {
             </div>
           }
         >
-          <InventoryManager />
+          <InventoryManager onSendItem={onSendItem} />
         </ErrorBoundary>
       )}
 

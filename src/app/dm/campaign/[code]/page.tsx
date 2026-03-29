@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useCallback,
+} from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
@@ -32,6 +38,31 @@ import { useDmStore } from '@/store/dmStore';
 import { BannerUpload } from '@/components/ui/campaign/BannerUpload';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import { CampaignPlayerData } from '@/types/campaign';
+import {
+  SendItemDialog,
+  SendItemTarget,
+} from '@/components/ui/campaign/SendItemDialog';
+import type { ItemTransfer } from '@/types/sharedState';
+import type { InventoryItem } from '@/types/character';
+import type { NPCInventoryItem } from '@/types/encounter';
+
+function npcItemToInventoryItem(npcItem: NPCInventoryItem): InventoryItem {
+  return {
+    id: npcItem.id,
+    name: npcItem.name,
+    quantity: npcItem.quantity,
+    category: npcItem.category || 'misc',
+    description: npcItem.description,
+    weight: npcItem.weight,
+    value: npcItem.value,
+    rarity: npcItem.rarity as InventoryItem['rarity'],
+    type: npcItem.type as InventoryItem['type'],
+    location: 'Backpack',
+    tags: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 export default function CampaignViewPage() {
   const params = useParams();
@@ -70,6 +101,15 @@ export default function CampaignViewPage() {
   const { toasts, addToast, dismissToast } = useToast();
   const knownPlayerIdsRef = useRef<Set<string>>(new Set());
 
+  const [npcSendingItem, setNpcSendingItem] = useState<NPCInventoryItem | null>(
+    null
+  );
+  const [npcSendingNpcName, setNpcSendingNpcName] = useState<string | null>(
+    null
+  );
+  const [npcSendDialogOpen, setNpcSendDialogOpen] = useState(false);
+  const [isNpcSendingItem, setIsNpcSendingItem] = useState(false);
+
   const playersSectionOpen =
     localCampaign?.dmDashboardUi?.playersSectionOpen ?? true;
 
@@ -96,6 +136,61 @@ export default function CampaignViewPage() {
 
     knownPlayerIdsRef.current = currentIds;
   }, [players, loading, addToast]);
+
+  const npcSendTargets: SendItemTarget[] = useMemo(
+    () =>
+      players.map(p => ({
+        playerId: p.playerId,
+        playerName: p.playerName,
+        characterName: p.characterName,
+        characterId: p.characterId,
+      })),
+    [players]
+  );
+
+  const handleNpcSendItem = useCallback(
+    async (item: InventoryItem, target: SendItemTarget) => {
+      setIsNpcSendingItem(true);
+      try {
+        const transfer: ItemTransfer = {
+          id: `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          item,
+          fromPlayerName: 'DM',
+          fromCharacterName: npcSendingNpcName ?? 'NPC',
+          fromType: 'npc',
+          sentAt: new Date().toISOString(),
+        };
+
+        const res = await fetch(`/api/campaign/${code}/shared`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            feature: 'item_transfer',
+            data: { transfer, playerId: target.playerId },
+            dmId,
+          }),
+        });
+
+        if (!res.ok) throw new Error('Failed to send item');
+
+        addToast({
+          type: 'success',
+          title: 'Item Sent',
+          message: `${item.name} sent to ${target.characterName}`,
+        });
+      } catch (err) {
+        console.error('Failed to send item:', err);
+        addToast({
+          type: 'error',
+          title: 'Failed',
+          message: 'Could not send item',
+        });
+      } finally {
+        setIsNpcSendingItem(false);
+      }
+    },
+    [code, dmId, npcSendingNpcName, addToast]
+  );
 
   const displayName = campaignName || localCampaign?.name || 'Campaign';
 
@@ -470,7 +565,16 @@ export default function CampaignViewPage() {
         )}
 
         {/* NPC Management — always visible */}
-        {!loading && !error && <NPCSection campaignCode={code} />}
+        {!loading && !error && (
+          <NPCSection
+            campaignCode={code}
+            onSendItemToPlayer={(item, npcName) => {
+              setNpcSendingItem(item);
+              setNpcSendingNpcName(npcName);
+              setNpcSendDialogOpen(true);
+            }}
+          />
+        )}
       </main>
 
       {/* Player Detail Dialog */}
@@ -497,6 +601,19 @@ export default function CampaignViewPage() {
           }}
         />
       )}
+
+      <SendItemDialog
+        open={npcSendDialogOpen}
+        onClose={() => {
+          setNpcSendDialogOpen(false);
+          setNpcSendingItem(null);
+          setNpcSendingNpcName(null);
+        }}
+        item={npcSendingItem ? npcItemToInventoryItem(npcSendingItem) : null}
+        targets={npcSendTargets}
+        onSend={handleNpcSendItem}
+        sending={isNpcSendingItem}
+      />
 
       <SendMessageDialog
         open={messageTarget !== null}

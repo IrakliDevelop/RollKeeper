@@ -10,10 +10,15 @@ import { usePlayerSync } from '@/hooks/usePlayerSync';
 import { SyncIndicator } from '@/components/ui/campaign/SyncIndicator';
 import { PartyHPSidebar } from '@/components/ui/campaign/PartyHPSidebar';
 import { DmMessageNotification } from '@/components/ui/campaign/DmMessageNotification';
+import { ItemTransferNotification } from '@/components/ui/campaign/ItemTransferNotification';
+import {
+  SendItemDialog,
+  SendItemTarget,
+} from '@/components/ui/campaign/SendItemDialog';
 import { DmEffectsNotification } from '@/components/ui/campaign/DmEffectsNotification';
 import { DmCounterNotification } from '@/components/ui/campaign/DmCounterNotification';
 import { useDmConditionOverrides } from '@/hooks/useDmConditionOverrides';
-import type { DmEffect } from '@/types/sharedState';
+import type { DmEffect, ItemTransfer } from '@/types/sharedState';
 import ExperimentalFeaturesSection from '@/components/ui/layout/ExperimentalFeaturesSection';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
@@ -36,11 +41,13 @@ import {
   SkillName,
   CharacterState,
   Spell,
+  InventoryItem,
 } from '@/types/character';
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { NavigationContext } from '@/contexts/NavigationContext';
 import { useSimpleDiceRoll } from '@/hooks/useSimpleDiceRoll';
 import { useLocationSync } from '@/hooks/useLocationSync';
+import { usePartySync } from '@/hooks/usePartySync';
 
 import { RollSummary } from '@/types/dice';
 import NotHydrated from '@/components/ui/feedback/NotHydrated';
@@ -51,7 +58,10 @@ import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
 import { getMsPerDay, getCampaignDays } from '@/utils/calendarCalculations';
 import TabbedCharacterSheet from '@/components/ui/character/TabbedCharacterSheet';
 import type { TabbedCharacterSheetRef } from '@/components/ui/character/TabbedCharacterSheet';
-import { setCharacterSubTab } from '@/components/ui/character/tabbedSheetConfig';
+import {
+  setCharacterSubTab,
+  setInventorySubTab,
+} from '@/components/ui/character/tabbedSheetConfig';
 
 export default function CharacterSheet() {
   const params = useParams();
@@ -179,6 +189,8 @@ export default function CharacterSheet() {
     showLevelUpAnimation,
     levelUpAnimationLevel,
     clearLevelUpAnimation,
+    addInventoryItem,
+    deleteInventoryItem,
   } = useCharacterStore();
 
   // Derive campaign days from local calendar (may be overridden by shared state below)
@@ -200,6 +212,9 @@ export default function CharacterSheet() {
   const [pendingRestType, setPendingRestType] = useState<
     'short' | 'long' | null
   >(null);
+  const [sendingItem, setSendingItem] = useState<InventoryItem | null>(null);
+  const [sendItemDialogOpen, setSendItemDialogOpen] = useState(false);
+  const [isSendingItem, setIsSendingItem] = useState(false);
   const tabbedSheetRef = useRef<TabbedCharacterSheetRef>(null);
 
   const playerSync = usePlayerSync({ characterId });
@@ -209,9 +224,21 @@ export default function CharacterSheet() {
     playerSync.campaignCode ?? undefined
   );
 
+  // Party sync — used for send-item targets
+  const { partyMembers } = usePartySync({
+    campaignCode: playerSync.campaignCode ?? null,
+    currentCharacterId: characterId,
+  });
+
   // Shared DM calendar state (when in a campaign)
-  const { sharedState, acknowledgeMessage, acknowledgeDmEffects } =
-    useSharedCampaignState(playerSync.campaignCode, characterId);
+  const {
+    sharedState,
+    acknowledgeMessage,
+    acknowledgeDmEffects,
+    acknowledgeTransfers,
+    pendingTransfers,
+    clearPendingTransfer,
+  } = useSharedCampaignState(playerSync.campaignCode, characterId);
   const sharedCalendar = sharedState?.calendar ?? null;
 
   // Auto-save DM messages to notes on arrival so they're never lost
@@ -229,6 +256,37 @@ export default function CharacterSheet() {
       }
     }
   }, [sharedState?.messages, addNote]);
+
+  // Auto-merge incoming item transfers into inventory
+  const processedTransferIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const transfers = sharedState?.transfers ?? [];
+    if (transfers.length === 0) return;
+
+    let added = false;
+    for (const transfer of transfers) {
+      if (processedTransferIdsRef.current.has(transfer.id)) continue;
+      processedTransferIdsRef.current.add(transfer.id);
+
+      addInventoryItem({
+        name: transfer.item.name,
+        category: transfer.item.category || 'misc',
+        quantity: transfer.item.quantity,
+        description: transfer.item.description,
+        weight: transfer.item.weight,
+        value: transfer.item.value,
+        rarity: transfer.item.rarity,
+        type: transfer.item.type,
+        location: transfer.item.location || 'Backpack',
+        tags: transfer.item.tags || [],
+      });
+      added = true;
+    }
+
+    if (added) {
+      acknowledgeTransfers();
+    }
+  }, [sharedState?.transfers, addInventoryItem, acknowledgeTransfers]);
 
   // Latch DM effects into local state for the notification toast before
   // acknowledgment clears them from shared state.
@@ -407,6 +465,67 @@ export default function CharacterSheet() {
     character.hitPoints.calculationMode,
     recalculateMaxHP,
   ]);
+
+  // Send item to another player
+  const handleSendItem = useCallback((item: InventoryItem) => {
+    setSendingItem(item);
+    setSendItemDialogOpen(true);
+  }, []);
+
+  const sendItemTargets: SendItemTarget[] = useMemo(
+    () =>
+      partyMembers.map(m => ({
+        playerId: m.characterId,
+        playerName: m.playerName,
+        characterName: m.characterName,
+        characterId: m.characterId,
+      })),
+    [partyMembers]
+  );
+
+  const handleConfirmSendItem = useCallback(
+    async (item: InventoryItem, target: SendItemTarget) => {
+      if (!playerSync.campaignCode) return;
+      setIsSendingItem(true);
+      try {
+        const transfer: ItemTransfer = {
+          id: `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          item,
+          fromPlayerName: character.playerName || character.name || 'Unknown',
+          fromCharacterName: character.name || 'Unknown',
+          fromType: 'player',
+          sentAt: new Date().toISOString(),
+        };
+
+        const res = await fetch(
+          `/api/campaign/${playerSync.campaignCode}/shared`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              feature: 'item_transfer',
+              data: { transfer, playerId: target.characterId },
+            }),
+          }
+        );
+
+        if (!res.ok) throw new Error('Failed to send item');
+        deleteInventoryItem(item.id);
+      } catch (err) {
+        console.error('Failed to send item:', err);
+      } finally {
+        setIsSendingItem(false);
+      }
+    },
+    [
+      playerSync.campaignCode,
+      character.playerName,
+      character.name,
+      deleteInventoryItem,
+    ]
+  );
+
+  const onSendItem = playerSync.campaignCode ? handleSendItem : undefined;
 
   if (!hasHydrated) {
     return <NotHydrated />;
@@ -808,6 +927,31 @@ export default function CharacterSheet() {
               />
             )}
 
+            {/* Item Transfer Notifications */}
+            {pendingTransfers.length > 0 && (
+              <ItemTransferNotification
+                transfers={pendingTransfers}
+                onDismiss={clearPendingTransfer}
+                onNavigateToInventory={() => {
+                  switchToTab('inventory');
+                  setInventorySubTab('items');
+                }}
+              />
+            )}
+
+            {/* Send Item Dialog */}
+            <SendItemDialog
+              open={sendItemDialogOpen}
+              onClose={() => {
+                setSendItemDialogOpen(false);
+                setSendingItem(null);
+              }}
+              item={sendingItem}
+              targets={sendItemTargets}
+              onSend={handleConfirmSendItem}
+              sending={isSendingItem}
+            />
+
             {/* Rest Dialog triggered from HUD */}
             <RestDialog
               restType={pendingRestType}
@@ -928,6 +1072,7 @@ export default function CharacterSheet() {
                 campaignCode={playerSync.campaignCode ?? undefined}
                 customCounter={sharedState?.customCounter}
                 locationCount={syncedLocations.length}
+                onSendItem={onSendItem}
               />
             </main>
 

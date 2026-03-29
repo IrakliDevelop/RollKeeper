@@ -5,6 +5,7 @@ import {
   campaignSharedKey,
   campaignMessagesKey,
   campaignEffectsKey,
+  campaignTransfersKey,
   campaignPlayersKey,
   refreshCampaignTTL,
   SLIDING_TTL_SECONDS,
@@ -17,6 +18,7 @@ import type {
   SharedCalendarPlayer,
   SharedCampaignState,
   SharedCustomCounter,
+  ItemTransfer,
 } from '@/types/sharedState';
 
 export async function GET(
@@ -57,13 +59,16 @@ export async function GET(
     let messages: DmMessage[] = [];
     let dmEffects: DmEffect[] = [];
     let customCounter: SharedCampaignState['customCounter'] = null;
+    let transfers: ItemTransfer[] = [];
 
     if (playerId) {
-      const [messagesRaw, effectsRaw, countersRaw] = await Promise.all([
-        redis.get<string>(campaignMessagesKey(code, playerId)),
-        redis.get<string>(campaignEffectsKey(code, playerId)),
-        redis.get<string>(campaignSharedKey(code, 'counters')),
-      ]);
+      const [messagesRaw, effectsRaw, countersRaw, transfersRaw] =
+        await Promise.all([
+          redis.get<string>(campaignMessagesKey(code, playerId)),
+          redis.get<string>(campaignEffectsKey(code, playerId)),
+          redis.get<string>(campaignSharedKey(code, 'counters')),
+          redis.get<string>(campaignTransfersKey(code, playerId)),
+        ]);
       if (messagesRaw) {
         messages =
           typeof messagesRaw === 'string'
@@ -84,6 +89,12 @@ export async function GET(
           customCounter = { label: parsed.label, value };
         }
       }
+      if (transfersRaw) {
+        transfers =
+          typeof transfersRaw === 'string'
+            ? JSON.parse(transfersRaw)
+            : transfersRaw;
+      }
     }
 
     await refreshCampaignTTL(redis, code);
@@ -93,6 +104,7 @@ export async function GET(
       messages,
       dmEffects,
       customCounter,
+      transfers,
     };
     return NextResponse.json(state);
   } catch (error) {
@@ -113,11 +125,15 @@ export async function POST(
     const body = await request.json();
     const { feature, data, dmId } = body;
 
-    if (!feature || !data || !dmId) {
+    if (!feature || !data) {
       return NextResponse.json(
-        { error: 'feature, data, and dmId are required' },
+        { error: 'feature and data are required' },
         { status: 400 }
       );
+    }
+
+    if (feature !== 'item_transfer' && !dmId) {
+      return NextResponse.json({ error: 'dmId is required' }, { status: 400 });
     }
 
     const redis = getRedis();
@@ -127,7 +143,7 @@ export async function POST(
     // itself is the access boundary; only DM pages call this endpoint.
     const campaignRaw = await redis.get<string>(campaignKey(code));
 
-    if (campaignRaw) {
+    if (dmId && campaignRaw) {
       const campaign: CampaignData =
         typeof campaignRaw === 'string' ? JSON.parse(campaignRaw) : campaignRaw;
 
@@ -210,6 +226,34 @@ export async function POST(
       return NextResponse.json({ success: true });
     }
 
+    if (feature === 'item_transfer') {
+      const { transfer, playerId: targetPlayerId } = data as {
+        transfer: ItemTransfer;
+        playerId: string;
+      };
+
+      if (!transfer || !targetPlayerId) {
+        return NextResponse.json(
+          { error: 'transfer and playerId are required' },
+          { status: 400 }
+        );
+      }
+
+      const key = campaignTransfersKey(code, targetPlayerId);
+      const existing = await redis.get<string>(key);
+      let queue: ItemTransfer[] = [];
+      if (existing) {
+        queue = typeof existing === 'string' ? JSON.parse(existing) : existing;
+      }
+      queue.push(transfer);
+      await redis.set(key, JSON.stringify(queue), {
+        ex: SLIDING_TTL_SECONDS,
+      });
+
+      await refreshCampaignTTL(redis, code);
+      return NextResponse.json({ success: true });
+    }
+
     // Default: store as shared feature key (calendar, etc.)
     await Promise.all([
       redis.set(campaignSharedKey(code, feature), JSON.stringify(data), {
@@ -250,6 +294,29 @@ export async function DELETE(
     // Acknowledge all DM effects for this player
     if (type === 'effects') {
       await redis.del(campaignEffectsKey(code, playerId));
+      return NextResponse.json({ success: true });
+    }
+
+    if (type === 'transfers') {
+      const { transferId } = body;
+      if (!transferId) {
+        await redis.del(campaignTransfersKey(code, playerId));
+        return NextResponse.json({ success: true });
+      }
+      const key = campaignTransfersKey(code, playerId);
+      const raw = await redis.get<string>(key);
+      if (raw) {
+        const transfers: ItemTransfer[] =
+          typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const filtered = transfers.filter(t => t.id !== transferId);
+        if (filtered.length === 0) {
+          await redis.del(key);
+        } else {
+          await redis.set(key, JSON.stringify(filtered), {
+            ex: SLIDING_TTL_SECONDS,
+          });
+        }
+      }
       return NextResponse.json({ success: true });
     }
 
