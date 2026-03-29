@@ -1,4 +1,5 @@
 import type { CalendarConfig } from './calendar';
+import type { InventoryItem } from './character';
 
 // Stored in Redis — DM's calendar data (events stay local, not synced)
 export interface SharedCalendar {
@@ -34,6 +35,16 @@ export interface DmEffect {
   appliedAt: string; // ISO timestamp
 }
 
+// Item transfer queued for a player (auto-merges on next poll)
+export interface ItemTransfer {
+  id: string;
+  item: InventoryItem;
+  fromPlayerName: string;
+  fromCharacterName: string;
+  fromType: 'player' | 'npc';
+  sentAt: string; // ISO timestamp
+}
+
 // DM custom counter synced per-player (e.g. "Desperation Points")
 export interface SharedCustomCounter {
   label: string;
@@ -47,6 +58,7 @@ export interface SharedCampaignState {
   messages: DmMessage[];
   dmEffects: DmEffect[];
   customCounter: { label: string; value: number } | null;
+  transfers: ItemTransfer[];
 }
 
 // POST body for DM pushing shared state

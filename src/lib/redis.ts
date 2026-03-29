@@ -48,6 +48,10 @@ export function campaignEffectsKey(code: string, playerId: string): string {
   return `campaign:${code}:effects:${playerId}`;
 }
 
+export function campaignTransfersKey(code: string, playerId: string): string {
+  return `campaign:${code}:transfers:${playerId}`;
+}
+
 export function campaignLocationsKey(code: string): string {
   return `campaign:${code}:locations`;
 }
