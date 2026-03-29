@@ -56,6 +56,7 @@ import {
   ToolProficiency,
   Language,
   Spell,
+  InventoryItem,
 } from '@/types/character';
 
 export interface TabbedSheetConfigParams {
@@ -225,6 +226,7 @@ export interface TabbedSheetConfigParams {
   campaignCode?: string;
   customCounter?: { label: string; value: number } | null;
   locationCount?: number;
+  onSendItem?: (item: InventoryItem) => void;
 }
 
 export function createTabbedSheetConfig(
@@ -236,6 +238,7 @@ export function createTabbedSheetConfig(
     totalLevel,
     proficiencyBonus,
     characterHasSpells,
+    onSendItem,
   } = params;
 
   const isBard =
@@ -464,7 +467,9 @@ export function createTabbedSheetConfig(
       id: 'inventory',
       label: 'Inventory',
       icon: '🎒',
-      content: <InventoryTabContent character={character} />,
+      content: (
+        <InventoryTabContent character={character} onSendItem={onSendItem} />
+      ),
     },
 
     // Tab 6: Features
@@ -556,7 +561,13 @@ const INVENTORY_SUB_TABS = [
 
 type InventorySubTab = (typeof INVENTORY_SUB_TABS)[number]['id'];
 
-function InventoryTabContent({ character }: { character: CharacterState }) {
+function InventoryTabContent({
+  character: _character,
+  onSendItem,
+}: {
+  character: CharacterState;
+  onSendItem?: (item: InventoryItem) => void;
+}) {
   const [activeSubTab, setActiveSubTab] = useState<InventorySubTab>('weapons');
 
   return (
@@ -622,7 +633,7 @@ function InventoryTabContent({ character }: { character: CharacterState }) {
             </div>
           }
         >
-          <InventoryManager />
+          <InventoryManager onSendItem={onSendItem} />
         </ErrorBoundary>
       )}
 
