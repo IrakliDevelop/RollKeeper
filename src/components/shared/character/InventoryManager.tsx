@@ -59,6 +59,7 @@ interface InventoryManagerProps {
   onDeleteItem?: (id: string) => void;
   onQuantityChange?: (id: string, quantity: number) => void;
   onReorderItems?: (sourceIndex: number, destinationIndex: number) => void;
+  onSendItem?: (item: InventoryItem) => void;
 
   // When provided, overrides internal weight/value calculation in Quick Stats
   overrideTotalWeight?: number;
@@ -83,6 +84,7 @@ export function InventoryManager({
   onDeleteItem,
   onQuantityChange,
   onReorderItems,
+  onSendItem,
   overrideTotalWeight,
   overrideTotalValue,
   readonly = false,
@@ -272,6 +274,7 @@ export function InventoryManager({
           ? undefined
           : (quantity: number) => onQuantityChange(item.id, quantity)
       }
+      onSend={onSendItem}
       onUse={
         readonly || !onQuantityChange || item.category !== 'consumable'
           ? undefined
