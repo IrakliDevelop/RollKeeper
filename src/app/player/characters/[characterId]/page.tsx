@@ -58,7 +58,10 @@ import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
 import { getMsPerDay, getCampaignDays } from '@/utils/calendarCalculations';
 import TabbedCharacterSheet from '@/components/ui/character/TabbedCharacterSheet';
 import type { TabbedCharacterSheetRef } from '@/components/ui/character/TabbedCharacterSheet';
-import { setCharacterSubTab } from '@/components/ui/character/tabbedSheetConfig';
+import {
+  setCharacterSubTab,
+  setInventorySubTab,
+} from '@/components/ui/character/tabbedSheetConfig';
 
 export default function CharacterSheet() {
   const params = useParams();
@@ -931,6 +934,7 @@ export default function CharacterSheet() {
                 onDismiss={clearPendingTransfer}
                 onNavigateToInventory={() => {
                   switchToTab('inventory');
+                  setInventorySubTab('items');
                 }}
               />
             )}
