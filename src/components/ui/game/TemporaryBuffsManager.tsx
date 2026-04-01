@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronUp,
   Zap,
+  Pencil,
 } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
 import type {
@@ -380,10 +381,12 @@ function getEffectBadgeVariant(
 function BuffCard({
   buff,
   onToggle,
+  onEdit,
   onDelete,
 }: {
   buff: TemporaryBuff;
   onToggle: (id: string) => void;
+  onEdit: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
   return (
@@ -422,14 +425,24 @@ function BuffCard({
             ))}
           </div>
         </div>
-        <Button
-          onClick={() => onDelete(buff.id)}
-          variant="ghost"
-          size="sm"
-          className="text-muted hover:text-accent-red-text shrink-0"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex shrink-0 gap-1">
+          <Button
+            onClick={() => onEdit(buff.id)}
+            variant="ghost"
+            size="sm"
+            className="text-muted hover:text-accent-blue-text"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            onClick={() => onDelete(buff.id)}
+            variant="ghost"
+            size="sm"
+            className="text-muted hover:text-accent-red-text"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -469,19 +482,37 @@ function createEmptyEffect(): EffectFormRow {
   };
 }
 
-function AddBuffForm({
+function buffToEffectRows(buff: TemporaryBuff): EffectFormRow[] {
+  return buff.effects.map(e => ({
+    tempId: e.id,
+    targetStat: e.targetStat,
+    mode: e.mode,
+    value: e.value.toString(),
+    targetAbility: (e.targetAbility as AbilityName) || '',
+    targetDamageType: e.targetDamageType || '',
+    targetCondition: e.targetCondition || '',
+    description: e.description || '',
+  }));
+}
+
+function BuffForm({
   onAdd,
+  onUpdate,
   onCancel,
+  initialBuff,
 }: {
-  onAdd: (buff: Omit<TemporaryBuff, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onAdd?: (buff: Omit<TemporaryBuff, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onUpdate?: (id: string, updates: Partial<TemporaryBuff>) => void;
   onCancel: () => void;
+  initialBuff?: TemporaryBuff;
 }) {
-  const [name, setName] = useState('');
-  const [source, setSource] = useState('');
-  const [effects, setEffects] = useState<EffectFormRow[]>([
-    createEmptyEffect(),
-  ]);
-  const [showPresets, setShowPresets] = useState(true);
+  const isEditing = !!initialBuff;
+  const [name, setName] = useState(initialBuff?.name ?? '');
+  const [source, setSource] = useState(initialBuff?.source ?? '');
+  const [effects, setEffects] = useState<EffectFormRow[]>(
+    initialBuff ? buffToEffectRows(initialBuff) : [createEmptyEffect()]
+  );
+  const [showPresets, setShowPresets] = useState(!isEditing);
 
   const handleTargetChange = useCallback(
     (idx: number, newTarget: BuffTargetStat) => {
@@ -573,10 +604,11 @@ function AddBuffForm({
     });
   }, [name, effects]);
 
-  const handleSubmit = useCallback(() => {
-    if (!isValid) return;
-    const buffEffects: BuffEffect[] = effects.map(e => ({
-      id: `be-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  const buildEffects = useCallback((): BuffEffect[] => {
+    return effects.map(e => ({
+      id: e.tempId.startsWith('be-')
+        ? e.tempId
+        : `be-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       targetStat: e.targetStat,
       mode: e.mode,
       value: Number(e.value),
@@ -596,18 +628,42 @@ function AddBuffForm({
           : undefined,
       description: e.description || undefined,
     }));
+  }, [effects]);
 
-    onAdd({
-      name: name.trim(),
-      source: source.trim() || undefined,
-      effects: buffEffects,
-      isActive: false,
-    });
-  }, [isValid, name, source, effects, onAdd]);
+  const handleSubmit = useCallback(() => {
+    if (!isValid) return;
+    const buffEffects = buildEffects();
+
+    if (isEditing && initialBuff && onUpdate) {
+      onUpdate(initialBuff.id, {
+        name: name.trim(),
+        source: source.trim() || undefined,
+        effects: buffEffects,
+      });
+    } else if (onAdd) {
+      onAdd({
+        name: name.trim(),
+        source: source.trim() || undefined,
+        effects: buffEffects,
+        isActive: false,
+      });
+    }
+  }, [
+    isValid,
+    isEditing,
+    initialBuff,
+    name,
+    source,
+    buildEffects,
+    onAdd,
+    onUpdate,
+  ]);
 
   return (
     <div className="border-accent-blue-border from-accent-blue-bg to-accent-blue-bg rounded-lg border-2 bg-linear-to-br p-4">
-      <h5 className="text-accent-blue-text mb-3 font-bold">Add New Buff</h5>
+      <h5 className="text-accent-blue-text mb-3 font-bold">
+        {isEditing ? 'Edit Buff' : 'Add New Buff'}
+      </h5>
 
       {/* Preset Templates */}
       {showPresets && (
@@ -791,9 +847,15 @@ function AddBuffForm({
           size="sm"
           onClick={handleSubmit}
           disabled={!isValid}
-          leftIcon={<Plus className="h-4 w-4" />}
+          leftIcon={
+            isEditing ? (
+              <Pencil className="h-4 w-4" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )
+          }
         >
-          Add Buff
+          {isEditing ? 'Save Changes' : 'Add Buff'}
         </Button>
       </div>
     </div>
@@ -805,14 +867,24 @@ function AddBuffForm({
 // ============================================================
 
 export default function TemporaryBuffsManager() {
-  const { character, addBuff, toggleBuff, deleteBuff, clearAllBuffs } =
-    useCharacterStore();
+  const {
+    character,
+    addBuff,
+    updateBuff,
+    toggleBuff,
+    deleteBuff,
+    clearAllBuffs,
+  } = useCharacterStore();
 
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingBuffId, setEditingBuffId] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const buffs = character.temporaryBuffs || [];
   const activeCount = buffs.filter(b => b.isActive).length;
+  const editingBuff = editingBuffId
+    ? (buffs.find(b => b.id === editingBuffId) ?? null)
+    : null;
 
   const handleAdd = useCallback(
     (buff: Omit<TemporaryBuff, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -821,6 +893,23 @@ export default function TemporaryBuffsManager() {
     },
     [addBuff]
   );
+
+  const handleUpdate = useCallback(
+    (id: string, updates: Partial<TemporaryBuff>) => {
+      updateBuff(id, updates);
+      setEditingBuffId(null);
+    },
+    [updateBuff]
+  );
+
+  const handleEdit = useCallback((id: string) => {
+    setShowAddForm(false);
+    setEditingBuffId(id);
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingBuffId(null);
+  }, []);
 
   return (
     <div className="border-divider bg-surface rounded-lg border-2 shadow-sm">
@@ -858,7 +947,10 @@ export default function TemporaryBuffsManager() {
             )}
             {!isCollapsed && (
               <Button
-                onClick={() => setShowAddForm(!showAddForm)}
+                onClick={() => {
+                  setEditingBuffId(null);
+                  setShowAddForm(!showAddForm);
+                }}
                 variant={showAddForm ? 'outline' : 'primary'}
                 size="sm"
                 leftIcon={
@@ -881,7 +973,7 @@ export default function TemporaryBuffsManager() {
         <div className="p-4">
           {showAddForm && (
             <div className="mb-4">
-              <AddBuffForm
+              <BuffForm
                 onAdd={handleAdd}
                 onCancel={() => setShowAddForm(false)}
               />
@@ -889,14 +981,24 @@ export default function TemporaryBuffsManager() {
           )}
 
           <div className="space-y-3">
-            {buffs.map(buff => (
-              <BuffCard
-                key={buff.id}
-                buff={buff}
-                onToggle={toggleBuff}
-                onDelete={deleteBuff}
-              />
-            ))}
+            {buffs.map(buff =>
+              editingBuffId === buff.id && editingBuff ? (
+                <BuffForm
+                  key={`edit-${buff.id}`}
+                  initialBuff={editingBuff}
+                  onUpdate={handleUpdate}
+                  onCancel={handleCancelEdit}
+                />
+              ) : (
+                <BuffCard
+                  key={buff.id}
+                  buff={buff}
+                  onToggle={toggleBuff}
+                  onEdit={handleEdit}
+                  onDelete={deleteBuff}
+                />
+              )
+            )}
             {buffs.length === 0 && !showAddForm && (
               <div className="border-divider-strong bg-surface-secondary rounded-lg border-2 border-dashed py-8 text-center">
                 <Sparkles className="text-faint mx-auto mb-3 h-10 w-10" />
