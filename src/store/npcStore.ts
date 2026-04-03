@@ -10,6 +10,13 @@ function generateId(): string {
   );
 }
 
+function arrayMove<T>(arr: T[], fromIndex: number, toIndex: number): T[] {
+  const next = [...arr];
+  const [removed] = next.splice(fromIndex, 1);
+  next.splice(toIndex, 0, removed);
+  return next;
+}
+
 interface NPCStoreState {
   npcsByCampaign: Record<string, CampaignNPC[]>;
 
@@ -25,6 +32,13 @@ interface NPCStoreState {
   deleteNPC: (campaignCode: string, id: string) => void;
   getNPC: (campaignCode: string, id: string) => CampaignNPC | undefined;
   getNPCsForCampaign: (campaignCode: string) => CampaignNPC[];
+  /** Reorder NPCs that appear in `orderedMemberIds` (subset, e.g. one group); persists new order in the campaign list. */
+  reorderNPCsSubset: (
+    campaignCode: string,
+    orderedMemberIds: string[],
+    fromIndex: number,
+    toIndex: number
+  ) => void;
   updateDeathSaves: (
     campaignCode: string,
     id: string,
@@ -95,6 +109,42 @@ export const useNPCStore = create<NPCStoreState>()(
 
       getNPCsForCampaign: campaignCode => {
         return get().npcsByCampaign[campaignCode] ?? [];
+      },
+
+      reorderNPCsSubset: (
+        campaignCode,
+        orderedMemberIds,
+        fromIndex,
+        toIndex
+      ) => {
+        if (fromIndex === toIndex) return;
+        const idSet = new Set(orderedMemberIds);
+        const newIds = arrayMove(orderedMemberIds, fromIndex, toIndex);
+
+        set(state => {
+          const npcs = state.npcsByCampaign[campaignCode] ?? [];
+          const globalIndices: number[] = [];
+          npcs.forEach((n, i) => {
+            if (idSet.has(n.id)) globalIndices.push(i);
+          });
+          if (globalIndices.length !== orderedMemberIds.length) {
+            return state;
+          }
+
+          const idToNpc = new Map(npcs.map(n => [n.id, n]));
+          const result = [...npcs];
+          newIds.forEach((id, j) => {
+            const npc = idToNpc.get(id);
+            if (npc) result[globalIndices[j]] = npc;
+          });
+
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: result,
+            },
+          };
+        });
       },
 
       updateDeathSaves: (campaignCode, id, deathSaves) => {
