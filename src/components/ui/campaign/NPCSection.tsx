@@ -39,6 +39,10 @@ export function NPCSection({
   const { getCampaign, setDmDashboardUi } = useDmStore();
   const campaign = getCampaign(campaignCode);
   const npcSectionOpen = campaign?.dmDashboardUi?.npcSectionOpen ?? true;
+  const collapsedGroups = useMemo(() => {
+    const names = campaign?.dmDashboardUi?.npcCollapsedGroupNames;
+    return new Set(names ?? []);
+  }, [campaign?.dmDashboardUi?.npcCollapsedGroupNames]);
   const npcs = getNPCsForCampaign(campaignCode);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -46,9 +50,6 @@ export function NPCSection({
   const [selectedNpc, setSelectedNpc] = useState<CampaignNPC | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
-    new Set()
-  );
   const handleCreate = () => {
     setEditingNpc(null);
     setDialogOpen(true);
@@ -100,14 +101,13 @@ export function NPCSection({
   };
 
   const handleGroupToggle = (groupName: string) => {
-    setCollapsedGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(groupName)) {
-        next.delete(groupName);
-      } else {
-        next.add(groupName);
-      }
-      return next;
+    const current =
+      getCampaign(campaignCode)?.dmDashboardUi?.npcCollapsedGroupNames ?? [];
+    const next = new Set(current);
+    if (next.has(groupName)) next.delete(groupName);
+    else next.add(groupName);
+    setDmDashboardUi(campaignCode, {
+      npcCollapsedGroupNames: Array.from(next),
     });
   };
 

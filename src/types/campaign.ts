@@ -27,5 +27,7 @@ export interface CampaignInfo {
   dmDashboardUi?: {
     playersSectionOpen?: boolean;
     npcSectionOpen?: boolean;
+    /** Group headers under NPC section (when NPCs use groups); names of collapsed groups. */
+    npcCollapsedGroupNames?: string[];
   };
 }

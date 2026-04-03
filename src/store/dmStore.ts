@@ -27,7 +27,11 @@ interface DmStoreState {
   /** Merge-persist DM dashboard section open/close (Players, NPCs on campaign page). */
   setDmDashboardUi: (
     code: string,
-    partial: Partial<{ playersSectionOpen: boolean; npcSectionOpen: boolean }>
+    partial: Partial<{
+      playersSectionOpen: boolean;
+      npcSectionOpen: boolean;
+      npcCollapsedGroupNames: string[];
+    }>
   ) => void;
 }
 
