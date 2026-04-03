@@ -21,6 +21,7 @@ import { useNPCStore } from '@/store/npcStore';
 import { useDmStore } from '@/store/dmStore';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
+import DragDropList from '@/components/ui/layout/DragDropList';
 import { Input } from '@/components/ui/forms/input';
 import { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
 import { NPCFormDialog } from './NPCFormDialog';
@@ -35,7 +36,13 @@ export function NPCSection({
   campaignCode,
   onSendItemToPlayer,
 }: NPCSectionProps) {
-  const { getNPCsForCampaign, createNPC, updateNPC, deleteNPC } = useNPCStore();
+  const {
+    getNPCsForCampaign,
+    createNPC,
+    updateNPC,
+    deleteNPC,
+    reorderNPCsSubset,
+  } = useNPCStore();
   const { getCampaign, setDmDashboardUi } = useDmStore();
   const campaign = getCampaign(campaignCode);
   const npcSectionOpen = campaign?.dmDashboardUi?.npcSectionOpen ?? true;
@@ -288,34 +295,58 @@ export function NPCSection({
 
                   {/* Group NPCs */}
                   {!collapsedGroups.has(group.name) && (
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                      {group.npcs.map(npc => (
+                    <DragDropList
+                      items={group.npcs}
+                      keyExtractor={npc => npc.id}
+                      onReorder={(from, to) =>
+                        reorderNPCsSubset(
+                          campaignCode,
+                          group.npcs.map(n => n.id),
+                          from,
+                          to
+                        )
+                      }
+                      className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3"
+                      itemClassName="group min-w-0"
+                      dragHandlePosition="right"
+                      renderItem={npc => (
                         <NPCCard
-                          key={npc.id}
                           npc={npc}
                           onEdit={() => handleEdit(npc)}
                           onDelete={() => handleDelete(npc)}
                           onClick={() => setSelectedNpc(npc)}
                         />
-                      ))}
-                    </div>
+                      )}
+                    />
                   )}
                 </div>
               ))}
             </div>
           ) : (
             /* Flat layout (no groups defined) */
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredNpcs.map(npc => (
+            <DragDropList
+              items={filteredNpcs}
+              keyExtractor={npc => npc.id}
+              onReorder={(from, to) =>
+                reorderNPCsSubset(
+                  campaignCode,
+                  filteredNpcs.map(n => n.id),
+                  from,
+                  to
+                )
+              }
+              className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+              itemClassName="group min-w-0"
+              dragHandlePosition="right"
+              renderItem={npc => (
                 <NPCCard
-                  key={npc.id}
                   npc={npc}
                   onEdit={() => handleEdit(npc)}
                   onDelete={() => handleDelete(npc)}
                   onClick={() => setSelectedNpc(npc)}
                 />
-              ))}
-            </div>
+              )}
+            />
           )}
         </div>
       )}
