@@ -395,12 +395,12 @@ function NPCCard({
 
   return (
     <div
-      className="border-accent-purple-border bg-surface-raised cursor-pointer overflow-hidden rounded-lg border-2 shadow-sm transition-shadow hover:shadow-md"
+      className="border-accent-purple-border bg-surface-raised h-[210px] cursor-pointer overflow-hidden rounded-lg border-2 shadow-sm transition-shadow hover:shadow-md"
       onClick={onClick}
     >
       {hasPortrait ? (
         /* Horizontal layout with tall portrait on the left */
-        <div className="flex">
+        <div className="flex h-full">
           {/* Portrait column */}
           <div className="border-divider relative w-28 shrink-0 self-stretch border-r-2 sm:w-32">
             <Image
@@ -412,7 +412,7 @@ function NPCCard({
           </div>
 
           {/* Content column */}
-          <div className="min-w-0 flex-1 p-3">
+          <div className="flex min-w-0 flex-1 flex-col p-3">
             {/* Header row */}
             <div className="mb-2 flex items-start justify-between gap-1">
               <div className="min-w-0">
@@ -449,14 +449,12 @@ function NPCCard({
               </div>
             </div>
 
-            {npc.description?.trim() && (
-              <p
-                className="text-muted mb-2 line-clamp-2 text-xs leading-snug"
-                title={npc.description.trim()}
-              >
-                {npc.description.trim()}
-              </p>
-            )}
+            <p
+              className="text-muted mb-2 line-clamp-2 min-h-[28px] text-xs leading-snug"
+              title={npc.description?.trim() || undefined}
+            >
+              {npc.description?.trim() || '\u00A0'}
+            </p>
 
             {/* CR + Prof badges */}
             <div className="mb-2 flex flex-wrap gap-1">
@@ -554,23 +552,25 @@ function NPCCard({
             )}
 
             {/* Tags */}
-            {npc.tags && npc.tags.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {npc.tags.map(tag => (
-                  <span
-                    key={tag}
-                    className="bg-surface-secondary border-divider text-faint rounded-full border px-1.5 py-px text-[9px]"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
+            <div className="mt-auto min-h-[18px]">
+              {npc.tags && npc.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {npc.tags.map(tag => (
+                    <span
+                      key={tag}
+                      className="bg-surface-secondary border-divider text-faint rounded-full border px-1.5 py-px text-[9px]"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       ) : (
         /* Vertical layout (no portrait) */
-        <div className="p-4">
+        <div className="flex h-full flex-col p-4">
           {/* Header */}
           <div className="mb-2 flex items-start justify-between">
             <div className="min-w-0">
@@ -607,14 +607,12 @@ function NPCCard({
             </div>
           </div>
 
-          {npc.description?.trim() && (
-            <p
-              className="text-muted mb-2 line-clamp-2 text-sm leading-snug"
-              title={npc.description.trim()}
-            >
-              {npc.description.trim()}
-            </p>
-          )}
+          <p
+            className="text-muted mb-2 line-clamp-2 min-h-[34px] text-sm leading-snug"
+            title={npc.description?.trim() || undefined}
+          >
+            {npc.description?.trim() || '\u00A0'}
+          </p>
 
           {/* CR + Prof badges */}
           <div className="mb-2 flex flex-wrap gap-1">
@@ -728,18 +726,20 @@ function NPCCard({
           )}
 
           {/* Tags */}
-          {npc.tags && npc.tags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {npc.tags.map(tag => (
-                <span
-                  key={tag}
-                  className="bg-surface-secondary border-divider text-faint rounded-full border px-1.5 py-px text-[9px]"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="mt-auto min-h-[18px]">
+            {npc.tags && npc.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {npc.tags.map(tag => (
+                  <span
+                    key={tag}
+                    className="bg-surface-secondary border-divider text-faint rounded-full border px-1.5 py-px text-[9px]"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
