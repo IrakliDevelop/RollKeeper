@@ -125,6 +125,13 @@ function hasSubstantiveStatBlock(
     languages: string;
     cr: string;
   },
+  core: {
+    size: string;
+    creatureType: string;
+    alignment: string;
+    hpFormula: string;
+    speed: string;
+  },
   traits: NamedText[],
   actions: NamedText[],
   bonusActions: NamedText[],
@@ -136,6 +143,12 @@ function hasSubstantiveStatBlock(
     v => v !== DEFAULT_ABILITY
   );
   const hasDetail = Object.values(details).some(v => v.trim() !== '');
+  const hasCoreOverrides =
+    core.size !== 'Medium' ||
+    core.creatureType !== 'Humanoid' ||
+    core.alignment.trim() !== '' ||
+    core.hpFormula.trim() !== '' ||
+    (core.speed.trim() !== '' && core.speed.trim() !== '30 ft.');
   const hasAbilities = [
     ...traits,
     ...actions,
@@ -143,7 +156,13 @@ function hasSubstantiveStatBlock(
     ...reactions,
     ...lairActions,
   ].some(t => t.name.trim());
-  return nonDefaultScore || hasDetail || hasAbilities || !!bestiarySourceId;
+  return (
+    nonDefaultScore ||
+    hasDetail ||
+    hasCoreOverrides ||
+    hasAbilities ||
+    !!bestiarySourceId
+  );
 }
 
 export function NPCFormDialog({
@@ -389,9 +408,17 @@ export function NPCFormDialog({
         setInt(editingNpc.abilityScores.int);
         setWis(editingNpc.abilityScores.wis);
         setCha(editingNpc.abilityScores.cha);
+        setSize('Medium');
+        setCreatureType('Humanoid');
+        setAlignment('');
+        setHpFormula('');
         resetDetailFields();
       } else {
         resetAbilityScores();
+        setSize('Medium');
+        setCreatureType('Humanoid');
+        setAlignment('');
+        setHpFormula('');
         resetDetailFields();
       }
     } else {
@@ -670,20 +697,30 @@ export function NPCFormDialog({
       languages,
       cr,
     };
+    const coreFields = {
+      size,
+      creatureType,
+      alignment,
+      hpFormula,
+      speed,
+    };
 
-    let monsterStatBlock: MonsterStatBlock | undefined;
-    if (
+    const shouldPersistStatBlock =
+      !bestiarySourceId ||
       hasSubstantiveStatBlock(
         scores,
         detailFields,
+        coreFields,
         traits,
         actions,
         bonusActions,
         reactions,
         lairActions,
         bestiarySourceId
-      )
-    ) {
+      );
+
+    let monsterStatBlock: MonsterStatBlock | undefined;
+    if (shouldPersistStatBlock) {
       monsterStatBlock = {
         str,
         dex,
@@ -719,7 +756,10 @@ export function NPCFormDialog({
       };
     }
 
-    onSave({
+    const payload: Omit<
+      CampaignNPC,
+      'id' | 'campaignCode' | 'createdAt' | 'updatedAt'
+    > = {
       name: name.trim(),
       armorClass: ac,
       maxHp: hp,
@@ -744,7 +784,9 @@ export function NPCFormDialog({
         inventoryItems.length > 0
           ? inventoryItems.filter(item => item.name.trim())
           : undefined,
-    });
+    };
+
+    onSave(payload);
     onOpenChange(false);
   };
 
