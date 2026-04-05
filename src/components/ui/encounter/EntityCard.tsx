@@ -51,6 +51,7 @@ interface EntityCardProps {
   onViewPlayer?: () => void;
   onViewNPC?: () => void;
   onChangePlayerColor?: (color: string | undefined) => void;
+  onLongRest?: () => void;
 }
 
 const TYPE_STYLES: Record<
@@ -399,6 +400,7 @@ export function EntityCard({
   onViewPlayer,
   onViewNPC,
   onChangePlayerColor,
+  onLongRest,
 }: EntityCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [editingInit, setEditingInit] = useState(false);
@@ -824,6 +826,7 @@ export function EntityCard({
           onResetLegendaryActions={onResetLegendaryActions}
           onSetConcentration={onSetConcentration}
           onUseLairAction={onUseLairAction}
+          onLongRest={onLongRest}
         />
       )}
     </div>

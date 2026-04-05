@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   ShieldOff,
   Eye,
+  Moon,
 } from 'lucide-react';
 import { EncounterEntity } from '@/types/encounter';
 import { HPBar } from '@/components/shared/combat/HPBar';
@@ -41,6 +42,7 @@ interface EntityCardExpandedProps {
   onResetLegendaryActions: () => void;
   onSetConcentration: (spellName: string | null) => void;
   onUseLairAction?: (actionId: string) => void;
+  onLongRest?: () => void;
 }
 
 const COMMON_CONDITIONS = [
@@ -74,6 +76,7 @@ export function EntityCardExpanded({
   onResetLegendaryActions,
   onSetConcentration,
   onUseLairAction,
+  onLongRest,
 }: EntityCardExpandedProps) {
   const [hpInput, setHpInput] = useState('');
   const [showStatBlock, setShowStatBlock] = useState(false);
@@ -621,7 +624,17 @@ export function EntityCardExpanded({
       </div>
 
       {/* Remove entity */}
-      <div className="border-divider flex justify-end border-t pt-2">
+      <div className="border-divider flex justify-end gap-2 border-t pt-2">
+        {onLongRest && (
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={<Moon size={14} />}
+            onClick={onLongRest}
+          >
+            Long Rest
+          </Button>
+        )}
         <Button
           variant="danger"
           size="sm"

@@ -256,6 +256,7 @@ export function AddEntityDialog({
       abilities,
       hitDice: npc.hitDice ? { ...npc.hitDice } : undefined,
       npcSourceId: npc.id,
+      campaignCode: campaignCode,
       spellcasting: npc.spellcasting
         ? (() => {
             const abilityScores = npc.monsterStatBlock ?? npc.abilityScores;

@@ -64,6 +64,7 @@ export function EncounterView({
     setConcentration,
     useLairAction: expendLairAction,
     setInitiative,
+    longRestEntity,
   } = useEncounterStore();
 
   const { getNPCsForCampaign } = useNPCStore();
@@ -342,6 +343,7 @@ export function EncounterView({
         onChangePlayerColor={(playerCharacterId, color) =>
           setPlayerColor(campaignCode, playerCharacterId, color)
         }
+        onLongRestEntity={entityId => longRestEntity(encounterId, entityId)}
       />
 
       {/* Add entity dialog */}
