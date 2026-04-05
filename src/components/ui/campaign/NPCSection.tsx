@@ -47,6 +47,11 @@ export function NPCSection({
   const { getCampaign, setDmDashboardUi } = useDmStore();
   const campaign = getCampaign(campaignCode);
   const npcSectionOpen = campaign?.dmDashboardUi?.npcSectionOpen ?? true;
+  const spellSlotDisplayMode: 'inline' | 'tracker' =
+    campaign?.dmDashboardUi?.npcInlineSpellSlots === false &&
+    campaign?.dmDashboardUi?.npcSeparateSpellSlotTracker === true
+      ? 'tracker'
+      : 'inline';
   const collapsedGroups = useMemo(() => {
     const names = campaign?.dmDashboardUi?.npcCollapsedGroupNames;
     return new Set(names ?? []);
@@ -221,6 +226,44 @@ export function NPCSection({
         >
           Create NPC
         </Button>
+      </div>
+
+      <div className="bg-surface-secondary border-divider mb-4 rounded-lg border px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted text-xs font-medium tracking-wide uppercase">
+            Spell Slot Display
+          </span>
+          <div className="bg-surface-raised border-divider inline-flex rounded-md border p-1">
+            <Button
+              variant={
+                spellSlotDisplayMode === 'inline' ? 'secondary' : 'ghost'
+              }
+              size="xs"
+              onClick={() =>
+                setDmDashboardUi(campaignCode, {
+                  npcInlineSpellSlots: true,
+                  npcSeparateSpellSlotTracker: false,
+                })
+              }
+            >
+              Inline
+            </Button>
+            <Button
+              variant={
+                spellSlotDisplayMode === 'tracker' ? 'secondary' : 'ghost'
+              }
+              size="xs"
+              onClick={() =>
+                setDmDashboardUi(campaignCode, {
+                  npcInlineSpellSlots: false,
+                  npcSeparateSpellSlotTracker: true,
+                })
+              }
+            >
+              Separate Tracker
+            </Button>
+          </div>
+        </div>
       </div>
 
       {!npcSectionOpen ? null : npcs.length === 0 ? (

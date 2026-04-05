@@ -28,8 +28,10 @@ import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
 import { SpellAutocomplete } from '@/components/ui/forms/SpellAutocomplete';
 import { useSpellsData } from '@/hooks/useSpellsData';
 import { useToast, ToastContainer } from '@/components/ui/feedback/Toast';
+import { SpellSlotTracker } from '@/components/shared/spells';
 import { useNPCStore } from '@/store/npcStore';
 import { useEncounterStore } from '@/store/encounterStore';
+import { useDmStore } from '@/store/dmStore';
 import {
   getNPCSpellSlots,
   calculateNPCSpellAttack,
@@ -136,6 +138,16 @@ export function NPCSpellTab({
 }: NPCSpellTabProps) {
   const sc = npc.spellcasting;
   const { toasts, dismissToast, addToast } = useToast();
+  const campaign = useDmStore(state =>
+    state.campaigns.find(c => c.code === campaignCode)
+  );
+  const spellSlotDisplayMode: 'inline' | 'tracker' =
+    campaign?.dmDashboardUi?.npcInlineSpellSlots === false &&
+    campaign?.dmDashboardUi?.npcSeparateSpellSlotTracker === true
+      ? 'tracker'
+      : 'inline';
+  const showInlineSpellSlots = spellSlotDisplayMode === 'inline';
+  const showSeparateSpellSlotTracker = spellSlotDisplayMode === 'tracker';
 
   // Read concentration state from encounter entity if in encounter context
   const encounterConcentration = useEncounterStore(state => {
@@ -458,6 +470,33 @@ export function NPCSpellTab({
         )}
       </div>
 
+      {showSeparateSpellSlotTracker && (
+        <div>
+          <SectionHeader
+            title="Spell Slot Tracker"
+            isCollapsed={isSectionCollapsed('slotTracker')}
+            onToggle={() => toggleSection('slotTracker')}
+            badge={
+              isSectionCollapsed('slotTracker') ? (
+                <Badge variant="neutral" size="sm">
+                  {totalUsedSlots}/{totalMaxSlots} slots used
+                </Badge>
+              ) : undefined
+            }
+          />
+          {!isSectionCollapsed('slotTracker') && (
+            <div className="mt-2">
+              <SpellSlotTracker
+                spellSlots={spellSlots}
+                compact
+                hideResetButtons
+                onSpellSlotChange={handleSpellSlotChange}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Spells & Slots (unified) */}
       <div>
         <SectionHeader
@@ -467,8 +506,13 @@ export function NPCSpellTab({
           badge={
             isSectionCollapsed('spells') ? (
               <Badge variant="neutral" size="sm">
-                {totalSpells} {totalSpells === 1 ? 'spell' : 'spells'} ·{' '}
-                {totalUsedSlots}/{totalMaxSlots} slots used
+                {totalSpells} {totalSpells === 1 ? 'spell' : 'spells'}
+                {showInlineSpellSlots && (
+                  <>
+                    {' '}
+                    · {totalUsedSlots}/{totalMaxSlots} slots used
+                  </>
+                )}
               </Badge>
             ) : undefined
           }
@@ -532,7 +576,7 @@ export function NPCSpellTab({
                         </button>
 
                         {/* Inline slot dots */}
-                        {hasSlots && (
+                        {showInlineSpellSlots && hasSlots && (
                           <div className="ml-auto flex items-center gap-1.5">
                             <div
                               className="flex gap-1"

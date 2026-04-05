@@ -29,5 +29,9 @@ export interface CampaignInfo {
     npcSectionOpen?: boolean;
     /** Group headers under NPC section (when NPCs use groups); names of collapsed groups. */
     npcCollapsedGroupNames?: string[];
+    /** Show slot pips inline inside each spell level header in NPC spell tab. */
+    npcInlineSpellSlots?: boolean;
+    /** Show the separate spell slot tracker block in NPC spell tab. */
+    npcSeparateSpellSlotTracker?: boolean;
   };
 }
