@@ -654,7 +654,7 @@ export function NPCDetailDialog({
           ))}
         </div>
 
-        <DialogBody>
+        <DialogBody className="max-h-[70vh] min-h-[60vh] overflow-y-auto">
           {activeTab === 'stats' && (
             <div className="space-y-4">
               {statBlock ? (
