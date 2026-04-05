@@ -923,11 +923,17 @@ export function NPCFormDialog({
             </div>
           </DialogHeader>
           {/* Form tabs */}
-          <div className="bg-surface-secondary flex rounded-lg p-1">
+          <div
+            role="tablist"
+            className="bg-surface-secondary flex rounded-lg p-1"
+          >
             {FORM_TABS.map(tab => (
               <button
                 key={tab.key}
+                role="tab"
                 type="button"
+                aria-selected={activeFormTab === tab.key}
+                aria-controls={`npc-form-panel-${tab.key}`}
                 onClick={() => setActiveFormTab(tab.key)}
                 className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                   activeFormTab === tab.key
