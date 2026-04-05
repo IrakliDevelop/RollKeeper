@@ -9,10 +9,13 @@ import {
   Trash2,
   Edit3,
   ImageIcon,
-  ChevronDown,
-  ChevronUp,
   ArrowUp,
   ArrowDown,
+  CircleUserRound,
+  ScrollText,
+  Package,
+  Wand2,
+  BookOpen,
 } from 'lucide-react';
 import {
   Dialog,
@@ -74,6 +77,37 @@ interface NPCFormDialogProps {
 const DEFAULT_ABILITY = 10;
 
 const DIE_TYPES = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
+
+type FormTab = 'basic' | 'statblock' | 'inventory' | 'spellcasting' | 'lore';
+
+const FORM_TABS: Array<{ key: FormTab; label: string; icon: React.ReactNode }> =
+  [
+    {
+      key: 'basic',
+      label: 'Basic',
+      icon: <CircleUserRound className="h-3.5 w-3.5" />,
+    },
+    {
+      key: 'statblock',
+      label: 'Stat Block',
+      icon: <ScrollText className="h-3.5 w-3.5" />,
+    },
+    {
+      key: 'inventory',
+      label: 'Inventory',
+      icon: <Package className="h-3.5 w-3.5" />,
+    },
+    {
+      key: 'spellcasting',
+      label: 'Spells',
+      icon: <Wand2 className="h-3.5 w-3.5" />,
+    },
+    {
+      key: 'lore',
+      label: 'Lore',
+      icon: <BookOpen className="h-3.5 w-3.5" />,
+    },
+  ];
 
 function abilityMod(score: number): string {
   const mod = Math.floor((score - 10) / 2);
@@ -180,6 +214,9 @@ export function NPCFormDialog({
   const { items: dbItems, loading: dbItemsLoading } = useItemsData();
   const { items: dbMagicItems } = useMagicItemsData();
 
+  // Active form tab
+  const [activeFormTab, setActiveFormTab] = useState<FormTab>('basic');
+
   // Bestiary search
   const [bestiaryQuery, setBestiaryQuery] = useState('');
   const [bestiaryResults, setBestiaryResults] = useState<ProcessedMonster[]>(
@@ -225,7 +262,6 @@ export function NPCFormDialog({
   const [cha, setCha] = useState(DEFAULT_ABILITY);
 
   // Details
-  const [showDetails, setShowDetails] = useState(false);
   const [saves, setSaves] = useState('');
   const [skills, setSkills] = useState('');
   const [resistances, setResistances] = useState('');
@@ -259,7 +295,6 @@ export function NPCFormDialog({
   const [lairActions, setLairActions] = useState<NamedText[]>([]);
 
   // Inventory
-  const [showInventory, setShowInventory] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<NPCInventoryItem[]>([]);
   const [inventoryEditFormOpen, setInventoryEditFormOpen] = useState(false);
   const [editingInventoryItemId, setEditingInventoryItemId] = useState<
@@ -267,11 +302,9 @@ export function NPCFormDialog({
   >(null);
 
   // Lore
-  const [showLore, setShowLore] = useState(false);
   const [loreHtml, setLoreHtml] = useState('');
 
   // Spellcasting
-  const [showSpellcasting, setShowSpellcasting] = useState(false);
   const [spellcastingEnabled, setSpellcastingEnabled] = useState(false);
   const [casterLevel, setCasterLevel] = useState(1);
   const [spellcastingAbility, setSpellcastingAbility] =
@@ -326,14 +359,12 @@ export function NPCFormDialog({
       setBestiarySourceId(editingNpc.bestiarySourceId ?? null);
       setBestiarySourceName(editingNpc.bestiarySourceId ? editingNpc.name : '');
       setLoreHtml(editingNpc.loreHtml ?? '');
-      setShowLore(!!editingNpc.loreHtml);
       setInventoryItems(editingNpc.inventory ?? []);
-      setShowInventory((editingNpc.inventory ?? []).length > 0);
+      setActiveFormTab('basic');
 
       // Spellcasting
       if (editingNpc?.spellcasting) {
         setSpellcastingEnabled(true);
-        setShowSpellcasting(true);
         setCasterLevel(editingNpc.spellcasting.casterLevel);
         setSpellcastingAbility(editingNpc.spellcasting.ability);
         setSpellAttackOverride(
@@ -357,7 +388,6 @@ export function NPCFormDialog({
         setSpellSlotOverrides(overrides);
       } else {
         setSpellcastingEnabled(false);
-        setShowSpellcasting(false);
         setCasterLevel(1);
         setSpellcastingAbility('intelligence');
         setSpellAttackOverride('');
@@ -441,17 +471,6 @@ export function NPCFormDialog({
         setBonusActions(sb.bonusActions?.map(b => ({ ...b })) ?? []);
         setReactions(sb.reactions?.map(r => ({ ...r })) ?? []);
         setLairActions(sb.lairActions?.map(l => ({ ...l })) ?? []);
-        const hasDetails =
-          sb.saves ||
-          sb.skills ||
-          sb.resistances ||
-          sb.immunities ||
-          sb.vulnerabilities ||
-          sb.conditionImmunities?.length ||
-          sb.senses ||
-          sb.languages ||
-          sb.cr;
-        setShowDetails(!!hasDetails);
       } else if (editingNpc.abilityScores) {
         setStr(editingNpc.abilityScores.str);
         setDex(editingNpc.abilityScores.dex);
@@ -497,7 +516,6 @@ export function NPCFormDialog({
     setSenses('');
     setLanguages('');
     setCr('');
-    setShowDetails(false);
     setTraits([]);
     setActions([]);
     setBonusActions([]);
@@ -515,6 +533,7 @@ export function NPCFormDialog({
   }
 
   function resetAll() {
+    setActiveFormTab('basic');
     setName('');
     setDescription('');
     setAc(10);
@@ -528,9 +547,7 @@ export function NPCFormDialog({
     setBestiarySourceId(null);
     setBestiarySourceName('');
     setLoreHtml('');
-    setShowLore(false);
     setInventoryItems([]);
-    setShowInventory(false);
     setBestiaryQuery('');
     setBestiaryResults([]);
     setGroup('');
@@ -539,7 +556,6 @@ export function NPCFormDialog({
     setInitiativeModifier(0);
     setInitiativeOverridden(false);
     setSpellcastingEnabled(false);
-    setShowSpellcasting(false);
     setCasterLevel(1);
     setSpellcastingAbility('intelligence');
     setSpellAttackOverride('');
@@ -675,18 +691,6 @@ export function NPCFormDialog({
     setPassiveInsight(10 + abilityModNum(sb.wis));
     setPassiveInvestigation(10 + abilityModNum(sb.int));
     setPassivesOverridden(false);
-
-    const hasDetails =
-      sb.saves ||
-      sb.skills ||
-      sb.resistances ||
-      sb.immunities ||
-      sb.vulnerabilities ||
-      sb.conditionImmunities.length > 0 ||
-      sb.senses ||
-      sb.languages ||
-      sb.cr;
-    setShowDetails(!!hasDetails);
   };
 
   const clearBestiarySource = () => {
@@ -918,323 +922,337 @@ export function NPCFormDialog({
               </Button>
             </div>
           </DialogHeader>
+          {/* Form tabs */}
+          <div className="bg-surface-secondary flex rounded-lg p-1">
+            {FORM_TABS.map(tab => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveFormTab(tab.key)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  activeFormTab === tab.key
+                    ? 'bg-surface-raised text-heading shadow-sm'
+                    : 'text-muted hover:text-body'
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
           <DialogBody className="max-h-[70vh] overflow-y-auto">
             <div className="space-y-5">
-              {/* ===== Bestiary Import (create only) ===== */}
-              {!editingNpc && (
-                <div className="space-y-2">
-                  <div className="relative">
-                    <Search
-                      size={14}
-                      className="text-muted absolute top-1/2 left-3 -translate-y-1/2"
-                    />
+              {activeFormTab === 'basic' && (
+                <>
+                  {/* ===== Bestiary Import (create only) ===== */}
+                  {!editingNpc && (
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <Search
+                          size={14}
+                          className="text-muted absolute top-1/2 left-3 -translate-y-1/2"
+                        />
+                        <input
+                          type="text"
+                          value={bestiaryQuery}
+                          onChange={e => setBestiaryQuery(e.target.value)}
+                          placeholder="Search bestiary to import..."
+                          className="bg-surface-secondary text-body border-divider placeholder:text-faint w-full rounded-md border py-2 pr-3 pl-9 text-sm focus:ring-1 focus:ring-(--color-accent-purple-border) focus:outline-none"
+                        />
+                        {bestiaryLoading && (
+                          <span className="text-muted absolute top-1/2 right-3 -translate-y-1/2 text-xs">
+                            Searching…
+                          </span>
+                        )}
+                      </div>
+
+                      {bestiaryResults.length > 0 && (
+                        <div className="border-divider bg-surface-raised max-h-48 overflow-y-auto rounded-md border">
+                          {bestiaryResults.map(m => (
+                            <button
+                              key={m.id}
+                              onClick={() => handleSelectMonster(m)}
+                              className="hover:bg-surface-secondary text-body flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors"
+                            >
+                              <span className="flex-1 font-medium">
+                                {m.name}
+                              </span>
+                              <span className="text-muted text-xs">
+                                CR {m.cr}
+                              </span>
+                              <span className="text-faint text-xs">
+                                {typeof m.type === 'string'
+                                  ? m.type
+                                  : m.type.type}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {bestiarySourceId && (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">
+                            Imported from: {bestiarySourceName}
+                          </Badge>
+                          <button
+                            onClick={clearBestiarySource}
+                            className="text-muted hover:text-body transition-colors"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ===== Portrait Upload ===== */}
+                  <div className="flex items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-divider bg-surface-secondary hover:border-accent-purple-border flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-colors"
+                    >
+                      {avatarUrl ? (
+                        <Image
+                          src={avatarUrl}
+                          alt="NPC portrait"
+                          width={64}
+                          height={64}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <ImageIcon size={24} className="text-muted" />
+                      )}
+                      {uploadingAvatar && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        </div>
+                      )}
+                    </button>
                     <input
-                      type="text"
-                      value={bestiaryQuery}
-                      onChange={e => setBestiaryQuery(e.target.value)}
-                      placeholder="Search bestiary to import..."
-                      className="bg-surface-secondary text-body border-divider placeholder:text-faint w-full rounded-md border py-2 pr-3 pl-9 text-sm focus:ring-1 focus:ring-(--color-accent-purple-border) focus:outline-none"
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarSelect}
+                      className="hidden"
                     />
-                    {bestiaryLoading && (
-                      <span className="text-muted absolute top-1/2 right-3 -translate-y-1/2 text-xs">
-                        Searching…
+                    <div className="flex flex-col gap-1">
+                      <span className="text-muted text-xs">
+                        {avatarUrl
+                          ? 'Portrait uploaded'
+                          : 'Click to upload portrait'}
                       </span>
-                    )}
+                      {avatarUrl && (
+                        <button
+                          onClick={handleRemoveAvatar}
+                          className="text-accent-red-text text-xs hover:underline"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  {bestiaryResults.length > 0 && (
-                    <div className="border-divider bg-surface-raised max-h-48 overflow-y-auto rounded-md border">
-                      {bestiaryResults.map(m => (
-                        <button
-                          key={m.id}
-                          onClick={() => handleSelectMonster(m)}
-                          className="hover:bg-surface-secondary text-body flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors"
-                        >
-                          <span className="flex-1 font-medium">{m.name}</span>
-                          <span className="text-muted text-xs">CR {m.cr}</span>
-                          <span className="text-faint text-xs">
-                            {typeof m.type === 'string' ? m.type : m.type.type}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  {/* ===== Name & Description ===== */}
+                  <div className="space-y-3">
+                    <Input
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      label="Name"
+                      placeholder="NPC name"
+                      required
+                      autoFocus
+                    />
+                    <Input
+                      value={description}
+                      onChange={e => setDescription(e.target.value)}
+                      label="Description"
+                      placeholder="Brief description"
+                    />
+                  </div>
 
-                  {bestiarySourceId && (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">
-                        Imported from: {bestiarySourceName}
-                      </Badge>
-                      <button
-                        onClick={clearBestiarySource}
-                        className="text-muted hover:text-body transition-colors"
-                      >
-                        <X size={14} />
-                      </button>
+                  {/* ===== Group & Tags ===== */}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-heading mb-1.5 block text-sm font-medium">
+                        Group
+                      </label>
+                      <input
+                        type="text"
+                        list="npc-groups-datalist"
+                        value={group}
+                        onChange={e => setGroup(e.target.value)}
+                        placeholder="e.g. Bandits, Town Guard"
+                        className="bg-surface border-divider text-body placeholder:text-faint w-full rounded-md border px-3 py-2 text-sm focus:ring-1 focus:ring-(--color-accent-purple-border) focus:outline-none"
+                      />
+                      {existingGroups.length > 0 && (
+                        <datalist id="npc-groups-datalist">
+                          {existingGroups.map(g => (
+                            <option key={g} value={g} />
+                          ))}
+                        </datalist>
+                      )}
                     </div>
-                  )}
-                </div>
+
+                    <div>
+                      <label className="text-heading mb-1.5 block text-sm font-medium">
+                        Tags
+                      </label>
+                      <div className="border-divider bg-surface flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5">
+                        {tags.map(tag => (
+                          <span
+                            key={tag}
+                            className="bg-accent-purple-bg text-accent-purple-text flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium"
+                          >
+                            {tag}
+                            <button
+                              type="button"
+                              onClick={() => removeTag(tag)}
+                              className="hover:text-heading transition-colors"
+                              aria-label={`Remove tag ${tag}`}
+                            >
+                              <X size={10} />
+                            </button>
+                          </span>
+                        ))}
+                        <input
+                          type="text"
+                          value={tagInput}
+                          onChange={e => setTagInput(e.target.value)}
+                          onKeyDown={handleTagKeyDown}
+                          onBlur={() => tagInput.trim() && addTag(tagInput)}
+                          placeholder={
+                            tags.length === 0 ? 'Add tags (Enter or comma)' : ''
+                          }
+                          className="text-body placeholder:text-faint min-w-28 flex-1 bg-transparent text-sm focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ===== Core Stats ===== */}
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-2">
+                      <SelectField
+                        label="Size"
+                        value={size}
+                        onValueChange={setSize}
+                      >
+                        {SIZES.map((s: string) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
+                      </SelectField>
+                      <SelectField
+                        label="Type"
+                        value={creatureType}
+                        onValueChange={setCreatureType}
+                      >
+                        {CREATURE_TYPES.map((t: string) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectField>
+                      <Input
+                        value={alignment}
+                        onChange={e => setAlignment(e.target.value)}
+                        label="Alignment"
+                        placeholder="Unaligned"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Input
+                        type="number"
+                        value={ac}
+                        onChange={e => setAc(parseInt(e.target.value) || 0)}
+                        label="AC"
+                        min={0}
+                      />
+                      <Input
+                        type="number"
+                        value={hp}
+                        onChange={e => setHp(parseInt(e.target.value) || 1)}
+                        label="HP"
+                        min={1}
+                      />
+                      <Input
+                        value={hpFormula}
+                        onChange={e => setHpFormula(e.target.value)}
+                        label="HP Formula"
+                        placeholder="2d8+2"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={speed}
+                        onChange={e => setSpeed(e.target.value)}
+                        label="Speed"
+                        placeholder="30 ft., fly 60 ft."
+                      />
+                      <Input
+                        type="number"
+                        value={initiativeModifier}
+                        onChange={e => {
+                          setInitiativeModifier(parseInt(e.target.value) || 0);
+                          setInitiativeOverridden(true);
+                        }}
+                        label="Init Mod"
+                        title="Initiative modifier (auto-calculated from DEX, overridable)"
+                      />
+                    </div>
+                  </div>
+                </>
               )}
 
-              {/* ===== Portrait Upload ===== */}
-              <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-divider bg-surface-secondary hover:border-accent-purple-border flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-colors"
-                >
-                  {avatarUrl ? (
-                    <Image
-                      src={avatarUrl}
-                      alt="NPC portrait"
-                      width={64}
-                      height={64}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <ImageIcon size={24} className="text-muted" />
-                  )}
-                  {uploadingAvatar && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    </div>
-                  )}
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarSelect}
-                  className="hidden"
-                />
-                <div className="flex flex-col gap-1">
-                  <span className="text-muted text-xs">
-                    {avatarUrl
-                      ? 'Portrait uploaded'
-                      : 'Click to upload portrait'}
-                  </span>
-                  {avatarUrl && (
-                    <button
-                      onClick={handleRemoveAvatar}
-                      className="text-accent-red-text text-xs hover:underline"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* ===== Name & Description ===== */}
-              <div className="space-y-3">
-                <Input
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  label="Name"
-                  placeholder="NPC name"
-                  required
-                  autoFocus
-                />
-                <Input
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  label="Description"
-                  placeholder="Brief description"
-                />
-              </div>
-
-              {/* ===== Group & Tags ===== */}
-              <div className="space-y-3">
-                <div>
-                  <label className="text-heading mb-1.5 block text-sm font-medium">
-                    Group
-                  </label>
-                  <input
-                    type="text"
-                    list="npc-groups-datalist"
-                    value={group}
-                    onChange={e => setGroup(e.target.value)}
-                    placeholder="e.g. Bandits, Town Guard"
-                    className="bg-surface border-divider text-body placeholder:text-faint w-full rounded-md border px-3 py-2 text-sm focus:ring-1 focus:ring-(--color-accent-purple-border) focus:outline-none"
-                  />
-                  {existingGroups.length > 0 && (
-                    <datalist id="npc-groups-datalist">
-                      {existingGroups.map(g => (
-                        <option key={g} value={g} />
+              {activeFormTab === 'statblock' && (
+                <>
+                  {/* ===== Ability Scores ===== */}
+                  <div>
+                    <label className="text-heading mb-1.5 block text-sm font-medium">
+                      Ability Scores
+                    </label>
+                    <div className="grid grid-cols-6 gap-2">
+                      {(
+                        [
+                          ['STR', str, setStr],
+                          ['DEX', dex, setDex],
+                          ['CON', con, setCon],
+                          ['INT', int, setInt],
+                          ['WIS', wis, setWis],
+                          ['CHA', cha, setCha],
+                        ] as const
+                      ).map(([label, value, setter]) => (
+                        <div key={label} className="text-center">
+                          <span className="text-muted block text-[10px] font-medium uppercase">
+                            {label}
+                          </span>
+                          <input
+                            type="number"
+                            value={value}
+                            onChange={e =>
+                              (
+                                setter as React.Dispatch<
+                                  React.SetStateAction<number>
+                                >
+                              )(parseInt(e.target.value) || 0)
+                            }
+                            min={1}
+                            max={30}
+                            className="bg-surface border-divider text-heading w-full rounded border px-1 py-1 text-center text-sm"
+                          />
+                          <span className="text-muted text-[10px]">
+                            {abilityMod(value)}
+                          </span>
+                        </div>
                       ))}
-                    </datalist>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-heading mb-1.5 block text-sm font-medium">
-                    Tags
-                  </label>
-                  <div className="border-divider bg-surface flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5">
-                    {tags.map(tag => (
-                      <span
-                        key={tag}
-                        className="bg-accent-purple-bg text-accent-purple-text flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium"
-                      >
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={() => removeTag(tag)}
-                          className="hover:text-heading transition-colors"
-                          aria-label={`Remove tag ${tag}`}
-                        >
-                          <X size={10} />
-                        </button>
-                      </span>
-                    ))}
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={e => setTagInput(e.target.value)}
-                      onKeyDown={handleTagKeyDown}
-                      onBlur={() => tagInput.trim() && addTag(tagInput)}
-                      placeholder={
-                        tags.length === 0 ? 'Add tags (Enter or comma)' : ''
-                      }
-                      className="text-body placeholder:text-faint min-w-28 flex-1 bg-transparent text-sm focus:outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* ===== Core Stats ===== */}
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-2">
-                  <SelectField
-                    label="Size"
-                    value={size}
-                    onValueChange={setSize}
-                  >
-                    {SIZES.map((s: string) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
-                      </SelectItem>
-                    ))}
-                  </SelectField>
-                  <SelectField
-                    label="Type"
-                    value={creatureType}
-                    onValueChange={setCreatureType}
-                  >
-                    {CREATURE_TYPES.map((t: string) => (
-                      <SelectItem key={t} value={t}>
-                        {t}
-                      </SelectItem>
-                    ))}
-                  </SelectField>
-                  <Input
-                    value={alignment}
-                    onChange={e => setAlignment(e.target.value)}
-                    label="Alignment"
-                    placeholder="Unaligned"
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <Input
-                    type="number"
-                    value={ac}
-                    onChange={e => setAc(parseInt(e.target.value) || 0)}
-                    label="AC"
-                    min={0}
-                  />
-                  <Input
-                    type="number"
-                    value={hp}
-                    onChange={e => setHp(parseInt(e.target.value) || 1)}
-                    label="HP"
-                    min={1}
-                  />
-                  <Input
-                    value={hpFormula}
-                    onChange={e => setHpFormula(e.target.value)}
-                    label="HP Formula"
-                    placeholder="2d8+2"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    value={speed}
-                    onChange={e => setSpeed(e.target.value)}
-                    label="Speed"
-                    placeholder="30 ft., fly 60 ft."
-                  />
-                  <Input
-                    type="number"
-                    value={initiativeModifier}
-                    onChange={e => {
-                      setInitiativeModifier(parseInt(e.target.value) || 0);
-                      setInitiativeOverridden(true);
-                    }}
-                    label="Init Mod"
-                    title="Initiative modifier (auto-calculated from DEX, overridable)"
-                  />
-                </div>
-              </div>
-
-              {/* ===== Ability Scores ===== */}
-              <div>
-                <label className="text-heading mb-1.5 block text-sm font-medium">
-                  Ability Scores
-                </label>
-                <div className="grid grid-cols-6 gap-2">
-                  {(
-                    [
-                      ['STR', str, setStr],
-                      ['DEX', dex, setDex],
-                      ['CON', con, setCon],
-                      ['INT', int, setInt],
-                      ['WIS', wis, setWis],
-                      ['CHA', cha, setCha],
-                    ] as const
-                  ).map(([label, value, setter]) => (
-                    <div key={label} className="text-center">
-                      <span className="text-muted block text-[10px] font-medium uppercase">
-                        {label}
-                      </span>
-                      <input
-                        type="number"
-                        value={value}
-                        onChange={e =>
-                          (
-                            setter as React.Dispatch<
-                              React.SetStateAction<number>
-                            >
-                          )(parseInt(e.target.value) || 0)
-                        }
-                        min={1}
-                        max={30}
-                        className="bg-surface border-divider text-heading w-full rounded border px-1 py-1 text-center text-sm"
-                      />
-                      <span className="text-muted text-[10px]">
-                        {abilityMod(value)}
-                      </span>
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
 
-              {/* ===== Details (collapsible) ===== */}
-              <div>
-                <button
-                  onClick={() => setShowDetails(v => !v)}
-                  className="text-accent-purple-text flex items-center gap-1 text-sm font-medium hover:underline"
-                >
-                  {showDetails ? (
-                    <>
-                      <ChevronUp size={14} /> Hide Details
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown size={14} /> Show Details
-                    </>
-                  )}
-                </button>
-                {showDetails && (
-                  <div className="mt-2 space-y-2">
+                  {/* ===== Details ===== */}
+                  <div className="space-y-2">
                     <div className="grid grid-cols-2 gap-2">
                       <Input
                         value={saves}
@@ -1394,59 +1412,40 @@ export function NPCFormDialog({
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
 
-              {/* ===== Traits / Actions / Reactions ===== */}
-              <AbilityListEditor
-                label="Traits"
-                items={traits}
-                onChange={setTraits}
-              />
-              <AbilityListEditor
-                label="Actions"
-                items={actions}
-                onChange={setActions}
-              />
-              <AbilityListEditor
-                label="Bonus Actions"
-                items={bonusActions}
-                onChange={setBonusActions}
-              />
-              <AbilityListEditor
-                label="Reactions"
-                items={reactions}
-                onChange={setReactions}
-              />
-              <AbilityListEditor
-                label="Lair Actions"
-                items={lairActions}
-                onChange={setLairActions}
-              />
+                  {/* ===== Traits / Actions / Reactions ===== */}
+                  <AbilityListEditor
+                    label="Traits"
+                    items={traits}
+                    onChange={setTraits}
+                  />
+                  <AbilityListEditor
+                    label="Actions"
+                    items={actions}
+                    onChange={setActions}
+                  />
+                  <AbilityListEditor
+                    label="Bonus Actions"
+                    items={bonusActions}
+                    onChange={setBonusActions}
+                  />
+                  <AbilityListEditor
+                    label="Reactions"
+                    items={reactions}
+                    onChange={setReactions}
+                  />
+                  <AbilityListEditor
+                    label="Lair Actions"
+                    items={lairActions}
+                    onChange={setLairActions}
+                  />
+                </>
+              )}
 
-              {/* ===== Inventory (collapsible) ===== */}
-              <div>
-                <button
-                  onClick={() => setShowInventory(v => !v)}
-                  className="text-accent-purple-text flex items-center gap-1 text-sm font-medium hover:underline"
-                >
-                  {showInventory ? (
-                    <>
-                      <ChevronUp size={14} /> Hide Inventory
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown size={14} /> Add Inventory
-                      {inventoryItems.length > 0 && (
-                        <Badge variant="neutral" size="sm">
-                          {inventoryItems.length}
-                        </Badge>
-                      )}
-                    </>
-                  )}
-                </button>
-                {showInventory && (
-                  <div className="mt-2 space-y-3">
+              {activeFormTab === 'inventory' && (
+                <>
+                  {/* ===== Inventory ===== */}
+                  <div className="space-y-3">
                     {/* Item search */}
                     <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border p-3">
                       <ItemAutocomplete
@@ -1599,32 +1598,13 @@ export function NPCFormDialog({
                       Add Item Manually
                     </button>
                   </div>
-                )}
-              </div>
+                </>
+              )}
 
-              {/* ===== Spellcasting (collapsible) ===== */}
-              <div>
-                <button
-                  onClick={() => setShowSpellcasting(v => !v)}
-                  className="text-accent-purple-text flex items-center gap-1 text-sm font-medium hover:underline"
-                >
-                  {showSpellcasting ? (
-                    <>
-                      <ChevronUp size={14} /> Hide Spellcasting
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown size={14} /> Configure Spellcasting
-                      {spellcastingEnabled && (
-                        <Badge variant="info" size="sm">
-                          Lvl {casterLevel}
-                        </Badge>
-                      )}
-                    </>
-                  )}
-                </button>
-                {showSpellcasting && (
-                  <div className="mt-2 space-y-3">
+              {activeFormTab === 'spellcasting' && (
+                <>
+                  {/* ===== Spellcasting ===== */}
+                  <div className="space-y-3">
                     {/* Enable toggle */}
                     <div className="flex items-center gap-2">
                       <Switch
@@ -1827,55 +1807,20 @@ export function NPCFormDialog({
                       </div>
                     )}
                   </div>
-                )}
-              </div>
+                </>
+              )}
 
-              {/* ===== Lore (collapsible) ===== */}
-              <div>
-                <button
-                  onClick={() => setShowLore(v => !v)}
-                  className="text-accent-purple-text flex items-center gap-1 text-sm font-medium hover:underline"
-                >
-                  {showLore ? (
-                    <>
-                      <ChevronUp size={14} /> Hide Lore
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown size={14} /> Add Lore
-                    </>
-                  )}
-                </button>
-                {showLore && (
-                  <div className="mt-2">
-                    <CompactRichTextEditor
-                      content={loreHtml}
-                      onChange={setLoreHtml}
-                      placeholder="Write NPC lore, backstory, motivations..."
-                      minHeight="120px"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* ===== Footer (duplicate of header actions for long forms) ===== */}
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onOpenChange(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleSubmit}
-                  disabled={!canSubmit}
-                >
-                  {submitLabel}
-                </Button>
-              </div>
+              {activeFormTab === 'lore' && (
+                <>
+                  {/* ===== Lore ===== */}
+                  <CompactRichTextEditor
+                    content={loreHtml}
+                    onChange={setLoreHtml}
+                    placeholder="Write NPC lore, backstory, motivations..."
+                    minHeight="120px"
+                  />
+                </>
+              )}
             </div>
           </DialogBody>
         </DialogContent>
