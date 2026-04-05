@@ -23,12 +23,13 @@ import {
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
-import { SpellSlotTracker } from '@/components/shared/spells/SpellSlotTracker';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
 import { SpellAutocomplete } from '@/components/ui/forms/SpellAutocomplete';
 import { useSpellsData } from '@/hooks/useSpellsData';
+import { useToast, ToastContainer } from '@/components/ui/feedback/Toast';
 import { useNPCStore } from '@/store/npcStore';
+import { useEncounterStore } from '@/store/encounterStore';
 import {
   getNPCSpellSlots,
   calculateNPCSpellAttack,
@@ -50,6 +51,8 @@ interface NPCSpellTabProps {
   npc: CampaignNPC;
   campaignCode: string;
   addSpellRef?: React.MutableRefObject<(() => void) | null>;
+  encounterId?: string;
+  npcEntityId?: string;
 }
 
 const ABILITY_LABEL_MAP: Record<string, string> = {
@@ -128,8 +131,19 @@ export function NPCSpellTab({
   npc,
   campaignCode,
   addSpellRef,
+  encounterId,
+  npcEntityId,
 }: NPCSpellTabProps) {
   const sc = npc.spellcasting;
+  const { toasts, dismissToast, addToast } = useToast();
+
+  // Read concentration state from encounter entity if in encounter context
+  const encounterConcentration = useEncounterStore(state => {
+    if (!encounterId || !npcEntityId) return undefined;
+    const enc = state.encounters.find(e => e.id === encounterId);
+    const entity = enc?.entities.find(e => e.id === npcEntityId);
+    return entity?.concentrationSpell;
+  });
 
   const [collapsedLevels, setCollapsedLevels] = useState<Set<number>>(
     new Set()
@@ -167,7 +181,7 @@ export function NPCSpellTab({
     : 0;
   const spellDC = sc ? calculateNPCSpellDC(sc, abilityScore, profBonus) : 10;
 
-  // Build spell slots for SpellSlotTracker
+  // Build spell slots
   const rawSlots = useMemo(
     () => (sc ? getNPCSpellSlots(sc.casterLevel, sc.slotOverrides) : {}),
     [sc]
@@ -202,13 +216,14 @@ export function NPCSpellTab({
     return groups;
   }, [scSpells]);
 
-  const sortedLevels = useMemo(
-    () =>
-      Object.keys(spellsByLevel)
-        .map(Number)
-        .sort((a, b) => a - b),
-    [spellsByLevel]
-  );
+  // Merge spell levels with slot levels so empty-spell levels with slots still show
+  const sortedLevels = useMemo(() => {
+    const levels = new Set(Object.keys(spellsByLevel).map(Number));
+    for (let l = 1; l <= 9; l++) {
+      if ((spellSlots[l as keyof SpellSlots]?.max ?? 0) > 0) levels.add(l);
+    }
+    return Array.from(levels).sort((a, b) => a - b);
+  }, [spellsByLevel, spellSlots]);
 
   const toggleLevel = useCallback((level: number) => {
     setCollapsedLevels(prev => {
@@ -275,8 +290,38 @@ export function NPCSpellTab({
           currentUsed + 1
         );
       }
+
+      // Set concentration on encounter entity if applicable
+      if (castingSpell.concentration && encounterId && npcEntityId) {
+        useEncounterStore
+          .getState()
+          .setConcentration(encounterId, npcEntityId, castingSpell.name);
+      }
+
+      // Show success toast
+      const levelText =
+        spellLevel === 0
+          ? 'cantrip'
+          : useFreecast
+            ? `innate cast`
+            : `level ${spellLevel}`;
+      addToast({
+        type: 'success',
+        title: `${npc.name} cast ${castingSpell.name}`,
+        message: `Cast as ${levelText}`,
+        duration: 3000,
+      });
     },
-    [campaignCode, npc.id, castingSpell, sc?.slotsUsed]
+    [
+      campaignCode,
+      npc.id,
+      npc.name,
+      castingSpell,
+      sc?.slotsUsed,
+      encounterId,
+      npcEntityId,
+      addToast,
+    ]
   );
 
   const handleRemoveSpell = useCallback(
@@ -413,56 +458,32 @@ export function NPCSpellTab({
         )}
       </div>
 
-      {/* Spell Slots section */}
+      {/* Spells & Slots (unified) */}
       <div>
         <SectionHeader
-          title="Spell Slots"
-          isCollapsed={isSectionCollapsed('slots')}
-          onToggle={() => toggleSection('slots')}
-          badge={
-            isSectionCollapsed('slots') ? (
-              <Badge variant="neutral" size="sm">
-                {totalUsedSlots}/{totalMaxSlots} used
-              </Badge>
-            ) : undefined
-          }
-        />
-        {!isSectionCollapsed('slots') && (
-          <div className="mt-2">
-            <SpellSlotTracker
-              spellSlots={spellSlots}
-              onSpellSlotChange={handleSpellSlotChange}
-              onResetSpellSlots={handleResetSlots}
-              compact
-              hideResetButtons
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Spell List section */}
-      <div>
-        <SectionHeader
-          title="Spell List"
+          title="Spells"
           isCollapsed={isSectionCollapsed('spells')}
           onToggle={() => toggleSection('spells')}
           badge={
             isSectionCollapsed('spells') ? (
               <Badge variant="neutral" size="sm">
-                {totalSpells} {totalSpells === 1 ? 'spell' : 'spells'}
+                {totalSpells} {totalSpells === 1 ? 'spell' : 'spells'} ·{' '}
+                {totalUsedSlots}/{totalMaxSlots} slots used
               </Badge>
             ) : undefined
           }
         />
         {!isSectionCollapsed('spells') && (
           <div className="mt-2">
-            {/* Spell List — collapsible by level */}
             {sortedLevels.length > 0 ? (
               <div className="space-y-2">
                 {sortedLevels.map(level => {
-                  const spells = spellsByLevel[level];
+                  const spells = spellsByLevel[level] ?? [];
                   const isCollapsed = collapsedLevels.has(level);
                   const isCantrip = level === 0;
+                  const slot = spellSlots[level as keyof SpellSlots];
+                  const hasSlots = !isCantrip && slot && slot.max > 0;
+                  const remaining = hasSlots ? slot.max - slot.used : 0;
 
                   return (
                     <div
@@ -473,17 +494,19 @@ export function NPCSpellTab({
                           : 'border-accent-purple-border'
                       }`}
                     >
-                      {/* Level header */}
-                      <button
-                        type="button"
-                        onClick={() => toggleLevel(level)}
-                        className={`flex w-full items-center justify-between px-3 py-2 text-left transition-colors ${
+                      {/* Level header with inline slots */}
+                      <div
+                        className={`flex w-full items-center gap-2 px-3 py-2 transition-colors ${
                           isCantrip
-                            ? 'bg-accent-amber-bg hover:bg-accent-amber-bg'
-                            : 'bg-accent-purple-bg hover:bg-accent-purple-bg'
+                            ? 'bg-accent-amber-bg'
+                            : 'bg-accent-purple-bg'
                         }`}
                       >
-                        <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleLevel(level)}
+                          className="flex items-center gap-2"
+                        >
                           {isCollapsed ? (
                             <ChevronRight
                               className={`h-4 w-4 ${isCantrip ? 'text-accent-amber-text' : 'text-accent-purple-text'}`}
@@ -498,17 +521,63 @@ export function NPCSpellTab({
                           >
                             {LEVEL_NAMES[level] ?? `Level ${level}`}
                           </span>
-                        </div>
-                        <Badge
-                          variant={isCantrip ? 'warning' : 'secondary'}
-                          size="sm"
-                        >
-                          {spells.length}
-                        </Badge>
-                      </button>
+                          {spells.length > 0 && (
+                            <Badge
+                              variant={isCantrip ? 'warning' : 'secondary'}
+                              size="sm"
+                            >
+                              {spells.length}
+                            </Badge>
+                          )}
+                        </button>
+
+                        {/* Inline slot dots */}
+                        {hasSlots && (
+                          <div className="ml-auto flex items-center gap-1.5">
+                            <div
+                              className="flex gap-1"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              {Array.from({ length: slot.max }, (_, index) => {
+                                const isUsed = index < slot.used;
+                                return (
+                                  <button
+                                    key={index}
+                                    type="button"
+                                    onClick={() => {
+                                      const newUsed = isUsed
+                                        ? slot.used - 1
+                                        : index + 1;
+                                      handleSpellSlotChange(
+                                        level as keyof SpellSlots,
+                                        Math.max(0, Math.min(newUsed, slot.max))
+                                      );
+                                    }}
+                                    className={`h-4 w-4 cursor-pointer rounded-full border-2 transition-all ${
+                                      isUsed
+                                        ? 'border-red-500 bg-red-500 opacity-70 hover:scale-110'
+                                        : 'border-emerald-400 bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.4)] hover:scale-110'
+                                    }`}
+                                    title={`Slot ${index + 1} — ${isUsed ? 'Used' : 'Available'}`}
+                                  />
+                                );
+                              })}
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold ${
+                                remaining === 0
+                                  ? 'text-accent-red-text'
+                                  : 'text-heading'
+                              }`}
+                            >
+                              {remaining}/{slot.max}
+                            </span>
+                          </div>
+                        )}
+                      </div>
 
                       {/* Spell rows */}
-                      {!isCollapsed && (
+                      {!isCollapsed && spells.length > 0 && (
                         <div className="divide-y divide-[var(--border-divider)]">
                           {spells.map(spell => (
                             <SpellRow
@@ -551,10 +620,16 @@ export function NPCSpellTab({
           onClose={() => setCastingSpell(null)}
           spell={castingSpell}
           spellSlots={spellSlots}
-          concentration={{ isConcentrating: false, spellName: undefined }}
+          concentration={{
+            isConcentrating: !!encounterConcentration,
+            spellName: encounterConcentration,
+          }}
           onCastSpell={handleCastSpell}
         />
       )}
+
+      {/* Toast notifications */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
       {/* Add Spell dialog */}
       <Dialog

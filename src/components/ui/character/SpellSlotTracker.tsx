@@ -12,6 +12,7 @@ interface SpellSlotTrackerProps {
   onResetSpellSlots: () => void;
   onResetPactMagic?: () => void;
   compact?: boolean;
+  hideTitle?: boolean;
   className?: string;
 }
 
@@ -23,6 +24,7 @@ export default function SpellSlotTracker({
   onResetSpellSlots,
   onResetPactMagic,
   compact = false,
+  hideTitle = false,
   className = '',
 }: SpellSlotTrackerProps) {
   return (
@@ -37,6 +39,7 @@ export default function SpellSlotTracker({
       compact={compact}
       hideControls={false}
       hideResetButtons={false}
+      hideTitle={hideTitle}
       showOnlyUsed={false}
       maxLevelToShow={9}
       className={className}

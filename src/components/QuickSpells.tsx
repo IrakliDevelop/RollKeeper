@@ -69,6 +69,9 @@ interface LevelSectionProps {
   onSpellAction: (spell: Spell, action: string) => void;
   favoriteSpells: string[];
   onToggleFavorite: (spellId: string) => void;
+  slotMax?: number;
+  slotUsed?: number;
+  onSlotChange?: (used: number) => void;
 }
 
 const SpellCard: React.FC<{
@@ -291,6 +294,9 @@ const LevelSection: React.FC<LevelSectionProps> = ({
   onSpellAction,
   favoriteSpells,
   onToggleFavorite,
+  slotMax,
+  slotUsed,
+  onSlotChange,
 }) => {
   const isCantrip = level === 0;
   const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
@@ -304,15 +310,20 @@ const LevelSection: React.FC<LevelSectionProps> = ({
     ? 'border-accent-amber-border'
     : 'border-accent-purple-border';
 
+  const hasSlots = !isCantrip && slotMax !== undefined && slotMax > 0;
+  const remaining = hasSlots ? slotMax! - (slotUsed ?? 0) : 0;
+
   return (
     <div
       className={`border-2 ${borderColor} bg-surface-raised overflow-hidden rounded-lg`}
     >
-      <button
-        onClick={onToggle}
-        className={`flex w-full items-center justify-between p-4 ${levelBg} transition-all hover:opacity-90`}
+      <div
+        className={`flex w-full items-center gap-3 p-4 ${levelBg} transition-all`}
       >
-        <div className="flex items-center gap-3">
+        <button
+          onClick={onToggle}
+          className="flex items-center gap-3 hover:opacity-90"
+        >
           <div className="flex items-center gap-2">
             {isExpanded ? (
               <ChevronDown size={18} className={levelColor} />
@@ -326,8 +337,42 @@ const LevelSection: React.FC<LevelSectionProps> = ({
           <Badge variant={isCantrip ? 'warning' : 'primary'} size="sm">
             {spells.length} spell{spells.length !== 1 ? 's' : ''}
           </Badge>
-        </div>
-      </button>
+        </button>
+
+        {/* Inline slot dots */}
+        {hasSlots && onSlotChange && (
+          <div className="ml-auto flex items-center gap-1.5">
+            <div className="flex gap-1">
+              {Array.from({ length: slotMax! }, (_, index) => {
+                const isUsed = index < (slotUsed ?? 0);
+                return (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => {
+                      const newUsed = isUsed ? (slotUsed ?? 0) - 1 : index + 1;
+                      onSlotChange(Math.max(0, Math.min(newUsed, slotMax!)));
+                    }}
+                    className={`h-4 w-4 cursor-pointer rounded-full border-2 transition-all ${
+                      isUsed
+                        ? 'border-red-500 bg-red-500 opacity-70 hover:scale-110'
+                        : 'border-emerald-400 bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.4)] hover:scale-110'
+                    }`}
+                    title={`Slot ${index + 1} — ${isUsed ? 'Used' : 'Available'}`}
+                  />
+                );
+              })}
+            </div>
+            <span
+              className={`text-[10px] font-bold ${
+                remaining === 0 ? 'text-accent-red-text' : 'text-heading'
+              }`}
+            >
+              {remaining}/{slotMax}
+            </span>
+          </div>
+        )}
+      </div>
 
       {isExpanded && (
         <div className="bg-surface-raised border-divider border-t-2 p-4">
@@ -730,20 +775,34 @@ export function QuickSpells({
         {/* Leveled spells */}
         {leveledSpells.length > 0 && (
           <div className="space-y-3">
-            {leveledSpells.map(level => (
-              <LevelSection
-                key={level}
-                level={level}
-                spells={spellsByLevel[level]}
-                isExpanded={expandedLevels.has(level)}
-                onToggle={() => toggleLevelExpanded(level)}
-                compactView={compactView}
-                spellSaveDC={spellSaveDC}
-                onSpellAction={handleSpellAction}
-                favoriteSpells={favoriteSpells}
-                onToggleFavorite={toggleSpellFavorite}
-              />
-            ))}
+            {leveledSpells.map(level => {
+              const slot =
+                character.spellSlots[
+                  level as keyof typeof character.spellSlots
+                ];
+              return (
+                <LevelSection
+                  key={level}
+                  level={level}
+                  spells={spellsByLevel[level]}
+                  isExpanded={expandedLevels.has(level)}
+                  onToggle={() => toggleLevelExpanded(level)}
+                  compactView={compactView}
+                  spellSaveDC={spellSaveDC}
+                  onSpellAction={handleSpellAction}
+                  favoriteSpells={favoriteSpells}
+                  onToggleFavorite={toggleSpellFavorite}
+                  slotMax={slot?.max}
+                  slotUsed={slot?.used}
+                  onSlotChange={used =>
+                    updateSpellSlot(
+                      level as keyof typeof character.spellSlots,
+                      used
+                    )
+                  }
+                />
+              );
+            })}
           </div>
         )}
 

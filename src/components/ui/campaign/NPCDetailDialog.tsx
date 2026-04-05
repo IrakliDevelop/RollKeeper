@@ -58,6 +58,8 @@ interface NPCDetailDialogProps {
   onSendItemToPlayer?: (item: NPCInventoryItem, npcName: string) => void;
   initialTab?: DetailTab;
   readOnly?: boolean;
+  encounterId?: string;
+  npcEntityId?: string;
 }
 
 const ABILITY_LABELS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const;
@@ -462,6 +464,8 @@ export function NPCDetailDialog({
   onSendItemToPlayer,
   initialTab,
   readOnly,
+  encounterId,
+  npcEntityId,
 }: NPCDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('stats');
   const [showFullImage, setShowFullImage] = useState(false);
@@ -709,6 +713,8 @@ export function NPCDetailDialog({
               npc={npc}
               campaignCode={npc.campaignCode}
               addSpellRef={addSpellRef}
+              encounterId={encounterId}
+              npcEntityId={npcEntityId}
             />
           )}
 

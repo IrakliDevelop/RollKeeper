@@ -466,13 +466,16 @@ export function SpellCastModal({
                   selectedLevel &&
                   !useFreecast &&
                   selectedLevel > spell.level && (
-                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-                      <h5 className="mb-2 font-medium text-blue-900">
+                    <div className="bg-accent-blue-bg border-accent-blue-border rounded-lg border p-3">
+                      <h5 className="text-accent-blue-text mb-2 font-medium">
                         At Higher Levels
                       </h5>
-                      <p className="text-sm text-blue-800">
-                        {spell.higherLevel}
-                      </p>
+                      <p
+                        className="text-accent-blue-text text-sm opacity-90"
+                        dangerouslySetInnerHTML={{
+                          __html: spell.higherLevel,
+                        }}
+                      />
                     </div>
                   )}
               </>

@@ -687,6 +687,7 @@ export interface CharacterState {
 
   daysSpent: number; // Number of in-game days spent in the campaign
   shareHpWithParty?: boolean; // Whether to share HP with party members (default true)
+  spellSlotsExpanded?: boolean; // Whether the full Spell Slot Tracker panel is expanded (default false)
 
   // Summons (familiars, summoned creatures)
   summons?: Summon[];

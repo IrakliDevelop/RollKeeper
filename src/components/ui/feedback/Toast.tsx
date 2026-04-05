@@ -1,7 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Dice6, Shield, Zap, CheckCircle2, XCircle, Info, Moon } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import {
+  X,
+  Dice6,
+  Shield,
+  Zap,
+  CheckCircle2,
+  XCircle,
+  Info,
+  Moon,
+} from 'lucide-react';
 
 export interface ToastData {
   id: string;
@@ -82,7 +92,7 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border-2 shadow-2xl backdrop-blur-sm transition-all duration-300 ease-out ${getToastStyles()} ${isVisible && !isExiting ? 'translate-x-0 transform opacity-100 scale-100' : 'translate-x-full transform opacity-0 scale-95'} ${isExiting ? 'translate-x-full transform opacity-0 scale-95' : ''} max-w-[420px] min-w-[320px]`}
+      className={`relative overflow-hidden rounded-xl border-2 shadow-2xl backdrop-blur-sm transition-all duration-300 ease-out ${getToastStyles()} ${isVisible && !isExiting ? 'translate-x-0 scale-100 transform opacity-100' : 'translate-x-full scale-95 transform opacity-0'} ${isExiting ? 'translate-x-full scale-95 transform opacity-0' : ''} max-w-[420px] min-w-[320px]`}
     >
       {/* Animated background pattern */}
       <div className="absolute inset-0 opacity-20">
@@ -92,7 +102,7 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
 
       {/* Shimmer effect */}
       <div className="absolute inset-0 opacity-30">
-        <div 
+        <div
           className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
           style={{
             animation: 'shimmer 2s ease-in-out infinite',
@@ -104,7 +114,7 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
       <div className="relative px-5 py-4">
         <div className="flex items-start gap-3">
           {/* Icon with glowing effect */}
-          <div className="flex-shrink-0 rounded-lg bg-white/20 p-2 backdrop-blur-sm ring-1 ring-white/30">
+          <div className="flex-shrink-0 rounded-lg bg-white/20 p-2 ring-1 ring-white/30 backdrop-blur-sm">
             {getIcon()}
           </div>
 
@@ -122,7 +132,7 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
               </button>
             </div>
 
-            <p className="mb-2 text-sm font-medium leading-relaxed text-white/95 drop-shadow-sm">
+            <p className="mb-2 text-sm leading-relaxed font-medium text-white/95 drop-shadow-sm">
               {toast.message}
             </p>
 
@@ -176,8 +186,8 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
   toasts,
   onDismiss,
 }) => {
-  return (
-    <div className="pointer-events-none fixed right-4 bottom-4 z-50 space-y-2">
+  const content = (
+    <div className="pointer-events-none fixed right-4 bottom-4 z-[100] space-y-2">
       <div className="pointer-events-auto space-y-2">
         {toasts.map(toast => (
           <Toast key={toast.id} toast={toast} onDismiss={onDismiss} />
@@ -185,6 +195,9 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') return content;
+  return createPortal(content, document.body);
 };
 
 // Hook for managing toasts
@@ -302,7 +315,7 @@ export const useToast = () => {
         'Short rest abilities restored',
         'Pact Magic slots restored',
         'Reaction reset',
-        'Ready to continue your adventure!'
+        'Ready to continue your adventure!',
       ],
       duration: 5000,
     });
@@ -318,7 +331,7 @@ export const useToast = () => {
         'All spell slots restored',
         'Hit points fully restored',
         'Hit dice partially restored',
-        'Ready for new challenges!'
+        'Ready for new challenges!',
       ],
       duration: 6000,
     });
