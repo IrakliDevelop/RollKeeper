@@ -567,7 +567,7 @@ export function NPCDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl">
+      <DialogContent className="h-[85vh] sm:max-w-4xl">
         <DialogHeader>
           <div className="flex items-start gap-4 pr-16">
             {npc.avatarUrl && (
@@ -655,7 +655,7 @@ export function NPCDetailDialog({
           ))}
         </div>
 
-        <DialogBody className="max-h-[70vh] min-h-[60vh] overflow-y-auto">
+        <DialogBody className="min-h-0 overflow-y-auto">
           {activeTab === 'stats' && (
             <div className="space-y-4">
               {statBlock ? (
