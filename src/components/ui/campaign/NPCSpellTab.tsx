@@ -93,6 +93,34 @@ function getProfBonus(npc: CampaignNPC): number {
   );
 }
 
+function SectionHeader({
+  title,
+  isCollapsed,
+  onToggle,
+  badge,
+}: {
+  title: string;
+  isCollapsed: boolean;
+  onToggle: () => void;
+  badge?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="bg-surface-secondary text-heading hover:bg-surface-hover flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition-colors"
+    >
+      <div className="flex items-center gap-2">
+        <ChevronDown
+          className={`h-4 w-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+        />
+        {title}
+      </div>
+      {badge}
+    </button>
+  );
+}
+
 export function NPCSpellTab({ npc, campaignCode }: NPCSpellTabProps) {
   const sc = npc.spellcasting;
 
@@ -175,6 +203,23 @@ export function NPCSpellTab({ npc, campaignCode }: NPCSpellTabProps) {
       return next;
     });
   }, []);
+
+  const collapsedSections = npc.collapsedSpellSections ?? [];
+  const isSectionCollapsed = (section: string) =>
+    collapsedSections.includes(section);
+
+  const toggleSection = useCallback(
+    (section: string) => {
+      const current = npc.collapsedSpellSections ?? [];
+      const next = current.includes(section)
+        ? current.filter(s => s !== section)
+        : [...current, section];
+      useNPCStore.getState().updateNPC(campaignCode, npc.id, {
+        collapsedSpellSections: next,
+      });
+    },
+    [campaignCode, npc.id, npc.collapsedSpellSections]
+  );
 
   const handleSpellSlotChange = useCallback(
     (level: keyof SpellSlots, used: number) => {
@@ -265,139 +310,203 @@ export function NPCSpellTab({ npc, campaignCode }: NPCSpellTabProps) {
 
   const attackStr = spellAttack >= 0 ? `+${spellAttack}` : `${spellAttack}`;
 
+  const totalMaxSlots = Object.values(spellSlots).reduce(
+    (sum, s) => sum + s.max,
+    0
+  );
+  const totalUsedSlots = Object.values(spellSlots).reduce(
+    (sum, s) => sum + s.used,
+    0
+  );
+  const totalSpells = sc.spells?.length ?? 0;
+
   return (
-    <div className="space-y-4">
-      {/* Header: stats badges + action buttons */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant="secondary" size="sm">
-            Caster Lv {sc.casterLevel}
-          </Badge>
-          <Badge variant="neutral" size="sm">
-            {ABILITY_LABEL_MAP[sc.ability] ?? sc.ability}
-          </Badge>
-          <Badge variant="info" size="sm">
-            Spell Attack: {attackStr}
-          </Badge>
-          <Badge variant="warning" size="sm">
-            Save DC: {spellDC}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={handleLongRest}
-            title="Long Rest (reset HP, slots, free casts)"
-          >
-            <Moon className="mr-1 h-3.5 w-3.5" />
-            Long Rest
-          </Button>
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={handleResetSlots}
-            title="Reset spell slots and free casts only"
-          >
-            <RotateCcw className="mr-1 h-3.5 w-3.5" />
-            Reset Slots
-          </Button>
-        </div>
+    <div className="space-y-3">
+      {/* Stats section */}
+      <div>
+        <SectionHeader
+          title="Spellcasting Stats"
+          isCollapsed={isSectionCollapsed('stats')}
+          onToggle={() => toggleSection('stats')}
+          badge={
+            isSectionCollapsed('stats') ? (
+              <Badge variant="neutral" size="sm">
+                Lv {sc.casterLevel} · DC {spellDC} · Atk {attackStr}
+              </Badge>
+            ) : undefined
+          }
+        />
+        {!isSectionCollapsed('stats') && (
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge variant="secondary" size="sm">
+                Caster Lv {sc.casterLevel}
+              </Badge>
+              <Badge variant="neutral" size="sm">
+                {ABILITY_LABEL_MAP[sc.ability] ?? sc.ability}
+              </Badge>
+              <Badge variant="info" size="sm">
+                Spell Attack: {attackStr}
+              </Badge>
+              <Badge variant="warning" size="sm">
+                Save DC: {spellDC}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={handleLongRest}
+                title="Long Rest (reset HP, slots, free casts)"
+              >
+                <Moon className="mr-1 h-3.5 w-3.5" />
+                Long Rest
+              </Button>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={handleResetSlots}
+                title="Reset spell slots and free casts only"
+              >
+                <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                Reset Slots
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Spell Slot Tracker */}
-      <SpellSlotTracker
-        spellSlots={spellSlots}
-        onSpellSlotChange={handleSpellSlotChange}
-        onResetSpellSlots={handleResetSlots}
-        compact
-        hideResetButtons
-      />
+      {/* Spell Slots section */}
+      <div>
+        <SectionHeader
+          title="Spell Slots"
+          isCollapsed={isSectionCollapsed('slots')}
+          onToggle={() => toggleSection('slots')}
+          badge={
+            isSectionCollapsed('slots') ? (
+              <Badge variant="neutral" size="sm">
+                {totalUsedSlots}/{totalMaxSlots} used
+              </Badge>
+            ) : undefined
+          }
+        />
+        {!isSectionCollapsed('slots') && (
+          <div className="mt-2">
+            <SpellSlotTracker
+              spellSlots={spellSlots}
+              onSpellSlotChange={handleSpellSlotChange}
+              onResetSpellSlots={handleResetSlots}
+              compact
+              hideResetButtons
+            />
+          </div>
+        )}
+      </div>
 
-      {/* Spell List — collapsible by level */}
-      {sortedLevels.length > 0 ? (
-        <div className="space-y-2">
-          {sortedLevels.map(level => {
-            const spells = spellsByLevel[level];
-            const isCollapsed = collapsedLevels.has(level);
-            const isCantrip = level === 0;
+      {/* Spell List section */}
+      <div>
+        <SectionHeader
+          title="Spell List"
+          isCollapsed={isSectionCollapsed('spells')}
+          onToggle={() => toggleSection('spells')}
+          badge={
+            isSectionCollapsed('spells') ? (
+              <Badge variant="neutral" size="sm">
+                {totalSpells} {totalSpells === 1 ? 'spell' : 'spells'}
+              </Badge>
+            ) : undefined
+          }
+        />
+        {!isSectionCollapsed('spells') && (
+          <div className="mt-2">
+            {/* Spell List — collapsible by level */}
+            {sortedLevels.length > 0 ? (
+              <div className="space-y-2">
+                {sortedLevels.map(level => {
+                  const spells = spellsByLevel[level];
+                  const isCollapsed = collapsedLevels.has(level);
+                  const isCantrip = level === 0;
 
-            return (
-              <div
-                key={level}
-                className={`overflow-hidden rounded-lg border-2 ${
-                  isCantrip
-                    ? 'border-accent-amber-border'
-                    : 'border-accent-purple-border'
-                }`}
-              >
-                {/* Level header */}
-                <button
-                  type="button"
-                  onClick={() => toggleLevel(level)}
-                  className={`flex w-full items-center justify-between px-3 py-2 text-left transition-colors ${
-                    isCantrip
-                      ? 'bg-accent-amber-bg hover:bg-accent-amber-bg'
-                      : 'bg-accent-purple-bg hover:bg-accent-purple-bg'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {isCollapsed ? (
-                      <ChevronRight
-                        className={`h-4 w-4 ${isCantrip ? 'text-accent-amber-text' : 'text-accent-purple-text'}`}
-                      />
-                    ) : (
-                      <ChevronDown
-                        className={`h-4 w-4 ${isCantrip ? 'text-accent-amber-text' : 'text-accent-purple-text'}`}
-                      />
-                    )}
-                    <span
-                      className={`text-sm font-semibold ${isCantrip ? 'text-accent-amber-text' : 'text-accent-purple-text'}`}
+                  return (
+                    <div
+                      key={level}
+                      className={`overflow-hidden rounded-lg border-2 ${
+                        isCantrip
+                          ? 'border-accent-amber-border'
+                          : 'border-accent-purple-border'
+                      }`}
                     >
-                      {LEVEL_NAMES[level] ?? `Level ${level}`}
-                    </span>
-                  </div>
-                  <Badge
-                    variant={isCantrip ? 'warning' : 'secondary'}
-                    size="sm"
-                  >
-                    {spells.length}
-                  </Badge>
-                </button>
+                      {/* Level header */}
+                      <button
+                        type="button"
+                        onClick={() => toggleLevel(level)}
+                        className={`flex w-full items-center justify-between px-3 py-2 text-left transition-colors ${
+                          isCantrip
+                            ? 'bg-accent-amber-bg hover:bg-accent-amber-bg'
+                            : 'bg-accent-purple-bg hover:bg-accent-purple-bg'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {isCollapsed ? (
+                            <ChevronRight
+                              className={`h-4 w-4 ${isCantrip ? 'text-accent-amber-text' : 'text-accent-purple-text'}`}
+                            />
+                          ) : (
+                            <ChevronDown
+                              className={`h-4 w-4 ${isCantrip ? 'text-accent-amber-text' : 'text-accent-purple-text'}`}
+                            />
+                          )}
+                          <span
+                            className={`text-sm font-semibold ${isCantrip ? 'text-accent-amber-text' : 'text-accent-purple-text'}`}
+                          >
+                            {LEVEL_NAMES[level] ?? `Level ${level}`}
+                          </span>
+                        </div>
+                        <Badge
+                          variant={isCantrip ? 'warning' : 'secondary'}
+                          size="sm"
+                        >
+                          {spells.length}
+                        </Badge>
+                      </button>
 
-                {/* Spell rows */}
-                {!isCollapsed && (
-                  <div className="divide-y divide-[var(--border-divider)]">
-                    {spells.map(spell => (
-                      <SpellRow
-                        key={spell.id}
-                        spell={spell}
-                        onView={() => setViewingSpell(spell)}
-                        onRemove={() => handleRemoveSpell(spell.id)}
-                      />
-                    ))}
-                  </div>
-                )}
+                      {/* Spell rows */}
+                      {!isCollapsed && (
+                        <div className="divide-y divide-[var(--border-divider)]">
+                          {spells.map(spell => (
+                            <SpellRow
+                              key={spell.id}
+                              spell={spell}
+                              onView={() => setViewingSpell(spell)}
+                              onRemove={() => handleRemoveSpell(spell.id)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-8 text-center">
-          <Star className="text-faint mb-2 h-8 w-8" />
-          <p className="text-muted text-sm">No spells added yet</p>
-        </div>
-      )}
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Star className="text-faint mb-2 h-8 w-8" />
+                <p className="text-muted text-sm">No spells added yet</p>
+              </div>
+            )}
+          </div>
+        )}
 
-      {/* Add Spell button */}
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={() => setAddSpellOpen(true)}
-      >
-        <Plus className="mr-1.5 h-4 w-4" />
-        Add Spell
-      </Button>
+        {/* Add Spell button — always visible */}
+        <Button
+          variant="secondary"
+          size="sm"
+          className="mt-2"
+          onClick={() => setAddSpellOpen(true)}
+        >
+          <Plus className="mr-1.5 h-4 w-4" />
+          Add Spell
+        </Button>
+      </div>
 
       {/* Spell Details modal */}
       {viewingSpell && (
