@@ -321,7 +321,7 @@ export function NPCSpellTab({ npc, campaignCode }: NPCSpellTabProps) {
   const totalSpells = sc.spells?.length ?? 0;
 
   return (
-    <div className="space-y-3">
+    <div className="flex min-h-full flex-col space-y-3">
       {/* Stats section */}
       <div>
         <SectionHeader
@@ -496,11 +496,11 @@ export function NPCSpellTab({ npc, campaignCode }: NPCSpellTabProps) {
           </div>
         )}
 
-        {/* Add Spell button — always visible */}
+        {/* Add Spell button — always visible, pushed to bottom */}
         <Button
           variant="secondary"
           size="sm"
-          className="mt-2"
+          className="mt-auto pt-2"
           onClick={() => setAddSpellOpen(true)}
         >
           <Plus className="mr-1.5 h-4 w-4" />

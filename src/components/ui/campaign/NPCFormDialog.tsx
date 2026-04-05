@@ -947,7 +947,7 @@ export function NPCFormDialog({
             ))}
           </div>
           <DialogBody className="max-h-[70vh] min-h-[60vh] overflow-y-auto">
-            <div className="space-y-5">
+            <div className="flex min-h-full flex-col space-y-5">
               {activeFormTab === 'basic' && (
                 <>
                   {/* ===== Bestiary Import (create only) ===== */}
@@ -1451,7 +1451,7 @@ export function NPCFormDialog({
               {activeFormTab === 'inventory' && (
                 <>
                   {/* ===== Inventory ===== */}
-                  <div className="space-y-3">
+                  <div className="flex flex-1 flex-col space-y-3">
                     {/* Item search */}
                     <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border p-3">
                       <ItemAutocomplete
@@ -1598,7 +1598,7 @@ export function NPCFormDialog({
                           },
                         ])
                       }
-                      className="text-accent-purple-text flex items-center gap-1 text-xs font-medium opacity-80 hover:opacity-100"
+                      className="text-accent-purple-text mt-auto flex items-center gap-1 pt-2 text-xs font-medium opacity-80 hover:opacity-100"
                     >
                       <Plus size={12} />
                       Add Item Manually
@@ -1610,7 +1610,7 @@ export function NPCFormDialog({
               {activeFormTab === 'spellcasting' && (
                 <>
                   {/* ===== Spellcasting ===== */}
-                  <div className="space-y-3">
+                  <div className="flex flex-1 flex-col space-y-3">
                     {/* Enable toggle */}
                     <div className="flex items-center gap-2">
                       <Switch

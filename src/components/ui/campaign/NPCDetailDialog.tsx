@@ -708,7 +708,7 @@ export function NPCDetailDialog({
           )}
 
           {activeTab === 'inventory' && (
-            <div>
+            <div className="flex min-h-full flex-col">
               {npc.inventory && npc.inventory.length > 0 ? (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {npc.inventory.map(item => (
@@ -749,7 +749,7 @@ export function NPCDetailDialog({
                 </div>
               )}
               {onUpdateInventory && (
-                <div className="mt-3">
+                <div className="mt-auto pt-3">
                   <Button
                     variant="secondary"
                     size="sm"
@@ -767,7 +767,7 @@ export function NPCDetailDialog({
           )}
 
           {activeTab === 'lore' && (
-            <div>
+            <div className="flex min-h-full flex-col">
               {npc.loreHtml ? (
                 <div
                   className="prose prose-sm text-body max-w-none"
