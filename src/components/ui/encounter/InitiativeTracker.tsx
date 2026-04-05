@@ -51,7 +51,6 @@ interface InitiativeTrackerProps {
     playerCharacterId: string,
     color: string | undefined
   ) => void;
-  onLongRestEntity?: (entityId: string) => void;
 }
 
 export function InitiativeTracker({
@@ -81,7 +80,6 @@ export function InitiativeTracker({
   onViewPlayer,
   onViewNPC,
   onChangePlayerColor,
-  onLongRestEntity,
 }: InitiativeTrackerProps) {
   const [hidePlayerHp, setHidePlayerHp] = useState(false);
   const currentEntity = encounter.entities[encounter.currentTurn];
@@ -236,11 +234,6 @@ export function InitiativeTracker({
               onViewNPC={
                 entity.npcSourceId && onViewNPC
                   ? () => onViewNPC(entity.npcSourceId!)
-                  : undefined
-              }
-              onLongRest={
-                entity.npcSourceId && onLongRestEntity
-                  ? () => onLongRestEntity(entity.id)
                   : undefined
               }
               onChangePlayerColor={

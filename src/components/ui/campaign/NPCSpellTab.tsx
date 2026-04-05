@@ -10,6 +10,7 @@ import {
   Trash2,
   Plus,
   Star,
+  Zap,
 } from 'lucide-react';
 import {
   Dialog,
@@ -24,6 +25,7 @@ import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
 import { SpellSlotTracker } from '@/components/shared/spells/SpellSlotTracker';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
+import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
 import { SpellAutocomplete } from '@/components/ui/forms/SpellAutocomplete';
 import { useSpellsData } from '@/hooks/useSpellsData';
 import { useNPCStore } from '@/store/npcStore';
@@ -133,6 +135,7 @@ export function NPCSpellTab({
     new Set()
   );
   const [viewingSpell, setViewingSpell] = useState<Spell | null>(null);
+  const [castingSpell, setCastingSpell] = useState<Spell | null>(null);
   const [addSpellOpen, setAddSpellOpen] = useState(false);
 
   // Expose add-spell trigger to parent via ref
@@ -256,6 +259,25 @@ export function NPCSpellTab({
   const handleLongRest = useCallback(() => {
     useNPCStore.getState().longRestNPC(campaignCode, npc.id);
   }, [campaignCode, npc.id]);
+
+  const handleCastSpell = useCallback(
+    (spellLevel: number, useFreecast: boolean) => {
+      if (!castingSpell) return;
+      const store = useNPCStore.getState();
+      if (useFreecast) {
+        store.useNPCFreeCast(campaignCode, npc.id, castingSpell.id);
+      } else if (spellLevel > 0) {
+        const currentUsed = sc?.slotsUsed?.[spellLevel] ?? 0;
+        store.setNPCSpellSlotUsed(
+          campaignCode,
+          npc.id,
+          spellLevel,
+          currentUsed + 1
+        );
+      }
+    },
+    [campaignCode, npc.id, castingSpell, sc?.slotsUsed]
+  );
 
   const handleRemoveSpell = useCallback(
     (spellId: string) => {
@@ -494,6 +516,7 @@ export function NPCSpellTab({
                               spell={spell}
                               onView={() => setViewingSpell(spell)}
                               onRemove={() => handleRemoveSpell(spell.id)}
+                              onCast={() => setCastingSpell(spell)}
                             />
                           ))}
                         </div>
@@ -518,6 +541,18 @@ export function NPCSpellTab({
           spell={viewingSpell}
           isOpen={!!viewingSpell}
           onClose={() => setViewingSpell(null)}
+        />
+      )}
+
+      {/* Cast Spell modal */}
+      {castingSpell && (
+        <SpellCastModal
+          isOpen={!!castingSpell}
+          onClose={() => setCastingSpell(null)}
+          spell={castingSpell}
+          spellSlots={spellSlots}
+          concentration={{ isConcentrating: false, spellName: undefined }}
+          onCastSpell={handleCastSpell}
         />
       )}
 
@@ -695,10 +730,12 @@ function SpellRow({
   spell,
   onView,
   onRemove,
+  onCast,
 }: {
   spell: Spell;
   onView: () => void;
   onRemove: () => void;
+  onCast: () => void;
 }) {
   const isAtWill = spell.freeCastMax !== undefined && spell.freeCastMax === 0;
   const isInnate = spell.freeCastMax !== undefined && spell.freeCastMax > 0;
@@ -758,6 +795,14 @@ function SpellRow({
 
       {/* Actions */}
       <div className="flex shrink-0 items-center gap-0.5">
+        <button
+          type="button"
+          onClick={onCast}
+          className="text-muted hover:text-accent-purple-text rounded p-1 transition-colors"
+          title="Cast spell"
+        >
+          <Zap className="h-3.5 w-3.5" />
+        </button>
         <button
           type="button"
           onClick={onView}

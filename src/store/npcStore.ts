@@ -61,6 +61,11 @@ interface NPCStoreState {
     level: number,
     used: number
   ) => void;
+  useNPCFreeCast: (
+    campaignCode: string,
+    npcId: string,
+    spellId: string
+  ) => void;
   longRestNPC: (campaignCode: string, npcId: string) => void;
 }
 
@@ -249,6 +254,32 @@ export const useNPCStore = create<NPCStoreState>()(
                       ...npc.spellcasting.slotsUsed,
                       [level]: clamped,
                     },
+                  },
+                  updatedAt: new Date().toISOString(),
+                };
+              }),
+            },
+          };
+        });
+      },
+
+      useNPCFreeCast: (campaignCode, npcId, spellId) => {
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(npc => {
+                if (npc.id !== npcId || !npc.spellcasting) return npc;
+                return {
+                  ...npc,
+                  spellcasting: {
+                    ...npc.spellcasting,
+                    spells: npc.spellcasting.spells.map(s =>
+                      s.id === spellId
+                        ? { ...s, freeCastsUsed: (s.freeCastsUsed ?? 0) + 1 }
+                        : s
+                    ),
                   },
                   updatedAt: new Date().toISOString(),
                 };
