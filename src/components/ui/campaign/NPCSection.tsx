@@ -38,6 +38,7 @@ export function NPCSection({
 }: NPCSectionProps) {
   const {
     getNPCsForCampaign,
+    getNPC,
     createNPC,
     updateNPC,
     deleteNPC,
@@ -55,8 +56,16 @@ export function NPCSection({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingNpc, setEditingNpc] = useState<CampaignNPC | null>(null);
   const [selectedNpc, setSelectedNpc] = useState<CampaignNPC | null>(null);
+  const [detailInitialTab, setDetailInitialTab] = useState<
+    'stats' | 'spells' | 'inventory' | 'lore' | undefined
+  >(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
+
+  // Read the selected NPC reactively from the store so spell mutations are reflected
+  const freshNpc = selectedNpc
+    ? (getNPC(selectedNpc.campaignCode, selectedNpc.id) ?? selectedNpc)
+    : null;
   const handleCreate = () => {
     setEditingNpc(null);
     setDialogOpen(true);
@@ -362,10 +371,14 @@ export function NPCSection({
       />
 
       <NPCDetailDialog
-        npc={selectedNpc}
+        npc={freshNpc}
         open={!!selectedNpc}
+        initialTab={detailInitialTab}
         onOpenChange={open => {
-          if (!open) setSelectedNpc(null);
+          if (!open) {
+            setSelectedNpc(null);
+            setDetailInitialTab(undefined);
+          }
         }}
         onEdit={npc => {
           setSelectedNpc(null);
@@ -466,6 +479,11 @@ function NPCCard({
               {npc.proficiencyBonus != null && (
                 <Badge variant="neutral" size="sm" className="text-[10px]">
                   Prof +{npc.proficiencyBonus}
+                </Badge>
+              )}
+              {npc.spellcasting && (
+                <Badge variant="info" size="sm" className="text-[10px]">
+                  Caster Lv{npc.spellcasting.casterLevel}
                 </Badge>
               )}
             </div>
@@ -624,6 +642,11 @@ function NPCCard({
             {npc.proficiencyBonus != null && (
               <Badge variant="neutral" size="sm" className="text-[10px]">
                 Prof +{npc.proficiencyBonus}
+              </Badge>
+            )}
+            {npc.spellcasting && (
+              <Badge variant="info" size="sm" className="text-[10px]">
+                Caster Lv{npc.spellcasting.casterLevel}
               </Badge>
             )}
           </div>

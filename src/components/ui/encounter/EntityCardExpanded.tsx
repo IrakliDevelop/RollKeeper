@@ -621,7 +621,7 @@ export function EntityCardExpanded({
       </div>
 
       {/* Remove entity */}
-      <div className="border-divider flex justify-end border-t pt-2">
+      <div className="border-divider flex justify-end gap-2 border-t pt-2">
         <Button
           variant="danger"
           size="sm"

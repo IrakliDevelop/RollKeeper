@@ -49,6 +49,7 @@ interface EntityCardProps {
   counterValue?: number;
   onAdjustCounter?: (delta: number) => void;
   onViewPlayer?: () => void;
+  onViewNPC?: () => void;
   onChangePlayerColor?: (color: string | undefined) => void;
 }
 
@@ -396,6 +397,7 @@ export function EntityCard({
   counterValue = 0,
   onAdjustCounter,
   onViewPlayer,
+  onViewNPC,
   onChangePlayerColor,
 }: EntityCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -782,6 +784,15 @@ export function EntityCard({
                 onClick={onViewPlayer}
                 className="text-muted hover:text-accent-blue-text rounded p-1 transition-colors"
                 title="View character details"
+              >
+                <Eye size={14} />
+              </button>
+            )}
+            {entity.npcSourceId && onViewNPC && (
+              <button
+                onClick={onViewNPC}
+                className="text-muted hover:text-accent-amber-text rounded p-1 transition-colors"
+                title="View NPC details"
               >
                 <Eye size={14} />
               </button>

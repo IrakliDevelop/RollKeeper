@@ -22,11 +22,19 @@ import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { EncounterEntity, CampaignNPC } from '@/types/encounter';
 import { ProcessedMonster } from '@/types/bestiary';
+import type { Spell } from '@/types/character';
 import { useNPCStore } from '@/store/npcStore';
 import {
   monsterToEncounterEntity,
   buildAbilitiesFromStatBlock,
 } from '@/utils/encounterConverter';
+import {
+  getNPCSpellSlots,
+  calculateNPCSpellAttack,
+  calculateNPCSpellDC,
+  getNPCSpellcastingAbilityScore,
+  getProficiencyBonusFromCR,
+} from '@/utils/npcSpellcasting';
 
 interface AddEntityDialogProps {
   open: boolean;
@@ -55,6 +63,41 @@ const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
   { id: 'monster', label: 'Monster', icon: <ContactRound size={14} /> },
   { id: 'custom', label: 'Custom', icon: <Drama size={14} /> },
 ];
+
+function buildPerDayMap(spells: Spell[]): Record<string, string[]> {
+  const map: Record<string, string[]> = {};
+  for (const spell of spells) {
+    if (spell.freeCastMax && spell.freeCastMax > 0) {
+      const key = String(spell.freeCastMax);
+      if (!map[key]) map[key] = [];
+      map[key].push(spell.name);
+    }
+  }
+  return map;
+}
+
+function buildSlotMap(
+  slots: Record<number, number>,
+  slotsUsed: Record<number, number>
+): Record<string, { max: number; used: number }> {
+  const map: Record<string, { max: number; used: number }> = {};
+  for (const [level, max] of Object.entries(slots)) {
+    if (max > 0) {
+      map[String(level)] = { max, used: slotsUsed[Number(level)] ?? 0 };
+    }
+  }
+  return map;
+}
+
+function buildUsedSpellsMap(spells: Spell[]): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (const spell of spells) {
+    if (spell.freeCastMax && spell.freeCastMax > 0 && spell.freeCastsUsed) {
+      map[spell.name] = spell.freeCastsUsed;
+    }
+  }
+  return map;
+}
 
 // Monster group colors for distinguishing multiples of the same type
 const GROUP_COLORS = [
@@ -203,7 +246,7 @@ export function AddEntityDialog({
             : npc.abilityScores
               ? Math.floor((npc.abilityScores.dex - 10) / 2)
               : 0,
-      currentHp: npc.maxHp,
+      currentHp: npc.currentHp ?? npc.maxHp,
       maxHp: npc.maxHp,
       tempHp: 0,
       armorClass: npc.armorClass,
@@ -212,6 +255,49 @@ export function AddEntityDialog({
       monsterStatBlock: npc.monsterStatBlock,
       abilities,
       hitDice: npc.hitDice ? { ...npc.hitDice } : undefined,
+      npcSourceId: npc.id,
+      campaignCode: campaignCode,
+      spellcasting: npc.spellcasting
+        ? (() => {
+            const abilityScores = npc.monsterStatBlock ?? npc.abilityScores;
+            const abilityScore = abilityScores
+              ? getNPCSpellcastingAbilityScore(
+                  npc.spellcasting!.ability,
+                  abilityScores as Parameters<
+                    typeof getNPCSpellcastingAbilityScore
+                  >[1]
+                )
+              : 10;
+            const profBonus = npc.monsterStatBlock
+              ? getProficiencyBonusFromCR(npc.monsterStatBlock.cr)
+              : (npc.proficiencyBonus ?? 2);
+
+            const slots = getNPCSpellSlots(
+              npc.spellcasting!.casterLevel,
+              npc.spellcasting!.slotOverrides
+            );
+
+            return {
+              ability: npc.spellcasting!.ability,
+              dc: calculateNPCSpellDC(
+                npc.spellcasting!,
+                abilityScore,
+                profBonus
+              ),
+              toHit: calculateNPCSpellAttack(
+                npc.spellcasting!,
+                abilityScore,
+                profBonus
+              ),
+              atWill: npc
+                .spellcasting!.spells.filter(s => s.freeCastMax === 0)
+                .map(s => s.name),
+              perDay: buildPerDayMap(npc.spellcasting!.spells),
+              slots: buildSlotMap(slots, npc.spellcasting!.slotsUsed),
+              usedSpells: buildUsedSpellsMap(npc.spellcasting!.spells),
+            };
+          })()
+        : undefined,
     });
   };
 

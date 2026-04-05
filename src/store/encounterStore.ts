@@ -5,6 +5,7 @@ import {
   EncounterEntity,
   EncounterCondition,
 } from '@/types/encounter';
+import { useNPCStore } from './npcStore';
 
 const ENCOUNTER_STORAGE_KEY = 'rollkeeper-encounter-data';
 
@@ -14,6 +15,28 @@ function generateId(): string {
 
 function rollD20(): number {
   return Math.floor(Math.random() * 20) + 1;
+}
+
+// Sync NPC entity HP/deathSaves back to persistent npcStore
+function syncNPCEntityToStore(
+  encounters: Encounter[],
+  encounterId: string,
+  entityId: string
+) {
+  const enc = encounters.find(e => e.id === encounterId);
+  const entity = enc?.entities.find(e => e.id === entityId);
+  if (entity?.type === 'npc' && entity.npcSourceId && entity.campaignCode) {
+    useNPCStore.getState().updateNPC(entity.campaignCode, entity.npcSourceId, {
+      currentHp: entity.currentHp,
+      tempHp: entity.tempHp,
+      deathSaves: entity.deathSaves
+        ? {
+            successes: entity.deathSaves.successes,
+            failures: entity.deathSaves.failures,
+          }
+        : undefined,
+    });
+  }
 }
 
 interface EncounterStoreState {
@@ -113,6 +136,9 @@ interface EncounterStoreState {
     actionId: string
   ) => void;
   resetLairActions: (encounterId: string, entityId: string) => void;
+
+  // Long rest
+  longRestEntity: (encounterId: string, entityId: string) => void;
 
   // Queries
   getEncountersByCampaign: (campaignCode: string) => Encounter[];
@@ -553,6 +579,7 @@ export const useEncounterStore = create<EncounterStoreState>()(
             }
           ),
         }));
+        syncNPCEntityToStore(get().encounters, encounterId, entityId);
       },
 
       healEntity: (encounterId, entityId, amount) => {
@@ -572,6 +599,7 @@ export const useEncounterStore = create<EncounterStoreState>()(
             }
           ),
         }));
+        syncNPCEntityToStore(get().encounters, encounterId, entityId);
       },
 
       setEntityHp: (encounterId, entityId, current, max) => {
@@ -587,6 +615,7 @@ export const useEncounterStore = create<EncounterStoreState>()(
             })
           ),
         }));
+        syncNPCEntityToStore(get().encounters, encounterId, entityId);
       },
 
       addTempHp: (encounterId, entityId, amount) => {
@@ -783,6 +812,69 @@ export const useEncounterStore = create<EncounterStoreState>()(
             })
           ),
         }));
+      },
+
+      // Long rest
+
+      longRestEntity: (encounterId, entityId) => {
+        set(state => ({
+          encounters: updateEntityInEncounter(
+            state.encounters,
+            encounterId,
+            entityId,
+            e => ({
+              ...e,
+              currentHp: e.maxHp,
+              tempHp: 0,
+              deathSaves: undefined,
+              hasUsedReaction: false,
+              concentrationSpell: undefined,
+              ...(e.spellcasting
+                ? {
+                    spellcasting: {
+                      ...e.spellcasting,
+                      slots: e.spellcasting.slots
+                        ? Object.fromEntries(
+                            Object.entries(e.spellcasting.slots).map(
+                              ([level, slot]) => [level, { ...slot, used: 0 }]
+                            )
+                          )
+                        : undefined,
+                      usedSpells: {},
+                    },
+                  }
+                : {}),
+              ...(e.hitDice
+                ? { hitDice: { ...e.hitDice, current: e.hitDice.max } }
+                : {}),
+              ...(e.abilities
+                ? {
+                    abilities: e.abilities.map(a => ({ ...a, usedUses: 0 })),
+                  }
+                : {}),
+              ...(e.legendaryActions
+                ? {
+                    legendaryActions: {
+                      ...e.legendaryActions,
+                      usedActions: 0,
+                    },
+                  }
+                : {}),
+            })
+          ),
+        }));
+        // Sync long rest back to persistent NPC store
+        const enc = get().encounters.find(e => e.id === encounterId);
+        const entity = enc?.entities.find(e => e.id === entityId);
+        if (
+          entity?.type === 'npc' &&
+          entity.npcSourceId &&
+          entity.campaignCode
+        ) {
+          useNPCStore
+            .getState()
+            .longRestNPC(entity.campaignCode, entity.npcSourceId);
+        }
       },
 
       // Queries

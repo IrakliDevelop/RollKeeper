@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Edit3,
   Trash2,
@@ -17,6 +17,7 @@ import {
   Coins,
   Pencil,
   Send,
+  Wand2,
 } from 'lucide-react';
 import {
   Dialog,
@@ -43,17 +44,20 @@ import {
   npcInventoryItemToFormData,
   formDataToNpcInventoryPatch,
 } from '@/utils/npcInventoryItemForm';
+import { NPCSpellTab } from './NPCSpellTab';
 
-type DetailTab = 'stats' | 'inventory' | 'lore';
+type DetailTab = 'stats' | 'spells' | 'inventory' | 'lore';
 
 interface NPCDetailDialogProps {
   npc: CampaignNPC | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onEdit: (npc: CampaignNPC) => void;
-  onDelete: (npc: CampaignNPC) => void;
+  onEdit?: (npc: CampaignNPC) => void;
+  onDelete?: (npc: CampaignNPC) => void;
   onUpdateInventory?: (npcId: string, inventory: NPCInventoryItem[]) => void;
   onSendItemToPlayer?: (item: NPCInventoryItem, npcName: string) => void;
+  initialTab?: DetailTab;
+  readOnly?: boolean;
 }
 
 const ABILITY_LABELS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const;
@@ -456,6 +460,8 @@ export function NPCDetailDialog({
   onDelete,
   onUpdateInventory,
   onSendItemToPlayer,
+  initialTab,
+  readOnly,
 }: NPCDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('stats');
   const [showFullImage, setShowFullImage] = useState(false);
@@ -463,6 +469,7 @@ export function NPCDetailDialog({
   const [inventoryFormEditingItem, setInventoryFormEditingItem] =
     useState<NPCInventoryItem | null>(null);
   const [viewingItem, setViewingItem] = useState<NPCInventoryItem | null>(null);
+  const addSpellRef = useRef<(() => void) | null>(null);
 
   const { items: dbItems, loading: dbItemsLoading } = useItemsData();
   const { items: dbMagicItems } = useMagicItemsData();
@@ -475,6 +482,12 @@ export function NPCDetailDialog({
       setViewingItem(null);
     }
   }, [open]);
+
+  React.useEffect(() => {
+    if (open && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [open, initialTab]);
 
   const handleInventoryFormSubmit = (data: InventoryFormData) => {
     if (!npc || !onUpdateInventory) return;
@@ -531,6 +544,15 @@ export function NPCDetailDialog({
         icon: <ScrollText className="h-3.5 w-3.5" />,
         label: 'Stat Block',
       },
+      ...(npc.spellcasting
+        ? [
+            {
+              key: 'spells' as DetailTab,
+              icon: <Wand2 className="h-3.5 w-3.5" />,
+              label: 'Spells',
+            },
+          ]
+        : []),
       {
         key: 'inventory',
         icon: <Package className="h-3.5 w-3.5" />,
@@ -545,7 +567,7 @@ export function NPCDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="h-[85vh] sm:max-w-4xl">
         <DialogHeader>
           <div className="flex items-start gap-4 pr-16">
             {npc.avatarUrl && (
@@ -588,27 +610,29 @@ export function NPCDetailDialog({
                 <p className="text-faint mt-0.5 text-xs italic">{typeInfo}</p>
               )}
             </div>
-            <div className="flex shrink-0 gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  onEdit(npc);
-                  onOpenChange(false);
-                }}
-                aria-label="Edit NPC"
-              >
-                <Edit3 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onDelete(npc)}
-                aria-label="Delete NPC"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
+            {!readOnly && onEdit && onDelete && (
+              <div className="flex shrink-0 gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    onEdit(npc);
+                    onOpenChange(false);
+                  }}
+                  aria-label="Edit NPC"
+                >
+                  <Edit3 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onDelete(npc)}
+                  aria-label="Delete NPC"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
         </DialogHeader>
 
@@ -631,7 +655,7 @@ export function NPCDetailDialog({
           ))}
         </div>
 
-        <DialogBody>
+        <DialogBody className="min-h-0 overflow-y-auto">
           {activeTab === 'stats' && (
             <div className="space-y-4">
               {statBlock ? (
@@ -680,112 +704,132 @@ export function NPCDetailDialog({
             </div>
           )}
 
-          {activeTab === 'inventory' && (
-            <div>
-              {npc.inventory && npc.inventory.length > 0 ? (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {npc.inventory.map(item => (
-                    <InventoryItemCard
-                      key={item.id}
-                      item={item}
-                      onClick={() => setViewingItem(item)}
-                      onEdit={
-                        onUpdateInventory
-                          ? () => {
-                              setInventoryFormEditingItem(item);
-                              setInventoryFormOpen(true);
-                            }
-                          : undefined
-                      }
-                      onRemove={
-                        onUpdateInventory
-                          ? () => handleRemoveItem(item.id)
-                          : undefined
-                      }
-                      onQuantityChange={
-                        onUpdateInventory
-                          ? qty => handleQuantityChange(item.id, qty)
-                          : undefined
-                      }
-                      onSend={
-                        onSendItemToPlayer
-                          ? () => onSendItemToPlayer(item, npc.name)
-                          : undefined
-                      }
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Package className="text-faint mb-3 h-10 w-10" />
+          {activeTab === 'spells' && npc.spellcasting && (
+            <NPCSpellTab
+              npc={npc}
+              campaignCode={npc.campaignCode}
+              addSpellRef={addSpellRef}
+            />
+          )}
+
+          {activeTab === 'inventory' &&
+            (npc.inventory && npc.inventory.length > 0 ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {npc.inventory.map(item => (
+                  <InventoryItemCard
+                    key={item.id}
+                    item={item}
+                    onClick={() => setViewingItem(item)}
+                    onEdit={
+                      onUpdateInventory
+                        ? () => {
+                            setInventoryFormEditingItem(item);
+                            setInventoryFormOpen(true);
+                          }
+                        : undefined
+                    }
+                    onRemove={
+                      onUpdateInventory
+                        ? () => handleRemoveItem(item.id)
+                        : undefined
+                    }
+                    onQuantityChange={
+                      onUpdateInventory
+                        ? qty => handleQuantityChange(item.id, qty)
+                        : undefined
+                    }
+                    onSend={
+                      onSendItemToPlayer
+                        ? () => onSendItemToPlayer(item, npc.name)
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-center">
+                <div>
+                  <Package className="text-faint mx-auto mb-3 h-10 w-10" />
                   <p className="text-muted text-sm">No inventory items</p>
                 </div>
-              )}
-              {onUpdateInventory && (
-                <div className="mt-3">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      setInventoryFormEditingItem(null);
-                      setInventoryFormOpen(true);
-                    }}
-                  >
-                    <Plus className="mr-1.5 h-4 w-4" />
-                    Add Item
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
+              </div>
+            ))}
 
-          {activeTab === 'lore' && (
-            <div>
-              {npc.loreHtml ? (
-                <div
-                  className="prose prose-sm text-body max-w-none"
-                  dangerouslySetInnerHTML={{ __html: npc.loreHtml }}
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <BookOpen className="text-faint mb-3 h-10 w-10" />
+          {activeTab === 'lore' &&
+            (npc.loreHtml ? (
+              <div
+                className="prose prose-sm text-body max-w-none"
+                dangerouslySetInnerHTML={{ __html: npc.loreHtml }}
+              />
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-center">
+                <div>
+                  <BookOpen className="text-faint mx-auto mb-3 h-10 w-10" />
                   <p className="text-muted text-sm">No lore written yet</p>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => {
-                      onEdit(npc);
-                      onOpenChange(false);
-                    }}
-                  >
-                    Edit to add lore
-                  </Button>
+                  {onEdit && !readOnly && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => {
+                        onEdit(npc);
+                        onOpenChange(false);
+                      }}
+                    >
+                      Edit to add lore
+                    </Button>
+                  )}
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            ))}
         </DialogBody>
 
-        <DialogFooter className="!flex-row !justify-between">
-          <div className="flex gap-2">
-            {statBlock && <NPCStatBlockExport npc={npc} />}
-          </div>
-          <div className="flex gap-2">
+        <DialogFooter className="!flex-col !items-start gap-2">
+          {activeTab === 'inventory' && onUpdateInventory && (
             <Button
               variant="secondary"
+              size="sm"
               onClick={() => {
-                onEdit(npc);
-                onOpenChange(false);
+                setInventoryFormEditingItem(null);
+                setInventoryFormOpen(true);
               }}
             >
-              <Edit3 className="mr-1.5 h-4 w-4" />
-              Edit
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add Item
             </Button>
-            <Button variant="danger" onClick={() => onDelete(npc)}>
-              <Trash2 className="mr-1.5 h-4 w-4" />
-              Delete
+          )}
+          {activeTab === 'spells' && npc.spellcasting && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => addSpellRef.current?.()}
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add Spell
             </Button>
+          )}
+          <div className="flex w-full justify-between">
+            <div className="flex gap-2">
+              {statBlock && <NPCStatBlockExport npc={npc} />}
+            </div>
+            {!readOnly && onEdit && onDelete && (
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    onEdit(npc);
+                    onOpenChange(false);
+                  }}
+                >
+                  <Edit3 className="mr-1.5 h-4 w-4" />
+                  Edit
+                </Button>
+                <Button variant="danger" onClick={() => onDelete(npc)}>
+                  <Trash2 className="mr-1.5 h-4 w-4" />
+                  Delete
+                </Button>
+              </div>
+            )}
           </div>
         </DialogFooter>
       </DialogContent>
