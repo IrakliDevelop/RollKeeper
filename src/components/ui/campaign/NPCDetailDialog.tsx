@@ -17,6 +17,7 @@ import {
   Coins,
   Pencil,
   Send,
+  Wand2,
 } from 'lucide-react';
 import {
   Dialog,
@@ -43,17 +44,20 @@ import {
   npcInventoryItemToFormData,
   formDataToNpcInventoryPatch,
 } from '@/utils/npcInventoryItemForm';
+import { NPCSpellTab } from './NPCSpellTab';
 
-type DetailTab = 'stats' | 'inventory' | 'lore';
+type DetailTab = 'stats' | 'spells' | 'inventory' | 'lore';
 
 interface NPCDetailDialogProps {
   npc: CampaignNPC | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onEdit: (npc: CampaignNPC) => void;
-  onDelete: (npc: CampaignNPC) => void;
+  onEdit?: (npc: CampaignNPC) => void;
+  onDelete?: (npc: CampaignNPC) => void;
   onUpdateInventory?: (npcId: string, inventory: NPCInventoryItem[]) => void;
   onSendItemToPlayer?: (item: NPCInventoryItem, npcName: string) => void;
+  initialTab?: DetailTab;
+  readOnly?: boolean;
 }
 
 const ABILITY_LABELS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const;
@@ -456,6 +460,8 @@ export function NPCDetailDialog({
   onDelete,
   onUpdateInventory,
   onSendItemToPlayer,
+  initialTab,
+  readOnly,
 }: NPCDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('stats');
   const [showFullImage, setShowFullImage] = useState(false);
@@ -475,6 +481,12 @@ export function NPCDetailDialog({
       setViewingItem(null);
     }
   }, [open]);
+
+  React.useEffect(() => {
+    if (open && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [open, initialTab]);
 
   const handleInventoryFormSubmit = (data: InventoryFormData) => {
     if (!npc || !onUpdateInventory) return;
@@ -531,6 +543,15 @@ export function NPCDetailDialog({
         icon: <ScrollText className="h-3.5 w-3.5" />,
         label: 'Stat Block',
       },
+      ...(npc.spellcasting
+        ? [
+            {
+              key: 'spells' as DetailTab,
+              icon: <Wand2 className="h-3.5 w-3.5" />,
+              label: 'Spells',
+            },
+          ]
+        : []),
       {
         key: 'inventory',
         icon: <Package className="h-3.5 w-3.5" />,
@@ -588,27 +609,29 @@ export function NPCDetailDialog({
                 <p className="text-faint mt-0.5 text-xs italic">{typeInfo}</p>
               )}
             </div>
-            <div className="flex shrink-0 gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  onEdit(npc);
-                  onOpenChange(false);
-                }}
-                aria-label="Edit NPC"
-              >
-                <Edit3 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onDelete(npc)}
-                aria-label="Delete NPC"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
+            {!readOnly && onEdit && onDelete && (
+              <div className="flex shrink-0 gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    onEdit(npc);
+                    onOpenChange(false);
+                  }}
+                  aria-label="Edit NPC"
+                >
+                  <Edit3 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onDelete(npc)}
+                  aria-label="Delete NPC"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
         </DialogHeader>
 
@@ -678,6 +701,10 @@ export function NPCDetailDialog({
                 </>
               )}
             </div>
+          )}
+
+          {activeTab === 'spells' && npc.spellcasting && (
+            <NPCSpellTab npc={npc} campaignCode={npc.campaignCode} />
           )}
 
           {activeTab === 'inventory' && (
@@ -750,17 +777,19 @@ export function NPCDetailDialog({
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <BookOpen className="text-faint mb-3 h-10 w-10" />
                   <p className="text-muted text-sm">No lore written yet</p>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => {
-                      onEdit(npc);
-                      onOpenChange(false);
-                    }}
-                  >
-                    Edit to add lore
-                  </Button>
+                  {onEdit && !readOnly && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => {
+                        onEdit(npc);
+                        onOpenChange(false);
+                      }}
+                    >
+                      Edit to add lore
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -771,22 +800,24 @@ export function NPCDetailDialog({
           <div className="flex gap-2">
             {statBlock && <NPCStatBlockExport npc={npc} />}
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                onEdit(npc);
-                onOpenChange(false);
-              }}
-            >
-              <Edit3 className="mr-1.5 h-4 w-4" />
-              Edit
-            </Button>
-            <Button variant="danger" onClick={() => onDelete(npc)}>
-              <Trash2 className="mr-1.5 h-4 w-4" />
-              Delete
-            </Button>
-          </div>
+          {!readOnly && onEdit && onDelete && (
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  onEdit(npc);
+                  onOpenChange(false);
+                }}
+              >
+                <Edit3 className="mr-1.5 h-4 w-4" />
+                Edit
+              </Button>
+              <Button variant="danger" onClick={() => onDelete(npc)}>
+                <Trash2 className="mr-1.5 h-4 w-4" />
+                Delete
+              </Button>
+            </div>
+          )}
         </DialogFooter>
       </DialogContent>
 
