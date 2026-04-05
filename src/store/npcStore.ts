@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { CampaignNPC } from '@/types/encounter';
+import { Spell } from '@/types/character';
+import {
+  getNPCSpellSlots,
+  resetNPCSpellcasting,
+} from '@/utils/npcSpellcasting';
 
 const NPC_STORAGE_KEY = 'rollkeeper-npc-data';
 
@@ -44,6 +49,19 @@ interface NPCStoreState {
     id: string,
     deathSaves: { successes: number; failures: number }
   ) => void;
+  addSpellToNPC: (campaignCode: string, npcId: string, spell: Spell) => void;
+  removeSpellFromNPC: (
+    campaignCode: string,
+    npcId: string,
+    spellId: string
+  ) => void;
+  setNPCSpellSlotUsed: (
+    campaignCode: string,
+    npcId: string,
+    level: number,
+    used: number
+  ) => void;
+  longRestNPC: (campaignCode: string, npcId: string) => void;
 }
 
 export const useNPCStore = create<NPCStoreState>()(
@@ -158,6 +176,117 @@ export const useNPCStore = create<NPCStoreState>()(
                   ? { ...npc, deathSaves, updatedAt: new Date().toISOString() }
                   : npc
               ),
+            },
+          };
+        });
+      },
+
+      addSpellToNPC: (campaignCode, npcId, spell) => {
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(npc => {
+                if (npc.id !== npcId || !npc.spellcasting) return npc;
+                return {
+                  ...npc,
+                  spellcasting: {
+                    ...npc.spellcasting,
+                    spells: [...npc.spellcasting.spells, spell],
+                  },
+                  updatedAt: new Date().toISOString(),
+                };
+              }),
+            },
+          };
+        });
+      },
+
+      removeSpellFromNPC: (campaignCode, npcId, spellId) => {
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(npc => {
+                if (npc.id !== npcId || !npc.spellcasting) return npc;
+                return {
+                  ...npc,
+                  spellcasting: {
+                    ...npc.spellcasting,
+                    spells: npc.spellcasting.spells.filter(
+                      s => s.id !== spellId
+                    ),
+                  },
+                  updatedAt: new Date().toISOString(),
+                };
+              }),
+            },
+          };
+        });
+      },
+
+      setNPCSpellSlotUsed: (campaignCode, npcId, level, used) => {
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(npc => {
+                if (npc.id !== npcId || !npc.spellcasting) return npc;
+                const maxSlots = getNPCSpellSlots(
+                  npc.spellcasting.casterLevel,
+                  npc.spellcasting.slotOverrides
+                );
+                const max = maxSlots[level] ?? 0;
+                const clamped = Math.max(0, Math.min(used, max));
+                return {
+                  ...npc,
+                  spellcasting: {
+                    ...npc.spellcasting,
+                    slotsUsed: {
+                      ...npc.spellcasting.slotsUsed,
+                      [level]: clamped,
+                    },
+                  },
+                  updatedAt: new Date().toISOString(),
+                };
+              }),
+            },
+          };
+        });
+      },
+
+      longRestNPC: (campaignCode, npcId) => {
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(npc => {
+                if (npc.id !== npcId) return npc;
+                return {
+                  ...npc,
+                  currentHp: npc.maxHp,
+                  tempHp: 0,
+                  deathSaves: undefined,
+                  ...(npc.hitDice
+                    ? {
+                        hitDice: {
+                          ...npc.hitDice,
+                          current: npc.hitDice.max,
+                        },
+                      }
+                    : {}),
+                  ...(npc.spellcasting
+                    ? {
+                        spellcasting: resetNPCSpellcasting(npc.spellcasting),
+                      }
+                    : {}),
+                  updatedAt: new Date().toISOString(),
+                };
+              }),
             },
           };
         });
