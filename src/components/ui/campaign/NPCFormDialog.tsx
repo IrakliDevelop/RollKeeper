@@ -895,7 +895,7 @@ export function NPCFormDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader className="flex flex-col gap-3 space-y-0 pr-10 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <DialogTitle className="shrink-0">
               {editingNpc ? 'Edit NPC' : 'Create NPC'}

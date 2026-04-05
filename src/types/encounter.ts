@@ -243,6 +243,9 @@ export interface CampaignNPC {
   // Spellcasting
   spellcasting?: NPCSpellcasting;
 
+  // UI state: which spell tab sections are collapsed
+  collapsedSpellSections?: string[]; // e.g. ['stats', 'slots', 'spells']
+
   // Passive abilities
   passivePerception?: number;
   passiveInsight?: number;

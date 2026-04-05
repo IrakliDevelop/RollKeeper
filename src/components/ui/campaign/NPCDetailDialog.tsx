@@ -566,7 +566,7 @@ export function NPCDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <div className="flex items-start gap-4 pr-16">
             {npc.avatarUrl && (
