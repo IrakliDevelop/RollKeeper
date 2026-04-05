@@ -521,7 +521,7 @@ export function useDmLocationEditor(
 
       // Try image export first, fall back to JSON if it fails (e.g. CORS)
       let snapshotUrl: string | undefined;
-      let filteredState = '';
+      const filteredState = '';
 
       let blob: Blob | null = null;
       try {
@@ -538,8 +538,8 @@ export function useDmLocationEditor(
           filter: (el: { id: string }) => !currentDmOnly[el.id],
         });
 
-        // Convert PNG → JPEG for battle map sync (display-only, much smaller)
-        if (pngBlob && mode === 'battlemap') {
+        // Convert PNG → JPEG for sync (display-only, much smaller)
+        if (pngBlob) {
           blob = await new Promise<Blob | null>(resolve => {
             const img = new window.Image();
             img.onload = () => {
@@ -561,8 +561,6 @@ export function useDmLocationEditor(
             img.onerror = () => resolve(pngBlob);
             img.src = URL.createObjectURL(pngBlob);
           });
-        } else {
-          blob = pngBlob;
         }
       } catch (error) {
         console.warn('Failed to export image:', error);
@@ -570,39 +568,35 @@ export function useDmLocationEditor(
         // without CORS). Fall through to JSON fallback.
       }
 
-      const ext = mode === 'battlemap' ? 'jpg' : 'png';
       if (blob) {
-        // Upload snapshot to S3
+        // Try S3 upload first
         const assetId = `location-${location.id}-${Date.now()}`;
         const formData = new FormData();
-        formData.append('file', blob, `${assetId}.${ext}`);
+        formData.append('file', blob, `${assetId}.jpg`);
         formData.append('assetId', assetId);
 
-        const uploadRes = await fetch('/api/assets/upload', {
-          method: 'POST',
-          body: formData,
-        });
+        try {
+          const uploadRes = await fetch('/api/assets/upload', {
+            method: 'POST',
+            body: formData,
+          });
 
-        if (uploadRes.ok) {
-          const data = (await uploadRes.json()) as { url: string };
-          snapshotUrl = data.url;
+          if (uploadRes.ok) {
+            const data = (await uploadRes.json()) as { url: string };
+            snapshotUrl = data.url;
+          }
+        } catch {
+          // S3 not configured or network error — fall through to base64
         }
-      }
 
-      // Fall back to JSON canvas state if image export didn't work
-      if (!snapshotUrl) {
-        const json = vp.exportJSON();
-        const parsed = JSON.parse(json) as {
-          elements: Array<{ id: string }>;
-          [key: string]: unknown;
-        };
-        const filteredElements = parsed.elements.filter(
-          (el: { id: string }) => !currentDmOnly[el.id]
-        );
-        filteredState = JSON.stringify({
-          ...parsed,
-          elements: filteredElements,
-        });
+        // Fall back to base64 data URL if S3 upload didn't work
+        if (!snapshotUrl) {
+          snapshotUrl = await new Promise<string>(resolve => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob!);
+          });
+        }
       }
 
       const syncData = {

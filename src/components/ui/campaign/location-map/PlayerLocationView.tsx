@@ -1,15 +1,8 @@
 'use client';
 
-import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, Map as MapIcon, Loader2, X, Maximize2 } from 'lucide-react';
-import {
-  FieldNotesCanvas as Canvas,
-  useCamera,
-  ViewportContext,
-} from '@fieldnotes/react';
-import { HandTool, type Viewport } from '@fieldnotes/core';
-import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
 import { useLocationSync } from '@/hooks/useLocationSync';
 import type { LocationMetadata, SyncedLocation } from '@/types/location';
@@ -234,15 +227,6 @@ function MapLightbox({ src, onClose }: { src: string; onClose: () => void }) {
   );
 }
 
-function PlayerCanvasZoomBadge() {
-  const { zoom } = useCamera();
-  return (
-    <div className="border-divider bg-surface-raised text-muted pointer-events-none absolute top-2 right-2 z-10 rounded-md border px-2 py-1 text-xs tabular-nums shadow-sm">
-      {Math.round(zoom * 100)}%
-    </div>
-  );
-}
-
 /* ─── Main component ────────────────────────────────────────── */
 
 export default function PlayerLocationView({
@@ -253,32 +237,30 @@ export default function PlayerLocationView({
 
   const [selectedLocation, setSelectedLocation] =
     useState<LocationMetadata | null>(null);
-  const [canvasState, setCanvasState] = useState<SyncedLocation | null>(null);
-  const [canvasLoading, setCanvasLoading] = useState(false);
-  const [canvasError, setCanvasError] = useState(false);
+  const [locationState, setLocationState] = useState<SyncedLocation | null>(
+    null
+  );
+  const [stateLoading, setStateLoading] = useState(false);
+  const [stateError, setStateError] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-
-  const canvasRef = useRef<FieldNotesCanvasRef>(null);
-  const tools = useMemo(() => [new HandTool()], []);
-  const [playerViewport, setPlayerViewport] = useState<Viewport | null>(null);
 
   const handleSelectLocation = useCallback(
     async (location: LocationMetadata) => {
       setSelectedLocation(location);
-      setCanvasState(null);
-      setCanvasError(false);
-      setCanvasLoading(true);
+      setLocationState(null);
+      setStateError(false);
+      setStateLoading(true);
       try {
         const state = await fetchLocationState(location.id);
         if (!state) {
-          setCanvasError(true);
+          setStateError(true);
         } else {
-          setCanvasState(state);
+          setLocationState(state);
         }
       } catch {
-        setCanvasError(true);
+        setStateError(true);
       } finally {
-        setCanvasLoading(false);
+        setStateLoading(false);
       }
     },
     [fetchLocationState]
@@ -297,43 +279,15 @@ export default function PlayerLocationView({
     prevLocationsLengthRef.current = locations.length;
   }
 
-  const handleReady = useCallback(
-    (vp: Viewport) => {
-      setPlayerViewport(vp);
-      if (!canvasState?.canvasState) return;
-      const img = new window.Image();
-      img.onload = () => {
-        try {
-          vp.loadJSON(canvasState.canvasState);
-          vp.requestRender();
-        } catch {
-          // State may be malformed
-        }
-      };
-      img.onerror = () => {
-        try {
-          vp.loadJSON(canvasState.canvasState);
-          vp.requestRender();
-        } catch {
-          // ignore
-        }
-      };
-      img.src = canvasState.mapImageUrl;
-    },
-    [canvasState]
-  );
-
   const handleBack = useCallback(() => {
     setSelectedLocation(null);
-    setCanvasState(null);
-    setCanvasError(false);
-    setPlayerViewport(null);
+    setLocationState(null);
+    setStateError(false);
   }, []);
 
-  const hasSnapshot = !!canvasState?.snapshotUrl;
-  const hasCanvas = !!(
-    canvasState?.canvasState && canvasState.canvasState.length > 0
-  );
+  // Prefer snapshot, fall back to raw map image
+  const displayImageUrl =
+    locationState?.snapshotUrl || locationState?.mapImageUrl;
 
   // Empty state
   if (!campaignCode || (!loading && locations.length === 0)) {
@@ -379,79 +333,56 @@ export default function PlayerLocationView({
 
         {/* Map area */}
         <div className="relative">
-          {canvasLoading && (
+          {stateLoading && (
             <div className="flex items-center justify-center py-24">
               <Loader2 size={24} className="text-muted animate-spin" />
             </div>
           )}
 
-          {canvasError && (
+          {stateError && (
             <div className="flex items-center justify-center py-24">
               <p className="text-muted text-sm">No map available</p>
             </div>
           )}
 
-          {!canvasLoading && !canvasError && canvasState && (
+          {!stateLoading && !stateError && displayImageUrl ? (
             <>
-              {hasSnapshot ? (
-                <>
-                  {/* Fitted preview image */}
-                  <div
-                    className="group relative cursor-pointer"
-                    onClick={() => setLightboxOpen(true)}
-                  >
-                    <img
-                      src={canvasState.snapshotUrl}
-                      alt={selectedLocation.name}
-                      className="w-full rounded-b-lg object-contain"
-                      style={{ maxHeight: '60vh' }}
-                    />
-                    {/* Expand overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center rounded-b-lg bg-black/0 transition-colors group-hover:bg-black/20">
-                      <div className="flex items-center gap-1.5 rounded-md bg-black/60 px-3 py-1.5 text-xs text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
-                        <Maximize2 size={13} />
-                        Click to expand
-                      </div>
-                    </div>
+              {/* Fitted preview image */}
+              <div
+                className="group relative cursor-pointer"
+                onClick={() => setLightboxOpen(true)}
+              >
+                <img
+                  src={displayImageUrl}
+                  alt={selectedLocation.name}
+                  className="w-full rounded-b-lg object-contain"
+                  style={{ maxHeight: '60vh' }}
+                />
+                {/* Expand overlay */}
+                <div className="absolute inset-0 flex items-center justify-center rounded-b-lg bg-black/0 transition-colors group-hover:bg-black/20">
+                  <div className="flex items-center gap-1.5 rounded-md bg-black/60 px-3 py-1.5 text-xs text-white opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
+                    <Maximize2 size={13} />
+                    Click to expand
                   </div>
+                </div>
+              </div>
 
-                  {/* Fullscreen lightbox */}
-                  {lightboxOpen && (
-                    <MapLightbox
-                      src={canvasState.snapshotUrl!}
-                      onClose={() => setLightboxOpen(false)}
-                    />
-                  )}
-                </>
-              ) : hasCanvas ? (
-                <div className="relative" style={{ height: '60vh' }}>
-                  <ViewportContext.Provider value={playerViewport}>
-                    {playerViewport && <PlayerCanvasZoomBadge />}
-                    <Canvas
-                      ref={canvasRef}
-                      tools={tools}
-                      defaultTool="hand"
-                      options={{
-                        background: {
-                          pattern: 'dots',
-                          color: '#cbd5e1',
-                          spacing: 24,
-                          dotRadius: 1,
-                        },
-                        camera: { minZoom: 0.1, maxZoom: 5 },
-                      }}
-                      onReady={handleReady}
-                      className="h-full w-full"
-                      style={{ minHeight: 0 }}
-                    />
-                  </ViewportContext.Provider>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center py-24">
-                  <p className="text-muted text-sm">No map available</p>
-                </div>
+              {/* Fullscreen lightbox */}
+              {lightboxOpen && (
+                <MapLightbox
+                  src={displayImageUrl}
+                  onClose={() => setLightboxOpen(false)}
+                />
               )}
             </>
+          ) : (
+            !stateLoading &&
+            !stateError &&
+            locationState && (
+              <div className="flex items-center justify-center py-24">
+                <p className="text-muted text-sm">No map available</p>
+              </div>
+            )
           )}
         </div>
       </div>
