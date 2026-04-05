@@ -899,7 +899,7 @@ export function NPCFormDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="h-[85vh] sm:max-w-3xl">
           <DialogHeader className="flex flex-col gap-3 space-y-0 pr-10 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <DialogTitle className="shrink-0">
               {editingNpc ? 'Edit NPC' : 'Create NPC'}
@@ -946,8 +946,8 @@ export function NPCFormDialog({
               </button>
             ))}
           </div>
-          <DialogBody className="max-h-[70vh] min-h-[60vh] overflow-y-auto">
-            <div className="flex min-h-full flex-col space-y-5">
+          <DialogBody className="min-h-0 overflow-y-auto">
+            <div className="space-y-5">
               {activeFormTab === 'basic' && (
                 <>
                   {/* ===== Bestiary Import (create only) ===== */}
