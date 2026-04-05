@@ -47,6 +47,7 @@ import type { FreeCastMode } from '@/utils/spellConversion';
 interface NPCSpellTabProps {
   npc: CampaignNPC;
   campaignCode: string;
+  addSpellRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 const ABILITY_LABEL_MAP: Record<string, string> = {
@@ -121,7 +122,11 @@ function SectionHeader({
   );
 }
 
-export function NPCSpellTab({ npc, campaignCode }: NPCSpellTabProps) {
+export function NPCSpellTab({
+  npc,
+  campaignCode,
+  addSpellRef,
+}: NPCSpellTabProps) {
   const sc = npc.spellcasting;
 
   const [collapsedLevels, setCollapsedLevels] = useState<Set<number>>(
@@ -129,6 +134,16 @@ export function NPCSpellTab({ npc, campaignCode }: NPCSpellTabProps) {
   );
   const [viewingSpell, setViewingSpell] = useState<Spell | null>(null);
   const [addSpellOpen, setAddSpellOpen] = useState(false);
+
+  // Expose add-spell trigger to parent via ref
+  React.useEffect(() => {
+    if (addSpellRef) {
+      addSpellRef.current = () => setAddSpellOpen(true);
+    }
+    return () => {
+      if (addSpellRef) addSpellRef.current = null;
+    };
+  }, [addSpellRef]);
 
   // Add spell form state
   const [freeCastMode, setFreeCastMode] = useState<FreeCastMode>('normal');
@@ -321,7 +336,7 @@ export function NPCSpellTab({ npc, campaignCode }: NPCSpellTabProps) {
   const totalSpells = sc.spells?.length ?? 0;
 
   return (
-    <div className="flex min-h-[55vh] flex-col space-y-3">
+    <div className="space-y-3">
       {/* Stats section */}
       <div>
         <SectionHeader
@@ -495,17 +510,6 @@ export function NPCSpellTab({ npc, campaignCode }: NPCSpellTabProps) {
             )}
           </div>
         )}
-
-        {/* Add Spell button — always visible, pushed to bottom */}
-        <Button
-          variant="secondary"
-          size="sm"
-          className="mt-auto"
-          onClick={() => setAddSpellOpen(true)}
-        >
-          <Plus className="mr-1.5 h-4 w-4" />
-          Add Spell
-        </Button>
       </div>
 
       {/* Spell Details modal */}

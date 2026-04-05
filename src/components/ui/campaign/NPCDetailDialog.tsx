@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Edit3,
   Trash2,
@@ -469,6 +469,7 @@ export function NPCDetailDialog({
   const [inventoryFormEditingItem, setInventoryFormEditingItem] =
     useState<NPCInventoryItem | null>(null);
   const [viewingItem, setViewingItem] = useState<NPCInventoryItem | null>(null);
+  const addSpellRef = useRef<(() => void) | null>(null);
 
   const { items: dbItems, loading: dbItemsLoading } = useItemsData();
   const { items: dbMagicItems } = useMagicItemsData();
@@ -704,11 +705,15 @@ export function NPCDetailDialog({
           )}
 
           {activeTab === 'spells' && npc.spellcasting && (
-            <NPCSpellTab npc={npc} campaignCode={npc.campaignCode} />
+            <NPCSpellTab
+              npc={npc}
+              campaignCode={npc.campaignCode}
+              addSpellRef={addSpellRef}
+            />
           )}
 
           {activeTab === 'inventory' && (
-            <div className="flex min-h-[55vh] flex-col">
+            <div>
               {npc.inventory && npc.inventory.length > 0 ? (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {npc.inventory.map(item => (
@@ -748,26 +753,11 @@ export function NPCDetailDialog({
                   <p className="text-muted text-sm">No inventory items</p>
                 </div>
               )}
-              {onUpdateInventory && (
-                <div className="mt-auto">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      setInventoryFormEditingItem(null);
-                      setInventoryFormOpen(true);
-                    }}
-                  >
-                    <Plus className="mr-1.5 h-4 w-4" />
-                    Add Item
-                  </Button>
-                </div>
-              )}
             </div>
           )}
 
           {activeTab === 'lore' && (
-            <div className="flex min-h-[55vh] flex-col">
+            <div>
               {npc.loreHtml ? (
                 <div
                   className="prose prose-sm text-body max-w-none"
@@ -799,6 +789,29 @@ export function NPCDetailDialog({
         <DialogFooter className="!flex-row !justify-between">
           <div className="flex gap-2">
             {statBlock && <NPCStatBlockExport npc={npc} />}
+            {activeTab === 'inventory' && onUpdateInventory && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setInventoryFormEditingItem(null);
+                  setInventoryFormOpen(true);
+                }}
+              >
+                <Plus className="mr-1.5 h-4 w-4" />
+                Add Item
+              </Button>
+            )}
+            {activeTab === 'spells' && npc.spellcasting && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => addSpellRef.current?.()}
+              >
+                <Plus className="mr-1.5 h-4 w-4" />
+                Add Spell
+              </Button>
+            )}
           </div>
           {!readOnly && onEdit && onDelete && (
             <div className="flex gap-2">
