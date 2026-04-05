@@ -31,6 +31,8 @@ interface DmStoreState {
       playersSectionOpen: boolean;
       npcSectionOpen: boolean;
       npcCollapsedGroupNames: string[];
+      npcInlineSpellSlots: boolean;
+      npcSeparateSpellSlotTracker: boolean;
     }>
   ) => void;
 }
