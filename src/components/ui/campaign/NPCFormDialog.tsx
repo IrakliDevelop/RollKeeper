@@ -26,11 +26,15 @@ import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { CompactRichTextEditor } from '@/components/ui/forms/CompactRichTextEditor';
 import { Badge } from '@/components/ui/layout/badge';
+import { Switch } from '@/components/ui/forms/switch';
 import {
   CampaignNPC,
   MonsterStatBlock,
   NPCInventoryItem,
+  NPCSpellcastingAbility,
 } from '@/types/encounter';
+import { FULL_CASTER_SPELL_SLOTS } from '@/utils/constants';
+import { getNPCSpellcastingAbilityScore } from '@/utils/npcSpellcasting';
 import { ProcessedMonster, CREATURE_TYPES, SIZES } from '@/types/bestiary';
 import { ProcessedItem } from '@/types/items';
 import {
@@ -266,6 +270,18 @@ export function NPCFormDialog({
   const [showLore, setShowLore] = useState(false);
   const [loreHtml, setLoreHtml] = useState('');
 
+  // Spellcasting
+  const [showSpellcasting, setShowSpellcasting] = useState(false);
+  const [spellcastingEnabled, setSpellcastingEnabled] = useState(false);
+  const [casterLevel, setCasterLevel] = useState(1);
+  const [spellcastingAbility, setSpellcastingAbility] =
+    useState<NPCSpellcastingAbility>('intelligence');
+  const [spellAttackOverride, setSpellAttackOverride] = useState<string>('');
+  const [spellDCOverride, setSpellDCOverride] = useState<string>('');
+  const [spellSlotOverrides, setSpellSlotOverrides] = useState<
+    Record<number, string>
+  >({});
+
   // ---------- Auto-calc initiative from DEX ----------
 
   useEffect(() => {
@@ -313,6 +329,41 @@ export function NPCFormDialog({
       setShowLore(!!editingNpc.loreHtml);
       setInventoryItems(editingNpc.inventory ?? []);
       setShowInventory((editingNpc.inventory ?? []).length > 0);
+
+      // Spellcasting
+      if (editingNpc?.spellcasting) {
+        setSpellcastingEnabled(true);
+        setShowSpellcasting(true);
+        setCasterLevel(editingNpc.spellcasting.casterLevel);
+        setSpellcastingAbility(editingNpc.spellcasting.ability);
+        setSpellAttackOverride(
+          editingNpc.spellcasting.spellAttackBonus !== undefined
+            ? String(editingNpc.spellcasting.spellAttackBonus)
+            : ''
+        );
+        setSpellDCOverride(
+          editingNpc.spellcasting.spellSaveDC !== undefined
+            ? String(editingNpc.spellcasting.spellSaveDC)
+            : ''
+        );
+        const overrides: Record<number, string> = {};
+        if (editingNpc.spellcasting.slotOverrides) {
+          for (const [lvl, count] of Object.entries(
+            editingNpc.spellcasting.slotOverrides
+          )) {
+            overrides[Number(lvl)] = String(count);
+          }
+        }
+        setSpellSlotOverrides(overrides);
+      } else {
+        setSpellcastingEnabled(false);
+        setShowSpellcasting(false);
+        setCasterLevel(1);
+        setSpellcastingAbility('intelligence');
+        setSpellAttackOverride('');
+        setSpellDCOverride('');
+        setSpellSlotOverrides({});
+      }
 
       // Group & tags
       setGroup(editingNpc.group ?? '');
@@ -487,6 +538,13 @@ export function NPCFormDialog({
     setTagInput('');
     setInitiativeModifier(0);
     setInitiativeOverridden(false);
+    setSpellcastingEnabled(false);
+    setShowSpellcasting(false);
+    setCasterLevel(1);
+    setSpellcastingAbility('intelligence');
+    setSpellAttackOverride('');
+    setSpellDCOverride('');
+    setSpellSlotOverrides({});
     resetAbilityScores();
     resetDetailFields();
   }
@@ -784,6 +842,28 @@ export function NPCFormDialog({
         inventoryItems.length > 0
           ? inventoryItems.filter(item => item.name.trim())
           : undefined,
+      spellcasting: spellcastingEnabled
+        ? {
+            casterLevel,
+            ability: spellcastingAbility,
+            spellAttackBonus: spellAttackOverride
+              ? parseInt(spellAttackOverride)
+              : undefined,
+            spellSaveDC: spellDCOverride
+              ? parseInt(spellDCOverride)
+              : undefined,
+            slotOverrides:
+              Object.keys(spellSlotOverrides).length > 0
+                ? Object.fromEntries(
+                    Object.entries(spellSlotOverrides)
+                      .filter(([, v]) => v !== '')
+                      .map(([k, v]) => [Number(k), parseInt(v)])
+                  )
+                : undefined,
+            slotsUsed: editingNpc?.spellcasting?.slotsUsed ?? {},
+            spells: editingNpc?.spellcasting?.spells ?? [],
+          }
+        : undefined,
     };
 
     onSave(payload);
@@ -1518,6 +1598,206 @@ export function NPCFormDialog({
                       <Plus size={12} />
                       Add Item Manually
                     </button>
+                  </div>
+                )}
+              </div>
+
+              {/* ===== Spellcasting (collapsible) ===== */}
+              <div>
+                <button
+                  onClick={() => setShowSpellcasting(v => !v)}
+                  className="text-accent-purple-text flex items-center gap-1 text-sm font-medium hover:underline"
+                >
+                  {showSpellcasting ? (
+                    <>
+                      <ChevronUp size={14} /> Hide Spellcasting
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown size={14} /> Configure Spellcasting
+                      {spellcastingEnabled && (
+                        <Badge variant="info" size="sm">
+                          Lvl {casterLevel}
+                        </Badge>
+                      )}
+                    </>
+                  )}
+                </button>
+                {showSpellcasting && (
+                  <div className="mt-2 space-y-3">
+                    {/* Enable toggle */}
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={spellcastingEnabled}
+                        onCheckedChange={setSpellcastingEnabled}
+                        id="spellcasting-enabled"
+                      />
+                      <label
+                        htmlFor="spellcasting-enabled"
+                        className="text-body text-sm font-medium"
+                      >
+                        Enable Spellcasting
+                      </label>
+                    </div>
+
+                    {spellcastingEnabled && (
+                      <div className="space-y-3">
+                        {/* Caster Level + Ability */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-muted mb-1 block text-xs font-medium">
+                              Caster Level
+                            </label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={20}
+                              value={casterLevel}
+                              onChange={e =>
+                                setCasterLevel(
+                                  Math.max(
+                                    1,
+                                    Math.min(20, parseInt(e.target.value) || 1)
+                                  )
+                                )
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="text-muted mb-1 block text-xs font-medium">
+                              Spellcasting Ability
+                            </label>
+                            <SelectField
+                              value={spellcastingAbility}
+                              onValueChange={v =>
+                                setSpellcastingAbility(
+                                  v as NPCSpellcastingAbility
+                                )
+                              }
+                            >
+                              <SelectItem value="intelligence">
+                                Intelligence
+                              </SelectItem>
+                              <SelectItem value="wisdom">Wisdom</SelectItem>
+                              <SelectItem value="charisma">Charisma</SelectItem>
+                            </SelectField>
+                          </div>
+                        </div>
+
+                        {/* Auto-calculated display */}
+                        {(() => {
+                          const abilityScore = getNPCSpellcastingAbilityScore(
+                            spellcastingAbility,
+                            { str, dex, con, int, wis, cha }
+                          );
+                          const prof = proficiencyBonus;
+                          const autoAttack =
+                            Math.floor((abilityScore - 10) / 2) + prof;
+                          const autoDC =
+                            8 + Math.floor((abilityScore - 10) / 2) + prof;
+                          return (
+                            <p className="text-muted text-xs">
+                              Auto: Spell Attack{' '}
+                              <span className="font-semibold">
+                                {autoAttack >= 0
+                                  ? `+${autoAttack}`
+                                  : autoAttack}
+                              </span>
+                              , Save DC{' '}
+                              <span className="font-semibold">{autoDC}</span> (
+                              {spellcastingAbility.charAt(0).toUpperCase() +
+                                spellcastingAbility.slice(1)}{' '}
+                              {abilityScore}, Prof +{prof})
+                            </p>
+                          );
+                        })()}
+
+                        {/* Override fields */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-muted mb-1 block text-xs font-medium">
+                              Spell Attack Override
+                            </label>
+                            <Input
+                              type="number"
+                              placeholder="Auto"
+                              value={spellAttackOverride}
+                              onChange={e =>
+                                setSpellAttackOverride(e.target.value)
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="text-muted mb-1 block text-xs font-medium">
+                              Save DC Override
+                            </label>
+                            <Input
+                              type="number"
+                              placeholder="Auto"
+                              value={spellDCOverride}
+                              onChange={e => setSpellDCOverride(e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Spell Slot Overrides */}
+                        <div>
+                          <label className="text-muted mb-1 block text-xs font-medium">
+                            Spell Slots (by Caster Level {casterLevel})
+                          </label>
+                          <div className="bg-surface-secondary border-divider rounded-md border p-2">
+                            <div className="space-y-1">
+                              {(() => {
+                                const baseSlots =
+                                  FULL_CASTER_SPELL_SLOTS[casterLevel] ?? {};
+                                const levels = Array.from(
+                                  { length: 9 },
+                                  (_, i) => i + 1
+                                );
+                                const activeLevels = levels.filter(
+                                  lvl =>
+                                    (baseSlots[lvl] ?? 0) > 0 ||
+                                    spellSlotOverrides[lvl]
+                                );
+                                if (activeLevels.length === 0) {
+                                  return (
+                                    <p className="text-muted text-xs italic">
+                                      No spell slots at this caster level.
+                                    </p>
+                                  );
+                                }
+                                return activeLevels.map(lvl => (
+                                  <div
+                                    key={lvl}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <span className="text-body w-20 text-xs font-medium">
+                                      Level {lvl}: {baseSlots[lvl] ?? 0}
+                                    </span>
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      placeholder={String(baseSlots[lvl] ?? 0)}
+                                      value={spellSlotOverrides[lvl] ?? ''}
+                                      onChange={e => {
+                                        setSpellSlotOverrides(prev => ({
+                                          ...prev,
+                                          [lvl]: e.target.value,
+                                        }));
+                                      }}
+                                      className="h-7 w-20 text-xs"
+                                    />
+                                    <span className="text-muted text-xs">
+                                      override
+                                    </span>
+                                  </div>
+                                ));
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
