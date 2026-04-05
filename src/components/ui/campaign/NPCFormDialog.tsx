@@ -1686,6 +1686,14 @@ export function NPCFormDialog({
 
                         {/* Auto-calculated display */}
                         {(() => {
+                          const hasExplicitScores =
+                            !!bestiarySourceId ||
+                            str !== DEFAULT_ABILITY ||
+                            dex !== DEFAULT_ABILITY ||
+                            con !== DEFAULT_ABILITY ||
+                            int !== DEFAULT_ABILITY ||
+                            wis !== DEFAULT_ABILITY ||
+                            cha !== DEFAULT_ABILITY;
                           const abilityScore = getNPCSpellcastingAbilityScore(
                             spellcastingAbility,
                             { str, dex, con, int, wis, cha }
@@ -1696,19 +1704,39 @@ export function NPCFormDialog({
                           const autoDC =
                             8 + Math.floor((abilityScore - 10) / 2) + prof;
                           return (
-                            <p className="text-muted text-xs">
-                              Auto: Spell Attack{' '}
-                              <span className="font-semibold">
-                                {autoAttack >= 0
-                                  ? `+${autoAttack}`
-                                  : autoAttack}
-                              </span>
-                              , Save DC{' '}
-                              <span className="font-semibold">{autoDC}</span> (
-                              {spellcastingAbility.charAt(0).toUpperCase() +
-                                spellcastingAbility.slice(1)}{' '}
-                              {abilityScore}, Prof +{prof})
-                            </p>
+                            <>
+                              {!hasExplicitScores && (
+                                <p className="text-accent-amber-text bg-accent-amber-bg border-accent-amber-border rounded-md border px-2 py-1.5 text-xs">
+                                  Set ability scores or manually override spell
+                                  attack/DC
+                                </p>
+                              )}
+                              <p className="text-muted text-xs">
+                                Auto: Spell Attack{' '}
+                                <span className="font-semibold">
+                                  {hasExplicitScores
+                                    ? autoAttack >= 0
+                                      ? `+${autoAttack}`
+                                      : autoAttack
+                                    : '—'}
+                                </span>
+                                , Save DC{' '}
+                                <span className="font-semibold">
+                                  {hasExplicitScores ? autoDC : '—'}
+                                </span>
+                                {hasExplicitScores && (
+                                  <>
+                                    {' '}
+                                    (
+                                    {spellcastingAbility
+                                      .charAt(0)
+                                      .toUpperCase() +
+                                      spellcastingAbility.slice(1)}{' '}
+                                    {abilityScore}, Prof +{prof})
+                                  </>
+                                )}
+                              </p>
+                            </>
                           );
                         })()}
 

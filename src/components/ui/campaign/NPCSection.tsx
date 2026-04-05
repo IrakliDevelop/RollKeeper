@@ -481,6 +481,11 @@ function NPCCard({
                   Prof +{npc.proficiencyBonus}
                 </Badge>
               )}
+              {npc.spellcasting && (
+                <Badge variant="info" size="sm" className="text-[10px]">
+                  Caster Lv{npc.spellcasting.casterLevel}
+                </Badge>
+              )}
             </div>
 
             {/* HP / AC / Speed / PP */}
@@ -637,6 +642,11 @@ function NPCCard({
             {npc.proficiencyBonus != null && (
               <Badge variant="neutral" size="sm" className="text-[10px]">
                 Prof +{npc.proficiencyBonus}
+              </Badge>
+            )}
+            {npc.spellcasting && (
+              <Badge variant="info" size="sm" className="text-[10px]">
+                Caster Lv{npc.spellcasting.casterLevel}
               </Badge>
             )}
           </div>
