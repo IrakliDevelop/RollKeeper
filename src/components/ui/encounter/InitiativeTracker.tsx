@@ -46,7 +46,7 @@ interface InitiativeTrackerProps {
   playerCounterValues?: Record<string, number>;
   onAdjustPlayerCounter?: (playerId: string, delta: number) => void;
   onViewPlayer?: (playerCharacterId: string) => void;
-  onViewNPC?: (npcSourceId: string) => void;
+  onViewNPC?: (npcSourceId: string, entityId: string) => void;
   onChangePlayerColor?: (
     playerCharacterId: string,
     color: string | undefined
@@ -233,7 +233,7 @@ export function InitiativeTracker({
               }
               onViewNPC={
                 entity.npcSourceId && onViewNPC
-                  ? () => onViewNPC(entity.npcSourceId!)
+                  ? () => onViewNPC(entity.npcSourceId!, entity.id)
                   : undefined
               }
               onChangePlayerColor={

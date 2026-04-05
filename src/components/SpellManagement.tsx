@@ -542,6 +542,9 @@ const LevelSection: React.FC<{
   onToggleFavorite: (id: string) => void;
   onSpellCast: (spell: Spell) => void;
   onReorder: (sourceIndex: number, destinationIndex: number) => void;
+  slotMax?: number;
+  slotUsed?: number;
+  onSlotChange?: (used: number) => void;
 }> = ({
   level,
   spells,
@@ -556,6 +559,9 @@ const LevelSection: React.FC<{
   onToggleFavorite,
   onSpellCast,
   onReorder,
+  slotMax,
+  slotUsed,
+  onSlotChange,
 }) => {
   const isCantrip = level === 0;
   const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
@@ -572,15 +578,20 @@ const LevelSection: React.FC<{
     s => s.isPrepared || s.isAlwaysPrepared
   ).length;
 
+  const hasSlots = !isCantrip && slotMax !== undefined && slotMax > 0;
+  const remaining = hasSlots ? slotMax! - (slotUsed ?? 0) : 0;
+
   return (
     <div
       className={`border-2 ${borderColor} bg-surface-raised overflow-hidden rounded-lg`}
     >
-      <button
-        onClick={onToggle}
-        className={`flex w-full items-center justify-between p-4 ${levelBg} transition-all hover:opacity-90`}
+      <div
+        className={`flex w-full items-center gap-3 p-4 ${levelBg} transition-all`}
       >
-        <div className="flex items-center gap-3">
+        <button
+          onClick={onToggle}
+          className="flex items-center gap-3 hover:opacity-90"
+        >
           <div className="flex items-center gap-2">
             {isExpanded ? (
               <ChevronDown size={18} className={levelColor} />
@@ -613,8 +624,42 @@ const LevelSection: React.FC<{
               </Badge>
             )}
           </div>
-        </div>
-      </button>
+        </button>
+
+        {/* Inline slot dots */}
+        {hasSlots && onSlotChange && (
+          <div className="ml-auto flex items-center gap-1.5">
+            <div className="flex gap-1">
+              {Array.from({ length: slotMax! }, (_, index) => {
+                const isUsed = index < (slotUsed ?? 0);
+                return (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => {
+                      const newUsed = isUsed ? (slotUsed ?? 0) - 1 : index + 1;
+                      onSlotChange(Math.max(0, Math.min(newUsed, slotMax!)));
+                    }}
+                    className={`h-4 w-4 cursor-pointer rounded-full border-2 transition-all ${
+                      isUsed
+                        ? 'border-red-500 bg-red-500 opacity-70 hover:scale-110'
+                        : 'border-emerald-400 bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.4)] hover:scale-110'
+                    }`}
+                    title={`Slot ${index + 1} — ${isUsed ? 'Used' : 'Available'}`}
+                  />
+                );
+              })}
+            </div>
+            <span
+              className={`text-[10px] font-bold ${
+                remaining === 0 ? 'text-accent-red-text' : 'text-heading'
+              }`}
+            >
+              {remaining}/{slotMax}
+            </span>
+          </div>
+        )}
+      </div>
 
       {isExpanded && (
         <div className="border-divider bg-surface-raised border-t-2 p-4">
@@ -1416,6 +1461,29 @@ export const SpellManagement: React.FC = () => {
               onToggleFavorite={toggleSpellFavorite}
               onSpellCast={handleCastSpell}
               onReorder={handleReorderSpellsInLevel(level)}
+              slotMax={
+                level > 0
+                  ? character.spellSlots[
+                      level as keyof typeof character.spellSlots
+                    ]?.max
+                  : undefined
+              }
+              slotUsed={
+                level > 0
+                  ? character.spellSlots[
+                      level as keyof typeof character.spellSlots
+                    ]?.used
+                  : undefined
+              }
+              onSlotChange={
+                level > 0
+                  ? used =>
+                      updateSpellSlot(
+                        level as keyof typeof character.spellSlots,
+                        used
+                      )
+                  : undefined
+              }
             />
           ))
         )}

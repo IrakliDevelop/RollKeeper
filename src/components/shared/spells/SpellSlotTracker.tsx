@@ -19,6 +19,7 @@ interface SpellSlotTrackerProps {
   compact?: boolean;
   hideControls?: boolean;
   hideResetButtons?: boolean;
+  hideTitle?: boolean;
   showOnlyUsed?: boolean;
   maxLevelToShow?: number;
 
@@ -36,6 +37,7 @@ export function SpellSlotTracker({
   compact = false,
   hideControls = false,
   hideResetButtons = false,
+  hideTitle = false,
   showOnlyUsed = false,
   maxLevelToShow = 9,
   className = '',
@@ -98,42 +100,71 @@ export function SpellSlotTracker({
 
   return (
     <div className={containerClasses}>
-      <div className="flex items-center justify-between">
-        <h3
-          className={`text-accent-purple-text flex items-center gap-2 font-semibold ${compact ? 'text-base' : 'text-lg'}`}
-        >
-          <Zap size={compact ? 16 : 20} />
-          Spell Slots
-        </h3>
-        {!readonly && !hideResetButtons && !hideControls && (
-          <div className="flex items-center space-x-2">
-            {hasSpellSlots && onResetSpellSlots && (
-              <Button
-                onClick={onResetSpellSlots}
-                variant="ghost"
-                size="xs"
-                leftIcon={<RotateCcw className="h-3 w-3" />}
-                className="text-accent-purple-text-muted hover:text-accent-purple-text"
-                title="Reset all spell slots"
-              >
-                Reset Slots
-              </Button>
-            )}
-            {hasPactMagic && onResetPactMagic && (
-              <Button
-                onClick={onResetPactMagic}
-                variant="ghost"
-                size="xs"
-                leftIcon={<RotateCcw className="h-3 w-3" />}
-                className="text-accent-purple-text-muted hover:text-accent-purple-text"
-                title="Reset pact magic slots"
-              >
-                Reset Pact
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
+      {!hideTitle ? (
+        <div className="flex items-center justify-between">
+          <h3
+            className={`text-accent-purple-text flex items-center gap-2 font-semibold ${compact ? 'text-base' : 'text-lg'}`}
+          >
+            <Zap size={compact ? 16 : 20} />
+            Spell Slots
+          </h3>
+          {!readonly && !hideResetButtons && !hideControls && (
+            <div className="flex items-center space-x-2">
+              {hasSpellSlots && onResetSpellSlots && (
+                <Button
+                  onClick={onResetSpellSlots}
+                  variant="ghost"
+                  size="xs"
+                  leftIcon={<RotateCcw className="h-3 w-3" />}
+                  className="text-accent-purple-text-muted hover:text-accent-purple-text"
+                  title="Reset all spell slots"
+                >
+                  Reset Slots
+                </Button>
+              )}
+              {hasPactMagic && onResetPactMagic && (
+                <Button
+                  onClick={onResetPactMagic}
+                  variant="ghost"
+                  size="xs"
+                  leftIcon={<RotateCcw className="h-3 w-3" />}
+                  className="text-accent-purple-text-muted hover:text-accent-purple-text"
+                  title="Reset pact magic slots"
+                >
+                  Reset Pact
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      ) : !readonly && !hideResetButtons && !hideControls ? (
+        <div className="flex items-center justify-end">
+          {hasSpellSlots && onResetSpellSlots && (
+            <Button
+              onClick={onResetSpellSlots}
+              variant="ghost"
+              size="xs"
+              leftIcon={<RotateCcw className="h-3 w-3" />}
+              className="text-accent-purple-text-muted hover:text-accent-purple-text"
+              title="Reset all spell slots"
+            >
+              Reset Slots
+            </Button>
+          )}
+          {hasPactMagic && onResetPactMagic && (
+            <Button
+              onClick={onResetPactMagic}
+              variant="ghost"
+              size="xs"
+              leftIcon={<RotateCcw className="h-3 w-3" />}
+              className="text-accent-purple-text-muted hover:text-accent-purple-text"
+              title="Reset pact magic slots"
+            >
+              Reset Pact
+            </Button>
+          )}
+        </div>
+      ) : null}
 
       {/* Regular Spell Slots */}
       {hasSpellSlots && levelsToShow.length > 0 && (

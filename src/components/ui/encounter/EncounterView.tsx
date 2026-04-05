@@ -39,6 +39,9 @@ export function EncounterView({
   );
   const [viewingNpcFromEncounter, setViewingNpcFromEncounter] =
     useState<CampaignNPC | null>(null);
+  const [viewingNpcEntityId, setViewingNpcEntityId] = useState<string | null>(
+    null
+  );
 
   const encounter = useEncounterStore(state =>
     state.encounters.find(e => e.id === encounterId)
@@ -67,7 +70,7 @@ export function EncounterView({
     longRestEntity,
   } = useEncounterStore();
 
-  const { getNPCsForCampaign } = useNPCStore();
+  const { getNPCsForCampaign, getNPC } = useNPCStore();
   const npcs = getNPCsForCampaign(campaignCode);
 
   const { dmId, adjustPlayerCounter, setPlayerColor } = useDmStore();
@@ -336,9 +339,12 @@ export function EncounterView({
           );
           if (player) setViewingPlayer(player);
         }}
-        onViewNPC={npcSourceId => {
+        onViewNPC={(npcSourceId, entityId) => {
           const npc = npcs.find(n => n.id === npcSourceId);
-          if (npc) setViewingNpcFromEncounter(npc);
+          if (npc) {
+            setViewingNpcFromEncounter(npc);
+            setViewingNpcEntityId(entityId);
+          }
         }}
         onChangePlayerColor={(playerCharacterId, color) =>
           setPlayerColor(campaignCode, playerCharacterId, color)
@@ -384,13 +390,23 @@ export function EncounterView({
       {/* NPC detail dialog (from encounter entity) */}
       {viewingNpcFromEncounter && (
         <NPCDetailDialog
-          npc={viewingNpcFromEncounter}
+          npc={
+            getNPC(
+              viewingNpcFromEncounter.campaignCode,
+              viewingNpcFromEncounter.id
+            ) ?? viewingNpcFromEncounter
+          }
           open={!!viewingNpcFromEncounter}
           onOpenChange={open => {
-            if (!open) setViewingNpcFromEncounter(null);
+            if (!open) {
+              setViewingNpcFromEncounter(null);
+              setViewingNpcEntityId(null);
+            }
           }}
           initialTab="spells"
           readOnly
+          encounterId={encounterId}
+          npcEntityId={viewingNpcEntityId ?? undefined}
         />
       )}
     </div>
