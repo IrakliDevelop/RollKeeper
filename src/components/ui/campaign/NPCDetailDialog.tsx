@@ -712,60 +712,59 @@ export function NPCDetailDialog({
             />
           )}
 
-          {activeTab === 'inventory' && (
-            <>
-              {npc.inventory && npc.inventory.length > 0 ? (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {npc.inventory.map(item => (
-                    <InventoryItemCard
-                      key={item.id}
-                      item={item}
-                      onClick={() => setViewingItem(item)}
-                      onEdit={
-                        onUpdateInventory
-                          ? () => {
-                              setInventoryFormEditingItem(item);
-                              setInventoryFormOpen(true);
-                            }
-                          : undefined
-                      }
-                      onRemove={
-                        onUpdateInventory
-                          ? () => handleRemoveItem(item.id)
-                          : undefined
-                      }
-                      onQuantityChange={
-                        onUpdateInventory
-                          ? qty => handleQuantityChange(item.id, qty)
-                          : undefined
-                      }
-                      onSend={
-                        onSendItemToPlayer
-                          ? () => onSendItemToPlayer(item, npc.name)
-                          : undefined
-                      }
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center text-center">
-                  <Package className="text-faint mb-3 h-10 w-10" />
+          {activeTab === 'inventory' &&
+            (npc.inventory && npc.inventory.length > 0 ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {npc.inventory.map(item => (
+                  <InventoryItemCard
+                    key={item.id}
+                    item={item}
+                    onClick={() => setViewingItem(item)}
+                    onEdit={
+                      onUpdateInventory
+                        ? () => {
+                            setInventoryFormEditingItem(item);
+                            setInventoryFormOpen(true);
+                          }
+                        : undefined
+                    }
+                    onRemove={
+                      onUpdateInventory
+                        ? () => handleRemoveItem(item.id)
+                        : undefined
+                    }
+                    onQuantityChange={
+                      onUpdateInventory
+                        ? qty => handleQuantityChange(item.id, qty)
+                        : undefined
+                    }
+                    onSend={
+                      onSendItemToPlayer
+                        ? () => onSendItemToPlayer(item, npc.name)
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-center">
+                <div>
+                  <Package className="text-faint mx-auto mb-3 h-10 w-10" />
                   <p className="text-muted text-sm">No inventory items</p>
                 </div>
-              )}
-            </>
-          )}
+              </div>
+            ))}
 
-          {activeTab === 'lore' && (
-            <>
-              {npc.loreHtml ? (
-                <div
-                  className="prose prose-sm text-body max-w-none"
-                  dangerouslySetInnerHTML={{ __html: npc.loreHtml }}
-                />
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center text-center">
-                  <BookOpen className="text-faint mb-3 h-10 w-10" />
+          {activeTab === 'lore' &&
+            (npc.loreHtml ? (
+              <div
+                className="prose prose-sm text-body max-w-none"
+                dangerouslySetInnerHTML={{ __html: npc.loreHtml }}
+              />
+            ) : (
+              <div className="flex flex-1 items-center justify-center text-center">
+                <div>
+                  <BookOpen className="text-faint mx-auto mb-3 h-10 w-10" />
                   <p className="text-muted text-sm">No lore written yet</p>
                   {onEdit && !readOnly && (
                     <Button
@@ -781,12 +780,11 @@ export function NPCDetailDialog({
                     </Button>
                   )}
                 </div>
-              )}
-            </>
-          )}
+              </div>
+            ))}
         </DialogBody>
 
-        <DialogFooter className="!flex-col !items-stretch gap-2">
+        <DialogFooter className="!flex-col !items-start gap-2">
           {activeTab === 'inventory' && onUpdateInventory && (
             <Button
               variant="secondary"
@@ -810,7 +808,7 @@ export function NPCDetailDialog({
               Add Spell
             </Button>
           )}
-          <div className="flex justify-between">
+          <div className="flex w-full justify-between">
             <div className="flex gap-2">
               {statBlock && <NPCStatBlockExport npc={npc} />}
             </div>
