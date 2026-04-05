@@ -1,5 +1,7 @@
 // Encounter tracker types for DM combat management
 
+import { Spell } from './character';
+
 export interface EncounterCondition {
   id: string;
   name: string;
@@ -41,6 +43,22 @@ export interface MonsterSpellcasting {
   perDay: Record<string, string[]>; // "3": ["fireball", "lightning bolt"]
   slots?: Record<string, { max: number; used: number }>; // Spell slots by level
   usedSpells: Record<string, number>; // Track per-day usage
+}
+
+export type NPCSpellcastingAbility = 'intelligence' | 'wisdom' | 'charisma';
+
+export interface NPCSpellSlotOverrides {
+  [level: number]: number;
+}
+
+export interface NPCSpellcasting {
+  casterLevel: number;
+  ability: NPCSpellcastingAbility;
+  spellAttackBonus?: number;
+  spellSaveDC?: number;
+  slotOverrides?: NPCSpellSlotOverrides;
+  slotsUsed: Record<number, number>;
+  spells: Spell[];
 }
 
 export interface MonsterStatBlock {
@@ -107,6 +125,7 @@ export interface EncounterEntity {
   // Monster source reference
   monsterSourceId?: string; // ProcessedMonster id for stat block lookup
   monsterStatBlock?: MonsterStatBlock; // Full stat block for display
+  npcSourceId?: string; // CampaignNPC.id for persistent NPC lookup
 
   // Lair action specific
   lairActions?: Array<{
@@ -188,6 +207,8 @@ export interface CampaignNPC {
   // Core combat stats
   armorClass: number;
   maxHp: number;
+  currentHp?: number; // Persistent HP tracking (defaults to maxHp if undefined)
+  tempHp?: number; // Temporary HP
   speed: string;
 
   // Full stat block (from bestiary import or manual entry)
@@ -218,6 +239,9 @@ export interface CampaignNPC {
 
   // Inventory
   inventory?: NPCInventoryItem[];
+
+  // Spellcasting
+  spellcasting?: NPCSpellcasting;
 
   // Passive abilities
   passivePerception?: number;
