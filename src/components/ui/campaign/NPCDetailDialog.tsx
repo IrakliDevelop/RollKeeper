@@ -713,7 +713,7 @@ export function NPCDetailDialog({
           )}
 
           {activeTab === 'inventory' && (
-            <div>
+            <>
               {npc.inventory && npc.inventory.length > 0 ? (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {npc.inventory.map(item => (
@@ -748,23 +748,23 @@ export function NPCDetailDialog({
                   ))}
                 </div>
               ) : (
-                <div className="flex flex-1 flex-col items-center justify-center text-center">
+                <div className="flex h-full flex-col items-center justify-center text-center">
                   <Package className="text-faint mb-3 h-10 w-10" />
                   <p className="text-muted text-sm">No inventory items</p>
                 </div>
               )}
-            </div>
+            </>
           )}
 
           {activeTab === 'lore' && (
-            <div>
+            <>
               {npc.loreHtml ? (
                 <div
                   className="prose prose-sm text-body max-w-none"
                   dangerouslySetInnerHTML={{ __html: npc.loreHtml }}
                 />
               ) : (
-                <div className="flex flex-1 flex-col items-center justify-center text-center">
+                <div className="flex h-full flex-col items-center justify-center text-center">
                   <BookOpen className="text-faint mb-3 h-10 w-10" />
                   <p className="text-muted text-sm">No lore written yet</p>
                   {onEdit && !readOnly && (
@@ -782,55 +782,57 @@ export function NPCDetailDialog({
                   )}
                 </div>
               )}
-            </div>
+            </>
           )}
         </DialogBody>
 
-        <DialogFooter className="!flex-row !justify-between">
-          <div className="flex gap-2">
-            {statBlock && <NPCStatBlockExport npc={npc} />}
-            {activeTab === 'inventory' && onUpdateInventory && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setInventoryFormEditingItem(null);
-                  setInventoryFormOpen(true);
-                }}
-              >
-                <Plus className="mr-1.5 h-4 w-4" />
-                Add Item
-              </Button>
-            )}
-            {activeTab === 'spells' && npc.spellcasting && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => addSpellRef.current?.()}
-              >
-                <Plus className="mr-1.5 h-4 w-4" />
-                Add Spell
-              </Button>
+        <DialogFooter className="!flex-col !items-stretch gap-2">
+          {activeTab === 'inventory' && onUpdateInventory && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setInventoryFormEditingItem(null);
+                setInventoryFormOpen(true);
+              }}
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add Item
+            </Button>
+          )}
+          {activeTab === 'spells' && npc.spellcasting && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => addSpellRef.current?.()}
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add Spell
+            </Button>
+          )}
+          <div className="flex justify-between">
+            <div className="flex gap-2">
+              {statBlock && <NPCStatBlockExport npc={npc} />}
+            </div>
+            {!readOnly && onEdit && onDelete && (
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    onEdit(npc);
+                    onOpenChange(false);
+                  }}
+                >
+                  <Edit3 className="mr-1.5 h-4 w-4" />
+                  Edit
+                </Button>
+                <Button variant="danger" onClick={() => onDelete(npc)}>
+                  <Trash2 className="mr-1.5 h-4 w-4" />
+                  Delete
+                </Button>
+              </div>
             )}
           </div>
-          {!readOnly && onEdit && onDelete && (
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  onEdit(npc);
-                  onOpenChange(false);
-                }}
-              >
-                <Edit3 className="mr-1.5 h-4 w-4" />
-                Edit
-              </Button>
-              <Button variant="danger" onClick={() => onDelete(npc)}>
-                <Trash2 className="mr-1.5 h-4 w-4" />
-                Delete
-              </Button>
-            </div>
-          )}
         </DialogFooter>
       </DialogContent>
 
