@@ -18,7 +18,9 @@ import { Button } from '@/components/ui/forms/button';
 import { InitiativeTracker } from './InitiativeTracker';
 import { AddEntityDialog } from './AddEntityDialog';
 import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
+import { NPCDetailDialog } from '@/components/ui/campaign/NPCDetailDialog';
 import { CampaignPlayerData } from '@/types/campaign';
+import { CampaignNPC } from '@/types/encounter';
 
 interface EncounterViewProps {
   encounterId: string;
@@ -35,6 +37,8 @@ export function EncounterView({
   const [viewingPlayer, setViewingPlayer] = useState<CampaignPlayerData | null>(
     null
   );
+  const [viewingNpcFromEncounter, setViewingNpcFromEncounter] =
+    useState<CampaignNPC | null>(null);
 
   const encounter = useEncounterStore(state =>
     state.encounters.find(e => e.id === encounterId)
@@ -331,6 +335,10 @@ export function EncounterView({
           );
           if (player) setViewingPlayer(player);
         }}
+        onViewNPC={npcSourceId => {
+          const npc = npcs.find(n => n.id === npcSourceId);
+          if (npc) setViewingNpcFromEncounter(npc);
+        }}
         onChangePlayerColor={(playerCharacterId, color) =>
           setPlayerColor(campaignCode, playerCharacterId, color)
         }
@@ -369,6 +377,19 @@ export function EncounterView({
                   )
               : undefined
           }
+        />
+      )}
+
+      {/* NPC detail dialog (from encounter entity) */}
+      {viewingNpcFromEncounter && (
+        <NPCDetailDialog
+          npc={viewingNpcFromEncounter}
+          open={!!viewingNpcFromEncounter}
+          onOpenChange={open => {
+            if (!open) setViewingNpcFromEncounter(null);
+          }}
+          initialTab="spells"
+          readOnly
         />
       )}
     </div>
