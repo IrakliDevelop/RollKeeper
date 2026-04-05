@@ -488,7 +488,7 @@ export function NPCSpellTab({ npc, campaignCode }: NPCSpellTabProps) {
                 })}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="flex flex-1 flex-col items-center justify-center text-center">
                 <Star className="text-faint mb-2 h-8 w-8" />
                 <p className="text-muted text-sm">No spells added yet</p>
               </div>

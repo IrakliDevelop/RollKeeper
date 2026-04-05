@@ -654,7 +654,7 @@ export function NPCDetailDialog({
           ))}
         </div>
 
-        <DialogBody className="max-h-[70vh] min-h-[60vh] overflow-y-auto">
+        <DialogBody className="h-[60vh] shrink-0 overflow-y-auto">
           {activeTab === 'stats' && (
             <div className="space-y-4">
               {statBlock ? (
@@ -743,7 +743,7 @@ export function NPCDetailDialog({
                   ))}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="flex flex-1 flex-col items-center justify-center text-center">
                   <Package className="text-faint mb-3 h-10 w-10" />
                   <p className="text-muted text-sm">No inventory items</p>
                 </div>
@@ -774,7 +774,7 @@ export function NPCDetailDialog({
                   dangerouslySetInnerHTML={{ __html: npc.loreHtml }}
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="flex flex-1 flex-col items-center justify-center text-center">
                   <BookOpen className="text-faint mb-3 h-10 w-10" />
                   <p className="text-muted text-sm">No lore written yet</p>
                   {onEdit && !readOnly && (
