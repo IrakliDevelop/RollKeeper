@@ -11,6 +11,7 @@ import {
   Plus,
   Star,
   Zap,
+  Filter,
 } from 'lucide-react';
 import {
   Dialog,
@@ -55,6 +56,23 @@ interface NPCSpellTabProps {
   addSpellRef?: React.MutableRefObject<(() => void) | null>;
   encounterId?: string;
   npcEntityId?: string;
+}
+
+type SpellCategory = 'regular' | 'at_will' | 'innate';
+
+const SPELL_CATEGORY_LABELS: Record<SpellCategory, string> = {
+  regular: 'Slot',
+  at_will: 'At Will',
+  innate: 'Innate',
+};
+
+const ALL_SPELL_CATEGORIES: SpellCategory[] = ['regular', 'at_will', 'innate'];
+
+function getSpellCategory(spell: Spell): SpellCategory {
+  if (spell.freeCastMax !== undefined && spell.freeCastMax === 0)
+    return 'at_will';
+  if (spell.freeCastMax !== undefined && spell.freeCastMax > 0) return 'innate';
+  return 'regular';
 }
 
 const ABILITY_LABEL_MAP: Record<string, string> = {
@@ -163,6 +181,9 @@ export function NPCSpellTab({
   const [viewingSpell, setViewingSpell] = useState<Spell | null>(null);
   const [castingSpell, setCastingSpell] = useState<Spell | null>(null);
   const [addSpellOpen, setAddSpellOpen] = useState(false);
+  const [activeCategories, setActiveCategories] = useState<Set<SpellCategory>>(
+    () => new Set(ALL_SPELL_CATEGORIES)
+  );
 
   // Expose add-spell trigger to parent via ref
   React.useEffect(() => {
@@ -228,14 +249,68 @@ export function NPCSpellTab({
     return groups;
   }, [scSpells]);
 
+  const isFiltering =
+    activeCategories.size > 0 &&
+    activeCategories.size < ALL_SPELL_CATEGORIES.length;
+
+  const filteredSpellsByLevel = useMemo(() => {
+    if (!isFiltering) return spellsByLevel;
+    const filtered: Record<number, Spell[]> = {};
+    for (const [lvl, spells] of Object.entries(spellsByLevel)) {
+      const matching = spells.filter(s =>
+        activeCategories.has(getSpellCategory(s))
+      );
+      if (matching.length > 0) filtered[Number(lvl)] = matching;
+    }
+    return filtered;
+  }, [spellsByLevel, activeCategories, isFiltering]);
+
+  const toggleCategory = useCallback((cat: SpellCategory) => {
+    setActiveCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) {
+        if (next.size === 1) return prev;
+        next.delete(cat);
+      } else {
+        next.add(cat);
+      }
+      return next;
+    });
+  }, []);
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<SpellCategory, number> = {
+      regular: 0,
+      at_will: 0,
+      innate: 0,
+    };
+    if (!scSpells) return counts;
+    for (const spell of scSpells) {
+      counts[getSpellCategory(spell)]++;
+    }
+    return counts;
+  }, [scSpells]);
+
+  const hasMultipleCategories =
+    (categoryCounts.regular > 0 ? 1 : 0) +
+      (categoryCounts.at_will > 0 ? 1 : 0) +
+      (categoryCounts.innate > 0 ? 1 : 0) >
+    1;
+
   // Merge spell levels with slot levels so empty-spell levels with slots still show
   const sortedLevels = useMemo(() => {
-    const levels = new Set(Object.keys(spellsByLevel).map(Number));
-    for (let l = 1; l <= 9; l++) {
-      if ((spellSlots[l as keyof SpellSlots]?.max ?? 0) > 0) levels.add(l);
+    const levels = new Set(
+      Object.keys(isFiltering ? filteredSpellsByLevel : spellsByLevel).map(
+        Number
+      )
+    );
+    if (!isFiltering) {
+      for (let l = 1; l <= 9; l++) {
+        if ((spellSlots[l as keyof SpellSlots]?.max ?? 0) > 0) levels.add(l);
+      }
     }
     return Array.from(levels).sort((a, b) => a - b);
-  }, [spellsByLevel, spellSlots]);
+  }, [spellsByLevel, filteredSpellsByLevel, spellSlots, isFiltering]);
 
   const toggleLevel = useCallback((level: number) => {
     setCollapsedLevels(prev => {
@@ -519,10 +594,39 @@ export function NPCSpellTab({
         />
         {!isSectionCollapsed('spells') && (
           <div className="mt-2">
+            {/* Category filter — only show when NPC has spells in 2+ categories */}
+            {hasMultipleCategories && (
+              <div className="mb-2 flex items-center gap-1.5">
+                <Filter className="text-muted h-3.5 w-3.5 shrink-0" />
+                {ALL_SPELL_CATEGORIES.map(cat => {
+                  const count = categoryCounts[cat];
+                  if (count === 0) return null;
+                  const isActive = activeCategories.has(cat);
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => toggleCategory(cat)}
+                      className={`rounded-md border px-2 py-0.5 text-xs font-medium transition-colors ${
+                        isActive
+                          ? 'border-accent-purple-border bg-accent-purple-bg text-accent-purple-text'
+                          : 'border-divider bg-surface-raised text-faint hover:text-muted'
+                      }`}
+                    >
+                      {SPELL_CATEGORY_LABELS[cat]}{' '}
+                      <span className="opacity-60">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {sortedLevels.length > 0 ? (
               <div className="space-y-2">
                 {sortedLevels.map(level => {
-                  const spells = spellsByLevel[level] ?? [];
+                  const spells =
+                    (isFiltering
+                      ? filteredSpellsByLevel[level]
+                      : spellsByLevel[level]) ?? [];
                   const isCollapsed = collapsedLevels.has(level);
                   const isCantrip = level === 0;
                   const slot = spellSlots[level as keyof SpellSlots];
