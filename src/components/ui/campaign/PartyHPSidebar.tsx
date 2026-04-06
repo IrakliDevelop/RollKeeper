@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { Users, User, Heart, Skull, EyeOff } from 'lucide-react';
+import { Users, User, Heart, Skull, EyeOff, Shield } from 'lucide-react';
 import { usePartySync } from '@/hooks/usePartySync';
 import { PartyMemberHP } from '@/app/api/campaign/[code]/party-hp/route';
 import { Badge } from '@/components/ui/layout/badge';
@@ -92,7 +92,14 @@ function PartyMemberRow({ member }: { member: PartyMemberHP }) {
         </div>
       </div>
 
-      {/* HP Section */}
+      {/* AC + HP Section */}
+      <div className="mb-1 flex items-center gap-1.5">
+        <Shield size={11} className="text-accent-blue-text flex-shrink-0" />
+        <span className="text-body text-xs font-medium">
+          {member.armorClass}
+        </span>
+      </div>
+
       {hp === null ? (
         <div className="text-faint flex items-center gap-1.5 text-xs">
           <EyeOff size={11} />
@@ -148,6 +155,7 @@ export function PartyHPSidebar({
   currentCharacterId,
 }: PartyHPSidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
   const { partyMembers, loading } = usePartySync({
     campaignCode,
     currentCharacterId,
@@ -172,11 +180,29 @@ export function PartyHPSidebar({
     }
   }, [isOpen]);
 
+  // Close on outside click
+  const handleOutsideClick = useCallback((e: MouseEvent) => {
+    if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node)) {
+      setIsOpen(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+      return () =>
+        document.removeEventListener('mousedown', handleOutsideClick);
+    }
+  }, [isOpen, handleOutsideClick]);
+
   // Don't render anything if not in a campaign
   if (!campaignCode) return null;
 
   return (
-    <div className="fixed top-1/2 left-0 z-[55] hidden -translate-y-1/2 lg:flex">
+    <div
+      ref={sidebarRef}
+      className="fixed top-1/2 left-0 z-[55] hidden -translate-y-1/2 lg:flex"
+    >
       {/* Panel Wrapper — collapses width when closed */}
       <div
         className="overflow-hidden transition-[width] duration-300 ease-in-out"
