@@ -99,6 +99,10 @@ interface PlayerSummaryCardProps {
   onClick?: () => void;
 }
 
+function ensureArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
 export function PlayerSummaryCard({
   player,
   customCounterLabel,
@@ -107,6 +111,10 @@ export function PlayerSummaryCard({
   onClick,
 }: PlayerSummaryCardProps) {
   const { characterData: char } = player;
+  const weapons = ensureArray<(typeof char.weapons)[number]>(char.weapons);
+  const activeConditions = ensureArray<
+    (typeof char.conditionsAndDiseases.activeConditions)[number]
+  >(char.conditionsAndDiseases?.activeConditions);
 
   const currentHp = char.hitPoints?.current ?? 0;
   const maxHp = char.hitPoints?.max ?? 0;
@@ -115,7 +123,7 @@ export function PlayerSummaryCard({
   const charClass = char.class?.name || 'Unknown';
   const level = char.totalLevel || char.level || 1;
 
-  const equippedWeapon = char.weapons?.find(w => w.isEquipped);
+  const equippedWeapon = weapons.find(w => w.isEquipped);
   const isConcentrating = char.concentration?.isConcentrating;
   const concentrationSpell = char.concentration?.spellName;
   const inspirationCount = char.heroicInspiration?.count ?? 0;
@@ -124,7 +132,6 @@ export function PlayerSummaryCard({
   const passiveInsight = calculatePassiveInsight(char);
   const passiveInvestigation = calculatePassiveInvestigation(char);
 
-  const activeConditions = char.conditionsAndDiseases?.activeConditions ?? [];
   const avatarSrc = char.avatar?.trim();
 
   return (
