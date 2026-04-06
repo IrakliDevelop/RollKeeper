@@ -4,6 +4,7 @@ import type {
   CalendarConfig,
   CalendarEvent,
   CampaignCalendar,
+  WeatherType,
 } from '@/types/calendar';
 
 const CALENDAR_STORAGE_KEY = 'rollkeeper-calendar-data';
@@ -33,6 +34,7 @@ interface CalendarStoreState {
     updates: Partial<Omit<CalendarEvent, 'id' | 'createdAt'>>
   ) => void;
   deleteEvent: (campaignCode: string, eventId: string) => void;
+  setWeather: (campaignCode: string, weather: WeatherType) => void;
   getEventsForDay: (
     campaignCode: string,
     year: number,
@@ -151,6 +153,14 @@ export const useCalendarStore = create<CalendarStoreState>()(
             c.campaignCode === campaignCode
               ? { ...c, events: (c.events ?? []).filter(e => e.id !== eventId) }
               : c
+          ),
+        }));
+      },
+
+      setWeather: (campaignCode, weather) => {
+        set(state => ({
+          calendars: state.calendars.map(c =>
+            c.campaignCode === campaignCode ? { ...c, weather } : c
           ),
         }));
       },

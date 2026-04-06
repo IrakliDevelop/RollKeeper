@@ -71,12 +71,48 @@ export interface CalendarEvent {
   createdAt: number; // timestamp for ordering
 }
 
+export type WeatherType =
+  | 'clear'
+  | 'cloudy'
+  | 'overcast'
+  | 'fog'
+  | 'rain'
+  | 'heavy-rain'
+  | 'thunderstorm'
+  | 'snow'
+  | 'blizzard'
+  | 'hail'
+  | 'wind'
+  | 'hot'
+  | 'cold';
+
+export const WEATHER_OPTIONS: {
+  type: WeatherType;
+  label: string;
+  icon: string;
+}[] = [
+  { type: 'clear', label: 'Clear', icon: '☀️' },
+  { type: 'cloudy', label: 'Cloudy', icon: '⛅' },
+  { type: 'overcast', label: 'Overcast', icon: '☁️' },
+  { type: 'fog', label: 'Fog', icon: '🌫️' },
+  { type: 'rain', label: 'Rain', icon: '🌧️' },
+  { type: 'heavy-rain', label: 'Heavy Rain', icon: '🌧️' },
+  { type: 'thunderstorm', label: 'Thunderstorm', icon: '⛈️' },
+  { type: 'snow', label: 'Snow', icon: '🌨️' },
+  { type: 'blizzard', label: 'Blizzard', icon: '❄️' },
+  { type: 'hail', label: 'Hail', icon: '🧊' },
+  { type: 'wind', label: 'Windy', icon: '💨' },
+  { type: 'hot', label: 'Hot', icon: '🔥' },
+  { type: 'cold', label: 'Cold', icon: '🥶' },
+];
+
 export interface CampaignCalendar {
   campaignCode: string;
   config: CalendarConfig;
   currentTime: number; // milliseconds since epoch
   startTime: number; // milliseconds since epoch — campaign start reference
   events: CalendarEvent[];
+  weather?: WeatherType;
 }
 
 // Derived from currentTime + config — never stored

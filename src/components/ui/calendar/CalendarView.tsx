@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { TimeDisplay } from './TimeDisplay';
 import { TimeControls } from './TimeControls';
+import { WeatherPicker } from './WeatherPicker';
 import { CalendarNav } from './CalendarNav';
 import { CalendarGrid } from './CalendarGrid';
 import { MoonLegend } from './MoonLegend';
@@ -38,6 +39,7 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
   );
   const advanceTime = useCalendarStore(state => state.advanceTime);
   const setCalendarTime = useCalendarStore(state => state.setTime);
+  const setWeather = useCalendarStore(state => state.setWeather);
   const setStartDate = useCalendarStore(state => state.setStartDate);
   const addEvent = useCalendarStore(state => state.addEvent);
   const updateEvent = useCalendarStore(state => state.updateEvent);
@@ -172,6 +174,7 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
               config={config}
               moonPhases={moonPhases}
               dayPeriod={dayPeriod}
+              weather={calendar.weather}
               onTimeEdit={(hour, minute) => {
                 const newTime = dateToTime(
                   { ...date, hour, minute, second: 0 },
@@ -220,6 +223,12 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
               currentTime={calendar.currentTime}
               config={config}
               onAdvance={handleAdvance}
+            />
+          </div>
+          <div className="border-divider border-t pt-4">
+            <WeatherPicker
+              current={calendar.weather}
+              onChange={weather => setWeather(campaignCode, weather)}
             />
           </div>
         </CardContent>

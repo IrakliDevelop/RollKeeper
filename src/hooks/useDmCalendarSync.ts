@@ -20,6 +20,7 @@ export function useDmCalendarSync(
     config: SharedCalendar['config'];
     currentTime: number;
     startTime: number;
+    weather?: SharedCalendar['weather'];
   } | null>(null);
   const hasPushedRef = useRef(false);
 
@@ -28,11 +29,13 @@ export function useDmCalendarSync(
       config: SharedCalendar['config'];
       currentTime: number;
       startTime: number;
+      weather?: SharedCalendar['weather'];
     }) => {
       const data: SharedCalendar = {
         config: calendar.config,
         currentTime: calendar.currentTime,
         startTime: calendar.startTime,
+        weather: calendar.weather,
         updatedAt: new Date().toISOString(),
       };
 
@@ -73,6 +76,7 @@ export function useDmCalendarSync(
       config: SharedCalendar['config'];
       currentTime: number;
       startTime: number;
+      weather?: SharedCalendar['weather'];
     }) => {
       pendingCalendarRef.current = calendar;
       if (debounceRef.current) {
@@ -120,7 +124,8 @@ export function useDmCalendarSync(
       if (
         current.config !== prev?.config ||
         current.currentTime !== prev?.currentTime ||
-        current.startTime !== prev?.startTime
+        current.startTime !== prev?.startTime ||
+        current.weather !== prev?.weather
       ) {
         debouncedPush(current);
       }
