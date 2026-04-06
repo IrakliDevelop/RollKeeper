@@ -21,6 +21,7 @@ import {
   ShieldAlert,
   ShieldOff,
   Eye,
+  Languages,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import {
@@ -108,6 +109,10 @@ function getHpColor(current: number, max: number): string {
   return 'text-red-600 dark:text-red-400';
 }
 
+function ensureArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
 function SectionTitle({
   icon,
   children,
@@ -134,14 +139,17 @@ export function PlayerDetailDialog({
 }: PlayerDetailDialogProps) {
   const char = player.characterData;
   if (!char) return null;
+  const classes = ensureArray<{ className?: string; level?: number }>(
+    char.classes
+  );
 
   const currentHp = char.hitPoints?.current ?? 0;
   const maxHp = char.hitPoints?.max ?? 0;
   const tempHp = char.hitPoints?.temporary ?? 0;
   const ac = calculateCharacterArmorClass(char);
   const level = char.totalLevel || char.level || 1;
-  const charClass = char.classes?.length
-    ? char.classes.map(c => `${c.className} ${c.level}`).join(' / ')
+  const charClass = classes.length
+    ? classes.map(c => `${c.className} ${c.level}`).join(' / ')
     : `${char.class?.name || 'Unknown'} ${level}`;
   const profBonus = getProficiencyBonus(level);
   const encumbrance = calculateEncumbrance(char);
@@ -433,6 +441,7 @@ export function PlayerDetailDialog({
                 <ConditionsSection char={char} />
                 <DefensesSection char={char} />
                 <SensesSection char={char} />
+                <LanguagesSection char={char} />
 
                 {attunement && (
                   <div>
@@ -490,8 +499,12 @@ function QuickStat({
 }
 
 function ConditionsSection({ char }: { char: CharacterState }) {
-  const conditions = char.conditionsAndDiseases?.activeConditions ?? [];
-  const diseases = char.conditionsAndDiseases?.activeDiseases ?? [];
+  const conditions = ensureArray<
+    (typeof char.conditionsAndDiseases.activeConditions)[number]
+  >(char.conditionsAndDiseases?.activeConditions);
+  const diseases = ensureArray<
+    (typeof char.conditionsAndDiseases.activeDiseases)[number]
+  >(char.conditionsAndDiseases?.activeDiseases);
   const isConcentrating = char.concentration?.isConcentrating;
 
   if (conditions.length === 0 && diseases.length === 0 && !isConcentrating)
@@ -507,14 +520,14 @@ function ConditionsSection({ char }: { char: CharacterState }) {
             {char.concentration.spellName}
           </Badge>
         )}
-        {conditions.map(c => (
-          <Badge key={c.id} variant="warning" size="sm">
+        {conditions.map((c, index) => (
+          <Badge key={c.id || `${c.name}-${index}`} variant="warning" size="sm">
             {c.name}
             {c.stackable && c.count > 1 && ` ×${c.count}`}
           </Badge>
         ))}
-        {diseases.map(d => (
-          <Badge key={d.id} variant="danger" size="sm">
+        {diseases.map((d, index) => (
+          <Badge key={d.id || `${d.name}-${index}`} variant="danger" size="sm">
             {d.name}
           </Badge>
         ))}
@@ -524,9 +537,9 @@ function ConditionsSection({ char }: { char: CharacterState }) {
 }
 
 function DefensesSection({ char }: { char: CharacterState }) {
-  const resistances = char.damageResistances ?? [];
-  const immunities = char.damageImmunities ?? [];
-  const conditionImmunities = char.conditionImmunities ?? [];
+  const resistances = ensureArray<string>(char.damageResistances);
+  const immunities = ensureArray<string>(char.damageImmunities);
+  const conditionImmunities = ensureArray<string>(char.conditionImmunities);
 
   if (
     resistances.length === 0 &&
@@ -590,7 +603,7 @@ function DefensesSection({ char }: { char: CharacterState }) {
 }
 
 function SensesSection({ char }: { char: CharacterState }) {
-  const senses = char.senses ?? [];
+  const senses = ensureArray<(typeof char.senses)[number]>(char.senses);
 
   if (senses.length === 0) return null;
 
@@ -598,10 +611,47 @@ function SensesSection({ char }: { char: CharacterState }) {
     <div>
       <SectionTitle icon={<Eye size={14} />}>Senses</SectionTitle>
       <div className="flex flex-wrap gap-1.5">
-        {senses.map(s => (
-          <Badge key={s.id} variant="info" size="sm">
+        {senses.map((s, index) => (
+          <Badge key={s.id || `${s.name}-${index}`} variant="info" size="sm">
             {s.name} {s.range} ft.
             {s.source && <span className="ml-1 opacity-70">({s.source})</span>}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function LanguagesSection({ char }: { char: CharacterState }) {
+  const languages = ensureArray<(typeof char.languages)[number]>(char.languages)
+    .filter(
+      language => typeof language?.name === 'string' && language.name.trim()
+    )
+    .map(language => ({
+      id: language.id,
+      name: language.name.trim(),
+      script:
+        typeof language.script === 'string'
+          ? language.script.trim()
+          : undefined,
+    }));
+
+  if (languages.length === 0) return null;
+
+  return (
+    <div>
+      <SectionTitle icon={<Languages size={14} />}>Languages</SectionTitle>
+      <div className="flex flex-wrap gap-1.5">
+        {languages.map((language, index) => (
+          <Badge
+            key={language.id || `${language.name}-${index}`}
+            variant="secondary"
+            size="sm"
+          >
+            {language.name}
+            {language.script && (
+              <span className="ml-1 opacity-70">({language.script})</span>
+            )}
           </Badge>
         ))}
       </div>
@@ -641,10 +691,14 @@ function CurrencySection({ char }: { char: CharacterState }) {
 
 function SpellSlotsSection({ char }: { char: CharacterState }) {
   const slots = char.spellSlots;
-  if (!slots) return null;
+  if (!slots || typeof slots !== 'object') return null;
 
   const levels = Object.entries(slots).filter(
-    ([, data]) => data && data.max > 0
+    ([, data]) =>
+      typeof data === 'object' &&
+      data !== null &&
+      typeof (data as { max?: number }).max === 'number' &&
+      (data as { max: number }).max > 0
   );
   if (levels.length === 0) return null;
 
@@ -653,7 +707,8 @@ function SpellSlotsSection({ char }: { char: CharacterState }) {
       <SectionTitle icon={<Sparkles size={14} />}>Spell Slots</SectionTitle>
       <div className="flex flex-wrap gap-3">
         {levels.map(([level, data]) => {
-          const remaining = data.max - data.used;
+          const slotData = data as { max: number; used: number };
+          const remaining = slotData.max - slotData.used;
           const allSpent = remaining === 0;
           return (
             <div
@@ -668,7 +723,7 @@ function SpellSlotsSection({ char }: { char: CharacterState }) {
                 Lv {level}
               </div>
               <div className="flex items-center justify-center gap-1">
-                {Array.from({ length: data.max }, (_, i) => {
+                {Array.from({ length: slotData.max }, (_, i) => {
                   const isFilled = i < remaining;
                   return (
                     <div
@@ -688,7 +743,7 @@ function SpellSlotsSection({ char }: { char: CharacterState }) {
                   allSpent ? 'text-accent-red-text' : 'text-muted'
                 }`}
               >
-                {remaining}/{data.max}
+                {remaining}/{slotData.max}
               </div>
             </div>
           );
@@ -699,16 +754,16 @@ function SpellSlotsSection({ char }: { char: CharacterState }) {
 }
 
 function WeaponsSection({ char }: { char: CharacterState }) {
-  const weapons = char.weapons;
-  if (!weapons || weapons.length === 0) return null;
+  const weapons = ensureArray<(typeof char.weapons)[number]>(char.weapons);
+  if (weapons.length === 0) return null;
 
   return (
     <div>
       <SectionTitle icon={<Swords size={14} />}>Weapons</SectionTitle>
       <div className="space-y-1.5">
-        {weapons.map(w => (
+        {weapons.map((w, index) => (
           <div
-            key={w.id}
+            key={w.id || `${w.name}-${index}`}
             className="bg-surface-secondary flex items-center justify-between rounded-lg px-3 py-2"
           >
             <div className="flex items-center gap-2">
@@ -729,7 +784,9 @@ function WeaponsSection({ char }: { char: CharacterState }) {
               )}
             </div>
             <span className="text-muted text-xs">
-              {w.damage?.map(d => `${d.dice} ${d.type}`).join(', ')}
+              {ensureArray<(typeof w.damage)[number]>(w.damage)
+                .map(d => `${d.dice} ${d.type}`)
+                .join(', ') || '—'}
             </span>
           </div>
         ))}
@@ -739,16 +796,16 @@ function WeaponsSection({ char }: { char: CharacterState }) {
 }
 
 function MagicItemsSection({ char }: { char: CharacterState }) {
-  const items = char.magicItems;
-  if (!items || items.length === 0) return null;
+  const items = ensureArray<(typeof char.magicItems)[number]>(char.magicItems);
+  if (items.length === 0) return null;
 
   return (
     <div>
       <SectionTitle icon={<Gem size={14} />}>Magic Items</SectionTitle>
       <div className="space-y-1.5">
-        {items.map(item => (
+        {items.map((item, index) => (
           <div
-            key={item.id}
+            key={item.id || `${item.name}-${index}`}
             className="bg-surface-secondary flex items-center justify-between rounded-lg px-3 py-2"
           >
             <div className="flex items-center gap-2">
@@ -781,16 +838,16 @@ function MagicItemsSection({ char }: { char: CharacterState }) {
 }
 
 function ArmorSection({ char }: { char: CharacterState }) {
-  const armor = char.armorItems;
-  if (!armor || armor.length === 0) return null;
+  const armor = ensureArray<(typeof char.armorItems)[number]>(char.armorItems);
+  if (armor.length === 0) return null;
 
   return (
     <div>
       <SectionTitle icon={<Shield size={14} />}>Armor</SectionTitle>
       <div className="space-y-1.5">
-        {armor.map(a => (
+        {armor.map((a, index) => (
           <div
-            key={a.id}
+            key={a.id || `${a.name}-${index}`}
             className="bg-surface-secondary flex items-center justify-between rounded-lg px-3 py-2"
           >
             <div className="flex items-center gap-2">
