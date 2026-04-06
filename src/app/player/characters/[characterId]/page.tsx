@@ -138,6 +138,7 @@ export default function CharacterSheet() {
     useExtendedFeature,
     resetExtendedFeatures,
     reorderExtendedFeatures,
+    toggleFavoriteFeature,
     migrateTraitsToExtendedFeatures,
     updateCharacterBackground,
     exportCharacter,
@@ -1044,6 +1045,7 @@ export default function CharacterSheet() {
                 resetExtendedFeatures={resetExtendedFeatures}
                 reorderExtendedFeatures={reorderExtendedFeatures}
                 addSpellsFromFeat={handleAddSpellsFromFeat}
+                toggleFavoriteFeature={toggleFavoriteFeature}
                 addToolProficiency={addToolProficiency}
                 updateToolProficiency={updateToolProficiency}
                 deleteToolProficiency={deleteToolProficiency}

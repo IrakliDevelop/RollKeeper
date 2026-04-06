@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { EquippedWeapons } from '@/components/EquippedWeapons';
 import { QuickSpells } from '@/components/QuickSpells';
+import { QuickFeatures } from '@/components/QuickFeatures';
 import { ConcentrationTracker } from '@/components/ui/character';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
@@ -179,6 +180,46 @@ export default function ActionsSection({
             </div>
           )}
       </CollapsibleSubsection>
+
+      {/* Quick Features - Collapsible */}
+      {(character.favoriteFeatureIds || []).length > 0 && (
+        <CollapsibleSubsection
+          title="Quick Features"
+          icon="⚡"
+          persistKey="quick-features"
+          defaultExpanded={true}
+          badge={
+            <span className="bg-accent-amber-bg text-accent-amber-text rounded-full px-2 py-1 text-sm font-medium">
+              {(character.favoriteFeatureIds || []).length} pinned
+            </span>
+          }
+          extraContent={
+            <Button
+              onClick={e => {
+                e.stopPropagation();
+                switchToTab('features');
+              }}
+              variant="ghost"
+              size="xs"
+              className="bg-accent-amber-bg text-accent-amber-text-muted hover:bg-accent-amber-bg-strong hover:text-accent-amber-text"
+            >
+              Manage
+            </Button>
+          }
+        >
+          <ErrorBoundary
+            fallback={
+              <div className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4">
+                <p className="text-accent-red-text-muted">
+                  Unable to load quick features
+                </p>
+              </div>
+            }
+          >
+            <QuickFeatures />
+          </ErrorBoundary>
+        </CollapsibleSubsection>
+      )}
 
       {/* Quick Spells - Collapsible */}
       <CollapsibleSubsection

@@ -245,6 +245,9 @@ function migrateCharacterData(character: unknown): CharacterState {
     if (!Array.isArray(result.summons)) {
       result.summons = [];
     }
+    if (!Array.isArray(result.favoriteFeatureIds)) {
+      result.favoriteFeatureIds = [];
+    }
     // Ensure defenses arrays exist
     if (!Array.isArray(result.damageImmunities)) {
       result.damageImmunities = [];
@@ -540,6 +543,7 @@ interface CharacterStore {
     destinationIndex: number,
     sourceType?: string
   ) => void;
+  toggleFavoriteFeature: (id: string) => void;
   migrateTraitsToExtendedFeatures: () => void;
 
   // Language management
@@ -2864,6 +2868,9 @@ export const useCharacterStore = create<CharacterStore>()(
             trackableTraits: (state.character.trackableTraits || []).filter(
               trait => trait.id !== id
             ),
+            favoriteFeatureIds: (
+              state.character.favoriteFeatureIds || []
+            ).filter(fid => fid !== id),
           },
           hasUnsavedChanges: true,
           saveStatus: 'saving',
@@ -3014,6 +3021,23 @@ export const useCharacterStore = create<CharacterStore>()(
               saveStatus: 'saving',
             };
           }
+        });
+      },
+
+      toggleFavoriteFeature: id => {
+        set(state => {
+          const favorites = state.character.favoriteFeatureIds || [];
+          const isFavorite = favorites.includes(id);
+          return {
+            character: {
+              ...state.character,
+              favoriteFeatureIds: isFavorite
+                ? favorites.filter(fid => fid !== id)
+                : [...favorites, id],
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
         });
       },
 
