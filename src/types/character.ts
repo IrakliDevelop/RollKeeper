@@ -633,6 +633,7 @@ export interface CharacterState {
 
   // Extended Features (new system)
   extendedFeatures: ExtendedFeature[];
+  favoriteFeatureIds: string[];
 
   // Rich Text Content
   features: RichTextContent[];

@@ -470,6 +470,7 @@ export const DEFAULT_CHARACTER_STATE = {
   trackableTraits: [] as TrackableTrait[],
 
   extendedFeatures: [] as ExtendedFeature[],
+  favoriteFeatureIds: [] as string[],
 
   features: [] as RichTextContent[],
   traits: [] as RichTextContent[],

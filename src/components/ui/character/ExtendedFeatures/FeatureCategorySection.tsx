@@ -22,6 +22,8 @@ interface FeatureCategorySectionProps {
   onDeleteFeature: (id: string) => void;
   onUseFeature: (id: string) => void;
   onReorderFeatures: (sourceIndex: number, destinationIndex: number) => void;
+  favoriteFeatureIds?: string[];
+  onToggleFavoriteFeature?: (id: string) => void;
   readonly?: boolean;
 }
 
@@ -34,6 +36,8 @@ export default function FeatureCategorySection({
   onDeleteFeature,
   onUseFeature,
   onReorderFeatures,
+  favoriteFeatureIds = [],
+  onToggleFavoriteFeature,
   readonly = false,
 }: FeatureCategorySectionProps) {
   const { features, label, description } = category;
@@ -93,6 +97,12 @@ export default function FeatureCategorySection({
                 }
                 onDelete={() => onDeleteFeature(feature.id)}
                 onUse={() => onUseFeature(feature.id)}
+                isFavorite={favoriteFeatureIds.includes(feature.id)}
+                onToggleFavorite={
+                  onToggleFavoriteFeature
+                    ? () => onToggleFavoriteFeature(feature.id)
+                    : undefined
+                }
                 readonly={readonly}
                 isDragging={isDragging}
               />

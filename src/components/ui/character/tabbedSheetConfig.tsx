@@ -175,6 +175,7 @@ export interface TabbedSheetConfigParams {
     sourceType?: string
   ) => void;
   addSpellsFromFeat?: (spells: Spell[]) => void;
+  toggleFavoriteFeature: (id: string) => void;
 
   // Tool proficiencies
   addToolProficiency: (
@@ -1161,6 +1162,8 @@ function FeaturesTabContent({
             onResetFeatures={params.resetExtendedFeatures}
             onReorderFeatures={params.reorderExtendedFeatures}
             onAddSpells={params.addSpellsFromFeat}
+            favoriteFeatureIds={character.favoriteFeatureIds || []}
+            onToggleFavoriteFeature={params.toggleFavoriteFeature}
           />
         </div>
       )}
