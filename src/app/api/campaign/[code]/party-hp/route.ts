@@ -16,6 +16,7 @@ export interface PartyMemberHP {
   avatar?: string;
   className: string;
   level: number;
+  armorClass: number;
   hitPoints: {
     current: number;
     max: number;
@@ -65,6 +66,14 @@ export async function GET(
 
           const primaryClass = char.classes?.[0];
 
+          let ac = char.armorClass ?? 10;
+          if (char.isTempACActive && char.tempArmorClass) {
+            ac = char.tempArmorClass;
+          }
+          if (char.isWearingShield) {
+            ac += char.shieldBonus ?? 2;
+          }
+
           members.push({
             characterId: parsed.characterId,
             characterName: parsed.characterName,
@@ -75,6 +84,7 @@ export async function GET(
               char.classes?.reduce((sum, c) => sum + c.level, 0) ||
               char.level ||
               1,
+            armorClass: ac,
             hitPoints: hpHidden
               ? null
               : {
