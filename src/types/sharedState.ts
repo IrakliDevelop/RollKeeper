@@ -1,4 +1,4 @@
-import type { CalendarConfig } from './calendar';
+import type { CalendarConfig, WeatherType } from './calendar';
 import type { InventoryItem } from './character';
 
 // Stored in Redis — DM's calendar data (events stay local, not synced)
@@ -6,6 +6,7 @@ export interface SharedCalendar {
   config: CalendarConfig;
   currentTime: number;
   startTime: number;
+  weather?: WeatherType;
   updatedAt: string; // ISO timestamp
 }
 
@@ -14,6 +15,7 @@ export interface SharedCalendarPlayer {
   config: CalendarConfig; // config.moons will be []
   currentTime: number;
   startTime: number;
+  weather?: WeatherType;
   updatedAt: string;
 }
 

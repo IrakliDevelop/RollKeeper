@@ -18,8 +18,9 @@ import type {
   MoonPhaseInfo,
   CalendarConfig,
   Era,
+  WeatherType,
 } from '@/types/calendar';
-import { MOON_PHASE_LABELS } from '@/types/calendar';
+import { MOON_PHASE_LABELS, WEATHER_OPTIONS } from '@/types/calendar';
 import { formatDate, formatTime } from '@/utils/calendarCalculations';
 
 interface TimeDisplayProps {
@@ -27,6 +28,7 @@ interface TimeDisplayProps {
   config: CalendarConfig;
   moonPhases: MoonPhaseInfo[];
   dayPeriod: string;
+  weather?: WeatherType;
   /** When provided, the time becomes editable. Called with (hour, minute). */
   onTimeEdit?: (hour: number, minute: number) => void;
 }
@@ -55,8 +57,12 @@ export function TimeDisplay({
   config,
   moonPhases,
   dayPeriod,
+  weather,
   onTimeEdit,
 }: TimeDisplayProps) {
+  const weatherInfo = weather
+    ? WEATHER_OPTIONS.find(w => w.type === weather)
+    : null;
   const weekDayName = config.weekDays[date.dayOfWeek]?.name ?? '';
   const eraStr = getEraDisplay(date.era);
 
@@ -167,11 +173,16 @@ export function TimeDisplay({
         )}
       </div>
 
-      {/* Season + Moons */}
+      {/* Season + Weather + Moons */}
       <div className="flex flex-wrap items-center gap-3">
         {date.season && (
           <Badge variant="neutral" className="text-xs">
             {date.season.name}
+          </Badge>
+        )}
+        {weatherInfo && (
+          <Badge variant="info" className="text-xs">
+            {weatherInfo.icon} {weatherInfo.label}
           </Badge>
         )}
         {moonPhases.map(mp => (

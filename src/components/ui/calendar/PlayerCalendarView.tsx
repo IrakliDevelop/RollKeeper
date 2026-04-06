@@ -35,6 +35,7 @@ import {
   formatTime,
   getDayPeriod,
 } from '@/utils/calendarCalculations';
+import { WEATHER_OPTIONS, type WeatherType } from '@/types/calendar';
 import type { SelectedDay } from './CalendarGrid';
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import type { CalendarEvent } from '@/types/calendar';
@@ -79,12 +80,17 @@ function getPeriodIcon(period: string) {
 function SyncedTimeDisplay({
   date,
   config,
+  weather,
 }: {
   date: import('@/types/calendar').CalendarDate;
   config: import('@/types/calendar').CalendarConfig;
+  weather?: WeatherType;
 }) {
   const period = getDayPeriod(date, config);
   const weekDayName = config.weekDays[date.dayOfWeek]?.name ?? '';
+  const weatherInfo = weather
+    ? WEATHER_OPTIONS.find(w => w.type === weather)
+    : null;
 
   return (
     <div className="border-divider bg-surface-raised inline-flex items-center gap-4 rounded-lg border p-4">
@@ -100,6 +106,17 @@ function SyncedTimeDisplay({
           <span className="text-muted text-xs">{weekDayName}</span>
         )}
       </div>
+      {weatherInfo && (
+        <>
+          <div className="border-divider h-8 border-l" />
+          <div className="flex items-center gap-1.5">
+            <span className="text-xl">{weatherInfo.icon}</span>
+            <span className="text-body text-sm font-medium">
+              {weatherInfo.label}
+            </span>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -358,7 +375,11 @@ export function PlayerCalendarView({
     <div className="space-y-4">
       {/* Time display (synced) */}
       {isSynced && date && config && (
-        <SyncedTimeDisplay date={date} config={config} />
+        <SyncedTimeDisplay
+          date={date}
+          config={config}
+          weather={sharedCalendar?.weather}
+        />
       )}
 
       {/* Date header + controls */}
