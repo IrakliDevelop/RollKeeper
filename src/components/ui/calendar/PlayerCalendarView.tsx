@@ -9,6 +9,10 @@ import {
   Undo2,
   MapPin,
   Link2,
+  Clock,
+  Sun,
+  Sunrise,
+  Sunset,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -28,6 +32,8 @@ import {
   timeToDate,
   dateToTime,
   getCampaignDays,
+  formatTime,
+  getDayPeriod,
 } from '@/utils/calendarCalculations';
 import type { SelectedDay } from './CalendarGrid';
 import type { ToastData } from '@/components/ui/feedback/Toast';
@@ -53,6 +59,49 @@ function getPresetDescription(id: string): string {
     default:
       return '';
   }
+}
+
+function getPeriodIcon(period: string) {
+  switch (period) {
+    case 'Morning':
+      return <Sunrise size={16} className="text-accent-amber-text" />;
+    case 'Afternoon':
+      return <Sun size={16} className="text-accent-amber-text" />;
+    case 'Evening':
+      return <Sunset size={16} className="text-accent-orange-text" />;
+    case 'Night':
+      return <Moon size={16} className="text-accent-blue-text" />;
+    default:
+      return <Clock size={16} className="text-muted" />;
+  }
+}
+
+function SyncedTimeDisplay({
+  date,
+  config,
+}: {
+  date: import('@/types/calendar').CalendarDate;
+  config: import('@/types/calendar').CalendarConfig;
+}) {
+  const period = getDayPeriod(date, config);
+  const weekDayName = config.weekDays[date.dayOfWeek]?.name ?? '';
+
+  return (
+    <div className="border-divider bg-surface-raised inline-flex items-center gap-4 rounded-lg border p-4">
+      <div className="text-heading font-mono text-3xl font-bold tracking-wide">
+        {formatTime(date)}
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-center gap-1.5">
+          {getPeriodIcon(period)}
+          <span className="text-body text-sm font-medium">{period}</span>
+        </div>
+        {weekDayName && (
+          <span className="text-muted text-xs">{weekDayName}</span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 interface PlayerCalendarViewProps {
@@ -307,6 +356,11 @@ export function PlayerCalendarView({
 
   return (
     <div className="space-y-4">
+      {/* Time display (synced) */}
+      {isSynced && date && config && (
+        <SyncedTimeDisplay date={date} config={config} />
+      )}
+
       {/* Date header + controls */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
