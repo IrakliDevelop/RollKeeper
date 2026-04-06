@@ -16,6 +16,7 @@ import {
   ShieldAlert,
   ShieldOff,
   Eye,
+  Thermometer,
 } from 'lucide-react';
 import { EncounterEntity } from '@/types/encounter';
 import { HPBar } from '@/components/shared/combat/HPBar';
@@ -100,6 +101,14 @@ export function EntityCardExpanded({
     }
   };
 
+  const handleAddTempHp = () => {
+    const amount = parseInt(hpInput);
+    if (!isNaN(amount) && amount > 0) {
+      onUpdate({ tempHp: Math.max(entity.tempHp, amount) });
+      setHpInput('');
+    }
+  };
+
   const handleAddCondition = (name: string) => {
     onAddCondition({ name, source: 'dm' });
   };
@@ -167,9 +176,9 @@ export function EntityCardExpanded({
               ))}
           </div>
 
-          {/* Damage/Heal controls — not for players or summons (synced from player sheet) */}
+          {/* Damage/Heal/THP controls — not for players or summons (synced from player sheet) */}
           {!isPlayerOwned && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Input
                 value={hpInput}
                 onChange={e => setHpInput(e.target.value)}
@@ -219,7 +228,16 @@ export function EntityCardExpanded({
               >
                 Heal
               </Button>
-              <div className="text-muted ml-2 flex items-center gap-1 text-sm">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAddTempHp}
+                disabled={!hpInput || parseInt(hpInput) <= 0}
+                title="Add temporary HP (takes higher)"
+              >
+                +THP
+              </Button>
+              <div className="text-muted ml-auto flex items-center gap-1 text-sm">
                 <Shield size={14} />
                 <input
                   type="number"
@@ -232,6 +250,26 @@ export function EntityCardExpanded({
                   className="bg-surface-raised text-heading w-12 rounded px-1 py-0.5 text-center text-sm font-medium shadow-sm"
                 />
               </div>
+            </div>
+          )}
+
+          {/* Temp HP indicator with clear — NPC/monster */}
+          {!isPlayerOwned && entity.tempHp > 0 && (
+            <div className="flex items-center gap-2">
+              <Thermometer
+                size={14}
+                className="text-accent-blue-text shrink-0"
+              />
+              <span className="text-accent-blue-text text-xs font-semibold">
+                Temp HP: {entity.tempHp}
+              </span>
+              <button
+                onClick={() => onUpdate({ tempHp: 0 })}
+                className="text-muted hover:text-accent-red-text text-xs transition-colors"
+                title="Clear temp HP"
+              >
+                Clear
+              </button>
             </div>
           )}
 
@@ -248,9 +286,17 @@ export function EntityCardExpanded({
             </div>
           )}
 
-          {entity.tempHp > 0 && (
-            <div className="text-accent-blue-text text-xs">
-              Temp HP: {entity.tempHp}
+          {/* Player: read-only temp HP */}
+          {isPlayerOwned && entity.tempHp > 0 && (
+            <div className="flex items-center gap-2">
+              <Thermometer
+                size={14}
+                className="text-accent-blue-text shrink-0"
+              />
+              <span className="text-accent-blue-text text-xs font-semibold">
+                Temp HP: {entity.tempHp}
+              </span>
+              <span className="text-faint text-xs">(synced from player)</span>
             </div>
           )}
         </div>

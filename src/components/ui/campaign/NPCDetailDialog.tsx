@@ -18,6 +18,9 @@ import {
   Pencil,
   Send,
   Wand2,
+  Swords,
+  Thermometer,
+  Tag,
 } from 'lucide-react';
 import {
   Dialog,
@@ -45,6 +48,7 @@ import {
   formDataToNpcInventoryPatch,
 } from '@/utils/npcInventoryItemForm';
 import { NPCSpellTab } from './NPCSpellTab';
+import { useNPCStore } from '@/store/npcStore';
 
 type DetailTab = 'stats' | 'spells' | 'inventory' | 'lore';
 
@@ -145,6 +149,88 @@ function ExtraStatsBadges({ npc }: { npc: CampaignNPC }) {
             {passiveParts.join(' · ')}
           </span>
         </span>
+      )}
+    </div>
+  );
+}
+
+function getInitiativeModifier(npc: CampaignNPC): number {
+  if (npc.initiativeModifier !== undefined) return npc.initiativeModifier;
+  const dex = npc.monsterStatBlock?.dex ?? npc.abilityScores?.dex ?? 10;
+  return Math.floor((dex - 10) / 2);
+}
+
+function formatMod(value: number): string {
+  return value >= 0 ? `+${value}` : `${value}`;
+}
+
+function CombatSummaryBar({ npc }: { npc: CampaignNPC }) {
+  const currentHp = npc.currentHp ?? npc.maxHp;
+  const initMod = getInitiativeModifier(npc);
+  const hpRatio = npc.maxHp > 0 ? currentHp / npc.maxHp : 1;
+
+  const hpColor =
+    hpRatio > 0.5
+      ? 'text-accent-emerald-text'
+      : hpRatio > 0.25
+        ? 'text-accent-amber-text'
+        : 'text-accent-red-text';
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        {/* HP */}
+        <div className="bg-surface-secondary flex items-center gap-2 rounded-lg px-3 py-2">
+          <Heart className="text-accent-red-text h-4 w-4 shrink-0" />
+          <span className="text-muted text-xs">HP</span>
+          <span className={`text-sm font-semibold ${hpColor}`}>
+            {currentHp}/{npc.maxHp}
+          </span>
+          {(npc.tempHp ?? 0) > 0 && (
+            <span className="text-accent-blue-text flex items-center gap-0.5 text-xs font-medium">
+              <Thermometer className="h-3 w-3" />+{npc.tempHp}
+            </span>
+          )}
+        </div>
+
+        {/* AC */}
+        <div className="bg-surface-secondary flex items-center gap-2 rounded-lg px-3 py-2">
+          <Shield className="text-accent-blue-text h-4 w-4 shrink-0" />
+          <span className="text-muted text-xs">AC</span>
+          <span className="text-heading text-sm font-semibold">
+            {npc.armorClass}
+          </span>
+        </div>
+
+        {/* Speed */}
+        <div className="bg-surface-secondary flex items-center gap-2 rounded-lg px-3 py-2">
+          <Footprints className="text-accent-amber-text h-4 w-4 shrink-0" />
+          <span className="text-muted text-xs">Speed</span>
+          <span className="text-heading text-sm font-semibold">
+            {npc.speed}
+          </span>
+        </div>
+
+        {/* Initiative */}
+        <div className="bg-surface-secondary flex items-center gap-2 rounded-lg px-3 py-2">
+          <Swords className="text-accent-purple-text h-4 w-4 shrink-0" />
+          <span className="text-muted text-xs">Initiative</span>
+          <span className="text-heading text-sm font-semibold">
+            {formatMod(initMod)}
+          </span>
+        </div>
+      </div>
+
+      {/* Tags */}
+      {npc.tags && npc.tags.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Tag className="text-muted h-3.5 w-3.5 shrink-0" />
+          {npc.tags.map(tag => (
+            <Badge key={tag} variant="neutral" size="sm">
+              {tag}
+            </Badge>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -478,6 +564,18 @@ export function NPCDetailDialog({
   const { items: dbItems, loading: dbItemsLoading } = useItemsData();
   const { items: dbMagicItems } = useMagicItemsData();
 
+  const handleTabChange = React.useCallback(
+    (tab: DetailTab) => {
+      setActiveTab(tab);
+      if (npc) {
+        useNPCStore
+          .getState()
+          .updateNPC(npc.campaignCode, npc.id, { lastDetailTab: tab });
+      }
+    },
+    [npc]
+  );
+
   React.useEffect(() => {
     if (!open) {
       setShowFullImage(false);
@@ -488,10 +586,16 @@ export function NPCDetailDialog({
   }, [open]);
 
   React.useEffect(() => {
-    if (open && initialTab) {
-      setActiveTab(initialTab);
+    if (open) {
+      if (initialTab) {
+        setActiveTab(initialTab);
+      } else if (npc?.lastDetailTab) {
+        setActiveTab(npc.lastDetailTab);
+      } else {
+        setActiveTab('stats');
+      }
     }
-  }, [open, initialTab]);
+  }, [open, initialTab, npc?.lastDetailTab]);
 
   const handleInventoryFormSubmit = (data: InventoryFormData) => {
     if (!npc || !onUpdateInventory) return;
@@ -646,7 +750,7 @@ export function NPCDetailDialog({
             <button
               key={tab.key}
               type="button"
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => handleTabChange(tab.key)}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                 activeTab === tab.key
                   ? 'bg-surface-raised text-heading shadow-sm'
@@ -662,40 +766,12 @@ export function NPCDetailDialog({
         <DialogBody className="min-h-0 overflow-y-auto">
           {activeTab === 'stats' && (
             <div className="space-y-4">
+              <CombatSummaryBar npc={npc} />
+              <ExtraStatsBadges npc={npc} />
               {statBlock ? (
-                <>
-                  <MonsterStatBlockPanel statBlock={statBlock} />
-                  <ExtraStatsBadges npc={npc} />
-                </>
+                <MonsterStatBlockPanel statBlock={statBlock} />
               ) : (
                 <>
-                  {/* Basic stats row */}
-                  <div className="flex flex-wrap gap-4">
-                    <div className="bg-surface-secondary flex items-center gap-2 rounded-lg px-3 py-2">
-                      <Heart className="text-accent-red-text h-4 w-4" />
-                      <span className="text-muted text-xs">HP</span>
-                      <span className="text-heading text-sm font-semibold">
-                        {npc.maxHp}
-                      </span>
-                    </div>
-                    <div className="bg-surface-secondary flex items-center gap-2 rounded-lg px-3 py-2">
-                      <Shield className="text-accent-blue-text h-4 w-4" />
-                      <span className="text-muted text-xs">AC</span>
-                      <span className="text-heading text-sm font-semibold">
-                        {npc.armorClass}
-                      </span>
-                    </div>
-                    <div className="bg-surface-secondary flex items-center gap-2 rounded-lg px-3 py-2">
-                      <Footprints className="text-accent-amber-text h-4 w-4" />
-                      <span className="text-muted text-xs">Speed</span>
-                      <span className="text-heading text-sm font-semibold">
-                        {npc.speed}
-                      </span>
-                    </div>
-                  </div>
-
-                  <ExtraStatsBadges npc={npc} />
-
                   {npc.abilityScores && (
                     <AbilityScoreGrid scores={npc.abilityScores} />
                   )}

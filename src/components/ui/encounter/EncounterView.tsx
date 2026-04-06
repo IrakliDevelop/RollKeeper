@@ -403,7 +403,6 @@ export function EncounterView({
               setViewingNpcEntityId(null);
             }
           }}
-          initialTab="spells"
           readOnly
           encounterId={encounterId}
           npcEntityId={viewingNpcEntityId ?? undefined}

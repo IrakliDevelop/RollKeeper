@@ -246,6 +246,9 @@ export interface CampaignNPC {
   // UI state: which spell tab sections are collapsed
   collapsedSpellSections?: string[]; // e.g. ['stats', 'slotTracker', 'spells']
 
+  // UI state: last viewed detail tab
+  lastDetailTab?: 'stats' | 'spells' | 'inventory' | 'lore';
+
   // Passive abilities
   passivePerception?: number;
   passiveInsight?: number;
