@@ -279,6 +279,7 @@ export interface Spell {
   castingSource?: string; // e.g. "Fey Touched", "Drow Magic", "Eldritch Invocation"
   freeCastMax?: number; // 0 = at will (unlimited), 1+ = X free casts per long rest
   freeCastsUsed?: number; // how many free casts used since last long rest
+  tags?: string[];
   createdAt: string;
   updatedAt: string;
 }
