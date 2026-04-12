@@ -75,7 +75,7 @@ export function characterShareKey(characterId: string): string {
   return `character:share:${characterId}`;
 }
 
-export const CHARACTER_SHARE_TTL_SECONDS = 24 * 60 * 60; // 24 hours
+const CHARACTER_SHARE_TTL_SECONDS = 24 * 60 * 60; // 24 hours
 
 export async function refreshCampaignTTL(
   redis: Redis,
@@ -89,4 +89,4 @@ export async function refreshCampaignTTL(
   ]);
 }
 
-export { SLIDING_TTL_SECONDS };
+export { SLIDING_TTL_SECONDS, CHARACTER_SHARE_TTL_SECONDS };
