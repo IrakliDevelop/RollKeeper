@@ -8,10 +8,11 @@ import {
   ChevronRight,
   Eye,
   Trash2,
-  Plus,
   Star,
-  Zap,
+  Wand2,
   Filter,
+  Pencil,
+  Tag,
 } from 'lucide-react';
 import {
   Dialog,
@@ -22,14 +23,13 @@ import {
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
-import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
 import { SpellAutocomplete } from '@/components/ui/forms/SpellAutocomplete';
 import { useSpellsData } from '@/hooks/useSpellsData';
 import { useToast, ToastContainer } from '@/components/ui/feedback/Toast';
-import { SpellSlotTracker } from '@/components/shared/spells';
+import { SpellSlotTracker, SpellFormFields } from '@/components/shared/spells';
 import { useNPCStore } from '@/store/npcStore';
 import { useEncounterStore } from '@/store/encounterStore';
 import { useDmStore } from '@/store/dmStore';
@@ -44,11 +44,13 @@ import {
 import {
   convertProcessedSpellToFormData,
   convertFormDataToSpell,
+  spellToFormData,
+  createInitialSpellFormData,
 } from '@/utils/spellConversion';
 import type { CampaignNPC } from '@/types/encounter';
 import type { Spell, SpellSlots } from '@/types/character';
 import type { ProcessedSpell } from '@/types/spells';
-import type { FreeCastMode } from '@/utils/spellConversion';
+import type { SpellFormData } from '@/utils/spellConversion';
 
 interface NPCSpellTabProps {
   npc: CampaignNPC;
@@ -181,8 +183,12 @@ export function NPCSpellTab({
   const [viewingSpell, setViewingSpell] = useState<Spell | null>(null);
   const [castingSpell, setCastingSpell] = useState<Spell | null>(null);
   const [addSpellOpen, setAddSpellOpen] = useState(false);
+  const [editingSpell, setEditingSpell] = useState<Spell | null>(null);
   const [activeCategories, setActiveCategories] = useState<Set<SpellCategory>>(
     () => new Set(ALL_SPELL_CATEGORIES)
+  );
+  const [activeTagFilters, setActiveTagFilters] = useState<Set<string>>(
+    () => new Set()
   );
 
   // Expose add-spell trigger to parent via ref
@@ -195,12 +201,15 @@ export function NPCSpellTab({
     };
   }, [addSpellRef]);
 
-  // Add spell form state
-  const [freeCastMode, setFreeCastMode] = useState<FreeCastMode>('normal');
-  const [freeCastMax, setFreeCastMax] = useState(1);
-  const [customSpellName, setCustomSpellName] = useState('');
-  const [customSpellLevel, setCustomSpellLevel] = useState(0);
-  const [showCustomForm, setShowCustomForm] = useState(false);
+  // Add/edit spell form state
+  const [addFormData, setAddFormData] = useState<SpellFormData>(
+    createInitialSpellFormData
+  );
+  const [addTags, setAddTags] = useState<string[]>([]);
+  const [editFormData, setEditFormData] = useState<SpellFormData>(
+    createInitialSpellFormData
+  );
+  const [editTags, setEditTags] = useState<string[]>([]);
 
   const { spells: dbSpells, loading: spellsLoading } = useSpellsData();
 
@@ -249,21 +258,37 @@ export function NPCSpellTab({
     return groups;
   }, [scSpells]);
 
-  const isFiltering =
+  const isCategoryFiltering =
     activeCategories.size > 0 &&
     activeCategories.size < ALL_SPELL_CATEGORIES.length;
+  const isTagFiltering = activeTagFilters.size > 0;
+  const isFiltering = isCategoryFiltering || isTagFiltering;
 
   const filteredSpellsByLevel = useMemo(() => {
     if (!isFiltering) return spellsByLevel;
     const filtered: Record<number, Spell[]> = {};
     for (const [lvl, spells] of Object.entries(spellsByLevel)) {
-      const matching = spells.filter(s =>
-        activeCategories.has(getSpellCategory(s))
-      );
+      const matching = spells.filter(s => {
+        if (isCategoryFiltering && !activeCategories.has(getSpellCategory(s)))
+          return false;
+        if (
+          isTagFiltering &&
+          (!s.tags || !s.tags.some(t => activeTagFilters.has(t)))
+        )
+          return false;
+        return true;
+      });
       if (matching.length > 0) filtered[Number(lvl)] = matching;
     }
     return filtered;
-  }, [spellsByLevel, activeCategories, isFiltering]);
+  }, [
+    spellsByLevel,
+    activeCategories,
+    activeTagFilters,
+    isFiltering,
+    isCategoryFiltering,
+    isTagFiltering,
+  ]);
 
   const toggleCategory = useCallback((cat: SpellCategory) => {
     setActiveCategories(prev => {
@@ -296,6 +321,29 @@ export function NPCSpellTab({
       (categoryCounts.at_will > 0 ? 1 : 0) +
       (categoryCounts.innate > 0 ? 1 : 0) >
     1;
+
+  const allSpellTags = useMemo(() => {
+    if (!scSpells) return [];
+    const tagSet = new Set<string>();
+    for (const spell of scSpells) {
+      if (spell.tags) {
+        for (const t of spell.tags) tagSet.add(t);
+      }
+    }
+    return Array.from(tagSet).sort();
+  }, [scSpells]);
+
+  const toggleTagFilter = useCallback((tag: string) => {
+    setActiveTagFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(tag)) {
+        next.delete(tag);
+      } else {
+        next.add(tag);
+      }
+      return next;
+    });
+  }, []);
 
   // Merge spell levels with slot levels so empty-spell levels with slots still show
   const sortedLevels = useMemo(() => {
@@ -418,62 +466,46 @@ export function NPCSpellTab({
     [campaignCode, npc.id]
   );
 
-  const handleAddSpellFromDb = useCallback(
-    (processedSpell: ProcessedSpell) => {
-      const formData = convertProcessedSpellToFormData(processedSpell);
-      // Apply free cast mode
-      formData.freeCastMode = freeCastMode;
-      formData.freeCastMax = freeCastMax;
-      const spell = convertFormDataToSpell(formData);
-      useNPCStore.getState().addSpellToNPC(campaignCode, npc.id, spell);
-      setAddSpellOpen(false);
-      resetAddForm();
-    },
-    [campaignCode, npc.id, freeCastMode, freeCastMax]
-  );
+  const handleAddSpellFromDb = useCallback((processedSpell: ProcessedSpell) => {
+    setAddFormData(convertProcessedSpellToFormData(processedSpell));
+  }, []);
 
-  const handleAddCustomSpell = useCallback(() => {
-    if (!customSpellName.trim()) return;
-    const now = new Date().toISOString();
-    const spell: Spell = {
-      id: `spell_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: customSpellName.trim(),
-      level: customSpellLevel,
-      school: 'Unknown',
-      castingTime: '1 action',
-      range: 'Self',
-      components: { verbal: false, somatic: false, material: false },
-      duration: 'Instantaneous',
-      description: '',
-      freeCastMax:
-        freeCastMode === 'at_will'
-          ? 0
-          : freeCastMode === 'innate'
-            ? freeCastMax
-            : undefined,
-      freeCastsUsed: freeCastMode !== 'normal' ? 0 : undefined,
-      createdAt: now,
-      updatedAt: now,
-    };
+  const handleAddSubmit = useCallback(() => {
+    if (!addFormData.name.trim()) return;
+    const spell = convertFormDataToSpell(addFormData);
+    if (addTags.length > 0) spell.tags = [...addTags];
     useNPCStore.getState().addSpellToNPC(campaignCode, npc.id, spell);
     setAddSpellOpen(false);
-    resetAddForm();
-  }, [
-    campaignCode,
-    npc.id,
-    customSpellName,
-    customSpellLevel,
-    freeCastMode,
-    freeCastMax,
-  ]);
+    setAddFormData(createInitialSpellFormData());
+    setAddTags([]);
+  }, [campaignCode, npc.id, addFormData, addTags]);
 
-  function resetAddForm() {
-    setFreeCastMode('normal');
-    setFreeCastMax(1);
-    setCustomSpellName('');
-    setCustomSpellLevel(0);
-    setShowCustomForm(false);
-  }
+  const handleEditSpellOpen = useCallback((spell: Spell) => {
+    setEditingSpell(spell);
+    setEditFormData(spellToFormData(spell));
+    setEditTags(spell.tags ?? []);
+  }, []);
+
+  const handleSaveEditSpell = useCallback(() => {
+    if (!editingSpell) return;
+    const updates = convertFormDataToSpell(editFormData, editingSpell.id);
+    // Preserve existing freeCastsUsed — don't reset usage count when editing
+    if (updates.freeCastMax !== undefined) {
+      updates.freeCastsUsed = editingSpell.freeCastsUsed ?? 0;
+    }
+    updates.tags = editTags.length > 0 ? editTags : undefined;
+    // Preserve original createdAt — convertFormDataToSpell always generates a new one
+    const { createdAt: _createdAt, ...updatesWithoutCreatedAt } = updates;
+    useNPCStore
+      .getState()
+      .updateSpellOnNPC(
+        campaignCode,
+        npc.id,
+        editingSpell.id,
+        updatesWithoutCreatedAt
+      );
+    setEditingSpell(null);
+  }, [campaignCode, npc.id, editingSpell, editFormData, editTags]);
 
   if (!sc) return null;
 
@@ -594,30 +626,65 @@ export function NPCSpellTab({
         />
         {!isSectionCollapsed('spells') && (
           <div className="mt-2">
-            {/* Category filter — only show when NPC has spells in 2+ categories */}
-            {hasMultipleCategories && (
-              <div className="mb-2 flex items-center gap-1.5">
-                <Filter className="text-muted h-3.5 w-3.5 shrink-0" />
-                {ALL_SPELL_CATEGORIES.map(cat => {
-                  const count = categoryCounts[cat];
-                  if (count === 0) return null;
-                  const isActive = activeCategories.has(cat);
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => toggleCategory(cat)}
-                      className={`rounded-md border px-2 py-0.5 text-xs font-medium transition-colors ${
-                        isActive
-                          ? 'border-accent-purple-border bg-accent-purple-bg text-accent-purple-text'
-                          : 'border-divider bg-surface-raised text-faint hover:text-muted'
-                      }`}
-                    >
-                      {SPELL_CATEGORY_LABELS[cat]}{' '}
-                      <span className="opacity-60">{count}</span>
-                    </button>
-                  );
-                })}
+            {/* Filters — categories + tags */}
+            {(hasMultipleCategories || allSpellTags.length > 0) && (
+              <div className="mb-2 space-y-1.5">
+                {hasMultipleCategories && (
+                  <div className="flex items-center gap-1.5">
+                    <Filter className="text-muted h-3.5 w-3.5 shrink-0" />
+                    {ALL_SPELL_CATEGORIES.map(cat => {
+                      const count = categoryCounts[cat];
+                      if (count === 0) return null;
+                      const isActive = activeCategories.has(cat);
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => toggleCategory(cat)}
+                          className={`rounded-md border px-2 py-0.5 text-xs font-medium transition-colors ${
+                            isActive
+                              ? 'border-accent-purple-border bg-accent-purple-bg text-accent-purple-text'
+                              : 'border-divider bg-surface-raised text-faint hover:text-muted'
+                          }`}
+                        >
+                          {SPELL_CATEGORY_LABELS[cat]}{' '}
+                          <span className="opacity-60">{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {allSpellTags.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <Tag className="text-muted h-3.5 w-3.5 shrink-0" />
+                    {allSpellTags.map(tag => {
+                      const isActive = activeTagFilters.has(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => toggleTagFilter(tag)}
+                          className={`rounded-md border px-2 py-0.5 text-xs font-medium transition-colors ${
+                            isActive
+                              ? 'border-accent-amber-border bg-accent-amber-bg text-accent-amber-text'
+                              : 'border-divider bg-surface-raised text-faint hover:text-muted'
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
+                    {isTagFiltering && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTagFilters(new Set())}
+                        className="text-muted hover:text-body text-xs transition-colors"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             {sortedLevels.length > 0 ? (
@@ -732,6 +799,7 @@ export function NPCSpellTab({
                               key={spell.id}
                               spell={spell}
                               onView={() => setViewingSpell(spell)}
+                              onEdit={() => handleEditSpellOpen(spell)}
                               onRemove={() => handleRemoveSpell(spell.id)}
                               onCast={() => setCastingSpell(spell)}
                             />
@@ -785,160 +853,84 @@ export function NPCSpellTab({
         onOpenChange={open => {
           if (!open) {
             setAddSpellOpen(false);
-            resetAddForm();
+            setAddFormData(createInitialSpellFormData());
+            setAddTags([]);
           }
         }}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>Add Spell to {npc.name}</DialogTitle>
           </DialogHeader>
           <DialogBody className="space-y-4">
-            {/* Free cast mode selector */}
-            <div>
-              <label className="text-heading mb-1.5 block text-sm font-medium">
-                Cast Type
-              </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFreeCastMode('normal')}
-                  className={`rounded-lg border-2 px-3 py-1.5 text-sm font-medium transition-colors ${
-                    freeCastMode === 'normal'
-                      ? 'border-accent-purple-border bg-accent-purple-bg text-accent-purple-text'
-                      : 'border-divider bg-surface-raised text-muted hover:text-body'
-                  }`}
-                >
-                  Normal
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFreeCastMode('at_will')}
-                  className={`rounded-lg border-2 px-3 py-1.5 text-sm font-medium transition-colors ${
-                    freeCastMode === 'at_will'
-                      ? 'border-accent-purple-border bg-accent-purple-bg text-accent-purple-text'
-                      : 'border-divider bg-surface-raised text-muted hover:text-body'
-                  }`}
-                >
-                  At Will
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFreeCastMode('innate')}
-                  className={`rounded-lg border-2 px-3 py-1.5 text-sm font-medium transition-colors ${
-                    freeCastMode === 'innate'
-                      ? 'border-accent-purple-border bg-accent-purple-bg text-accent-purple-text'
-                      : 'border-divider bg-surface-raised text-muted hover:text-body'
-                  }`}
-                >
-                  Innate
-                </button>
-              </div>
-              {freeCastMode === 'innate' && (
-                <div className="mt-2 flex items-center gap-2">
-                  <label className="text-muted text-sm">Uses per day:</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={9}
-                    value={freeCastMax}
-                    onChange={e =>
-                      setFreeCastMax(Math.max(1, parseInt(e.target.value) || 1))
-                    }
-                    className="w-20"
-                    size="sm"
-                  />
-                </div>
-              )}
+            {/* DB search — pre-fills all form fields on select */}
+            <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border-2 p-4">
+              <SpellAutocomplete
+                spells={dbSpells}
+                onSelect={handleAddSpellFromDb}
+                loading={spellsLoading}
+                placeholder="Search spells from database to auto-fill..."
+              />
             </div>
 
-            {/* Database search */}
-            <SpellAutocomplete
-              spells={dbSpells}
-              onSelect={handleAddSpellFromDb}
-              loading={spellsLoading}
+            <SpellFormFields
+              formData={addFormData}
+              onChange={setAddFormData}
+              tags={addTags}
+              onTagsChange={setAddTags}
+              existingTags={allSpellTags}
             />
-
-            {/* Divider */}
-            <div className="flex items-center gap-3">
-              <div className="border-divider flex-1 border-t" />
-              <span className="text-muted text-xs">or</span>
-              <div className="border-divider flex-1 border-t" />
-            </div>
-
-            {/* Custom spell quick add */}
-            {!showCustomForm ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowCustomForm(true)}
-                className="w-full"
-              >
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                Quick Custom Spell
-              </Button>
-            ) : (
-              <div className="bg-surface-secondary space-y-3 rounded-lg p-3">
-                <h4 className="text-heading text-sm font-semibold">
-                  Custom Spell
-                </h4>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <Input
-                      placeholder="Spell name"
-                      value={customSpellName}
-                      onChange={e => setCustomSpellName(e.target.value)}
-                      size="sm"
-                    />
-                  </div>
-                  <div className="w-20">
-                    <Input
-                      type="number"
-                      min={0}
-                      max={9}
-                      value={customSpellLevel}
-                      onChange={e =>
-                        setCustomSpellLevel(
-                          Math.max(
-                            0,
-                            Math.min(9, parseInt(e.target.value) || 0)
-                          )
-                        )
-                      }
-                      placeholder="Lv"
-                      size="sm"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    onClick={() => setShowCustomForm(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="xs"
-                    onClick={handleAddCustomSpell}
-                    disabled={!customSpellName.trim()}
-                  >
-                    Add
-                  </Button>
-                </div>
-              </div>
-            )}
           </DialogBody>
           <DialogFooter>
             <Button
               variant="ghost"
               onClick={() => {
                 setAddSpellOpen(false);
-                resetAddForm();
+                setAddFormData(createInitialSpellFormData());
+                setAddTags([]);
               }}
             >
-              Close
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleAddSubmit}
+              disabled={!addFormData.name.trim()}
+            >
+              Add Spell
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Spell dialog */}
+      <Dialog
+        open={!!editingSpell}
+        onOpenChange={open => {
+          if (!open) setEditingSpell(null);
+        }}
+      >
+        <DialogContent size="lg">
+          <DialogHeader>
+            <DialogTitle>Edit: {editingSpell?.name}</DialogTitle>
+          </DialogHeader>
+          {editingSpell && (
+            <DialogBody>
+              <SpellFormFields
+                formData={editFormData}
+                onChange={setEditFormData}
+                tags={editTags}
+                onTagsChange={setEditTags}
+                existingTags={allSpellTags}
+              />
+            </DialogBody>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditingSpell(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={handleSaveEditSpell}>
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -952,11 +944,13 @@ export function NPCSpellTab({
 function SpellRow({
   spell,
   onView,
+  onEdit,
   onRemove,
   onCast,
 }: {
   spell: Spell;
   onView: () => void;
+  onEdit: () => void;
   onRemove: () => void;
   onCast: () => void;
 }) {
@@ -965,84 +959,107 @@ function SpellRow({
   const innateRemaining = isInnate
     ? spell.freeCastMax! - (spell.freeCastsUsed ?? 0)
     : 0;
+  const tags = spell.tags ?? [];
 
   return (
-    <div className="bg-surface-raised flex items-center gap-2 px-3 py-1.5">
-      {/* Favorite star for at-will/innate */}
-      {(isAtWill || isInnate) && (
-        <Star className="text-accent-amber-text h-3.5 w-3.5 shrink-0" />
-      )}
+    <div className="bg-surface-raised space-y-0.5 px-3 py-1.5">
+      <div className="flex items-center gap-2">
+        {/* Favorite star for at-will/innate */}
+        {(isAtWill || isInnate) && (
+          <Star className="text-accent-amber-text h-3.5 w-3.5 shrink-0" />
+        )}
 
-      {/* Spell name */}
-      <span className="text-heading min-w-0 flex-1 truncate text-sm font-medium">
-        {spell.name}
-      </span>
-
-      {/* Level badge */}
-      <Badge variant={spell.level === 0 ? 'warning' : 'secondary'} size="sm">
-        {spell.level === 0 ? 'C' : `L${spell.level}`}
-      </Badge>
-
-      {/* School */}
-      {spell.school && spell.school !== 'Unknown' && (
-        <span className="text-faint hidden text-xs sm:inline">
-          {spell.school}
+        {/* Spell name */}
+        <span className="text-heading min-w-0 flex-1 truncate text-sm font-medium">
+          {spell.name}
         </span>
-      )}
 
-      {/* At-will / Innate badges */}
-      {isAtWill && (
-        <Badge variant="warning" size="sm">
-          At Will
+        {/* Level badge */}
+        <Badge variant={spell.level === 0 ? 'warning' : 'secondary'} size="sm">
+          {spell.level === 0 ? 'C' : `L${spell.level}`}
         </Badge>
-      )}
-      {isInnate && (
-        <Badge variant={innateRemaining > 0 ? 'success' : 'danger'} size="sm">
-          {innateRemaining}/{spell.freeCastMax}
-        </Badge>
-      )}
 
-      {/* Concentration */}
-      {spell.concentration && (
-        <Badge variant="info" size="sm">
-          C
-        </Badge>
-      )}
+        {/* School */}
+        {spell.school && spell.school !== 'Unknown' && (
+          <span className="text-faint hidden text-xs sm:inline">
+            {spell.school}
+          </span>
+        )}
 
-      {/* Ritual */}
-      {spell.ritual && (
-        <Badge variant="neutral" size="sm">
-          R
-        </Badge>
-      )}
+        {/* At-will / Innate badges */}
+        {isAtWill && (
+          <Badge variant="warning" size="sm">
+            At Will
+          </Badge>
+        )}
+        {isInnate && (
+          <Badge variant={innateRemaining > 0 ? 'success' : 'danger'} size="sm">
+            {innateRemaining}/{spell.freeCastMax}
+          </Badge>
+        )}
 
-      {/* Actions */}
-      <div className="flex shrink-0 items-center gap-0.5">
-        <button
-          type="button"
-          onClick={onCast}
-          className="text-muted hover:text-accent-purple-text rounded p-1 transition-colors"
-          title="Cast spell"
-        >
-          <Zap className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={onView}
-          className="text-muted hover:text-accent-blue-text rounded p-1 transition-colors"
-          title="View spell details"
-        >
-          <Eye className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="text-muted hover:text-accent-red-text rounded p-1 transition-colors"
-          title="Remove spell"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        {/* Concentration */}
+        {spell.concentration && (
+          <Badge variant="info" size="sm">
+            C
+          </Badge>
+        )}
+
+        {/* Ritual */}
+        {spell.ritual && (
+          <Badge variant="neutral" size="sm">
+            R
+          </Badge>
+        )}
+
+        {/* Actions */}
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={onCast}
+            className="text-muted hover:text-accent-purple-text rounded p-1 transition-colors"
+            title="Cast spell"
+          >
+            <Wand2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onView}
+            className="text-muted hover:text-accent-blue-text rounded p-1 transition-colors"
+            title="View spell details"
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-muted hover:text-accent-amber-text rounded p-1 transition-colors"
+            title="Edit spell"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-muted hover:text-accent-red-text rounded p-1 transition-colors"
+            title="Remove spell"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 pl-5">
+          {tags.map(tag => (
+            <span
+              key={tag}
+              className="border-accent-amber-border bg-accent-amber-bg text-accent-amber-text rounded border px-1.5 py-0 text-[10px] font-medium"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

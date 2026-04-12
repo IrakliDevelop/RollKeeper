@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Spell, SpellActionType } from '@/types/character';
+import { Spell } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import {
   Plus,
@@ -42,106 +42,23 @@ import { SpellAutocomplete } from '@/components/ui/forms/SpellAutocomplete';
 import { useSpellsData } from '@/hooks/useSpellsData';
 import {
   convertProcessedSpellToFormData,
+  spellToFormData,
+  createInitialSpellFormData,
   type SpellFormData,
-  type FreeCastMode,
 } from '@/utils/spellConversion';
+import { SpellFormFields } from '@/components/shared/spells';
 import { ProcessedSpell } from '@/types/spells';
-import RichTextEditor from '@/components/ui/forms/RichTextEditor';
 import { SummonCreaturePickerModal } from '@/components/ui/character/summons';
 import { isSummoningSpell } from '@/utils/summonConverter';
 import {
   calculateSpellAttackBonus,
   getSpellcastingAbilityModifier,
 } from '@/utils/calculations';
-
-// Constants for spell schools and common casting times
-const SPELL_SCHOOLS = [
-  'Abjuration',
-  'Conjuration',
-  'Divination',
-  'Enchantment',
-  'Evocation',
-  'Illusion',
-  'Necromancy',
-  'Transmutation',
-];
-
-const CASTING_TIMES = [
-  '1 action',
-  '1 bonus action',
-  '1 reaction',
-  '1 minute',
-  '10 minutes',
-  '1 hour',
-  '8 hours',
-  '24 hours',
-];
-
-const RANGES = [
-  'Self',
-  'Touch',
-  '5 feet',
-  '10 feet',
-  '15 feet',
-  '30 feet',
-  '60 feet',
-  '90 feet',
-  '120 feet',
-  '150 feet',
-  '300 feet',
-  '500 feet',
-  '1 mile',
-  'Sight',
-  'Unlimited',
-];
-
-const DURATIONS = [
-  'Instantaneous',
-  '1 round',
-  '1 minute',
-  '10 minutes',
-  '1 hour',
-  '2 hours',
-  '8 hours',
-  '24 hours',
-  '7 days',
-  '10 days',
-  '30 days',
-  'Until dispelled',
-  'Permanent',
-];
-
-const ACTION_TYPES = [
-  { value: '', label: 'No Action Required' },
-  { value: 'attack', label: 'Spell Attack' },
-  { value: 'save', label: 'Saving Throw' },
-  { value: 'utility', label: 'Utility/Other' },
-];
-
-const SAVING_THROWS = [
-  'Strength',
-  'Dexterity',
-  'Constitution',
-  'Intelligence',
-  'Wisdom',
-  'Charisma',
-];
-
-const DAMAGE_TYPES = [
-  'Acid',
-  'Bludgeoning',
-  'Cold',
-  'Fire',
-  'Force',
-  'Lightning',
-  'Necrotic',
-  'Piercing',
-  'Poison',
-  'Psychic',
-  'Radiant',
-  'Slashing',
-  'Thunder',
-];
+import {
+  SPELL_SCHOOLS,
+  ACTION_TYPES,
+  DAMAGE_TYPES,
+} from '@/utils/spellConstants';
 
 interface SpellFilters {
   searchQuery: string;
@@ -158,35 +75,6 @@ interface SpellFilters {
 interface SpellsByLevel {
   [level: number]: Spell[];
 }
-
-const initialFormData: SpellFormData = {
-  name: '',
-  level: 0,
-  school: 'Evocation',
-  castingTime: '1 action',
-  range: 'Touch',
-  components: {
-    verbal: false,
-    somatic: false,
-    material: false,
-    materialDescription: '',
-  },
-  duration: 'Instantaneous',
-  description: '',
-  higherLevel: '',
-  ritual: false,
-  concentration: false,
-  isPrepared: false,
-  isAlwaysPrepared: false,
-  actionType: '',
-  savingThrow: '',
-  damage: '',
-  damageType: '',
-  source: 'PHB',
-  castingSource: '',
-  freeCastMode: 'normal',
-  freeCastMax: 1,
-};
 
 const initialFilters: SpellFilters = {
   searchQuery: '',
@@ -705,7 +593,9 @@ export const SpellManagement: React.FC = () => {
   } = useCharacterStore();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<SpellFormData>(initialFormData);
+  const [formData, setFormData] = useState<SpellFormData>(
+    createInitialSpellFormData
+  );
   const [viewingSpell, setViewingSpell] = useState<Spell | null>(null);
   const [castModalOpen, setCastModalOpen] = useState(false);
   const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null);
@@ -923,49 +813,13 @@ export const SpellManagement: React.FC = () => {
   };
 
   const resetForm = () => {
-    setFormData(initialFormData);
+    setFormData(createInitialSpellFormData());
     setIsFormOpen(false);
     setEditingId(null);
   };
 
   const handleEdit = (spell: Spell) => {
-    let freeCastMode: FreeCastMode = 'normal';
-    let freeCastMax = 1;
-    if (spell.freeCastMax !== undefined) {
-      if (spell.freeCastMax === 0) {
-        freeCastMode = 'at_will';
-      } else {
-        freeCastMode = 'innate';
-        freeCastMax = spell.freeCastMax;
-      }
-    }
-
-    setFormData({
-      name: spell.name,
-      level: spell.level,
-      school: spell.school,
-      castingTime: spell.castingTime,
-      range: spell.range,
-      components: {
-        ...spell.components,
-        materialDescription: spell.components.materialDescription || '',
-      },
-      duration: spell.duration,
-      description: spell.description,
-      higherLevel: spell.higherLevel || '',
-      ritual: spell.ritual || false,
-      concentration: spell.concentration || false,
-      isPrepared: spell.isPrepared || false,
-      isAlwaysPrepared: spell.isAlwaysPrepared || false,
-      actionType: spell.actionType || '',
-      savingThrow: spell.savingThrow || '',
-      damage: spell.damage || '',
-      damageType: spell.damageType || '',
-      source: spell.source || 'PHB',
-      castingSource: spell.castingSource || '',
-      freeCastMode,
-      freeCastMax,
-    });
+    setFormData(spellToFormData(spell));
     setEditingId(spell.id);
     setIsFormOpen(true);
   };
@@ -1528,494 +1382,11 @@ export const SpellManagement: React.FC = () => {
                 </div>
               )}
 
-              {/* Section: Basic Information */}
-              <div className="space-y-4">
-                <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-                  Basic Information
-                </h4>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <Input
-                    label="Spell Name"
-                    value={formData.name}
-                    onChange={e =>
-                      setFormData(prev => ({ ...prev, name: e.target.value }))
-                    }
-                    required
-                    placeholder="Enter spell name"
-                  />
-
-                  <div>
-                    <label className="text-body mb-2 block text-sm font-medium">
-                      Level
-                    </label>
-                    <SelectField
-                      value={formData.level.toString()}
-                      onValueChange={value =>
-                        setFormData(prev => ({
-                          ...prev,
-                          level: parseInt(value),
-                        }))
-                      }
-                    >
-                      <SelectItem value="0">Cantrip</SelectItem>
-                      {Array.from({ length: 9 }, (_, i) => (
-                        <SelectItem key={i + 1} value={(i + 1).toString()}>
-                          Level {i + 1}
-                        </SelectItem>
-                      ))}
-                    </SelectField>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="text-body mb-2 block text-sm font-medium">
-                      School
-                    </label>
-                    <SelectField
-                      value={formData.school}
-                      onValueChange={value =>
-                        setFormData(prev => ({ ...prev, school: value }))
-                      }
-                    >
-                      {SPELL_SCHOOLS.map(school => (
-                        <SelectItem key={school} value={school}>
-                          {school}
-                        </SelectItem>
-                      ))}
-                    </SelectField>
-                  </div>
-
-                  <Input
-                    label="Source"
-                    value={formData.source}
-                    onChange={e =>
-                      setFormData(prev => ({ ...prev, source: e.target.value }))
-                    }
-                    placeholder="e.g., PHB, XGE, TCE"
-                  />
-                </div>
-              </div>
-
-              {/* Section: Casting Details */}
-              <div className="space-y-4">
-                <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-                  Casting Details
-                </h4>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <div>
-                    <label className="text-body mb-2 block text-sm font-medium">
-                      Casting Time
-                    </label>
-                    <SelectField
-                      value={formData.castingTime}
-                      onValueChange={value =>
-                        setFormData(prev => ({ ...prev, castingTime: value }))
-                      }
-                    >
-                      {CASTING_TIMES.map(time => (
-                        <SelectItem key={time} value={time}>
-                          {time}
-                        </SelectItem>
-                      ))}
-                    </SelectField>
-                  </div>
-
-                  <div>
-                    <label className="text-body mb-2 block text-sm font-medium">
-                      Range
-                    </label>
-                    <SelectField
-                      value={formData.range}
-                      onValueChange={value =>
-                        setFormData(prev => ({ ...prev, range: value }))
-                      }
-                    >
-                      {RANGES.map(range => (
-                        <SelectItem key={range} value={range}>
-                          {range}
-                        </SelectItem>
-                      ))}
-                    </SelectField>
-                  </div>
-
-                  <div>
-                    <label className="text-body mb-2 block text-sm font-medium">
-                      Duration
-                    </label>
-                    <SelectField
-                      value={formData.duration}
-                      onValueChange={value =>
-                        setFormData(prev => ({ ...prev, duration: value }))
-                      }
-                    >
-                      {DURATIONS.map(duration => (
-                        <SelectItem key={duration} value={duration}>
-                          {duration}
-                        </SelectItem>
-                      ))}
-                    </SelectField>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section: Components */}
-              <div className="space-y-4">
-                <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-                  Components
-                </h4>
-
-                <div className="flex flex-wrap gap-4">
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <Checkbox
-                      checked={formData.components.verbal}
-                      onCheckedChange={checked =>
-                        setFormData(prev => ({
-                          ...prev,
-                          components: {
-                            ...prev.components,
-                            verbal: checked as boolean,
-                          },
-                        }))
-                      }
-                    />
-                    <span className="text-heading text-sm font-medium">
-                      Verbal (V)
-                    </span>
-                  </label>
-
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <Checkbox
-                      checked={formData.components.somatic}
-                      onCheckedChange={checked =>
-                        setFormData(prev => ({
-                          ...prev,
-                          components: {
-                            ...prev.components,
-                            somatic: checked as boolean,
-                          },
-                        }))
-                      }
-                    />
-                    <span className="text-heading text-sm font-medium">
-                      Somatic (S)
-                    </span>
-                  </label>
-
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <Checkbox
-                      checked={formData.components.material}
-                      onCheckedChange={checked =>
-                        setFormData(prev => ({
-                          ...prev,
-                          components: {
-                            ...prev.components,
-                            material: checked as boolean,
-                          },
-                        }))
-                      }
-                    />
-                    <span className="text-heading text-sm font-medium">
-                      Material (M)
-                    </span>
-                  </label>
-                </div>
-
-                {formData.components.material && (
-                  <Input
-                    label="Material Component Description"
-                    value={formData.components.materialDescription}
-                    onChange={e =>
-                      setFormData(prev => ({
-                        ...prev,
-                        components: {
-                          ...prev.components,
-                          materialDescription: e.target.value,
-                        },
-                      }))
-                    }
-                    placeholder="Describe the material components..."
-                  />
-                )}
-              </div>
-
-              {/* Section: Spell Properties */}
-              <div className="space-y-4">
-                <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-                  Spell Properties
-                </h4>
-
-                <div className="flex flex-wrap gap-4">
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <Checkbox
-                      checked={formData.ritual}
-                      onCheckedChange={checked =>
-                        setFormData(prev => ({
-                          ...prev,
-                          ritual: checked as boolean,
-                        }))
-                      }
-                    />
-                    <span className="text-heading text-sm font-medium">
-                      Ritual
-                    </span>
-                  </label>
-
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <Checkbox
-                      checked={formData.concentration}
-                      onCheckedChange={checked =>
-                        setFormData(prev => ({
-                          ...prev,
-                          concentration: checked as boolean,
-                        }))
-                      }
-                    />
-                    <span className="text-heading text-sm font-medium">
-                      Concentration
-                    </span>
-                  </label>
-
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <Checkbox
-                      checked={formData.isPrepared}
-                      onCheckedChange={checked =>
-                        setFormData(prev => ({
-                          ...prev,
-                          isPrepared: checked as boolean,
-                        }))
-                      }
-                    />
-                    <span className="text-heading text-sm font-medium">
-                      Prepared
-                    </span>
-                  </label>
-
-                  <label className="flex cursor-pointer items-center gap-2">
-                    <Checkbox
-                      checked={formData.isAlwaysPrepared}
-                      onCheckedChange={checked =>
-                        setFormData(prev => ({
-                          ...prev,
-                          isAlwaysPrepared: checked as boolean,
-                        }))
-                      }
-                    />
-                    <span className="text-heading text-sm font-medium">
-                      Always Prepared
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Section: Casting Source */}
-              <div className="space-y-4">
-                <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-                  Casting Source
-                </h4>
-
-                <Input
-                  label="Source / Origin"
-                  value={formData.castingSource}
-                  onChange={e =>
-                    setFormData(prev => ({
-                      ...prev,
-                      castingSource: e.target.value,
-                    }))
-                  }
-                  placeholder='e.g. "Fey Touched", "Drow Magic", "Eldritch Invocation"'
-                  helperText="Where this spell comes from (feat, race, background, etc.)"
-                />
-
-                <div>
-                  <label className="text-body mb-2 block text-sm font-medium">
-                    Free Casting
-                  </label>
-                  <SelectField
-                    value={formData.freeCastMode}
-                    onValueChange={value =>
-                      setFormData(prev => ({
-                        ...prev,
-                        freeCastMode: value as FreeCastMode,
-                      }))
-                    }
-                  >
-                    <SelectItem value="normal">
-                      Normal (uses spell slot)
-                    </SelectItem>
-                    <SelectItem value="at_will">
-                      At Will (no slot needed, unlimited)
-                    </SelectItem>
-                    <SelectItem value="innate">
-                      Innate (limited free casts per long rest)
-                    </SelectItem>
-                  </SelectField>
-                  <p className="text-muted mt-1 text-xs">
-                    {formData.freeCastMode === 'normal' &&
-                      'Standard spellcasting — always uses a spell slot.'}
-                    {formData.freeCastMode === 'at_will' &&
-                      'Can always be cast without using a spell slot.'}
-                    {formData.freeCastMode === 'innate' &&
-                      'Can be cast a limited number of times for free per long rest, then requires a slot.'}
-                  </p>
-                </div>
-
-                {formData.freeCastMode === 'innate' && (
-                  <Input
-                    label="Free Casts per Long Rest"
-                    type="number"
-                    value={formData.freeCastMax.toString()}
-                    onChange={e =>
-                      setFormData(prev => ({
-                        ...prev,
-                        freeCastMax: Math.max(1, parseInt(e.target.value) || 1),
-                      }))
-                    }
-                    min={1}
-                    max={10}
-                    helperText="How many times this spell can be cast without a slot before needing a long rest"
-                  />
-                )}
-              </div>
-
-              {/* Section: Description */}
-              <div className="space-y-4">
-                <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-                  Description
-                </h4>
-
-                <div>
-                  <label className="text-body mb-2 block text-sm font-medium">
-                    Spell Description *
-                  </label>
-                  <RichTextEditor
-                    content={formData.description}
-                    onChange={content =>
-                      setFormData(prev => ({
-                        ...prev,
-                        description: content,
-                      }))
-                    }
-                    placeholder="Describe what the spell does..."
-                    minHeight="150px"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-body mb-2 block text-sm font-medium">
-                    At Higher Levels
-                  </label>
-                  <RichTextEditor
-                    content={formData.higherLevel}
-                    onChange={content =>
-                      setFormData(prev => ({
-                        ...prev,
-                        higherLevel: content,
-                      }))
-                    }
-                    placeholder="Describe what happens when cast at higher levels..."
-                    minHeight="100px"
-                  />
-                </div>
-              </div>
-
-              {/* Section: Combat Details */}
-              <div className="space-y-4">
-                <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-                  Combat Details
-                </h4>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="text-body mb-2 block text-sm font-medium">
-                      Action Type
-                    </label>
-                    <SelectField
-                      value={formData.actionType}
-                      onValueChange={value =>
-                        setFormData(prev => ({
-                          ...prev,
-                          actionType: value as SpellActionType | '',
-                        }))
-                      }
-                    >
-                      {ACTION_TYPES.map(type => (
-                        <SelectItem
-                          key={type.value || 'none'}
-                          value={type.value || 'none'}
-                        >
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectField>
-                  </div>
-
-                  {formData.actionType === 'save' && (
-                    <div>
-                      <label className="text-body mb-2 block text-sm font-medium">
-                        Saving Throw
-                      </label>
-                      <SelectField
-                        value={formData.savingThrow || '__none__'}
-                        onValueChange={value =>
-                          setFormData(prev => ({
-                            ...prev,
-                            savingThrow: value === '__none__' ? '' : value,
-                          }))
-                        }
-                      >
-                        <SelectItem value="__none__" disabled>
-                          Select...
-                        </SelectItem>
-                        {SAVING_THROWS.map(save => (
-                          <SelectItem key={save} value={save}>
-                            {save}
-                          </SelectItem>
-                        ))}
-                      </SelectField>
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <Input
-                    label="Damage Dice"
-                    value={formData.damage}
-                    onChange={e =>
-                      setFormData(prev => ({ ...prev, damage: e.target.value }))
-                    }
-                    placeholder="e.g., 1d8, 3d6"
-                  />
-
-                  {formData.damage && (
-                    <div>
-                      <label className="text-body mb-2 block text-sm font-medium">
-                        Damage Type
-                      </label>
-                      <SelectField
-                        value={formData.damageType || '__none__'}
-                        onValueChange={value =>
-                          setFormData(prev => ({
-                            ...prev,
-                            damageType: value === '__none__' ? '' : value,
-                          }))
-                        }
-                      >
-                        <SelectItem value="__none__" disabled>
-                          Select...
-                        </SelectItem>
-                        {DAMAGE_TYPES.map(type => (
-                          <SelectItem key={type} value={type}>
-                            {type}
-                          </SelectItem>
-                        ))}
-                      </SelectField>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <SpellFormFields
+                formData={formData}
+                onChange={setFormData}
+                showPreparedOptions
+              />
 
               {/* Form Actions */}
               <div className="border-divider flex justify-end gap-3 border-t-2 pt-4">

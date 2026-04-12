@@ -50,6 +50,12 @@ interface NPCStoreState {
     deathSaves: { successes: number; failures: number }
   ) => void;
   addSpellToNPC: (campaignCode: string, npcId: string, spell: Spell) => void;
+  updateSpellOnNPC: (
+    campaignCode: string,
+    npcId: string,
+    spellId: string,
+    updates: Partial<Spell>
+  ) => void;
   removeSpellFromNPC: (
     campaignCode: string,
     npcId: string,
@@ -199,6 +205,36 @@ export const useNPCStore = create<NPCStoreState>()(
                   spellcasting: {
                     ...npc.spellcasting,
                     spells: [...npc.spellcasting.spells, spell],
+                  },
+                  updatedAt: new Date().toISOString(),
+                };
+              }),
+            },
+          };
+        });
+      },
+
+      updateSpellOnNPC: (campaignCode, npcId, spellId, updates) => {
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(npc => {
+                if (npc.id !== npcId || !npc.spellcasting) return npc;
+                return {
+                  ...npc,
+                  spellcasting: {
+                    ...npc.spellcasting,
+                    spells: npc.spellcasting.spells.map(s =>
+                      s.id === spellId
+                        ? {
+                            ...s,
+                            ...updates,
+                            updatedAt: new Date().toISOString(),
+                          }
+                        : s
+                    ),
                   },
                   updatedAt: new Date().toISOString(),
                 };
