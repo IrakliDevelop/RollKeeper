@@ -290,3 +290,84 @@ export function searchSpells(
       return aName.localeCompare(bName);
     });
 }
+
+/**
+ * Default empty SpellFormData — shared starting point for add dialogs.
+ */
+export function createInitialSpellFormData(): SpellFormData {
+  return {
+    name: '',
+    level: 0,
+    school: 'Evocation',
+    castingTime: '1 action',
+    range: 'Touch',
+    components: {
+      verbal: false,
+      somatic: false,
+      material: false,
+      materialDescription: '',
+    },
+    duration: 'Instantaneous',
+    description: '',
+    higherLevel: '',
+    ritual: false,
+    concentration: false,
+    isPrepared: false,
+    isAlwaysPrepared: false,
+    actionType: '',
+    savingThrow: '',
+    damage: '',
+    damageType: '',
+    source: 'PHB',
+    castingSource: '',
+    freeCastMode: 'normal',
+    freeCastMax: 1,
+  };
+}
+
+/**
+ * Convert a stored Spell back to SpellFormData for editing.
+ * Missing optional fields default to empty strings / false.
+ * Backwards compatible: old NPC spells with only name+level+bare bones load safely.
+ */
+export function spellToFormData(spell: Spell): SpellFormData {
+  let freeCastMode: FreeCastMode = 'normal';
+  let freeCastMax = 1;
+  if (spell.freeCastMax !== undefined) {
+    if (spell.freeCastMax === 0) {
+      freeCastMode = 'at_will';
+    } else {
+      freeCastMode = 'innate';
+      freeCastMax = spell.freeCastMax;
+    }
+  }
+
+  return {
+    name: spell.name,
+    level: spell.level,
+    school: spell.school || 'Evocation',
+    castingTime: spell.castingTime || '1 action',
+    range: spell.range || 'Touch',
+    components: {
+      verbal: spell.components?.verbal ?? false,
+      somatic: spell.components?.somatic ?? false,
+      material: spell.components?.material ?? false,
+      materialDescription: spell.components?.materialDescription || '',
+    },
+    duration: spell.duration || 'Instantaneous',
+    description: spell.description || '',
+    higherLevel: spell.higherLevel || '',
+    ritual: spell.ritual || false,
+    concentration: spell.concentration || false,
+    isPrepared: spell.isPrepared || false,
+    isAlwaysPrepared: spell.isAlwaysPrepared || false,
+    actionType: spell.actionType || '',
+    savingThrow: spell.savingThrow || '',
+    damage: spell.damage || '',
+    damageType: spell.damageType || '',
+    source: spell.source || 'PHB',
+    castingSource: spell.castingSource || '',
+    freeCastMode,
+    freeCastMax,
+  };
+}
