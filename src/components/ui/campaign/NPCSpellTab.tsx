@@ -494,9 +494,16 @@ export function NPCSpellTab({
       updates.freeCastsUsed = editingSpell.freeCastsUsed ?? 0;
     }
     updates.tags = editTags.length > 0 ? editTags : undefined;
+    // Preserve original createdAt — convertFormDataToSpell always generates a new one
+    const { createdAt: _createdAt, ...updatesWithoutCreatedAt } = updates;
     useNPCStore
       .getState()
-      .updateSpellOnNPC(campaignCode, npc.id, editingSpell.id, updates);
+      .updateSpellOnNPC(
+        campaignCode,
+        npc.id,
+        editingSpell.id,
+        updatesWithoutCreatedAt
+      );
     setEditingSpell(null);
   }, [campaignCode, npc.id, editingSpell, editFormData, editTags]);
 

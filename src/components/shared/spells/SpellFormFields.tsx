@@ -379,15 +379,19 @@ export function SpellFormFields({
               Action Type
             </label>
             <SelectField
-              value={formData.actionType}
+              value={formData.actionType || '__none__'}
               onValueChange={value =>
-                set({ actionType: value as SpellActionType | '' })
+                set({
+                  actionType: (value === '__none__' ? '' : value) as
+                    | SpellActionType
+                    | '',
+                })
               }
             >
               {ACTION_TYPES.map(type => (
                 <SelectItem
-                  key={type.value || 'none'}
-                  value={type.value || 'none'}
+                  key={type.value || '__none__'}
+                  value={type.value || '__none__'}
                 >
                   {type.label}
                 </SelectItem>
