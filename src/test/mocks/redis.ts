@@ -82,4 +82,6 @@ vi.mock('@/lib/redis', () => ({
     `campaign:${code}:player:${playerId}`,
   refreshCampaignTTL: vi.fn(async () => {}),
   SLIDING_TTL_SECONDS: 30 * 24 * 60 * 60,
+  characterShareKey: (characterId: string) => `character:share:${characterId}`,
+  CHARACTER_SHARE_TTL_SECONDS: 24 * 60 * 60,
 }));

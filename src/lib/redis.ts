@@ -71,6 +71,12 @@ export function campaignBattleMapKey(
   return `campaign:${code}:battlemap:${battleMapId}`;
 }
 
+export function characterShareKey(characterId: string): string {
+  return `character:share:${characterId}`;
+}
+
+const CHARACTER_SHARE_TTL_SECONDS = 24 * 60 * 60; // 24 hours
+
 export async function refreshCampaignTTL(
   redis: Redis,
   code: string
@@ -83,4 +89,4 @@ export async function refreshCampaignTTL(
   ]);
 }
 
-export { SLIDING_TTL_SECONDS };
+export { SLIDING_TTL_SECONDS, CHARACTER_SHARE_TTL_SECONDS };
