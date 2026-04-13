@@ -104,4 +104,17 @@ describe('POST /api/character/share', () => {
     const res = await POST(req as NextRequest);
     expect(res.status).toBe(400);
   });
+
+  it('returns 500 when body cannot be parsed', async () => {
+    const req = new Request('http://localhost/api/character/share', {
+      method: 'POST',
+      body: 'not-json',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const res = await (POST as (req: NextRequest) => Promise<Response>)(
+      req as NextRequest
+    );
+    expect(res.status).toBe(500);
+  });
 });

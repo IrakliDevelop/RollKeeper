@@ -22,12 +22,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Strip base64 avatars — S3 URLs transfer fine; base64 blobs are too large
-    if (character.character?.avatar?.startsWith('data:image/')) {
-      character.character.avatar = undefined;
-    }
+    const payload: CharacterExport = character.character?.avatar?.startsWith(
+      'data:image/'
+    )
+      ? {
+          ...character,
+          character: { ...character.character, avatar: undefined },
+        }
+      : character;
 
     const redis = getRedis();
-    await redis.set(characterShareKey(characterId), JSON.stringify(character), {
+    await redis.set(characterShareKey(characterId), JSON.stringify(payload), {
       ex: CHARACTER_SHARE_TTL_SECONDS,
     });
 
