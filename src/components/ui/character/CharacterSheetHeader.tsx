@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   Pencil,
   Eye,
+  Share2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { SaveIndicator } from '@/components/ui/feedback/SaveIndicator';
@@ -19,6 +20,7 @@ import { exportCharacterToFile } from '@/utils/fileOperations';
 import { useState, useEffect } from 'react';
 import { Button, Input } from '@/components/ui/forms';
 import { AvatarUpload } from './AvatarUpload';
+import { QRShareDialog } from './QRShareDialog';
 
 interface CharacterSheetHeaderProps {
   characterId: string;
@@ -84,6 +86,7 @@ export default function CharacterSheetHeader({
   const [isHovering, setIsHovering] = useState(false);
 
   const [isEditMode, setIsEditMode] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -180,6 +183,16 @@ export default function CharacterSheetHeader({
                   title="Export Character"
                 >
                   Export
+                </Button>
+
+                <Button
+                  onClick={() => setShareOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Share2 size={16} />}
+                  title="Share Character via QR"
+                >
+                  Share
                 </Button>
 
                 <Button asChild variant="outline" size="sm">
@@ -355,6 +368,17 @@ export default function CharacterSheetHeader({
                 </Button>
 
                 <Button
+                  onClick={() => setShareOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Share2 size={16} />}
+                  className="shadow-sm"
+                  title="Share character via QR code"
+                >
+                  Share
+                </Button>
+
+                <Button
                   asChild
                   variant="secondary"
                   size="sm"
@@ -382,6 +406,13 @@ export default function CharacterSheetHeader({
           </div>
         </div>
       </header>
+
+      <QRShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        characterId={characterId}
+        getExportData={exportCharacter}
+      />
     </>
   );
 }
