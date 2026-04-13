@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Copy, Check, Loader2 } from 'lucide-react';
 import { CharacterExport } from '@/types/character';
@@ -52,10 +52,12 @@ export function QRShareDialog({
     }
   };
 
-  const handleOpenChange = (newOpen: boolean) => {
-    onOpenChange(newOpen);
-    if (newOpen) doUpload();
-  };
+  // Radix controlled dialogs only fire onOpenChange to request *closing*,
+  // not when the parent sets open={true}. Use an effect to trigger upload.
+  useEffect(() => {
+    if (open) doUpload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleCopy = async () => {
     try {
@@ -68,7 +70,7 @@ export function QRShareDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Share Character</DialogTitle>
