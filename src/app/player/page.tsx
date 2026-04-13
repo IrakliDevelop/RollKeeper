@@ -217,50 +217,34 @@ export default function PlayerDashboardPage() {
           : 'border-accent-blue-border hover:bg-surface-secondary'
       }`}
     >
-      <div className="p-6">
-        <div className="mb-4 flex items-start gap-3">
-          {/* Avatar */}
+      <div className="p-4 sm:p-5 lg:p-6">
+        {/* Top row: Avatar + Name/Class + Actions */}
+        <div className="mb-3 flex items-start gap-3">
           <div className="flex-shrink-0">
             <AvatarUpload
               avatar={character.avatar}
               characterId={character.id}
               characterName={character.name}
-              onAvatarChange={() => {}} // View only on dashboard
-              size="md"
+              onAvatarChange={() => {}}
+              size="sm"
               editable={false}
             />
           </div>
 
-          {/* Character Info */}
           <div className="min-w-0 flex-1">
-            <div className="mb-2 flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <h3 className="text-heading mb-1 line-clamp-2 text-xl font-semibold">
-                  {character.name}
-                </h3>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="text-body text-sm">{character.race}</span>
-                  <span className="text-faint">•</span>
-                  <Badge variant={getClassBadgeVariant(character.class)}>
-                    {character.class}
-                  </Badge>
-                  <span className="text-faint">•</span>
-                  <span className="text-body text-sm">
-                    Level {character.level}
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
+            <div className="flex items-start justify-between gap-1">
+              <h3 className="text-heading min-w-0 flex-1 truncate text-lg leading-tight font-semibold">
+                {character.name}
+              </h3>
               {!isArchived && (
-                <div className="flex flex-shrink-0 space-x-1">
+                <div className="flex flex-shrink-0">
                   <Button
                     onClick={() => handleDuplicateCharacter(character)}
                     variant="ghost"
                     size="sm"
                     title="Duplicate Character"
                   >
-                    <Copy size={16} />
+                    <Copy size={14} />
                   </Button>
                   <Button
                     onClick={() => handleArchiveCharacter(character.id)}
@@ -268,40 +252,54 @@ export default function PlayerDashboardPage() {
                     size="sm"
                     title="Archive Character"
                   >
-                    <Archive size={16} />
+                    <Archive size={14} />
                   </Button>
                 </div>
               )}
             </div>
-
-            {/* Campaign + Tags */}
-            <div className="mt-2 flex flex-wrap gap-1">
-              {character.campaignCode && (
-                <Badge variant="info" size="sm">
-                  <Link2 size={10} className="mr-1" />
-                  {character.campaignName || character.campaignCode}
-                </Badge>
-              )}
-              {character.tags.map(tag => (
-                <Badge key={tag} variant="neutral" size="sm">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
+            <p className="text-body mt-0.5 truncate text-sm">
+              {character.race}
+            </p>
           </div>
         </div>
 
-        <div className="text-muted mb-4 text-sm">
-          <div className="flex justify-between">
-            <span>
-              Created: {new Date(character.createdAt).toLocaleDateString()}
-            </span>
-            <span>
-              Last Played: {new Date(character.lastPlayed).toLocaleDateString()}
-            </span>
-          </div>
+        {/* Class badge + Level */}
+        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <Badge variant={getClassBadgeVariant(character.class)}>
+            {character.class}
+          </Badge>
+          <span className="text-faint">•</span>
+          <span className="text-body text-sm">Level {character.level}</span>
         </div>
 
+        {/* Campaign + Tags */}
+        {(character.campaignCode || character.tags.length > 0) && (
+          <div className="mb-3 flex flex-wrap gap-1">
+            {character.campaignCode && (
+              <Badge variant="info" size="sm">
+                <Link2 size={10} className="mr-1" />
+                {character.campaignName || character.campaignCode}
+              </Badge>
+            )}
+            {character.tags.map(tag => (
+              <Badge key={tag} variant="neutral" size="sm">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {/* Dates */}
+        <div className="text-muted mb-3 flex justify-between text-xs">
+          <span>
+            Created: {new Date(character.createdAt).toLocaleDateString()}
+          </span>
+          <span>
+            Last Played: {new Date(character.lastPlayed).toLocaleDateString()}
+          </span>
+        </div>
+
+        {/* Actions */}
         <div className="flex space-x-2">
           {!isArchived ? (
             <>
@@ -374,7 +372,7 @@ export default function PlayerDashboardPage() {
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Dashboard Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-heading mb-2 text-3xl font-bold">
               Your Characters
@@ -383,7 +381,7 @@ export default function PlayerDashboardPage() {
               Manage your D&D characters and jump into your adventures
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Button
               variant="outline"
               leftIcon={<Link2 size={18} />}
@@ -396,7 +394,7 @@ export default function PlayerDashboardPage() {
               leftIcon={<Upload size={18} />}
               onClick={() => fileInputRef.current?.click()}
             >
-              Import Character
+              Import
             </Button>
             <input
               ref={fileInputRef}
@@ -508,7 +506,7 @@ export default function PlayerDashboardPage() {
                   <User size={24} />
                   Active Characters ({activeCharacters.length})
                 </h2>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
                   {activeCharacters.map(character => (
                     <CharacterCard key={character.id} character={character} />
                   ))}
@@ -526,7 +524,7 @@ export default function PlayerDashboardPage() {
                   <Archive size={24} />
                   Archived Characters ({archivedCharacters.length})
                 </h2>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
                   {archivedCharacters.map(character => (
                     <CharacterCard
                       key={character.id}
