@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Angry, Zap, ChevronDown, ChevronRight, ArrowUp } from 'lucide-react';
+import { Angry, Zap, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import LevelUpWizard from '@/components/ui/character/LevelUpWizard';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
@@ -61,12 +61,31 @@ import {
   InventoryItem,
 } from '@/types/character';
 
+function WizardHatIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 2L6 18h12L12 2z" />
+      <path d="M4 22c0-2 3.5-4 8-4s8 2 8 4" />
+      <circle cx="10" cy="10" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 function LevelUpButton() {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <>
       <Button variant="primary" size="sm" onClick={() => setIsOpen(true)}>
-        <ArrowUp size={14} className="mr-1" />
+        <WizardHatIcon size={14} />
         Level Up
       </Button>
       {isOpen && (
