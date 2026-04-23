@@ -73,10 +73,25 @@ export function getAvailableSubclasses(
   return matchedClass.subclasses;
 }
 
+export function getMissedSubclassFeatureLevels(
+  subclass: ProcessedSubclass,
+  fromLevel: number,
+  toLevel: number
+): number[] {
+  const levels = new Set<number>();
+  for (const f of subclass.features) {
+    if (f.level >= fromLevel && f.level <= toLevel) {
+      levels.add(f.level);
+    }
+  }
+  return Array.from(levels).sort((a, b) => a - b);
+}
+
 export function computeWizardSteps(params: {
   isCustomClass: boolean;
   needsEditionPicker: boolean;
   isMulticlassed: boolean;
+  needsSubclassMigration: boolean;
   requiresSubclass: boolean;
   hasFeatures: boolean;
   requiresASI: boolean;
@@ -97,6 +112,9 @@ export function computeWizardSteps(params: {
   }
   if (params.isMulticlassed) {
     steps.push({ id: 'class', label: 'Class' });
+  }
+  if (params.needsSubclassMigration) {
+    steps.push({ id: 'subclass-migration', label: 'Subclass' });
   }
   if (params.requiresSubclass) {
     steps.push({ id: 'subclass', label: 'Subclass' });

@@ -9,6 +9,7 @@ import type { ProcessedFeat } from '@/utils/featDataLoader';
 export type WizardStepId =
   | 'edition'
   | 'class'
+  | 'subclass-migration'
   | 'subclass'
   | 'features'
   | 'asi'
@@ -30,6 +31,19 @@ export interface SubclassSpellGrant {
   isAlwaysPrepared: boolean;
 }
 
+export interface MissedSubclassFeature {
+  feature: ClassFeature;
+  level: number;
+  adopted: boolean;
+}
+
+export interface SubclassMigration {
+  needed: boolean;
+  selectedSubclass?: ProcessedSubclass;
+  missedFeatures: MissedSubclassFeature[];
+  missedSpellGrants: SubclassSpellGrant[];
+}
+
 export interface LevelUpWizardState {
   targetClassIndex: number;
   targetClass: MulticlassInfo;
@@ -49,4 +63,5 @@ export interface LevelUpWizardState {
   hpRollResult?: number;
   steps: WizardStepConfig[];
   currentStepIndex: number;
+  subclassMigration: SubclassMigration;
 }

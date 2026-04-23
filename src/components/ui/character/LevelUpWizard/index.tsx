@@ -18,6 +18,7 @@ import { useLevelUpWizard } from './LevelUpWizard.hooks';
 import EditionPickerStep from './steps/EditionPickerStep';
 import ClassPickerStep from './steps/ClassPickerStep';
 import SubclassSelectionStep from './steps/SubclassSelectionStep';
+import SubclassMigrationStep from './steps/SubclassMigrationStep';
 import FeaturesSummaryStep from './steps/FeaturesSummaryStep';
 import ASIFeatStep from './steps/ASIFeatStep';
 import HPStep from './steps/HPStep';
@@ -54,6 +55,7 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
   const isFirstStep = state.currentStepIndex === 0;
 
   const activeSubclassName =
+    state.subclassMigration?.selectedSubclass?.shortName ||
     state.selectedSubclass?.shortName ||
     state.targetClass?.subclass ||
     undefined;
@@ -121,6 +123,29 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
             />
           )}
 
+          {currentStep?.id === 'subclass-migration' && (
+            <SubclassMigrationStep
+              className={state.targetClass?.className || ''}
+              currentLevel={state.targetClass?.level || 0}
+              subclasses={wizard.availableSubclasses}
+              selectedSubclass={state.subclassMigration.selectedSubclass}
+              onSelectSubclass={wizard.setMigrationSubclass}
+              missedFeatures={state.subclassMigration.missedFeatures}
+              missedSpellGrants={state.subclassMigration.missedSpellGrants}
+              onToggleFeature={key => {
+                wizard.setMigrationAdoptedFeatures(prev => {
+                  const next = new Set(prev);
+                  if (next.has(key)) {
+                    next.delete(key);
+                  } else {
+                    next.add(key);
+                  }
+                  return next;
+                });
+              }}
+            />
+          )}
+
           {currentStep?.id === 'subclass' && state.matchedClass && (
             <SubclassSelectionStep
               className={state.targetClass?.className || ''}
@@ -175,7 +200,10 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
               newClassLevel={state.newClassLevel}
               oldTotalLevel={wizard.totalLevel}
               newTotalLevel={state.newTotalLevel}
-              selectedSubclass={state.selectedSubclass?.shortName}
+              selectedSubclass={
+                state.subclassMigration?.selectedSubclass?.shortName ||
+                state.selectedSubclass?.shortName
+              }
               features={state.features}
               subclassFeatures={state.subclassFeatures}
               subclassSpellGrants={state.subclassSpellGrants}

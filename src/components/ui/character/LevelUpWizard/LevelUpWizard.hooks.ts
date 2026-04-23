@@ -38,6 +38,8 @@ import type {
   LevelUpWizardState,
   ASIChoice,
   SubclassSpellGrant,
+  SubclassMigration,
+  MissedSubclassFeature,
   WizardStepConfig,
 } from './LevelUpWizard.types';
 
@@ -181,6 +183,12 @@ export function useLevelUpWizard(character: CharacterState) {
   );
   const [hpRollResult, setHPRollResult] = useState<number | undefined>();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [migrationSubclass, setMigrationSubclass] = useState<
+    ProcessedSubclass | undefined
+  >();
+  const [migrationAdoptedFeatures, setMigrationAdoptedFeatures] = useState<
+    Set<string>
+  >(new Set());
 
   const targetClass: MulticlassInfo | null =
     targetClassIndex >= 0 ? classes[targetClassIndex] : null;
@@ -216,6 +224,73 @@ export function useLevelUpWizard(character: CharacterState) {
     !targetClass?.subclass &&
     !selectedSubclass;
 
+  // Detect subclass migration: character is past subclass selection level but has no subclass
+  const needsSubclassMigration =
+    !!matchedClass &&
+    !!subclassSelectionLevel &&
+    !!targetClass &&
+    !targetClass.subclass &&
+    !selectedSubclass &&
+    targetClass.level >= subclassSelectionLevel;
+
+  const subclassMigration: SubclassMigration = useMemo(() => {
+    if (!needsSubclassMigration || !matchedClass || !subclassSelectionLevel) {
+      return { needed: false, missedFeatures: [], missedSpellGrants: [] };
+    }
+
+    if (!migrationSubclass) {
+      return {
+        needed: true,
+        missedFeatures: [],
+        missedSpellGrants: [],
+      };
+    }
+
+    const missedFeatures: MissedSubclassFeature[] = [];
+    for (const f of migrationSubclass.features) {
+      if (f.level >= subclassSelectionLevel && f.level <= targetClass!.level) {
+        const key = `${f.name}-${f.level}`;
+        missedFeatures.push({
+          feature: f,
+          level: f.level,
+          adopted: migrationAdoptedFeatures.has(key),
+        });
+      }
+    }
+
+    const missedSpellGrants: SubclassSpellGrant[] = [];
+    if (migrationSubclass.spellList) {
+      for (const entry of migrationSubclass.spellList) {
+        if (
+          entry.level >= subclassSelectionLevel &&
+          entry.level <= targetClass!.level
+        ) {
+          for (const spellName of entry.spells) {
+            missedSpellGrants.push({
+              spellName,
+              grantType: 'prepared',
+              isAlwaysPrepared: true,
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      needed: true,
+      selectedSubclass: migrationSubclass,
+      missedFeatures,
+      missedSpellGrants,
+    };
+  }, [
+    needsSubclassMigration,
+    matchedClass,
+    subclassSelectionLevel,
+    targetClass,
+    migrationSubclass,
+    migrationAdoptedFeatures,
+  ]);
+
   const asiLevels = matchedClass ? getASILevels(matchedClass) : [];
   const requiresASI = asiLevels.includes(newClassLevel);
 
@@ -224,6 +299,7 @@ export function useLevelUpWizard(character: CharacterState) {
     : [];
 
   const activeSubclass: ProcessedSubclass | undefined = useMemo(() => {
+    if (migrationSubclass) return migrationSubclass;
     if (selectedSubclass) return selectedSubclass;
     if (!matchedClass || !targetClass?.subclass) return undefined;
     return matchedClass.subclasses.find(
@@ -231,7 +307,7 @@ export function useLevelUpWizard(character: CharacterState) {
         sc.shortName === targetClass.subclass ||
         sc.name === targetClass.subclass
     );
-  }, [matchedClass, targetClass, selectedSubclass]);
+  }, [matchedClass, targetClass, selectedSubclass, migrationSubclass]);
 
   const subclassFeatures = activeSubclass
     ? getSubclassFeaturesForLevel(activeSubclass, newClassLevel)
@@ -257,11 +333,13 @@ export function useLevelUpWizard(character: CharacterState) {
       isCustomClass,
       needsEditionPicker,
       isMulticlassed: classes.length > 1,
+      needsSubclassMigration: needsSubclassMigration,
       requiresSubclass:
-        requiresSubclass ||
-        (!!matchedClass &&
-          subclassSelectionLevel === newClassLevel &&
-          !targetClass?.subclass),
+        !needsSubclassMigration &&
+        (requiresSubclass ||
+          (!!matchedClass &&
+            subclassSelectionLevel === newClassLevel &&
+            !targetClass?.subclass)),
       hasFeatures: hasFeatures || subclassSpellGrants.length > 0,
       requiresASI,
       needsHPInput,
@@ -270,6 +348,7 @@ export function useLevelUpWizard(character: CharacterState) {
     isCustomClass,
     needsEditionPicker,
     classes.length,
+    needsSubclassMigration,
     requiresSubclass,
     matchedClass,
     subclassSelectionLevel,
@@ -290,6 +369,8 @@ export function useLevelUpWizard(character: CharacterState) {
         return !!selectedEdition;
       case 'class':
         return targetClassIndex >= 0;
+      case 'subclass-migration':
+        return !!migrationSubclass;
       case 'subclass':
         return !!selectedSubclass;
       case 'features': {
@@ -312,6 +393,7 @@ export function useLevelUpWizard(character: CharacterState) {
     currentStep,
     selectedEdition,
     targetClassIndex,
+    migrationSubclass,
     selectedSubclass,
     asiChoice,
     hpRollResult,
@@ -345,11 +427,13 @@ export function useLevelUpWizard(character: CharacterState) {
     const classIdx = targetClassIndex;
 
     const updatedClasses = [...classes];
+    const subclassToSet =
+      selectedSubclass?.shortName || migrationSubclass?.shortName;
     updatedClasses[classIdx] = {
       ...updatedClasses[classIdx],
       level: newClassLevel,
       ...(selectedEdition ? { classSource: selectedEdition } : {}),
-      ...(selectedSubclass ? { subclass: selectedSubclass.shortName } : {}),
+      ...(subclassToSet ? { subclass: subclassToSet } : {}),
     };
 
     const updatedCharacter: CharacterState = {
@@ -378,12 +462,27 @@ export function useLevelUpWizard(character: CharacterState) {
     }
 
     let newSpells = [...(migrated.spells || [])];
+    // Migration: add missed subclass spells
+    if (
+      subclassMigration.needed &&
+      subclassMigration.missedSpellGrants.length > 0 &&
+      migrationSubclass
+    ) {
+      const migSpells = buildSubclassSpells(
+        subclassMigration.missedSpellGrants,
+        allSpells,
+        migrationSubclass.shortName,
+        newSpells
+      );
+      newSpells = [...newSpells, ...migSpells];
+    }
+    // Current level subclass spells
     if (subclassSpellGrants.length > 0 && activeSubclass) {
       const subSpells = buildSubclassSpells(
         subclassSpellGrants,
         allSpells,
         activeSubclass.shortName,
-        migrated.spells || []
+        newSpells
       );
       newSpells = [...newSpells, ...subSpells];
     }
@@ -411,21 +510,44 @@ export function useLevelUpWizard(character: CharacterState) {
       hitPoints: { ...migrated.hitPoints, ...hpUpdates },
     });
 
+    let featureOrder = (migrated.extendedFeatures || []).length;
+
+    // Migration: add adopted missed subclass features
+    if (subclassMigration.needed && migrationSubclass) {
+      const adoptedFeatures = subclassMigration.missedFeatures
+        .filter(mf => mf.adopted)
+        .map(mf => mf.feature);
+      if (adoptedFeatures.length > 0) {
+        const migEntries = buildFeatureEntries(
+          adoptedFeatures,
+          'class',
+          `${migrationSubclass.shortName} (${targetClass.className} - migrated)`,
+          featureOrder
+        );
+        migEntries.forEach(f => addExtendedFeature(f));
+        featureOrder += migEntries.length;
+      }
+    }
+
     const featureSourceDetail = `${targetClass.className} Level ${newClassLevel}`;
     const classFeatureEntries = buildFeatureEntries(
       classFeatures,
       'class',
       featureSourceDetail,
-      (migrated.extendedFeatures || []).length,
+      featureOrder,
       featureChoices
     );
+    featureOrder += classFeatureEntries.length;
+
     const subFeatureEntries = buildFeatureEntries(
       subclassFeatures,
       'class',
       `${activeSubclass?.shortName || targetClass.subclass || ''} (${targetClass.className} ${newClassLevel})`,
-      (migrated.extendedFeatures || []).length + classFeatureEntries.length,
+      featureOrder,
       featureChoices
     );
+    featureOrder += subFeatureEntries.length;
+
     if (asiChoice?.type === 'feat') {
       const featEntry = buildFeatureEntries(
         [
@@ -440,9 +562,7 @@ export function useLevelUpWizard(character: CharacterState) {
         ],
         'feat',
         asiChoice.feat.name,
-        (migrated.extendedFeatures || []).length +
-          classFeatureEntries.length +
-          subFeatureEntries.length
+        featureOrder
       );
       featEntry.forEach(f => addExtendedFeature(f));
     }
@@ -458,6 +578,8 @@ export function useLevelUpWizard(character: CharacterState) {
     selectedSubclass,
     migrated,
     asiChoice,
+    subclassMigration,
+    migrationSubclass,
     subclassSpellGrants,
     activeSubclass,
     allSpells,
@@ -491,6 +613,7 @@ export function useLevelUpWizard(character: CharacterState) {
       hpRollResult,
       steps,
       currentStepIndex,
+      subclassMigration,
     } as LevelUpWizardState,
     editionOptions,
     availableSubclasses: matchedClass
@@ -512,6 +635,8 @@ export function useLevelUpWizard(character: CharacterState) {
     setASIChoice,
     setFeatureChoices,
     setHPRollResult,
+    setMigrationSubclass,
+    setMigrationAdoptedFeatures,
     applyLevelUp,
   };
 }
