@@ -227,14 +227,17 @@ function FeatPanel({
                     !isSelected && 'hover:bg-surface-secondary'
                   )}
                 >
-                  <span
-                    className={cn(
-                      'text-sm font-medium',
-                      isSelected ? 'text-accent-purple-text' : 'text-heading'
-                    )}
-                  >
-                    {feat.name}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        'text-sm font-medium',
+                        isSelected ? 'text-accent-purple-text' : 'text-heading'
+                      )}
+                    >
+                      {feat.name}
+                    </span>
+                    <span className="text-faint text-xs">{feat.source}</span>
+                  </div>
                   {feat.prerequisites.length > 0 && (
                     <span className="text-faint text-xs">
                       Requires: {feat.prerequisites.join(', ')}
