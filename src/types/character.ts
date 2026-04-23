@@ -308,6 +308,7 @@ export interface MulticlassInfo {
   spellcaster?: 'full' | 'half' | 'third' | 'warlock' | 'none';
   hitDie: number; // d6, d8, d10, d12 - the size of the hit die for this class
   subclass?: string; // Optional subclass name
+  classSource?: string; // PHB or XPHB
 }
 
 // Multiclass validation result
@@ -935,6 +936,7 @@ export interface MulticlassInfo {
   spellcaster?: 'full' | 'half' | 'third' | 'warlock' | 'none';
   hitDie: number;
   subclass?: string;
+  classSource?: string; // PHB or XPHB
 }
 
 export interface HitDicePools {

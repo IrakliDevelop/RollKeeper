@@ -1,0 +1,642 @@
+'use client';
+
+import { useState, useCallback, useMemo } from 'react';
+import { useCharacterStore } from '@/store/characterStore';
+import { useClassData } from '@/hooks/useClassData';
+import { useSpellsData } from '@/hooks/useSpellsData';
+import type {
+  CharacterState,
+  MulticlassInfo,
+  Spell,
+  ExtendedFeature,
+} from '@/types/character';
+import type {
+  ProcessedClass,
+  ProcessedSubclass,
+  ClassFeature,
+} from '@/types/classes';
+import type { ProcessedSpell } from '@/types/spells';
+import {
+  calculateCharacterSpellSlots,
+  calculateCharacterPactMagic,
+  calculateModifier,
+} from '@/utils/calculations';
+import { calculateHitDicePools, migrateToMulticlass } from '@/utils/multiclass';
+import {
+  matchClassByName,
+  getEditionOptions,
+  getSubclassSelectionLevel,
+  getASILevels,
+  getFeaturesForLevel,
+  getSubclassFeaturesForLevel,
+  getAvailableSubclasses,
+  computeWizardSteps,
+  getSpellsKnownDelta,
+  getCantripsKnownDelta,
+} from './LevelUpWizard.utils';
+import type {
+  LevelUpWizardState,
+  ASIChoice,
+  SubclassSpellGrant,
+  SubclassMigration,
+  MissedSubclassFeature,
+  WizardStepConfig,
+} from './LevelUpWizard.types';
+
+function resolveSubclassSpellGrants(
+  subclass: ProcessedSubclass,
+  level: number
+): SubclassSpellGrant[] {
+  if (!subclass.spellList) return [];
+  const grants: SubclassSpellGrant[] = [];
+  for (const entry of subclass.spellList) {
+    if (entry.level !== level) continue;
+    for (const spellName of entry.spells) {
+      grants.push({
+        spellName,
+        grantType: 'prepared',
+        isAlwaysPrepared: true,
+      });
+    }
+  }
+  return grants;
+}
+
+function buildSubclassSpells(
+  grants: SubclassSpellGrant[],
+  allSpells: ProcessedSpell[],
+  subclassName: string,
+  existingSpells: Spell[]
+): Spell[] {
+  const result: Spell[] = [];
+  const existingNames = new Set(existingSpells.map(s => s.name.toLowerCase()));
+
+  for (const grant of grants) {
+    if (grant.grantType === 'expanded') continue;
+    if (existingNames.has(grant.spellName.toLowerCase())) continue;
+
+    const found = allSpells.find(
+      s => s.name.toLowerCase() === grant.spellName.toLowerCase()
+    );
+    if (!found) continue;
+
+    const now = new Date().toISOString();
+    const spell: Spell = {
+      id: `${found.id}-${subclassName.toLowerCase().replace(/\s+/g, '-')}`,
+      name: found.name,
+      level: found.level,
+      school: found.school,
+      castingTime: found.castingTime,
+      range: found.range,
+      duration: found.duration,
+      components: {
+        verbal: found.components.verbal,
+        somatic: found.components.somatic,
+        material: found.components.material,
+        materialDescription: found.components.materialComponent,
+      },
+      description: found.description,
+      isPrepared: grant.isAlwaysPrepared,
+      isAlwaysPrepared: grant.isAlwaysPrepared,
+      castingSource: subclassName,
+      createdAt: now,
+      updatedAt: now,
+    };
+    result.push(spell);
+  }
+  return result;
+}
+
+function buildFeatureEntries(
+  features: ClassFeature[],
+  sourceType: 'class' | 'feat',
+  sourceDetail: string,
+  startOrder: number,
+  chosenOptions?: Record<string, string>
+): Omit<ExtendedFeature, 'id' | 'createdAt' | 'updatedAt'>[] {
+  const result: Omit<ExtendedFeature, 'id' | 'createdAt' | 'updatedAt'>[] = [];
+  let order = startOrder;
+
+  for (const f of features) {
+    if (f.name === 'Ability Score Improvement' || f.name === 'Epic Boon')
+      continue;
+
+    result.push({
+      name: f.name,
+      description: f.entries?.map(e => `<p>${e}</p>`).join('') || '',
+      maxUses: 0,
+      usedUses: 0,
+      restType: 'long' as const,
+      sourceType,
+      sourceDetail,
+      displayOrder: order++,
+      isPassive: true,
+      scaleWithProficiency: false,
+      proficiencyMultiplier: 1,
+    });
+
+    if (f.choice && chosenOptions?.[f.name]) {
+      const chosen = f.choice.options.find(
+        o => o.name === chosenOptions[f.name]
+      );
+      if (chosen) {
+        result.push({
+          name: chosen.name,
+          description: chosen.entries.map(e => `<p>${e}</p>`).join(''),
+          maxUses: 0,
+          usedUses: 0,
+          restType: 'long' as const,
+          sourceType,
+          sourceDetail,
+          displayOrder: order++,
+          isPassive: true,
+          scaleWithProficiency: false,
+          proficiencyMultiplier: 1,
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
+export function useLevelUpWizard(character: CharacterState) {
+  const { classData, loading: classLoading } = useClassData();
+  const { spells: allSpells, loading: spellsLoading } = useSpellsData();
+  const updateCharacter = useCharacterStore(s => s.updateCharacter);
+  const addExtendedFeature = useCharacterStore(s => s.addExtendedFeature);
+
+  const migrated = useMemo(() => migrateToMulticlass(character), [character]);
+  const classes = migrated.classes || [];
+  const totalLevel = migrated.totalLevel || migrated.level || 1;
+
+  const [selectedEdition, setSelectedEdition] = useState<string | undefined>();
+  const [targetClassIndex, setTargetClassIndex] = useState<number>(
+    classes.length === 1 ? 0 : -1
+  );
+  const [selectedSubclass, setSelectedSubclass] = useState<
+    ProcessedSubclass | undefined
+  >();
+  const [asiChoice, setASIChoice] = useState<ASIChoice | undefined>();
+  const [featureChoices, setFeatureChoices] = useState<Record<string, string>>(
+    {}
+  );
+  const [hpRollResult, setHPRollResult] = useState<number | undefined>();
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [migrationSubclass, setMigrationSubclass] = useState<
+    ProcessedSubclass | undefined
+  >();
+  const [migrationAdoptedFeatures, setMigrationAdoptedFeatures] = useState<
+    Set<string>
+  >(new Set());
+
+  const targetClass: MulticlassInfo | null =
+    targetClassIndex >= 0 ? classes[targetClassIndex] : null;
+
+  const editionToUse = selectedEdition || targetClass?.classSource;
+
+  const matchedClass: ProcessedClass | null = useMemo(() => {
+    if (!targetClass || targetClass.isCustom) return null;
+    return matchClassByName(classData, targetClass.className, editionToUse);
+  }, [classData, targetClass, editionToUse]);
+
+  const editionOptions = useMemo(() => {
+    if (!targetClass) return [];
+    return getEditionOptions(classData, targetClass.className);
+  }, [classData, targetClass]);
+
+  const needsEditionPicker =
+    !!targetClass &&
+    !targetClass.isCustom &&
+    !targetClass.classSource &&
+    !selectedEdition &&
+    editionOptions.length > 1;
+
+  const newClassLevel = targetClass ? targetClass.level + 1 : 1;
+  const newTotalLevel = totalLevel + 1;
+
+  const subclassSelectionLevel = matchedClass
+    ? getSubclassSelectionLevel(matchedClass)
+    : null;
+  const requiresSubclass =
+    !!matchedClass &&
+    subclassSelectionLevel === newClassLevel &&
+    !targetClass?.subclass &&
+    !selectedSubclass;
+
+  // Detect subclass migration: character is past subclass selection level but has no subclass
+  const needsSubclassMigration =
+    !!matchedClass &&
+    !!subclassSelectionLevel &&
+    !!targetClass &&
+    !targetClass.subclass &&
+    !selectedSubclass &&
+    targetClass.level >= subclassSelectionLevel;
+
+  const subclassMigration: SubclassMigration = useMemo(() => {
+    if (!needsSubclassMigration || !matchedClass || !subclassSelectionLevel) {
+      return { needed: false, missedFeatures: [], missedSpellGrants: [] };
+    }
+
+    if (!migrationSubclass) {
+      return {
+        needed: true,
+        missedFeatures: [],
+        missedSpellGrants: [],
+      };
+    }
+
+    const missedFeatures: MissedSubclassFeature[] = [];
+    for (const f of migrationSubclass.features) {
+      if (f.level >= subclassSelectionLevel && f.level <= targetClass!.level) {
+        const key = `${f.name}-${f.level}`;
+        missedFeatures.push({
+          feature: f,
+          level: f.level,
+          adopted: migrationAdoptedFeatures.has(key),
+        });
+      }
+    }
+
+    const missedSpellGrants: SubclassSpellGrant[] = [];
+    if (migrationSubclass.spellList) {
+      for (const entry of migrationSubclass.spellList) {
+        if (
+          entry.level >= subclassSelectionLevel &&
+          entry.level <= targetClass!.level
+        ) {
+          for (const spellName of entry.spells) {
+            missedSpellGrants.push({
+              spellName,
+              grantType: 'prepared',
+              isAlwaysPrepared: true,
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      needed: true,
+      selectedSubclass: migrationSubclass,
+      missedFeatures,
+      missedSpellGrants,
+    };
+  }, [
+    needsSubclassMigration,
+    matchedClass,
+    subclassSelectionLevel,
+    targetClass,
+    migrationSubclass,
+    migrationAdoptedFeatures,
+  ]);
+
+  const asiLevels = matchedClass ? getASILevels(matchedClass) : [];
+  const requiresASI = asiLevels.includes(newClassLevel);
+
+  const classFeatures = matchedClass
+    ? getFeaturesForLevel(matchedClass, newClassLevel)
+    : [];
+
+  const activeSubclass: ProcessedSubclass | undefined = useMemo(() => {
+    if (migrationSubclass) return migrationSubclass;
+    if (selectedSubclass) return selectedSubclass;
+    if (!matchedClass || !targetClass?.subclass) return undefined;
+    return matchedClass.subclasses.find(
+      sc =>
+        sc.shortName === targetClass.subclass ||
+        sc.name === targetClass.subclass
+    );
+  }, [matchedClass, targetClass, selectedSubclass, migrationSubclass]);
+
+  const subclassFeatures = activeSubclass
+    ? getSubclassFeaturesForLevel(activeSubclass, newClassLevel)
+    : [];
+
+  const allFeatures = [...classFeatures, ...subclassFeatures];
+  const hasFeatures =
+    allFeatures.filter(
+      f => f.name !== 'Ability Score Improvement' && f.name !== 'Epic Boon'
+    ).length > 0;
+
+  const subclassSpellGrants: SubclassSpellGrant[] = useMemo(() => {
+    if (!activeSubclass) return [];
+    return resolveSubclassSpellGrants(activeSubclass, newClassLevel);
+  }, [activeSubclass, newClassLevel]);
+
+  const isCustomClass =
+    !!targetClass?.isCustom || (!matchedClass && !!targetClass);
+  const needsHPInput = character.hitPoints.calculationMode === 'manual';
+
+  const steps: WizardStepConfig[] = useMemo(() => {
+    return computeWizardSteps({
+      isCustomClass,
+      needsEditionPicker,
+      isMulticlassed: classes.length > 1,
+      needsSubclassMigration: needsSubclassMigration,
+      requiresSubclass:
+        !needsSubclassMigration &&
+        (requiresSubclass ||
+          (!!matchedClass &&
+            subclassSelectionLevel === newClassLevel &&
+            !targetClass?.subclass)),
+      hasFeatures: hasFeatures || subclassSpellGrants.length > 0,
+      requiresASI,
+      needsHPInput,
+    });
+  }, [
+    isCustomClass,
+    needsEditionPicker,
+    classes.length,
+    needsSubclassMigration,
+    requiresSubclass,
+    matchedClass,
+    subclassSelectionLevel,
+    newClassLevel,
+    targetClass,
+    hasFeatures,
+    subclassSpellGrants.length,
+    requiresASI,
+    needsHPInput,
+  ]);
+
+  const currentStep = steps[currentStepIndex] || steps[0];
+
+  const canGoNext = useCallback((): boolean => {
+    if (!currentStep) return false;
+    switch (currentStep.id) {
+      case 'edition':
+        return !!selectedEdition;
+      case 'class':
+        return targetClassIndex >= 0;
+      case 'subclass-migration':
+        return !!migrationSubclass;
+      case 'subclass':
+        return !!selectedSubclass;
+      case 'features': {
+        const allChoiceFeatures = [
+          ...classFeatures,
+          ...subclassFeatures,
+        ].filter(f => f.choice);
+        return allChoiceFeatures.every(f => featureChoices[f.name]);
+      }
+      case 'asi':
+        return !!asiChoice;
+      case 'hp':
+        return hpRollResult !== undefined && hpRollResult > 0;
+      case 'confirm':
+        return true;
+      default:
+        return true;
+    }
+  }, [
+    currentStep,
+    selectedEdition,
+    targetClassIndex,
+    migrationSubclass,
+    selectedSubclass,
+    asiChoice,
+    hpRollResult,
+    classFeatures,
+    subclassFeatures,
+    featureChoices,
+  ]);
+
+  const goNext = useCallback(() => {
+    if (currentStepIndex < steps.length - 1) {
+      setCurrentStepIndex(prev => prev + 1);
+    }
+  }, [currentStepIndex, steps.length]);
+
+  const goBack = useCallback(() => {
+    if (currentStepIndex > 0) {
+      setCurrentStepIndex(prev => prev - 1);
+    }
+  }, [currentStepIndex]);
+
+  const spellsKnownDelta = matchedClass
+    ? getSpellsKnownDelta(matchedClass, newClassLevel - 1, newClassLevel)
+    : 0;
+
+  const cantripsKnownDelta = matchedClass
+    ? getCantripsKnownDelta(matchedClass, newClassLevel - 1, newClassLevel)
+    : 0;
+
+  const applyLevelUp = useCallback(() => {
+    if (!targetClass) return;
+    const classIdx = targetClassIndex;
+
+    const updatedClasses = [...classes];
+    const subclassToSet =
+      selectedSubclass?.shortName || migrationSubclass?.shortName;
+    updatedClasses[classIdx] = {
+      ...updatedClasses[classIdx],
+      level: newClassLevel,
+      ...(selectedEdition ? { classSource: selectedEdition } : {}),
+      ...(subclassToSet ? { subclass: subclassToSet } : {}),
+    };
+
+    const updatedCharacter: CharacterState = {
+      ...migrated,
+      classes: updatedClasses,
+      totalLevel: newTotalLevel,
+      level: newTotalLevel,
+    };
+
+    const hitDicePools = calculateHitDicePools(
+      updatedClasses,
+      migrated.hitDicePools
+    );
+    const spellSlots = calculateCharacterSpellSlots(updatedCharacter);
+    const pactMagic = calculateCharacterPactMagic(updatedCharacter);
+
+    let abilities = { ...migrated.abilities };
+    if (asiChoice?.type === 'asi') {
+      for (const inc of asiChoice.increases) {
+        const key = inc.ability as keyof typeof abilities;
+        abilities = {
+          ...abilities,
+          [key]: Math.min(20, abilities[key] + inc.amount),
+        };
+      }
+    }
+
+    let newSpells = [...(migrated.spells || [])];
+    // Migration: add missed subclass spells
+    if (
+      subclassMigration.needed &&
+      subclassMigration.missedSpellGrants.length > 0 &&
+      migrationSubclass
+    ) {
+      const migSpells = buildSubclassSpells(
+        subclassMigration.missedSpellGrants,
+        allSpells,
+        migrationSubclass.shortName,
+        newSpells
+      );
+      newSpells = [...newSpells, ...migSpells];
+    }
+    // Current level subclass spells
+    if (subclassSpellGrants.length > 0 && activeSubclass) {
+      const subSpells = buildSubclassSpells(
+        subclassSpellGrants,
+        allSpells,
+        activeSubclass.shortName,
+        newSpells
+      );
+      newSpells = [...newSpells, ...subSpells];
+    }
+    if (asiChoice?.type === 'feat' && asiChoice.grantedSpells.length > 0) {
+      newSpells = [...newSpells, ...asiChoice.grantedSpells];
+    }
+
+    const hpUpdates: Partial<CharacterState['hitPoints']> = {};
+    if (needsHPInput && hpRollResult !== undefined) {
+      const conMod = calculateModifier(abilities.constitution);
+      hpUpdates.max = (migrated.hitPoints.max || 0) + hpRollResult + conMod;
+      hpUpdates.current =
+        (migrated.hitPoints.current || 0) + hpRollResult + conMod;
+    }
+
+    updateCharacter({
+      classes: updatedClasses,
+      totalLevel: newTotalLevel,
+      level: newTotalLevel,
+      hitDicePools,
+      spellSlots,
+      pactMagic,
+      abilities,
+      spells: newSpells,
+      hitPoints: { ...migrated.hitPoints, ...hpUpdates },
+    });
+
+    let featureOrder = (migrated.extendedFeatures || []).length;
+
+    // Migration: add adopted missed subclass features
+    if (subclassMigration.needed && migrationSubclass) {
+      const adoptedFeatures = subclassMigration.missedFeatures
+        .filter(mf => mf.adopted)
+        .map(mf => mf.feature);
+      if (adoptedFeatures.length > 0) {
+        const migEntries = buildFeatureEntries(
+          adoptedFeatures,
+          'class',
+          `${migrationSubclass.shortName} (${targetClass.className} - migrated)`,
+          featureOrder
+        );
+        migEntries.forEach(f => addExtendedFeature(f));
+        featureOrder += migEntries.length;
+      }
+    }
+
+    const featureSourceDetail = `${targetClass.className} Level ${newClassLevel}`;
+    const classFeatureEntries = buildFeatureEntries(
+      classFeatures,
+      'class',
+      featureSourceDetail,
+      featureOrder,
+      featureChoices
+    );
+    featureOrder += classFeatureEntries.length;
+
+    const subFeatureEntries = buildFeatureEntries(
+      subclassFeatures,
+      'class',
+      `${activeSubclass?.shortName || targetClass.subclass || ''} (${targetClass.className} ${newClassLevel})`,
+      featureOrder,
+      featureChoices
+    );
+    featureOrder += subFeatureEntries.length;
+
+    if (asiChoice?.type === 'feat') {
+      const featEntry = buildFeatureEntries(
+        [
+          {
+            name: asiChoice.feat.name,
+            level: newClassLevel,
+            source: asiChoice.feat.source,
+            entries: [asiChoice.feat.description],
+            isSubclassFeature: false,
+            original: '',
+          },
+        ],
+        'feat',
+        asiChoice.feat.name,
+        featureOrder
+      );
+      featEntry.forEach(f => addExtendedFeature(f));
+    }
+    classFeatureEntries.forEach(f => addExtendedFeature(f));
+    subFeatureEntries.forEach(f => addExtendedFeature(f));
+  }, [
+    targetClass,
+    targetClassIndex,
+    classes,
+    newClassLevel,
+    newTotalLevel,
+    selectedEdition,
+    selectedSubclass,
+    migrated,
+    asiChoice,
+    subclassMigration,
+    migrationSubclass,
+    subclassSpellGrants,
+    activeSubclass,
+    allSpells,
+    classFeatures,
+    subclassFeatures,
+    featureChoices,
+    needsHPInput,
+    hpRollResult,
+    updateCharacter,
+    addExtendedFeature,
+  ]);
+
+  return {
+    loading: classLoading || spellsLoading,
+    state: {
+      targetClassIndex,
+      targetClass: targetClass as MulticlassInfo,
+      newClassLevel,
+      newTotalLevel,
+      matchedClass,
+      features: classFeatures,
+      subclassFeatures,
+      subclassSpellGrants,
+      requiresSubclass,
+      requiresASI,
+      isCustomClass,
+      selectedEdition,
+      selectedSubclass,
+      asiChoice,
+      featureChoices,
+      hpRollResult,
+      steps,
+      currentStepIndex,
+      subclassMigration,
+    } as LevelUpWizardState,
+    editionOptions,
+    availableSubclasses: matchedClass
+      ? getAvailableSubclasses(matchedClass)
+      : [],
+    classes,
+    totalLevel,
+    character: migrated,
+    allSpells,
+    spellsKnownDelta,
+    cantripsKnownDelta,
+    currentStep,
+    canGoNext: canGoNext(),
+    goNext,
+    goBack,
+    setSelectedEdition,
+    setTargetClassIndex,
+    setSelectedSubclass,
+    setASIChoice,
+    setFeatureChoices,
+    setHPRollResult,
+    setMigrationSubclass,
+    setMigrationAdoptedFeatures,
+    applyLevelUp,
+  };
+}

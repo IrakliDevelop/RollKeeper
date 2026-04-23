@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Angry, Zap, ChevronDown, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
+import LevelUpWizard from '@/components/ui/character/LevelUpWizard';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { PlayerCalendarView } from '@/components/ui/calendar/PlayerCalendarView';
 import PlayerLocationView from '@/components/ui/campaign/location-map/PlayerLocationView';
@@ -58,6 +60,29 @@ import {
   Spell,
   InventoryItem,
 } from '@/types/character';
+
+function WizardHatIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 512 512" fill="currentColor">
+      <path d="M496 448H16c-8.84 0-16 7.16-16 16v32c0 8.84 7.16 16 16 16h480c8.84 0 16-7.16 16-16v-32c0-8.84-7.16-16-16-16zm-304-64l-64-32 64-32 32-64 32 64 64 32-64 32-16 32h208l-86.41-201.63a63.955 63.955 0 0 1-1.89-45.45L416 0 228.42 107.19a127.989 127.989 0 0 0-53.46 59.15L64 416h144l-16-32zm64-224l16-32 16 32 32 16-32 16-16 32-16-32-32-16 32-16z" />
+    </svg>
+  );
+}
+
+function LevelUpButton() {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <>
+      <Button variant="primary" size="sm" onClick={() => setIsOpen(true)}>
+        <WizardHatIcon size={14} />
+        Level Up
+      </Button>
+      {isOpen && (
+        <LevelUpWizard isOpen={isOpen} onClose={() => setIsOpen(false)} />
+      )}
+    </>
+  );
+}
 
 export interface TabbedSheetConfigParams {
   character: CharacterState;
@@ -392,9 +417,12 @@ export function createTabbedSheetConfig(
                 onRollSavingThrow={params.rollSavingThrow}
               />
               <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
-                  Experience Points
-                </h2>
+                <div className="border-divider mb-4 flex items-center justify-between border-b pb-2">
+                  <h2 className="text-heading text-lg font-bold">
+                    Experience Points
+                  </h2>
+                  {totalLevel < 20 && <LevelUpButton />}
+                </div>
                 <XPTracker
                   currentXP={character.experience}
                   currentLevel={totalLevel}

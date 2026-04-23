@@ -87,6 +87,16 @@ export interface RawSubclassData {
   };
 }
 
+export interface FeatureOption {
+  name: string;
+  entries: string[];
+}
+
+export interface FeatureChoice {
+  count: number;
+  options: FeatureOption[];
+}
+
 // Class feature with description
 export interface ClassFeature {
   name: string;
@@ -98,6 +108,7 @@ export interface ClassFeature {
   subclassShortName?: string;
   original: string; // Original feature reference
   is2024Rules?: boolean;
+  choice?: FeatureChoice;
 }
 
 // Processed class data for our application
