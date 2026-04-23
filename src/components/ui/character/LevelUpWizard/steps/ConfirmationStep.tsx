@@ -155,17 +155,25 @@ export default function ConfirmationStep({
                   </ul>
                 </>
               ) : (
-                <span className="text-heading text-sm">
-                  Feat:{' '}
-                  <span className="font-medium">{asiChoice.feat.name}</span>
-                  {asiChoice.grantedSpells.length > 0 && (
-                    <span className="text-muted">
-                      {' '}
-                      (+{asiChoice.grantedSpells.length} spell
-                      {asiChoice.grantedSpells.length > 1 ? 's' : ''})
-                    </span>
-                  )}
-                </span>
+                <div>
+                  <span className="text-heading text-sm">
+                    Feat:{' '}
+                    <span className="font-medium">{asiChoice.feat.name}</span>
+                    {asiChoice.grantedSpells.length > 0 && (
+                      <span className="text-muted">
+                        {' '}
+                        (+{asiChoice.grantedSpells.length} spell
+                        {asiChoice.grantedSpells.length > 1 ? 's' : ''})
+                      </span>
+                    )}
+                  </span>
+                  <div
+                    className="text-muted mt-1 text-xs leading-relaxed"
+                    dangerouslySetInnerHTML={{
+                      __html: asiChoice.feat.description,
+                    }}
+                  />
+                </div>
               )}
             </div>
           </div>

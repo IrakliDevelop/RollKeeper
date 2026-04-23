@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Plus, Minus, Search } from 'lucide-react';
+import { Plus, Minus, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Input } from '@/components/ui/forms/input';
 import { useFeatsData } from '@/hooks/useFeatsData';
@@ -137,6 +137,7 @@ function FeatPanel({
 }) {
   const { feats, loading: featsLoading } = useFeatsData();
   const [search, setSearch] = useState('');
+  const [expandedFeatId, setExpandedFeatId] = useState<string | null>(null);
   const [spellPickerFeat, setSpellPickerFeat] = useState<ProcessedFeat | null>(
     null
   );
@@ -200,31 +201,68 @@ function FeatPanel({
       <div className="max-h-60 space-y-1 overflow-y-auto">
         {filtered.slice(0, 50).map(feat => {
           const isSelected = selectedFeat?.id === feat.id;
+          const isExpanded = expandedFeatId === feat.id;
           return (
-            <button
+            <div
               key={feat.id}
-              onClick={() => handleSelectFeat(feat)}
               className={cn(
-                'flex w-full flex-col rounded-lg border px-3 py-2 text-left transition-all',
+                'rounded-lg border transition-all',
                 isSelected
                   ? 'border-accent-purple-border bg-accent-purple-bg'
-                  : 'border-divider bg-surface-raised hover:bg-surface-secondary'
+                  : 'border-divider bg-surface-raised'
               )}
             >
-              <span
-                className={cn(
-                  'text-sm font-medium',
-                  isSelected ? 'text-accent-purple-text' : 'text-heading'
-                )}
-              >
-                {feat.name}
-              </span>
-              {feat.prerequisites.length > 0 && (
-                <span className="text-faint text-xs">
-                  Requires: {feat.prerequisites.join(', ')}
-                </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleSelectFeat(feat)}
+                  className={cn(
+                    'flex min-w-0 flex-1 flex-col px-3 py-2 text-left',
+                    !isSelected && 'hover:bg-surface-secondary'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'text-sm font-medium',
+                      isSelected ? 'text-accent-purple-text' : 'text-heading'
+                    )}
+                  >
+                    {feat.name}
+                  </span>
+                  {feat.prerequisites.length > 0 && (
+                    <span className="text-faint text-xs">
+                      Requires: {feat.prerequisites.join(', ')}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    setExpandedFeatId(isExpanded ? null : feat.id);
+                  }}
+                  className="text-muted hover:text-heading flex-shrink-0 px-2 py-2"
+                  title={isExpanded ? 'Hide details' : 'Show details'}
+                >
+                  {isExpanded ? (
+                    <ChevronUp size={14} />
+                  ) : (
+                    <ChevronDown size={14} />
+                  )}
+                </button>
+              </div>
+              {isExpanded && (
+                <div className="border-divider border-t px-3 py-2">
+                  <div
+                    className="text-body text-xs leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: feat.description }}
+                  />
+                  {feat.abilityIncreases && (
+                    <p className="text-accent-blue-text mt-1 text-xs">
+                      {feat.abilityIncreases}
+                    </p>
+                  )}
+                </div>
               )}
-            </button>
+            </div>
           );
         })}
       </div>
