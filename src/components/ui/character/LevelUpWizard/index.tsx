@@ -155,6 +155,7 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
               onChoiceChange={wizard.setASIChoice}
               allSpells={wizard.allSpells}
               spellsLoading={false}
+              newTotalLevel={state.newTotalLevel}
             />
           )}
 

@@ -18,6 +18,7 @@ interface ASIFeatStepProps {
   onChoiceChange: (choice: ASIChoice) => void;
   allSpells: ProcessedSpell[];
   spellsLoading: boolean;
+  newTotalLevel: number;
 }
 
 const ABILITY_NAMES: { key: keyof CharacterAbilities; label: string }[] = [
@@ -129,11 +130,13 @@ function FeatPanel({
   onChoiceChange,
   allSpells,
   spellsLoading,
+  newTotalLevel,
 }: {
   asiChoice: ASIChoice | undefined;
   onChoiceChange: (choice: ASIChoice) => void;
   allSpells: ProcessedSpell[];
   spellsLoading: boolean;
+  newTotalLevel: number;
 }) {
   const { feats, loading: featsLoading } = useFeatsData();
   const [search, setSearch] = useState('');
@@ -144,9 +147,13 @@ function FeatPanel({
 
   const selectedFeat = asiChoice?.type === 'feat' ? asiChoice.feat : null;
 
+  const eligible = feats.filter(
+    f => !f.levelRequirement || f.levelRequirement <= newTotalLevel
+  );
+
   const filtered = search.trim()
-    ? feats.filter(f => f.name.toLowerCase().includes(search.toLowerCase()))
-    : feats;
+    ? eligible.filter(f => f.name.toLowerCase().includes(search.toLowerCase()))
+    : eligible;
 
   const handleSelectFeat = useCallback(
     (feat: ProcessedFeat) => {
@@ -288,6 +295,7 @@ export default function ASIFeatStep({
   onChoiceChange,
   allSpells,
   spellsLoading,
+  newTotalLevel,
 }: ASIFeatStepProps) {
   const [mode, setMode] = useState<'asi' | 'feat'>(asiChoice?.type || 'asi');
 
@@ -346,6 +354,7 @@ export default function ASIFeatStep({
           onChoiceChange={onChoiceChange}
           allSpells={allSpells}
           spellsLoading={spellsLoading}
+          newTotalLevel={newTotalLevel}
         />
       )}
     </div>
