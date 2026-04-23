@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Angry, Zap, ChevronDown, ChevronRight } from 'lucide-react';
+import { Angry, Zap, ChevronDown, ChevronRight, ArrowUp } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
+import LevelUpWizard from '@/components/ui/character/LevelUpWizard';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { PlayerCalendarView } from '@/components/ui/calendar/PlayerCalendarView';
 import PlayerLocationView from '@/components/ui/campaign/location-map/PlayerLocationView';
@@ -58,6 +60,21 @@ import {
   Spell,
   InventoryItem,
 } from '@/types/character';
+
+function LevelUpButton() {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <>
+      <Button variant="primary" size="sm" onClick={() => setIsOpen(true)}>
+        <ArrowUp size={14} className="mr-1" />
+        Level Up
+      </Button>
+      {isOpen && (
+        <LevelUpWizard isOpen={isOpen} onClose={() => setIsOpen(false)} />
+      )}
+    </>
+  );
+}
 
 export interface TabbedSheetConfigParams {
   character: CharacterState;
@@ -392,9 +409,12 @@ export function createTabbedSheetConfig(
                 onRollSavingThrow={params.rollSavingThrow}
               />
               <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
-                  Experience Points
-                </h2>
+                <div className="border-divider mb-4 flex items-center justify-between border-b pb-2">
+                  <h2 className="text-heading text-lg font-bold">
+                    Experience Points
+                  </h2>
+                  {totalLevel < 20 && <LevelUpButton />}
+                </div>
                 <XPTracker
                   currentXP={character.experience}
                   currentLevel={totalLevel}
