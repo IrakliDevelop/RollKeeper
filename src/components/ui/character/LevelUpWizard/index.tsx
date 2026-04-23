@@ -138,6 +138,13 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
               subclassFeatures={state.subclassFeatures}
               subclassName={activeSubclassName}
               subclassSpellGrants={state.subclassSpellGrants}
+              featureChoices={state.featureChoices}
+              onFeatureChoiceChange={(featureName, optionName) =>
+                wizard.setFeatureChoices(prev => ({
+                  ...prev,
+                  [featureName]: optionName,
+                }))
+              }
             />
           )}
 

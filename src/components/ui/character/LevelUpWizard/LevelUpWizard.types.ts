@@ -45,6 +45,7 @@ export interface LevelUpWizardState {
   selectedEdition?: string;
   selectedSubclass?: ProcessedSubclass;
   asiChoice?: ASIChoice;
+  featureChoices: Record<string, string>;
   hpRollResult?: number;
   steps: WizardStepConfig[];
   currentStepIndex: number;

@@ -109,13 +109,17 @@ function buildFeatureEntries(
   features: ClassFeature[],
   sourceType: 'class' | 'feat',
   sourceDetail: string,
-  startOrder: number
+  startOrder: number,
+  chosenOptions?: Record<string, string>
 ): Omit<ExtendedFeature, 'id' | 'createdAt' | 'updatedAt'>[] {
-  return features
-    .filter(
-      f => f.name !== 'Ability Score Improvement' && f.name !== 'Epic Boon'
-    )
-    .map((f, i) => ({
+  const result: Omit<ExtendedFeature, 'id' | 'createdAt' | 'updatedAt'>[] = [];
+  let order = startOrder;
+
+  for (const f of features) {
+    if (f.name === 'Ability Score Improvement' || f.name === 'Epic Boon')
+      continue;
+
+    result.push({
       name: f.name,
       description: f.entries?.map(e => `<p>${e}</p>`).join('') || '',
       maxUses: 0,
@@ -123,11 +127,35 @@ function buildFeatureEntries(
       restType: 'long' as const,
       sourceType,
       sourceDetail,
-      displayOrder: startOrder + i,
+      displayOrder: order++,
       isPassive: true,
       scaleWithProficiency: false,
       proficiencyMultiplier: 1,
-    }));
+    });
+
+    if (f.choice && chosenOptions?.[f.name]) {
+      const chosen = f.choice.options.find(
+        o => o.name === chosenOptions[f.name]
+      );
+      if (chosen) {
+        result.push({
+          name: chosen.name,
+          description: chosen.entries.map(e => `<p>${e}</p>`).join(''),
+          maxUses: 0,
+          usedUses: 0,
+          restType: 'long' as const,
+          sourceType,
+          sourceDetail,
+          displayOrder: order++,
+          isPassive: true,
+          scaleWithProficiency: false,
+          proficiencyMultiplier: 1,
+        });
+      }
+    }
+  }
+
+  return result;
 }
 
 export function useLevelUpWizard(character: CharacterState) {
@@ -148,6 +176,9 @@ export function useLevelUpWizard(character: CharacterState) {
     ProcessedSubclass | undefined
   >();
   const [asiChoice, setASIChoice] = useState<ASIChoice | undefined>();
+  const [featureChoices, setFeatureChoices] = useState<Record<string, string>>(
+    {}
+  );
   const [hpRollResult, setHPRollResult] = useState<number | undefined>();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
@@ -261,8 +292,13 @@ export function useLevelUpWizard(character: CharacterState) {
         return targetClassIndex >= 0;
       case 'subclass':
         return !!selectedSubclass;
-      case 'features':
-        return true;
+      case 'features': {
+        const allChoiceFeatures = [
+          ...classFeatures,
+          ...subclassFeatures,
+        ].filter(f => f.choice);
+        return allChoiceFeatures.every(f => featureChoices[f.name]);
+      }
       case 'asi':
         return !!asiChoice;
       case 'hp':
@@ -279,6 +315,9 @@ export function useLevelUpWizard(character: CharacterState) {
     selectedSubclass,
     asiChoice,
     hpRollResult,
+    classFeatures,
+    subclassFeatures,
+    featureChoices,
   ]);
 
   const goNext = useCallback(() => {
@@ -377,13 +416,15 @@ export function useLevelUpWizard(character: CharacterState) {
       classFeatures,
       'class',
       featureSourceDetail,
-      (migrated.extendedFeatures || []).length
+      (migrated.extendedFeatures || []).length,
+      featureChoices
     );
     const subFeatureEntries = buildFeatureEntries(
       subclassFeatures,
       'class',
       `${activeSubclass?.shortName || targetClass.subclass || ''} (${targetClass.className} ${newClassLevel})`,
-      (migrated.extendedFeatures || []).length + classFeatureEntries.length
+      (migrated.extendedFeatures || []).length + classFeatureEntries.length,
+      featureChoices
     );
     if (asiChoice?.type === 'feat') {
       const featEntry = buildFeatureEntries(
@@ -422,6 +463,7 @@ export function useLevelUpWizard(character: CharacterState) {
     allSpells,
     classFeatures,
     subclassFeatures,
+    featureChoices,
     needsHPInput,
     hpRollResult,
     updateCharacter,
@@ -445,6 +487,7 @@ export function useLevelUpWizard(character: CharacterState) {
       selectedEdition,
       selectedSubclass,
       asiChoice,
+      featureChoices,
       hpRollResult,
       steps,
       currentStepIndex,
@@ -467,6 +510,7 @@ export function useLevelUpWizard(character: CharacterState) {
     setTargetClassIndex,
     setSelectedSubclass,
     setASIChoice,
+    setFeatureChoices,
     setHPRollResult,
     applyLevelUp,
   };
