@@ -117,7 +117,7 @@ function buildFeatureEntries(
     )
     .map((f, i) => ({
       name: f.name,
-      description: f.entries?.join('\n\n') || '',
+      description: f.entries?.map(e => `<p>${e}</p>`).join('') || '',
       maxUses: 0,
       usedUses: 0,
       restType: 'long' as const,

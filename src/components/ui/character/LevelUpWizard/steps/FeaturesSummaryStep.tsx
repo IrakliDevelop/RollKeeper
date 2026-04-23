@@ -47,9 +47,11 @@ function FeatureCard({ feature }: { feature: ClassFeature }) {
       {expanded && hasDescription && (
         <div className="border-divider text-body border-t px-3 py-2 text-sm leading-relaxed">
           {feature.entries!.map((entry, i) => (
-            <p key={i} className="mb-2 last:mb-0">
-              {entry}
-            </p>
+            <p
+              key={i}
+              className="mb-2 last:mb-0"
+              dangerouslySetInnerHTML={{ __html: entry }}
+            />
           ))}
         </div>
       )}
