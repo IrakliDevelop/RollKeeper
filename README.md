@@ -1,6 +1,6 @@
 # RollKeeper
 
-A comprehensive web-based D&D 5e companion application for players and Dungeon Masters. Built with Next.js, featuring full character sheet management, real-time campaign synchronization, encounter tracking, NPC management, interactive maps, and searchable game reference compendiums.
+A comprehensive web-based D&D 5e companion application for players and Dungeon Masters. Built with Next.js 15 and React 19, featuring full character sheet management, real-time campaign synchronization, encounter tracking, NPC management, interactive maps, and searchable game reference compendiums.
 
 ## Features
 
@@ -12,6 +12,7 @@ A comprehensive web-based D&D 5e companion application for players and Dungeon M
 - Auto-save with debounce, manual save (Ctrl+S), and save-on-tab-switch
 - Character import/export (JSON) with bulk import support
 - Character duplication and archiving
+- QR code character sharing
 - S3-backed avatar uploads
 
 **Actions & Combat**
@@ -21,9 +22,10 @@ A comprehensive web-based D&D 5e companion application for players and Dungeon M
 - Spell attack bonus and spell save DC auto-calculation
 - Reaction tracking (used/reset per turn)
 - Initiative calculation from Dexterity with manual overrides
+- Combat log tracking
 
 **Spellcasting**
-- Full spell slot tracking (levels 1-9) with inline slot indicators per spell level
+- Full spell slot tracking (levels 1–9) with inline slot indicators per spell level
 - Spell casting modal with level selection, concentration warnings, and ritual casting
 - Free casts: at-will spells and innate spells with limited daily uses
 - Warlock Pact Magic with separate slot tracking and short rest recovery
@@ -167,24 +169,32 @@ A comprehensive web-based D&D 5e companion application for players and Dungeon M
 - Complete feat list with descriptions, prerequisites, and benefits
 - Search and filter by prerequisite or benefit type
 
+**Resources Hub** (`/resources`)
+- Central navigation page linking to all compendiums
+
 ## Tech Stack
 
 | Category | Technology |
 |---|---|
 | **Framework** | Next.js 15 (App Router, Turbopack) |
 | **Language** | TypeScript 5 |
+| **UI Library** | React 19 |
 | **Styling** | Tailwind CSS 4 |
 | **State** | Zustand 5 (with localStorage persistence) |
-| **UI Components** | Radix UI (Dialog, Tabs, Checkbox, Radio, Select, Tooltip) |
+| **UI Components** | Radix UI (Dialog, Tabs, Checkbox, Radio, Select, Switch, Toast, Tooltip) |
 | **Rich Text** | TipTap 3 |
 | **Forms** | React Hook Form 7 + Zod 4 |
 | **Dice** | @3d-dice/dice-box |
 | **Canvas/Maps** | TlDraw 4 |
+| **Node Graphs** | React Flow |
 | **Icons** | Lucide React |
 | **Animations** | Framer Motion |
+| **QR Codes** | qrcode.react |
+| **Image Export** | html-to-image |
 | **Sync** | Upstash Redis (serverless HTTP) |
 | **File Storage** | AWS S3 |
-| **Testing** | Vitest + Storybook + Playwright |
+| **Testing** | Vitest 4 + Storybook 10 + Playwright |
+| **Code Quality** | ESLint 9 + Prettier + Husky + lint-staged |
 
 ## Getting Started
 
@@ -192,14 +202,14 @@ A comprehensive web-based D&D 5e companion application for players and Dungeon M
 
 - Node.js 18+
 - npm
-- Docker (for local Redis — required for campaign sync features)
+- Docker (required for campaign sync — runs local Redis)
 
 ### Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/AbandonedLand/RollKeeper.git
-cd rollkeeper
+cd RollKeeper
 
 # Install dependencies
 npm install
@@ -208,56 +218,92 @@ npm install
 cp .env.example .env.local
 ```
 
+The defaults in `.env.example` work with the local Docker setup — no changes needed for development.
+
 ### Local Redis Setup
 
-Campaign sync (DM-player communication) requires Redis. The included Docker Compose file sets up Redis and a serverless HTTP wrapper:
+Campaign sync (DM–player communication) requires a Redis instance exposed via an HTTP proxy. The included Docker Compose file handles both:
 
 ```bash
 # Start Redis + serverless-redis-http
 docker-compose up -d
 ```
 
-This starts:
-- **Redis** on port 6379
-- **Serverless Redis HTTP** on port 8079 (proxies REST calls to Redis)
+This starts two containers:
 
-The default `.env.example` values work with this setup — no changes needed.
+| Service | Port | Purpose |
+|---|---|---|
+| **Redis** (redis:7-alpine) | 6379 | Key-value store for campaign data |
+| **Serverless Redis HTTP** | 8079 | REST proxy that wraps Redis for the Upstash SDK |
+
+The proxy speaks the Upstash REST protocol, so the app connects to `http://localhost:8079` with token `local_dev_token` — matching the defaults in `.env.example`.
+
+To stop Redis:
+
+```bash
+docker-compose down
+```
+
+Data persists in a Docker volume (`redis-data`) across restarts. To wipe it:
+
+```bash
+docker-compose down -v
+```
+
+> **Note:** Redis is only needed for campaign sync features (DM dashboard, multiplayer). Character sheets work fully offline with localStorage — you can skip Docker if you only need single-player functionality.
 
 ### Environment Variables
 
 | Variable | Required | Default (local) | Purpose |
 |---|---|---|---|
-| `UPSTASH_REDIS_REST_URL` | Yes (for sync) | `http://localhost:8079` | Redis HTTP proxy URL |
-| `UPSTASH_REDIS_REST_TOKEN` | Yes (for sync) | `local_dev_token` | Redis auth token |
+| `UPSTASH_REDIS_REST_URL` | For campaign sync | `http://localhost:8079` | Redis HTTP proxy URL |
+| `UPSTASH_REDIS_REST_TOKEN` | For campaign sync | `local_dev_token` | Redis auth token |
 | `AWS_ACCESS_KEY_ID` | No | — | S3 avatar/banner uploads |
 | `AWS_SECRET_ACCESS_KEY` | No | — | S3 avatar/banner uploads |
 | `AWS_S3_REGION` | No | `eu-central-1` | S3 bucket region |
 | `AWS_S3_BUCKET_NAME` | No | `rollkeeper-images` | S3 bucket name |
 | `NEXT_PUBLIC_TLDRAW_LICENSE_KEY` | No | — | TlDraw license for maps |
 
-> **Note:** The app works without AWS credentials — avatar and banner uploads will be disabled. Redis is only needed for campaign sync features; character sheets work fully offline with localStorage.
+> The app works without AWS credentials — avatar and banner uploads will be disabled.
 
 ### Run the App
 
 ```bash
-# Development server (with Turbopack)
+# Development server (Turbopack, port 3001)
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3001](http://localhost:3001) in your browser.
+
+### Production Build
+
+```bash
+npm run build    # Build for production
+npm run start    # Start production server
+```
 
 ### Scripts
 
 ```bash
-npm run dev          # Development server (Turbopack)
-npm run build        # Production build
-npm run start        # Production server
-npm run lint         # ESLint
-npm run lint:fix     # ESLint with auto-fix
-npm run format       # Prettier + ESLint fix
-npm run type-check   # TypeScript type checking
-npm run test         # Run tests (Vitest + Playwright)
-npm run storybook    # Storybook dev server (port 6006)
+# Development
+npm run dev              # Dev server with Turbopack (port 3001)
+npm run build            # Production build
+npm run start            # Production server
+
+# Code Quality
+npm run lint             # ESLint
+npm run lint:fix         # ESLint with auto-fix
+npm run prettier         # Prettier format all files
+npm run prettier:check   # Check Prettier formatting
+npm run format           # Prettier + ESLint fix (combined)
+npm run format:check     # Check both Prettier + ESLint (CI-friendly)
+npm run type-check       # TypeScript type checking (no emit)
+
+# Testing
+npm run test             # Run unit tests (Vitest)
+npm run test:watch       # Run unit tests in watch mode
+npm run storybook        # Storybook dev server (port 6006)
+npm run build-storybook  # Build static Storybook
 ```
 
 ## Architecture
@@ -274,21 +320,60 @@ npm run storybook    # Storybook dev server (port 6006)
 src/
   app/                    # Next.js App Router pages & API routes
     player/               # Player views (roster, character sheet)
-    dm/                   # DM views (dashboard, campaigns, encounters, maps)
+    dm/                   # DM views (dashboard, campaign detail)
+      campaign/[code]/    # Campaign pages (encounters, locations, battlemaps, calendar)
     bestiary/             # Monster reference compendium
     spellbook/            # Spell reference compendium
     classes/              # Class reference compendium
     feats/                # Feat reference compendium
+    resources/            # Compendium hub page
+    import/               # Character import
     api/                  # API routes (data serving & campaign sync)
   components/
     ui/                   # Design system (forms, layout, feedback, game UI)
     shared/               # Shared domain components (character, combat, spells)
+    bestiary/             # Bestiary-specific components
+    spellbook/            # Spellbook-specific components
+    classes/              # Class reference components
+    feats/                # Feats reference components
   store/                  # Zustand stores (all localStorage-persisted)
+    characterStore.ts     # Active character state
+    playerStore.ts        # Multi-character roster & settings
+    dmStore.ts            # DM identity & campaign list
+    encounterStore.ts     # Encounter & combat tracking
+    npcStore.ts           # NPC management
+    battleMapStore.ts     # Battle map state
+    calendarStore.ts      # Campaign calendar
+    locationStore.ts      # Campaign locations
+    combatLogStore.ts     # Combat action log
   hooks/                  # Custom React hooks (data fetching, sync, theme)
   types/                  # TypeScript interfaces
   utils/                  # Pure helpers (D&D math, data conversion)
 json/                     # Static game data (monsters, spells, items, etc.)
 ```
+
+### State Management
+
+| Store | Purpose | Persistence Key |
+|---|---|---|
+| `characterStore` | Active character editing (single character at a time) | `rollkeeper-character-data` |
+| `playerStore` | Multi-character roster, player settings, avatars | `rollkeeper-player-data` |
+| `dmStore` | DM identity and campaign list | `rollkeeper-dm-data` |
+| `encounterStore` | Encounter entities, initiative, turn tracking | `rollkeeper-encounter-data` |
+| `npcStore` | NPC stat blocks (global, not campaign-scoped) | `rollkeeper-npc-data` |
+| `battleMapStore` | Battle map annotations and state | `rollkeeper-battlemap-data` |
+| `calendarStore` | Campaign calendar configuration and events | `rollkeeper-calendar-data` |
+| `locationStore` | Campaign locations and map data | `rollkeeper-location-data` |
+| `combatLogStore` | Combat action history | `rollkeeper-combat-log` |
+
+### Testing
+
+Tests use **Vitest** as the runner with two project configurations:
+
+- **Unit tests** (`npm run test`) — run with jsdom, files matching `src/**/*.test.{ts,tsx}`
+- **Storybook tests** — component stories run in headless Chromium via `@vitest/browser-playwright`
+
+Storybook 10 is set up with accessibility auditing (`@storybook/addon-a11y`) and visual testing via Chromatic.
 
 ## License
 
