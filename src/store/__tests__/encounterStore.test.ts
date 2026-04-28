@@ -746,4 +746,471 @@ describe('encounterStore', () => {
       expect(entity.lairActions!.every(la => !la.usedThisRound)).toBe(true);
     });
   });
+
+  // ── Queries ──
+
+  describe('getEncountersByCampaign', () => {
+    it('returns only encounters matching the campaign code', () => {
+      const store = useEncounterStore.getState();
+      store.createEncounter('Alpha', 'CAMP-A');
+      store.createEncounter('Beta', 'CAMP-B');
+      store.createEncounter('Gamma', 'CAMP-A');
+
+      const results = useEncounterStore
+        .getState()
+        .getEncountersByCampaign('CAMP-A');
+
+      expect(results).toHaveLength(2);
+      expect(results.every(e => e.campaignCode === 'CAMP-A')).toBe(true);
+      expect(results.map(e => e.name)).toEqual(
+        expect.arrayContaining(['Alpha', 'Gamma'])
+      );
+    });
+
+    it('returns empty array when no encounters match', () => {
+      useEncounterStore.getState().createEncounter('Solo', 'CAMP-X');
+
+      const results = useEncounterStore
+        .getState()
+        .getEncountersByCampaign('CAMP-MISSING');
+
+      expect(results).toHaveLength(0);
+    });
+  });
+
+  // ── Active encounter ──
+
+  describe('setActiveEncounter', () => {
+    it('sets the active encounter id', () => {
+      const id = useEncounterStore.getState().createEncounter('Fight');
+      useEncounterStore.getState().setActiveEncounter(null);
+      expect(useEncounterStore.getState().activeEncounterId).toBeNull();
+
+      useEncounterStore.getState().setActiveEncounter(id);
+      expect(useEncounterStore.getState().activeEncounterId).toBe(id);
+    });
+  });
+
+  // ── setTurn ──
+
+  describe('setTurn', () => {
+    it('jumps to the specified entity index', () => {
+      const encId = setupEncounterWithEntities([
+        { name: 'A', initiative: 20, initiativeModifier: 0 },
+        { name: 'B', initiative: 15, initiativeModifier: 0 },
+        { name: 'C', initiative: 10, initiativeModifier: 0 },
+      ]);
+      useEncounterStore.getState().startCombat(encId);
+
+      const enc = useEncounterStore.getState().getEncounter(encId)!;
+      const targetEntityId = enc.entities[2].id; // 'C'
+
+      useEncounterStore.getState().setTurn(encId, targetEntityId);
+
+      expect(
+        useEncounterStore.getState().getEncounter(encId)!.currentTurn
+      ).toBe(2);
+    });
+
+    it('does nothing when entity id is not found', () => {
+      const encId = setupEncounterWithEntities([
+        { name: 'A', initiative: 20, initiativeModifier: 0 },
+      ]);
+      useEncounterStore.getState().startCombat(encId);
+
+      useEncounterStore.getState().setTurn(encId, 'nonexistent-id');
+
+      expect(
+        useEncounterStore.getState().getEncounter(encId)!.currentTurn
+      ).toBe(0);
+    });
+  });
+
+  // ── HP: setEntityHp ──
+
+  describe('setEntityHp', () => {
+    it('sets current HP directly', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore
+        .getState()
+        .addEntity(
+          encId,
+          createMockEncounterEntity({ currentHp: 10, maxHp: 20 })
+        );
+
+      useEncounterStore.getState().setEntityHp(encId, entityId, 15);
+
+      const entity = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0];
+      expect(entity.currentHp).toBe(15);
+      expect(entity.maxHp).toBe(20); // unchanged
+    });
+
+    it('clamps current HP to max', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore
+        .getState()
+        .addEntity(
+          encId,
+          createMockEncounterEntity({ currentHp: 10, maxHp: 20 })
+        );
+
+      useEncounterStore.getState().setEntityHp(encId, entityId, 999);
+
+      const entity = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0];
+      expect(entity.currentHp).toBe(20);
+    });
+
+    it('clamps current HP to 0 minimum', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore
+        .getState()
+        .addEntity(
+          encId,
+          createMockEncounterEntity({ currentHp: 10, maxHp: 20 })
+        );
+
+      useEncounterStore.getState().setEntityHp(encId, entityId, -5);
+
+      const entity = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0];
+      expect(entity.currentHp).toBe(0);
+    });
+
+    it('updates max HP when provided', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore
+        .getState()
+        .addEntity(
+          encId,
+          createMockEncounterEntity({ currentHp: 10, maxHp: 20 })
+        );
+
+      useEncounterStore.getState().setEntityHp(encId, entityId, 25, 30);
+
+      const entity = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0];
+      expect(entity.maxHp).toBe(30);
+      expect(entity.currentHp).toBe(25);
+    });
+  });
+
+  // ── HP: addTempHp ──
+
+  describe('addTempHp', () => {
+    it('sets temp HP when entity has none', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore
+        .getState()
+        .addEntity(
+          encId,
+          createMockEncounterEntity({ currentHp: 10, maxHp: 10, tempHp: 0 })
+        );
+
+      useEncounterStore.getState().addTempHp(encId, entityId, 8);
+
+      const entity = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0];
+      expect(entity.tempHp).toBe(8);
+    });
+
+    it('takes the higher value when new temp HP is greater', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore
+        .getState()
+        .addEntity(
+          encId,
+          createMockEncounterEntity({ currentHp: 10, maxHp: 10, tempHp: 5 })
+        );
+
+      useEncounterStore.getState().addTempHp(encId, entityId, 12);
+
+      const entity = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0];
+      expect(entity.tempHp).toBe(12);
+    });
+
+    it('keeps existing temp HP when new value is lower', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore
+        .getState()
+        .addEntity(
+          encId,
+          createMockEncounterEntity({ currentHp: 10, maxHp: 10, tempHp: 10 })
+        );
+
+      useEncounterStore.getState().addTempHp(encId, entityId, 3);
+
+      const entity = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0];
+      expect(entity.tempHp).toBe(10);
+    });
+  });
+
+  // ── Conditions: updateCondition ──
+
+  describe('updateCondition', () => {
+    it('updates specific fields of an existing condition', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore
+        .getState()
+        .addEntity(encId, createMockEncounterEntity());
+
+      useEncounterStore.getState().addCondition(encId, entityId, {
+        name: 'Frightened',
+        source: 'dm',
+        duration: 3,
+      });
+      const conditionId = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0].conditions[0].id;
+
+      useEncounterStore
+        .getState()
+        .updateCondition(encId, entityId, conditionId, { duration: 1 });
+
+      const condition = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0].conditions[0];
+      expect(condition.duration).toBe(1);
+      expect(condition.name).toBe('Frightened'); // unchanged
+    });
+
+    it('does not affect other conditions', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore
+        .getState()
+        .addEntity(encId, createMockEncounterEntity());
+
+      useEncounterStore
+        .getState()
+        .addCondition(encId, entityId, { name: 'Blinded', source: 'dm' });
+      useEncounterStore
+        .getState()
+        .addCondition(encId, entityId, { name: 'Deafened', source: 'dm' });
+
+      const conditions = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0].conditions;
+      const blindedId = conditions.find(c => c.name === 'Blinded')!.id;
+
+      useEncounterStore
+        .getState()
+        .updateCondition(encId, entityId, blindedId, { duration: 5 });
+
+      const updated = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0].conditions;
+      expect(updated.find(c => c.name === 'Blinded')!.duration).toBe(5);
+      expect(
+        updated.find(c => c.name === 'Deafened')!.duration
+      ).toBeUndefined();
+    });
+  });
+
+  // ── reorderEntities ──
+
+  describe('reorderEntities', () => {
+    it('reorders entities to match the supplied id order', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const idA = useEncounterStore
+        .getState()
+        .addEntity(encId, createMockEncounterEntity({ name: 'A' }));
+      const idB = useEncounterStore
+        .getState()
+        .addEntity(encId, createMockEncounterEntity({ name: 'B' }));
+      const idC = useEncounterStore
+        .getState()
+        .addEntity(encId, createMockEncounterEntity({ name: 'C' }));
+
+      useEncounterStore.getState().reorderEntities(encId, [idC, idA, idB]);
+
+      const entities = useEncounterStore
+        .getState()
+        .getEncounter(encId)!.entities;
+      expect(entities.map(e => e.name)).toEqual(['C', 'A', 'B']);
+    });
+
+    it('sets sortOrder to manual', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const idA = useEncounterStore
+        .getState()
+        .addEntity(encId, createMockEncounterEntity({ name: 'A' }));
+
+      useEncounterStore.getState().reorderEntities(encId, [idA]);
+
+      expect(useEncounterStore.getState().getEncounter(encId)!.sortOrder).toBe(
+        'manual'
+      );
+    });
+
+    it('ignores unknown entity ids', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const idA = useEncounterStore
+        .getState()
+        .addEntity(encId, createMockEncounterEntity({ name: 'A' }));
+      const idB = useEncounterStore
+        .getState()
+        .addEntity(encId, createMockEncounterEntity({ name: 'B' }));
+
+      // Provide one valid and one bogus id
+      useEncounterStore
+        .getState()
+        .reorderEntities(encId, [idB, 'ghost-id', idA]);
+
+      const entities = useEncounterStore
+        .getState()
+        .getEncounter(encId)!.entities;
+      expect(entities.map(e => e.name)).toEqual(['B', 'A']);
+    });
+  });
+
+  // ── longRestEntity ──
+
+  describe('longRestEntity', () => {
+    it('restores HP to max and clears temp HP', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore
+        .getState()
+        .addEntity(
+          encId,
+          createMockEncounterEntity({ currentHp: 3, maxHp: 30, tempHp: 5 })
+        );
+
+      useEncounterStore.getState().longRestEntity(encId, entityId);
+
+      const entity = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0];
+      expect(entity.currentHp).toBe(30);
+      expect(entity.tempHp).toBe(0);
+    });
+
+    it('clears death saves and concentration', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore.getState().addEntity(
+        encId,
+        createMockEncounterEntity({
+          currentHp: 0,
+          maxHp: 20,
+          tempHp: 0,
+          concentrationSpell: 'Haste',
+          deathSaves: { successes: 1, failures: 2, isStabilized: false },
+          hasUsedReaction: true,
+        })
+      );
+
+      useEncounterStore.getState().longRestEntity(encId, entityId);
+
+      const entity = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0];
+      expect(entity.deathSaves).toBeUndefined();
+      expect(entity.concentrationSpell).toBeUndefined();
+      expect(entity.hasUsedReaction).toBe(false);
+    });
+
+    it('resets ability usedUses to 0', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore.getState().addEntity(
+        encId,
+        createMockEncounterEntity({
+          currentHp: 5,
+          maxHp: 20,
+          abilities: [
+            {
+              id: 'ab-1',
+              name: 'Breath',
+              description: 'Fire',
+              usageType: 'recharge',
+              rechargeOn: 5,
+              maxUses: 1,
+              usedUses: 1,
+            },
+            {
+              id: 'ab-2',
+              name: 'Claw',
+              description: 'Slash',
+              usageType: 'per-day',
+              maxUses: 3,
+              usedUses: 2,
+            },
+          ],
+        })
+      );
+
+      useEncounterStore.getState().longRestEntity(encId, entityId);
+
+      const abilities = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0].abilities!;
+      expect(abilities.every(a => a.usedUses === 0)).toBe(true);
+    });
+
+    it('resets legendary action usedActions to 0', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore.getState().addEntity(
+        encId,
+        createMockEncounterEntity({
+          currentHp: 5,
+          maxHp: 40,
+          legendaryActions: {
+            maxActions: 3,
+            usedActions: 3,
+            actions: [
+              { id: 'la-1', name: 'Detect', cost: 1, description: 'Perceive' },
+            ],
+          },
+        })
+      );
+
+      useEncounterStore.getState().longRestEntity(encId, entityId);
+
+      const entity = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0];
+      expect(entity.legendaryActions!.usedActions).toBe(0);
+    });
+
+    it('resets spell slot used counts to 0', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore.getState().addEntity(
+        encId,
+        createMockEncounterEntity({
+          currentHp: 5,
+          maxHp: 20,
+          spellcasting: {
+            spellcastingAbility: 'intelligence',
+            spellAttackBonus: 7,
+            spellSaveDC: 15,
+            slots: {
+              1: { max: 4, used: 4 },
+              2: { max: 3, used: 2 },
+            },
+            usedSpells: { 'magic-missile': true },
+            knownSpells: [],
+          },
+        })
+      );
+
+      useEncounterStore.getState().longRestEntity(encId, entityId);
+
+      const spellcasting = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0].spellcasting!;
+      expect(spellcasting.slots![1].used).toBe(0);
+      expect(spellcasting.slots![2].used).toBe(0);
+      expect(spellcasting.usedSpells).toEqual({});
+    });
+
+    it('restores hit dice current to max', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore.getState().addEntity(
+        encId,
+        createMockEncounterEntity({
+          currentHp: 5,
+          maxHp: 20,
+          hitDice: { dieType: 'd8', max: 5, current: 2 },
+        })
+      );
+
+      useEncounterStore.getState().longRestEntity(encId, entityId);
+
+      const entity = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0];
+      expect(entity.hitDice!.current).toBe(5);
+    });
+  });
 });
