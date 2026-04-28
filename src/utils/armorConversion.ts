@@ -74,9 +74,14 @@ const NAME_TO_TYPE: Record<string, ArmorType> = {
   shield: 'shield',
 };
 
+// Sorted longest-first so "studded leather" matches before "leather", etc.
+const NAME_TO_TYPE_ENTRIES = Object.entries(NAME_TO_TYPE).sort(
+  (a, b) => b[0].length - a[0].length
+);
+
 function inferArmorType(item: ProcessedArmor): ArmorType {
   if (item.baseItem) {
-    for (const [pattern, armorType] of Object.entries(NAME_TO_TYPE)) {
+    for (const [pattern, armorType] of NAME_TO_TYPE_ENTRIES) {
       if (item.baseItem.includes(pattern)) {
         return armorType;
       }
@@ -84,7 +89,7 @@ function inferArmorType(item: ProcessedArmor): ArmorType {
   }
 
   const nameLower = item.name.toLowerCase();
-  for (const [pattern, armorType] of Object.entries(NAME_TO_TYPE)) {
+  for (const [pattern, armorType] of NAME_TO_TYPE_ENTRIES) {
     if (nameLower.includes(pattern)) {
       return armorType;
     }

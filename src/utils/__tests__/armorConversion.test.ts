@@ -62,10 +62,7 @@ describe('convertProcessedArmorToFormData', () => {
     expect(result.baseAC).toBe(11);
   });
 
-  it('infers studded leather via AC-based category lookup when name is ambiguous', () => {
-    // Neither name nor baseItem will reliably match 'studded-leather' because
-    // 'leather' pattern is found first in NAME_TO_TYPE. The AC/category fallback
-    // resolves studded-leather when: category=light + ac=12 (unique within light tier).
+  it('infers studded leather via AC-based category lookup when name has no keyword', () => {
     const armor = makeProcessedArmor({
       name: 'Mystic Studded Scale',
       category: 'light',
@@ -76,18 +73,15 @@ describe('convertProcessedArmorToFormData', () => {
     expect(result.baseAC).toBe(12);
   });
 
-  it('infers leather armor via name match (studded leather without baseItem hits leather first)', () => {
-    // JS object iteration order means 'leather' pattern is tested before 'studded leather'
-    // so a name containing 'studded leather' matches leather type via name scan
+  it('infers studded leather from name (longest pattern matches first)', () => {
     const armor = makeProcessedArmor({
       name: 'Studded Leather Armor',
       category: 'light',
       ac: 12,
     });
     const result = convertProcessedArmorToFormData(armor);
-    // 'leather' pattern is matched first in NAME_TO_TYPE iteration
-    expect(result.type).toBe('leather');
-    expect(result.baseAC).toBe(11);
+    expect(result.type).toBe('studded-leather');
+    expect(result.baseAC).toBe(12);
   });
 
   it('infers plate from name', () => {
