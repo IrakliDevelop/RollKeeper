@@ -960,18 +960,18 @@ describe('encounterStore', () => {
       useEncounterStore.getState().addCondition(encId, entityId, {
         name: 'Frightened',
         source: 'dm',
-        duration: 3,
+        duration: '3 rounds',
       });
       const conditionId = useEncounterStore.getState().getEncounter(encId)!
         .entities[0].conditions[0].id;
 
       useEncounterStore
         .getState()
-        .updateCondition(encId, entityId, conditionId, { duration: 1 });
+        .updateCondition(encId, entityId, conditionId, { duration: '1 round' });
 
       const condition = useEncounterStore.getState().getEncounter(encId)!
         .entities[0].conditions[0];
-      expect(condition.duration).toBe(1);
+      expect(condition.duration).toBe('1 round');
       expect(condition.name).toBe('Frightened'); // unchanged
     });
 
@@ -994,11 +994,13 @@ describe('encounterStore', () => {
 
       useEncounterStore
         .getState()
-        .updateCondition(encId, entityId, blindedId, { duration: 5 });
+        .updateCondition(encId, entityId, blindedId, { duration: '5 rounds' });
 
       const updated = useEncounterStore.getState().getEncounter(encId)!
         .entities[0].conditions;
-      expect(updated.find(c => c.name === 'Blinded')!.duration).toBe(5);
+      expect(updated.find(c => c.name === 'Blinded')!.duration).toBe(
+        '5 rounds'
+      );
       expect(
         updated.find(c => c.name === 'Deafened')!.duration
       ).toBeUndefined();
@@ -1173,15 +1175,16 @@ describe('encounterStore', () => {
           currentHp: 5,
           maxHp: 20,
           spellcasting: {
-            spellcastingAbility: 'intelligence',
-            spellAttackBonus: 7,
-            spellSaveDC: 15,
+            ability: 'intelligence',
+            dc: 15,
+            toHit: 7,
+            atWill: [],
+            perDay: {},
             slots: {
               1: { max: 4, used: 4 },
               2: { max: 3, used: 2 },
             },
-            usedSpells: { 'magic-missile': true },
-            knownSpells: [],
+            usedSpells: { 'magic-missile': 1 },
           },
         })
       );

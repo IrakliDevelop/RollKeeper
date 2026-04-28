@@ -320,19 +320,12 @@ describe('playerStore', () => {
 
     it('imports a PlayerCharacter export format', () => {
       const id = usePlayerStore.getState().createCharacter('Hero');
-      const playerChar = usePlayerStore.getState().exportCharacter(id)!;
-      // Cast to CharacterExport-compatible to trigger the characterData branch
-      const asExport = playerChar as unknown as Parameters<
-        typeof usePlayerStore.getState.importCharacter
-      >[0];
+      const charState = usePlayerStore
+        .getState()
+        .getCharacterById(id)!.characterData;
       const importedId = usePlayerStore
         .getState()
-        .importCharacter(
-          asExport as Parameters<
-            ReturnType<typeof usePlayerStore.getState>['importCharacter']
-          >[0],
-          'Re-imported'
-        );
+        .importCharacter(charState, 'Re-imported');
       expect(usePlayerStore.getState().getCharacterById(importedId)?.name).toBe(
         'Re-imported'
       );
@@ -374,12 +367,10 @@ describe('playerStore', () => {
     });
 
     it('resets all settings fields', () => {
-      usePlayerStore
-        .getState()
-        .updateSettings({
-          enableDeathAnimation: true,
-          enableLevelUpAnimation: true,
-        });
+      usePlayerStore.getState().updateSettings({
+        enableDeathAnimation: true,
+        enableLevelUpAnimation: true,
+      });
       usePlayerStore.getState().resetSettings();
       expect(usePlayerStore.getState().settings).toEqual({
         enableDeathAnimation: false,
