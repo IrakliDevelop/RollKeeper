@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GET } from '../route';
 import { NextRequest } from 'next/server';
+import type { ProcessedSpell } from '@/types/spells';
 
 vi.mock('@/utils/spellDataLoader', () => ({
   loadAllSpells: vi.fn(),
@@ -18,7 +19,7 @@ describe('GET /api/spells', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(loadAllSpells).mockResolvedValue(
-      mockSpells as ReturnType<typeof mockSpells.map>
+      mockSpells as unknown as ProcessedSpell[]
     );
   });
 

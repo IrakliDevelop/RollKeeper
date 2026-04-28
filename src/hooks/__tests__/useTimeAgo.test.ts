@@ -68,9 +68,12 @@ describe('useTimeAgo', () => {
 
   it('clears the interval and returns null when date changes to null', () => {
     let date: Date | null = new Date(Date.now() - 30000);
-    const { result, rerender } = renderHook(({ d }) => useTimeAgo(d), {
-      initialProps: { d: date },
-    });
+    const { result, rerender } = renderHook(
+      ({ d }: { d: Date | null }) => useTimeAgo(d),
+      {
+        initialProps: { d: date as Date | null },
+      }
+    );
     expect(result.current).toBe('30s ago');
 
     date = null;

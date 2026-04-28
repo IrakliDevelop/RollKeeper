@@ -24,10 +24,13 @@ const makeTransfer = (id: string): ItemTransfer => ({
   item: {
     id: `item-${id}`,
     name: 'Healing Potion',
+    category: 'consumable',
     quantity: 1,
     weight: 0.5,
     description: '',
-    equipped: false,
+    tags: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   },
   fromPlayerName: 'Alice',
   fromCharacterName: 'Elara',
@@ -102,7 +105,7 @@ describe('useSharedCampaignState', () => {
           minutesPerHour: 60,
           leapYear: null,
           epochs: [],
-        },
+        } as unknown as import('@/types/calendar').CalendarConfig,
         currentTime: 1000,
         startTime: 0,
         updatedAt: '2026-04-28T00:00:00.000Z',
@@ -398,13 +401,14 @@ describe('useSharedCampaignState', () => {
       await result.current.acknowledgeMessage('msg-1');
     });
 
-    const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
-    const deleteCall = calls.find(
-      ([, opts]: [string, RequestInit]) => opts?.method === 'DELETE'
-    );
+    const calls = vi.mocked(globalThis.fetch).mock.calls as unknown as [
+      string,
+      RequestInit,
+    ][];
+    const deleteCall = calls.find(([, opts]) => opts?.method === 'DELETE');
     expect(deleteCall).toBeDefined();
-    expect(deleteCall[0]).toContain('/api/campaign/CAMP01/shared');
-    expect(JSON.parse(deleteCall[1].body as string)).toMatchObject({
+    expect(deleteCall![0]).toContain('/api/campaign/CAMP01/shared');
+    expect(JSON.parse(deleteCall![1].body as string)).toMatchObject({
       playerId: 'player-1',
       messageId: 'msg-1',
     });
@@ -476,11 +480,12 @@ describe('useSharedCampaignState', () => {
       await result.current.acknowledgeDmEffects();
     });
 
-    const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
-    const deleteCall = calls.find(
-      ([, opts]: [string, RequestInit]) => opts?.method === 'DELETE'
-    );
-    expect(JSON.parse(deleteCall[1].body as string)).toMatchObject({
+    const calls = vi.mocked(globalThis.fetch).mock.calls as unknown as [
+      string,
+      RequestInit,
+    ][];
+    const deleteCall = calls.find(([, opts]) => opts?.method === 'DELETE');
+    expect(JSON.parse(deleteCall![1].body as string)).toMatchObject({
       playerId: 'player-1',
       type: 'effects',
     });
@@ -530,11 +535,12 @@ describe('useSharedCampaignState', () => {
       await result.current.acknowledgeTransfers();
     });
 
-    const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
-    const deleteCall = calls.find(
-      ([, opts]: [string, RequestInit]) => opts?.method === 'DELETE'
-    );
-    expect(JSON.parse(deleteCall[1].body as string)).toMatchObject({
+    const calls = vi.mocked(globalThis.fetch).mock.calls as unknown as [
+      string,
+      RequestInit,
+    ][];
+    const deleteCall = calls.find(([, opts]) => opts?.method === 'DELETE');
+    expect(JSON.parse(deleteCall![1].body as string)).toMatchObject({
       playerId: 'player-1',
       type: 'transfers',
     });
