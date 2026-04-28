@@ -174,3 +174,361 @@ describe('npcStore (campaign-scoped)', () => {
     });
   });
 });
+
+// ─── Additional action coverage ──────────────────────────────────────────────
+
+const SPELL_BASE = {
+  id: 'spell-1',
+  name: 'Fireball',
+  level: 3,
+  school: 'Evocation',
+  castingTime: '1 action',
+  range: '150 feet',
+  components: { verbal: true, somatic: true, material: true },
+  duration: 'Instantaneous',
+  description: 'A bright streak flashes from your pointing finger.',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+const SPELLCASTING_BASE = {
+  casterLevel: 5,
+  ability: 'intelligence' as const,
+  slotsUsed: {},
+  spells: [],
+};
+
+function createNPCWithSpellcasting(campaignCode: string) {
+  const id = useNPCStore.getState().createNPC(campaignCode, {
+    name: 'Mage',
+    armorClass: 12,
+    maxHp: 40,
+    speed: '30 ft.',
+    spellcasting: { ...SPELLCASTING_BASE },
+  });
+  return id;
+}
+
+describe('npcStore — reorderNPCsSubset', () => {
+  beforeEach(() => {
+    useNPCStore.setState({ npcsByCampaign: {} });
+  });
+
+  it('moves an NPC from one position to another within the subset', () => {
+    const id1 = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Alpha',
+      armorClass: 10,
+      maxHp: 5,
+      speed: '30 ft.',
+    });
+    const id2 = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Beta',
+      armorClass: 10,
+      maxHp: 5,
+      speed: '30 ft.',
+    });
+    const id3 = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Gamma',
+      armorClass: 10,
+      maxHp: 5,
+      speed: '30 ft.',
+    });
+
+    // Move Beta (index 1) to index 0
+    useNPCStore.getState().reorderNPCsSubset(CAMPAIGN, [id1, id2, id3], 1, 0);
+
+    const npcs = useNPCStore.getState().getNPCsForCampaign(CAMPAIGN);
+    expect(npcs[0].id).toBe(id2);
+    expect(npcs[1].id).toBe(id1);
+    expect(npcs[2].id).toBe(id3);
+  });
+
+  it('is a no-op when fromIndex equals toIndex', () => {
+    const id1 = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Alpha',
+      armorClass: 10,
+      maxHp: 5,
+      speed: '30 ft.',
+    });
+    const id2 = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Beta',
+      armorClass: 10,
+      maxHp: 5,
+      speed: '30 ft.',
+    });
+
+    useNPCStore.getState().reorderNPCsSubset(CAMPAIGN, [id1, id2], 0, 0);
+
+    const npcs = useNPCStore.getState().getNPCsForCampaign(CAMPAIGN);
+    expect(npcs[0].id).toBe(id1);
+    expect(npcs[1].id).toBe(id2);
+  });
+});
+
+describe('npcStore — updateDeathSaves', () => {
+  beforeEach(() => {
+    useNPCStore.setState({ npcsByCampaign: {} });
+  });
+
+  it('sets death saves on the target NPC', () => {
+    const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Dying Hero',
+      armorClass: 10,
+      maxHp: 10,
+      speed: '30 ft.',
+    });
+
+    useNPCStore
+      .getState()
+      .updateDeathSaves(CAMPAIGN, id, { successes: 2, failures: 1 });
+
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.deathSaves).toEqual({ successes: 2, failures: 1 });
+  });
+
+  it('does not affect other NPCs', () => {
+    const id1 = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'NPC 1',
+      armorClass: 10,
+      maxHp: 10,
+      speed: '30 ft.',
+    });
+    const id2 = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'NPC 2',
+      armorClass: 10,
+      maxHp: 10,
+      speed: '30 ft.',
+    });
+
+    useNPCStore
+      .getState()
+      .updateDeathSaves(CAMPAIGN, id1, { successes: 3, failures: 0 });
+
+    const npc2 = useNPCStore.getState().getNPC(CAMPAIGN, id2);
+    expect(npc2?.deathSaves).toBeUndefined();
+  });
+});
+
+describe('npcStore — spell management', () => {
+  beforeEach(() => {
+    useNPCStore.setState({ npcsByCampaign: {} });
+  });
+
+  describe('addSpellToNPC', () => {
+    it('appends a spell to the spellcasting spells array', () => {
+      const id = createNPCWithSpellcasting(CAMPAIGN);
+      useNPCStore.getState().addSpellToNPC(CAMPAIGN, id, { ...SPELL_BASE });
+
+      const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+      expect(npc?.spellcasting?.spells).toHaveLength(1);
+      expect(npc?.spellcasting?.spells[0].name).toBe('Fireball');
+    });
+
+    it('does nothing when NPC has no spellcasting block', () => {
+      const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+        name: 'Warrior',
+        armorClass: 16,
+        maxHp: 50,
+        speed: '30 ft.',
+      });
+
+      useNPCStore.getState().addSpellToNPC(CAMPAIGN, id, { ...SPELL_BASE });
+
+      const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+      expect(npc?.spellcasting).toBeUndefined();
+    });
+  });
+
+  describe('updateSpellOnNPC', () => {
+    it('merges updates into the target spell', () => {
+      const id = createNPCWithSpellcasting(CAMPAIGN);
+      useNPCStore.getState().addSpellToNPC(CAMPAIGN, id, { ...SPELL_BASE });
+
+      useNPCStore
+        .getState()
+        .updateSpellOnNPC(CAMPAIGN, id, 'spell-1', { name: 'Cone of Cold' });
+
+      const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+      expect(npc?.spellcasting?.spells[0].name).toBe('Cone of Cold');
+    });
+
+    it('leaves other spells untouched', () => {
+      const id = createNPCWithSpellcasting(CAMPAIGN);
+      const spell2 = { ...SPELL_BASE, id: 'spell-2', name: 'Shield' };
+      useNPCStore.getState().addSpellToNPC(CAMPAIGN, id, { ...SPELL_BASE });
+      useNPCStore.getState().addSpellToNPC(CAMPAIGN, id, spell2);
+
+      useNPCStore
+        .getState()
+        .updateSpellOnNPC(CAMPAIGN, id, 'spell-1', { name: 'Thunderwave' });
+
+      const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+      expect(npc?.spellcasting?.spells[1].name).toBe('Shield');
+    });
+  });
+
+  describe('removeSpellFromNPC', () => {
+    it('removes the specified spell by id', () => {
+      const id = createNPCWithSpellcasting(CAMPAIGN);
+      const spell2 = { ...SPELL_BASE, id: 'spell-2', name: 'Shield' };
+      useNPCStore.getState().addSpellToNPC(CAMPAIGN, id, { ...SPELL_BASE });
+      useNPCStore.getState().addSpellToNPC(CAMPAIGN, id, spell2);
+
+      useNPCStore.getState().removeSpellFromNPC(CAMPAIGN, id, 'spell-1');
+
+      const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+      expect(npc?.spellcasting?.spells).toHaveLength(1);
+      expect(npc?.spellcasting?.spells[0].id).toBe('spell-2');
+    });
+
+    it('is a no-op for unknown spell id', () => {
+      const id = createNPCWithSpellcasting(CAMPAIGN);
+      useNPCStore.getState().addSpellToNPC(CAMPAIGN, id, { ...SPELL_BASE });
+
+      useNPCStore.getState().removeSpellFromNPC(CAMPAIGN, id, 'no-such-spell');
+
+      const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+      expect(npc?.spellcasting?.spells).toHaveLength(1);
+    });
+  });
+});
+
+describe('npcStore — setNPCSpellSlotUsed', () => {
+  beforeEach(() => {
+    useNPCStore.setState({ npcsByCampaign: {} });
+  });
+
+  it('sets used slots for the given level', () => {
+    const id = createNPCWithSpellcasting(CAMPAIGN);
+
+    // casterLevel 5 has { 1: 4, 2: 3, 3: 2 }
+    useNPCStore.getState().setNPCSpellSlotUsed(CAMPAIGN, id, 3, 2);
+
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.spellcasting?.slotsUsed[3]).toBe(2);
+  });
+
+  it('clamps used slots to the maximum available', () => {
+    const id = createNPCWithSpellcasting(CAMPAIGN);
+
+    // Level 3 max is 2 for casterLevel 5; request 99
+    useNPCStore.getState().setNPCSpellSlotUsed(CAMPAIGN, id, 3, 99);
+
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.spellcasting?.slotsUsed[3]).toBe(2);
+  });
+
+  it('clamps negative values to 0', () => {
+    const id = createNPCWithSpellcasting(CAMPAIGN);
+
+    useNPCStore.getState().setNPCSpellSlotUsed(CAMPAIGN, id, 1, -5);
+
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.spellcasting?.slotsUsed[1]).toBe(0);
+  });
+});
+
+describe('npcStore — useNPCFreeCast', () => {
+  beforeEach(() => {
+    useNPCStore.setState({ npcsByCampaign: {} });
+  });
+
+  it('increments freeCastsUsed on the target spell', () => {
+    const id = createNPCWithSpellcasting(CAMPAIGN);
+    const spell = { ...SPELL_BASE, freeCastMax: 3, freeCastsUsed: 0 };
+    useNPCStore.getState().addSpellToNPC(CAMPAIGN, id, spell);
+
+    useNPCStore.getState().useNPCFreeCast(CAMPAIGN, id, 'spell-1');
+
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.spellcasting?.spells[0].freeCastsUsed).toBe(1);
+  });
+
+  it('initialises from 0 when freeCastsUsed is undefined', () => {
+    const id = createNPCWithSpellcasting(CAMPAIGN);
+    // SPELL_BASE has no freeCastsUsed field
+    useNPCStore.getState().addSpellToNPC(CAMPAIGN, id, { ...SPELL_BASE });
+
+    useNPCStore.getState().useNPCFreeCast(CAMPAIGN, id, 'spell-1');
+
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.spellcasting?.spells[0].freeCastsUsed).toBe(1);
+  });
+});
+
+describe('npcStore — longRestNPC', () => {
+  beforeEach(() => {
+    useNPCStore.setState({ npcsByCampaign: {} });
+  });
+
+  it('restores HP to max and clears tempHp and deathSaves', () => {
+    const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Battered Fighter',
+      armorClass: 16,
+      maxHp: 40,
+      currentHp: 5,
+      tempHp: 3,
+      speed: '30 ft.',
+    });
+    useNPCStore
+      .getState()
+      .updateDeathSaves(CAMPAIGN, id, { successes: 1, failures: 2 });
+
+    useNPCStore.getState().longRestNPC(CAMPAIGN, id);
+
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.currentHp).toBe(40);
+    expect(npc?.tempHp).toBe(0);
+    expect(npc?.deathSaves).toBeUndefined();
+  });
+
+  it('restores hit dice to max', () => {
+    const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Fighter',
+      armorClass: 16,
+      maxHp: 40,
+      speed: '30 ft.',
+      hitDice: { current: 2, max: 5, dieType: 'd10' },
+    });
+
+    useNPCStore.getState().longRestNPC(CAMPAIGN, id);
+
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.hitDice?.current).toBe(5);
+  });
+
+  it('resets spell slots and freeCastsUsed for spellcasters', () => {
+    const id = createNPCWithSpellcasting(CAMPAIGN);
+    const spell = { ...SPELL_BASE, freeCastMax: 2, freeCastsUsed: 2 };
+    useNPCStore.getState().addSpellToNPC(CAMPAIGN, id, spell);
+    useNPCStore.getState().setNPCSpellSlotUsed(CAMPAIGN, id, 1, 4);
+
+    useNPCStore.getState().longRestNPC(CAMPAIGN, id);
+
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.spellcasting?.slotsUsed).toEqual({});
+    expect(npc?.spellcasting?.spells[0].freeCastsUsed).toBe(0);
+  });
+
+  it('does not affect other NPCs', () => {
+    const id1 = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Resting',
+      armorClass: 10,
+      maxHp: 30,
+      currentHp: 1,
+      speed: '30 ft.',
+    });
+    const id2 = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Not Resting',
+      armorClass: 10,
+      maxHp: 30,
+      currentHp: 10,
+      speed: '30 ft.',
+    });
+
+    useNPCStore.getState().longRestNPC(CAMPAIGN, id1);
+
+    const npc2 = useNPCStore.getState().getNPC(CAMPAIGN, id2);
+    expect(npc2?.currentHp).toBe(10);
+  });
+});
