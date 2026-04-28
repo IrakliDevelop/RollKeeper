@@ -285,7 +285,7 @@ describe('characterStore — persistence actions', () => {
         // spellSlots intentionally omitted — migration should supply defaults
       } as unknown as import('@/types/character').CharacterState;
       // Remove spellSlots from the object
-      delete (legacyCharacter as Record<string, unknown>).spellSlots;
+      delete (legacyCharacter as unknown as Record<string, unknown>).spellSlots;
 
       useCharacterStore.getState().loadCharacterState(legacyCharacter);
       const { character } = useCharacterStore.getState();

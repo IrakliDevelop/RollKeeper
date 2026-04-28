@@ -24,7 +24,7 @@ function resetStore(overrides = {}) {
 const sword = {
   name: 'Longsword',
   category: 'martial' as const,
-  weaponType: ['melee'] as string[],
+  weaponType: ['melee'] as import('@/types/character').WeaponType[],
   damage: [{ dice: '1d8', type: 'slashing' as const, label: 'Slashing' }],
   enhancementBonus: 0,
   isEquipped: true,
@@ -34,7 +34,11 @@ const sword = {
 const dagger = {
   name: 'Dagger',
   category: 'simple' as const,
-  weaponType: ['melee', 'thrown', 'finesse'] as string[],
+  weaponType: [
+    'melee',
+    'thrown',
+    'finesse',
+  ] as import('@/types/character').WeaponType[],
   damage: [{ dice: '1d4', type: 'piercing' as const, label: 'Piercing' }],
   enhancementBonus: 0,
   isEquipped: false,

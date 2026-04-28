@@ -15,6 +15,8 @@ function resetStoreWithUsedResources() {
           usedUses: 1,
           restType: 'short',
           scaleWithProficiency: false,
+          createdAt: '',
+          updatedAt: '',
         },
         {
           id: 't2',
@@ -23,6 +25,8 @@ function resetStoreWithUsedResources() {
           usedUses: 1,
           restType: 'long',
           scaleWithProficiency: false,
+          createdAt: '',
+          updatedAt: '',
         },
       ],
       extendedFeatures: [
@@ -35,6 +39,9 @@ function resetStoreWithUsedResources() {
           usedUses: 1,
           restType: 'short',
           isPassive: false,
+          displayOrder: 0,
+          createdAt: '',
+          updatedAt: '',
         },
         {
           id: 'ef2',
@@ -45,6 +52,9 @@ function resetStoreWithUsedResources() {
           usedUses: 2,
           restType: 'long',
           isPassive: false,
+          displayOrder: 1,
+          createdAt: '',
+          updatedAt: '',
         },
       ],
       weapons: [
