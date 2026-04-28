@@ -360,10 +360,10 @@ describe('partialFeatureToFormData', () => {
   it('handles all sourceType values', () => {
     const types: Array<ExtendedFeature['sourceType']> = [
       'class',
-      'subclass',
+      'race',
       'background',
       'feat',
-      'racial',
+      'magic-item',
       'other',
     ];
     for (const sourceType of types) {

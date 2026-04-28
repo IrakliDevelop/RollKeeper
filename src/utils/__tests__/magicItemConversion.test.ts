@@ -124,7 +124,7 @@ describe('convertProcessedMagicItemToFormData', () => {
 
   it('handles all magic item categories', () => {
     const categories = [
-      'weapon',
+      'artifact',
       'armor',
       'shield',
       'wondrous',
