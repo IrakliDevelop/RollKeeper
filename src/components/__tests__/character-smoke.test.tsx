@@ -175,8 +175,20 @@ describe('MulticlassManager', () => {
     );
     const character = makeCharacter({
       classes: [
-        { className: 'Fighter', level: 3, spellcaster: 'none', hitDie: 10 },
-        { className: 'Wizard', level: 2, spellcaster: 'full', hitDie: 6 },
+        {
+          className: 'Fighter',
+          level: 3,
+          spellcaster: 'none',
+          hitDie: 10,
+          isCustom: false,
+        },
+        {
+          className: 'Wizard',
+          level: 2,
+          spellcaster: 'full',
+          hitDie: 6,
+          isCustom: false,
+        },
       ],
     });
     render(
@@ -196,8 +208,20 @@ describe('MulticlassManager', () => {
     );
     const character = makeCharacter({
       classes: [
-        { className: 'Fighter', level: 3, spellcaster: 'none', hitDie: 10 },
-        { className: 'Wizard', level: 2, spellcaster: 'full', hitDie: 6 },
+        {
+          className: 'Fighter',
+          level: 3,
+          spellcaster: 'none',
+          hitDie: 10,
+          isCustom: false,
+        },
+        {
+          className: 'Wizard',
+          level: 2,
+          spellcaster: 'full',
+          hitDie: 6,
+          isCustom: false,
+        },
       ],
     });
     render(
