@@ -17,6 +17,9 @@ export default defineConfig({
     projects: [
       {
         extends: true,
+        esbuild: {
+          jsx: 'automatic',
+        },
         test: {
           name: 'unit',
           environment: 'jsdom',
