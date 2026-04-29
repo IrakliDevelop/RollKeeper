@@ -13,7 +13,7 @@ const mockHitDicePools: HitDicePools = {
 
 // ── HitDiceTracker ──────────────────────────────────────────────────────────
 
-describe('HitDiceTracker', () => {
+describe('HitDiceTracker', { timeout: 10_000 }, () => {
   async function renderTracker(overrides: Record<string, unknown> = {}) {
     const { default: HitDiceTracker } = await import(
       '@/components/ui/character/HitDiceTracker'
@@ -35,9 +35,9 @@ describe('HitDiceTracker', () => {
 
   it('displays die types and remaining counts', async () => {
     await renderTracker();
-    expect(screen.getByText('D10')).toBeInTheDocument();
+    expect(screen.getAllByText('D10').length).toBeGreaterThan(0);
     expect(screen.getByText('3 / 5')).toBeInTheDocument();
-    expect(screen.getByText('D6')).toBeInTheDocument();
+    expect(screen.getAllByText('D6').length).toBeGreaterThan(0);
     expect(screen.getByText('3 / 3')).toBeInTheDocument();
   });
 

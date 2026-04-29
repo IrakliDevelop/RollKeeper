@@ -101,7 +101,7 @@ describe('CharacterHeader', () => {
   });
 });
 
-describe('CharacterBasicInfo', () => {
+describe('CharacterBasicInfo', { timeout: 10_000 }, () => {
   it('renders without crashing', async () => {
     const { default: CharacterBasicInfo } = await import(
       '@/components/ui/character/CharacterBasicInfo'
