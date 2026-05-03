@@ -221,6 +221,17 @@ export default function DmLocationToolbar({
 
             {/* Cell size */}
             <span className="text-muted text-xs">Size</span>
+            <button
+              onClick={() =>
+                onUpdateGridSettings({
+                  cellSize: Math.max(20, gridCellSize - 1),
+                })
+              }
+              className="text-muted hover:text-body hover:bg-surface-secondary flex h-5 w-5 items-center justify-center rounded text-xs"
+              title="Decrease grid size"
+            >
+              −
+            </button>
             <input
               type="range"
               min={20}
@@ -231,10 +242,32 @@ export default function DmLocationToolbar({
               }
               className="w-16"
             />
+            <button
+              onClick={() =>
+                onUpdateGridSettings({
+                  cellSize: Math.min(150, gridCellSize + 1),
+                })
+              }
+              className="text-muted hover:text-body hover:bg-surface-secondary flex h-5 w-5 items-center justify-center rounded text-xs"
+              title="Increase grid size"
+            >
+              +
+            </button>
             <span className="text-muted w-7 text-xs">{gridCellSize}</span>
 
             {/* Opacity */}
             <span className="text-muted text-xs">Opacity</span>
+            <button
+              onClick={() =>
+                onUpdateGridSettings({
+                  opacity: Math.max(0.1, gridOpacity - 0.01),
+                })
+              }
+              className="text-muted hover:text-body hover:bg-surface-secondary flex h-5 w-5 items-center justify-center rounded text-xs"
+              title="Decrease opacity"
+            >
+              −
+            </button>
             <input
               type="range"
               min={10}
@@ -245,6 +278,17 @@ export default function DmLocationToolbar({
               }
               className="w-16"
             />
+            <button
+              onClick={() =>
+                onUpdateGridSettings({
+                  opacity: Math.min(1, gridOpacity + 0.01),
+                })
+              }
+              className="text-muted hover:text-body hover:bg-surface-secondary flex h-5 w-5 items-center justify-center rounded text-xs"
+              title="Increase opacity"
+            >
+              +
+            </button>
             <span className="text-muted w-8 text-xs">
               {Math.round(gridOpacity * 100)}%
             </span>
