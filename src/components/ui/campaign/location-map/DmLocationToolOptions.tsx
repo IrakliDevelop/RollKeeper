@@ -3,11 +3,15 @@
 import type { ShapeKind } from '@fieldnotes/core';
 import type {
   ArrowToolOptions,
+  MeasureToolOptions,
   NoteToolOptions,
   ShapeToolOptions,
+  TemplateShape,
+  TemplateToolOptions,
   TextToolOptions,
 } from '@fieldnotes/core';
 import { useActiveTool, useToolOptions } from '@fieldnotes/react';
+import type { EditorMode } from './DmLocationEditor.types';
 
 const COLOR_SWATCHES = [
   '#334155',
@@ -31,7 +35,13 @@ const NOTE_TEXT_COLORS = [
   '#ffffff',
 ];
 
-export default function DmLocationToolOptions() {
+interface DmLocationToolOptionsProps {
+  mode?: EditorMode;
+}
+
+export default function DmLocationToolOptions({
+  mode = 'location',
+}: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
   const [arrowOpts, setArrowOpts] = useToolOptions<
     ArrowToolOptions & Record<string, unknown>
@@ -45,12 +55,20 @@ export default function DmLocationToolOptions() {
   const [shapeOpts, setShapeOpts] = useToolOptions<
     ShapeToolOptions & Record<string, unknown>
   >('shape');
+  const [measureOpts, setMeasureOpts] = useToolOptions<
+    MeasureToolOptions & Record<string, unknown>
+  >('measure');
+  const [templateOpts, setTemplateOpts] = useToolOptions<
+    TemplateToolOptions & Record<string, unknown>
+  >('template');
 
   const showOptionsBar =
     activeTool === 'arrow' ||
     activeTool === 'note' ||
     activeTool === 'text' ||
-    activeTool === 'shape';
+    activeTool === 'shape' ||
+    (mode === 'battlemap' &&
+      (activeTool === 'measure' || activeTool === 'template'));
 
   if (!showOptionsBar) return null;
 
@@ -72,6 +90,7 @@ export default function DmLocationToolOptions() {
     else if (activeTool === 'text') setTextOpts({ color });
     else if (activeTool === 'note') setNoteOpts({ backgroundColor: color });
     else if (activeTool === 'arrow') setArrowOpts({ color });
+    else if (activeTool === 'template') setTemplateOpts({ strokeColor: color });
   };
 
   return (
@@ -104,7 +123,9 @@ export default function DmLocationToolOptions() {
           ? 'Stroke'
           : activeTool === 'note'
             ? 'Background'
-            : 'Color'}
+            : activeTool === 'template'
+              ? 'Outline'
+              : 'Color'}
       </span>
       <div className="flex items-center gap-1">
         {COLOR_SWATCHES.map(color => (
@@ -246,6 +267,84 @@ export default function DmLocationToolOptions() {
               </button>
             ))}
           </div>
+        </>
+      )}
+
+      {mode === 'battlemap' && activeTool === 'measure' && measureOpts && (
+        <>
+          <div className="bg-divider h-6 w-px" />
+          <span className="text-muted text-xs font-medium">Feet / Cell</span>
+          <input
+            type="range"
+            min={1}
+            max={20}
+            value={measureOpts.feetPerCell ?? 5}
+            onChange={e =>
+              setMeasureOpts({ feetPerCell: Number(e.target.value) })
+            }
+            className="w-20"
+          />
+          <span className="text-muted w-8 text-xs">
+            {measureOpts.feetPerCell ?? 5}
+          </span>
+        </>
+      )}
+
+      {mode === 'battlemap' && activeTool === 'template' && templateOpts && (
+        <>
+          <div className="bg-divider h-6 w-px" />
+          <span className="text-muted text-xs font-medium">Template</span>
+          <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
+            {(['circle', 'cone', 'line', 'square'] as TemplateShape[]).map(
+              shape => (
+                <button
+                  key={shape}
+                  type="button"
+                  onClick={() => setTemplateOpts({ templateShape: shape })}
+                  className={`rounded px-2 py-0.5 text-xs capitalize transition-colors ${
+                    (templateOpts.templateShape ?? 'circle') === shape
+                      ? 'bg-accent-blue-bg text-accent-blue-text font-semibold'
+                      : 'text-muted hover:bg-surface-raised hover:text-body'
+                  }`}
+                >
+                  {shape}
+                </button>
+              )
+            )}
+          </div>
+          <div className="bg-divider h-6 w-px" />
+          <span className="text-muted text-xs font-medium">Fill</span>
+          <div className="flex items-center gap-1">
+            {COLOR_SWATCHES.slice(0, 8).map(color => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => setTemplateOpts({ fillColor: `${color}33` })}
+                title={color}
+                className={`h-5 w-5 rounded-full border-2 transition-transform ${
+                  (templateOpts.fillColor ?? '#ef444433') === `${color}33`
+                    ? 'border-accent-blue-border scale-110'
+                    : 'border-divider hover:scale-105'
+                }`}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+          <div className="bg-divider h-6 w-px" />
+          <span className="text-muted text-xs font-medium">Feet / Cell</span>
+          <input
+            type="range"
+            min={1}
+            max={20}
+            value={templateOpts.feetPerCell ?? 5}
+            onChange={e =>
+              setTemplateOpts({ feetPerCell: Number(e.target.value) })
+            }
+            className="w-20"
+          />
+          <span className="text-muted w-8 text-xs">
+            {templateOpts.feetPerCell ?? 5}
+          </span>
         </>
       )}
     </div>
