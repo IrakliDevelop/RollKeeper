@@ -5,10 +5,12 @@ import {
   HandTool,
   SelectTool,
   ArrowTool,
+  MeasureTool,
   NoteTool,
   ImageTool,
   TextTool,
   ShapeTool,
+  TemplateTool,
   AutoSave,
   type Tool,
   type Viewport,
@@ -199,8 +201,8 @@ export function useDmLocationEditor(
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(true);
 
   // Build tools once — no PencilTool or EraserTool for the location editor
-  const tools = useMemo<Tool[]>(
-    () => [
+  const tools = useMemo<Tool[]>(() => {
+    const baseTools: Tool[] = [
       new HandTool(),
       new SelectTool(),
       new TextTool({ fontSize: 16, color: '#334155', textAlign: 'left' }),
@@ -213,9 +215,24 @@ export function useDmLocationEditor(
       }),
       new ArrowTool({ color: '#334155', width: 2 }),
       new ImageTool(),
-    ],
-    []
-  );
+    ];
+
+    if (mode === 'battlemap') {
+      baseTools.push(new MeasureTool({ feetPerCell: 5 }));
+      baseTools.push(
+        new TemplateTool({
+          templateShape: 'circle',
+          feetPerCell: 5,
+          fillColor: '#ef444433',
+          strokeColor: '#ef4444',
+          strokeWidth: 2,
+          opacity: 0.3,
+        })
+      );
+    }
+
+    return baseTools;
+  }, [mode]);
 
   const getVp = useCallback(() => canvasRef.current?.viewport ?? null, []);
 

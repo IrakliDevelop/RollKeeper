@@ -8,11 +8,14 @@ import {
   Shapes,
   Image as ImageIcon,
   ArrowRight,
+  Ruler,
+  Sparkles,
   Undo2,
   Redo2,
   Trash2,
+  Eraser,
+  Download,
   Loader2,
-  Upload,
   Check,
   AlertCircle,
   ExternalLink,
@@ -24,7 +27,7 @@ import DmOnlyToggle from './DmOnlyToggle';
 import { useSelectToolSelectionCount } from './useSelectToolSelectionCount';
 import type { DmLocationToolbarProps } from './DmLocationToolbar.types';
 
-const TOOL_DEFS = [
+const BASE_TOOL_DEFS = [
   { name: 'hand', icon: Hand, label: 'Pan' },
   { name: 'select', icon: MousePointer2, label: 'Select' },
   { name: 'text', icon: Type, label: 'Text' },
@@ -32,6 +35,11 @@ const TOOL_DEFS = [
   { name: 'shape', icon: Shapes, label: 'Shape' },
   { name: 'image', icon: ImageIcon, label: 'Image' },
   { name: 'arrow', icon: ArrowRight, label: 'Arrow' },
+] as const;
+
+const BATTLEMAP_TOOL_DEFS = [
+  { name: 'measure', icon: Ruler, label: 'Measure' },
+  { name: 'template', icon: Sparkles, label: 'Template' },
 ] as const;
 
 function formatSyncTime(iso: string): string {
@@ -73,6 +81,10 @@ export default function DmLocationToolbar({
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
   const selectionCount = useSelectToolSelectionCount();
+  const toolDefs =
+    mode === 'battlemap'
+      ? [...BASE_TOOL_DEFS, ...BATTLEMAP_TOOL_DEFS]
+      : BASE_TOOL_DEFS;
 
   const handleToolClick = (name: string) => {
     if (name === 'image') {
@@ -86,7 +98,7 @@ export default function DmLocationToolbar({
     <div className="border-divider bg-surface-raised flex items-center gap-1 border-b px-2 py-1">
       {/* Left group: Tool buttons */}
       <div className="flex items-center gap-0.5">
-        {TOOL_DEFS.map(({ name, icon: Icon, label }) => (
+        {toolDefs.map(({ name, icon: Icon, label }) => (
           <Button
             key={name}
             variant={activeTool === name ? 'primary' : 'ghost'}
@@ -144,7 +156,7 @@ export default function DmLocationToolbar({
           title="Clear canvas"
           className="text-accent-red-text h-8 w-8 p-0"
         >
-          <Upload size={15} className="rotate-180" />
+          <Eraser size={15} />
         </Button>
       </div>
 
@@ -353,7 +365,7 @@ export default function DmLocationToolbar({
               title="Download PNG export (debug)"
               className="h-8 w-8 p-0"
             >
-              <Upload size={15} className="rotate-180" />
+              <Download size={15} />
             </Button>
           )}
         </div>
