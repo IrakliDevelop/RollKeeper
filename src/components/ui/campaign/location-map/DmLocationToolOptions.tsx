@@ -319,10 +319,10 @@ export default function DmLocationToolOptions({
               <button
                 key={color}
                 type="button"
-                onClick={() => setTemplateOpts({ fillColor: `${color}33` })}
+                onClick={() => setTemplateOpts({ fillColor: `${color}80` })}
                 title={color}
                 className={`h-5 w-5 rounded-full border-2 transition-transform ${
-                  (templateOpts.fillColor ?? '#ef444433') === `${color}33`
+                  (templateOpts.fillColor ?? '#ef444480') === `${color}80`
                     ? 'border-accent-blue-border scale-110'
                     : 'border-divider hover:scale-105'
                 }`}

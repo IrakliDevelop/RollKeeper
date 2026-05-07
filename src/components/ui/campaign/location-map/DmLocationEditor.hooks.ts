@@ -223,10 +223,9 @@ export function useDmLocationEditor(
         new TemplateTool({
           templateShape: 'circle',
           feetPerCell: 5,
-          fillColor: '#ef444433',
+          fillColor: '#ef444480',
           strokeColor: '#ef4444',
           strokeWidth: 2,
-          opacity: 0.3,
         })
       );
     }

@@ -82,31 +82,23 @@ export default function BattleMapDisplayPage() {
       document.removeEventListener('visibilitychange', handleVisibility);
   }, [fetchFromRedis]);
 
-  // Wheel zoom — native listener with passive:false to prevent page scroll
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const factor = e.deltaY < 0 ? 1.1 : 0.9;
-      setTransform(prev => ({
-        ...prev,
-        scale: Math.max(0.1, Math.min(10, prev.scale * factor)),
-      }));
-    };
-
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
+  const zoomIn = useCallback(() => {
+    setTransform(prev => ({
+      ...prev,
+      scale: Math.min(10, prev.scale * 1.2),
+    }));
   }, []);
 
-  // Keyboard: F for fullscreen
+  const zoomOut = useCallback(() => {
+    setTransform(prev => ({
+      ...prev,
+      scale: Math.max(0.1, prev.scale / 1.2),
+    }));
+  }, []);
+
+  // Keyboard: F for fullscreen, +/- for zoom, Escape exits fullscreen
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && document.fullscreenElement) {
-        document.exitFullscreen().catch(() => {});
-        return;
-      }
       if (e.key === 'f' || e.key === 'F') {
         if (!document.fullscreenElement) {
           document.documentElement.requestFullscreen().catch(() => {});
@@ -114,10 +106,12 @@ export default function BattleMapDisplayPage() {
           document.exitFullscreen().catch(() => {});
         }
       }
+      if (e.key === '+' || e.key === '=') zoomIn();
+      if (e.key === '-' || e.key === '_') zoomOut();
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, []);
+  }, [zoomIn, zoomOut]);
 
   // Pointer drag for pan
   const handlePointerDown = useCallback(
@@ -198,6 +192,62 @@ export default function BattleMapDisplayPage() {
           }}
         />
       )}
+
+      {/* Fixed zoom controls — bottom-left */}
+      <div
+        onDoubleClick={e => e.stopPropagation()}
+        onPointerDown={e => e.stopPropagation()}
+        style={{
+          position: 'fixed',
+          bottom: 24,
+          left: 24,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          zIndex: 10,
+        }}
+      >
+        <button
+          onClick={zoomIn}
+          title="Zoom in (+)"
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 8,
+            border: '1px solid rgba(255,255,255,0.3)',
+            background: 'rgba(0,0,0,0.6)',
+            color: '#fff',
+            fontSize: 22,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          +
+        </button>
+        <button
+          onClick={zoomOut}
+          title="Zoom out (−)"
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 8,
+            border: '1px solid rgba(255,255,255,0.3)',
+            background: 'rgba(0,0,0,0.6)',
+            color: '#fff',
+            fontSize: 22,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(8px)',
+          }}
+        >
+          −
+        </button>
+      </div>
     </div>
   );
 }
