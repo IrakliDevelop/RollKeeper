@@ -29,9 +29,9 @@ describe('redis utilities', () => {
   });
 
   describe('SLIDING_TTL_SECONDS', () => {
-    it('equals 30 days in seconds', async () => {
+    it('equals 60 days in seconds', async () => {
       const { SLIDING_TTL_SECONDS } = await import('@/lib/redis');
-      expect(SLIDING_TTL_SECONDS).toBe(30 * 24 * 60 * 60);
+      expect(SLIDING_TTL_SECONDS).toBe(60 * 24 * 60 * 60);
     });
   });
 

@@ -1,6 +1,6 @@
 import { Redis } from '@upstash/redis';
 
-const SLIDING_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+const SLIDING_TTL_SECONDS = 60 * 24 * 60 * 60; // 60 days
 
 function createRedisClient(): Redis {
   const url = process.env.UPSTASH_REDIS_REST_URL;
