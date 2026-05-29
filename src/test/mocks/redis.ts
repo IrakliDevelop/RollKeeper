@@ -186,6 +186,6 @@ vi.mock('@/lib/redis', () => ({
     `campaign:${code}:battlemap:${battleMapId}`,
   characterShareKey: (characterId: string) => `character:share:${characterId}`,
   refreshCampaignTTL: vi.fn(async () => {}),
-  SLIDING_TTL_SECONDS: 30 * 24 * 60 * 60,
+  SLIDING_TTL_SECONDS: 60 * 24 * 60 * 60,
   CHARACTER_SHARE_TTL_SECONDS: 24 * 60 * 60,
 }));
