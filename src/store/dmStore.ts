@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { createSafeStorage } from '@/lib/safeStorage';
 import { CampaignInfo } from '@/types/campaign';
 
 const DM_STORAGE_KEY = 'rollkeeper-dm-data';
@@ -147,7 +148,7 @@ export const useDmStore = create<DmStoreState>()(
     }),
     {
       name: DM_STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => createSafeStorage()),
       version: 1,
     }
   )

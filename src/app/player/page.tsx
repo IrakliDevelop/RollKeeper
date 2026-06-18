@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Plus,
@@ -28,6 +28,12 @@ import { AvatarUpload } from '@/components/ui/character/AvatarUpload';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { JoinCampaignDialog } from '@/components/ui/campaign/JoinCampaignDialog';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
+import { DataSafetyBanner } from '@/components/ui/feedback/DataSafetyBanner';
+import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
+import {
+  exportAllCharactersToFile,
+  isCharacterBackup,
+} from '@/utils/fileOperations';
 
 export default function PlayerDashboardPage() {
   const {
@@ -53,6 +59,32 @@ export default function PlayerDashboardPage() {
   const activeCharacters = getActiveCharacters();
   const archivedCharacters = getArchivedCharacters();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleExportAll = useCallback(() => {
+    if (characters.length === 0) return;
+    exportAllCharactersToFile(characters);
+    addToast({
+      type: 'success',
+      title: 'Backup exported',
+      message: `Saved a backup of ${characters.length} character${
+        characters.length === 1 ? '' : 's'
+      }. Keep it somewhere safe.`,
+      duration: 5000,
+    });
+  }, [characters, addToast]);
+
+  // Surface a clear warning if a localStorage save ever fails (quota full).
+  useStorageQuotaListener(
+    useCallback(() => {
+      addToast({
+        type: 'error',
+        title: 'Save failed — storage full',
+        message:
+          'Your latest change could not be saved. Export a backup now to avoid losing data.',
+        duration: 12000,
+      });
+    }, [addToast])
+  );
 
   // Check for migration on component mount
   useEffect(() => {
@@ -106,6 +138,20 @@ export default function PlayerDashboardPage() {
       try {
         const fileText = await file.text();
         const characterData = JSON.parse(fileText);
+
+        // Full-roster backup bundle → restore every character in it.
+        if (isCharacterBackup(characterData)) {
+          const count = characterData.characters.length;
+          characterData.characters.forEach(c => importCharacter(c));
+          addToast({
+            type: 'success',
+            title: 'Backup restored',
+            message: `Imported ${count} character${count === 1 ? '' : 's'} from the backup.`,
+            duration: 5000,
+          });
+          event.target.value = '';
+          return;
+        }
 
         let characterName = 'Imported Character';
         if (characterData.name) {
@@ -397,6 +443,15 @@ export default function PlayerDashboardPage() {
             >
               Import
             </Button>
+            {characters.length > 0 && (
+              <Button
+                variant="outline"
+                leftIcon={<Download size={18} />}
+                onClick={handleExportAll}
+              >
+                Export All
+              </Button>
+            )}
             <input
               ref={fileInputRef}
               type="file"
@@ -411,6 +466,11 @@ export default function PlayerDashboardPage() {
             </Link>
           </div>
         </div>
+
+        {/* Local-storage safety reminder */}
+        {characters.length > 0 && (
+          <DataSafetyBanner onExport={handleExportAll} />
+        )}
 
         {/* Stats Cards */}
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
