@@ -5,7 +5,7 @@ import {
   type Encounter,
   type EncounterEntity,
 } from '@/types/encounter';
-import { hpPercent, hpStateLabel } from '@/utils/hpState';
+import { hpPercent, hpStateLabel, hpTier } from '@/utils/hpState';
 import type {
   SharedInitiativeState,
   SharedTurnEntry,
@@ -40,10 +40,17 @@ function toEntry(
     entry.playerCharacterId = entity.playerCharacterId;
     entry.currentHp = entity.currentHp;
     entry.maxHp = entity.maxHp;
+    entry.isDead = entity.currentHp <= 0;
     return entry;
   }
 
   // Non-players (enemies/NPCs) expose only what the DM's combat config allows.
+  if (config.enemyHpDisplay === 'off') return entry;
+
+  const pct = hpPercent(entity.currentHp, entity.maxHp);
+  entry.isDead = entity.currentHp <= 0;
+  if (!entry.isDead) entry.hpTier = hpTier(pct);
+
   switch (config.enemyHpDisplay) {
     case 'label':
       entry.hpState = hpStateLabel(
@@ -54,14 +61,11 @@ function toEntry(
       break;
     case 'bar':
     case 'percent':
-      entry.hpPercent = Math.round(hpPercent(entity.currentHp, entity.maxHp));
+      entry.hpPercent = Math.round(pct);
       break;
     case 'exact':
       entry.currentHp = entity.currentHp;
       entry.maxHp = entity.maxHp;
-      break;
-    case 'off':
-    default:
       break;
   }
 

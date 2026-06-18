@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Swords, User, Skull } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { useDraggableY } from '@/hooks/useDraggableY';
-import { getHpBarColor } from '@/utils/hpColor';
+import { getHpBarColor, getHpTierTextColor } from '@/utils/hpColor';
 import type { SharedInitiativeState } from '@/types/sharedState';
 
 const OPEN_KEY = 'rollkeeper-initiative-panel-open';
@@ -151,39 +151,58 @@ export function InitiativePanel({
               const isCurrent = entry.entityId === effectiveCurrentId;
               const isYou = entry.playerCharacterId === characterId;
               const isPlayer = entry.type === 'player';
+              const isDead = entry.isDead === true;
               const hp = entry.currentHp;
               const maxHp = entry.maxHp;
               const hasHp = hp !== undefined && maxHp !== undefined;
-              // Right-aligned HP summary (players + enemy 'exact'/'percent'/'label')
-              const hpText = hasHp
-                ? `${hp}/${maxHp}`
-                : entry.hpPercent !== undefined &&
-                    state.enemyHpMode === 'percent'
-                  ? `${entry.hpPercent}%`
-                  : entry.hpState
-                    ? entry.hpState
+              // Right-aligned HP summary. Dead overrides everything.
+              const hpText = isDead
+                ? isPlayer
+                  ? 'Down'
+                  : 'Defeated'
+                : hasHp
+                  ? `${hp}/${maxHp}`
+                  : entry.hpPercent !== undefined &&
+                      state.enemyHpMode === 'percent'
+                    ? `${entry.hpPercent}%`
+                    : (entry.hpState ?? null);
+              // Colour: dead = red; players use neutral (they have a bar);
+              // enemies use their coarse health tier.
+              const hpTextColor = isDead
+                ? 'text-accent-red-text font-medium'
+                : isPlayer
+                  ? 'text-faint'
+                  : entry.hpTier
+                    ? getHpTierTextColor(entry.hpTier)
+                    : 'text-faint';
+              // Bar for players (real HP) and enemy 'bar' mode (%). Hidden when dead.
+              const barPercent = isDead
+                ? null
+                : hasHp
+                  ? maxHp > 0
+                    ? Math.min(100, (hp / maxHp) * 100)
+                    : 0
+                  : !isPlayer &&
+                      state.enemyHpMode === 'bar' &&
+                      entry.hpPercent !== undefined
+                    ? entry.hpPercent
                     : null;
-              // Bar for players (from real HP) and for enemy 'bar' mode (from %)
-              const barPercent = hasHp
-                ? maxHp > 0
-                  ? Math.min(100, (hp / maxHp) * 100)
-                  : 0
-                : !isPlayer &&
-                    state.enemyHpMode === 'bar' &&
-                    entry.hpPercent !== undefined
-                  ? entry.hpPercent
-                  : null;
               return (
                 <li
                   key={entry.entityId}
                   className={`flex flex-col gap-1 px-3 py-1.5 ${
-                    isCurrent
+                    isCurrent && !isDead
                       ? 'bg-accent-amber-bg border-accent-amber-border border-l-2'
                       : 'border-l-2 border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    {isPlayer ? (
+                    {isDead ? (
+                      <Skull
+                        size={13}
+                        className="text-accent-red-text shrink-0"
+                      />
+                    ) : isPlayer ? (
                       <User
                         size={13}
                         className="text-accent-blue-text shrink-0"
@@ -191,18 +210,20 @@ export function InitiativePanel({
                     ) : (
                       <Skull size={13} className="text-faint shrink-0" />
                     )}
-                    {isCurrent && (
+                    {isCurrent && !isDead && (
                       <span aria-hidden className="text-accent-amber-text">
                         ▶
                       </span>
                     )}
                     <span
                       className={`truncate text-sm ${
-                        isCurrent
-                          ? 'text-accent-amber-text font-semibold'
-                          : isPlayer
-                            ? 'text-heading font-medium'
-                            : 'text-muted'
+                        isDead
+                          ? 'text-faint line-through'
+                          : isCurrent
+                            ? 'text-accent-amber-text font-semibold'
+                            : isPlayer
+                              ? 'text-heading font-medium'
+                              : 'text-muted'
                       }`}
                     >
                       {entry.displayName}
@@ -213,7 +234,9 @@ export function InitiativePanel({
                       )}
                     </span>
                     {hpText && (
-                      <span className="text-faint ml-auto text-xs whitespace-nowrap">
+                      <span
+                        className={`ml-auto text-xs whitespace-nowrap ${hpTextColor}`}
+                      >
                         {hpText}
                       </span>
                     )}
