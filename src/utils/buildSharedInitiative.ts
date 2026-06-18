@@ -11,14 +11,23 @@ import type {
   SharedTurnEntry,
 } from '@/types/sharedState';
 
+const HIDDEN_LABEL: Record<
+  NonNullable<EncounterEntity['playerDisposition']>,
+  string
+> = {
+  ally: 'Ally',
+  neutral: 'Stranger',
+  enemy: 'Enemy',
+};
+
 function playerFacingName(entity: EncounterEntity): string {
   // Players are never masked.
   if (entity.type === 'player') return entity.name;
   // A custom alias wins over everything else.
   const alias = entity.playerAlias?.trim();
   if (alias) return alias;
-  // Otherwise a hidden entity shows a generic label.
-  if (entity.isHidden) return 'Enemy';
+  // Otherwise a hidden entity shows a generic label matching its disguise.
+  if (entity.isHidden) return HIDDEN_LABEL[entity.playerDisposition ?? 'enemy'];
   return entity.name;
 }
 
@@ -43,6 +52,9 @@ function toEntry(
     entry.isDead = entity.currentHp <= 0;
     return entry;
   }
+
+  // Player-facing allegiance (disguise). Defaults to enemy for non-players.
+  entry.disposition = entity.playerDisposition ?? 'enemy';
 
   // Non-players (enemies/NPCs) expose only what the DM's combat config allows.
   if (config.enemyHpDisplay === 'off') return entry;

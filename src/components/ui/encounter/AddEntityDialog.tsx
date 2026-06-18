@@ -21,7 +21,11 @@ import {
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Checkbox } from '@/components/ui/forms/checkbox';
-import { EncounterEntity, CampaignNPC } from '@/types/encounter';
+import {
+  EncounterEntity,
+  CampaignNPC,
+  PlayerDisposition,
+} from '@/types/encounter';
 import { ProcessedMonster } from '@/types/bestiary';
 import type { Spell } from '@/types/character';
 import { useNPCStore } from '@/store/npcStore';
@@ -112,6 +116,63 @@ const GROUP_COLORS = [
   '#f97316', // orange
 ];
 
+const DISPOSITION_OPTIONS: Array<{
+  value: PlayerDisposition;
+  label: string;
+  title: string;
+  activeClass: string;
+}> = [
+  {
+    value: 'ally',
+    label: 'Ally',
+    title: 'Players see this as an ally',
+    activeClass: 'bg-surface-raised text-accent-emerald-text shadow-sm',
+  },
+  {
+    value: 'enemy',
+    label: 'Enemy',
+    title: 'Players see this as an enemy',
+    activeClass: 'bg-surface-raised text-accent-red-text shadow-sm',
+  },
+  {
+    value: 'neutral',
+    label: 'Neutral',
+    title: 'Players see this as neutral',
+    activeClass: 'bg-surface-raised text-muted shadow-sm',
+  },
+];
+
+function DispositionToggle({
+  value,
+  onChange,
+}: {
+  value: PlayerDisposition;
+  onChange: (v: PlayerDisposition) => void;
+}) {
+  return (
+    <div>
+      <label className="text-body mb-1 block text-sm">Player sees as</label>
+      <div className="bg-surface-secondary inline-flex rounded-lg p-0.5">
+        {DISPOSITION_OPTIONS.map(opt => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+              value === opt.value
+                ? opt.activeClass
+                : 'text-muted hover:text-body'
+            }`}
+            title={opt.title}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function AddEntityDialog({
   open,
   onOpenChange,
@@ -163,6 +224,12 @@ export function AddEntityDialog({
   // NPC add-to-encounter form (per-NPC hide/alias when clicking "Add" on an existing NPC)
   const [npcHideFromPlayers, setNpcHideFromPlayers] = useState(false);
   const [npcPlayerAlias, setNpcPlayerAlias] = useState('');
+  const [npcDisposition, setNpcDisposition] =
+    useState<PlayerDisposition>('enemy');
+  const [monsterDisposition, setMonsterDisposition] =
+    useState<PlayerDisposition>('enemy');
+  const [customDisposition, setCustomDisposition] =
+    useState<PlayerDisposition>('enemy');
 
   const searchMonsters = useCallback(async (query: string) => {
     if (query.length < 2) {
@@ -196,10 +263,13 @@ export function AddEntityDialog({
     if (!open) {
       setMonsterHideFromPlayers(false);
       setMonsterPlayerAlias('');
+      setMonsterDisposition('enemy');
       setNpcHideFromPlayers(false);
       setNpcPlayerAlias('');
+      setNpcDisposition('enemy');
       setCustomHideFromPlayers(false);
       setCustomPlayerAlias('');
+      setCustomDisposition('enemy');
     }
   }, [open]);
 
@@ -230,6 +300,7 @@ export function AddEntityDialog({
         ...entity,
         isHidden: monsterHideFromPlayers,
         playerAlias: aliasValue,
+        playerDisposition: monsterDisposition,
       });
     }
 
@@ -238,6 +309,7 @@ export function AddEntityDialog({
     setSelectedMonster(null);
     setMonsterHideFromPlayers(false);
     setMonsterPlayerAlias('');
+    setMonsterDisposition('enemy');
   };
 
   const handleAddPlayer = (player: (typeof campaignPlayers)[number]) => {
@@ -282,6 +354,7 @@ export function AddEntityDialog({
       conditions: [],
       isHidden: npcHideFromPlayers,
       playerAlias: npcPlayerAlias.trim() || undefined,
+      playerDisposition: npcDisposition,
       monsterStatBlock: npc.monsterStatBlock,
       abilities,
       hitDice: npc.hitDice ? { ...npc.hitDice } : undefined,
@@ -331,6 +404,7 @@ export function AddEntityDialog({
     });
     setNpcHideFromPlayers(false);
     setNpcPlayerAlias('');
+    setNpcDisposition('enemy');
   };
 
   const handleCreateNpc = () => {
@@ -364,6 +438,7 @@ export function AddEntityDialog({
       conditions: [],
       isHidden: customHideFromPlayers,
       playerAlias: customPlayerAlias.trim() || undefined,
+      playerDisposition: customDisposition,
     });
     setCustomName('');
     setCustomHp('10');
@@ -371,6 +446,7 @@ export function AddEntityDialog({
     setCustomInitMod('0');
     setCustomHideFromPlayers(false);
     setCustomPlayerAlias('');
+    setCustomDisposition('enemy');
   };
 
   return (
@@ -500,7 +576,7 @@ export function AddEntityDialog({
                       </p>
                     </div>
 
-                    {/* Hide / alias controls for monster */}
+                    {/* Hide / alias / disposition controls for monster */}
                     <div className="space-y-2">
                       <Checkbox
                         size="sm"
@@ -516,6 +592,10 @@ export function AddEntityDialog({
                           label="Player alias"
                         />
                       )}
+                      <DispositionToggle
+                        value={monsterDisposition}
+                        onChange={setMonsterDisposition}
+                      />
                     </div>
 
                     <Button
@@ -690,7 +770,7 @@ export function AddEntityDialog({
                   </Button>
                 )}
 
-                {/* Hide / alias options applied when adding any NPC below */}
+                {/* Hide / alias / disposition options applied when adding any NPC below */}
                 {!creatingNpc && (
                   <div className="border-divider space-y-2 rounded-lg border p-2">
                     <Checkbox
@@ -707,6 +787,10 @@ export function AddEntityDialog({
                         label="Player alias"
                       />
                     )}
+                    <DispositionToggle
+                      value={npcDisposition}
+                      onChange={setNpcDisposition}
+                    />
                   </div>
                 )}
 
@@ -820,7 +904,7 @@ export function AddEntityDialog({
                     type="number"
                   />
                 </div>
-                {/* Hide / alias controls for custom entity */}
+                {/* Hide / alias / disposition controls for custom entity */}
                 <div className="space-y-2">
                   <Checkbox
                     size="sm"
@@ -836,6 +920,10 @@ export function AddEntityDialog({
                       label="Player alias"
                     />
                   )}
+                  <DispositionToggle
+                    value={customDisposition}
+                    onChange={setCustomDisposition}
+                  />
                 </div>
                 <Button
                   variant="primary"
