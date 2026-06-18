@@ -407,11 +407,24 @@ export const useEncounterStore = create<EncounterStoreState>()(
             enc => {
               if (!enc.isActive || enc.entities.length === 0) return enc;
               const isFirstTurn = enc.currentTurn === 0;
+              const incomingTurn = isFirstTurn
+                ? enc.entities.length - 1
+                : enc.currentTurn - 1;
+
+              // Reset reaction for the entity whose turn is starting, mirroring
+              // nextTurn so backing up the tracker keeps reaction state correct.
+              let entities = enc.entities;
+              const incomingEntity = entities[incomingTurn];
+              if (incomingEntity?.hasUsedReaction) {
+                entities = entities.map((e, i) =>
+                  i === incomingTurn ? { ...e, hasUsedReaction: false } : e
+                );
+              }
+
               return {
                 ...enc,
-                currentTurn: isFirstTurn
-                  ? enc.entities.length - 1
-                  : enc.currentTurn - 1,
+                entities,
+                currentTurn: incomingTurn,
                 round: isFirstTurn ? Math.max(1, enc.round - 1) : enc.round,
                 updatedAt: new Date().toISOString(),
               };
