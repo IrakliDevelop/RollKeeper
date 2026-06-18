@@ -14,6 +14,9 @@ import {
 } from '@/utils/encounterSync';
 import { useDmEffectsSync } from '@/hooks/useDmEffectsSync';
 import { useDmCounterSync } from '@/hooks/useDmCounterSync';
+import { useDmInitiativeSync } from '@/hooks/useDmInitiativeSync';
+import { useTurnRequestSync } from '@/hooks/useTurnRequestSync';
+import { buildSharedInitiative } from '@/utils/buildSharedInitiative';
 import { Button } from '@/components/ui/forms/button';
 import { InitiativeTracker } from './InitiativeTracker';
 import { AddEntityDialog } from './AddEntityDialog';
@@ -78,6 +81,29 @@ export function EncounterView({
 
   const { syncPlayerEffects } = useDmEffectsSync({ campaignCode, dmId });
   useDmCounterSync(campaignCode, dmId);
+
+  const { pushInitiative } = useDmInitiativeSync({ campaignCode, dmId });
+
+  useTurnRequestSync({
+    campaignCode,
+    encounterId: encounter?.id,
+    isActive: !!encounter?.isActive,
+    // No onApplied: EncounterView has no toast mechanism.
+  });
+
+  // Push initiative state to Redis whenever turn/round/entities change.
+  // Only fires for campaign-linked encounters; safe when encounter is undefined.
+  useEffect(() => {
+    if (!encounter || !encounter.campaignCode) return;
+    pushInitiative(buildSharedInitiative(encounter));
+  }, [
+    encounter,
+    encounter?.isActive,
+    encounter?.round,
+    encounter?.currentTurn,
+    encounter?.entities,
+    pushInitiative,
+  ]);
 
   const { players: campaignPlayers } = useCampaignSync({
     code: campaignCode,

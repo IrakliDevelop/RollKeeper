@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { SharedCampaignState, ItemTransfer } from '@/types/sharedState';
 
-const POLL_INTERVAL_MS = 15000; // 15 seconds
+const POLL_INTERVAL_MS = 15000; // 15 seconds (idle / out of combat)
+const COMBAT_POLL_INTERVAL_MS = 5000; // 5 seconds while combat is active
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 const ACTIVITY_EVENTS = [
   'mousemove',
@@ -37,6 +38,16 @@ export function useSharedCampaignState(
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isPausedRef = useRef(false);
+  const currentIntervalRef = useRef(POLL_INTERVAL_MS);
+  // Stable ref so fetchSharedState can call startPolling without a circular dep.
+  const startPollingRef = useRef<() => void>(() => {});
+
+  const stopPolling = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
 
   const fetchSharedState = useCallback(async () => {
     if (!campaignCode) return;
@@ -51,6 +62,14 @@ export function useSharedCampaignState(
       setSharedState(data);
       setError(null);
       setLastFetched(new Date());
+      // Adaptive poll: 5s while combat is active, 15s otherwise.
+      const desired = data.initiative?.isActive
+        ? COMBAT_POLL_INTERVAL_MS
+        : POLL_INTERVAL_MS;
+      if (desired !== currentIntervalRef.current && !isPausedRef.current) {
+        currentIntervalRef.current = desired;
+        startPollingRef.current();
+      }
       if (data.transfers && data.transfers.length > 0) {
         setPendingTransfers(prev => {
           const existingIds = new Set(prev.map(t => t.id));
@@ -69,17 +88,16 @@ export function useSharedCampaignState(
     }
   }, [campaignCode, playerId]);
 
-  const stopPolling = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  }, []);
-
   const startPolling = useCallback(() => {
     stopPolling();
-    intervalRef.current = setInterval(fetchSharedState, POLL_INTERVAL_MS);
+    intervalRef.current = setInterval(
+      fetchSharedState,
+      currentIntervalRef.current
+    );
   }, [fetchSharedState, stopPolling]);
+
+  // Keep the ref in sync with the latest startPolling callback.
+  startPollingRef.current = startPolling;
 
   const pausePolling = useCallback(() => {
     if (isPausedRef.current) return;

@@ -54,6 +54,35 @@ export interface SharedCustomCounter {
   updatedAt: string; // ISO timestamp
 }
 
+// A single combatant row shown to players during combat
+export interface SharedTurnEntry {
+  entityId: string;
+  displayName: string; // real name, or "Enemy" when hidden && non-player
+  type: 'player' | 'monster' | 'npc' | 'lair';
+  playerCharacterId?: string; // player entities only — marks "you" + identity
+  currentHp?: number; // player entities only — never set for monsters/npcs/lairs
+  maxHp?: number; // player entities only
+}
+
+// Initiative/turn state pushed by the DM, read by players
+export interface SharedInitiativeState {
+  encounterId: string;
+  isActive: boolean;
+  round: number;
+  currentEntityId: string | null;
+  turnOrder: SharedTurnEntry[];
+  updatedAt: string; // ISO timestamp
+}
+
+// Player → DM request to advance past their own turn
+export interface TurnEndRequest {
+  encounterId: string;
+  round: number;
+  entityId: string;
+  playerId: string;
+  requestedAt: string; // ISO timestamp
+}
+
 // Full shared state envelope returned by GET
 export interface SharedCampaignState {
   calendar: SharedCalendarPlayer | null;
@@ -61,6 +90,7 @@ export interface SharedCampaignState {
   dmEffects: DmEffect[];
   customCounter: { label: string; value: number } | null;
   transfers: ItemTransfer[];
+  initiative: SharedInitiativeState | null;
 }
 
 // POST body for DM pushing shared state

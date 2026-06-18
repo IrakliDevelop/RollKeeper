@@ -6,6 +6,8 @@ import {
   ChevronUp,
   Shield,
   Eye,
+  EyeOff,
+  Pencil,
   Sparkles,
   Angry,
   Minus,
@@ -22,6 +24,7 @@ import {
   Brain,
   ClockAlert,
 } from 'lucide-react';
+import { Input } from '@/components/ui/forms/input';
 import { EncounterEntity, ChessPiece } from '@/types/encounter';
 import { HPBar } from '@/components/shared/combat/HPBar';
 import { ConditionBadge } from '@/components/shared/combat/ConditionBadge';
@@ -405,6 +408,8 @@ export function EntityCard({
   const [initInput, setInitInput] = useState('');
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [isEditingAlias, setIsEditingAlias] = useState(false);
+  const [aliasInput, setAliasInput] = useState('');
   const style = entity.summonOwnerId
     ? TYPE_STYLES.player
     : (TYPE_STYLES[entity.type] ?? TYPE_STYLES.monster);
@@ -539,6 +544,75 @@ export function EntityCard({
                   ? 'NPC'
                   : entity.type.charAt(0).toUpperCase() + entity.type.slice(1)}
             </span>
+            {/* DM-only: eye toggle + alias edit for non-player entities */}
+            {entity.type !== 'player' && (
+              <>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    onUpdate({ isHidden: !entity.isHidden });
+                  }}
+                  className={`shrink-0 rounded p-0.5 transition-colors ${
+                    entity.isHidden
+                      ? 'text-accent-amber-text hover:text-accent-amber-text hover:bg-accent-amber-bg'
+                      : 'text-faint hover:text-muted hover:bg-surface-raised'
+                  }`}
+                  title={
+                    entity.isHidden
+                      ? 'Name hidden from players — click to reveal'
+                      : 'Name visible to players — click to hide'
+                  }
+                >
+                  {entity.isHidden ? <EyeOff size={13} /> : <Eye size={13} />}
+                </button>
+                {isEditingAlias ? (
+                  <Input
+                    value={aliasInput}
+                    onChange={e => setAliasInput(e.target.value)}
+                    onBlur={() => {
+                      onUpdate({
+                        playerAlias: aliasInput.trim() || undefined,
+                      });
+                      setIsEditingAlias(false);
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        onUpdate({
+                          playerAlias: aliasInput.trim() || undefined,
+                        });
+                        setIsEditingAlias(false);
+                      }
+                      if (e.key === 'Escape') {
+                        setIsEditingAlias(false);
+                      }
+                    }}
+                    placeholder="Alias…"
+                    className="h-5 w-24 shrink-0 px-1 py-0 text-xs"
+                    autoFocus
+                  />
+                ) : (
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      setAliasInput(entity.playerAlias ?? '');
+                      setIsEditingAlias(true);
+                    }}
+                    className={`shrink-0 rounded p-0.5 transition-colors ${
+                      entity.playerAlias
+                        ? 'text-accent-blue-text hover:bg-accent-blue-bg'
+                        : 'text-faint hover:text-muted hover:bg-surface-raised'
+                    }`}
+                    title={
+                      entity.playerAlias
+                        ? `Players see: "${entity.playerAlias}" — click to edit`
+                        : 'Set alias players see — click to edit'
+                    }
+                  >
+                    <Pencil size={13} />
+                  </button>
+                )}
+              </>
+            )}
             {(entity.type === 'player' || entity.summonOwnerId) && (
               <SyncIndicator lastSynced={lastSynced} />
             )}
@@ -588,6 +662,18 @@ export function EntityCard({
                 size="sm"
               />
             ))}
+
+          {/* DM hint: what players see when name is hidden or aliased */}
+          {entity.type !== 'player' &&
+            (entity.isHidden || entity.playerAlias) && (
+              <div className="text-faint mt-0.5 text-[10px]">
+                Players see:{' '}
+                <span className="font-medium">
+                  {entity.playerAlias?.trim() ||
+                    (entity.isHidden ? 'Enemy' : entity.name)}
+                </span>
+              </div>
+            )}
 
           {/* Death Saving Throws (players & NPCs at 0 HP) */}
           {(entity.type === 'player' || entity.type === 'npc') &&

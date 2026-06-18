@@ -155,7 +155,8 @@ export interface EncounterEntity {
 
   // Visual
   color?: string; // For grouping same monsters
-  isHidden?: boolean; // DM can hide from players
+  isHidden?: boolean; // DM can hide the real name from players (they see a generic label)
+  playerAlias?: string; // Optional name players see instead (DM-controlled entities); takes precedence over the hidden generic label
   chessPiece?: ChessPiece; // Chess piece icon for map correlation
 
   // Player sync reference

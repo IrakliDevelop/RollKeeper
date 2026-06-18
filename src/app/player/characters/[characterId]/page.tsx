@@ -52,6 +52,7 @@ import { usePartySync } from '@/hooks/usePartySync';
 import { RollSummary } from '@/types/dice';
 import NotHydrated from '@/components/ui/feedback/NotHydrated';
 import CharacterHUD from '@/components/ui/character/CharacterHUD';
+import { InitiativePanel } from '@/components/ui/campaign/InitiativePanel';
 import RestDialog from '@/components/ui/character/RestDialog';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
@@ -526,6 +527,38 @@ export default function CharacterSheet() {
     ]
   );
 
+  const handleEndTurn = useCallback(
+    async (entityId: string) => {
+      const init = sharedState?.initiative;
+      if (!playerSync.campaignCode || !init) return;
+      try {
+        const res = await fetch(
+          `/api/campaign/${playerSync.campaignCode}/turn-request`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              encounterId: init.encounterId,
+              round: init.round,
+              entityId,
+              playerId: characterId,
+              requestedAt: new Date().toISOString(),
+            }),
+          }
+        );
+        if (!res.ok) {
+          console.warn(
+            'End-turn request was rejected by the server:',
+            res.status
+          );
+        }
+      } catch (err) {
+        console.error('Failed to send end-turn request:', err);
+      }
+    },
+    [playerSync.campaignCode, sharedState?.initiative, characterId]
+  );
+
   const onSendItem = playerSync.campaignCode ? handleSendItem : undefined;
 
   if (!hasHydrated) {
@@ -783,6 +816,13 @@ export default function CharacterSheet() {
           <PartyHPSidebar
             campaignCode={playerSync.campaignCode ?? null}
             currentCharacterId={characterId}
+          />
+
+          {/* Shared initiative panel — shown during active combat */}
+          <InitiativePanel
+            state={sharedState?.initiative ?? null}
+            characterId={characterId}
+            onEndTurn={handleEndTurn}
           />
 
           {/* Header */}

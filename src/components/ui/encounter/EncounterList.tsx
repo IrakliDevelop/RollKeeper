@@ -148,8 +148,8 @@ function EncounterCard({
   const npcCount = encounter.entities.filter(e => e.type === 'npc').length;
 
   return (
-    <div className="border-divider bg-surface-raised hover:bg-surface-secondary rounded-lg border shadow-sm transition-all hover:shadow-md">
-      <div className="p-4">
+    <div className="border-divider bg-surface-raised hover:bg-surface-secondary flex h-full flex-col rounded-lg border shadow-sm transition-all hover:shadow-md">
+      <div className="flex flex-1 flex-col p-4">
         <div className="mb-3 flex items-start justify-between">
           <h3 className="text-heading truncate text-lg font-semibold">
             {encounter.name}
@@ -212,7 +212,7 @@ function EncounterCard({
           </Link>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="mt-auto flex items-center gap-2 pt-1">
           <Link
             href={`/dm/campaign/${campaignCode}/encounters/${encounter.id}`}
             className="flex-1"

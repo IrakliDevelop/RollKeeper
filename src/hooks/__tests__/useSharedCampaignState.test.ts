@@ -16,6 +16,7 @@ const makeSharedState = (
   dmEffects: [],
   customCounter: null,
   transfers: [],
+  initiative: null,
   ...overrides,
 });
 

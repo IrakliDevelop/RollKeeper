@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { Checkbox } from '@/components/ui/forms/checkbox';
 import { EncounterEntity, CampaignNPC } from '@/types/encounter';
 import { ProcessedMonster } from '@/types/bestiary';
 import type { Spell } from '@/types/character';
@@ -132,6 +133,8 @@ export function AddEntityDialog({
     useState<ProcessedMonster | null>(null);
   const [customizeHp, setCustomizeHp] = useState('');
   const [customizeAc, setCustomizeAc] = useState('');
+  const [monsterHideFromPlayers, setMonsterHideFromPlayers] = useState(false);
+  const [monsterPlayerAlias, setMonsterPlayerAlias] = useState('');
 
   // NPC creation form
   const [creatingNpc, setCreatingNpc] = useState(false);
@@ -154,6 +157,12 @@ export function AddEntityDialog({
   const [customHp, setCustomHp] = useState('10');
   const [customAc, setCustomAc] = useState('10');
   const [customInitMod, setCustomInitMod] = useState('0');
+  const [customHideFromPlayers, setCustomHideFromPlayers] = useState(false);
+  const [customPlayerAlias, setCustomPlayerAlias] = useState('');
+
+  // NPC add-to-encounter form (per-NPC hide/alias when clicking "Add" on an existing NPC)
+  const [npcHideFromPlayers, setNpcHideFromPlayers] = useState(false);
+  const [npcPlayerAlias, setNpcPlayerAlias] = useState('');
 
   const searchMonsters = useCallback(async (query: string) => {
     if (query.length < 2) {
@@ -181,6 +190,19 @@ export function AddEntityDialog({
     return () => clearTimeout(timeout);
   }, [monsterSearch, searchMonsters]);
 
+  // Reset hide/alias fields when the dialog closes so a previous, unsubmitted
+  // choice doesn't leak into the next time it's opened.
+  useEffect(() => {
+    if (!open) {
+      setMonsterHideFromPlayers(false);
+      setMonsterPlayerAlias('');
+      setNpcHideFromPlayers(false);
+      setNpcPlayerAlias('');
+      setCustomHideFromPlayers(false);
+      setCustomPlayerAlias('');
+    }
+  }, [open]);
+
   const handleSelectMonster = (monster: ProcessedMonster) => {
     setSelectedMonster(monster);
     setCustomizeHp(monster.hpAverage.toString());
@@ -192,6 +214,7 @@ export function AddEntityDialog({
     const color = GROUP_COLORS[selectedMonsterColorIdx % GROUP_COLORS.length];
     const hpOverride = parseInt(customizeHp) || undefined;
     const acOverride = parseInt(customizeAc) || undefined;
+    const aliasValue = monsterPlayerAlias.trim() || undefined;
 
     for (let i = 0; i < monsterCount; i++) {
       const suffix = monsterCount > 1 ? ` ${String.fromCharCode(65 + i)}` : '';
@@ -203,12 +226,18 @@ export function AddEntityDialog({
         acOverride:
           acOverride !== selectedMonster.acValue ? acOverride : undefined,
       });
-      onAddEntity(entity);
+      onAddEntity({
+        ...entity,
+        isHidden: monsterHideFromPlayers,
+        playerAlias: aliasValue,
+      });
     }
 
     setSelectedMonsterColorIdx(prev => prev + 1);
     setMonsterCount(1);
     setSelectedMonster(null);
+    setMonsterHideFromPlayers(false);
+    setMonsterPlayerAlias('');
   };
 
   const handleAddPlayer = (player: (typeof campaignPlayers)[number]) => {
@@ -251,7 +280,8 @@ export function AddEntityDialog({
       tempHp: 0,
       armorClass: npc.armorClass,
       conditions: [],
-      isHidden: false,
+      isHidden: npcHideFromPlayers,
+      playerAlias: npcPlayerAlias.trim() || undefined,
       monsterStatBlock: npc.monsterStatBlock,
       abilities,
       hitDice: npc.hitDice ? { ...npc.hitDice } : undefined,
@@ -299,6 +329,8 @@ export function AddEntityDialog({
           })()
         : undefined,
     });
+    setNpcHideFromPlayers(false);
+    setNpcPlayerAlias('');
   };
 
   const handleCreateNpc = () => {
@@ -330,12 +362,15 @@ export function AddEntityDialog({
       tempHp: 0,
       armorClass: parseInt(customAc) || 10,
       conditions: [],
-      isHidden: false,
+      isHidden: customHideFromPlayers,
+      playerAlias: customPlayerAlias.trim() || undefined,
     });
     setCustomName('');
     setCustomHp('10');
     setCustomAc('10');
     setCustomInitMod('0');
+    setCustomHideFromPlayers(false);
+    setCustomPlayerAlias('');
   };
 
   return (
@@ -371,7 +406,11 @@ export function AddEntityDialog({
                   /* Monster customization step */
                   <div className="space-y-3">
                     <button
-                      onClick={() => setSelectedMonster(null)}
+                      onClick={() => {
+                        setSelectedMonster(null);
+                        setMonsterHideFromPlayers(false);
+                        setMonsterPlayerAlias('');
+                      }}
                       className="text-muted hover:text-body flex items-center gap-1 text-sm transition-colors"
                     >
                       <ArrowLeft size={14} />
@@ -459,6 +498,24 @@ export function AddEntityDialog({
                           selectedMonster.legendaryActions.length > 0 &&
                           ' · Legendary'}
                       </p>
+                    </div>
+
+                    {/* Hide / alias controls for monster */}
+                    <div className="space-y-2">
+                      <Checkbox
+                        size="sm"
+                        checked={monsterHideFromPlayers}
+                        onCheckedChange={setMonsterHideFromPlayers}
+                        label="Hide name from players"
+                      />
+                      {(monsterHideFromPlayers || monsterPlayerAlias) && (
+                        <Input
+                          value={monsterPlayerAlias}
+                          onChange={e => setMonsterPlayerAlias(e.target.value)}
+                          placeholder="Name players see (optional)"
+                          label="Player alias"
+                        />
+                      )}
                     </div>
 
                     <Button
@@ -633,6 +690,26 @@ export function AddEntityDialog({
                   </Button>
                 )}
 
+                {/* Hide / alias options applied when adding any NPC below */}
+                {!creatingNpc && (
+                  <div className="border-divider space-y-2 rounded-lg border p-2">
+                    <Checkbox
+                      size="sm"
+                      checked={npcHideFromPlayers}
+                      onCheckedChange={setNpcHideFromPlayers}
+                      label="Hide name from players"
+                    />
+                    {(npcHideFromPlayers || npcPlayerAlias) && (
+                      <Input
+                        value={npcPlayerAlias}
+                        onChange={e => setNpcPlayerAlias(e.target.value)}
+                        placeholder="Name players see (optional)"
+                        label="Player alias"
+                      />
+                    )}
+                  </div>
+                )}
+
                 {allNpcs.length === 0 && !creatingNpc ? (
                   <p className="text-muted py-8 text-center text-sm">
                     No NPCs yet. Create one to reuse across encounters.
@@ -742,6 +819,23 @@ export function AddEntityDialog({
                     label="Init Mod"
                     type="number"
                   />
+                </div>
+                {/* Hide / alias controls for custom entity */}
+                <div className="space-y-2">
+                  <Checkbox
+                    size="sm"
+                    checked={customHideFromPlayers}
+                    onCheckedChange={setCustomHideFromPlayers}
+                    label="Hide name from players"
+                  />
+                  {(customHideFromPlayers || customPlayerAlias) && (
+                    <Input
+                      value={customPlayerAlias}
+                      onChange={e => setCustomPlayerAlias(e.target.value)}
+                      placeholder="Name players see (optional)"
+                      label="Player alias"
+                    />
+                  )}
                 </div>
                 <Button
                   variant="primary"
