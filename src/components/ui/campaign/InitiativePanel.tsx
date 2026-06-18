@@ -223,7 +223,7 @@ export function InitiativePanel({
                             ? 'text-accent-amber-text font-semibold'
                             : isPlayer
                               ? 'text-heading font-medium'
-                              : 'text-muted'
+                              : 'text-accent-red-text-muted'
                       }`}
                     >
                       {entry.displayName}
