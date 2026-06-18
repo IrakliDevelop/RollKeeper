@@ -1,21 +1,16 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Users, User, Heart, Skull, EyeOff, Shield } from 'lucide-react';
 import { usePartySync } from '@/hooks/usePartySync';
+import { useDraggableY } from '@/hooks/useDraggableY';
+import { getHpBarColor } from '@/utils/hpColor';
 import { PartyMemberHP } from '@/app/api/campaign/[code]/party-hp/route';
 import { Badge } from '@/components/ui/layout/badge';
 
 const STORAGE_KEY = 'rollkeeper-party-hp-sidebar';
-
-function getHpBarColor(current: number, max: number): string {
-  if (max === 0) return 'bg-surface-secondary';
-  const pct = current / max;
-  if (pct > 0.5) return 'bg-green-600 dark:bg-green-500';
-  if (pct > 0.25) return 'bg-amber-500 dark:bg-amber-400';
-  return 'bg-red-600 dark:bg-red-500';
-}
+const POS_KEY = 'rollkeeper-party-hp-sidebar-y';
 
 function DeathSavesDisplay({
   deathSaves,
@@ -155,7 +150,7 @@ export function PartyHPSidebar({
   currentCharacterId,
 }: PartyHPSidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
+  const { topPx, containerRef: sidebarRef, startDrag } = useDraggableY(POS_KEY);
   const { partyMembers, loading } = usePartySync({
     campaignCode,
     currentCharacterId,
@@ -181,11 +176,17 @@ export function PartyHPSidebar({
   }, [isOpen]);
 
   // Close on outside click
-  const handleOutsideClick = useCallback((e: MouseEvent) => {
-    if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node)) {
-      setIsOpen(false);
-    }
-  }, []);
+  const handleOutsideClick = useCallback(
+    (e: MouseEvent) => {
+      if (
+        sidebarRef.current &&
+        !sidebarRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    },
+    [sidebarRef]
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -201,7 +202,10 @@ export function PartyHPSidebar({
   return (
     <div
       ref={sidebarRef}
-      className="fixed top-1/2 left-0 z-[55] hidden -translate-y-1/2 lg:flex"
+      className={`fixed left-0 z-[55] hidden lg:flex ${
+        topPx === null ? 'top-1/2 -translate-y-1/2' : ''
+      }`}
+      style={topPx !== null ? { top: topPx } : undefined}
     >
       {/* Panel Wrapper — collapses width when closed */}
       <div
@@ -209,8 +213,11 @@ export function PartyHPSidebar({
         style={{ width: isOpen ? '240px' : '0px' }}
       >
         <div className="border-divider bg-surface-raised max-h-[70vh] w-[240px] overflow-hidden rounded-r-xl border-y-2 border-r-2 shadow-lg">
-          {/* Header */}
-          <div className="border-divider border-b px-3 py-2.5">
+          {/* Header — also the vertical drag handle */}
+          <div
+            onPointerDown={startDrag}
+            className="border-divider cursor-grab touch-none border-b px-3 py-2.5 select-none active:cursor-grabbing"
+          >
             <div className="text-heading flex items-center gap-2 text-sm font-semibold">
               <Users size={14} className="text-accent-blue-text" />
               Party HP

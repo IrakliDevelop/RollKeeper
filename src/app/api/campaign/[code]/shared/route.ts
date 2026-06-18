@@ -19,6 +19,7 @@ import type {
   SharedCampaignState,
   SharedCustomCounter,
   ItemTransfer,
+  SharedInitiativeState,
 } from '@/types/sharedState';
 
 export async function GET(
@@ -34,6 +35,16 @@ export async function GET(
     const calendarRaw = await redis.get<string>(
       campaignSharedKey(code, 'calendar')
     );
+    const initiativeRaw = await redis.get<string>(
+      campaignSharedKey(code, 'initiative')
+    );
+    let initiative: SharedInitiativeState | null = null;
+    if (initiativeRaw) {
+      initiative =
+        typeof initiativeRaw === 'string'
+          ? JSON.parse(initiativeRaw)
+          : initiativeRaw;
+    }
 
     let calendar: SharedCalendarPlayer | null = null;
 
@@ -105,6 +116,7 @@ export async function GET(
       dmEffects,
       customCounter,
       transfers,
+      initiative,
     };
     return NextResponse.json(state);
   } catch (error) {

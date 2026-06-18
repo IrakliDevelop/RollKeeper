@@ -253,6 +253,37 @@ describe('GET /api/campaign/[code]/shared', () => {
     expect(data.dmEffects).toEqual([]);
     expect(data.transfers).toEqual([]);
   });
+
+  it('returns the stored initiative state', async () => {
+    seedRedis(campaignSharedKey('ABC123', 'initiative'), {
+      encounterId: 'enc-1',
+      isActive: true,
+      round: 3,
+      currentEntityId: 'a',
+      turnOrder: [{ entityId: 'a', displayName: 'Aragorn', type: 'player' }],
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const req = new NextRequest(
+      'http://localhost/api/campaign/ABC123/shared?role=player&playerId=char-a'
+    );
+    const res = await GET(req, createRouteParams({ code: 'ABC123' }));
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.initiative).not.toBeNull();
+    expect(data.initiative.round).toBe(3);
+    expect(data.initiative.currentEntityId).toBe('a');
+  });
+
+  it('returns null initiative when none is stored', async () => {
+    const req = new NextRequest(
+      'http://localhost/api/campaign/ABC123/shared?role=player&playerId=char-a'
+    );
+    const res = await GET(req, createRouteParams({ code: 'ABC123' }));
+    const data = await res.json();
+    expect(data.initiative).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
