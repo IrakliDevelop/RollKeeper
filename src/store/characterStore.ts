@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { createSafeStorage } from '@/lib/safeStorage';
 import {
   CharacterState,
   SaveStatus,
@@ -5136,7 +5137,7 @@ export const useCharacterStore = create<CharacterStore>()(
     }),
     {
       name: STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => createSafeStorage()),
       // Only persist the character data and save metadata
       partialize: state => ({
         character: state.character,

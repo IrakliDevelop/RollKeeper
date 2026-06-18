@@ -26,6 +26,7 @@ import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
 import { YouDiedOverlay } from '@/components/ui/feedback/YouDiedOverlay';
 import { LevelUpOverlay } from '@/components/ui/feedback/LevelUpOverlay';
 import { CombatStartBanner } from '@/components/ui/feedback/CombatStartBanner';
+import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
 
 import CharacterSheetHeader from '@/components/ui/character/CharacterSheetHeader';
 import { useHydration } from '@/hooks/useHydration';
@@ -96,6 +97,19 @@ export default function CharacterSheet() {
     showLongRest,
     addToast,
   } = useToast();
+
+  // Warn if a save fails because localStorage is full (auto-save writes here).
+  useStorageQuotaListener(
+    useCallback(() => {
+      addToast({
+        type: 'error',
+        title: 'Save failed — storage full',
+        message:
+          'This change could not be saved. Export a backup from the character list now to avoid losing data.',
+        duration: 12000,
+      });
+    }, [addToast])
+  );
 
   const {
     character,

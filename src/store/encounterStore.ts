@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { createSafeStorage } from '@/lib/safeStorage';
 import {
   Encounter,
   EncounterEntity,
@@ -911,7 +912,7 @@ export const useEncounterStore = create<EncounterStoreState>()(
     }),
     {
       name: ENCOUNTER_STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => createSafeStorage()),
       version: 1,
     }
   )

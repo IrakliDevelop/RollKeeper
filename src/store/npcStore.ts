@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { createSafeStorage } from '@/lib/safeStorage';
 import { CampaignNPC } from '@/types/encounter';
 import { Spell } from '@/types/character';
 import {
@@ -361,7 +362,7 @@ export const useNPCStore = create<NPCStoreState>()(
     }),
     {
       name: NPC_STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => createSafeStorage()),
       version: 2,
       migrate: (persisted: unknown, version: number) => {
         if (version < 2) {

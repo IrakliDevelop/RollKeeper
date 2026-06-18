@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { createSafeStorage } from '@/lib/safeStorage';
 import type { BattleMap } from '@/types/battlemap';
 
 const BATTLEMAP_STORAGE_KEY = 'rollkeeper-battlemap-data';
@@ -197,7 +198,7 @@ export const useBattleMapStore = create<BattleMapStoreState>()(
     }),
     {
       name: BATTLEMAP_STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => createSafeStorage()),
     }
   )
 );

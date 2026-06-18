@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { createSafeStorage } from '@/lib/safeStorage';
 import { CharacterState, CharacterExport } from '@/types/character';
 import { DEFAULT_CHARACTER_STATE, STORAGE_KEY } from '@/utils/constants';
 
@@ -82,7 +83,7 @@ interface PlayerStoreState {
   migrateFromOldStorage: () => boolean;
   exportCharacter: (characterId: string) => PlayerCharacter | null;
   importCharacter: (
-    data: CharacterState | CharacterExport,
+    data: CharacterState | CharacterExport | PlayerCharacter,
     name?: string
   ) => string;
 
@@ -454,7 +455,7 @@ export const usePlayerStore = create<PlayerStoreState>()(
     }),
     {
       name: PLAYER_STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => createSafeStorage()),
       version: 1,
       merge: (persistedState, currentState) => ({
         ...currentState,

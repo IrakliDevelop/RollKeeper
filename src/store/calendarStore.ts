@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { createSafeStorage } from '@/lib/safeStorage';
 import type {
   CalendarConfig,
   CalendarEvent,
@@ -177,7 +178,7 @@ export const useCalendarStore = create<CalendarStoreState>()(
     }),
     {
       name: CALENDAR_STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => createSafeStorage()),
       version: 3,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as CalendarStoreState;
