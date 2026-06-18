@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Swords, User, Skull } from 'lucide-react';
+import { Swords, User, Skull, Shield, CircleDot } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { useDraggableY } from '@/hooks/useDraggableY';
 import { getHpBarColor, getHpTierTextColor } from '@/utils/hpColor';
@@ -152,6 +152,14 @@ export function InitiativePanel({
               const isYou = entry.playerCharacterId === characterId;
               const isPlayer = entry.type === 'player';
               const isDead = entry.isDead === true;
+              // Player-facing allegiance (disguise): colour + icon by side.
+              const disposition = entry.disposition ?? 'enemy';
+              const dispoColor =
+                disposition === 'ally'
+                  ? 'text-accent-emerald-text'
+                  : disposition === 'neutral'
+                    ? 'text-muted'
+                    : 'text-accent-red-text-muted';
               const hp = entry.currentHp;
               const maxHp = entry.maxHp;
               const hasHp = hp !== undefined && maxHp !== undefined;
@@ -207,8 +215,15 @@ export function InitiativePanel({
                         size={13}
                         className="text-accent-blue-text shrink-0"
                       />
+                    ) : disposition === 'ally' ? (
+                      <Shield size={13} className={`shrink-0 ${dispoColor}`} />
+                    ) : disposition === 'neutral' ? (
+                      <CircleDot
+                        size={13}
+                        className={`shrink-0 ${dispoColor}`}
+                      />
                     ) : (
-                      <Skull size={13} className="text-faint shrink-0" />
+                      <Skull size={13} className={`shrink-0 ${dispoColor}`} />
                     )}
                     {isCurrent && !isDead && (
                       <span aria-hidden className="text-accent-amber-text">
@@ -223,7 +238,7 @@ export function InitiativePanel({
                             ? 'text-accent-amber-text font-semibold'
                             : isPlayer
                               ? 'text-heading font-medium'
-                              : 'text-accent-red-text-muted'
+                              : dispoColor
                       }`}
                     >
                       {entry.displayName}

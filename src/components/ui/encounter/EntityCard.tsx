@@ -25,7 +25,11 @@ import {
   ClockAlert,
 } from 'lucide-react';
 import { Input } from '@/components/ui/forms/input';
-import { EncounterEntity, ChessPiece } from '@/types/encounter';
+import {
+  EncounterEntity,
+  ChessPiece,
+  PlayerDisposition,
+} from '@/types/encounter';
 import { HPBar } from '@/components/shared/combat/HPBar';
 import { ConditionBadge } from '@/components/shared/combat/ConditionBadge';
 import { EntityCardExpanded } from './EntityCardExpanded';
@@ -611,6 +615,47 @@ export function EntityCard({
                     <Pencil size={13} />
                   </button>
                 )}
+                {/* Disposition segmented toggle */}
+                <div
+                  className="bg-surface-secondary ml-1 flex shrink-0 items-center rounded-md p-0.5"
+                  title="Player-facing allegiance"
+                >
+                  {(
+                    [
+                      { value: 'ally', label: 'A', title: 'Ally' },
+                      { value: 'enemy', label: 'E', title: 'Enemy' },
+                      { value: 'neutral', label: 'N', title: 'Neutral' },
+                    ] as Array<{
+                      value: PlayerDisposition;
+                      label: string;
+                      title: string;
+                    }>
+                  ).map(opt => {
+                    const active =
+                      (entity.playerDisposition ?? 'enemy') === opt.value;
+                    const activeClass =
+                      opt.value === 'ally'
+                        ? 'bg-surface-raised text-accent-emerald-text shadow-sm'
+                        : opt.value === 'enemy'
+                          ? 'bg-surface-raised text-accent-red-text shadow-sm'
+                          : 'bg-surface-raised text-muted shadow-sm';
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={e => {
+                          e.stopPropagation();
+                          onUpdate({ playerDisposition: opt.value });
+                        }}
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-semibold transition-colors ${
+                          active ? activeClass : 'text-faint hover:text-muted'
+                        }`}
+                        title={opt.title}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </>
             )}
             {(entity.type === 'player' || entity.summonOwnerId) && (

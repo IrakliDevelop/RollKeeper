@@ -100,6 +100,10 @@ export type ChessPiece =
   | 'knight'
   | 'pawn';
 
+// Player-facing allegiance for a DM-controlled combatant (lets a villain be
+// disguised as an ally until the DM reveals the twist).
+export type PlayerDisposition = 'ally' | 'enemy' | 'neutral';
+
 export interface EncounterEntity {
   id: string;
   type: EntityType;
@@ -157,6 +161,7 @@ export interface EncounterEntity {
   color?: string; // For grouping same monsters
   isHidden?: boolean; // DM can hide the real name from players (they see a generic label)
   playerAlias?: string; // Optional name players see instead (DM-controlled entities); takes precedence over the hidden generic label
+  playerDisposition?: PlayerDisposition; // Allegiance players see (disguise); defaults to enemy for non-players
   chessPiece?: ChessPiece; // Chess piece icon for map correlation
 
   // Player sync reference

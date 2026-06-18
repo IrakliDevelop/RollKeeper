@@ -70,6 +70,7 @@ export interface SharedTurnEntry {
   // not leak an exact percentage).
   hpTier?: 'high' | 'mid' | 'low' | 'critical';
   isDead?: boolean; // current HP <= 0 (players always; enemies when HP is shared)
+  disposition?: 'ally' | 'enemy' | 'neutral'; // player-facing allegiance (non-players)
 }
 
 // Initiative/turn state pushed by the DM, read by players

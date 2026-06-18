@@ -133,6 +133,53 @@ describe('buildSharedInitiative', () => {
     expect(rows.find(r => r.entityId === 'm2')!.displayName).toBe('Enemy');
   });
 
+  it('hidden generic label follows the disguise disposition', () => {
+    const enc = encounter([
+      entity({
+        id: 'a',
+        name: 'Strahd',
+        initiative: 20,
+        isHidden: true,
+        playerDisposition: 'ally',
+      }),
+      entity({
+        id: 'n',
+        name: 'Spy',
+        initiative: 15,
+        isHidden: true,
+        playerDisposition: 'neutral',
+      }),
+      entity({ id: 'e', name: 'Orc', initiative: 10, isHidden: true }),
+    ]);
+    const rows = buildSharedInitiative(enc).turnOrder;
+    expect(rows.find(r => r.entityId === 'a')!.displayName).toBe('Ally');
+    expect(rows.find(r => r.entityId === 'n')!.displayName).toBe('Stranger');
+    expect(rows.find(r => r.entityId === 'e')!.displayName).toBe('Enemy');
+  });
+
+  it('sends disposition for non-players (default enemy), not for players', () => {
+    const enc = encounter([
+      entity({
+        id: 'a',
+        name: 'Noble',
+        initiative: 20,
+        playerDisposition: 'ally',
+      }),
+      entity({ id: 'e', name: 'Goblin', initiative: 10 }),
+      entity({
+        id: 'p',
+        name: 'Aragorn',
+        type: 'player',
+        initiative: 15,
+        playerCharacterId: 'char-a',
+      }),
+    ]);
+    const rows = buildSharedInitiative(enc).turnOrder;
+    expect(rows.find(r => r.entityId === 'a')!.disposition).toBe('ally');
+    expect(rows.find(r => r.entityId === 'e')!.disposition).toBe('enemy');
+    expect(rows.find(r => r.entityId === 'p')!.disposition).toBeUndefined();
+  });
+
   it('ignores playerAlias for player entities (players are never masked)', () => {
     const enc = encounter([
       entity({
