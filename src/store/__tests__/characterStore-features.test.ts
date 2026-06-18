@@ -16,7 +16,11 @@ function resetStore(overrides = {}) {
   usePlayerStore.setState({
     characters: [],
     activeCharacterId: null,
-    settings: { enableDeathAnimation: false, enableLevelUpAnimation: false },
+    settings: {
+      enableDeathAnimation: false,
+      enableLevelUpAnimation: false,
+      enableCombatStartBanner: false,
+    },
     lastSelectedCharacterId: null,
   });
 }
@@ -196,27 +200,21 @@ describe('characterStore — extended features', () => {
   });
 
   it('reorderExtendedFeatures (with sourceType) reorders within source type only', () => {
-    useCharacterStore
-      .getState()
-      .addExtendedFeature({
-        ...baseFeature,
-        name: 'Class A',
-        sourceType: 'class' as const,
-      });
-    useCharacterStore
-      .getState()
-      .addExtendedFeature({
-        ...baseFeature,
-        name: 'Class B',
-        sourceType: 'class' as const,
-      });
-    useCharacterStore
-      .getState()
-      .addExtendedFeature({
-        ...baseFeature,
-        name: 'Feat A',
-        sourceType: 'feat' as const,
-      });
+    useCharacterStore.getState().addExtendedFeature({
+      ...baseFeature,
+      name: 'Class A',
+      sourceType: 'class' as const,
+    });
+    useCharacterStore.getState().addExtendedFeature({
+      ...baseFeature,
+      name: 'Class B',
+      sourceType: 'class' as const,
+    });
+    useCharacterStore.getState().addExtendedFeature({
+      ...baseFeature,
+      name: 'Feat A',
+      sourceType: 'feat' as const,
+    });
     useCharacterStore.getState().reorderExtendedFeatures(0, 1, 'class');
     const { extendedFeatures } = useCharacterStore.getState().character;
     const classFeatures = extendedFeatures.filter(
@@ -450,12 +448,10 @@ describe('characterStore — traits (rich text)', () => {
   it('updateTrait modifies the trait by id', () => {
     useCharacterStore.getState().addTrait(traitEntry);
     const id = useCharacterStore.getState().character.traits[0].id;
-    useCharacterStore
-      .getState()
-      .updateTrait(id, {
-        title: 'Fearless',
-        content: '<p>Immune to fear.</p>',
-      });
+    useCharacterStore.getState().updateTrait(id, {
+      title: 'Fearless',
+      content: '<p>Immune to fear.</p>',
+    });
     const { traits } = useCharacterStore.getState().character;
     expect(traits[0].title).toBe('Fearless');
     expect(traits[0].content).toBe('<p>Immune to fear.</p>');
@@ -512,12 +508,10 @@ describe('characterStore — notes', () => {
   it('updateNote modifies the note by id', () => {
     useCharacterStore.getState().addNote(noteEntry);
     const id = useCharacterStore.getState().character.notes[0].id;
-    useCharacterStore
-      .getState()
-      .updateNote(id, {
-        title: 'Session 1 - Updated',
-        content: '<p>Met the innkeeper. Got a quest.</p>',
-      });
+    useCharacterStore.getState().updateNote(id, {
+      title: 'Session 1 - Updated',
+      content: '<p>Met the innkeeper. Got a quest.</p>',
+    });
     const { notes } = useCharacterStore.getState().character;
     expect(notes[0].title).toBe('Session 1 - Updated');
     expect(notes[0].content).toBe('<p>Met the innkeeper. Got a quest.</p>');
@@ -611,11 +605,9 @@ describe('characterStore — background', () => {
   });
 
   it('updateCharacterBackground updates backstory', () => {
-    useCharacterStore
-      .getState()
-      .updateCharacterBackground({
-        backstory: '<p>A long and storied past.</p>',
-      });
+    useCharacterStore.getState().updateCharacterBackground({
+      backstory: '<p>A long and storied past.</p>',
+    });
     expect(
       useCharacterStore.getState().character.characterBackground.backstory
     ).toBe('<p>A long and storied past.</p>');

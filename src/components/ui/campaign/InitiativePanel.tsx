@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Swords, User, Skull } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { useDraggableY } from '@/hooks/useDraggableY';
@@ -61,6 +61,14 @@ export function InitiativePanel({
       // Ignore localStorage errors
     }
   }, [isOpen]);
+
+  // Auto-open the panel when combat starts so players don't miss it.
+  const isActive = !!state?.isActive;
+  const prevActiveRef = useRef(false);
+  useEffect(() => {
+    if (isActive && !prevActiveRef.current) setIsOpen(true);
+    prevActiveRef.current = isActive;
+  }, [isActive]);
 
   // Reconcile: once the synced state moves off the turn we ended (or combat
   // ends), drop the optimistic override and follow the source of truth.

@@ -19,6 +19,7 @@ import {
   ChevronUp,
   TrendingUp,
   Link2,
+  Swords,
 } from 'lucide-react';
 import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
 import { Button } from '@/components/ui/forms';
@@ -622,6 +623,37 @@ export default function PlayerDashboardPage() {
                       onChange={e =>
                         updateSettings({
                           enableLevelUpAnimation: e.target.checked,
+                        })
+                      }
+                      className="peer sr-only"
+                    />
+                    <div className="peer bg-divider-strong after:border-divider-strong dark:after:bg-surface-raised h-6 w-11 rounded-full peer-checked:bg-amber-500 peer-focus:ring-2 peer-focus:ring-amber-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+                  </label>
+                </div>
+
+                {/* Combat Start Banner Toggle */}
+                <div className="border-divider bg-surface-secondary flex items-center justify-between rounded-lg border p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-accent-red-bg flex h-10 w-10 items-center justify-center rounded-lg">
+                      <Swords className="text-accent-red-text-muted h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-heading font-medium">
+                        Combat Start Banner
+                      </h4>
+                      <p className="text-muted text-sm">
+                        A &quot;Combat Begins&quot; flourish when the DM starts
+                        a fight
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex cursor-pointer items-center">
+                    <input
+                      type="checkbox"
+                      checked={settings?.enableCombatStartBanner}
+                      onChange={e =>
+                        updateSettings({
+                          enableCombatStartBanner: e.target.checked,
                         })
                       }
                       className="peer sr-only"

@@ -25,6 +25,7 @@ import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
 import { YouDiedOverlay } from '@/components/ui/feedback/YouDiedOverlay';
 import { LevelUpOverlay } from '@/components/ui/feedback/LevelUpOverlay';
+import { CombatStartBanner } from '@/components/ui/feedback/CombatStartBanner';
 
 import CharacterSheetHeader from '@/components/ui/character/CharacterSheetHeader';
 import { useHydration } from '@/hooks/useHydration';
@@ -70,6 +71,8 @@ export default function CharacterSheet() {
 
   const { getCharacterById, updateCharacterData } = usePlayerStore();
   const playerCharacter = getCharacterById(characterId);
+  const playerSettings = usePlayerStore(s => s.settings);
+  const [showCombatBanner, setShowCombatBanner] = useState(false);
 
   const hasHydrated = useHydration();
 
@@ -561,6 +564,30 @@ export default function CharacterSheet() {
 
   const onSendItem = playerSync.campaignCode ? handleSendItem : undefined;
 
+  // "Combat begins" banner: fire once per encounter when combat reaches round 1.
+  // Reset when combat ends so a later encounter can show it again. round !== 1 is
+  // ignored so loading into an in-progress fight doesn't trigger it.
+  const enableCombatStartBanner = playerSettings.enableCombatStartBanner;
+  const combatBannerShownForRef = useRef<string | null>(null);
+  const initiativeActive = sharedState?.initiative?.isActive ?? false;
+  const initiativeRound = sharedState?.initiative?.round ?? 0;
+  const initiativeEncounterId = sharedState?.initiative?.encounterId ?? null;
+  useEffect(() => {
+    if (!initiativeActive) {
+      combatBannerShownForRef.current = null;
+      return;
+    }
+    if (initiativeRound !== 1) return;
+    if (combatBannerShownForRef.current === initiativeEncounterId) return;
+    combatBannerShownForRef.current = initiativeEncounterId;
+    if (enableCombatStartBanner) setShowCombatBanner(true);
+  }, [
+    initiativeActive,
+    initiativeRound,
+    initiativeEncounterId,
+    enableCombatStartBanner,
+  ]);
+
   if (!hasHydrated) {
     return <NotHydrated />;
   }
@@ -823,6 +850,12 @@ export default function CharacterSheet() {
             state={sharedState?.initiative ?? null}
             characterId={characterId}
             onEndTurn={handleEndTurn}
+          />
+
+          {/* "Combat begins" flourish when a fight starts */}
+          <CombatStartBanner
+            isVisible={showCombatBanner}
+            onDone={() => setShowCombatBanner(false)}
           />
 
           {/* Header */}

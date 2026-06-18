@@ -30,11 +30,13 @@ export interface PlayerCharacter {
 export interface PlayerSettings {
   enableDeathAnimation: boolean;
   enableLevelUpAnimation: boolean;
+  enableCombatStartBanner: boolean;
 }
 
 const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   enableDeathAnimation: false,
   enableLevelUpAnimation: false,
+  enableCombatStartBanner: true,
 };
 
 // Store state interface
