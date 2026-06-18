@@ -1,5 +1,11 @@
 import { getSortedEntities } from '@/store/encounterStore';
-import type { Encounter, EncounterEntity } from '@/types/encounter';
+import {
+  DEFAULT_COMBAT_CONFIG,
+  type CombatConfig,
+  type Encounter,
+  type EncounterEntity,
+} from '@/types/encounter';
+import { hpPercent, hpStateLabel } from '@/utils/hpState';
 import type {
   SharedInitiativeState,
   SharedTurnEntry,
@@ -16,7 +22,10 @@ function playerFacingName(entity: EncounterEntity): string {
   return entity.name;
 }
 
-function toEntry(entity: EncounterEntity): SharedTurnEntry {
+function toEntry(
+  entity: EncounterEntity,
+  config: CombatConfig
+): SharedTurnEntry {
   const isPlayer = entity.type === 'player';
   const displayName = playerFacingName(entity);
 
@@ -26,11 +35,34 @@ function toEntry(entity: EncounterEntity): SharedTurnEntry {
     type: entity.type as SharedTurnEntry['type'],
   };
 
-  // HP + identity are exposed for player entities only.
+  // Players always expose identity + exact HP (their own sheet is authoritative).
   if (isPlayer) {
     entry.playerCharacterId = entity.playerCharacterId;
     entry.currentHp = entity.currentHp;
     entry.maxHp = entity.maxHp;
+    return entry;
+  }
+
+  // Non-players (enemies/NPCs) expose only what the DM's combat config allows.
+  switch (config.enemyHpDisplay) {
+    case 'label':
+      entry.hpState = hpStateLabel(
+        entity.currentHp,
+        entity.maxHp,
+        config.hpStateBands
+      );
+      break;
+    case 'bar':
+    case 'percent':
+      entry.hpPercent = Math.round(hpPercent(entity.currentHp, entity.maxHp));
+      break;
+    case 'exact':
+      entry.currentHp = entity.currentHp;
+      entry.maxHp = entity.maxHp;
+      break;
+    case 'off':
+    default:
+      break;
   }
 
   return entry;
@@ -41,7 +73,8 @@ function toEntry(entity: EncounterEntity): SharedTurnEntry {
  * Pure — safe to unit test and to call on every turn change.
  */
 export function buildSharedInitiative(
-  encounter: Encounter
+  encounter: Encounter,
+  config: CombatConfig = DEFAULT_COMBAT_CONFIG
 ): SharedInitiativeState {
   const sorted = getSortedEntities(encounter.entities);
   const current = sorted[encounter.currentTurn];
@@ -51,7 +84,8 @@ export function buildSharedInitiative(
     isActive: encounter.isActive,
     round: encounter.round,
     currentEntityId: current ? current.id : null,
-    turnOrder: sorted.map(toEntry),
+    turnOrder: sorted.map(e => toEntry(e, config)),
+    enemyHpMode: config.enemyHpDisplay,
     updatedAt: new Date().toISOString(),
   };
 }

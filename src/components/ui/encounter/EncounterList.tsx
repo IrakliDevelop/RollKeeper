@@ -11,12 +11,14 @@ import {
   Play,
   Square,
   Map as MapIcon,
+  Settings,
 } from 'lucide-react';
 import { useEncounterStore } from '@/store/encounterStore';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
+import { CombatConfigDialog } from '@/components/ui/encounter/CombatConfigDialog';
 import { Encounter } from '@/types/encounter';
 import type { BattleMap } from '@/types/battlemap';
 
@@ -38,6 +40,7 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
   }, [battleMaps]);
   const [newName, setNewName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
 
   const handleCreate = () => {
     if (!newName.trim()) return;
@@ -54,45 +57,59 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
 
   return (
     <div className="space-y-6">
-      {/* Create button / form */}
-      {isCreating ? (
-        <div className="bg-surface-raised border-divider flex items-center gap-3 rounded-lg border p-4">
-          <Input
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            placeholder="Encounter name..."
-            onKeyDown={e => {
-              if (e.key === 'Enter') handleCreate();
-              if (e.key === 'Escape') setIsCreating(false);
-            }}
-            autoFocus
-            className="flex-1"
-          />
+      {/* Header row: Create button / form + gear button */}
+      <div className="flex items-center gap-2">
+        {isCreating ? (
+          <div className="bg-surface-raised border-divider flex flex-1 items-center gap-3 rounded-lg border p-4">
+            <Input
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              placeholder="Encounter name..."
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleCreate();
+                if (e.key === 'Escape') setIsCreating(false);
+              }}
+              autoFocus
+              className="flex-1"
+            />
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleCreate}
+              disabled={!newName.trim()}
+            >
+              Create
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsCreating(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
           <Button
             variant="primary"
-            size="sm"
-            onClick={handleCreate}
-            disabled={!newName.trim()}
+            onClick={() => setIsCreating(true)}
+            leftIcon={<Plus size={18} />}
           >
-            Create
+            New Encounter
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsCreating(false)}
-          >
-            Cancel
-          </Button>
-        </div>
-      ) : (
+        )}
+
         <Button
-          variant="primary"
-          onClick={() => setIsCreating(true)}
-          leftIcon={<Plus size={18} />}
+          variant="ghost"
+          size="sm"
+          onClick={() => setConfigOpen(true)}
+          title="Combat configuration"
+          aria-label="Open combat configuration"
         >
-          New Encounter
+          <Settings size={16} className="text-muted" />
         </Button>
-      )}
+      </div>
+
+      <CombatConfigDialog open={configOpen} onOpenChange={setConfigOpen} />
 
       {/* Encounter list */}
       {sorted.length === 0 ? (

@@ -82,6 +82,8 @@ export function EncounterView({
   const { syncPlayerEffects } = useDmEffectsSync({ campaignCode, dmId });
   useDmCounterSync(campaignCode, dmId);
 
+  const combatConfig = useEncounterStore(state => state.combatConfig);
+
   const { pushInitiative } = useDmInitiativeSync({ campaignCode, dmId });
 
   useTurnRequestSync({
@@ -95,13 +97,14 @@ export function EncounterView({
   // Only fires for campaign-linked encounters; safe when encounter is undefined.
   useEffect(() => {
     if (!encounter || !encounter.campaignCode) return;
-    pushInitiative(buildSharedInitiative(encounter));
+    pushInitiative(buildSharedInitiative(encounter, combatConfig));
   }, [
     encounter,
     encounter?.isActive,
     encounter?.round,
     encounter?.currentTurn,
     encounter?.entities,
+    combatConfig,
     pushInitiative,
   ]);
 
