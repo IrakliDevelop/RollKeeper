@@ -104,7 +104,7 @@ export function InitiativePanel({
         onClick={() => setIsOpen(o => !o)}
         aria-label={isOpen ? 'Hide initiative' : 'Show initiative'}
         title={isOpen ? 'Hide initiative' : 'Show initiative'}
-        className={`relative self-start rounded-l-lg border-y-2 border-l-2 px-1.5 py-3 shadow-md transition-colors ${
+        className={`relative self-center rounded-l-lg border-y-2 border-l-2 px-2.5 py-5 shadow-md transition-colors ${
           isMyTurn
             ? 'border-accent-amber-border bg-accent-amber-bg text-accent-amber-text animate-pulse'
             : isOpen
@@ -112,7 +112,7 @@ export function InitiativePanel({
               : 'border-divider bg-surface-raised text-muted hover:text-body hover:bg-surface-secondary'
         }`}
       >
-        <Swords size={16} />
+        <Swords size={20} />
         {!isOpen && (
           <span className="bg-accent-red-bg text-accent-red-text border-accent-red-border absolute -top-1 -left-1 flex h-4 min-w-4 items-center justify-center rounded-full border px-1 text-[10px] font-bold">
             {state.round}

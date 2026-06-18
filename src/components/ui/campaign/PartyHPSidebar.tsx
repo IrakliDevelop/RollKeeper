@@ -255,14 +255,14 @@ export function PartyHPSidebar({
       {/* Toggle Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`relative self-center rounded-r-lg border-y-2 border-r-2 px-1.5 py-3 shadow-md transition-colors ${
+        className={`relative self-center rounded-r-lg border-y-2 border-r-2 px-2.5 py-5 shadow-md transition-colors ${
           isOpen
             ? 'border-accent-blue-border bg-accent-blue-bg text-accent-blue-text'
             : 'border-divider bg-surface-raised text-muted hover:text-body hover:bg-surface-secondary'
         }`}
         title={isOpen ? 'Hide party HP' : 'Show party HP'}
       >
-        <Users size={16} />
+        <Users size={20} />
         {!isOpen && partyMembers.length > 0 && (
           <div className="bg-accent-blue-bg text-accent-blue-text border-accent-blue-border absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border text-xs font-bold">
             {partyMembers.length}
