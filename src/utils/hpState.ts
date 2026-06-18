@@ -6,6 +6,16 @@ export function hpPercent(current: number, max: number): number {
   return Math.max(0, Math.min(100, (current / max) * 100));
 }
 
+export type HpTier = 'high' | 'mid' | 'low' | 'critical';
+
+/** Coarse health tier from a 0-100 percentage, for colour-coding. */
+export function hpTier(percent: number): HpTier {
+  if (percent > 75) return 'high';
+  if (percent > 50) return 'mid';
+  if (percent > 25) return 'low';
+  return 'critical';
+}
+
 /**
  * The player-facing HP-state label for the given HP, using the configured
  * bands. A band applies when the current percentage is at or above its

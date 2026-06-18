@@ -65,6 +65,11 @@ export interface SharedTurnEntry {
   maxHp?: number; // players always; non-players only when enemyHpMode is 'exact'
   hpState?: string; // non-players when enemyHpMode is 'label' (e.g. "Bloodied")
   hpPercent?: number; // non-players when enemyHpMode is 'bar' | 'percent' (0-100)
+  // Coarse health tier for colour-coding any shown enemy HP indicator. Set for
+  // non-players whenever enemyHpMode !== 'off' (kept coarse so 'label' mode does
+  // not leak an exact percentage).
+  hpTier?: 'high' | 'mid' | 'low' | 'critical';
+  isDead?: boolean; // current HP <= 0 (players always; enemies when HP is shared)
 }
 
 // Initiative/turn state pushed by the DM, read by players

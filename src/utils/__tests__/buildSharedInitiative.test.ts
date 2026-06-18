@@ -249,4 +249,61 @@ describe('buildSharedInitiative — enemy HP config', () => {
     expect(monster.currentHp).toBe(5);
     expect(monster.maxHp).toBe(20);
   });
+
+  it('sets a coarse hpTier for a living enemy when HP is shown', () => {
+    const result = buildSharedInitiative(enc(), {
+      enemyHpDisplay: 'label',
+      hpStateBands: bands,
+    });
+    // 5/20 = 25% -> 'critical'
+    expect(result.turnOrder.find(r => r.entityId === 'm')!.hpTier).toBe(
+      'critical'
+    );
+  });
+
+  it('marks a dead enemy isDead (no tier) when HP is shown', () => {
+    const e = encounter([
+      entity({
+        id: 'm',
+        name: 'Goblin',
+        initiative: 5,
+        currentHp: 0,
+        maxHp: 20,
+      }),
+    ]);
+    const monster = buildSharedInitiative(e, {
+      enemyHpDisplay: 'label',
+      hpStateBands: bands,
+    }).turnOrder[0];
+    expect(monster.isDead).toBe(true);
+    expect(monster.hpTier).toBeUndefined();
+  });
+
+  it('never marks enemy death when HP display is off', () => {
+    const e = encounter([
+      entity({
+        id: 'm',
+        name: 'Goblin',
+        initiative: 5,
+        currentHp: 0,
+        maxHp: 20,
+      }),
+    ]);
+    expect(buildSharedInitiative(e).turnOrder[0].isDead).toBeUndefined();
+  });
+
+  it('marks a downed player isDead', () => {
+    const e = encounter([
+      entity({
+        id: 'p',
+        name: 'Aragorn',
+        type: 'player',
+        initiative: 20,
+        currentHp: 0,
+        maxHp: 30,
+        playerCharacterId: 'char-a',
+      }),
+    ]);
+    expect(buildSharedInitiative(e).turnOrder[0].isDead).toBe(true);
+  });
 });
