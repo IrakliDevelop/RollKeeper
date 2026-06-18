@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getSortedEntities } from './encounterStore';
+import useEncounterStore, { getSortedEntities } from './encounterStore';
 import { EncounterEntity } from '@/types/encounter';
 
 /** Helper to create a minimal EncounterEntity with overrides */
@@ -464,5 +464,49 @@ describe('getSortedEntities', () => {
         'cat', // 10, summon of p3
       ]);
     });
+  });
+});
+
+describe('prevTurn', () => {
+  const store = useEncounterStore.getState();
+
+  function entityData(name: string, initiative: number) {
+    return {
+      type: 'monster' as const,
+      name,
+      initiative,
+      initiativeModifier: 0,
+      currentHp: 10,
+      maxHp: 10,
+      tempHp: 0,
+      armorClass: 10,
+      conditions: [],
+      isHidden: false,
+    };
+  }
+
+  function getEntity(encId: string, entityId: string) {
+    return useEncounterStore
+      .getState()
+      .getEncounter(encId)
+      ?.entities.find(e => e.id === entityId);
+  }
+
+  it('resets the incoming entity reaction when stepping backwards', () => {
+    const encId = store.createEncounter('Prev Turn Test');
+    const aId = store.addEntity(encId, entityData('A', 20));
+    store.addEntity(encId, entityData('B', 10));
+
+    store.startCombat(encId); // currentTurn 0 = A (init 20)
+    store.nextTurn(encId); // currentTurn 1 = B
+
+    // A used its reaction during B's turn
+    store.updateEntity(encId, aId, { hasUsedReaction: true });
+    expect(getEntity(encId, aId)?.hasUsedReaction).toBe(true);
+
+    // Stepping back into A's turn should make A's reaction available again,
+    // mirroring nextTurn resetting the incoming entity's reaction.
+    store.prevTurn(encId);
+    expect(getEntity(encId, aId)?.hasUsedReaction).toBe(false);
   });
 });

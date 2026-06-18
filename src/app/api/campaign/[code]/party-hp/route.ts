@@ -8,6 +8,7 @@ import {
 } from '@/lib/redis';
 import { CampaignPlayerData } from '@/types/campaign';
 import { DeathSavingThrows } from '@/types/character';
+import { calculateCharacterArmorClass } from '@/utils/calculations';
 
 export interface PartyMemberHP {
   characterId: string;
@@ -66,13 +67,10 @@ export async function GET(
 
           const primaryClass = char.classes?.[0];
 
-          let ac = char.armorClass ?? 10;
-          if (char.isTempACActive && char.tempArmorClass) {
-            ac = char.tempArmorClass;
-          }
-          if (char.isWearingShield) {
-            ac += char.shieldBonus ?? 2;
-          }
+          // Use the shared AC calculation so the party tracker matches the
+          // character sheet, including active temporary buffs (Shield, Mage
+          // Armor, Barkskin, Haste, etc.).
+          const ac = calculateCharacterArmorClass(char);
 
           members.push({
             characterId: parsed.characterId,

@@ -221,7 +221,9 @@ describe('GET /api/campaign/[code]/party-hp', () => {
     expect(data.members[0].hitPoints).not.toBeNull();
   });
 
-  it('applies temp AC when isTempACActive is true', async () => {
+  it('stacks temp AC on base AC when isTempACActive is true', async () => {
+    // Matches the canonical calculateCharacterArmorClass / character-sheet
+    // behavior: temp AC is additive (base 14 + temp 20 = 34), not a replacement.
     seedRedis('campaign:ABC123', createMockCampaignData());
     seedRedisSet('campaign:ABC123:players', ['player-1']);
     seedRedis(
@@ -246,7 +248,7 @@ describe('GET /api/campaign/[code]/party-hp', () => {
     const data = await res.json();
 
     expect(res.status).toBe(200);
-    expect(data.members[0].armorClass).toBe(20);
+    expect(data.members[0].armorClass).toBe(34);
   });
 
   it('adds shield bonus to AC when isWearingShield is true', async () => {
@@ -262,6 +264,51 @@ describe('GET /api/campaign/[code]/party-hp', () => {
           tempArmorClass: 0,
           isWearingShield: true,
           shieldBonus: 2,
+        },
+      })
+    );
+
+    const req = createNextRequest('/api/campaign/ABC123/party-hp');
+    const res = await GET(
+      req as NextRequest,
+      createRouteParams({ code: 'ABC123' })
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.members[0].armorClass).toBe(18);
+  });
+
+  it('includes active AC buffs (e.g. Haste +2) in the reported AC', async () => {
+    seedRedis('campaign:ABC123', createMockCampaignData());
+    seedRedisSet('campaign:ABC123:players', ['player-1']);
+    seedRedis(
+      'campaign:ABC123:player:player-1',
+      createMockPlayerData({
+        characterData: {
+          ...createMockPlayerData().characterData,
+          armorClass: 16,
+          isTempACActive: false,
+          tempArmorClass: 0,
+          isWearingShield: false,
+          shieldBonus: 2,
+          temporaryBuffs: [
+            {
+              id: 'buff-haste',
+              name: 'Haste',
+              effects: [
+                {
+                  id: 'eff-1',
+                  targetStat: 'ac',
+                  mode: 'add',
+                  value: 2,
+                },
+              ],
+              isActive: true,
+              createdAt: '2025-01-01T00:00:00.000Z',
+              updatedAt: '2025-01-01T00:00:00.000Z',
+            },
+          ],
         },
       })
     );
