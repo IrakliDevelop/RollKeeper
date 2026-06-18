@@ -16,7 +16,11 @@ function resetStore(overrides = {}) {
   usePlayerStore.setState({
     characters: [],
     activeCharacterId: null,
-    settings: { enableDeathAnimation: false, enableLevelUpAnimation: false },
+    settings: {
+      enableDeathAnimation: false,
+      enableLevelUpAnimation: false,
+      enableCombatStartBanner: false,
+    },
     lastSelectedCharacterId: null,
   });
 }
@@ -884,12 +888,10 @@ describe('characterStore — tool proficiencies', () => {
     });
 
     it('stores proficiency level correctly', () => {
-      useCharacterStore
-        .getState()
-        .addToolProficiency({
-          name: "Smith's Tools",
-          proficiencyLevel: 'expertise',
-        });
+      useCharacterStore.getState().addToolProficiency({
+        name: "Smith's Tools",
+        proficiencyLevel: 'expertise',
+      });
       expect(
         useCharacterStore.getState().character.toolProficiencies[0]
           .proficiencyLevel
@@ -918,12 +920,10 @@ describe('characterStore — tool proficiencies', () => {
 
     it('does not affect other tools', () => {
       useCharacterStore.getState().addToolProficiency(baseTool);
-      useCharacterStore
-        .getState()
-        .addToolProficiency({
-          name: "Smith's Tools",
-          proficiencyLevel: 'none',
-        });
+      useCharacterStore.getState().addToolProficiency({
+        name: "Smith's Tools",
+        proficiencyLevel: 'none',
+      });
       const firstId =
         useCharacterStore.getState().character.toolProficiencies[0].id;
 
@@ -950,12 +950,10 @@ describe('characterStore — tool proficiencies', () => {
 
     it('does not remove other tools', () => {
       useCharacterStore.getState().addToolProficiency(baseTool);
-      useCharacterStore
-        .getState()
-        .addToolProficiency({
-          name: "Smith's Tools",
-          proficiencyLevel: 'none',
-        });
+      useCharacterStore.getState().addToolProficiency({
+        name: "Smith's Tools",
+        proficiencyLevel: 'none',
+      });
       const firstId =
         useCharacterStore.getState().character.toolProficiencies[0].id;
 

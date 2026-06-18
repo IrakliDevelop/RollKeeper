@@ -5,7 +5,11 @@ function resetStore() {
   usePlayerStore.setState({
     characters: [],
     activeCharacterId: null,
-    settings: { enableDeathAnimation: false, enableLevelUpAnimation: false },
+    settings: {
+      enableDeathAnimation: false,
+      enableLevelUpAnimation: false,
+      enableCombatStartBanner: false,
+    },
     lastSelectedCharacterId: null,
   });
 }
@@ -375,6 +379,7 @@ describe('playerStore', () => {
       expect(usePlayerStore.getState().settings).toEqual({
         enableDeathAnimation: false,
         enableLevelUpAnimation: false,
+        enableCombatStartBanner: true,
       });
     });
   });
@@ -392,6 +397,7 @@ describe('playerStore', () => {
       expect(state.settings).toEqual({
         enableDeathAnimation: false,
         enableLevelUpAnimation: false,
+        enableCombatStartBanner: true,
       });
     });
   });

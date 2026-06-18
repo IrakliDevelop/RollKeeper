@@ -22,7 +22,11 @@ function resetStore(overrides = {}) {
   usePlayerStore.setState({
     characters: [],
     activeCharacterId: null,
-    settings: { enableDeathAnimation: false, enableLevelUpAnimation: false },
+    settings: {
+      enableDeathAnimation: false,
+      enableLevelUpAnimation: false,
+      enableCombatStartBanner: false,
+    },
     lastSelectedCharacterId: null,
   });
 }
