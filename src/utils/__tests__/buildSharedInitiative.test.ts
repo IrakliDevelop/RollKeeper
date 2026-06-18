@@ -177,3 +177,76 @@ describe('buildSharedInitiative', () => {
     expect(monster.playerCharacterId).toBeUndefined();
   });
 });
+
+describe('buildSharedInitiative — enemy HP config', () => {
+  const enc = () =>
+    encounter([
+      entity({
+        id: 'p',
+        name: 'Aragorn',
+        type: 'player',
+        initiative: 20,
+        currentHp: 24,
+        maxHp: 30,
+        playerCharacterId: 'char-a',
+      }),
+      entity({
+        id: 'm',
+        name: 'Goblin',
+        initiative: 5,
+        currentHp: 5,
+        maxHp: 20,
+      }),
+    ]);
+
+  const bands = [
+    { minPercent: 50, label: 'Healthy' },
+    { minPercent: 0, label: 'Bloodied' },
+  ];
+
+  it('defaults to off — non-players expose no HP and mode is "off"', () => {
+    const result = buildSharedInitiative(enc());
+    expect(result.enemyHpMode).toBe('off');
+    const monster = result.turnOrder.find(r => r.entityId === 'm')!;
+    expect(monster.hpState).toBeUndefined();
+    expect(monster.hpPercent).toBeUndefined();
+    expect(monster.currentHp).toBeUndefined();
+  });
+
+  it('label mode sets hpState for non-players (not players)', () => {
+    const result = buildSharedInitiative(enc(), {
+      enemyHpDisplay: 'label',
+      hpStateBands: bands,
+    });
+    expect(result.enemyHpMode).toBe('label');
+    expect(result.turnOrder.find(r => r.entityId === 'm')!.hpState).toBe(
+      'Bloodied' // 5/20 = 25% -> below 50 band
+    );
+    expect(
+      result.turnOrder.find(r => r.entityId === 'p')!.hpState
+    ).toBeUndefined();
+  });
+
+  it('percent and bar modes set hpPercent (no raw HP) for non-players', () => {
+    for (const mode of ['percent', 'bar'] as const) {
+      const result = buildSharedInitiative(enc(), {
+        enemyHpDisplay: mode,
+        hpStateBands: bands,
+      });
+      const monster = result.turnOrder.find(r => r.entityId === 'm')!;
+      expect(monster.hpPercent).toBe(25);
+      expect(monster.currentHp).toBeUndefined();
+      expect(monster.maxHp).toBeUndefined();
+    }
+  });
+
+  it('exact mode exposes raw HP for non-players', () => {
+    const result = buildSharedInitiative(enc(), {
+      enemyHpDisplay: 'exact',
+      hpStateBands: bands,
+    });
+    const monster = result.turnOrder.find(r => r.entityId === 'm')!;
+    expect(monster.currentHp).toBe(5);
+    expect(monster.maxHp).toBe(20);
+  });
+});

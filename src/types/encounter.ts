@@ -186,6 +186,36 @@ export interface Encounter {
   updatedAt: string;
 }
 
+// How much of an enemy's (non-player) HP players may see during combat.
+export type EnemyHpDisplay = 'off' | 'label' | 'bar' | 'percent' | 'exact';
+
+// A named HP band shown to players when enemyHpDisplay is 'label'. `minPercent`
+// is the lowest HP percentage (inclusive) at which this label applies.
+export interface HpStateBand {
+  minPercent: number;
+  label: string;
+}
+
+// Global, DM-controlled combat settings (shared across all encounters).
+export interface CombatConfig {
+  enemyHpDisplay: EnemyHpDisplay;
+  hpStateBands: HpStateBand[];
+}
+
+export const DEFAULT_HP_STATE_BANDS: HpStateBand[] = [
+  { minPercent: 100, label: 'Unharmed' },
+  { minPercent: 75, label: 'Healthy' },
+  { minPercent: 50, label: 'Injured' },
+  { minPercent: 25, label: 'Bloodied' },
+  { minPercent: 1, label: 'Near Death' },
+  { minPercent: 0, label: 'Down' },
+];
+
+export const DEFAULT_COMBAT_CONFIG: CombatConfig = {
+  enemyHpDisplay: 'off',
+  hpStateBands: DEFAULT_HP_STATE_BANDS,
+};
+
 export interface NPCInventoryItem {
   id: string;
   name: string;

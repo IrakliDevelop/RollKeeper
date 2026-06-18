@@ -8,6 +8,7 @@ const state: SharedInitiativeState = {
   isActive: true,
   round: 1,
   currentEntityId: 'a',
+  enemyHpMode: 'off',
   turnOrder: [],
   updatedAt: '',
 };

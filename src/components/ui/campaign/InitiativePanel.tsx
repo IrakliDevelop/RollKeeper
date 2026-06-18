@@ -146,6 +146,25 @@ export function InitiativePanel({
               const hp = entry.currentHp;
               const maxHp = entry.maxHp;
               const hasHp = hp !== undefined && maxHp !== undefined;
+              // Right-aligned HP summary (players + enemy 'exact'/'percent'/'label')
+              const hpText = hasHp
+                ? `${hp}/${maxHp}`
+                : entry.hpPercent !== undefined &&
+                    state.enemyHpMode === 'percent'
+                  ? `${entry.hpPercent}%`
+                  : entry.hpState
+                    ? entry.hpState
+                    : null;
+              // Bar for players (from real HP) and for enemy 'bar' mode (from %)
+              const barPercent = hasHp
+                ? maxHp > 0
+                  ? Math.min(100, (hp / maxHp) * 100)
+                  : 0
+                : !isPlayer &&
+                    state.enemyHpMode === 'bar' &&
+                    entry.hpPercent !== undefined
+                  ? entry.hpPercent
+                  : null;
               return (
                 <li
                   key={entry.entityId}
@@ -185,19 +204,17 @@ export function InitiativePanel({
                         </span>
                       )}
                     </span>
-                    {hasHp && (
+                    {hpText && (
                       <span className="text-faint ml-auto text-xs whitespace-nowrap">
-                        {hp}/{maxHp}
+                        {hpText}
                       </span>
                     )}
                   </div>
-                  {isPlayer && hasHp && (
+                  {barPercent !== null && (
                     <div className="bg-surface-secondary ml-[21px] h-1.5 overflow-hidden rounded-full">
                       <div
-                        className={`h-full rounded-full transition-all ${getHpBarColor(hp, maxHp)}`}
-                        style={{
-                          width: `${maxHp > 0 ? Math.min(100, (hp / maxHp) * 100) : 0}%`,
-                        }}
+                        className={`h-full rounded-full transition-all ${getHpBarColor(barPercent, 100)}`}
+                        style={{ width: `${barPercent}%` }}
                       />
                     </div>
                   )}

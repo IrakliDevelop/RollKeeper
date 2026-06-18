@@ -4,6 +4,8 @@ import {
   Encounter,
   EncounterEntity,
   EncounterCondition,
+  CombatConfig,
+  DEFAULT_COMBAT_CONFIG,
 } from '@/types/encounter';
 import { useNPCStore } from './npcStore';
 
@@ -42,6 +44,10 @@ function syncNPCEntityToStore(
 interface EncounterStoreState {
   encounters: Encounter[];
   activeEncounterId: string | null;
+
+  // Global combat settings (shared across encounters)
+  combatConfig: CombatConfig;
+  setCombatConfig: (updates: Partial<CombatConfig>) => void;
 
   // Encounter CRUD
   createEncounter: (name: string, campaignCode?: string) => string;
@@ -223,6 +229,13 @@ export const useEncounterStore = create<EncounterStoreState>()(
     (set, get) => ({
       encounters: [],
       activeEncounterId: null,
+      combatConfig: DEFAULT_COMBAT_CONFIG,
+
+      setCombatConfig: updates => {
+        set(state => ({
+          combatConfig: { ...state.combatConfig, ...updates },
+        }));
+      },
 
       createEncounter: (name, campaignCode) => {
         const id = generateId();

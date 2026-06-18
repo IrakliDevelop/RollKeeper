@@ -1,5 +1,6 @@
 import type { CalendarConfig, WeatherType } from './calendar';
 import type { InventoryItem } from './character';
+import type { EnemyHpDisplay } from './encounter';
 
 // Stored in Redis — DM's calendar data (events stay local, not synced)
 export interface SharedCalendar {
@@ -60,8 +61,10 @@ export interface SharedTurnEntry {
   displayName: string; // real name, or "Enemy" when hidden && non-player
   type: 'player' | 'monster' | 'npc' | 'lair';
   playerCharacterId?: string; // player entities only — marks "you" + identity
-  currentHp?: number; // player entities only — never set for monsters/npcs/lairs
-  maxHp?: number; // player entities only
+  currentHp?: number; // players always; non-players only when enemyHpMode is 'exact'
+  maxHp?: number; // players always; non-players only when enemyHpMode is 'exact'
+  hpState?: string; // non-players when enemyHpMode is 'label' (e.g. "Bloodied")
+  hpPercent?: number; // non-players when enemyHpMode is 'bar' | 'percent' (0-100)
 }
 
 // Initiative/turn state pushed by the DM, read by players
@@ -71,6 +74,9 @@ export interface SharedInitiativeState {
   round: number;
   currentEntityId: string | null;
   turnOrder: SharedTurnEntry[];
+  // How non-player HP is presented to players; tells the panel how to render
+  // hpState / hpPercent / currentHp on enemy rows. Defaults to 'off'.
+  enemyHpMode: EnemyHpDisplay;
   updatedAt: string; // ISO timestamp
 }
 
