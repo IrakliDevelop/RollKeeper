@@ -11,7 +11,9 @@ import {
   ImageTool,
   TextTool,
   ShapeTool,
+  LaserTool,
   AutoSave,
+  IndexedDBAdapter,
   type Tool,
   type Viewport,
 } from '@fieldnotes/core';
@@ -37,6 +39,7 @@ import {
 import {
   FieldNotesDemoGridControls,
   FieldNotesDemoLayersPanel,
+  FieldNotesDemoSelectionBar,
   FieldNotesDemoToolbar,
   FieldNotesDemoToolOptions,
 } from './FieldNotesDemoPanels';
@@ -324,22 +327,25 @@ export default function FieldNotesCanvasPage({
         fillColor: 'transparent',
       }),
       new ImageTool(),
+      new LaserTool({ color: '#ef4444', width: 3, fadeMs: 800 }),
     ],
     []
   );
 
-  const handleReady = useCallback((vp: Viewport) => {
+  const handleReady = useCallback(async (vp: Viewport) => {
     setViewport(vp);
 
     const autoSave = new AutoSave(vp.store, vp.camera, {
       key: 'fieldnotes-canvas-autosave',
       debounceMs: 1000,
       layerManager: vp.layerManager,
+      adapter: new IndexedDBAdapter(),
     });
-    const saved = autoSave.load();
+    const saved = await autoSave.load();
     if (saved) {
       vp.loadState(saved);
     }
+    vp.setSmartGuides(true);
     autoSave.start();
     autoSaveRef.current = autoSave;
   }, []);
@@ -425,9 +431,9 @@ export default function FieldNotesCanvasPage({
     []
   );
 
-  const handleClearExtras = useCallback(() => {
+  const handleClearExtras = useCallback(async () => {
     setPlacedNotes([]);
-    autoSaveRef.current?.clear();
+    await autoSaveRef.current?.clear();
   }, []);
 
   const handleSaveEdit = useCallback(() => {
@@ -621,6 +627,7 @@ export default function FieldNotesCanvasPage({
               onPickImageTool={() => fileInputRef.current?.click()}
               onClearExtras={handleClearExtras}
             />
+            <FieldNotesDemoSelectionBar />
             <FieldNotesDemoToolOptions />
             <FieldNotesDemoGridControls />
           </>
@@ -715,6 +722,8 @@ export default function FieldNotesCanvasPage({
                 dotRadius: 1,
               },
               camera: { minZoom: 0.1, maxZoom: 5 },
+              minimap: true,
+              contextMenu: true,
             }}
             onReady={handleReady}
             className="flex-1"
