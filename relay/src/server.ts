@@ -1,8 +1,64 @@
 import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { createClient } from 'redis';
 import { createSyncServer } from '@fieldnotes/sync-server';
+import type { HubBackend, SyncHub } from '@fieldnotes/sync-server';
 import { makePolicies } from './policies.js';
 import { BufferedRedisBackend } from './backend.js';
+import { patchSendCorrectionLeak } from './corrections.js';
+
+export interface StartRelayOptions {
+  secret: string;
+  /** Port to listen on; 0 picks an ephemeral free port (used by tests). */
+  port?: number;
+  /** Override the storage backend (e.g. MemoryHubBackend in tests). */
+  backend?: HubBackend;
+}
+
+export interface RelayHandle {
+  hub: SyncHub;
+  wss: ReturnType<typeof createSyncServer>['wss'];
+  address: () => AddressInfo;
+  close: () => Promise<void>;
+}
+
+/** Boots the HTTP + WebSocket relay without touching Redis or process.env
+ * beyond what the caller passes in — the pieces `server.ts`'s `main()` and
+ * the integration tests both need. */
+export async function startRelay(
+  opts: StartRelayOptions
+): Promise<RelayHandle> {
+  const server = http.createServer((req, res) => {
+    if (req.url === '/healthz') {
+      res.writeHead(200, { 'content-type': 'text/plain' });
+      res.end('ok');
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+
+  const policies = makePolicies(opts.secret);
+  const { hub, wss, close } = createSyncServer({
+    server,
+    ...policies,
+    ...(opts.backend ? { backend: opts.backend } : {}),
+  });
+  // Upstream sendCorrection leak — see corrections.ts.
+  patchSendCorrectionLeak(hub, policies.canRead);
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(opts.port ?? 0, () => resolve());
+  });
+
+  return {
+    hub,
+    wss,
+    address: () => server.address() as AddressInfo,
+    close,
+  };
+}
 
 async function main(): Promise<void> {
   const secret = process.env.BATTLEMAP_RELAY_SECRET;
@@ -29,23 +85,8 @@ async function main(): Promise<void> {
     );
   }
 
-  const server = http.createServer((req, res) => {
-    if (req.url === '/healthz') {
-      res.writeHead(200, { 'content-type': 'text/plain' });
-      res.end('ok');
-      return;
-    }
-    res.writeHead(404);
-    res.end();
-  });
-
-  const { close } = createSyncServer({
-    server,
-    ...makePolicies(secret),
-    ...(backend ? { backend } : {}),
-  });
-
-  server.listen(port, () => console.log(`[relay] listening on :${port}`));
+  const { close } = await startRelay({ secret, port, backend });
+  console.log(`[relay] listening on :${port}`);
 
   const shutdown = async (): Promise<void> => {
     console.log('[relay] shutting down…');
@@ -58,7 +99,11 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => void shutdown());
 }
 
-main().catch(err => {
-  console.error('[relay] fatal:', err);
-  process.exit(1);
-});
+// Only run when executed directly (e.g. `node dist/server.js`), not when
+// imported by tests.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch(err => {
+    console.error('[relay] fatal:', err);
+    process.exit(1);
+  });
+}
