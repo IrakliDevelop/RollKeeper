@@ -138,7 +138,7 @@ export interface DmLocationEditorState {
   handleImageFileSelect: (
     e: React.ChangeEvent<HTMLInputElement>
   ) => Promise<void>;
-  handleOpenTvDisplay: () => void;
+  handleOpenTvDisplay: () => Promise<void>;
   handleFitToMap: () => void;
 }
 
@@ -528,13 +528,23 @@ export function useDmLocationEditor(
   const handleToggleDmOnly = useCallback(() => {
     if (!selectedElementId) return;
     storeToggleDmOnly(campaignCode, location.id, selectedElementId);
-    // Re-emit the element so the sync client re-stamps its audience:
-    // hide → relay sends players/display a remove; reveal → an upsert.
+    // Battlemap only: re-emit the element so the sync client re-stamps its
+    // audience (hide → relay sends players/display a remove; reveal → an
+    // upsert). Location mode has no relay — touching there would just fire
+    // saveAndMarkDirty and flip the sync indicator on a pure visibility toggle.
+    if (mode !== 'battlemap') return;
     const vp = getVp();
     if (vp?.store.getById(selectedElementId)) {
       vp.store.update(selectedElementId, {});
     }
-  }, [selectedElementId, campaignCode, location.id, storeToggleDmOnly, getVp]);
+  }, [
+    selectedElementId,
+    campaignCode,
+    location.id,
+    storeToggleDmOnly,
+    mode,
+    getVp,
+  ]);
 
   const handleDeleteSelected = useCallback(() => {
     const vp = getVp();
