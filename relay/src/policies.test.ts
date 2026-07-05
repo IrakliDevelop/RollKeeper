@@ -154,15 +154,52 @@ describe('authorize', () => {
       })
     ).toBe(false);
   });
-  it('non-data ops pass through (request-snapshot)', () => {
+  it('player may not reveal a DM-hidden element by upserting it without audience', () => {
+    // e1 is player-owned but the DM has hidden it (audience 'dm').
+    // The player's op omits the audience field entirely — must still be denied.
     expect(
       authorize({
         ...base,
         userId: 'p1',
         role: 'player',
-        op: { kind: 'request-snapshot' },
+        op: upsert('e1'),
+        currentElement: el('e1', { ownerId: 'p1', audience: DM_AUDIENCE }),
+      })
+    ).toBe(false);
+  });
+  it('player may not remove a DM-hidden element even if they own it', () => {
+    expect(
+      authorize({
+        ...base,
+        userId: 'p1',
+        role: 'player',
+        op: { kind: 'remove', id: 'e1' },
+        currentElement: el('e1', { ownerId: 'p1', audience: DM_AUDIENCE }),
+      })
+    ).toBe(false);
+  });
+  it('dm may reveal a DM-hidden element', () => {
+    expect(
+      authorize({
+        ...base,
+        userId: 'dm-1',
+        role: 'dm',
+        op: upsert('e1'),
+        currentElement: el('e1', { ownerId: 'p1', audience: DM_AUDIENCE }),
       })
     ).toBe(true);
+  });
+  it('unknown op kinds fail closed for players', () => {
+    // authorize is only ever invoked for upsert/remove/clear by the hub;
+    // anything else (including a future mutating op kind) must be denied.
+    expect(
+      authorize({
+        ...base,
+        userId: 'p1',
+        role: 'player',
+        op: { kind: 'request-snapshot' } as never,
+      })
+    ).toBe(false);
   });
 });
 
