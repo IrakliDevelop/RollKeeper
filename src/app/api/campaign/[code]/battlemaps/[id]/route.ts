@@ -1,33 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getRedis,
-  campaignKey,
   campaignBattleMapsKey,
   campaignBattleMapKey,
   refreshCampaignTTL,
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
-import type { CampaignData } from '@/types/campaign';
+import { verifyDmAuthority } from '@/lib/dmAuth';
 import type { BattleMapMetadata, SyncedBattleMap } from '@/types/battlemap';
-
-async function checkAndUpdateDmId(
-  redis: ReturnType<typeof getRedis>,
-  code: string,
-  dmId: string
-): Promise<void> {
-  const campaignRaw = await redis.get<string>(campaignKey(code));
-  if (campaignRaw) {
-    const campaign: CampaignData =
-      typeof campaignRaw === 'string' ? JSON.parse(campaignRaw) : campaignRaw;
-    if (campaign.dmId !== dmId) {
-      await redis.set(
-        campaignKey(code),
-        JSON.stringify({ ...campaign, dmId }),
-        { ex: SLIDING_TTL_SECONDS }
-      );
-    }
-  }
-}
 
 export async function GET(
   _request: NextRequest,
@@ -76,7 +56,13 @@ export async function POST(
     }
 
     const redis = getRedis();
-    await checkAndUpdateDmId(redis, code, dmId);
+    const dmAuth = await verifyDmAuthority(redis, code, dmId);
+    if (dmAuth === 'mismatch') {
+      return NextResponse.json(
+        { error: 'dmId does not match campaign owner' },
+        { status: 403 }
+      );
+    }
     await redis.set(campaignBattleMapKey(code, id), battleMap, {
       ex: SLIDING_TTL_SECONDS,
     });
@@ -129,7 +115,13 @@ export async function DELETE(
     }
 
     const redis = getRedis();
-    await checkAndUpdateDmId(redis, code, dmId);
+    const dmAuth = await verifyDmAuthority(redis, code, dmId);
+    if (dmAuth === 'mismatch') {
+      return NextResponse.json(
+        { error: 'dmId does not match campaign owner' },
+        { status: 403 }
+      );
+    }
     await redis.del(campaignBattleMapKey(code, id));
 
     const existingRaw = await redis.get<BattleMapMetadata[]>(

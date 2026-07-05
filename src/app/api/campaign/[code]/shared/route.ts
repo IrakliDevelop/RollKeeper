@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getRedis,
-  campaignKey,
   campaignSharedKey,
   campaignMessagesKey,
   campaignEffectsKey,
@@ -10,7 +9,7 @@ import {
   refreshCampaignTTL,
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
-import type { CampaignData } from '@/types/campaign';
+import { verifyDmAuthority } from '@/lib/dmAuth';
 import type {
   DmMessage,
   DmEffect,
@@ -150,20 +149,14 @@ export async function POST(
 
     const redis = getRedis();
 
-    // Check campaign exists — if the dmId drifted (e.g. localStorage reset),
-    // update the campaign record to the caller's dmId. The campaign code
-    // itself is the access boundary; only DM pages call this endpoint.
-    const campaignRaw = await redis.get<string>(campaignKey(code));
-
-    if (dmId && campaignRaw) {
-      const campaign: CampaignData =
-        typeof campaignRaw === 'string' ? JSON.parse(campaignRaw) : campaignRaw;
-
-      if (campaign.dmId !== dmId) {
-        await redis.set(
-          campaignKey(code),
-          JSON.stringify({ ...campaign, dmId }),
-          { ex: SLIDING_TTL_SECONDS }
+    // Strict DM check — a mismatched dmId must never take over the campaign
+    // (it would let anyone mint DM battle-map tokens and see hidden elements).
+    if (dmId) {
+      const dmAuth = await verifyDmAuthority(redis, code, dmId);
+      if (dmAuth === 'mismatch') {
+        return NextResponse.json(
+          { error: 'dmId does not match campaign owner' },
+          { status: 403 }
         );
       }
     }
