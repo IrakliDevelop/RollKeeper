@@ -1,42 +1,47 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
+import React from 'react';
 import { Input } from '@/components/ui/forms/input';
-import type { EncounterEntity, PlayerDisposition } from '@/types/encounter';
-import { buildCustomEntity } from './buildEntity';
+import type { PlayerDisposition } from '@/types/encounter';
 import { SharedOptions } from './SharedOptions';
 
 interface CustomTabProps {
-  onAdd: (entity: Omit<EncounterEntity, 'id'>) => void;
+  name: string;
+  onNameChange: (v: string) => void;
+  type: 'npc' | 'monster';
+  onTypeChange: (v: 'npc' | 'monster') => void;
+  hp: string;
+  onHpChange: (v: string) => void;
+  ac: string;
+  onAcChange: (v: string) => void;
+  initMod: string;
+  onInitModChange: (v: string) => void;
+  hideName: boolean;
+  onHideNameChange: (v: boolean) => void;
+  playerAlias: string;
+  onPlayerAliasChange: (v: string) => void;
+  disposition: PlayerDisposition;
+  onDispositionChange: (v: PlayerDisposition) => void;
 }
 
-export function CustomTab({ onAdd }: CustomTabProps) {
-  const [name, setName] = useState('');
-  const [type, setType] = useState<'npc' | 'monster'>('npc');
-  const [hp, setHp] = useState('10');
-  const [ac, setAc] = useState('10');
-  const [initMod, setInitMod] = useState('0');
-  const [hideName, setHideName] = useState(false);
-  const [playerAlias, setPlayerAlias] = useState('');
-  const [disposition, setDisposition] = useState<PlayerDisposition>('enemy');
-
-  const handleAdd = () => {
-    if (!name.trim()) return;
-    onAdd(
-      buildCustomEntity({
-        name,
-        type,
-        hp: parseInt(hp) || 10,
-        ac: parseInt(ac) || 10,
-        initMod: parseInt(initMod) || 0,
-        isHidden: hideName,
-        playerAlias: playerAlias || undefined,
-        playerDisposition: disposition,
-      })
-    );
-  };
-
+export function CustomTab({
+  name,
+  onNameChange,
+  type,
+  onTypeChange,
+  hp,
+  onHpChange,
+  ac,
+  onAcChange,
+  initMod,
+  onInitModChange,
+  hideName,
+  onHideNameChange,
+  playerAlias,
+  onPlayerAliasChange,
+  disposition,
+  onDispositionChange,
+}: CustomTabProps) {
   return (
     <div className="space-y-3 pb-4">
       {/* Name */}
@@ -46,7 +51,7 @@ export function CustomTab({ onAdd }: CustomTabProps) {
         </label>
         <input
           value={name}
-          onChange={e => setName(e.target.value)}
+          onChange={e => onNameChange(e.target.value)}
           placeholder="e.g. Cursed Statue"
           className="border-divider bg-surface-raised focus:border-accent-amber-border w-full rounded-[11px] border-[1.5px] px-[14px] py-3 text-sm focus:outline-none"
         />
@@ -60,7 +65,7 @@ export function CustomTab({ onAdd }: CustomTabProps) {
         <div className="bg-surface-secondary inline-flex rounded-[10px] p-[3px]">
           <button
             type="button"
-            onClick={() => setType('npc')}
+            onClick={() => onTypeChange('npc')}
             className={`rounded-lg px-4 py-1.5 text-[12.5px] font-bold transition-colors ${
               type === 'npc'
                 ? 'bg-surface-raised text-accent-amber-text shadow-sm'
@@ -71,7 +76,7 @@ export function CustomTab({ onAdd }: CustomTabProps) {
           </button>
           <button
             type="button"
-            onClick={() => setType('monster')}
+            onClick={() => onTypeChange('monster')}
             className={`rounded-lg px-4 py-1.5 text-[12.5px] font-bold transition-colors ${
               type === 'monster'
                 ? 'bg-surface-raised text-accent-purple-text shadow-sm'
@@ -87,19 +92,19 @@ export function CustomTab({ onAdd }: CustomTabProps) {
       <div className="grid grid-cols-3 gap-3">
         <Input
           value={hp}
-          onChange={e => setHp(e.target.value)}
+          onChange={e => onHpChange(e.target.value)}
           label="HP"
           type="number"
         />
         <Input
           value={ac}
-          onChange={e => setAc(e.target.value)}
+          onChange={e => onAcChange(e.target.value)}
           label="AC"
           type="number"
         />
         <Input
           value={initMod}
-          onChange={e => setInitMod(e.target.value)}
+          onChange={e => onInitModChange(e.target.value)}
           label="Init Mod"
           type="number"
         />
@@ -107,24 +112,12 @@ export function CustomTab({ onAdd }: CustomTabProps) {
 
       <SharedOptions
         hideName={hideName}
-        onHideNameChange={setHideName}
+        onHideNameChange={onHideNameChange}
         playerAlias={playerAlias}
-        onPlayerAliasChange={setPlayerAlias}
+        onPlayerAliasChange={onPlayerAliasChange}
         disposition={disposition}
-        onDispositionChange={setDisposition}
+        onDispositionChange={onDispositionChange}
       />
-
-      {/* Footer add button */}
-      <div className="border-divider border-t pt-3.5 pb-4">
-        <button
-          onClick={handleAdd}
-          disabled={!name.trim()}
-          className="bg-accent-emerald-text-muted flex w-full items-center justify-center gap-1.5 rounded-[13px] py-[15px] text-[15px] font-extrabold text-white shadow-[0_5px_16px_-5px_rgba(18,133,92,0.6)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Plus size={16} />
-          Add {type === 'npc' ? 'NPC' : 'Monster'}
-        </button>
-      </div>
     </div>
   );
 }

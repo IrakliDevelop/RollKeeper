@@ -133,9 +133,10 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
       ) : (
         <button
           onClick={() => setCreatingNpc(true)}
-          className="border-accent-amber-border-strong bg-accent-amber-bg text-accent-amber-text w-full rounded-[13px] border-[1.5px] border-dashed py-3 text-sm font-extrabold"
+          className="border-accent-amber-border-strong bg-accent-amber-bg text-accent-amber-text flex w-full items-center justify-center gap-1.5 rounded-[13px] border-[1.5px] border-dashed py-3 text-sm font-extrabold"
         >
-          + Create New NPC
+          <Plus size={14} />
+          Create New NPC
         </button>
       )}
 

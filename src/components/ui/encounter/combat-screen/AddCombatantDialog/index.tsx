@@ -1,17 +1,24 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from '@/components/ui/feedback/dialog';
-import type { EncounterEntity, CampaignNPC } from '@/types/encounter';
+import { Button } from '@/components/ui/forms/button';
+import type {
+  EncounterEntity,
+  CampaignNPC,
+  PlayerDisposition,
+} from '@/types/encounter';
+import type { ProcessedMonster } from '@/types/bestiary';
 import { PlayerTab } from './PlayerTab';
 import { NpcTab } from './NpcTab';
 import { MonsterTab } from './MonsterTab';
 import { CustomTab } from './CustomTab';
+import { buildMonsterEntities, buildCustomEntity } from './buildEntity';
 
 export interface AddCombatantDialogProps {
   open: boolean;
@@ -58,11 +65,59 @@ export function AddCombatantDialog({
 }: AddCombatantDialogProps) {
   const [tab, setTab] = useState<Tab>('monster');
   const [monsterColorIdx, setMonsterColorIdx] = useState(0);
-  const [resetKey, setResetKey] = useState(0);
+
+  // Monster detail state (lifted for anchored footer)
+  const [selMonster, setSelMonster] = useState<ProcessedMonster | null>(null);
+  const [mHp, setMHp] = useState('');
+  const [mAc, setMAc] = useState('');
+  const [mCount, setMCount] = useState(1);
+  const [mHideName, setMHideName] = useState(false);
+  const [mAlias, setMAlias] = useState('');
+  const [mDisposition, setMDisposition] = useState<PlayerDisposition>('enemy');
+
+  // Custom form state (lifted for anchored footer)
+  const [cName, setCName] = useState('');
+  const [cType, setCType] = useState<'npc' | 'monster'>('npc');
+  const [cHp, setCHp] = useState('10');
+  const [cAc, setCAc] = useState('10');
+  const [cInit, setCInit] = useState('0');
+  const [cHideName, setCHideName] = useState(false);
+  const [cAlias, setCAlias] = useState('');
+  const [cDisposition, setCDisposition] = useState<PlayerDisposition>('enemy');
+
+  const resetMonsterState = () => {
+    setSelMonster(null);
+    setMHp('');
+    setMAc('');
+    setMCount(1);
+    setMHideName(false);
+    setMAlias('');
+    setMDisposition('enemy');
+  };
+
+  const resetCustomState = () => {
+    setCName('');
+    setCType('npc');
+    setCHp('10');
+    setCAc('10');
+    setCInit('0');
+    setCHideName(false);
+    setCAlias('');
+    setCDisposition('enemy');
+  };
 
   const handleOpenChange = (v: boolean) => {
-    if (!v) setResetKey(k => k + 1);
+    if (!v) {
+      resetMonsterState();
+      resetCustomState();
+    }
     onOpenChange(v);
+  };
+
+  const handleTabChange = (newTab: Tab) => {
+    setTab(newTab);
+    resetMonsterState();
+    resetCustomState();
   };
 
   const handleAdd = (entity: Omit<EncounterEntity, 'id'>) => {
@@ -76,10 +131,39 @@ export function AddCombatantDialog({
     onOpenChange(false);
   };
 
-  const handleTabChange = (newTab: Tab) => {
-    setTab(newTab);
-    setResetKey(k => k + 1);
+  const handleMonsterAdd = () => {
+    if (!selMonster) return;
+    handleAddMultiple(
+      buildMonsterEntities(selMonster, {
+        count: mCount,
+        hpOverride: parseInt(mHp) || selMonster.hpAverage,
+        acOverride: parseInt(mAc) || selMonster.acValue,
+        isHidden: mHideName,
+        playerAlias: mAlias || undefined,
+        playerDisposition: mDisposition,
+        colorIdx: monsterColorIdx,
+      })
+    );
   };
+
+  const handleCustomAdd = () => {
+    if (!cName.trim()) return;
+    handleAdd(
+      buildCustomEntity({
+        name: cName,
+        type: cType,
+        hp: parseInt(cHp) || 10,
+        ac: parseInt(cAc) || 10,
+        initMod: parseInt(cInit) || 0,
+        isHidden: cHideName,
+        playerAlias: cAlias || undefined,
+        playerDisposition: cDisposition,
+      })
+    );
+  };
+
+  const showFooter =
+    (tab === 'monster' && selMonster !== null) || tab === 'custom';
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -90,7 +174,7 @@ export function AddCombatantDialog({
         {/* Accessible title (visually hidden — custom heading below) */}
         <DialogTitle className="sr-only">Add Combatant</DialogTitle>
 
-        {/* Header */}
+        {/* Header — anchored */}
         <div className="shrink-0 px-6 pt-5">
           <div className="flex items-start justify-between">
             <div>
@@ -110,7 +194,7 @@ export function AddCombatantDialog({
             </button>
           </div>
 
-          {/* Tab bar */}
+          {/* Tab bar — anchored */}
           <div className="bg-surface-inset mt-4 mb-0 flex gap-[3px] rounded-[12px] p-1">
             {TABS.map(t => (
               <button
@@ -131,11 +215,13 @@ export function AddCombatantDialog({
           </div>
         </div>
 
-        {/* Scrollable body */}
-        <div className="flex-1 overflow-y-auto px-6 pt-[18px]">
+        {/* Scrollable body — only this region scrolls */}
+        <div
+          className="flex-1 overflow-y-auto px-6 pt-[18px]"
+          data-testid="dialog-body"
+        >
           {tab === 'player' && (
             <PlayerTab
-              key={`player-${resetKey}`}
               players={campaignPlayers}
               playerColors={playerColors}
               campaignCode={campaignCode}
@@ -143,24 +229,78 @@ export function AddCombatantDialog({
             />
           )}
           {tab === 'npc' && (
-            <NpcTab
-              key={`npc-${resetKey}`}
-              npcs={npcs}
-              campaignCode={campaignCode}
-              onAdd={handleAdd}
-            />
+            <NpcTab npcs={npcs} campaignCode={campaignCode} onAdd={handleAdd} />
           )}
           {tab === 'monster' && (
             <MonsterTab
-              key={`monster-${resetKey}`}
-              colorIdx={monsterColorIdx}
-              onAdd={handleAddMultiple}
+              selected={selMonster}
+              onSelect={setSelMonster}
+              hp={mHp}
+              onHpChange={setMHp}
+              ac={mAc}
+              onAcChange={setMAc}
+              count={mCount}
+              onCountChange={setMCount}
+              hideName={mHideName}
+              onHideNameChange={setMHideName}
+              playerAlias={mAlias}
+              onPlayerAliasChange={setMAlias}
+              disposition={mDisposition}
+              onDispositionChange={setMDisposition}
             />
           )}
           {tab === 'custom' && (
-            <CustomTab key={`custom-${resetKey}`} onAdd={handleAdd} />
+            <CustomTab
+              name={cName}
+              onNameChange={setCName}
+              type={cType}
+              onTypeChange={setCType}
+              hp={cHp}
+              onHpChange={setCHp}
+              ac={cAc}
+              onAcChange={setCAc}
+              initMod={cInit}
+              onInitModChange={setCInit}
+              hideName={cHideName}
+              onHideNameChange={setCHideName}
+              playerAlias={cAlias}
+              onPlayerAliasChange={setCAlias}
+              disposition={cDisposition}
+              onDispositionChange={setCDisposition}
+            />
           )}
         </div>
+
+        {/* Anchored footer — shown only for monster (with selection) and custom */}
+        {showFooter && (
+          <div
+            className="border-divider shrink-0 border-t px-6 pt-3.5 pb-4"
+            data-testid="dialog-footer"
+          >
+            {tab === 'monster' && selMonster && (
+              <Button
+                variant="success"
+                fullWidth
+                onClick={handleMonsterAdd}
+                leftIcon={<Plus size={16} />}
+              >
+                Add {selMonster.name}
+                {mCount > 1 ? ` ×${mCount}` : ''}
+              </Button>
+            )}
+            {tab === 'custom' && (
+              <Button
+                variant="success"
+                fullWidth
+                onClick={handleCustomAdd}
+                disabled={!cName.trim()}
+                leftIcon={<Plus size={16} />}
+              >
+                Add {cType === 'npc' ? 'NPC' : 'Monster'}
+              </Button>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

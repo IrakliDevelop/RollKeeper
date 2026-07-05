@@ -4,18 +4,11 @@ import type {
   PlayerDisposition,
 } from '@/types/encounter';
 import type { ProcessedMonster } from '@/types/bestiary';
-import type { Spell } from '@/types/character';
 import {
   monsterToEncounterEntity,
   buildAbilitiesFromStatBlock,
 } from '@/utils/encounterConverter';
-import {
-  getNPCSpellSlots,
-  calculateNPCSpellAttack,
-  calculateNPCSpellDC,
-  getNPCSpellcastingAbilityScore,
-  getProficiencyBonusFromCR,
-} from '@/utils/npcSpellcasting';
+import { buildNpcSpellcasting } from './buildNpcSpellcasting';
 
 export const GROUP_COLORS = [
   '#ef4444',
@@ -27,41 +20,6 @@ export const GROUP_COLORS = [
   '#06b6d4',
   '#f97316',
 ];
-
-function buildPerDayMap(spells: Spell[]): Record<string, string[]> {
-  const map: Record<string, string[]> = {};
-  for (const spell of spells) {
-    if (spell.freeCastMax && spell.freeCastMax > 0) {
-      const key = String(spell.freeCastMax);
-      if (!map[key]) map[key] = [];
-      map[key].push(spell.name);
-    }
-  }
-  return map;
-}
-
-function buildSlotMap(
-  slots: Record<number, number>,
-  slotsUsed: Record<number, number>
-): Record<string, { max: number; used: number }> {
-  const map: Record<string, { max: number; used: number }> = {};
-  for (const [level, max] of Object.entries(slots)) {
-    if (max > 0) {
-      map[String(level)] = { max, used: slotsUsed[Number(level)] ?? 0 };
-    }
-  }
-  return map;
-}
-
-function buildUsedSpellsMap(spells: Spell[]): Record<string, number> {
-  const map: Record<string, number> = {};
-  for (const spell of spells) {
-    if (spell.freeCastMax && spell.freeCastMax > 0 && spell.freeCastsUsed) {
-      map[spell.name] = spell.freeCastsUsed;
-    }
-  }
-  return map;
-}
 
 export interface CampaignPlayer {
   id: string;
@@ -136,41 +94,7 @@ export function buildNpcEntity(
     hitDice: npc.hitDice ? { ...npc.hitDice } : undefined,
     npcSourceId: npc.id,
     campaignCode: opts.campaignCode,
-    spellcasting: npc.spellcasting
-      ? (() => {
-          const abilityScores = npc.monsterStatBlock ?? npc.abilityScores;
-          const abilityScore = abilityScores
-            ? getNPCSpellcastingAbilityScore(
-                npc.spellcasting!.ability,
-                abilityScores as Parameters<
-                  typeof getNPCSpellcastingAbilityScore
-                >[1]
-              )
-            : 10;
-          const profBonus = npc.monsterStatBlock
-            ? getProficiencyBonusFromCR(npc.monsterStatBlock.cr)
-            : (npc.proficiencyBonus ?? 2);
-          const slots = getNPCSpellSlots(
-            npc.spellcasting!.casterLevel,
-            npc.spellcasting!.slotOverrides
-          );
-          return {
-            ability: npc.spellcasting!.ability,
-            dc: calculateNPCSpellDC(npc.spellcasting!, abilityScore, profBonus),
-            toHit: calculateNPCSpellAttack(
-              npc.spellcasting!,
-              abilityScore,
-              profBonus
-            ),
-            atWill: npc
-              .spellcasting!.spells.filter(s => s.freeCastMax === 0)
-              .map(s => s.name),
-            perDay: buildPerDayMap(npc.spellcasting!.spells),
-            slots: buildSlotMap(slots, npc.spellcasting!.slotsUsed),
-            usedSpells: buildUsedSpellsMap(npc.spellcasting!.spells),
-          };
-        })()
-      : undefined,
+    spellcasting: buildNpcSpellcasting(npc),
   };
 }
 

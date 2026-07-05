@@ -150,7 +150,7 @@ describe('AddCombatantDialog', () => {
     fireEvent.click(plusBtn);
     fireEvent.click(plusBtn);
 
-    // Click Add button
+    // Click Add button (now in anchored footer)
     fireEvent.click(screen.getByRole('button', { name: /add goblin/i }));
 
     expect(onAddEntity).toHaveBeenCalledTimes(3);
@@ -183,7 +183,7 @@ describe('AddCombatantDialog', () => {
     const aliasInput = screen.getByPlaceholderText(/name players see/i);
     fireEvent.change(aliasInput, { target: { value: 'Dark Figure' } });
 
-    // Enemy is default disposition — click Add button
+    // Enemy is default disposition — click Add button (now in anchored footer)
     const addBtn = screen.getByRole('button', { name: /add npc/i });
     fireEvent.click(addBtn);
 
@@ -208,4 +208,32 @@ describe('AddCombatantDialog', () => {
       expect.stringContaining('Town Guard')
     );
   });
+
+  it('monster add button is anchored outside the scrollable body', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ monsters: [mockMonster] }),
+    } as unknown as Response);
+
+    render(<AddCombatantDialog {...defaultProps} />);
+
+    const searchInput = screen.getByPlaceholderText(/search the bestiary/i);
+    fireEvent.change(searchInput, { target: { value: 'goblin' } });
+
+    await waitFor(
+      () => {
+        expect(screen.getByText('Goblin')).toBeInTheDocument();
+      },
+      { timeout: 2000 }
+    );
+
+    fireEvent.click(screen.getByText('Goblin'));
+
+    const footer = screen.getByTestId('dialog-footer');
+    const addBtn = screen.getByRole('button', { name: /add goblin/i });
+    expect(footer).toContainElement(addBtn);
+
+    const body = screen.getByTestId('dialog-body');
+    expect(body).not.toContainElement(addBtn);
+  }, 10000);
 });
