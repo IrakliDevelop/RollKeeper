@@ -18,6 +18,10 @@ import {
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useLocationStore } from '@/store/locationStore';
 import { useBattleMapStore } from '@/store/battleMapStore';
+import {
+  createManagedBattleMapConnection,
+  type BattleMapConnectionStatus,
+} from '@/lib/battlemapSync';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
 import type { GridSettings } from '@/types/location';
 
@@ -122,6 +126,7 @@ export interface DmLocationEditorState {
   // Sync status
   hasUnsyncedChanges: boolean;
   lastSyncedAt: string | null;
+  syncStatus: BattleMapConnectionStatus | 'disabled';
 
   // Handlers
   handleReady: (vp: Viewport) => void;
@@ -146,6 +151,10 @@ export function useDmLocationEditor(
   const canvasRef = useRef<FieldNotesCanvasRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autoSaveRef = useRef<AutoSave | null>(null);
+  const connectionRef = useRef<{ stop: () => void } | null>(null);
+  const [syncStatus, setSyncStatus] = useState<
+    BattleMapConnectionStatus | 'disabled'
+  >('disabled');
 
   const [viewport, setViewport] = useState<Viewport | null>(null);
 
@@ -294,8 +303,12 @@ export function useDmLocationEditor(
       autoSave.start();
       autoSaveRef.current = autoSave;
 
-      // Wire autosave to also call onSave so parent can persist to store
-      const saveAndMarkDirty = () => {
+      // Wire autosave to also call onSave so parent can persist to store.
+      // Remote-origin ops (relayed from another client) must not thrash
+      // zustand/localStorage on every incoming drag frame; AutoSave still
+      // snapshots everything on its own 1.5s debounce regardless of origin.
+      const saveAndMarkDirty = (_data: unknown, meta?: { origin?: string }) => {
+        if (meta?.origin !== undefined && meta.origin !== 'local') return;
         const json = vp.exportJSON();
         onSave(json);
         setHasUnsyncedChanges(true);
@@ -303,8 +316,29 @@ export function useDmLocationEditor(
       vp.store.on('add', saveAndMarkDirty);
       vp.store.on('remove', saveAndMarkDirty);
       vp.store.on('update', saveAndMarkDirty);
+
+      // Live sync — battlemap mode only; resolver reads Zustand LIVE via
+      // getState() (a captured snapshot would go stale after the first toggle).
+      if (mode === 'battlemap' && process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL) {
+        connectionRef.current?.stop();
+        connectionRef.current = createManagedBattleMapConnection({
+          relayUrl: process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL,
+          campaignCode,
+          battleMapId: location.id,
+          store: vp.store,
+          clientId: dmId,
+          tokenRequest: { role: 'dm', battleMapId: location.id, dmId },
+          seedLocal: true,
+          resolveAudience: el =>
+            useBattleMapStore.getState().battleMaps[campaignCode]?.[location.id]
+              ?.dmOnlyElements[el.id]
+              ? 'dm'
+              : undefined,
+          onStatus: setSyncStatus,
+        });
+      }
     },
-    [location, onSave]
+    [location, onSave, mode, campaignCode, dmId]
   );
 
   /** Zoom & pan so the map image fills the viewport with a small margin. */
@@ -389,10 +423,11 @@ export function useDmLocationEditor(
     img.src = proxied;
   }
 
-  // Cleanup autosave on unmount
+  // Cleanup autosave and sync connection on unmount
   useEffect(() => {
     return () => {
       autoSaveRef.current?.stop();
+      connectionRef.current?.stop();
     };
   }, []);
 
@@ -493,7 +528,13 @@ export function useDmLocationEditor(
   const handleToggleDmOnly = useCallback(() => {
     if (!selectedElementId) return;
     storeToggleDmOnly(campaignCode, location.id, selectedElementId);
-  }, [selectedElementId, campaignCode, location.id, storeToggleDmOnly]);
+    // Re-emit the element so the sync client re-stamps its audience:
+    // hide → relay sends players/display a remove; reveal → an upsert.
+    const vp = getVp();
+    if (vp?.store.getById(selectedElementId)) {
+      vp.store.update(selectedElementId, {});
+    }
+  }, [selectedElementId, campaignCode, location.id, storeToggleDmOnly, getVp]);
 
   const handleDeleteSelected = useCallback(() => {
     const vp = getVp();
@@ -773,12 +814,27 @@ export function useDmLocationEditor(
     [getVp]
   );
 
-  const handleOpenTvDisplay = useCallback(() => {
+  const handleOpenTvDisplay = useCallback(async () => {
+    let dk = '';
+    try {
+      const res = await fetch(`/api/campaign/${campaignCode}/display-key`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dmId }),
+      });
+      if (res.ok) {
+        dk = ((await res.json()) as { displayKey?: string }).displayKey ?? '';
+      }
+    } catch {
+      // relay not configured — the display page will show its error state
+    }
     window.open(
-      `/dm/campaign/${campaignCode}/battlemaps/${location.id}/display`,
+      `/dm/campaign/${campaignCode}/battlemaps/${location.id}/display${
+        dk ? `?dk=${encodeURIComponent(dk)}` : ''
+      }`,
       '_blank'
     );
-  }, [campaignCode, location.id]);
+  }, [campaignCode, dmId, location.id]);
 
   const handleFitToMap = useCallback(() => {
     const vp = getVp();
@@ -807,6 +863,7 @@ export function useDmLocationEditor(
     syncing,
     hasUnsyncedChanges,
     lastSyncedAt,
+    syncStatus,
     imageUploading,
     setImageUploading,
     handleReady,

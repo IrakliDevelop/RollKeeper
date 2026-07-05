@@ -1,4 +1,5 @@
 import type { EditorMode } from './DmLocationEditor.types';
+import type { BattleMapConnectionStatus } from '@/lib/battlemapSync';
 
 export interface DmLocationToolbarProps {
   onPickImage: () => void;
@@ -29,4 +30,6 @@ export interface DmLocationToolbarProps {
   lastSyncedAt: string | null;
   mode?: EditorMode;
   onOpenTvDisplay?: () => void;
+  /** Live sync connection status (battlemap mode only); 'disabled' when the relay isn't configured. */
+  syncStatus: BattleMapConnectionStatus | 'disabled';
 }

@@ -34,6 +34,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     syncing,
     hasUnsyncedChanges,
     lastSyncedAt,
+    syncStatus,
     imageUploading,
     handleReady,
     handlePickImage,
@@ -81,6 +82,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             onToggleDmOnly={handleToggleDmOnly}
             mode={mode}
             onOpenTvDisplay={handleOpenTvDisplay}
+            syncStatus={syncStatus}
           />
         )}
 
