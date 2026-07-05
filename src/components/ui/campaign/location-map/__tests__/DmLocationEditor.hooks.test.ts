@@ -149,3 +149,78 @@ describe('useDmLocationEditor — handleToggleDmOnly mode gating', () => {
     expect(store.update).toHaveBeenCalledWith('el-1', {});
   });
 });
+
+describe('useDmLocationEditor — handleOpenTvDisplay popup-blocker survival', () => {
+  const savedRelayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+  let openSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+  });
+
+  afterEach(() => {
+    if (savedRelayUrl !== undefined) {
+      process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = savedRelayUrl;
+    }
+    openSpy?.mockRestore();
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it('opens the tab synchronously, before the display-key fetch resolves (survives transient-activation loss)', async () => {
+    const fakeWin = { location: { href: '' } } as unknown as Window;
+    openSpy = vi.spyOn(window, 'open').mockReturnValue(fakeWin);
+
+    let resolveFetch!: (value: unknown) => void;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise(resolve => {
+          resolveFetch = resolve;
+        })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = await setup('location');
+
+    const displayPromise = result.current.handleOpenTvDisplay();
+
+    // window.open must have fired already, synchronously, before the fetch
+    // (still pending) resolves — otherwise Safari drops the user gesture.
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    expect(openSpy).toHaveBeenCalledWith('', '_blank');
+    expect(fakeWin.location.href).toBe('');
+
+    resolveFetch({
+      ok: true,
+      json: async () => ({ displayKey: 'dk-123' }),
+    });
+    await act(async () => {
+      await displayPromise;
+    });
+
+    expect(fakeWin.location.href).toContain('dk=dk-123');
+    expect(openSpy).toHaveBeenCalledTimes(1); // no second window.open call
+  });
+
+  it('falls back to window.open(url) when the popup was blocked', async () => {
+    openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ displayKey: 'dk-9' }),
+      }))
+    );
+
+    const { result } = await setup('location');
+    await act(async () => {
+      await result.current.handleOpenTvDisplay();
+    });
+
+    expect(openSpy).toHaveBeenCalledTimes(2);
+    expect(openSpy).toHaveBeenLastCalledWith(
+      expect.stringContaining('dk=dk-9'),
+      '_blank'
+    );
+  });
+});
