@@ -11,6 +11,8 @@ export interface EncounterCondition {
   sourceSpell?: string; // What spell caused this
   stackCount?: number;
   source?: 'player-sync' | 'dm'; // Where this condition came from
+  kind?: 'buff' | 'debuff' | 'neutral';
+  rounds?: number | null; // remaining rounds; null/undefined = untimed (∞)
 }
 
 export interface MonsterAbility {
