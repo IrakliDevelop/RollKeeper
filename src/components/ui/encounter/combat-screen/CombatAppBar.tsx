@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Plus, Settings, Edit3 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
@@ -22,6 +22,7 @@ export function CombatAppBar({
 }: CombatAppBarProps): React.JSX.Element {
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const cancelingRef = useRef(false);
 
   function startEdit() {
     setNameInput(name);
@@ -29,6 +30,10 @@ export function CombatAppBar({
   }
 
   function commitEdit() {
+    if (cancelingRef.current) {
+      cancelingRef.current = false;
+      return;
+    }
     const trimmed = nameInput.trim();
     if (trimmed) onRename(trimmed);
     setEditing(false);
@@ -54,7 +59,10 @@ export function CombatAppBar({
             onBlur={commitEdit}
             onKeyDown={e => {
               if (e.key === 'Enter') commitEdit();
-              if (e.key === 'Escape') cancelEdit();
+              if (e.key === 'Escape') {
+                cancelingRef.current = true;
+                cancelEdit();
+              }
             }}
             className="font-display bg-surface-secondary text-heading min-w-0 rounded px-2 py-1 text-xl font-bold"
             autoFocus
