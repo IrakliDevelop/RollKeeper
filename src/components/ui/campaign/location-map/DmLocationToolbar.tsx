@@ -77,6 +77,7 @@ export default function DmLocationToolbar({
   onToggleDmOnly,
   mode,
   onOpenTvDisplay,
+  syncStatus,
 }: DmLocationToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
@@ -309,35 +310,36 @@ export default function DmLocationToolbar({
 
         {/* Sync status indicator */}
         <div className="flex items-center gap-1.5">
-          {lastSyncedAt ? (
-            <div
-              className={`flex items-center gap-1 text-xs ${
-                hasUnsyncedChanges
-                  ? 'text-accent-amber-text'
-                  : 'text-accent-emerald-text'
-              }`}
-              title={
-                hasUnsyncedChanges
-                  ? `Unsynced changes · Last synced ${formatSyncTime(lastSyncedAt)}`
-                  : `Synced ${formatSyncTime(lastSyncedAt)}`
-              }
-            >
-              {hasUnsyncedChanges ? (
-                <AlertCircle size={12} />
-              ) : (
-                <Check size={12} />
-              )}
-              <span className="hidden sm:inline">
-                {hasUnsyncedChanges
-                  ? `Unsynced · ${formatSyncTime(lastSyncedAt)}`
-                  : `Synced ${formatSyncTime(lastSyncedAt)}`}
+          {mode !== 'battlemap' &&
+            (lastSyncedAt ? (
+              <div
+                className={`flex items-center gap-1 text-xs ${
+                  hasUnsyncedChanges
+                    ? 'text-accent-amber-text'
+                    : 'text-accent-emerald-text'
+                }`}
+                title={
+                  hasUnsyncedChanges
+                    ? `Unsynced changes · Last synced ${formatSyncTime(lastSyncedAt)}`
+                    : `Synced ${formatSyncTime(lastSyncedAt)}`
+                }
+              >
+                {hasUnsyncedChanges ? (
+                  <AlertCircle size={12} />
+                ) : (
+                  <Check size={12} />
+                )}
+                <span className="hidden sm:inline">
+                  {hasUnsyncedChanges
+                    ? `Unsynced · ${formatSyncTime(lastSyncedAt)}`
+                    : `Synced ${formatSyncTime(lastSyncedAt)}`}
+                </span>
+              </div>
+            ) : (
+              <span className="text-muted hidden text-xs sm:inline">
+                Not synced yet
               </span>
-            </div>
-          ) : (
-            <span className="text-muted hidden text-xs sm:inline">
-              Not synced yet
-            </span>
-          )}
+            ))}
 
           {mode === 'battlemap' && onOpenTvDisplay && (
             <Button
@@ -349,15 +351,45 @@ export default function DmLocationToolbar({
               Open TV Display
             </Button>
           )}
-          <Button
-            variant={mode === 'battlemap' ? 'success' : 'primary'}
-            onClick={onSyncToPlayers}
-            disabled={syncing}
-            className="flex items-center gap-1.5 px-3 py-1 text-xs"
-          >
-            {syncing ? <Loader2 size={13} className="animate-spin" /> : null}
-            {mode === 'battlemap' ? 'Push to Display' : 'Sync to Players'}
-          </Button>
+          {mode === 'battlemap' && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs ${
+                syncStatus === 'live'
+                  ? 'bg-accent-emerald-bg text-accent-emerald-text'
+                  : syncStatus === 'connecting'
+                    ? 'bg-accent-amber-bg text-accent-amber-text'
+                    : syncStatus === 'denied' || syncStatus === 'offline'
+                      ? 'bg-accent-red-bg text-accent-red-text'
+                      : 'text-muted'
+              }`}
+              title={
+                syncStatus === 'disabled'
+                  ? 'Live sync not configured (NEXT_PUBLIC_BATTLEMAP_RELAY_URL)'
+                  : `Live sync: ${syncStatus}`
+              }
+            >
+              {syncStatus === 'live'
+                ? 'Live'
+                : syncStatus === 'connecting'
+                  ? 'Connecting…'
+                  : syncStatus === 'offline'
+                    ? 'Offline'
+                    : syncStatus === 'denied'
+                      ? 'Denied'
+                      : 'Sync off'}
+            </span>
+          )}
+          {mode !== 'battlemap' && (
+            <Button
+              variant="primary"
+              onClick={onSyncToPlayers}
+              disabled={syncing}
+              className="flex items-center gap-1.5 px-3 py-1 text-xs"
+            >
+              {syncing ? <Loader2 size={13} className="animate-spin" /> : null}
+              Sync to Players
+            </Button>
+          )}
           {mode !== 'battlemap' && (
             <Button
               variant="ghost"
