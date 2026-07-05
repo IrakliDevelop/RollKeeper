@@ -186,7 +186,7 @@ export function AddCombatantDialog({
               </h2>
             </div>
             <button
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleOpenChange(false)}
               aria-label="Close"
               className="border-divider bg-surface-raised text-muted hover:text-heading mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border transition-colors"
             >
