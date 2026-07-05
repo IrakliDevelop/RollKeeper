@@ -2,11 +2,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-
-afterEach(cleanup);
 import { CombatantRow } from '@/components/ui/encounter/combat-screen/CombatantRow';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
+
+afterEach(cleanup);
 
 const mockEntity: EncounterEntity = {
   id: 'e1',
@@ -60,7 +60,6 @@ const defaultProps = {
   isActive: false,
   isSelected: false,
   isOnDeck: false,
-  combatActive: true,
   hidePlayerHp: false,
 };
 
@@ -98,7 +97,7 @@ describe('CombatantRow', () => {
     expect(onSelect).toHaveBeenCalled();
   });
 
-  it('active row shows ON DECK pill on the on-deck entity', () => {
+  it('on-deck entity shows ON DECK pill', () => {
     const actions = makeMockActions();
     render(
       <CombatantRow

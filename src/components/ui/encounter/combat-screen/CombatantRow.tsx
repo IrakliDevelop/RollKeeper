@@ -21,7 +21,6 @@ export interface CombatantRowProps {
   isActive: boolean;
   isSelected: boolean;
   isOnDeck: boolean;
-  combatActive: boolean;
   hidePlayerHp: boolean;
   lastSynced?: string;
   counterLabel?: string;
@@ -48,7 +47,7 @@ function getRowClass(
   if (isActive)
     return 'border-accent-amber-border-strong bg-accent-amber-bg shadow-lg';
   if (isSelected) return 'border-accent-blue-border-strong bg-accent-blue-bg';
-  if (isOnDeck) return 'border-accent-amber-border bg-accent-amber-bg';
+  if (isOnDeck) return 'border-accent-amber-border bg-accent-amber-bg/50';
   return 'border-divider bg-surface-raised';
 }
 
@@ -130,7 +129,7 @@ export function CombatantRow({
               />
             ) : (
               <span
-                className={`font-display text-heading truncate text-sm font-bold ${isDead ? 'line-through opacity-60' : ''} ${entity.type !== 'player' ? 'hover:text-body cursor-pointer rounded transition-colors' : ''}`}
+                className={`font-display text-heading truncate text-sm font-bold ${isDead ? 'line-through' : ''} ${entity.type !== 'player' ? 'hover:text-body cursor-pointer rounded transition-colors' : ''}`}
                 onClick={e => {
                   if (entity.type !== 'player') {
                     e.stopPropagation();
