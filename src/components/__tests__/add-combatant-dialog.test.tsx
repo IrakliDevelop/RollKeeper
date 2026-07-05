@@ -236,4 +236,48 @@ describe('AddCombatantDialog', () => {
     const body = screen.getByTestId('dialog-body');
     expect(body).not.toContainElement(addBtn);
   }, 10000);
+
+  it('X close button resets custom form state', () => {
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
+      <AddCombatantDialog
+        {...defaultProps}
+        onOpenChange={onOpenChange}
+        open={true}
+      />
+    );
+
+    // Switch to Custom tab
+    fireEvent.click(screen.getByRole('button', { name: /custom/i }));
+
+    // Type a name into the Name field
+    const nameInput = screen.getByPlaceholderText(/cursed statue/i);
+    fireEvent.change(nameInput, { target: { value: 'Test Enemy' } });
+    expect((nameInput as HTMLInputElement).value).toBe('Test Enemy');
+
+    // Click X close button
+    const closeBtn = screen.getByRole('button', { name: /close/i });
+    fireEvent.click(closeBtn);
+
+    // Verify onOpenChange was called with false (proving X calls handleOpenChange)
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    // Re-render with open={true}
+    rerender(
+      <AddCombatantDialog
+        {...defaultProps}
+        onOpenChange={onOpenChange}
+        open={true}
+      />
+    );
+
+    // Switch to Custom tab again
+    fireEvent.click(screen.getByRole('button', { name: /custom/i }));
+
+    // Verify name field is now empty (state was reset when X was clicked)
+    const nameInputAfterReopen = screen.getByPlaceholderText(
+      /cursed statue/i
+    ) as HTMLInputElement;
+    expect(nameInputAfterReopen.value).toBe('');
+  });
 });
