@@ -26,6 +26,6 @@ App side (`.env.local`): `BATTLEMAP_RELAY_SECRET=dev-secret-change-me`,
 ## Railway deploy
 
 1. New service from this GitHub repo; set **Root Directory = `relay`**.
-2. Set env vars: `BATTLEMAP_RELAY_SECRET` (same as Vercel), `REDIS_URL` (Upstash TCP URL from the Upstash console — the `rediss://` one, not the REST URL).
+2. Set env vars: `BATTLEMAP_RELAY_SECRET` (same as Vercel), `REDIS_URL` (Upstash TCP URL from the Upstash console — the `rediss://` one, not the REST URL), and `NIXPACKS_NO_CACHE=1` (without it, Nixpacks mounts its build cache inside `node_modules/.cache` and `npm ci` fails with `EBUSY` trying to remove it).
 3. Railway builds via `relay/railway.json` and health-checks `/healthz`.
 4. Set `NEXT_PUBLIC_BATTLEMAP_RELAY_URL=wss://<service>.up.railway.app` on Vercel and redeploy the app.
