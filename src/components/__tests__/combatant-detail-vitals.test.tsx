@@ -3,6 +3,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DetailVitals } from '@/components/ui/encounter/combat-screen/detail/DetailVitals';
+import { DetailHeader } from '@/components/ui/encounter/combat-screen/detail/DetailHeader';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
 
@@ -190,5 +191,54 @@ describe('DetailVitals', () => {
       <DetailVitals entity={lairEntity} actions={actions} />
     );
     expect(container.firstChild).toBeNull();
+  });
+
+  it('player entity max HP is static text — no edit button and onSetMaxHp never called', () => {
+    const actions = makeActions();
+    render(<DetailVitals entity={playerEntity} actions={actions} />);
+
+    expect(screen.queryByTitle('Edit max HP')).not.toBeInTheDocument();
+    expect(actions.onSetMaxHp).not.toHaveBeenCalled();
+  });
+});
+
+describe('DetailHeader', () => {
+  it('clicking Enemy disposition calls onUpdate with enemy playerDisposition', async () => {
+    const actions = makeActions();
+    const user = userEvent.setup();
+    render(<DetailHeader entity={npcEntity} actions={actions} />);
+
+    await user.click(screen.getByRole('button', { name: 'Enemy' }));
+    expect(actions.onUpdate).toHaveBeenCalledWith('npc-1', {
+      playerDisposition: 'enemy',
+    });
+  });
+
+  it('Remove button calls window.confirm and invokes onRemove when confirmed', async () => {
+    const actions = makeActions();
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true);
+    render(<DetailHeader entity={npcEntity} actions={actions} />);
+
+    await user.click(
+      screen.getByRole('button', { name: /remove from combat/i })
+    );
+    expect(window.confirm).toHaveBeenCalled();
+    expect(actions.onRemove).toHaveBeenCalledWith('npc-1');
+    vi.restoreAllMocks();
+  });
+
+  it('Remove button calls window.confirm but does NOT call onRemove when cancelled', async () => {
+    const actions = makeActions();
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(false);
+    render(<DetailHeader entity={npcEntity} actions={actions} />);
+
+    await user.click(
+      screen.getByRole('button', { name: /remove from combat/i })
+    );
+    expect(window.confirm).toHaveBeenCalled();
+    expect(actions.onRemove).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
   });
 });
