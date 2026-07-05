@@ -8,8 +8,8 @@ import {
   useSyncExternalStore,
 } from 'react';
 
-export type Theme = 'light' | 'dark' | 'system';
-export type ResolvedTheme = 'light' | 'dark';
+export type Theme = 'light' | 'dark' | 'parchment' | 'system';
+export type ResolvedTheme = 'light' | 'dark' | 'parchment';
 
 interface ThemeContextValue {
   /** The user-chosen preference: 'light', 'dark', or 'system'. */
@@ -36,7 +36,12 @@ function getSystemPreference(): ResolvedTheme {
 function getStoredTheme(): Theme {
   if (typeof window === 'undefined') return 'system';
   const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === 'light' || stored === 'dark' || stored === 'system') {
+  if (
+    stored === 'light' ||
+    stored === 'dark' ||
+    stored === 'parchment' ||
+    stored === 'system'
+  ) {
     return stored;
   }
   return 'system';
@@ -49,10 +54,10 @@ function resolveTheme(theme: Theme): ResolvedTheme {
 
 function applyTheme(resolved: ResolvedTheme) {
   const root = document.documentElement;
-  if (resolved === 'dark') {
-    root.setAttribute('data-theme', 'dark');
-  } else {
+  if (resolved === 'light') {
     root.removeAttribute('data-theme');
+  } else {
+    root.setAttribute('data-theme', resolved);
   }
 }
 

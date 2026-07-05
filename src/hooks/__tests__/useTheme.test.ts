@@ -178,4 +178,47 @@ describe('useThemeInit', () => {
     expect(result.current.theme).toBe('system');
     expect(result.current.resolvedTheme).toBe('light');
   });
+
+  it('resolves parchment when stored', async () => {
+    localStorage.setItem(STORAGE_KEY, 'parchment');
+    const { useThemeInit } = await import('@/hooks/useTheme');
+
+    const { result } = renderHook(() => useThemeInit());
+    await act(async () => {});
+
+    expect(result.current.theme).toBe('parchment');
+    expect(result.current.resolvedTheme).toBe('parchment');
+    expect(document.documentElement.getAttribute('data-theme')).toBe(
+      'parchment'
+    );
+  });
+
+  it('setTheme("parchment") applies attribute and persists', async () => {
+    const { useThemeInit } = await import('@/hooks/useTheme');
+
+    const { result } = renderHook(() => useThemeInit());
+    await act(async () => {});
+
+    act(() => {
+      result.current.setTheme('parchment');
+    });
+
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('parchment');
+    expect(document.documentElement.getAttribute('data-theme')).toBe(
+      'parchment'
+    );
+  });
+
+  it('system never resolves to parchment', async () => {
+    localStorage.setItem(STORAGE_KEY, 'system');
+    const { useThemeInit } = await import('@/hooks/useTheme');
+
+    const { result } = renderHook(() => useThemeInit());
+    await act(async () => {});
+
+    expect(['light', 'dark']).toContain(result.current.resolvedTheme);
+    expect(
+      document.documentElement.getAttribute('data-theme') ?? 'light'
+    ).not.toBe('parchment');
+  });
 });
