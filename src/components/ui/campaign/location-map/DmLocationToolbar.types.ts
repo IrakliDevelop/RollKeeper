@@ -32,4 +32,7 @@ export interface DmLocationToolbarProps {
   onOpenTvDisplay?: () => void;
   /** Live sync connection status (battlemap mode only); 'disabled' when the relay isn't configured. */
   syncStatus: BattleMapConnectionStatus | 'disabled';
+  /** Whether the battle map is currently shared with players (battlemap mode only) */
+  sharedWithPlayers?: boolean;
+  onToggleShareWithPlayers?: () => void;
 }

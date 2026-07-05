@@ -35,6 +35,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     hasUnsyncedChanges,
     lastSyncedAt,
     syncStatus,
+    sharedWithPlayers,
+    handleToggleShareWithPlayers,
     imageUploading,
     handleReady,
     handlePickImage,
@@ -83,6 +85,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             mode={mode}
             onOpenTvDisplay={handleOpenTvDisplay}
             syncStatus={syncStatus}
+            sharedWithPlayers={sharedWithPlayers}
+            onToggleShareWithPlayers={handleToggleShareWithPlayers}
           />
         )}
 

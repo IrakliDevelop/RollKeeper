@@ -19,6 +19,7 @@ import type {
   SharedCustomCounter,
   ItemTransfer,
   SharedInitiativeState,
+  SharedBattleMapState,
 } from '@/types/sharedState';
 
 export async function GET(
@@ -43,6 +44,17 @@ export async function GET(
         typeof initiativeRaw === 'string'
           ? JSON.parse(initiativeRaw)
           : initiativeRaw;
+    }
+
+    const battleMapRaw = await redis.get<string>(
+      campaignSharedKey(code, 'battlemap')
+    );
+    let battleMap: SharedBattleMapState | null = null;
+    if (battleMapRaw) {
+      battleMap =
+        typeof battleMapRaw === 'string'
+          ? JSON.parse(battleMapRaw)
+          : battleMapRaw;
     }
 
     let calendar: SharedCalendarPlayer | null = null;
@@ -116,6 +128,7 @@ export async function GET(
       customCounter,
       transfers,
       initiative,
+      battleMap,
     };
     return NextResponse.json(state);
   } catch (error) {

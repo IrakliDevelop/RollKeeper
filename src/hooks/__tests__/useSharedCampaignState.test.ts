@@ -17,6 +17,7 @@ const makeSharedState = (
   customCounter: null,
   transfers: [],
   initiative: null,
+  battleMap: null,
   ...overrides,
 });
 
