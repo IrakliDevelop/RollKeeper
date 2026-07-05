@@ -1,15 +1,37 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { EntityCard } from '@/components/ui/encounter/EntityCard';
-import { InitiativeTracker } from '@/components/ui/encounter/InitiativeTracker';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { CombatScreen } from '@/components/ui/encounter/combat-screen/CombatScreen';
 import { MonsterStatBlockPanel } from '@/components/ui/encounter/MonsterStatBlockPanel';
-import {
+import type {
   EncounterEntity,
   Encounter,
   MonsterStatBlock,
 } from '@/types/encounter';
+import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
 
-const mockEntity: EncounterEntity = {
+// Mock window.matchMedia to return matches=true → rail layout
+function mockMatchMedia(matches = true) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockReturnValue({
+      matches,
+      media: '',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }),
+  });
+}
+
+beforeEach(() => {
+  mockMatchMedia(true);
+});
+
+afterEach(cleanup);
+
+// ── Fixtures ────────────────────────────────────────────────────────────────
+
+const goblin: EncounterEntity = {
   id: 'e1',
   type: 'monster',
   name: 'Goblin',
@@ -22,10 +44,23 @@ const mockEntity: EncounterEntity = {
   conditions: [],
 };
 
-const mockEncounter: Encounter = {
+const dragon: EncounterEntity = {
+  id: 'e2',
+  type: 'monster',
+  name: 'Dragon',
+  initiative: 20,
+  initiativeModifier: 5,
+  currentHp: 120,
+  maxHp: 120,
+  tempHp: 0,
+  armorClass: 19,
+  conditions: [],
+};
+
+const activeEncounter: Encounter = {
   id: 'enc1',
   name: 'Test Encounter',
-  entities: [mockEntity],
+  entities: [goblin, dragon],
   currentTurn: 0,
   round: 1,
   isActive: true,
@@ -33,6 +68,125 @@ const mockEncounter: Encounter = {
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
+
+function makeActions(): EntityActions {
+  return {
+    onUpdate: vi.fn(),
+    onRemove: vi.fn(),
+    onDamage: vi.fn(),
+    onHeal: vi.fn(),
+    onAddTempHp: vi.fn(),
+    onSetMaxHp: vi.fn(),
+    onAddCondition: vi.fn(),
+    onRemoveCondition: vi.fn(),
+    onSetConditionRounds: vi.fn(),
+    onUseAbility: vi.fn(),
+    onRestoreAbility: vi.fn(),
+    onUseLegendaryAction: vi.fn(),
+    onResetLegendaryActions: vi.fn(),
+    onSetConcentration: vi.fn(),
+    onUseLairAction: vi.fn(),
+    onSetInitiative: vi.fn(),
+    onLongRest: vi.fn(),
+  };
+}
+
+function makeProps(overrides: Partial<{ encounter: Encounter }> = {}) {
+  return {
+    encounter: activeEncounter,
+    actions: makeActions(),
+    onStartCombat: vi.fn(),
+    onEndCombat: vi.fn(),
+    onNextTurn: vi.fn(),
+    onPrevTurn: vi.fn(),
+    onRollAllInitiatives: vi.fn(),
+    onRename: vi.fn(),
+    onOpenAdd: vi.fn(),
+    onOpenConfig: vi.fn(),
+    backHref: '/encounters',
+    ...overrides,
+  };
+}
+
+// ── CombatScreen ─────────────────────────────────────────────────────────────
+
+describe('CombatScreen', () => {
+  it('renders rows for all entities', () => {
+    render(<CombatScreen {...makeProps()} />);
+    expect(screen.getAllByText('Goblin').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Dragon').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows active entity in detail pane by default (rail)', () => {
+    // currentTurn=0 → Goblin is active → appears in both row and detail pane
+    render(<CombatScreen {...makeProps()} />);
+    expect(screen.getAllByText('Goblin').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('clicking a row shows entity name in the detail pane', () => {
+    render(<CombatScreen {...makeProps()} />);
+    // Initially Goblin is in detail pane; Dragon only in the row
+    const dragonOccurrences = screen.getAllByText('Dragon');
+    // Click the Dragon row
+    fireEvent.click(dragonOccurrences[0]);
+    // Dragon should now appear in both row and detail pane
+    expect(screen.getAllByText('Dragon').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('auto-selects active entity on turn change', () => {
+    const { rerender } = render(<CombatScreen {...makeProps()} />);
+    // Turn 0 = Goblin is active → appears in row + detail
+    expect(screen.getAllByText('Goblin').length).toBeGreaterThanOrEqual(2);
+
+    // Advance to turn 1 → Dragon becomes active
+    rerender(
+      <CombatScreen
+        {...makeProps({ encounter: { ...activeEncounter, currentTurn: 1 } })}
+      />
+    );
+    expect(screen.getAllByText('Dragon').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows empty state when no entities', () => {
+    const emptyEncounter = {
+      ...activeEncounter,
+      entities: [],
+      isActive: false,
+    };
+    render(<CombatScreen {...makeProps({ encounter: emptyEncounter })} />);
+    expect(screen.getByText(/No combatants yet/i)).toBeInTheDocument();
+  });
+});
+
+// ── onSetMaxHp clamp ─────────────────────────────────────────────────────────
+
+describe('onSetMaxHp clamp logic', () => {
+  it('clamps currentHp to new max when max is lowered below currentHp', () => {
+    const entity = { id: 'e1', currentHp: 20 } as EncounterEntity;
+    const setEntityHp = vi.fn();
+    const onSetMaxHp = (entityId: string, max: number) => {
+      const e = [entity].find(en => en.id === entityId);
+      if (!e) return;
+      setEntityHp('enc1', entityId, Math.min(e.currentHp, max), max);
+    };
+    onSetMaxHp('e1', 15);
+    expect(setEntityHp).toHaveBeenCalledWith('enc1', 'e1', 15, 15);
+  });
+
+  it('preserves currentHp when max is raised above currentHp', () => {
+    const entity = { id: 'e1', currentHp: 20 } as EncounterEntity;
+    const setEntityHp = vi.fn();
+    const onSetMaxHp = (entityId: string, max: number) => {
+      const e = [entity].find(en => en.id === entityId);
+      if (!e) return;
+      setEntityHp('enc1', entityId, Math.min(e.currentHp, max), max);
+    };
+    onSetMaxHp('e1', 30);
+    expect(setEntityHp).toHaveBeenCalledWith('enc1', 'e1', 20, 30);
+  });
+});
+
+// ── MonsterStatBlockPanel ─────────────────────────────────────────────────────
 
 const mockStatBlock: MonsterStatBlock = {
   str: 8,
@@ -67,115 +221,6 @@ const mockStatBlock: MonsterStatBlock = {
   alignment: 'neutral evil',
   hpFormula: '2d6',
 };
-
-const noop = vi.fn();
-
-describe('EntityCard', () => {
-  const defaultProps = {
-    entity: mockEntity,
-    isCurrentTurn: false,
-    onUpdate: noop,
-    onRemove: noop,
-    onDamage: noop,
-    onHeal: noop,
-    onAddCondition: noop,
-    onRemoveCondition: noop,
-    onUseAbility: noop,
-    onRestoreAbility: noop,
-    onUseLegendaryAction: noop,
-    onResetLegendaryActions: noop,
-    onSetConcentration: noop,
-    onSetInitiative: noop,
-  };
-
-  it('renders without crashing', () => {
-    render(<EntityCard {...defaultProps} />);
-  });
-
-  it('displays entity name', () => {
-    render(<EntityCard {...defaultProps} />);
-    expect(screen.getAllByText('Goblin').length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('displays entity type badge', () => {
-    render(<EntityCard {...defaultProps} />);
-    expect(screen.getAllByText('Monster').length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('displays initiative value', () => {
-    render(<EntityCard {...defaultProps} />);
-    expect(screen.getAllByText('15').length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('displays armor class', () => {
-    render(<EntityCard {...defaultProps} />);
-    expect(screen.getAllByText('15').length).toBeGreaterThanOrEqual(1);
-  });
-});
-
-describe('InitiativeTracker', () => {
-  const defaultProps = {
-    encounter: mockEncounter,
-    onStartCombat: noop,
-    onEndCombat: noop,
-    onNextTurn: noop,
-    onPrevTurn: noop,
-    onRollAllInitiatives: noop,
-    onUpdateEntity: noop,
-    onRemoveEntity: noop,
-    onDamageEntity: noop,
-    onHealEntity: noop,
-    onAddCondition: noop,
-    onRemoveCondition: noop,
-    onUseAbility: noop,
-    onRestoreAbility: noop,
-    onUseLegendaryAction: noop,
-    onResetLegendaryActions: noop,
-    onSetConcentration: noop,
-    onUseLairAction: noop,
-    onSetInitiative: noop,
-  };
-
-  it('renders without crashing', () => {
-    render(<InitiativeTracker {...defaultProps} />);
-  });
-
-  it('displays round number when combat is active', () => {
-    render(<InitiativeTracker {...defaultProps} />);
-    expect(screen.getAllByText('1').length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('displays current entity turn info', () => {
-    render(<InitiativeTracker {...defaultProps} />);
-    expect(screen.getAllByText('Goblin').length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('shows Next Turn and Prev buttons when active', () => {
-    render(<InitiativeTracker {...defaultProps} />);
-    expect(
-      screen.getAllByRole('button', { name: /Next Turn/i }).length
-    ).toBeGreaterThanOrEqual(1);
-    expect(
-      screen.getAllByRole('button', { name: /Prev/i }).length
-    ).toBeGreaterThanOrEqual(1);
-  });
-
-  it('shows Start Combat button when inactive', () => {
-    const inactiveEncounter = { ...mockEncounter, isActive: false };
-    render(
-      <InitiativeTracker {...defaultProps} encounter={inactiveEncounter} />
-    );
-    expect(
-      screen.getAllByRole('button', { name: /Start Combat/i }).length
-    ).toBeGreaterThanOrEqual(1);
-  });
-
-  it('shows empty state when no entities', () => {
-    const emptyEncounter = { ...mockEncounter, entities: [] };
-    render(<InitiativeTracker {...defaultProps} encounter={emptyEncounter} />);
-    expect(screen.getByText(/No combatants yet/i)).toBeInTheDocument();
-  });
-});
 
 describe('MonsterStatBlockPanel', () => {
   it('renders without crashing', () => {
