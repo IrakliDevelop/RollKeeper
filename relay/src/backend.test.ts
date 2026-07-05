@@ -97,4 +97,125 @@ describe('BufferedRedisBackend', () => {
     await b.stopAndFlush();
     expect(calls.filter(c => c.method === 'hSet')).toHaveLength(1);
   });
+
+  it('a failed flush re-marks entries and retries next interval without losing interim writes', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { redis, calls } = fakeRedis();
+    let fail = true;
+    const origHSet = redis.hSet;
+    redis.hSet = async (key, fv) => {
+      await origHSet(key, fv);
+      if (fail) throw new Error('boom');
+    };
+    const b = new BufferedRedisBackend(redis, { flushIntervalMs: 1000 });
+    await b.apply('r1', up('a'));
+    await vi.advanceTimersByTimeAsync(1000); // flush fails
+    expect(calls.filter(c => c.method === 'hSet')).toHaveLength(1);
+    fail = false;
+    await b.apply('r1', up('b')); // interim write between failure and retry
+    await vi.advanceTimersByTimeAsync(1000); // retry succeeds
+    const hsets = calls.filter(c => c.method === 'hSet');
+    expect(hsets).toHaveLength(2);
+    // re-marked 'a' AND the interim 'b' are both in the retried payload
+    expect(
+      Object.keys(hsets[1].args[1] as Record<string, string>).sort()
+    ).toEqual(['a', 'b']);
+  });
+
+  it('a failed clear sets pendingClear and retries del before writing new upserts', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { redis, calls } = fakeRedis();
+    let failDel = true;
+    const origDel = redis.del;
+    redis.del = async key => {
+      await origDel(key);
+      if (failDel) throw new Error('down');
+    };
+    const b = new BufferedRedisBackend(redis, { flushIntervalMs: 1000 });
+    await b.apply('r1', up('a'));
+    await b.apply('r1', { kind: 'clear' } as SyncOp); // del fails, swallowed
+    expect(await b.snapshot('r1')).toEqual([]); // memory still cleared
+    failDel = false;
+    await b.apply('r1', up('b')); // element created after the clear
+    await vi.advanceTimersByTimeAsync(1000);
+    // retried del lands BEFORE the hSet of the post-clear element
+    const order = calls
+      .filter(c => c.method === 'del' || c.method === 'hSet')
+      .map(c => c.method);
+    expect(order).toEqual(['del', 'del', 'hSet']);
+    const hsets = calls.filter(c => c.method === 'hSet');
+    expect(Object.keys(hsets[0].args[1] as Record<string, string>)).toEqual([
+      'b',
+    ]);
+  });
+
+  it('keeps a failed clear pending: no hSet until del succeeds', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { redis, calls } = fakeRedis();
+    let failDel = true;
+    const origDel = redis.del;
+    redis.del = async key => {
+      await origDel(key);
+      if (failDel) throw new Error('down');
+    };
+    const b = new BufferedRedisBackend(redis, { flushIntervalMs: 1000 });
+    await b.apply('r1', up('a'));
+    await b.apply('r1', { kind: 'clear' } as SyncOp); // del fails
+    await b.apply('r1', up('b'));
+    await vi.advanceTimersByTimeAsync(1000); // del fails again -> room skipped
+    expect(calls.filter(c => c.method === 'hSet')).toHaveLength(0);
+    failDel = false;
+    await vi.advanceTimersByTimeAsync(1000); // rescheduled retry: del then hSet
+    expect(calls.filter(c => c.method === 'hSet')).toHaveLength(1);
+  });
+
+  it('evicts idle rooms after idleEvictMs and re-hydrates from redis on next access', async () => {
+    const { redis, calls } = fakeRedis();
+    const b = new BufferedRedisBackend(redis, {
+      flushIntervalMs: 1000,
+      idleEvictMs: 5000,
+    });
+    await b.apply('r1', up('a'));
+    await vi.advanceTimersByTimeAsync(1000); // flush r1; too fresh to evict
+    const hGetAllsR1 = () =>
+      calls.filter(
+        c => c.method === 'hGetAll' && (c.args[0] as string).endsWith(':r1')
+      );
+    expect(hGetAllsR1()).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(5000); // r1 goes idle (no flush scheduled)
+    await b.apply('r2', up('x')); // activity elsewhere schedules a flush
+    await vi.advanceTimersByTimeAsync(1000); // that flush opportunistically evicts r1
+    await b.snapshot('r1'); // next access re-hydrates from redis
+    expect(hGetAllsR1()).toHaveLength(2);
+  });
+
+  it('does not start a second flush while one is still in-flight', async () => {
+    const { redis, calls } = fakeRedis();
+    let release!: () => void;
+    const gate = new Promise<void>(res => {
+      release = res;
+    });
+    const origHSet = redis.hSet;
+    let gated = true;
+    redis.hSet = async (key, fv) => {
+      await origHSet(key, fv);
+      if (gated) await gate;
+    };
+    const b = new BufferedRedisBackend(redis, { flushIntervalMs: 1000 });
+    await b.apply('r1', up('a'));
+    await vi.advanceTimersByTimeAsync(1000); // flush 1 starts, hSet hangs
+    expect(calls.filter(c => c.method === 'hSet')).toHaveLength(1);
+    await b.apply('r1', up('b')); // schedules the next interval
+    await vi.advanceTimersByTimeAsync(1000); // timer fires but flush 1 is in-flight
+    expect(calls.filter(c => c.method === 'hSet')).toHaveLength(1); // still one
+    gated = false;
+    release();
+    await vi.advanceTimersByTimeAsync(0); // let flush 1 finish
+    await vi.advanceTimersByTimeAsync(1000); // rescheduled flush writes 'b'
+    const hsets = calls.filter(c => c.method === 'hSet');
+    expect(hsets).toHaveLength(2);
+    expect(Object.keys(hsets[1].args[1] as Record<string, string>)).toEqual([
+      'b',
+    ]);
+  });
 });

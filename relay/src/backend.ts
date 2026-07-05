@@ -15,6 +15,7 @@ export interface BufferedRedisBackendOptions {
   keyPrefix?: string; // default 'fieldnotes:room:'
   flushIntervalMs?: number; // default 3000
   roomTtlSeconds?: number; // default 172800 (2 days)
+  idleEvictMs?: number; // default 21600000 (6 hours)
 }
 
 interface RoomState {
@@ -22,6 +23,9 @@ interface RoomState {
   dirty: Set<string>;
   removed: Set<string>;
   hydrated: boolean;
+  /** A clear whose redis DEL failed; must be retried before any writes land. */
+  pendingClear: boolean;
+  lastAccess: number;
 }
 
 /**
@@ -29,10 +33,16 @@ interface RoomState {
  * are batched into one hSet + hDel + expire per room per flush interval.
  * Rationale: Upstash bills per command; the stock sync-redis backend issues
  * 1-2 commands per drag-frame op. Single-instance only (state lives here).
+ *
+ * Idle rooms are evicted opportunistically: whenever a flush runs, rooms with
+ * no pending writes whose last access is older than `idleEvictMs` are dropped
+ * from memory (they re-hydrate from Redis on next access). A fully idle
+ * process performs no sweeps — the Redis TTL still bounds persistence.
  */
 export class BufferedRedisBackend implements HubBackend {
   private rooms = new Map<string, RoomState>();
   private timer: NodeJS.Timeout | null = null;
+  private flushing = false;
 
   constructor(
     private redis: BackendRedis,
@@ -51,9 +61,12 @@ export class BufferedRedisBackend implements HubBackend {
         dirty: new Set(),
         removed: new Set(),
         hydrated: false,
+        pendingClear: false,
+        lastAccess: Date.now(),
       };
       this.rooms.set(room, st);
     }
+    st.lastAccess = Date.now();
     if (!st.hydrated) {
       st.hydrated = true; // set first so concurrent callers don't double-hydrate
       const raw = await this.redis.hGetAll(this.key(room));
@@ -96,7 +109,16 @@ export class BufferedRedisBackend implements HubBackend {
       st.elements.clear();
       st.dirty.clear();
       st.removed.clear();
-      await this.redis.del(this.key(room));
+      try {
+        await this.redis.del(this.key(room));
+        st.pendingClear = false;
+      } catch (err) {
+        // memory is already cleared; retry the DEL on the next flush so a
+        // stale Redis hash cannot resurrect elements after a restart
+        st.pendingClear = true;
+        this.schedule();
+        console.error('[backend] clear failed, will retry:', err);
+      }
     }
   }
 
@@ -109,28 +131,62 @@ export class BufferedRedisBackend implements HubBackend {
   }
 
   async flush(): Promise<void> {
+    if (this.flushing) {
+      // a slow flush is still in-flight; don't overlap — try next interval
+      this.schedule();
+      return;
+    }
+    this.flushing = true;
+    try {
+      for (const [room, st] of this.rooms) {
+        const key = this.key(room);
+        if (st.pendingClear) {
+          // the DEL must land before any post-clear writes, otherwise a later
+          // successful DEL would wipe them; skip the room until it succeeds
+          try {
+            await this.redis.del(key);
+            st.pendingClear = false;
+          } catch (err) {
+            this.schedule();
+            console.error('[backend] clear retry failed, will retry:', err);
+            continue;
+          }
+        }
+        if (st.dirty.size === 0 && st.removed.size === 0) continue;
+        const toSet: Record<string, string> = {};
+        for (const id of st.dirty) {
+          const el = st.elements.get(id);
+          if (el) toSet[id] = JSON.stringify(el);
+        }
+        const toDel = [...st.removed];
+        st.dirty.clear();
+        st.removed.clear();
+        try {
+          if (Object.keys(toSet).length > 0) await this.redis.hSet(key, toSet);
+          if (toDel.length > 0) await this.redis.hDel(key, toDel);
+          await this.redis.expire(key, this.opts.roomTtlSeconds ?? 172800);
+        } catch (err) {
+          // put them back and retry on the next flush; the retry rebuilds
+          // payloads from live elements, so interim writes are never lost
+          for (const id of Object.keys(toSet)) st.dirty.add(id);
+          for (const id of toDel) st.removed.add(id);
+          this.schedule();
+          console.error('[backend] flush failed, will retry:', err);
+        }
+      }
+      this.evictIdleRooms();
+    } finally {
+      this.flushing = false;
+    }
+  }
+
+  /** Opportunistic eviction — runs at the end of every flush. */
+  private evictIdleRooms(): void {
+    const idleMs = this.opts.idleEvictMs ?? 6 * 60 * 60 * 1000;
+    const now = Date.now();
     for (const [room, st] of this.rooms) {
-      if (st.dirty.size === 0 && st.removed.size === 0) continue;
-      const key = this.key(room);
-      const toSet: Record<string, string> = {};
-      for (const id of st.dirty) {
-        const el = st.elements.get(id);
-        if (el) toSet[id] = JSON.stringify(el);
-      }
-      const toDel = [...st.removed];
-      st.dirty.clear();
-      st.removed.clear();
-      try {
-        if (Object.keys(toSet).length > 0) await this.redis.hSet(key, toSet);
-        if (toDel.length > 0) await this.redis.hDel(key, toDel);
-        await this.redis.expire(key, this.opts.roomTtlSeconds ?? 172800);
-      } catch (err) {
-        // put them back and retry on the next flush
-        for (const id of Object.keys(toSet)) st.dirty.add(id);
-        for (const id of toDel) st.removed.add(id);
-        this.schedule();
-        console.error('[backend] flush failed, will retry:', err);
-      }
+      if (st.dirty.size > 0 || st.removed.size > 0 || st.pendingClear) continue;
+      if (now - st.lastAccess > idleMs) this.rooms.delete(room);
     }
   }
 
