@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/forms/button';
 import { CombatScreen } from './combat-screen/CombatScreen';
 import type { EntityActions } from './combat-screen/types';
 import { buildEntityActions } from './combat-screen/buildEntityActions';
-import { AddEntityDialog } from './AddEntityDialog';
+import { AddCombatantDialog } from './combat-screen/AddCombatantDialog';
 import { CombatConfigDialog } from './CombatConfigDialog';
 import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
 import { NPCDetailDialog } from '@/components/ui/campaign/NPCDetailDialog';
@@ -280,8 +280,8 @@ export function EncounterView({
         backHref={`/dm/campaign/${campaignCode}/encounters`}
       />
 
-      {/* Add entity dialog */}
-      <AddEntityDialog
+      {/* Add combatant dialog */}
+      <AddCombatantDialog
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
         onAddEntity={entity => {
