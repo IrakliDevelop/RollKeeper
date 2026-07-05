@@ -43,6 +43,7 @@ export class BufferedRedisBackend implements HubBackend {
   private rooms = new Map<string, RoomState>();
   private timer: NodeJS.Timeout | null = null;
   private flushing = false;
+  private flushPromise: Promise<void> | null = null;
 
   constructor(
     private redis: BackendRedis,
@@ -137,6 +138,10 @@ export class BufferedRedisBackend implements HubBackend {
       return;
     }
     this.flushing = true;
+    let resolveFlush!: () => void;
+    this.flushPromise = new Promise<void>(res => {
+      resolveFlush = res;
+    });
     try {
       for (const [room, st] of this.rooms) {
         const key = this.key(room);
@@ -177,6 +182,8 @@ export class BufferedRedisBackend implements HubBackend {
       this.evictIdleRooms();
     } finally {
       this.flushing = false;
+      resolveFlush();
+      this.flushPromise = null;
     }
   }
 
@@ -195,6 +202,10 @@ export class BufferedRedisBackend implements HubBackend {
       clearTimeout(this.timer);
       this.timer = null;
     }
+    // wait out any flush already in progress before running the final one,
+    // otherwise flush() would see `flushing` still true and no-op immediately,
+    // letting SIGTERM exit with unflushed writes.
+    if (this.flushPromise) await this.flushPromise;
     await this.flush();
   }
 }
