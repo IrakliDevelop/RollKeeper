@@ -110,6 +110,12 @@ interface EncounterStoreState {
     conditionId: string,
     updates: Partial<EncounterCondition>
   ) => void;
+  setConditionRounds: (
+    encounterId: string,
+    entityId: string,
+    conditionId: string,
+    rounds: number | null
+  ) => void;
 
   // Abilities/Charges
   useAbility: (
@@ -223,6 +229,34 @@ function getSortedEntities(entities: EncounterEntity[]): EncounterEntity[] {
   }
 
   return result;
+}
+
+function applyTurnStart(
+  entities: EncounterEntity[],
+  incomingTurn: number
+): EncounterEntity[] {
+  return entities.map((e, i) => {
+    if (i !== incomingTurn) return e;
+    let next = e;
+    if (next.hasUsedReaction) next = { ...next, hasUsedReaction: false };
+    if (next.legendaryActions && next.legendaryActions.usedActions > 0) {
+      next = {
+        ...next,
+        legendaryActions: { ...next.legendaryActions, usedActions: 0 },
+      };
+    }
+    if (next.conditions.some(c => typeof c.rounds === 'number')) {
+      next = {
+        ...next,
+        conditions: next.conditions
+          .map(c =>
+            typeof c.rounds === 'number' ? { ...c, rounds: c.rounds - 1 } : c
+          )
+          .filter(c => !(typeof c.rounds === 'number' && c.rounds <= 0)),
+      };
+    }
+    return next;
+  });
 }
 
 export const useEncounterStore = create<EncounterStoreState>()(
@@ -392,14 +426,9 @@ export const useEncounterStore = create<EncounterStoreState>()(
                 });
               }
 
-              // Reset reaction for the entity whose turn is starting
+              // Apply turn-start effects (reaction reset, legendary reset, condition decrement)
               const incomingTurn = isNewRound ? 0 : nextTurn;
-              const incomingEntity = entities[incomingTurn];
-              if (incomingEntity?.hasUsedReaction) {
-                entities = entities.map((e, i) =>
-                  i === incomingTurn ? { ...e, hasUsedReaction: false } : e
-                );
-              }
+              entities = applyTurnStart(entities, incomingTurn);
 
               return {
                 ...enc,
@@ -702,6 +731,32 @@ export const useEncounterStore = create<EncounterStoreState>()(
               conditions: e.conditions.map(c =>
                 c.id === conditionId ? { ...c, ...updates } : c
               ),
+            })
+          ),
+        }));
+      },
+
+      setConditionRounds: (encounterId, entityId, conditionId, rounds) => {
+        set(state => ({
+          encounters: updateEncounterById(
+            state.encounters,
+            encounterId,
+            enc => ({
+              ...enc,
+              entities: enc.entities.map(e =>
+                e.id !== entityId
+                  ? e
+                  : {
+                      ...e,
+                      conditions:
+                        rounds === 0
+                          ? e.conditions.filter(c => c.id !== conditionId)
+                          : e.conditions.map(c =>
+                              c.id === conditionId ? { ...c, rounds } : c
+                            ),
+                    }
+              ),
+              updatedAt: new Date().toISOString(),
             })
           ),
         }));

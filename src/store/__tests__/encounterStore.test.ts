@@ -1216,4 +1216,193 @@ describe('encounterStore', () => {
       expect(entity.hitDice!.current).toBe(5);
     });
   });
+
+  // ── condition rounds ──
+
+  describe('condition rounds', () => {
+    it('decrements timed conditions at start of owner turn and removes at 0', () => {
+      const encId = useEncounterStore.getState().createEncounter('Timed Conds');
+      const _entityIdA = useEncounterStore.getState().addEntity(
+        encId,
+        createMockEncounterEntity({
+          name: 'A',
+          initiative: 20,
+          initiativeModifier: 0,
+        })
+      );
+      const entityIdB = useEncounterStore.getState().addEntity(
+        encId,
+        createMockEncounterEntity({
+          name: 'B',
+          initiative: 10,
+          initiativeModifier: 0,
+        })
+      );
+
+      useEncounterStore
+        .getState()
+        .addCondition(encId, entityIdB, {
+          name: 'Bless',
+          kind: 'buff',
+          rounds: 2,
+          source: 'dm',
+        });
+      useEncounterStore
+        .getState()
+        .addCondition(encId, entityIdB, { name: 'Prone', source: 'dm' });
+
+      useEncounterStore.getState().startCombat(encId); // currentTurn = 0 (A)
+
+      // Advance to B's turn → applyTurnStart on B → Bless: 2→1, Prone untouched
+      useEncounterStore.getState().nextTurn(encId);
+
+      let enc = useEncounterStore.getState().getEncounter(encId)!;
+      let entityB = enc.entities.find(e => e.name === 'B')!;
+      expect(entityB.conditions.find(c => c.name === 'Bless')?.rounds).toBe(1);
+      expect(entityB.conditions.find(c => c.name === 'Prone')).toBeDefined();
+      expect(
+        entityB.conditions.find(c => c.name === 'Prone')?.rounds
+      ).toBeUndefined();
+
+      // Advance to A's turn (new round) → applyTurnStart on A (no timed conds)
+      useEncounterStore.getState().nextTurn(encId);
+      // Advance to B's turn again → applyTurnStart on B → Bless: 1→0 → removed
+      useEncounterStore.getState().nextTurn(encId);
+
+      enc = useEncounterStore.getState().getEncounter(encId)!;
+      entityB = enc.entities.find(e => e.name === 'B')!;
+      expect(entityB.conditions.find(c => c.name === 'Bless')).toBeUndefined();
+      expect(entityB.conditions.find(c => c.name === 'Prone')).toBeDefined();
+    });
+
+    it('setConditionRounds sets, clears (null), and removes at 0', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const entityId = useEncounterStore
+        .getState()
+        .addEntity(encId, createMockEncounterEntity());
+      useEncounterStore
+        .getState()
+        .addCondition(encId, entityId, { name: 'Poisoned', source: 'dm' });
+      const conditionId = useEncounterStore.getState().getEncounter(encId)!
+        .entities[0].conditions[0].id;
+
+      // Set rounds to 3
+      useEncounterStore
+        .getState()
+        .setConditionRounds(encId, entityId, conditionId, 3);
+      expect(
+        useEncounterStore.getState().getEncounter(encId)!.entities[0]
+          .conditions[0].rounds
+      ).toBe(3);
+
+      // Clear to untimed (null)
+      useEncounterStore
+        .getState()
+        .setConditionRounds(encId, entityId, conditionId, null);
+      expect(
+        useEncounterStore.getState().getEncounter(encId)!.entities[0]
+          .conditions[0].rounds
+      ).toBeNull();
+
+      // Set to 0 → condition is removed
+      useEncounterStore
+        .getState()
+        .setConditionRounds(encId, entityId, conditionId, 0);
+      expect(
+        useEncounterStore.getState().getEncounter(encId)!.entities[0].conditions
+      ).toHaveLength(0);
+    });
+
+    it('prevTurn does not decrement rounds', () => {
+      const encId = useEncounterStore.getState().createEncounter('Battle');
+      const _entityIdA = useEncounterStore.getState().addEntity(
+        encId,
+        createMockEncounterEntity({
+          name: 'A',
+          initiative: 20,
+          initiativeModifier: 0,
+        })
+      );
+      const entityIdB = useEncounterStore.getState().addEntity(
+        encId,
+        createMockEncounterEntity({
+          name: 'B',
+          initiative: 10,
+          initiativeModifier: 0,
+        })
+      );
+      useEncounterStore
+        .getState()
+        .addCondition(encId, entityIdB, {
+          name: 'Bless',
+          kind: 'buff',
+          rounds: 2,
+          source: 'dm',
+        });
+
+      useEncounterStore.getState().startCombat(encId); // currentTurn = 0 (A)
+
+      // nextTurn → B's turn → Bless decrements to 1
+      useEncounterStore.getState().nextTurn(encId);
+      const afterNext = useEncounterStore.getState().getEncounter(encId)!;
+      expect(
+        afterNext.entities
+          .find(e => e.name === 'B')!
+          .conditions.find(c => c.name === 'Bless')?.rounds
+      ).toBe(1);
+
+      // prevTurn → back to A; Bless on B must NOT change
+      useEncounterStore.getState().prevTurn(encId);
+      const afterPrev = useEncounterStore.getState().getEncounter(encId)!;
+      expect(
+        afterPrev.entities
+          .find(e => e.name === 'B')!
+          .conditions.find(c => c.name === 'Bless')?.rounds
+      ).toBe(1);
+    });
+  });
+
+  // ── legendary auto-reset ──
+
+  describe('legendary auto-reset', () => {
+    it('resets usedActions to 0 at start of the owner turn', () => {
+      const encId = useEncounterStore.getState().createEncounter('Boss Fight');
+      useEncounterStore.getState().addEntity(
+        encId,
+        createMockEncounterEntity({
+          name: 'Dragon',
+          initiative: 20,
+          initiativeModifier: 0,
+          legendaryActions: {
+            maxActions: 3,
+            usedActions: 2,
+            actions: [
+              { id: 'la-1', name: 'Detect', cost: 1, description: 'Sense' },
+            ],
+          },
+        })
+      );
+      useEncounterStore.getState().addEntity(
+        encId,
+        createMockEncounterEntity({
+          name: 'Fighter',
+          initiative: 10,
+          initiativeModifier: 0,
+        })
+      );
+
+      useEncounterStore.getState().startCombat(encId); // currentTurn = 0 (Dragon, usedActions=2)
+
+      // nextTurn → Fighter's turn → applyTurnStart on Fighter (no legendary)
+      useEncounterStore.getState().nextTurn(encId);
+      // nextTurn → Dragon's turn again (round 2) → applyTurnStart on Dragon → usedActions=0
+      useEncounterStore.getState().nextTurn(encId);
+
+      const entity = useEncounterStore
+        .getState()
+        .getEncounter(encId)!
+        .entities.find(e => e.name === 'Dragon')!;
+      expect(entity.legendaryActions!.usedActions).toBe(0);
+    });
+  });
 });
