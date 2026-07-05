@@ -42,6 +42,12 @@ export function computeSeedIds(
   return local.filter(el => !presentIds.has(el.id)).map(el => el.id);
 }
 
+/** Transport surface the connection manager relies on (WebSocketTransport-compatible). */
+export type BattleMapTransport = Pick<
+  WebSocketTransport,
+  'send' | 'onMessage' | 'onReconnect' | 'onClose' | 'close'
+>;
+
 export interface ManagedConnectionOptions {
   relayUrl: string;
   campaignCode: string;
@@ -51,9 +57,11 @@ export interface ManagedConnectionOptions {
   clientId: string;
   tokenRequest: BattleMapTokenRequest;
   resolveAudience?: (el: CanvasElement) => string | undefined;
-  /** DM only: push local elements missing from the first snapshot. */
+  /** DM only: push local elements missing from each snapshot. */
   seedLocal?: boolean;
   onStatus?: (s: BattleMapConnectionStatus) => void;
+  /** DI seam for tests; defaults to `url => new WebSocketTransport(url)`. */
+  transportFactory?: (url: string) => BattleMapTransport;
 }
 
 const MAX_AUTH_FAILURES = 4;
@@ -71,7 +79,9 @@ export function createManagedBattleMapConnection(
 ): { stop: () => void } {
   let stopped = false;
   let client: SyncClient | null = null;
-  let transport: WebSocketTransport | null = null;
+  let transport: BattleMapTransport | null = null;
+  const transportFactory =
+    opts.transportFactory ?? ((url: string) => new WebSocketTransport(url));
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let attempt = 0;
   let authFailures = 0;
@@ -99,36 +109,55 @@ export function createManagedBattleMapConnection(
     }
 
     const url = `${opts.relayUrl}?room=${encodeURIComponent(room)}&token=${encodeURIComponent(token)}`;
-    const t = new WebSocketTransport(url);
+    const t = transportFactory(url);
     transport = t;
 
-    let sawSnapshot = false;
     // Subscribed BEFORE client.start() so this handler runs first;
     // the deferred seed then runs after SyncClient has applied the merge.
+    // Handles EVERY snapshot addressed to us (not just the first): on a
+    // transport-internal reconnect SyncClient re-requests a snapshot and runs a
+    // destructive reconcile that deletes local elements absent from the hub —
+    // each resync needs a fresh reseed or those elements are lost.
     const unsubMsg = t.onMessage(raw => {
-      if (sawSnapshot) return;
+      let env: {
+        from?: string;
+        op?: { kind?: string; to?: string; elements?: { id: string }[] };
+      };
       try {
-        const msg = JSON.parse(raw) as {
-          kind?: string;
-          elements?: { id: string }[];
-        };
-        if (msg.kind !== 'snapshot') return;
-        sawSnapshot = true;
-        attempt = 0;
-        authFailures = 0;
-        opts.onStatus?.('live');
-        if (opts.seedLocal) {
-          const present = new Set((msg.elements ?? []).map(e => e.id));
-          setTimeout(() => {
-            if (stopped) return;
-            for (const id of computeSeedIds(opts.store.snapshot(), present)) {
-              // no-op update re-emits the element as a local upsert
-              opts.store.update(id, {});
-            }
-          }, 0);
-        }
+        // The sync library wraps every message as { from, op } (see
+        // SyncClient.sendOp) — the op payload lives under env.op.
+        env = JSON.parse(raw) as typeof env;
       } catch {
         // non-JSON frame — ignore
+        return;
+      }
+      const op = env?.op;
+      if (!op || op.kind !== 'snapshot') return;
+      // Snapshots are addressed; ignore ones targeted at other clients.
+      if (op.to !== opts.clientId) return;
+      attempt = 0;
+      authFailures = 0;
+      opts.onStatus?.('live');
+      if (opts.seedLocal) {
+        // Capture local state SYNCHRONOUSLY, before SyncClient's own handler
+        // (subscribed after us) applies the merge/reconcile for this snapshot.
+        const localBefore = opts.store.snapshot();
+        const present = new Set((op.elements ?? []).map(e => e.id));
+        setTimeout(() => {
+          if (stopped) return;
+          const missing = new Set(computeSeedIds(localBefore, present));
+          for (const el of localBefore) {
+            if (!missing.has(el.id)) continue;
+            if (opts.store.getById(el.id)) {
+              // no-op update re-emits the element as a local upsert
+              opts.store.update(el.id, {});
+            } else {
+              // reconcile just deleted it — re-adding re-emits it as a
+              // local upsert so it gets pushed back to the hub
+              opts.store.add(el);
+            }
+          }
+        }, 0);
       }
     });
 
