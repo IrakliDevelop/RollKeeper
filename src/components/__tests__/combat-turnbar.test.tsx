@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { CombatTurnBar } from '@/components/ui/encounter/combat-screen/CombatTurnBar';
+import { CombatAppBar } from '@/components/ui/encounter/combat-screen/CombatAppBar';
 import type { Encounter, EncounterEntity } from '@/types/encounter';
 
 afterEach(cleanup);
@@ -180,5 +181,55 @@ describe('CombatTurnBar — active combat (focus)', () => {
       />
     );
     expect(screen.getByText('Goblin')).toBeInTheDocument();
+  });
+
+  it('End Combat button is reachable and calls onEndCombat', () => {
+    const onEndCombat = vi.fn();
+    render(
+      <CombatTurnBar
+        {...baseProps}
+        layout="focus"
+        encounter={activeEncounter}
+        onEndCombat={onEndCombat}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /end combat/i }));
+    expect(onEndCombat).toHaveBeenCalledOnce();
+  });
+
+  it('HP toggle is reachable and calls onToggleHidePlayerHp', () => {
+    const onToggleHidePlayerHp = vi.fn();
+    render(
+      <CombatTurnBar
+        {...baseProps}
+        layout="focus"
+        encounter={activeEncounter}
+        onToggleHidePlayerHp={onToggleHidePlayerHp}
+      />
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: /hide player hp|show player hp/i })
+    );
+    expect(onToggleHidePlayerHp).toHaveBeenCalledOnce();
+  });
+});
+
+describe('CombatAppBar — rename behavior', () => {
+  it('pressing Escape while editing does not call onRename', () => {
+    const onRename = vi.fn();
+    render(
+      <CombatAppBar
+        name="Old Name"
+        backHref="/"
+        onRename={onRename}
+        onOpenAdd={vi.fn()}
+        onOpenConfig={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByTitle('Click to rename'));
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: 'New Name' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(onRename).not.toHaveBeenCalled();
   });
 });
