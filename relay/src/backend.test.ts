@@ -189,6 +189,45 @@ describe('BufferedRedisBackend', () => {
     expect(hGetAllsR1()).toHaveLength(2);
   });
 
+  it('stopAndFlush awaits an in-flight flush before running the final flush, without losing writes applied during it', async () => {
+    const { redis, calls } = fakeRedis();
+    let release!: () => void;
+    const gate = new Promise<void>(res => {
+      release = res;
+    });
+    const origHSet = redis.hSet;
+    let gated = true;
+    redis.hSet = async (key, fv) => {
+      await origHSet(key, fv);
+      if (gated) await gate;
+    };
+    const b = new BufferedRedisBackend(redis, { flushIntervalMs: 1000 });
+    await b.apply('r1', up('a'));
+    await vi.advanceTimersByTimeAsync(1000); // flush 1 starts, hSet hangs on the gate
+    expect(calls.filter(c => c.method === 'hSet')).toHaveLength(1);
+
+    await b.apply('r1', up('b')); // written while flush 1 is still in-flight
+
+    let resolved = false;
+    const stopPromise = b.stopAndFlush().then(() => {
+      resolved = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(resolved).toBe(false); // must not resolve while flush 1 is still gated
+
+    gated = false;
+    release();
+    await stopPromise;
+
+    expect(resolved).toBe(true);
+    const hsets = calls.filter(c => c.method === 'hSet');
+    expect(hsets).toHaveLength(2); // the in-flight flush + the final flush
+    expect(Object.keys(hsets[1].args[1] as Record<string, string>)).toEqual([
+      'b',
+    ]);
+  });
+
   it('does not start a second flush while one is still in-flight', async () => {
     const { redis, calls } = fakeRedis();
     let release!: () => void;
