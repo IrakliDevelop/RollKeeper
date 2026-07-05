@@ -79,6 +79,7 @@ function DisplayCanvas() {
         defaultTool="hand"
         onReady={handleReady}
         options={{ background: { pattern: 'none' } }}
+        style={{ width: '100%', height: '100%' }}
       />
       {overlayMessage && (
         <div
