@@ -546,7 +546,7 @@ describe('POST /api/campaign/[code]/shared', () => {
     expect(res.status).toBe(400);
   });
 
-  it('updates dmId on campaign record when dmId has drifted', async () => {
+  it('returns 403 and does not update dmId when dmId does not match campaign owner', async () => {
     const originalCampaign = createMockCampaignData({ dmId: 'old-dm-id' });
     seedRedis(campaignKey('TEST'), originalCampaign);
 
@@ -558,11 +558,16 @@ describe('POST /api/campaign/[code]/shared', () => {
         dmId: 'new-dm-id',
       },
     });
-    await POST(req as NextRequest, createRouteParams({ code: 'TEST' }));
+    const res = await POST(
+      req as NextRequest,
+      createRouteParams({ code: 'TEST' })
+    );
+
+    expect(res.status).toBe(403);
 
     const raw = getRedisStore().get(campaignKey('TEST'))!;
     const updated = JSON.parse(raw);
-    expect(updated.dmId).toBe('new-dm-id');
+    expect(updated.dmId).toBe('old-dm-id');
   });
 
   it('does not modify campaign record when dmId matches', async () => {
