@@ -58,6 +58,20 @@ export async function PUT(
 
     const redis = getRedis();
 
+    // Only create when absent (true expiry restore). If a record exists,
+    // the caller must already be its DM — PUT must not transfer ownership.
+    const existingRaw = await redis.get<string>(campaignKey(code));
+    if (existingRaw) {
+      const existing: CampaignData =
+        typeof existingRaw === 'string' ? JSON.parse(existingRaw) : existingRaw;
+      if (existing.dmId !== dmId) {
+        return NextResponse.json(
+          { error: 'dmId does not match campaign owner' },
+          { status: 403 }
+        );
+      }
+    }
+
     const campaignData: CampaignData = {
       dmId,
       campaignName,
