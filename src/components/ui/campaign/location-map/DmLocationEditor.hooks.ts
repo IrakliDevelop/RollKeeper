@@ -597,6 +597,9 @@ export function useDmLocationEditor(
   }, [getVp]);
 
   const handleSyncToPlayers = useCallback(async () => {
+    // Battle maps are live-synced via the relay; snapshot push is locations-only.
+    if (mode === 'battlemap') return;
+
     const vp = getVp();
     if (!vp) return;
     setSyncing(true);
@@ -698,29 +701,8 @@ export function useDmLocationEditor(
         updatedAt: new Date().toISOString(),
       };
 
-      // In battlemap mode, broadcast locally for instant TV display updates
-      if (mode === 'battlemap') {
-        try {
-          const channel = new BroadcastChannel(
-            `battlemap:${campaignCode}:${location.id}`
-          );
-          channel.postMessage(syncData);
-          channel.close();
-        } catch {
-          // BroadcastChannel not supported — Redis fallback handles it
-        }
-      }
-
-      const payloadKey = mode === 'battlemap' ? 'battleMap' : 'location';
-      const payload = {
-        dmId,
-        [payloadKey]: syncData,
-      };
-
-      const endpoint =
-        mode === 'battlemap'
-          ? `/api/campaign/${campaignCode}/battlemaps/${location.id}`
-          : `/api/campaign/${campaignCode}/locations/${location.id}`;
+      const payload = { dmId, location: syncData };
+      const endpoint = `/api/campaign/${campaignCode}/locations/${location.id}`;
 
       const res = await fetch(endpoint, {
         method: 'POST',
