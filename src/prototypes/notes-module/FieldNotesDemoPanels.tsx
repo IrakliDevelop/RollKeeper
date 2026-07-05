@@ -2,9 +2,10 @@
 
 import * as React from 'react';
 
-import type { ShapeKind } from '@fieldnotes/core';
+import type { ShapeKind, AlignEdge, ArrowStrokeStyle } from '@fieldnotes/core';
 import type {
   ArrowToolOptions,
+  EraserToolOptions,
   NoteToolOptions,
   PencilToolOptions,
   ShapeToolOptions,
@@ -16,11 +17,19 @@ import {
   useElements,
   useHistory,
   useLayers,
+  useSelection,
+  useSelectionOps,
+  useSelectionStyle,
   useToolOptions,
   useViewport,
 } from '@fieldnotes/react';
-import { SelectTool } from '@fieldnotes/core';
 import {
+  AlignCenterHorizontal,
+  AlignCenterVertical,
+  AlignEndHorizontal,
+  AlignEndVertical,
+  AlignStartHorizontal,
+  AlignStartVertical,
   ArrowUpRight,
   ChevronDown,
   ChevronUp,
@@ -28,26 +37,34 @@ import {
   Eraser,
   Eye,
   EyeOff,
+  FileCode2,
   Grid3X3,
+  Group,
   Hand,
   Image as ImageIcon,
   Layers,
   Lock,
+  Maximize2,
   MousePointer2,
+  MoveHorizontal,
+  MoveVertical,
   PanelLeftClose,
   PanelLeftOpen,
   Pencil,
   Plus,
   Redo2,
+  Ruler,
   Scissors,
   Shapes,
   StickyNote,
   Trash2,
   Type,
   Undo2,
+  Ungroup,
   Unlock,
   Upload,
   X,
+  Zap,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
@@ -66,6 +83,7 @@ const TOOL_DEFS: {
   { name: 'text', icon: Type, label: 'Text' },
   { name: 'shape', icon: Shapes, label: 'Shape' },
   { name: 'image', icon: ImageIcon, label: 'Image' },
+  { name: 'laser', icon: Zap, label: 'Laser Pointer' },
 ];
 
 /** Viewport exposes historyRecorder for batched deletes (same as keyboard). */
@@ -73,40 +91,203 @@ type ViewportHistoryAccess = {
   historyRecorder: { begin: () => void; commit: () => void };
 };
 
-/** Selection changes do not always emit store events; mirror prototype pointer + tool listeners. */
-function useSelectToolSelectionCount() {
+const ALIGN_BUTTONS: {
+  edge: AlignEdge;
+  icon: typeof AlignStartHorizontal;
+  label: string;
+}[] = [
+  { edge: 'left', icon: AlignStartHorizontal, label: 'Align left' },
+  { edge: 'center-x', icon: AlignCenterHorizontal, label: 'Align center' },
+  { edge: 'right', icon: AlignEndHorizontal, label: 'Align right' },
+  { edge: 'top', icon: AlignStartVertical, label: 'Align top' },
+  { edge: 'middle', icon: AlignCenterVertical, label: 'Align middle' },
+  { edge: 'bottom', icon: AlignEndVertical, label: 'Align bottom' },
+];
+
+const ARROW_STYLES: { value: ArrowStrokeStyle; label: string }[] = [
+  { value: 'solid', label: 'Solid' },
+  { value: 'dashed', label: 'Dashed' },
+  { value: 'dotted', label: 'Dotted' },
+];
+
+function ToolbarIconButton({
+  active,
+  disabled,
+  title,
+  onClick,
+  children,
+  className = '',
+}: {
+  active?: boolean;
+  disabled?: boolean;
+  title: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`rounded-md p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${className} ${
+        active
+          ? 'bg-indigo-100 text-indigo-700'
+          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700 disabled:hover:bg-transparent disabled:hover:text-slate-500'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function FieldNotesDemoSelectionBar() {
   const viewport = useViewport();
-  const [tick, setTick] = React.useState(0);
+  const {
+    selectedCount,
+    canGroup,
+    canUngroup,
+    canAlign,
+    canDistribute,
+    isLocked,
+    group,
+    ungroup,
+    toggleLock,
+    align,
+    distribute,
+  } = useSelectionOps();
+  const selectedIds = useSelection();
+  const [selectionStyle, applySelectionStyle] = useSelectionStyle();
 
-  React.useEffect(() => {
-    const bump = () => setTick(t => t + 1);
-    const wrapper = viewport.domLayer.parentElement;
-    if (wrapper) {
-      wrapper.addEventListener('pointerdown', bump, { passive: true });
-      wrapper.addEventListener('pointerup', bump, { passive: true });
-      wrapper.addEventListener('pointercancel', bump, { passive: true });
+  if (selectedCount === 0) return null;
+
+  const handleZOrder = (action: 'front' | 'back' | 'forward' | 'backward') => {
+    for (const id of selectedIds) {
+      if (action === 'front') viewport.store.bringToFront(id);
+      else if (action === 'back') viewport.store.sendToBack(id);
+      else if (action === 'forward') viewport.store.bringForward(id);
+      else viewport.store.sendBackward(id);
     }
-    const u1 = viewport.toolManager.onChange(bump);
-    const u2 = viewport.store.onChange(bump);
-    return () => {
-      if (wrapper) {
-        wrapper.removeEventListener('pointerdown', bump);
-        wrapper.removeEventListener('pointerup', bump);
-        wrapper.removeEventListener('pointercancel', bump);
-      }
-      u1();
-      u2();
-    };
-  }, [viewport]);
+    viewport.requestRender();
+  };
 
-  return React.useMemo(() => {
-    void tick;
-    if (viewport.toolManager.activeTool?.name !== 'select') return 0;
-    const selectTool = viewport.toolManager.getTool<SelectTool>('select');
-    if (!selectTool) return 0;
-    return selectTool.selectedIds.filter(id => viewport.store.getById(id))
-      .length;
-  }, [viewport, tick]);
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-indigo-100 bg-indigo-50/60 px-3 py-1.5">
+      <span className="text-xs font-semibold text-indigo-800">
+        {selectedCount} selected
+      </span>
+
+      <div className="mx-1 h-5 w-px bg-indigo-200" />
+
+      <ToolbarIconButton
+        title="Group (Ctrl+G)"
+        disabled={!canGroup}
+        onClick={group}
+      >
+        <Group size={15} />
+      </ToolbarIconButton>
+      <ToolbarIconButton
+        title="Ungroup (Ctrl+Shift+G)"
+        disabled={!canUngroup}
+        onClick={ungroup}
+      >
+        <Ungroup size={15} />
+      </ToolbarIconButton>
+      <ToolbarIconButton
+        title={isLocked ? 'Unlock (Ctrl+Shift+L)' : 'Lock (Ctrl+Shift+L)'}
+        active={isLocked === true}
+        disabled={isLocked === null}
+        onClick={toggleLock}
+      >
+        {isLocked ? <Lock size={15} /> : <Unlock size={15} />}
+      </ToolbarIconButton>
+
+      <div className="mx-1 h-5 w-px bg-indigo-200" />
+
+      {ALIGN_BUTTONS.map(({ edge, icon: Icon, label }) => (
+        <ToolbarIconButton
+          key={edge}
+          title={label}
+          disabled={!canAlign}
+          onClick={() => align(edge)}
+        >
+          <Icon size={15} />
+        </ToolbarIconButton>
+      ))}
+
+      <ToolbarIconButton
+        title="Distribute horizontally"
+        disabled={!canDistribute}
+        onClick={() => distribute('horizontal')}
+      >
+        <MoveHorizontal size={15} />
+      </ToolbarIconButton>
+      <ToolbarIconButton
+        title="Distribute vertically"
+        disabled={!canDistribute}
+        onClick={() => distribute('vertical')}
+      >
+        <MoveVertical size={15} />
+      </ToolbarIconButton>
+
+      <div className="mx-1 h-5 w-px bg-indigo-200" />
+
+      <ToolbarIconButton
+        title="Bring to front"
+        onClick={() => handleZOrder('front')}
+      >
+        <ChevronUp size={15} />
+      </ToolbarIconButton>
+      <ToolbarIconButton
+        title="Send to back"
+        onClick={() => handleZOrder('back')}
+      >
+        <ChevronDown size={15} />
+      </ToolbarIconButton>
+
+      {selectionStyle && (
+        <>
+          <div className="mx-1 h-5 w-px bg-indigo-200" />
+          <span className="text-xs font-medium text-slate-500">Style</span>
+          <div className="flex items-center gap-1">
+            {['#334155', '#ef4444', '#3b82f6', '#22c55e', '#eab308'].map(
+              color => (
+                <button
+                  key={color}
+                  type="button"
+                  title={`Apply ${color}`}
+                  onClick={() => applySelectionStyle({ color })}
+                  className={`h-5 w-5 rounded-full border-2 transition-transform hover:scale-105 ${
+                    selectionStyle.color === color
+                      ? 'scale-110 border-indigo-500'
+                      : 'border-slate-300'
+                  }`}
+                  style={{ backgroundColor: color }}
+                />
+              )
+            )}
+          </div>
+          <div className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-white p-0.5">
+            {ARROW_STYLES.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => applySelectionStyle({ strokeStyle: value })}
+                className={`rounded px-2 py-0.5 text-[10px] transition-colors ${
+                  selectionStyle.strokeStyle === value
+                    ? 'bg-indigo-100 font-semibold text-indigo-700'
+                    : 'text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export function FieldNotesDemoToolbar({
@@ -123,7 +304,7 @@ export function FieldNotesDemoToolbar({
   setLayersPanelOpen: (v: boolean | ((p: boolean) => boolean)) => void;
   onPickImageTool: () => void;
   /** Clears React-only state (e.g. placed note cards) after canvas clear */
-  onClearExtras?: () => void;
+  onClearExtras?: () => void | Promise<void>;
 }) {
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
@@ -132,7 +313,8 @@ export function FieldNotesDemoToolbar({
   const viewport = useViewport();
   const gridEls = useElements('grid');
   const snapOn = viewport.snapToGrid;
-  const selectionCount = useSelectToolSelectionCount();
+  const { selectedCount, selectedIds } = useSelectionOps();
+  const [smartGuidesOn, setSmartGuidesOn] = React.useState(true);
 
   const handleSwitchTool = (name: string) => {
     if (name === 'image') {
@@ -158,6 +340,18 @@ export function FieldNotesDemoToolbar({
     viewport.requestRender();
   };
 
+  const handleFitToContent = () => {
+    viewport.fitToContent(48);
+    viewport.requestRender();
+  };
+
+  const toggleSmartGuides = () => {
+    const next = !smartGuidesOn;
+    viewport.setSmartGuides(next);
+    setSmartGuidesOn(next);
+    viewport.requestRender();
+  };
+
   const toggleSnap = () => {
     viewport.setSnapToGrid(!viewport.snapToGrid);
     viewport.requestRender();
@@ -179,14 +373,10 @@ export function FieldNotesDemoToolbar({
   };
 
   const handleDeleteSelected = () => {
-    if (viewport.toolManager.activeTool?.name !== 'select') return;
-    const selectTool = viewport.toolManager.getTool<SelectTool>('select');
-    if (!selectTool) return;
-    const ids = selectTool.selectedIds.filter(id => viewport.store.getById(id));
-    if (ids.length === 0) return;
+    if (selectedIds.length === 0) return;
     const { historyRecorder } = viewport as unknown as ViewportHistoryAccess;
     historyRecorder.begin();
-    for (const id of ids) {
+    for (const id of selectedIds) {
       viewport.store.remove(id);
     }
     historyRecorder.commit();
@@ -202,6 +392,21 @@ export function FieldNotesDemoToolbar({
     a.download = `fieldnotes-canvas-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportSvg = async () => {
+    try {
+      const svg = await viewport.exportSVG({ padding: 24 });
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fieldnotes-canvas-${Date.now()}.svg`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('SVG export failed');
+    }
   };
 
   const handleImport = () => {
@@ -225,11 +430,11 @@ export function FieldNotesDemoToolbar({
     input.click();
   };
 
-  const handleClear = () => {
+  const handleClear = async () => {
     if (viewport.store.count === 0) return;
     if (!confirm('Clear all elements from the canvas?')) return;
     viewport.store.clear();
-    onClearExtras?.();
+    await onClearExtras?.();
     viewport.requestRender();
   };
 
@@ -312,6 +517,14 @@ export function FieldNotesDemoToolbar({
         </button>
         <button
           type="button"
+          onClick={handleFitToContent}
+          className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          title="Fit to content (Shift+1)"
+        >
+          <Maximize2 size={16} />
+        </button>
+        <button
+          type="button"
           onClick={handleZoomIn}
           className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
           title="Zoom In"
@@ -320,6 +533,19 @@ export function FieldNotesDemoToolbar({
         </button>
 
         <div className="mx-2 h-6 w-px bg-slate-200" />
+
+        <button
+          type="button"
+          onClick={toggleSmartGuides}
+          className={`rounded-md p-2 transition-colors ${
+            smartGuidesOn
+              ? 'bg-indigo-100 text-indigo-700'
+              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+          }`}
+          title={smartGuidesOn ? 'Smart guides: On' : 'Smart guides: Off'}
+        >
+          <Ruler size={16} />
+        </button>
 
         <span className="text-xs text-slate-400">
           {elements.length} elements
@@ -380,6 +606,14 @@ export function FieldNotesDemoToolbar({
         </button>
         <button
           type="button"
+          onClick={handleExportSvg}
+          className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          title="Export SVG"
+        >
+          <FileCode2 size={16} />
+        </button>
+        <button
+          type="button"
           onClick={handleImport}
           className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
           title="Import JSON"
@@ -392,9 +626,9 @@ export function FieldNotesDemoToolbar({
         <button
           type="button"
           onClick={handleDeleteSelected}
-          disabled={selectionCount === 0}
+          disabled={selectedCount === 0}
           className="rounded-md p-2 text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-500"
-          title="Remove selected element(s) (Select tool)"
+          title="Remove selected element(s)"
           aria-label="Remove selected canvas elements"
         >
           <Scissors size={16} />
@@ -418,6 +652,9 @@ export function FieldNotesDemoToolOptions() {
   const [pencilOpts, setPencilOpts] = useToolOptions<
     PencilToolOptions & Record<string, unknown>
   >('pencil');
+  const [eraserOpts, setEraserOpts] = useToolOptions<
+    EraserToolOptions & Record<string, unknown>
+  >('eraser');
   const [arrowOpts, setArrowOpts] = useToolOptions<
     ArrowToolOptions & Record<string, unknown>
   >('arrow');
@@ -433,6 +670,7 @@ export function FieldNotesDemoToolOptions() {
 
   if (
     activeTool !== 'pencil' &&
+    activeTool !== 'eraser' &&
     activeTool !== 'arrow' &&
     activeTool !== 'note' &&
     activeTool !== 'text' &&
@@ -442,6 +680,7 @@ export function FieldNotesDemoToolOptions() {
   }
 
   const shapeKind = (shapeOpts?.shape ?? 'rectangle') as ShapeKind;
+  const isHighlighter = pencilOpts?.blendMode === 'multiply';
 
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-1.5">
@@ -453,6 +692,7 @@ export function FieldNotesDemoToolOptions() {
               [
                 { value: 'rectangle' as const, label: 'Rectangle' },
                 { value: 'ellipse' as const, label: 'Ellipse' },
+                { value: 'line' as const, label: 'Line' },
               ] as const
             ).map(({ value, label }) => (
               <button
@@ -684,6 +924,89 @@ export function FieldNotesDemoToolOptions() {
           <span className="min-w-[28px] text-xs text-slate-500 tabular-nums">
             {shapeOpts.strokeWidth ?? 2}px
           </span>
+        </>
+      )}
+
+      {activeTool === 'arrow' && arrowOpts && (
+        <>
+          <div className="mx-1 h-6 w-px bg-slate-200" />
+          <span className="text-xs font-medium text-slate-500">Stroke</span>
+          <div className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-white p-0.5">
+            {ARROW_STYLES.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setArrowOpts({ strokeStyle: value })}
+                className={`rounded px-2 py-1 text-xs transition-colors ${
+                  (arrowOpts.strokeStyle ?? 'solid') === value
+                    ? 'bg-indigo-100 font-semibold text-indigo-700'
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {activeTool === 'pencil' && pencilOpts && (
+        <>
+          <div className="mx-1 h-6 w-px bg-slate-200" />
+          <button
+            type="button"
+            onClick={() =>
+              setPencilOpts(
+                isHighlighter
+                  ? {
+                      blendMode: undefined,
+                      opacity: undefined,
+                      color: '#334155',
+                    }
+                  : {
+                      blendMode: 'multiply',
+                      opacity: 0.45,
+                      color: '#eab308',
+                      width: Math.max(pencilOpts.width ?? 2, 8),
+                    }
+              )
+            }
+            className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+              isHighlighter
+                ? 'bg-yellow-100 text-yellow-800'
+                : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            {isHighlighter ? 'Highlighter on' : 'Highlighter off'}
+          </button>
+        </>
+      )}
+
+      {activeTool === 'eraser' && eraserOpts && (
+        <>
+          <div className="mx-1 h-6 w-px bg-slate-200" />
+          <span className="text-xs font-medium text-slate-500">Mode</span>
+          <div className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-white p-0.5">
+            {(
+              [
+                { value: 'stroke' as const, label: 'Stroke' },
+                { value: 'partial' as const, label: 'Partial' },
+              ] as const
+            ).map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setEraserOpts({ mode: value })}
+                className={`rounded px-2 py-1 text-xs transition-colors ${
+                  (eraserOpts.mode ?? 'stroke') === value
+                    ? 'bg-indigo-100 font-semibold text-indigo-700'
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </>
       )}
 

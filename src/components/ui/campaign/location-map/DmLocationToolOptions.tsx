@@ -6,6 +6,7 @@ import type {
   MeasureToolOptions,
   NoteToolOptions,
   ShapeToolOptions,
+  TemplateRenderStyle,
   TemplateShape,
   TemplateToolOptions,
   TextToolOptions,
@@ -33,6 +34,23 @@ const NOTE_TEXT_COLORS = [
   '#2563eb',
   '#7c3aed',
   '#ffffff',
+];
+
+const TEMPLATE_RENDER_STYLES: {
+  value: TemplateRenderStyle;
+  label: string;
+  title: string;
+}[] = [
+  {
+    value: 'cells',
+    label: 'Cells',
+    title: 'Fill snapped grid cells (square or hex)',
+  },
+  {
+    value: 'geometric',
+    label: 'Smooth',
+    title: 'Smooth geometric shape that rotates and moves freely on hex grids',
+  },
 ];
 
 interface DmLocationToolOptionsProps {
@@ -311,6 +329,25 @@ export default function DmLocationToolOptions({
                 </button>
               )
             )}
+          </div>
+          <div className="bg-divider h-6 w-px" />
+          <span className="text-muted text-xs font-medium">Render</span>
+          <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
+            {TEMPLATE_RENDER_STYLES.map(({ value, label, title }) => (
+              <button
+                key={value}
+                type="button"
+                title={title}
+                onClick={() => setTemplateOpts({ renderStyle: value })}
+                className={`rounded px-2 py-0.5 text-xs transition-colors ${
+                  (templateOpts.renderStyle ?? 'cells') === value
+                    ? 'bg-accent-blue-bg text-accent-blue-text font-semibold'
+                    : 'text-muted hover:bg-surface-raised hover:text-body'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
           <div className="bg-divider h-6 w-px" />
           <span className="text-muted text-xs font-medium">Fill</span>
