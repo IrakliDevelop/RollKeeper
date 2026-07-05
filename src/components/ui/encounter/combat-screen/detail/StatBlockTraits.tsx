@@ -90,6 +90,7 @@ export function StatBlockTraits({
     statBlock.actions.length > 0 ||
     statBlock.bonusActions.length > 0 ||
     statBlock.reactions.length > 0 ||
+    statBlock.lairActions.length > 0 ||
     spellcasting != null;
 
   if (!hasSections) return null;
@@ -100,6 +101,7 @@ export function StatBlockTraits({
       <TraitBlock title="Actions" entries={statBlock.actions} />
       <TraitBlock title="Bonus Actions" entries={statBlock.bonusActions} />
       <TraitBlock title="Reactions" entries={statBlock.reactions} />
+      <TraitBlock title="Lair Actions" entries={statBlock.lairActions} />
       {spellcasting && <SpellcastingBlock spellcasting={spellcasting} />}
     </div>
   );

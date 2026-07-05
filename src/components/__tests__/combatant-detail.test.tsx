@@ -200,6 +200,64 @@ describe('CombatantDetail — monster with full stat block', () => {
     );
   });
 
+  it('decrement from rounds=1 calls onSetConditionRounds with 0 (removal path)', async () => {
+    const actions = makeActions();
+    const user = userEvent.setup();
+    const entityWithOneRound: EncounterEntity = {
+      ...monsterEntity,
+      conditions: [{ id: 'cond2', name: 'Blinded', kind: 'debuff', rounds: 1 }],
+    };
+    render(<CombatantDetail entity={entityWithOneRound} actions={actions} />);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Blinded decrease rounds' })
+    );
+
+    expect(actions.onSetConditionRounds).toHaveBeenCalledWith(
+      'monster-1',
+      'cond2',
+      0
+    );
+  });
+
+  it('decrement when rounds is undefined does NOT call onSetConditionRounds and "–" button is disabled', async () => {
+    const actions = makeActions();
+    const user = userEvent.setup();
+    const entityWithInfinite: EncounterEntity = {
+      ...monsterEntity,
+      conditions: [{ id: 'cond3', name: 'Stunned', kind: 'debuff' }],
+    };
+    render(<CombatantDetail entity={entityWithInfinite} actions={actions} />);
+
+    const decreaseBtn = screen.getByRole('button', {
+      name: 'Stunned decrease rounds',
+    });
+    expect(decreaseBtn).toBeDisabled();
+
+    await user.click(decreaseBtn);
+
+    expect(actions.onSetConditionRounds).not.toHaveBeenCalled();
+  });
+
+  it('stat block with lairActions renders the lair action name in the detail', () => {
+    const actions = makeActions();
+    const entityWithLair: EncounterEntity = {
+      ...monsterEntity,
+      monsterStatBlock: {
+        ...baseStatBlock,
+        lairActions: [
+          {
+            name: 'Grasping Roots',
+            text: '<p>Roots erupt from the ground.</p>',
+          },
+        ],
+      },
+    };
+    render(<CombatantDetail entity={entityWithLair} actions={actions} />);
+
+    expect(screen.getByText('Grasping Roots.')).toBeInTheDocument();
+  });
+
   it('legendary Use is disabled when action cost exceeds remaining', () => {
     const actions = makeActions();
     render(<CombatantDetail entity={monsterEntity} actions={actions} />);
