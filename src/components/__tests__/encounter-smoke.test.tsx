@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { CombatScreen } from '@/components/ui/encounter/combat-screen/CombatScreen';
+import { buildEntityActions } from '@/components/ui/encounter/combat-screen/buildEntityActions';
 import { MonsterStatBlockPanel } from '@/components/ui/encounter/MonsterStatBlockPanel';
 import type {
   EncounterEntity,
@@ -158,31 +159,121 @@ describe('CombatScreen', () => {
   });
 });
 
-// ── onSetMaxHp clamp ─────────────────────────────────────────────────────────
+// ── helpers for buildEntityActions tests ─────────────────────────────────────
 
-describe('onSetMaxHp clamp logic', () => {
+const BUILD_ENC_ID = 'enc-test';
+
+function makeStore() {
+  return {
+    updateEntity: vi.fn(),
+    removeEntity: vi.fn(),
+    damageEntity: vi.fn(),
+    healEntity: vi.fn(),
+    addTempHp: vi.fn(),
+    setEntityHp: vi.fn(),
+    addCondition: vi.fn(),
+    removeCondition: vi.fn(),
+    setConditionRounds: vi.fn(),
+    useAbility: vi.fn(),
+    restoreAbility: vi.fn(),
+    useLegendaryAction: vi.fn(),
+    resetLegendaryActions: vi.fn(),
+    setConcentration: vi.fn(),
+    useLairAction: vi.fn(),
+    setInitiative: vi.fn(),
+    longRestEntity: vi.fn(),
+  };
+}
+
+function makeBuildEncounter(entities: EncounterEntity[]): Encounter {
+  return {
+    id: BUILD_ENC_ID,
+    name: 'Build Test',
+    entities,
+    currentTurn: 0,
+    round: 1,
+    isActive: false,
+    sortOrder: 'initiative',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+// ── buildEntityActions › onSetMaxHp ──────────────────────────────────────────
+
+describe('buildEntityActions › onSetMaxHp', () => {
   it('clamps currentHp to new max when max is lowered below currentHp', () => {
-    const entity = { id: 'e1', currentHp: 20 } as EncounterEntity;
-    const setEntityHp = vi.fn();
-    const onSetMaxHp = (entityId: string, max: number) => {
-      const e = [entity].find(en => en.id === entityId);
-      if (!e) return;
-      setEntityHp('enc1', entityId, Math.min(e.currentHp, max), max);
+    const entity: EncounterEntity = {
+      ...goblin,
+      id: 'e1',
+      currentHp: 10,
+      maxHp: 12,
     };
-    onSetMaxHp('e1', 15);
-    expect(setEntityHp).toHaveBeenCalledWith('enc1', 'e1', 15, 15);
+    const store = makeStore();
+    const actions = buildEntityActions({
+      encounterId: BUILD_ENC_ID,
+      encounter: makeBuildEncounter([entity]),
+      store,
+      syncPlayerEffects: vi.fn(),
+    });
+
+    actions.onSetMaxHp('e1', 5);
+    expect(store.setEntityHp).toHaveBeenCalledWith(BUILD_ENC_ID, 'e1', 5, 5);
   });
 
   it('preserves currentHp when max is raised above currentHp', () => {
-    const entity = { id: 'e1', currentHp: 20 } as EncounterEntity;
-    const setEntityHp = vi.fn();
-    const onSetMaxHp = (entityId: string, max: number) => {
-      const e = [entity].find(en => en.id === entityId);
-      if (!e) return;
-      setEntityHp('enc1', entityId, Math.min(e.currentHp, max), max);
+    const entity: EncounterEntity = {
+      ...goblin,
+      id: 'e1',
+      currentHp: 10,
+      maxHp: 12,
     };
-    onSetMaxHp('e1', 30);
-    expect(setEntityHp).toHaveBeenCalledWith('enc1', 'e1', 20, 30);
+    const store = makeStore();
+    const actions = buildEntityActions({
+      encounterId: BUILD_ENC_ID,
+      encounter: makeBuildEncounter([entity]),
+      store,
+      syncPlayerEffects: vi.fn(),
+    });
+
+    actions.onSetMaxHp('e1', 20);
+    expect(store.setEntityHp).toHaveBeenCalledWith(BUILD_ENC_ID, 'e1', 10, 20);
+  });
+});
+
+// ── buildEntityActions › summon cascade ──────────────────────────────────────
+
+describe('buildEntityActions › summon cascade on remove', () => {
+  it('also removes summon entities when a player entity is removed', () => {
+    const player: EncounterEntity = {
+      ...goblin,
+      id: 'p1-entity',
+      type: 'player',
+      playerCharacterId: 'p1',
+    };
+    const summon: EncounterEntity = {
+      ...goblin,
+      id: 's1-entity',
+      type: 'monster',
+      summonOwnerId: 'p1',
+    };
+    const other: EncounterEntity = { ...goblin, id: 'o1-entity' };
+    const store = makeStore();
+    const actions = buildEntityActions({
+      encounterId: BUILD_ENC_ID,
+      encounter: makeBuildEncounter([player, summon, other]),
+      store,
+      syncPlayerEffects: vi.fn(),
+    });
+
+    actions.onRemove('p1-entity');
+
+    expect(store.removeEntity).toHaveBeenCalledWith(BUILD_ENC_ID, 's1-entity');
+    expect(store.removeEntity).toHaveBeenCalledWith(BUILD_ENC_ID, 'p1-entity');
+    expect(store.removeEntity).not.toHaveBeenCalledWith(
+      BUILD_ENC_ID,
+      'o1-entity'
+    );
   });
 });
 

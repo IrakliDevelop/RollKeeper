@@ -50,6 +50,7 @@ export function FocusLayout({
           entities.map((entity, index) => {
             const isEntityActive = isActive && index === currentTurn;
             const pcId = entity.playerCharacterId;
+            const syncId = pcId ?? entity.summonOwnerId;
             const counterValue =
               pcId !== undefined ? playerCounterValues?.[pcId] : undefined;
 
@@ -64,7 +65,7 @@ export function FocusLayout({
                     isOnDeck={false}
                     hidePlayerHp={hidePlayerHp}
                     lastSynced={
-                      pcId !== undefined ? playerSyncMap?.[pcId] : undefined
+                      syncId !== undefined ? playerSyncMap?.[syncId] : undefined
                     }
                     counterLabel={customCounterLabel}
                     counterValue={counterValue}
@@ -96,7 +97,7 @@ export function FocusLayout({
                 isOnDeck={onDeckEntity?.id === entity.id}
                 hidePlayerHp={hidePlayerHp}
                 lastSynced={
-                  pcId !== undefined ? playerSyncMap?.[pcId] : undefined
+                  syncId !== undefined ? playerSyncMap?.[syncId] : undefined
                 }
                 counterLabel={customCounterLabel}
                 counterValue={counterValue}

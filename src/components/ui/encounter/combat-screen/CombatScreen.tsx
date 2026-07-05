@@ -51,19 +51,23 @@ export function CombatScreen({
 
   const { entities, currentTurn, isActive } = encounter;
   const onDeckEntity = getOnDeckEntity(encounter);
+  const activeEntityId = entities[currentTurn]?.id;
 
-  // Auto-select active entity when turn changes
+  // Auto-select active entity when turn changes (not on unrelated entity mutations)
   useEffect(() => {
-    if (isActive && entities.length > 0) {
-      const active = entities[currentTurn];
-      if (active) setRailSelectionId(active.id);
-    }
-  }, [isActive, currentTurn, entities]);
+    if (isActive && activeEntityId) setRailSelectionId(activeEntityId);
+  }, [isActive, currentTurn, activeEntityId]);
 
   const detailEntity =
     entities.find(e => e.id === railSelectionId) ??
     entities[currentTurn] ??
     entities[0];
+
+  const detailPcId = detailEntity?.playerCharacterId;
+  const detailOpenSheet =
+    detailPcId !== undefined
+      ? () => actions.onViewPlayer?.(detailPcId)
+      : undefined;
 
   const appBar = (
     <CombatAppBar
@@ -107,6 +111,7 @@ export function CombatScreen({
               <div className="space-y-2 p-3">
                 {entities.map((entity, index) => {
                   const pcId = entity.playerCharacterId;
+                  const syncId = pcId ?? entity.summonOwnerId;
                   const counterValue =
                     pcId !== undefined
                       ? playerCounterValues?.[pcId]
@@ -121,7 +126,9 @@ export function CombatScreen({
                       isOnDeck={onDeckEntity?.id === entity.id}
                       hidePlayerHp={hidePlayerHp}
                       lastSynced={
-                        pcId !== undefined ? playerSyncMap?.[pcId] : undefined
+                        syncId !== undefined
+                          ? playerSyncMap?.[syncId]
+                          : undefined
                       }
                       counterLabel={customCounterLabel}
                       counterValue={counterValue}
@@ -139,12 +146,7 @@ export function CombatScreen({
               <CombatantDetail
                 entity={detailEntity}
                 actions={actions}
-                onOpenSheet={(() => {
-                  const pcId = detailEntity.playerCharacterId;
-                  return pcId !== undefined
-                    ? () => actions.onViewPlayer?.(pcId)
-                    : undefined;
-                })()}
+                onOpenSheet={detailOpenSheet}
               />
             )}
           </div>
