@@ -95,6 +95,13 @@ export interface TurnEndRequest {
   requestedAt: string; // ISO timestamp
 }
 
+// Live battle map activation (DM → players via shared state)
+export interface SharedBattleMapState {
+  activeBattleMapId: string | null;
+  name?: string;
+  updatedAt: string;
+}
+
 // Full shared state envelope returned by GET
 export interface SharedCampaignState {
   calendar: SharedCalendarPlayer | null;
@@ -103,6 +110,7 @@ export interface SharedCampaignState {
   customCounter: { label: string; value: number } | null;
   transfers: ItemTransfer[];
   initiative: SharedInitiativeState | null;
+  battleMap: SharedBattleMapState | null;
 }
 
 // POST body for DM pushing shared state

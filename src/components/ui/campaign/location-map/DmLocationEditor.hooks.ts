@@ -18,6 +18,7 @@ import {
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useLocationStore } from '@/store/locationStore';
 import { useBattleMapStore } from '@/store/battleMapStore';
+import { useDmBattleMapSync } from '@/hooks/useDmBattleMapSync';
 import {
   createManagedBattleMapConnection,
   type BattleMapConnectionStatus,
@@ -128,6 +129,10 @@ export interface DmLocationEditorState {
   lastSyncedAt: string | null;
   syncStatus: BattleMapConnectionStatus | 'disabled';
 
+  // Share with players (battlemap mode only)
+  sharedWithPlayers: boolean;
+  handleToggleShareWithPlayers: () => void;
+
   // Handlers
   handleReady: (vp: Viewport) => void;
   handlePickImage: () => void;
@@ -208,6 +213,21 @@ export function useDmLocationEditor(
   // Sync status
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(true);
+
+  // Share with players (battlemap mode only)
+  const { pushActive } = useDmBattleMapSync(campaignCode, dmId);
+  const [sharedWithPlayers, setSharedWithPlayers] = useState(false);
+
+  const handleToggleShareWithPlayers = useCallback(() => {
+    setSharedWithPlayers(prev => {
+      const next = !prev;
+      void pushActive(
+        next ? location.id : null,
+        next ? location.name : undefined
+      );
+      return next;
+    });
+  }, [pushActive, location.id, location.name]);
 
   // Build tools once — no PencilTool or EraserTool for the location editor
   const tools = useMemo<Tool[]>(() => {
@@ -874,6 +894,8 @@ export function useDmLocationEditor(
     hasUnsyncedChanges,
     lastSyncedAt,
     syncStatus,
+    sharedWithPlayers,
+    handleToggleShareWithPlayers,
     imageUploading,
     setImageUploading,
     handleReady,

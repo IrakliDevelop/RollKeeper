@@ -78,6 +78,8 @@ export default function DmLocationToolbar({
   mode,
   onOpenTvDisplay,
   syncStatus,
+  sharedWithPlayers,
+  onToggleShareWithPlayers,
 }: DmLocationToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
@@ -378,6 +380,20 @@ export default function DmLocationToolbar({
                       ? 'Denied'
                       : 'Sync off'}
             </span>
+          )}
+          {mode === 'battlemap' && (
+            <Button
+              variant={sharedWithPlayers ? 'success' : 'outline'}
+              onClick={onToggleShareWithPlayers}
+              className="flex items-center gap-1.5 px-3 py-1 text-xs"
+              title={
+                sharedWithPlayers
+                  ? 'Players see the join banner — click to end'
+                  : 'Show a join banner on player character sheets'
+              }
+            >
+              {sharedWithPlayers ? 'Live for players' : 'Share with players'}
+            </Button>
           )}
           {mode !== 'battlemap' && (
             <Button

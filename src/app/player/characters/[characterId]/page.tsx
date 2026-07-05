@@ -26,6 +26,7 @@ import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
 import { YouDiedOverlay } from '@/components/ui/feedback/YouDiedOverlay';
 import { LevelUpOverlay } from '@/components/ui/feedback/LevelUpOverlay';
 import { CombatStartBanner } from '@/components/ui/feedback/CombatStartBanner';
+import { BattleMapLiveBanner } from '@/components/ui/campaign/BattleMapLiveBanner';
 import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
 
 import CharacterSheetHeader from '@/components/ui/character/CharacterSheetHeader';
@@ -871,6 +872,17 @@ export default function CharacterSheet() {
             isVisible={showCombatBanner}
             onDone={() => setShowCombatBanner(false)}
           />
+
+          {/* Live battle map join banner — shown when the DM shares a map */}
+          {playerSync.campaignCode &&
+            sharedState?.battleMap?.activeBattleMapId && (
+              <BattleMapLiveBanner
+                campaignCode={playerSync.campaignCode}
+                battleMapId={sharedState.battleMap.activeBattleMapId}
+                mapName={sharedState.battleMap.name}
+                characterId={characterId}
+              />
+            )}
 
           {/* Header */}
           <CharacterSheetHeader
