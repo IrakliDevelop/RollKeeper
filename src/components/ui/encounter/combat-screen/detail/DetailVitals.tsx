@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Shield, Plus, Brain, ClockAlert } from 'lucide-react';
-import type { EncounterEntity } from '@/types/encounter';
+import { Shield, Plus, X } from 'lucide-react';
 import { HPBar } from '@/components/shared/combat/HPBar';
 import { rollHitDie } from '../spendHitDie';
 import type { DetailSectionProps } from './DetailHeader';
 import { DamageControls } from './DamageControls';
 import { DeathSaves } from './DeathSaves';
+import { ConcentrationReaction } from './ConcentrationReaction';
 
 function hpColorClass(current: number, max: number): string {
   const pct = max > 0 ? (current / max) * 100 : 0;
@@ -98,7 +98,7 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
                   className="text-accent-blue-text hover:text-accent-red-text ml-0.5 transition-colors"
                   aria-label="Clear temp HP"
                 >
-                  ×
+                  <X size={11} aria-hidden />
                 </button>
               </span>
             ))}
@@ -150,76 +150,7 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
         />
       )}
 
-      {/* Concentration */}
-      <div className="flex items-center gap-2">
-        <Brain size={13} className="text-accent-purple-text shrink-0" />
-        <span className="text-body text-xs">Concentration:</span>
-        {isPlayer ? (
-          <span className="text-body text-xs">
-            {entity.concentrationSpell ? (
-              <span className="text-accent-purple-text font-medium">
-                {entity.concentrationSpell}
-              </span>
-            ) : (
-              <span className="text-faint">None</span>
-            )}
-            <span className="text-faint ml-1">(synced)</span>
-          </span>
-        ) : (
-          <>
-            <input
-              type="text"
-              value={entity.concentrationSpell ?? ''}
-              onChange={e =>
-                actions.onSetConcentration(entity.id, e.target.value || null)
-              }
-              placeholder="None"
-              className="bg-surface-raised text-body placeholder:text-faint flex-1 rounded px-2 py-0.5 text-xs shadow-sm"
-            />
-            {entity.concentrationSpell && (
-              <button
-                onClick={() => actions.onSetConcentration(entity.id, null)}
-                className="text-muted hover:text-accent-red-text text-xs transition-colors"
-              >
-                Drop
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Reaction */}
-      <div className="flex items-center gap-2">
-        <ClockAlert size={13} className="text-muted shrink-0" />
-        <span className="text-body text-xs">Reaction:</span>
-        {isPlayer ? (
-          <span className="text-body text-xs">
-            {entity.hasUsedReaction ? (
-              <span className="text-accent-red-text font-medium">Used</span>
-            ) : (
-              <span className="text-accent-emerald-text font-medium">
-                Available
-              </span>
-            )}
-            <span className="text-faint ml-1">(synced)</span>
-          </span>
-        ) : (
-          <button
-            onClick={() =>
-              actions.onUpdate(entity.id, {
-                hasUsedReaction: !entity.hasUsedReaction,
-              })
-            }
-            className={`rounded-md border px-2.5 py-0.5 text-xs font-medium transition-colors ${
-              entity.hasUsedReaction
-                ? 'border-accent-red-border bg-accent-red-bg text-accent-red-text'
-                : 'border-accent-emerald-border bg-accent-emerald-bg text-accent-emerald-text'
-            }`}
-          >
-            {entity.hasUsedReaction ? 'Used' : 'Available'}
-          </button>
-        )}
-      </div>
+      <ConcentrationReaction entity={entity} actions={actions} />
 
       {/* Death saves (players read-only, NPCs interactive) */}
       {showDeathSaves && <DeathSaves entity={entity} actions={actions} />}
