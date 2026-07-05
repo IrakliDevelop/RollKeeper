@@ -25,10 +25,12 @@ export function ActiveEffectChip({
   const hasRounds = cond.rounds != null;
 
   const handleDecrease = () => {
-    const current = cond.rounds ?? 0;
-    const next = current - 1;
-    // stepping to 0 removes via the store; pass 0 directly
-    actions.onSetConditionRounds(entityId, cond.id, next <= 0 ? 0 : next);
+    if (typeof cond.rounds !== 'number') return; // ∞ — nothing to count down
+    actions.onSetConditionRounds(
+      entityId,
+      cond.id,
+      Math.max(0, cond.rounds - 1)
+    );
   };
 
   const handleIncrease = () => {
@@ -47,8 +49,9 @@ export function ActiveEffectChip({
       )}
       <button
         onClick={handleDecrease}
+        disabled={!hasRounds}
         aria-label={`${cond.name} decrease rounds`}
-        className="text-muted hover:text-body rounded p-0.5 transition-colors"
+        className="text-muted hover:text-body rounded p-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Minus size={9} />
       </button>

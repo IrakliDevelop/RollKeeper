@@ -61,16 +61,16 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
   const canEdit = !isPlayer && sb != null;
 
   const resistances =
-    sbField(sb ?? ({} as MonsterStatBlock), 'resistances') ??
+    (sb != null ? sbField(sb, 'resistances') : undefined) ??
     entity.damageResistances?.join(', ');
   const immunities =
-    sbField(sb ?? ({} as MonsterStatBlock), 'immunities') ??
+    (sb != null ? sbField(sb, 'immunities') : undefined) ??
     entity.damageImmunities?.join(', ');
   const condImmunities =
     sb?.conditionImmunities?.join(', ') ??
     entity.conditionImmunities?.join(', ');
   const senses =
-    sbField(sb ?? ({} as MonsterStatBlock), 'senses') ??
+    (sb != null ? sbField(sb, 'senses') : undefined) ??
     entity.senses?.map(s => `${s.name} ${s.range} ft.`).join(', ');
 
   const hasAnyData =

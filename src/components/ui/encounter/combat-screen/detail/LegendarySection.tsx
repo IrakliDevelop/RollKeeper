@@ -33,6 +33,7 @@ export function LegendarySection({ entity, actions }: DetailSectionProps) {
             onClick={() => actions.onResetLegendaryActions(entity.id)}
             className="text-muted hover:text-body rounded p-0.5 transition-colors"
             title="Reset legendary actions"
+            aria-label="Reset legendary actions"
           >
             <RotateCcw size={12} />
           </button>
