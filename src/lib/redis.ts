@@ -71,6 +71,10 @@ export function campaignBattleMapKey(
   return `campaign:${code}:battlemap:${battleMapId}`;
 }
 
+export function campaignDisplayKeyKey(code: string): string {
+  return `campaign:${code}:displaykey`;
+}
+
 export function characterShareKey(characterId: string): string {
   return `character:share:${characterId}`;
 }
