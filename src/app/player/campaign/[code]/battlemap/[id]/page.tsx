@@ -36,7 +36,7 @@ function PlayerBattleMapPage() {
       campaignCode={code}
       battleMapId={battleMapId}
       characterId={characterId}
-      characterName={character.name ?? 'Player'}
+      characterAvatar={character.avatar}
     />
   );
 }
