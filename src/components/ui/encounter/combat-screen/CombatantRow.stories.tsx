@@ -116,7 +116,6 @@ const meta: Meta<typeof CombatantRow> = {
     isActive: false,
     isSelected: false,
     isOnDeck: false,
-    combatActive: true,
     hidePlayerHp: false,
     actions: baseActions,
     onSelect: fn(),
