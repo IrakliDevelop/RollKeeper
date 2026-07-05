@@ -236,7 +236,7 @@ export function useDmLocationEditor(
   const getVp = useCallback(() => canvasRef.current?.viewport ?? null, []);
 
   const handleReady = useCallback(
-    (vp: Viewport) => {
+    async (vp: Viewport) => {
       setViewport(vp);
 
       // Track selected element for DM-only toggle
@@ -277,7 +277,7 @@ export function useDmLocationEditor(
           pinGridToMapBackgroundLayer(vp);
           _fitCameraToMap(vp, location.mapImageSize);
           // Clear stale localStorage data after successful load
-          autoSave.clear();
+          await autoSave.clear();
         } catch {
           // Corrupt state — start fresh
           _initializeBackground(
@@ -515,12 +515,12 @@ export function useDmLocationEditor(
     setSelectedElementId(null);
   }, [getVp]);
 
-  const handleClear = useCallback(() => {
+  const handleClear = useCallback(async () => {
     const vp = getVp();
     if (!vp || vp.store.count === 0) return;
     if (!confirm('Clear all elements from the canvas?')) return;
     vp.store.clear();
-    autoSaveRef.current?.clear();
+    await autoSaveRef.current?.clear();
     vp.requestRender();
     setSelectedElementId(null);
   }, [getVp]);
