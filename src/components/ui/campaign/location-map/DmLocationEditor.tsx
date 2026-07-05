@@ -110,6 +110,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
               onReady={handleReady}
               className="h-full w-full"
               style={{ minHeight: 0 }}
+              snapToGrid={mode === 'battlemap'}
             />
           </div>
 

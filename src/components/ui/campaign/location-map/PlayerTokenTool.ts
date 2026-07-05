@@ -1,6 +1,8 @@
 import {
+  createImage,
   createShape,
-  createText,
+  smartSnap,
+  TemplateTool,
   type Tool,
   type ToolContext,
   type PointerState,
@@ -25,46 +27,162 @@ export function tokenColorForId(id: string): string {
 }
 
 const TOKEN_SIZE = 40; // ≈ one 5-ft cell at default 50px grid
+const TOKEN_RENDER_PX = 128;
+const TOKEN_RING_PX = 8;
 
 /**
- * Places the player's token: a colored ellipse plus a small name label.
- * Ownership is stamped by the relay; other players can't move it.
+ * Only http(s) avatars may become token images: a base64 data-URL avatar
+ * would ride along in every sync upsert for the token (huge payloads).
+ */
+export function tokenAvatarUrl(avatar: string | undefined): string | null {
+  return avatar && /^https?:\/\//.test(avatar) ? avatar : null;
+}
+
+/** Same-origin proxy for S3 URLs so canvas compositing isn't CORS-tainted. */
+function proxyUrl(url: string): string {
+  if (url.includes('.s3.') && url.includes('.amazonaws.com')) {
+    return `/api/assets/proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
+const circularTokenCache = new Map<string, Promise<string | null>>();
+
+/**
+ * Composites the avatar into a circular token (cover-fit, transparent
+ * corners, colored ring) and uploads it to S3, returning the hosted URL.
+ * Returns null when the image can't be loaded or S3 isn't configured —
+ * callers fall back to the square avatar. Cached per character+avatar so
+ * repeat placements don't re-upload.
+ */
+export function buildCircularTokenUrl(
+  avatarUrl: string,
+  ringColor: string,
+  cacheKey: string
+): Promise<string | null> {
+  const key = `${cacheKey}:${avatarUrl}:${ringColor}`;
+  const cached = circularTokenCache.get(key);
+  if (cached) return cached;
+
+  const promise = (async (): Promise<string | null> => {
+    const img = await new Promise<HTMLImageElement | null>(resolve => {
+      const el = new window.Image();
+      el.crossOrigin = 'anonymous';
+      el.onload = () => resolve(el);
+      el.onerror = () => resolve(null);
+      el.src = proxyUrl(avatarUrl);
+    });
+    if (!img) return null;
+
+    const size = TOKEN_RENDER_PX;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // circular clip, cover-fit draw, then the ring
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - TOKEN_RING_PX / 2, 0, Math.PI * 2);
+    ctx.clip();
+    const scale = Math.max(size / img.width, size / img.height);
+    const w = img.width * scale;
+    const h = img.height * scale;
+    ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - TOKEN_RING_PX / 2, 0, Math.PI * 2);
+    ctx.lineWidth = TOKEN_RING_PX;
+    ctx.strokeStyle = ringColor;
+    ctx.stroke();
+
+    const blob = await new Promise<Blob | null>(resolve =>
+      canvas.toBlob(resolve, 'image/png')
+    );
+    if (!blob) return null;
+
+    try {
+      const formData = new FormData();
+      formData.append('file', blob, `token-${cacheKey}.png`);
+      formData.append('assetId', `token-${cacheKey}`);
+      const res = await fetch('/api/assets/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!res.ok) return null; // S3 not configured — square avatar fallback
+      const data = (await res.json()) as { url?: string };
+      return data.url ?? null;
+    } catch {
+      return null;
+    }
+  })();
+
+  circularTokenCache.set(key, promise);
+  return promise;
+}
+
+/**
+ * Places the player's token — their (circularized) avatar when available,
+ * otherwise a colored ellipse. `srcRef` is read at placement time because
+ * the canvas keeps the first registered tool instance: the circular token
+ * URL resolves asynchronously and lands in the ref, not in a new tool.
+ * Placement snaps to the grid and sizes to one cell; the tool then hands
+ * off to Select so the next drag moves the token instead of stamping
+ * another. Ownership is stamped by the relay.
  */
 export class PlayerTokenTool implements Tool {
   readonly name = 'token';
 
   constructor(
     private readonly color: string,
-    private readonly label: string
+    private readonly srcRef: { current: string | null }
   ) {}
 
   onPointerDown(state: PointerState, ctx: ToolContext): void {
     const world = ctx.camera.screenToWorld({ x: state.x, y: state.y });
-    ctx.store.add(
-      createShape({
-        position: { x: world.x - TOKEN_SIZE / 2, y: world.y - TOKEN_SIZE / 2 },
-        size: { w: TOKEN_SIZE, h: TOKEN_SIZE },
-        shape: 'ellipse',
-        fillColor: this.color,
-        strokeColor: '#1e293b',
-        strokeWidth: 2,
-        layerId: ctx.activeLayerId ?? '',
-      })
-    );
-    ctx.store.add(
-      createText({
-        position: { x: world.x - TOKEN_SIZE, y: world.y + TOKEN_SIZE / 2 + 4 },
-        text: this.label,
-        fontSize: 12,
-        color: '#f8fafc',
-        textAlign: 'center',
-        size: { w: TOKEN_SIZE * 2, h: 16 },
-        layerId: ctx.activeLayerId ?? '',
-      })
-    );
+    const center = smartSnap(world, ctx);
+    const size = ctx.gridSize ?? TOKEN_SIZE;
+    const src = this.srcRef.current;
+
+    if (src) {
+      ctx.store.add(
+        createImage({
+          position: { x: center.x - size / 2, y: center.y - size / 2 },
+          size: { w: size, h: size },
+          src,
+          layerId: ctx.activeLayerId ?? '',
+        })
+      );
+    } else {
+      ctx.store.add(
+        createShape({
+          position: { x: center.x - size / 2, y: center.y - size / 2 },
+          size: { w: size, h: size },
+          shape: 'ellipse',
+          fillColor: this.color,
+          strokeColor: '#1e293b',
+          strokeWidth: 2,
+          layerId: ctx.activeLayerId ?? '',
+        })
+      );
+    }
     ctx.requestRender();
   }
 
   onPointerMove(): void {}
-  onPointerUp(): void {}
+  onPointerUp(_state: PointerState, ctx: ToolContext): void {
+    // One token per activation: hand off to Select so the next drag moves
+    // the token rather than placing another.
+    ctx.switchTool?.('select');
+  }
+}
+
+/**
+ * TemplateTool that hands off to Select after the drag-to-size gesture ends,
+ * so a follow-up drag adjusts/moves instead of stamping another template.
+ */
+export class PlayerTemplateTool extends TemplateTool {
+  onPointerUp(state: PointerState, ctx: ToolContext): void {
+    super.onPointerUp(state, ctx);
+    ctx.switchTool?.('select');
+  }
 }

@@ -255,6 +255,7 @@ export function useDmLocationEditor(
           fillColor: '#ef444480',
           strokeColor: '#ef4444',
           strokeWidth: 2,
+          renderStyle: 'geometric',
         })
       );
     }
