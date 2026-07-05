@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useEncounterStore } from '@/store/encounterStore';
@@ -20,6 +20,7 @@ import { buildSharedInitiative } from '@/utils/buildSharedInitiative';
 import { Button } from '@/components/ui/forms/button';
 import { CombatScreen } from './combat-screen/CombatScreen';
 import type { EntityActions } from './combat-screen/types';
+import { buildEntityActions } from './combat-screen/buildEntityActions';
 import { AddEntityDialog } from './AddEntityDialog';
 import { CombatConfigDialog } from './CombatConfigDialog';
 import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
@@ -173,7 +174,81 @@ export function EncounterView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignPlayers]);
 
-  if (!encounter) {
+  const actions = useMemo<EntityActions | undefined>(
+    () =>
+      encounter
+        ? buildEntityActions({
+            encounterId,
+            encounter,
+            store: {
+              updateEntity,
+              removeEntity,
+              damageEntity,
+              healEntity,
+              addTempHp,
+              setEntityHp,
+              addCondition,
+              removeCondition,
+              setConditionRounds,
+              useAbility: expendAbility,
+              restoreAbility,
+              useLegendaryAction: expendLegendaryAction,
+              resetLegendaryActions,
+              setConcentration,
+              useLairAction: expendLairAction,
+              setInitiative,
+              longRestEntity,
+            },
+            syncPlayerEffects,
+            onViewPlayer: playerCharacterId => {
+              const player = campaignPlayers.find(
+                p => p.playerId === playerCharacterId
+              );
+              if (player) setViewingPlayer(player);
+            },
+            onViewNPC: (npcSourceId, entityId) => {
+              const npc = npcs.find(n => n.id === npcSourceId);
+              if (npc) {
+                setViewingNpcFromEncounter(npc);
+                setViewingNpcEntityId(entityId);
+              }
+            },
+            onChangePlayerColor: (playerCharacterId, color) =>
+              setPlayerColor(campaignCode, playerCharacterId, color),
+            onAdjustCounter: (playerId, delta) =>
+              adjustPlayerCounter(campaignCode, playerId, delta),
+          })
+        : undefined,
+    [
+      encounter,
+      encounterId,
+      campaignPlayers,
+      npcs,
+      campaignCode,
+      syncPlayerEffects,
+      updateEntity,
+      removeEntity,
+      damageEntity,
+      healEntity,
+      addTempHp,
+      setEntityHp,
+      addCondition,
+      removeCondition,
+      setConditionRounds,
+      expendAbility,
+      restoreAbility,
+      expendLegendaryAction,
+      resetLegendaryActions,
+      setConcentration,
+      expendLairAction,
+      setInitiative,
+      longRestEntity,
+      setPlayerColor,
+      adjustPlayerCounter,
+    ]
+  );
+
+  if (!encounter || !actions) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
         <p className="text-muted mb-4">Encounter not found.</p>
@@ -185,134 +260,6 @@ export function EncounterView({
       </div>
     );
   }
-
-  const actions: EntityActions = {
-    onUpdate: (entityId, updates) =>
-      updateEntity(encounterId, entityId, updates),
-
-    onRemove: entityId => {
-      // Cascade-remove summon entities when removing a player
-      const entity = encounter.entities.find(e => e.id === entityId);
-      if (entity?.type === 'player' && entity.playerCharacterId) {
-        const summonEntities = encounter.entities.filter(
-          e => e.summonOwnerId === entity.playerCharacterId
-        );
-        for (const se of summonEntities) {
-          removeEntity(encounterId, se.id);
-        }
-      }
-      removeEntity(encounterId, entityId);
-    },
-
-    onDamage: (entityId, amount) => damageEntity(encounterId, entityId, amount),
-    onHeal: (entityId, amount) => healEntity(encounterId, entityId, amount),
-    onAddTempHp: (entityId, amount) => addTempHp(encounterId, entityId, amount),
-
-    onSetMaxHp: (entityId, max) => {
-      const entity = encounter.entities.find(e => e.id === entityId);
-      if (!entity) return;
-      setEntityHp(encounterId, entityId, Math.min(entity.currentHp, max), max);
-    },
-
-    onAddCondition: (entityId, condition) => {
-      addCondition(encounterId, entityId, condition);
-      const entity = encounter.entities.find(e => e.id === entityId);
-      if (entity?.type === 'player' && entity.playerCharacterId) {
-        // Build a snapshot of the entity after the add for sync
-        const snapshot = {
-          ...entity,
-          conditions: [
-            ...entity.conditions,
-            { ...condition, id: 'pending', source: 'dm' as const },
-          ],
-        };
-        syncPlayerEffects(entity.playerCharacterId, snapshot);
-      }
-    },
-
-    onRemoveCondition: (entityId, conditionId) => {
-      const entity = encounter.entities.find(e => e.id === entityId);
-
-      if (entity?.type === 'player' && entity.playerCharacterId) {
-        const removedCondition = entity.conditions.find(
-          c => c.id === conditionId
-        );
-
-        // If DM removes a player-synced condition, suppress it
-        if (removedCondition?.source === 'player-sync') {
-          const suppressed = [
-            ...(entity.suppressedConditions ?? []),
-            removedCondition.name,
-          ];
-          updateEntity(encounterId, entityId, {
-            suppressedConditions: [...new Set(suppressed)],
-          });
-        }
-
-        removeCondition(encounterId, entityId, conditionId);
-
-        // Build snapshot after removal + suppression for sync
-        const updatedSuppressed =
-          removedCondition?.source === 'player-sync'
-            ? [
-                ...new Set([
-                  ...(entity.suppressedConditions ?? []),
-                  removedCondition.name,
-                ]),
-              ]
-            : entity.suppressedConditions;
-
-        const snapshot = {
-          ...entity,
-          conditions: entity.conditions.filter(c => c.id !== conditionId),
-          suppressedConditions: updatedSuppressed,
-        };
-        syncPlayerEffects(entity.playerCharacterId, snapshot);
-      } else {
-        removeCondition(encounterId, entityId, conditionId);
-      }
-    },
-
-    onSetConditionRounds: (entityId, conditionId, rounds) =>
-      setConditionRounds(encounterId, entityId, conditionId, rounds),
-
-    onUseAbility: (entityId, abilityId) =>
-      expendAbility(encounterId, entityId, abilityId),
-    onRestoreAbility: (entityId, abilityId) =>
-      restoreAbility(encounterId, entityId, abilityId),
-    onUseLegendaryAction: (entityId, actionId) =>
-      expendLegendaryAction(encounterId, entityId, actionId),
-    onResetLegendaryActions: entityId =>
-      resetLegendaryActions(encounterId, entityId),
-    onSetConcentration: (entityId, spellName) =>
-      setConcentration(encounterId, entityId, spellName),
-    onUseLairAction: (entityId, actionId) =>
-      expendLairAction(encounterId, entityId, actionId),
-    onSetInitiative: (entityId, value) =>
-      setInitiative(encounterId, entityId, value),
-    onLongRest: entityId => longRestEntity(encounterId, entityId),
-
-    onViewPlayer: playerCharacterId => {
-      const player = campaignPlayers.find(
-        p => p.playerId === playerCharacterId
-      );
-      if (player) setViewingPlayer(player);
-    },
-
-    onViewNPC: (npcSourceId, entityId) => {
-      const npc = npcs.find(n => n.id === npcSourceId);
-      if (npc) {
-        setViewingNpcFromEncounter(npc);
-        setViewingNpcEntityId(entityId);
-      }
-    },
-
-    onChangePlayerColor: (playerCharacterId, color) =>
-      setPlayerColor(campaignCode, playerCharacterId, color),
-
-    onAdjustCounter: (playerId, delta) =>
-      adjustPlayerCounter(campaignCode, playerId, delta),
-  };
 
   return (
     <div className="flex h-full flex-col">
