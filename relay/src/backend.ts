@@ -69,7 +69,11 @@ export class BufferedRedisBackend implements HubBackend {
     }
     st.lastAccess = Date.now();
     if (!st.hydrated) {
-      st.hydrated = true; // set first so concurrent callers don't double-hydrate
+      // Hub serializes calls per room, so there is no concurrent-caller race
+      // to guard against here. Only latch `hydrated` AFTER hGetAll succeeds:
+      // if it rejects, the room must stay un-hydrated so the failing op
+      // propagates its error and the next access retries the hydration
+      // instead of silently latching on an empty map.
       const raw = await this.redis.hGetAll(this.key(room));
       for (const [id, json] of Object.entries(raw)) {
         if (!st.elements.has(id) && !st.removed.has(id)) {
@@ -80,6 +84,7 @@ export class BufferedRedisBackend implements HubBackend {
           }
         }
       }
+      st.hydrated = true;
     }
     return st;
   }

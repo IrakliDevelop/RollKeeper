@@ -42,6 +42,27 @@ describe('BufferedRedisBackend', () => {
     expect(calls.filter(c => c.method === 'hGetAll')).toHaveLength(1);
   });
 
+  it('does not latch hydrated on a failed hGetAll — the next access retries', async () => {
+    const seed = { a: JSON.stringify(elem('a')) };
+    const { redis, calls } = fakeRedis(seed);
+    let failNext = true;
+    const originalHGetAll = redis.hGetAll;
+    redis.hGetAll = async key => {
+      if (failNext) {
+        failNext = false;
+        calls.push({ method: 'hGetAll', args: [key] });
+        throw new Error('redis unavailable');
+      }
+      return originalHGetAll(key);
+    };
+    const b = new BufferedRedisBackend(redis);
+
+    await expect(b.snapshot('r1')).rejects.toThrow('redis unavailable');
+    // Second access retries hydration instead of serving a latched-empty room.
+    expect((await b.snapshot('r1')).map(e => e.id)).toEqual(['a']);
+    expect(calls.filter(c => c.method === 'hGetAll')).toHaveLength(2);
+  });
+
   it('buffers upserts and flushes them as one hSet + expire after the interval', async () => {
     const { redis, calls } = fakeRedis();
     const b = new BufferedRedisBackend(redis, {
