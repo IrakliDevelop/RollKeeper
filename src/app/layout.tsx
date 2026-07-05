@@ -1,5 +1,11 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono, Cinzel_Decorative } from 'next/font/google';
+import {
+  Geist,
+  Geist_Mono,
+  Cinzel_Decorative,
+  Bricolage_Grotesque,
+  Hanken_Grotesk,
+} from 'next/font/google';
 import './globals.css';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { ThemeProviderWrapper } from './ThemeProviderWrapper';
@@ -18,6 +24,18 @@ const cinzelDecorative = Cinzel_Decorative({
   variable: '--font-cinzel-decorative',
   subsets: ['latin'],
   weight: ['400', '700', '900'],
+});
+
+const bricolage = Bricolage_Grotesque({
+  variable: '--font-bricolage',
+  subsets: ['latin'],
+  weight: ['600', '700', '800'],
+});
+
+const hanken = Hanken_Grotesk({
+  variable: '--font-hanken',
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
 });
 
 export const metadata: Metadata = {
@@ -39,12 +57,12 @@ const themeScript = `
 (function() {
   try {
     var stored = localStorage.getItem('rollkeeper-theme');
-    var theme = stored === 'dark' || stored === 'light' ? stored : null;
+    var theme = stored === 'dark' || stored === 'light' || stored === 'parchment' ? stored : null;
     if (!theme) {
       theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
-    if (theme === 'dark') {
-      document.documentElement.setAttribute('data-theme', 'dark');
+    if (theme !== 'light') {
+      document.documentElement.setAttribute('data-theme', theme);
     }
   } catch (e) {}
 })();
@@ -61,7 +79,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${cinzelDecorative.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${cinzelDecorative.variable} ${bricolage.variable} ${hanken.variable} antialiased`}
         suppressHydrationWarning={true}
       >
         <ThemeProviderWrapper>

@@ -9,6 +9,10 @@
    ============================================================ */
 
 :root {
+  /* --- Font families --- */
+  --font-body-family: Arial, Helvetica, sans-serif;
+  --font-display-family: var(--font-geist-sans);
+
   /* --- Core backgrounds --- */
   --background: #f8fafc; /* slate-50 — off-white base reduces glare */
   --foreground: #171717;
@@ -272,6 +276,143 @@
   --input-border-focus: #34d399; /* emerald-400 */
 }
 
+[data-theme='parchment'] {
+  /* --- Font families --- */
+  --font-body-family: var(--font-hanken), 'Hanken Grotesk', sans-serif;
+  --font-display-family:
+    var(--font-bricolage), 'Bricolage Grotesque', sans-serif;
+
+  /* --- Core backgrounds --- */
+  --background: #f4f2ed;
+  --foreground: #221f1a;
+  --surface: #f4f2ed;
+  --surface-secondary: #f4f3ef;
+  --surface-raised: #ffffff;
+  --surface-inset: #eae6dc;
+  --surface-hover: #ece8df;
+  --surface-overlay: rgba(34, 31, 26, 0.42);
+
+  /* --- Text --- */
+  --heading: #221f1a;
+  --body: #6b6459;
+  --muted: #8a8377;
+  --faint: #b0a99b;
+  --inverse: #ffffff;
+
+  /* --- Borders / Dividers --- */
+  --divider: #ebe7dd;
+  --divider-strong: #e0dbcf;
+  --ring: #2f6fd0;
+
+  /* --- Accent surfaces (emerald) --- */
+  --accent-emerald-bg: #eaf6f0;
+  --accent-emerald-bg-strong: #d5ede2;
+  --accent-emerald-border: #b9decc;
+  --accent-emerald-border-strong: #7fc4a6;
+  --accent-emerald-text: #0c6344;
+  --accent-emerald-text-muted: #12855c;
+
+  /* --- Accent surfaces (blue) --- */
+  --accent-blue-bg: #eaf1fc;
+  --accent-blue-bg-strong: #d8e6f9;
+  --accent-blue-border: #bdd4f2;
+  --accent-blue-border-strong: #8ab2e6;
+  --accent-blue-text: #245aab;
+  --accent-blue-text-muted: #2f6fd0;
+
+  /* --- Accent surfaces (amber) --- */
+  --accent-amber-bg: #fef6e0;
+  --accent-amber-bg-strong: #fbedc6;
+  --accent-amber-border: #f0dfb0;
+  --accent-amber-border-strong: #f4c430;
+  --accent-amber-text: #8f5e18;
+  --accent-amber-text-muted: #b7791f;
+
+  /* --- Accent surfaces (red) --- */
+  --accent-red-bg: #fbeae7;
+  --accent-red-bg-strong: #f7d8d2;
+  --accent-red-border: #efbcb3;
+  --accent-red-border-strong: #dd8677;
+  --accent-red-text: #9c2e22;
+  --accent-red-text-muted: #c0392b;
+
+  /* --- Accent surfaces (purple) --- */
+  --accent-purple-bg: #f1ebfa;
+  --accent-purple-bg-strong: #e5daf4;
+  --accent-purple-border: #d2bfea;
+  --accent-purple-border-strong: #b394dc;
+  --accent-purple-text: #633d99;
+  --accent-purple-text-muted: #7c4dbc;
+
+  /* --- Accent surfaces (indigo) --- */
+  --accent-indigo-bg: #eceefa;
+  --accent-indigo-bg-strong: #dce0f5;
+  --accent-indigo-border: #c2c8ec;
+  --accent-indigo-border-strong: #98a2de;
+  --accent-indigo-text: #3c4a9e;
+  --accent-indigo-text-muted: #4b5cc4;
+
+  /* --- Accent surfaces (green) --- */
+  --accent-green-bg: #ecf5ea;
+  --accent-green-bg-strong: #daecd7;
+  --accent-green-border: #bfddba;
+  --accent-green-border-strong: #8fc488;
+  --accent-green-text: #2f6b2a;
+  --accent-green-text-muted: #3d8b37;
+
+  /* --- Accent surfaces (orange) --- */
+  --accent-orange-bg: #fbefe6;
+  --accent-orange-bg-strong: #f7dfce;
+  --accent-orange-border: #efc7a9;
+  --accent-orange-border-strong: #e09b6b;
+  --accent-orange-text: #9a4419;
+  --accent-orange-text-muted: #c0561f;
+
+  /* --- Accent surfaces (yellow) --- */
+  --accent-yellow-bg: #fdf8e3;
+  --accent-yellow-bg-strong: #faf0c4;
+  --accent-yellow-border: #f1df95;
+  --accent-yellow-border-strong: #e3c64b;
+  --accent-yellow-text: #7e4d06;
+  --accent-yellow-text-muted: #a16207;
+
+  /* --- Accent surfaces (violet) --- */
+  --accent-violet-bg: #efebfa;
+  --accent-violet-bg-strong: #e1daf5;
+  --accent-violet-border: #cbbfec;
+  --accent-violet-border-strong: #a896de;
+  --accent-violet-text: #573e9e;
+  --accent-violet-text-muted: #6d4fc4;
+
+  /* --- Gradient endpoints --- */
+  --gradient-slate-from: #fcfbf8;
+  --gradient-slate-to: #f4f3ef;
+  --gradient-blue-from: #eaf1fc;
+  --gradient-blue-to: #d8e6f9;
+  --gradient-green-from: #ecf5ea;
+  --gradient-green-to: #daecd7;
+  --gradient-purple-from: #f1ebfa;
+  --gradient-purple-to: #e5daf4;
+  --gradient-emerald-from: #eaf6f0;
+  --gradient-emerald-to: #d5ede2;
+  --gradient-amber-from: #fef6e0;
+  --gradient-amber-to: #fbedc6;
+  --gradient-red-from: #fbeae7;
+  --gradient-red-to: #f7d8d2;
+  --gradient-indigo-from: #eceefa;
+  --gradient-indigo-to: #dce0f5;
+  --gradient-page-from: #f4f2ed;
+  --gradient-page-via: #faf6ec;
+  --gradient-page-to: #fef6e0;
+
+  /* --- Input-specific --- */
+  --input-bg: #fcfbf8;
+  --input-text: #221f1a;
+  --input-placeholder: #b0a99b;
+  --input-border: #e0dbcf;
+  --input-border-focus: #12855c;
+}
+
 /* ============================================================
    TAILWIND v4 THEME REGISTRATION
    Register CSS variables so Tailwind generates utility classes.
@@ -392,6 +533,7 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-cinzel: var(--font-cinzel-decorative);
+  --font-display: var(--font-display-family);
 }
 
 /* ============================================================
@@ -419,7 +561,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body-family);
 }
 
 /* Global button cursor styling */
