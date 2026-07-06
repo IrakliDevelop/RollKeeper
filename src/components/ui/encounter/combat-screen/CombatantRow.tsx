@@ -152,6 +152,7 @@ export function CombatantRow({
           <RowVitals
             entity={entity}
             hidePlayerHp={hidePlayerHp}
+            maxConditions={isRail ? 2 : 4}
             onRemoveCondition={actions.onRemoveCondition}
           />
         </div>
