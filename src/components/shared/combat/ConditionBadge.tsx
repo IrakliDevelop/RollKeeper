@@ -23,12 +23,12 @@ export function ConditionBadge({
 
   return (
     <span
-      className={`border-accent-red-border bg-accent-red-bg text-accent-red-text inline-flex items-center gap-1 rounded-full border font-medium ${sizeClasses}`}
+      className={`border-accent-red-border bg-accent-red-bg text-accent-red-text inline-flex min-w-0 items-center gap-1 rounded-full border font-medium ${sizeClasses}`}
       title={sourceSpell ? `From: ${sourceSpell}` : undefined}
     >
-      {name}
+      <span className="min-w-0 truncate">{name}</span>
       {stackCount && stackCount > 1 && (
-        <span className="font-bold">x{stackCount}</span>
+        <span className="shrink-0 font-bold">x{stackCount}</span>
       )}
       {onRemove && (
         <button
@@ -36,7 +36,7 @@ export function ConditionBadge({
             e.stopPropagation();
             onRemove();
           }}
-          className="hover:text-accent-red-text-muted -mr-0.5 rounded-full transition-colors"
+          className="hover:text-accent-red-text-muted -mr-0.5 shrink-0 rounded-full transition-colors"
           aria-label={`Remove ${name}`}
         >
           <X size={size === 'sm' ? 10 : 12} />
