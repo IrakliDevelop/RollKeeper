@@ -131,6 +131,9 @@ const createPlayerCharacter = (
 
 // Migration function
 const migrateOldCharacterData = (): PlayerCharacter | null => {
+  // localStorage is unavailable during SSR; migration only runs in the browser.
+  if (typeof window === 'undefined') return null;
+
   try {
     // Check for old character data
     const oldCharacterData = localStorage.getItem(STORAGE_KEY);
