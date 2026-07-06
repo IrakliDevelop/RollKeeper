@@ -20,6 +20,7 @@ export function RowControls({
   counterValue,
   actions,
 }: RowControlsProps) {
+  const pcId = entity.playerCharacterId;
   return (
     <div className="flex shrink-0 items-center gap-1.5">
       {entity.type !== 'lair' && (
@@ -39,50 +40,55 @@ export function RowControls({
         </div>
       )}
 
-      {counterLabel && entity.type === 'player' && actions.onAdjustCounter && (
-        <div
-          className="bg-accent-purple-bg flex items-center gap-1 rounded-full px-1.5 py-0.5"
-          title={counterLabel}
-          onClick={e => e.stopPropagation()}
-        >
-          <Angry size={10} className="text-accent-purple-text" />
-          <button
-            onClick={e => {
-              e.stopPropagation();
-              actions.onAdjustCounter?.(entity.id, -1);
-            }}
-            className="text-accent-purple-text hover:bg-surface-secondary rounded p-0.5 transition-colors"
-            disabled={counterValue <= 0}
+      {counterLabel &&
+        entity.type === 'player' &&
+        pcId !== undefined &&
+        actions.onAdjustCounter && (
+          <div
+            className="bg-accent-purple-bg flex items-center gap-1 rounded-full px-1.5 py-0.5"
+            title={counterLabel}
+            onClick={e => e.stopPropagation()}
           >
-            <Minus size={10} />
-          </button>
-          <span className="text-accent-purple-text min-w-[1rem] text-center text-[11px] font-bold tabular-nums">
-            {counterValue}
-          </span>
-          <button
-            onClick={e => {
-              e.stopPropagation();
-              actions.onAdjustCounter?.(entity.id, 1);
-            }}
-            className="text-accent-purple-text hover:bg-surface-secondary rounded p-0.5 transition-colors"
-          >
-            <Plus size={10} />
-          </button>
-        </div>
-      )}
+            <Angry size={10} className="text-accent-purple-text" />
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                actions.onAdjustCounter?.(pcId, -1);
+              }}
+              className="text-accent-purple-text hover:bg-surface-secondary rounded p-0.5 transition-colors"
+              disabled={counterValue <= 0}
+            >
+              <Minus size={10} />
+            </button>
+            <span className="text-accent-purple-text min-w-[1rem] text-center text-[11px] font-bold tabular-nums">
+              {counterValue}
+            </span>
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                actions.onAdjustCounter?.(pcId, 1);
+              }}
+              className="text-accent-purple-text hover:bg-surface-secondary rounded p-0.5 transition-colors"
+            >
+              <Plus size={10} />
+            </button>
+          </div>
+        )}
 
-      {entity.type === 'player' && actions.onViewPlayer && (
-        <button
-          onClick={e => {
-            e.stopPropagation();
-            actions.onViewPlayer?.(entity.playerCharacterId ?? entity.id);
-          }}
-          className="text-muted hover:text-accent-blue-text rounded p-1 transition-colors"
-          title="View character sheet"
-        >
-          <Eye size={14} />
-        </button>
-      )}
+      {entity.type === 'player' &&
+        pcId !== undefined &&
+        actions.onViewPlayer && (
+          <button
+            onClick={e => {
+              e.stopPropagation();
+              actions.onViewPlayer?.(pcId);
+            }}
+            className="text-muted hover:text-accent-blue-text rounded p-1 transition-colors"
+            title="View character sheet"
+          >
+            <Eye size={14} />
+          </button>
+        )}
 
       {entity.npcSourceId && actions.onViewNPC && (
         <button

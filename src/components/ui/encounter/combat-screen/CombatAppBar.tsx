@@ -91,7 +91,7 @@ export function CombatAppBar({
           onClick={onOpenAdd}
           leftIcon={<Plus size={16} />}
         >
-          + Add
+          Add
         </Button>
         <Button
           variant="ghost"

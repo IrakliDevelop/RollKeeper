@@ -64,8 +64,9 @@ export function TokenChip({ entity, size, actions }: TokenChipProps) {
 
   function handleColorChange(c: string | undefined) {
     actions.onUpdate(entity.id, { color: c });
-    if (isPlayer) {
-      actions.onChangePlayerColor?.(entity.playerCharacterId ?? entity.id, c);
+    const pcId = entity.playerCharacterId;
+    if (pcId !== undefined) {
+      actions.onChangePlayerColor?.(pcId, c);
     }
   }
 

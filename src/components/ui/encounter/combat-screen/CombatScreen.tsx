@@ -144,6 +144,7 @@ export function CombatScreen({
           <div className="min-w-0 flex-1 overflow-y-auto">
             {detailEntity && (
               <CombatantDetail
+                key={detailEntity.id}
                 entity={detailEntity}
                 actions={actions}
                 onOpenSheet={detailOpenSheet}

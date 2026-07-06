@@ -122,13 +122,13 @@ export function AddCombatantDialog({
 
   const handleAdd = (entity: Omit<EncounterEntity, 'id'>) => {
     onAddEntity(entity);
-    onOpenChange(false);
+    handleOpenChange(false);
   };
 
   const handleAddMultiple = (entities: Array<Omit<EncounterEntity, 'id'>>) => {
     for (const entity of entities) onAddEntity(entity);
     setMonsterColorIdx(i => i + 1);
-    onOpenChange(false);
+    handleOpenChange(false);
   };
 
   const handleMonsterAdd = () => {

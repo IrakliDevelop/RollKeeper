@@ -12,7 +12,7 @@ export type Theme = 'light' | 'dark' | 'parchment' | 'system';
 export type ResolvedTheme = 'light' | 'dark' | 'parchment';
 
 interface ThemeContextValue {
-  /** The user-chosen preference: 'light', 'dark', or 'system'. */
+  /** The user-chosen preference: 'light', 'dark', 'parchment', or 'system'. */
   theme: Theme;
   /** The actual applied theme after resolving 'system'. */
   resolvedTheme: ResolvedTheme;

@@ -74,6 +74,7 @@ export function FocusLayout({
                   />
                   <div className="bg-surface-raised border-divider rounded-b-lg border border-t-0">
                     <CombatantDetail
+                      key={entity.id}
                       entity={entity}
                       actions={actions}
                       onOpenSheet={
@@ -129,6 +130,7 @@ export function FocusLayout({
               </button>
             </div>
             <CombatantDetail
+              key={drawerEntity.id}
               entity={drawerEntity}
               actions={actions}
               onOpenSheet={

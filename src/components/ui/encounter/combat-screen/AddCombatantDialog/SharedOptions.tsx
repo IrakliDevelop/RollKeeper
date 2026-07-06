@@ -63,7 +63,7 @@ export function SharedOptions({
               : 'bg-surface-raised border-divider-strong'
           }`}
         >
-          {hideName && <Check size={12} className="text-white" />}
+          {hideName && <Check size={12} className="text-inverse" />}
         </span>
         <span className="text-body text-[13.5px] font-semibold">
           Hide name from players

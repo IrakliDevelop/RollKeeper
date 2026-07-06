@@ -157,6 +157,69 @@ describe('CombatScreen', () => {
     render(<CombatScreen {...makeProps({ encounter: emptyEncounter })} />);
     expect(screen.getByText(/No combatants yet/i)).toBeInTheDocument();
   });
+
+  it('switching detail entity resets speed input (key prevents stale defaultValue)', () => {
+    const baseStatBlock: MonsterStatBlock = {
+      str: 10,
+      dex: 10,
+      con: 10,
+      int: 10,
+      wis: 10,
+      cha: 10,
+      saves: '',
+      skills: '',
+      speed: '30 ft.',
+      resistances: '',
+      immunities: '',
+      vulnerabilities: '',
+      conditionImmunities: [],
+      senses: '',
+      passivePerception: 10,
+      traits: [],
+      actions: [],
+      reactions: [],
+      bonusActions: [],
+      lairActions: [],
+      cr: '1',
+      type: 'humanoid',
+      size: 'Medium',
+      languages: '',
+      alignment: 'neutral',
+      hpFormula: '2d8',
+    };
+    const monsterA: EncounterEntity = {
+      ...goblin,
+      id: 'ma',
+      name: 'Slow Goblin',
+      monsterStatBlock: { ...baseStatBlock, speed: '30 ft.' },
+    };
+    const monsterB: EncounterEntity = {
+      ...dragon,
+      id: 'mb',
+      name: 'Fast Dragon',
+      monsterStatBlock: { ...baseStatBlock, speed: '60 ft.' },
+    };
+    const enc: Encounter = {
+      ...activeEncounter,
+      entities: [monsterA, monsterB],
+      currentTurn: 0,
+    };
+
+    render(<CombatScreen {...makeProps({ encounter: enc })} />);
+
+    // currentTurn=0 → Slow Goblin is active → detail pane shows its speed
+    const speedInput = screen.getByRole('textbox', { name: /speed/i });
+    expect(speedInput).toHaveValue('30 ft.');
+
+    // Click Fast Dragon's HP display to trigger row onSelect
+    // (clicking the name span stops propagation for monsters, so use HP text)
+    fireEvent.click(screen.getByText('120/120'));
+
+    // Detail pane must now show Fast Dragon's speed (not the stale '30 ft.')
+    expect(screen.getByRole('textbox', { name: /speed/i })).toHaveValue(
+      '60 ft.'
+    );
+  });
 });
 
 // ── helpers for buildEntityActions tests ─────────────────────────────────────
