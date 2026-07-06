@@ -205,6 +205,37 @@ describe('CombatantRow', () => {
     expect(screen.getByText('+3')).toBeInTheDocument();
   });
 
+  it('buffs render on their own strip and do not consume the condition cap', () => {
+    const actions = makeMockActions();
+    const conditions = [
+      { id: 'c1', name: 'Blinded' },
+      { id: 'c2', name: 'Charmed' },
+      { id: 'c3', name: 'Deafened' },
+      { id: 'b1', name: 'Rage', kind: 'buff' as const },
+      { id: 'b2', name: 'Shield of Faith', kind: 'buff' as const },
+    ];
+    render(
+      <CombatantRow
+        {...defaultProps}
+        entity={{ ...mockEntity, conditions }}
+        actions={actions}
+        onSelect={vi.fn()}
+      />
+    );
+    // conditions strip: 2 visible + overflow for the 3rd only (buffs excluded)
+    expect(screen.getByText('Blinded')).toBeInTheDocument();
+    expect(screen.getByText('Charmed')).toBeInTheDocument();
+    expect(screen.queryByText('Deafened')).not.toBeInTheDocument();
+    expect(screen.getByText('+1')).toBeInTheDocument();
+    // buff strip: both visible, emerald variant
+    expect(screen.getByText('Rage')).toBeInTheDocument();
+    expect(screen.getByText('Shield of Faith')).toBeInTheDocument();
+    const buffBadge = screen
+      .getByText('Rage')
+      .closest('span[class*="accent-emerald"]');
+    expect(buffBadge).not.toBeNull();
+  });
+
   it('lair entity hides HP and AC', () => {
     const actions = makeMockActions();
     render(
