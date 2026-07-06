@@ -39,7 +39,10 @@ export function ActiveEffectChip({
   };
 
   return (
-    <div className="bg-surface-raised border-divider flex items-center gap-0.5 rounded-full border px-2 py-0.5">
+    <div
+      className="bg-surface-raised border-divider flex items-center gap-0.5 rounded-full border px-2 py-0.5"
+      title={cond.sourceSpell ? `From: ${cond.sourceSpell}` : undefined}
+    >
       <span
         className={`h-2 w-2 shrink-0 rounded-full ${kindDotClass(cond.kind)}`}
       />

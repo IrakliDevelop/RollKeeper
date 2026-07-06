@@ -237,6 +237,57 @@ describe('AddCombatantDialog', () => {
     expect(body).not.toContainElement(addBtn);
   }, 10000);
 
+  it('custom Add button resets form state so name field is empty on reopen', () => {
+    const onOpenChange = vi.fn();
+    const onAddEntity = vi.fn();
+    const { rerender } = render(
+      <AddCombatantDialog
+        {...defaultProps}
+        onOpenChange={onOpenChange}
+        onAddEntity={onAddEntity}
+        open={true}
+      />
+    );
+
+    // Switch to Custom tab and fill name
+    fireEvent.click(screen.getByRole('button', { name: /custom/i }));
+    const nameInput = screen.getByPlaceholderText(/cursed statue/i);
+    fireEvent.change(nameInput, { target: { value: 'Shadow Wraith' } });
+    expect((nameInput as HTMLInputElement).value).toBe('Shadow Wraith');
+
+    // Click the footer Add button (footer is visible because name is non-empty)
+    fireEvent.click(screen.getByRole('button', { name: /add npc/i }));
+
+    // handleAdd should have called handleOpenChange(false) which resets state
+    expect(onAddEntity).toHaveBeenCalledOnce();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    // Simulate close → reopen
+    rerender(
+      <AddCombatantDialog
+        {...defaultProps}
+        onOpenChange={onOpenChange}
+        onAddEntity={onAddEntity}
+        open={false}
+      />
+    );
+    rerender(
+      <AddCombatantDialog
+        {...defaultProps}
+        onOpenChange={onOpenChange}
+        onAddEntity={onAddEntity}
+        open={true}
+      />
+    );
+
+    // Switch back to Custom tab — name field must be empty
+    fireEvent.click(screen.getByRole('button', { name: /custom/i }));
+    const nameInputAfterReopen = screen.getByPlaceholderText(
+      /cursed statue/i
+    ) as HTMLInputElement;
+    expect(nameInputAfterReopen.value).toBe('');
+  });
+
   it('X close button resets custom form state', () => {
     const onOpenChange = vi.fn();
     const { rerender } = render(

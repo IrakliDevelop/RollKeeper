@@ -63,7 +63,44 @@ const defaultProps = {
   hidePlayerHp: false,
 };
 
+const playerEntity: EncounterEntity = {
+  id: 'entity-42',
+  type: 'player',
+  name: 'Thorin',
+  playerCharacterId: 'pc-9',
+  initiative: 12,
+  initiativeModifier: 1,
+  currentHp: 40,
+  maxHp: 50,
+  tempHp: 0,
+  armorClass: 18,
+  conditions: [],
+};
+
 describe('CombatantRow', () => {
+  it('counter + button calls onAdjustCounter with playerCharacterId, not entity.id', () => {
+    const onAdjustCounter = vi.fn();
+    const actions = { ...makeMockActions(), onAdjustCounter };
+    render(
+      <CombatantRow
+        {...defaultProps}
+        entity={playerEntity}
+        counterLabel="Rage"
+        counterValue={3}
+        actions={actions}
+        onSelect={vi.fn()}
+      />
+    );
+    // The counter div has title="Rage"; its last button is the + (increment)
+    const counterContainer = screen.getByTitle('Rage');
+    const counterButtons = counterContainer.querySelectorAll('button');
+    const plusButton = counterButtons[counterButtons.length - 1];
+    fireEvent.click(plusButton);
+    // Must be called with playerCharacterId='pc-9', NOT entity.id='entity-42'
+    expect(onAdjustCounter).toHaveBeenCalledWith('pc-9', 1);
+    expect(onAdjustCounter).not.toHaveBeenCalledWith('entity-42', 1);
+  });
+
   it('renders name, initiative, AC and HP', () => {
     const actions = makeMockActions();
     render(
