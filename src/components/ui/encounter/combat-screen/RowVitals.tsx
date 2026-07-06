@@ -20,9 +20,8 @@ export function RowVitals({
 }: RowVitalsProps) {
   const showHp = entity.type !== 'lair';
   const isHpHidden = hidePlayerHp && entity.type === 'player';
-  const conditions = entity.conditions;
-  const visibleConditions = conditions.slice(0, maxConditions);
-  const overflowCount = conditions.length - maxConditions;
+  const buffs = entity.conditions.filter(c => c.kind === 'buff');
+  const conditions = entity.conditions.filter(c => c.kind !== 'buff');
   const showPlayerHint =
     entity.type !== 'player' &&
     ((entity.isHidden ?? false) || !!entity.playerAlias);
@@ -70,23 +69,56 @@ export function RowVitals({
           </div>
         )}
 
-      {conditions.length > 0 && (
-        <div className="flex flex-nowrap items-center gap-1 overflow-hidden">
-          {visibleConditions.map(c => (
-            <ConditionBadge
-              key={c.id}
-              name={c.name}
-              stackCount={c.stackCount}
-              sourceSpell={c.sourceSpell}
-              onRemove={() => onRemoveCondition(entity.id, c.id)}
-            />
-          ))}
-          {overflowCount > 0 && (
-            <span className="bg-surface-secondary text-faint inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium">
-              +{overflowCount}
-            </span>
-          )}
-        </div>
+      <EffectStrip
+        effects={conditions}
+        max={maxConditions}
+        variant="condition"
+        entityId={entity.id}
+        onRemoveCondition={onRemoveCondition}
+      />
+      <EffectStrip
+        effects={buffs}
+        max={maxConditions}
+        variant="buff"
+        entityId={entity.id}
+        onRemoveCondition={onRemoveCondition}
+      />
+    </div>
+  );
+}
+
+function EffectStrip({
+  effects,
+  max,
+  variant,
+  entityId,
+  onRemoveCondition,
+}: {
+  effects: EncounterEntity['conditions'];
+  max: number;
+  variant: 'condition' | 'buff';
+  entityId: string;
+  onRemoveCondition: (entityId: string, conditionId: string) => void;
+}) {
+  if (effects.length === 0) return null;
+  const visible = effects.slice(0, max);
+  const overflowCount = effects.length - max;
+  return (
+    <div className="flex flex-nowrap items-center gap-1 overflow-hidden">
+      {visible.map(c => (
+        <ConditionBadge
+          key={c.id}
+          name={c.name}
+          stackCount={c.stackCount}
+          sourceSpell={c.sourceSpell}
+          variant={variant}
+          onRemove={() => onRemoveCondition(entityId, c.id)}
+        />
+      ))}
+      {overflowCount > 0 && (
+        <span className="bg-surface-secondary text-faint inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+          +{overflowCount}
+        </span>
       )}
     </div>
   );
