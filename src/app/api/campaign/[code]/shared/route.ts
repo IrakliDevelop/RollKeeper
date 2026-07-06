@@ -146,7 +146,15 @@ export async function POST(
 ) {
   try {
     const { code } = await params;
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json(
+        { error: 'Invalid or empty request body' },
+        { status: 400 }
+      );
+    }
+
     const { feature, data, dmId } = body;
 
     if (!feature || !data) {
@@ -297,7 +305,15 @@ export async function DELETE(
 ) {
   try {
     const { code } = await params;
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json(
+        { error: 'Invalid or empty request body' },
+        { status: 400 }
+      );
+    }
+
     const { playerId, type } = body;
 
     if (!playerId) {
