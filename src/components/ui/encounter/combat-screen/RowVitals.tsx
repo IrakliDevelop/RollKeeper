@@ -5,24 +5,24 @@ import { HPBar } from '@/components/shared/combat/HPBar';
 import { ConditionBadge } from '@/components/shared/combat/ConditionBadge';
 import type { EncounterEntity } from '@/types/encounter';
 
-const MAX_VISIBLE_CONDITIONS = 4;
-
 interface RowVitalsProps {
   entity: EncounterEntity;
   hidePlayerHp: boolean;
+  maxConditions: number;
   onRemoveCondition: (entityId: string, conditionId: string) => void;
 }
 
 export function RowVitals({
   entity,
   hidePlayerHp,
+  maxConditions,
   onRemoveCondition,
 }: RowVitalsProps) {
   const showHp = entity.type !== 'lair';
   const isHpHidden = hidePlayerHp && entity.type === 'player';
   const conditions = entity.conditions;
-  const visibleConditions = conditions.slice(0, MAX_VISIBLE_CONDITIONS);
-  const overflowCount = conditions.length - MAX_VISIBLE_CONDITIONS;
+  const visibleConditions = conditions.slice(0, maxConditions);
+  const overflowCount = conditions.length - maxConditions;
   const showPlayerHint =
     entity.type !== 'player' &&
     ((entity.isHidden ?? false) || !!entity.playerAlias);
@@ -71,7 +71,7 @@ export function RowVitals({
         )}
 
       {conditions.length > 0 && (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-nowrap items-center gap-1 overflow-hidden">
           {visibleConditions.map(c => (
             <ConditionBadge
               key={c.id}
@@ -82,7 +82,7 @@ export function RowVitals({
             />
           ))}
           {overflowCount > 0 && (
-            <span className="bg-surface-secondary text-faint inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+            <span className="bg-surface-secondary text-faint inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium">
               +{overflowCount}
             </span>
           )}

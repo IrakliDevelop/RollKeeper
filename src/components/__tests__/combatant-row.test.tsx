@@ -182,6 +182,29 @@ describe('CombatantRow', () => {
     expect(actions.onRemoveCondition).toHaveBeenCalledWith('e1', 'c1');
   });
 
+  it('rail density caps visible conditions at 2 with +N overflow', () => {
+    const actions = makeMockActions();
+    const conditions = [
+      'Blinded',
+      'Charmed',
+      'Deafened',
+      'Frightened',
+      'Poisoned',
+    ].map((name, i) => ({ id: `c${i}`, name }));
+    render(
+      <CombatantRow
+        {...defaultProps}
+        entity={{ ...mockEntity, conditions }}
+        actions={actions}
+        onSelect={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Blinded')).toBeInTheDocument();
+    expect(screen.getByText('Charmed')).toBeInTheDocument();
+    expect(screen.queryByText('Deafened')).not.toBeInTheDocument();
+    expect(screen.getByText('+3')).toBeInTheDocument();
+  });
+
   it('lair entity hides HP and AC', () => {
     const actions = makeMockActions();
     render(
