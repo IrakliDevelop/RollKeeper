@@ -58,6 +58,7 @@ import {
   getClassHitDie,
   isDead,
 } from '@/utils/hpCalculations';
+import { detectSpellAoe } from '@/utils/spellAoeDetection';
 import { usePlayerStore } from '@/store/playerStore';
 
 // Function to migrate weapon damage from old format to new array format
@@ -147,6 +148,14 @@ function migrateCharacterData(character: unknown): CharacterState {
     // Ensure spells array exists
     if (!Array.isArray(result.spells)) {
       result.spells = DEFAULT_CHARACTER_STATE.spells;
+    }
+    // Back-fill AoE template metadata for spells saved before the aoe field
+    // existed. undefined = never detected → run detection once; null or a
+    // value = already decided (by detection or the user) → never touch.
+    for (const spell of result.spells) {
+      if (spell.aoe === undefined) {
+        spell.aoe = detectSpellAoe(spell.description, spell.range);
+      }
     }
     // Ensure spellcasting stats exist
     if (
