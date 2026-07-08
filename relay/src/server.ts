@@ -6,6 +6,7 @@ import type { HubBackend, SyncHub } from '@fieldnotes/sync-server';
 import { makePolicies } from './policies.js';
 import { BufferedRedisBackend } from './backend.js';
 import { patchSendCorrectionLeak } from './corrections.js';
+import { handlePokeRequest } from './poke.js';
 
 export interface StartRelayOptions {
   secret: string;
@@ -28,10 +29,22 @@ export interface RelayHandle {
 export async function startRelay(
   opts: StartRelayOptions
 ): Promise<RelayHandle> {
+  let pokeHandler:
+    | ((req: http.IncomingMessage, res: http.ServerResponse) => void)
+    | null = null;
   const server = http.createServer((req, res) => {
     if (req.url === '/healthz') {
       res.writeHead(200, { 'content-type': 'text/plain' });
       res.end('ok');
+      return;
+    }
+    if (req.url === '/poke') {
+      if (pokeHandler) {
+        pokeHandler(req, res);
+      } else {
+        res.writeHead(503);
+        res.end();
+      }
       return;
     }
     res.writeHead(404);
@@ -46,6 +59,13 @@ export async function startRelay(
   });
   // Upstream sendCorrection leak — see corrections.ts.
   patchSendCorrectionLeak(hub, policies.canRead);
+
+  pokeHandler = (req, res) =>
+    void handlePokeRequest(hub, opts.secret, req, res).catch(err => {
+      console.error('[poke]', err);
+      if (!res.headersSent) res.writeHead(500);
+      res.end();
+    });
 
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
