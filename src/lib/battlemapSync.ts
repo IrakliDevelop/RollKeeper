@@ -42,6 +42,23 @@ export function computeSeedIds(
   return local.filter(el => !presentIds.has(el.id)).map(el => el.id);
 }
 
+/** Parses a relay poke envelope: `{from:'@poke', op:{kind:'presence', data:{kind:'poke', feature}}}`. */
+export function pokeFeatureFromEnvelope(raw: string): string | null {
+  let env: {
+    from?: string;
+    op?: { kind?: string; data?: { kind?: string; feature?: unknown } };
+  };
+  try {
+    env = JSON.parse(raw) as typeof env;
+  } catch {
+    return null;
+  }
+  if (env?.from !== '@poke') return null;
+  const op = env.op;
+  if (op?.kind !== 'presence' || op.data?.kind !== 'poke') return null;
+  return typeof op.data.feature === 'string' ? op.data.feature : null;
+}
+
 /** Transport surface the connection manager relies on (WebSocketTransport-compatible). */
 export type BattleMapTransport = Pick<
   WebSocketTransport,
@@ -60,6 +77,8 @@ export interface ManagedConnectionOptions {
   /** DM only: push local elements missing from each snapshot. */
   seedLocal?: boolean;
   onStatus?: (s: BattleMapConnectionStatus) => void;
+  /** Fires when the relay pokes this room (e.g. initiative changed → refetch /shared). */
+  onPoke?: (feature: string) => void;
   /** DI seam for tests; defaults to `url => new WebSocketTransport(url)`. */
   transportFactory?: (url: string) => BattleMapTransport;
 }
@@ -161,6 +180,13 @@ export function createManagedBattleMapConnection(
       }
     });
 
+    const unsubPoke = opts.onPoke
+      ? t.onMessage(raw => {
+          const feature = pokeFeatureFromEnvelope(raw);
+          if (feature) opts.onPoke!(feature);
+        })
+      : null;
+
     t.onReconnect(() => {
       if (!stopped) opts.onStatus?.('live');
     });
@@ -170,6 +196,7 @@ export function createManagedBattleMapConnection(
       if (code >= 4000 && code <= 4999) {
         // transport is now terminated — rebuild with a fresh token
         unsubMsg();
+        unsubPoke?.();
         client?.stop();
         client = null;
         transport = null;
