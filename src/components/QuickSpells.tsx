@@ -17,6 +17,7 @@ import {
   Infinity,
 } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
+import { useCastSpell } from '@/hooks/useCastSpell';
 import { Spell } from '@/types/character';
 import {
   calculateSpellAttackBonus,
@@ -401,15 +402,9 @@ export function QuickSpells({
   showDamageRoll,
   animateRoll,
 }: QuickSpellsProps) {
-  const {
-    character,
-    updateCharacter,
-    updateSpellSlot,
-    startConcentration,
-    stopConcentration,
-    toggleSpellFavorite,
-    toggleReaction,
-  } = useCharacterStore();
+  const { character, updateSpellSlot, toggleSpellFavorite, toggleReaction } =
+    useCharacterStore();
+  const { castSpell } = useCastSpell();
 
   // Local state
   const [castModalOpen, setCastModalOpen] = useState(false);
@@ -596,42 +591,19 @@ export function QuickSpells({
     }
   };
 
-  const handleCastSpell = (spellLevel: number, useFreecast: boolean) => {
+  const handleCastSpell = (
+    spellLevel: number,
+    useFreecast: boolean,
+    isRitual?: boolean,
+    usePact?: boolean
+  ) => {
     if (!selectedSpell) return;
-
-    if (selectedSpell.concentration) {
-      if (character.concentration.isConcentrating) {
-        stopConcentration();
-      }
-      startConcentration(selectedSpell.name, selectedSpell.id, spellLevel);
-    }
-
-    if (useFreecast) {
-      if (selectedSpell.freeCastMax && selectedSpell.freeCastMax > 0) {
-        updateCharacter({
-          spells: character.spells.map(s =>
-            s.id === selectedSpell.id
-              ? { ...s, freeCastsUsed: (s.freeCastsUsed || 0) + 1 }
-              : s
-          ),
-        });
-      }
-    } else if (selectedSpell.level > 0) {
-      updateSpellSlot(
-        spellLevel as keyof typeof character.spellSlots,
-        character.spellSlots[spellLevel as keyof typeof character.spellSlots]
-          .used + 1
-      );
-    }
-
-    // Auto-trigger reaction usage when casting a reaction spell
-    if (
-      selectedSpell.castingTime?.toLowerCase().includes('reaction') &&
-      !character.reaction?.hasUsedReaction
-    ) {
-      toggleReaction();
-    }
-
+    castSpell(selectedSpell, {
+      level: spellLevel,
+      useFreecast,
+      isRitual,
+      usePact,
+    });
     setCastModalOpen(false);
     setSelectedSpell(null);
   };
@@ -830,6 +802,7 @@ export function QuickSpells({
           spellSlots={character.spellSlots}
           concentration={character.concentration}
           hasUsedReaction={character.reaction?.hasUsedReaction}
+          pactMagic={character.pactMagic}
           onCastSpell={handleCastSpell}
           onResetReaction={toggleReaction}
         />
