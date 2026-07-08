@@ -48,6 +48,7 @@ const mockFormData: SpellFormData = {
   castingSource: '',
   freeCastMode: 'normal',
   freeCastMax: 1,
+  aoe: null,
 };
 
 const mockSpell: Spell = {

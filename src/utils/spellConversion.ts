@@ -5,6 +5,8 @@
 
 import { ProcessedSpell } from '@/types/spells';
 import { Spell, SpellActionType } from '@/types/character';
+import type { SpellAoe } from '@/types/spellAoe';
+import { detectSpellAoe } from './spellAoeDetection';
 import { formatSpellDescriptionForEditor } from './referenceParser';
 
 /**
@@ -39,6 +41,8 @@ export interface SpellFormData {
   castingSource: string;
   freeCastMode: FreeCastMode;
   freeCastMax: number;
+  /** AoE template geometry. Always a value or explicit null in the form — never undefined. */
+  aoe: SpellAoe | null;
 }
 
 /**
@@ -193,6 +197,7 @@ export function convertProcessedSpellToFormData(
     castingSource: '',
     freeCastMode: 'normal',
     freeCastMax: 1,
+    aoe: detectSpellAoe(spell.description, spell.range),
   };
 }
 
@@ -240,6 +245,7 @@ export function convertFormDataToSpell(
           ? formData.freeCastMax
           : undefined,
     freeCastsUsed: formData.freeCastMode !== 'normal' ? 0 : undefined,
+    aoe: formData.aoe,
     createdAt: now,
     updatedAt: now,
   };
@@ -322,6 +328,7 @@ export function createInitialSpellFormData(): SpellFormData {
     castingSource: '',
     freeCastMode: 'normal',
     freeCastMax: 1,
+    aoe: null,
   };
 }
 
@@ -369,5 +376,6 @@ export function spellToFormData(spell: Spell): SpellFormData {
     castingSource: spell.castingSource || '',
     freeCastMode,
     freeCastMax,
+    aoe: spell.aoe ?? null,
   };
 }
