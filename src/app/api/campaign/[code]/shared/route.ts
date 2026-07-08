@@ -10,6 +10,7 @@ import {
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
 import { verifyDmAuthority } from '@/lib/dmAuth';
+import { sendInitiativePoke } from '@/lib/relayPoke';
 import type {
   DmMessage,
   DmEffect,
@@ -280,13 +281,20 @@ export async function POST(
       return NextResponse.json({ success: true });
     }
 
-    // Default: store as shared feature key (calendar, etc.)
+    // Default: store as shared feature key (calendar, initiative, etc.)
     await Promise.all([
       redis.set(campaignSharedKey(code, feature), JSON.stringify(data), {
         ex: SLIDING_TTL_SECONDS,
       }),
       refreshCampaignTTL(redis, code),
     ]);
+
+    // Latency shave: nudge connected battle-map clients to refetch now.
+    // Awaited (serverless may drop un-awaited work) but never throws; the
+    // adaptive poll remains the guarantee.
+    if (feature === 'initiative') {
+      await sendInitiativePoke(code, redis);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
