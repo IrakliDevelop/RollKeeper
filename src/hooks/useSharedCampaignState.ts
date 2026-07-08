@@ -22,6 +22,8 @@ interface UseSharedCampaignStateResult {
   acknowledgeTransfers: () => Promise<void>;
   pendingTransfers: ItemTransfer[];
   clearPendingTransfer: (transferId: string) => void;
+  /** Immediate refetch (e.g. on a relay poke). Debounced: at most one per second. */
+  refetchNow: () => void;
 }
 
 export function useSharedCampaignState(
@@ -87,6 +89,15 @@ export function useSharedCampaignState(
       setLoading(false);
     }
   }, [campaignCode, playerId]);
+
+  const REFETCH_DEBOUNCE_MS = 1000;
+  const lastRefetchNowRef = useRef(0);
+  const refetchNow = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRefetchNowRef.current < REFETCH_DEBOUNCE_MS) return;
+    lastRefetchNowRef.current = now;
+    fetchSharedState();
+  }, [fetchSharedState]);
 
   const startPolling = useCallback(() => {
     stopPolling();
@@ -250,5 +261,6 @@ export function useSharedCampaignState(
     acknowledgeTransfers,
     pendingTransfers,
     clearPendingTransfer,
+    refetchNow,
   };
 }
