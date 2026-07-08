@@ -48,6 +48,12 @@ export function SpellPlacementController({
 
   // If something else steals the tool while armed (e.g. user taps a toolbar
   // button), treat it as a cancel so the banner doesn't dangle.
+  // INVARIANT: the success path stays cancel-free ONLY because the tool's
+  // onPointerUp calls switchTool('select') and onPlaced() synchronously in
+  // one tick, and the parent clears `pending` synchronously inside onPlaced —
+  // React 19 batches both updates into one commit, so this effect never sees
+  // select-with-pending on success. If onPlaced ever gains an async gap
+  // before clearing pending, a successful placement will spuriously cancel.
   useEffect(() => {
     if (pending && wasArmedRef.current && activeTool !== 'spelltemplate') {
       onCancel();
