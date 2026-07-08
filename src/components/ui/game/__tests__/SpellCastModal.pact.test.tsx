@@ -72,4 +72,34 @@ describe('SpellCastModal pact magic', () => {
     renderModal(null);
     expect(screen.queryByRole('button', { name: /pact/i })).toBeNull();
   });
+
+  it('slot button at pact level does not show selected when pact option is chosen', () => {
+    // Create slots with level 3 available
+    const slotsWithLevel3 = Object.fromEntries(
+      Array.from({ length: 9 }, (_, i) => [
+        i + 1,
+        i + 1 === 3 ? { max: 2, used: 0 } : { max: 0, used: 0 },
+      ])
+    ) as unknown as SpellSlots;
+
+    const onCastSpell = vi.fn();
+    render(
+      <SpellCastModal
+        isOpen
+        onClose={() => {}}
+        spell={spell}
+        spellSlots={slotsWithLevel3}
+        concentration={noConc}
+        onCastSpell={onCastSpell}
+        pactMagic={{ slots: { max: 2, used: 0 }, level: 3 }}
+      />
+    );
+
+    const pactButton = screen.getByRole('button', { name: /pact/i });
+    fireEvent.click(pactButton);
+
+    // Find the level 3 slot button (unique to slot buttons) and verify it's not selected
+    const slotButton = screen.getByRole('button', { name: /Base Level/ });
+    expect(slotButton.className).not.toContain('border-purple-500');
+  });
 });
