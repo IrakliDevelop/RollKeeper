@@ -1,0 +1,113 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type {
+  ToolContext,
+  PointerState,
+  TemplateElement,
+} from '@fieldnotes/core';
+import {
+  SpellTemplateTool,
+  type SpellTemplateConfig,
+} from '@/components/ui/campaign/player-vtt/SpellTemplateTool';
+
+function fakeCtx() {
+  const added: TemplateElement[] = [];
+  const updates: Array<{ id: string; patch: Record<string, unknown> }> = [];
+  const ctx = {
+    camera: { screenToWorld: (p: { x: number; y: number }) => p },
+    store: {
+      add: vi.fn((el: TemplateElement) => {
+        added.push(el);
+        return el;
+      }),
+      update: vi.fn((id: string, patch: Record<string, unknown>) => {
+        updates.push({ id, patch });
+      }),
+    },
+    requestRender: vi.fn(),
+    switchTool: vi.fn(),
+    setCursor: vi.fn(),
+    gridSize: 40,
+    activeLayerId: 'layer-1',
+    snapToGrid: false, // smartSnap becomes identity without grid snap
+  } as unknown as ToolContext;
+  return { ctx, added, updates };
+}
+
+const down = (x: number, y: number) => ({ x, y }) as PointerState;
+
+function armed(config: Partial<SpellTemplateConfig> = {}) {
+  const onPlaced = vi.fn();
+  const ref = {
+    current: {
+      shape: 'circle',
+      sizeFeet: 20,
+      onPlaced,
+      ...config,
+    } as SpellTemplateConfig,
+  };
+  return { tool: new SpellTemplateTool(ref), ref, onPlaced };
+}
+
+describe('SpellTemplateTool', () => {
+  let f: ReturnType<typeof fakeCtx>;
+  beforeEach(() => {
+    f = fakeCtx();
+  });
+
+  it('places a circle sized from feet at the tap point (20ft radius @5ft/40px = 160px)', () => {
+    const { tool, onPlaced } = armed({ shape: 'circle', sizeFeet: 20 });
+    tool.onPointerDown(down(100, 200), f.ctx);
+    expect(f.added).toHaveLength(1);
+    const el = f.added[0];
+    expect(el.templateShape).toBe('circle');
+    expect(el.radius).toBe(160);
+    expect(el.radiusFeet).toBe(20);
+    expect(el.feetPerCell).toBe(5);
+    expect(el.position).toEqual({ x: 100, y: 200 });
+    tool.onPointerUp(down(100, 200), f.ctx);
+    expect(f.ctx.switchTool).toHaveBeenCalledWith('select');
+    expect(onPlaced).toHaveBeenCalledTimes(1);
+  });
+
+  it('squares use sizeFeet as the SIDE (15ft cube @5ft/40px → radius 60px)', () => {
+    const { tool } = armed({ shape: 'square', sizeFeet: 15 });
+    tool.onPointerDown(down(0, 0), f.ctx);
+    expect(f.added[0].templateShape).toBe('square');
+    expect(f.added[0].radius).toBe(60);
+  });
+
+  it('cones aim by drag: angle updates on move, final on release', () => {
+    const { tool, onPlaced } = armed({ shape: 'cone', sizeFeet: 15 });
+    tool.onPointerDown(down(0, 0), f.ctx);
+    expect(f.added[0].angle).toBe(0);
+    tool.onPointerMove(down(10, 10), f.ctx);
+    expect(f.updates).toHaveLength(1);
+    expect(f.updates[0].patch.angle).toBeCloseTo(Math.PI / 4);
+    tool.onPointerUp(down(10, 10), f.ctx);
+    expect(onPlaced).toHaveBeenCalledTimes(1);
+    expect(f.ctx.switchTool).toHaveBeenCalledWith('select');
+  });
+
+  it('does not update angle for circles on move', () => {
+    const { tool } = armed({ shape: 'circle', sizeFeet: 20 });
+    tool.onPointerDown(down(0, 0), f.ctx);
+    tool.onPointerMove(down(50, 0), f.ctx);
+    expect(f.updates).toHaveLength(0);
+  });
+
+  it('with a null config, bails to select without placing', () => {
+    const ref = { current: null };
+    const tool = new SpellTemplateTool(ref);
+    tool.onPointerDown(down(0, 0), f.ctx);
+    expect(f.added).toHaveLength(0);
+    expect(f.ctx.switchTool).toHaveBeenCalledWith('select');
+  });
+
+  it('sets crosshair cursor on activate, default on deactivate', () => {
+    const { tool } = armed();
+    tool.onActivate?.(f.ctx);
+    expect(f.ctx.setCursor).toHaveBeenCalledWith('crosshair');
+    tool.onDeactivate?.(f.ctx);
+    expect(f.ctx.setCursor).toHaveBeenCalledWith('default');
+  });
+});
