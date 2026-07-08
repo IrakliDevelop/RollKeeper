@@ -456,7 +456,10 @@ export function SpellCastModal({
                           const available = slot.max - slot.used;
                           const isMinLevel = level === spell.level;
                           const isSelected =
-                            !useFreecast && selectedLevel === level;
+                            !useFreecast &&
+                            !useRitual &&
+                            !usePact &&
+                            selectedLevel === level;
 
                           return (
                             <button
