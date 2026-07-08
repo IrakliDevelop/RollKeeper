@@ -8,8 +8,14 @@ import {
   ClockAlert,
   Infinity,
   BookOpen,
+  Moon,
 } from 'lucide-react';
-import { Spell, SpellSlots, ConcentrationState } from '@/types/character';
+import {
+  Spell,
+  SpellSlots,
+  ConcentrationState,
+  PactMagic,
+} from '@/types/character';
 import {
   Dialog,
   DialogContent,
@@ -29,9 +35,11 @@ interface SpellCastModalProps {
   onCastSpell: (
     spellLevel: number,
     useFreecast: boolean,
-    isRitual?: boolean
+    isRitual?: boolean,
+    usePact?: boolean
   ) => void;
   onResetReaction?: () => void;
+  pactMagic?: PactMagic | null;
 }
 
 export function SpellCastModal({
@@ -43,10 +51,12 @@ export function SpellCastModal({
   hasUsedReaction,
   onCastSpell,
   onResetReaction,
+  pactMagic,
 }: SpellCastModalProps) {
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const [useFreecast, setUseFreecast] = useState(false);
   const [useRitual, setUseRitual] = useState(false);
+  const [usePact, setUsePact] = useState(false);
 
   const isAtWill = spell.freeCastMax === 0;
   const isInnate = spell.freeCastMax !== undefined && spell.freeCastMax > 0;
@@ -56,6 +66,13 @@ export function SpellCastModal({
     : 0;
   const canFreecast = isAtWill || (isInnate && freeCastsRemaining > 0);
   const canRitual = spell.ritual === true && spell.level > 0;
+
+  const pactAvailable =
+    !!pactMagic && pactMagic.slots.max > 0 && pactMagic.level >= spell.level;
+  const pactRemaining = pactMagic
+    ? pactMagic.slots.max - pactMagic.slots.used
+    : 0;
+  const canPact = pactAvailable && pactRemaining > 0;
 
   const availableLevels = [];
   for (let level = Math.max(1, spell.level); level <= 9; level++) {
@@ -68,6 +85,7 @@ export function SpellCastModal({
   React.useEffect(() => {
     if (!isOpen) return;
     setUseRitual(false);
+    setUsePact(false);
     if (spell.level === 0) {
       setSelectedLevel(0);
       setUseFreecast(false);
@@ -97,11 +115,12 @@ export function SpellCastModal({
 
   const handleCast = () => {
     if (selectedLevel !== null) {
-      onCastSpell(selectedLevel, useFreecast, useRitual);
+      onCastSpell(selectedLevel, useFreecast, useRitual, usePact);
       onClose();
       setSelectedLevel(null);
       setUseFreecast(false);
       setUseRitual(false);
+      setUsePact(false);
     }
   };
 
@@ -110,24 +129,35 @@ export function SpellCastModal({
     setSelectedLevel(null);
     setUseFreecast(false);
     setUseRitual(false);
+    setUsePact(false);
   };
 
   const handleSelectFreecast = () => {
     setUseFreecast(true);
     setUseRitual(false);
+    setUsePact(false);
     setSelectedLevel(spell.level);
   };
 
   const handleSelectSlot = (level: number) => {
     setUseFreecast(false);
     setUseRitual(false);
+    setUsePact(false);
     setSelectedLevel(level);
   };
 
   const handleSelectRitual = () => {
     setUseRitual(true);
     setUseFreecast(false);
+    setUsePact(false);
     setSelectedLevel(spell.level);
+  };
+
+  const handleSelectPact = () => {
+    setUsePact(true);
+    setUseRitual(false);
+    setUseFreecast(false);
+    setSelectedLevel(pactMagic!.level);
   };
 
   const canCast =
@@ -135,6 +165,7 @@ export function SpellCastModal({
     (spell.level === 0 ||
       useFreecast ||
       useRitual ||
+      usePact ||
       availableLevels.includes(selectedLevel));
 
   return (
@@ -370,8 +401,39 @@ export function SpellCastModal({
                   </div>
                 )}
 
+                {/* Pact Magic Option */}
+                {pactAvailable && (
+                  <div>
+                    <h4 className="text-heading mb-3 font-medium">
+                      Pact Magic:
+                    </h4>
+                    <button
+                      onClick={handleSelectPact}
+                      disabled={!canPact}
+                      className={`border-accent-purple-border flex w-full items-center justify-between rounded-lg border-2 p-3 transition-all duration-200 ${
+                        usePact
+                          ? 'bg-accent-purple-bg shadow-md'
+                          : canPact
+                            ? 'bg-surface-raised hover:bg-accent-purple-bg'
+                            : 'bg-surface-secondary cursor-not-allowed opacity-50'
+                      }`}
+                    >
+                      <span className="text-accent-purple-text flex items-center gap-3 font-medium">
+                        <Moon size={16} />
+                        Pact slot (level {pactMagic!.level})
+                      </span>
+                      <span className="text-accent-purple-text text-sm">
+                        {pactRemaining}/{pactMagic!.slots.max} remaining
+                      </span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Slot-Based Casting */}
-                {availableLevels.length === 0 && !canFreecast && !canRitual ? (
+                {availableLevels.length === 0 &&
+                !canFreecast &&
+                !canRitual &&
+                !canPact ? (
                   <div className="py-4 text-center">
                     <p className="mb-2 text-gray-600">
                       No available spell slots to cast this spell.
