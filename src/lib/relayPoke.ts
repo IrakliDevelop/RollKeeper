@@ -7,7 +7,10 @@ const POKE_TOKEN_TTL_MS = 30_000;
 const POKE_TIMEOUT_MS = 2_000;
 
 export function relayHttpUrl(wsUrl: string): string {
-  return wsUrl.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:');
+  return wsUrl
+    .replace(/^wss:/, 'https:')
+    .replace(/^ws:/, 'http:')
+    .replace(/\/$/, '');
 }
 
 interface RedisReader {

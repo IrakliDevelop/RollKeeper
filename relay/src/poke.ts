@@ -20,6 +20,7 @@ interface HubInternals {
  * sender connection — neither applies to a server-originated poke.
  * The sync client's presence dispatch is stateless, so `from: '@poke'`
  * pollutes no client-side bookkeeping.
+ * NOTE: broadcasts only to locally-connected sockets (bypasses hub fanout) — fine for single-instance deploy; revisit if relay runs multiple instances.
  */
 export function pokeRoom(hub: SyncHub, room: string, feature: string): number {
   const internals = hub as unknown as HubInternals;
