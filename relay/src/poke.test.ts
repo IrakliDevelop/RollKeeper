@@ -1,18 +1,30 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { SyncHub } from '@fieldnotes/sync-server';
+import WebSocket from 'ws';
 import { pokeRoom, handlePokeRequest } from './poke.js';
 import { signBattleMapToken } from './token.js';
+import { startRelay, type RelayHandle } from './server.js';
 
 const SECRET = 'test-secret';
 const ROOM = 'CAMP1:map-42';
 
+/** Mirrors the real `SyncHub` shape: `rooms` maps room -> connection ids,
+ * and the actual connection objects (with `send`) live in `conns`. */
 function fakeHub(rooms: Record<string, { send: (m: string) => void }[]>) {
-  const map = new Map<string, Set<{ send: (m: string) => void }>>();
-  for (const [room, conns] of Object.entries(rooms)) {
-    map.set(room, new Set(conns));
+  const conns = new Map<string, { send: (m: string) => void }>();
+  const roomMap = new Map<string, Set<string>>();
+  let counter = 0;
+  for (const [room, list] of Object.entries(rooms)) {
+    const ids = new Set<string>();
+    for (const conn of list) {
+      const id = `c${++counter}`;
+      conns.set(id, conn);
+      ids.add(id);
+    }
+    roomMap.set(room, ids);
   }
-  return { rooms: map } as unknown as SyncHub;
+  return { rooms: roomMap, conns } as unknown as SyncHub;
 }
 
 /** Minimal async-iterable POST request carrying a JSON body. */
@@ -157,5 +169,72 @@ describe('handlePokeRequest', () => {
     const res = fakeRes();
     await handlePokeRequest(fakeHub({}), SECRET, fakeReq('', 'GET'), res);
     expect(res.statusCode).toBe(405);
+  });
+});
+
+describe('poke integration (real relay)', () => {
+  let handle: RelayHandle | null = null;
+  let socket: WebSocket | null = null;
+
+  afterEach(async () => {
+    socket?.close();
+    socket = null;
+    await handle?.close();
+    handle = null;
+  });
+
+  it('delivers a real poke to a live websocket connection in the room', async () => {
+    handle = await startRelay({ secret: SECRET, port: 0 });
+    const port = handle.address().port;
+
+    const playerToken = signBattleMapToken(
+      { userId: 'p1', role: 'player', room: ROOM, exp: Date.now() + 30_000 },
+      SECRET
+    );
+    const wsUrl = `ws://127.0.0.1:${port}?room=${encodeURIComponent(
+      ROOM
+    )}&token=${encodeURIComponent(playerToken)}`;
+    socket = new WebSocket(wsUrl);
+
+    const messages: string[] = [];
+    socket.on('message', data => {
+      messages.push(data.toString());
+    });
+
+    await vi.waitFor(() => {
+      expect(socket?.readyState).toBe(WebSocket.OPEN);
+    });
+
+    // The hub registers the connection asynchronously after the WS upgrade
+    // (authenticate resolves via a microtask), so retry the poke until the
+    // relay reports the connection as a room member.
+    await vi.waitFor(async () => {
+      const response = await fetch(`http://127.0.0.1:${port}/poke`, {
+        method: 'POST',
+        body: JSON.stringify({
+          room: ROOM,
+          feature: 'initiative',
+          token: dmToken(),
+        }),
+      });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ sent: 1 });
+    });
+
+    await vi.waitFor(() => {
+      const pokeMessage = messages
+        .map(m => JSON.parse(m) as unknown)
+        .find(
+          (m): m is { from: string; op: { kind: string; data: unknown } } =>
+            typeof m === 'object' &&
+            m !== null &&
+            (m as { op?: { data?: { kind?: unknown } } }).op?.data?.kind ===
+              'poke'
+        );
+      expect(pokeMessage).toEqual({
+        from: '@poke',
+        op: { kind: 'presence', data: { kind: 'poke', feature: 'initiative' } },
+      });
+    });
   });
 });
