@@ -2,13 +2,15 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { SyncHub } from '@fieldnotes/sync-server';
 import { verifyBattleMapToken } from './token.js';
 
-/** Narrow structural view of the hub's private room registry — same
- * private-access pattern as `corrections.ts`. Connections only need `send`. */
+/** Narrow structural view of the hub's private registries — same
+ * private-access pattern as `corrections.ts`. `rooms` maps room -> connection
+ * ids; the actual connection objects (with `send`) live in `conns`. */
 interface RoomConnection {
   send(message: string): void;
 }
-interface HubWithRooms {
-  rooms: Map<string, Set<RoomConnection>>;
+interface HubInternals {
+  rooms: Map<string, Set<string>>;
+  conns: Map<string, RoomConnection>;
 }
 
 /**
@@ -20,20 +22,23 @@ interface HubWithRooms {
  * pollutes no client-side bookkeeping.
  */
 export function pokeRoom(hub: SyncHub, room: string, feature: string): number {
-  const rooms = (hub as unknown as HubWithRooms).rooms;
-  const members = rooms.get(room);
-  if (!members || members.size === 0) return 0;
+  const internals = hub as unknown as HubInternals;
+  const memberIds = internals.rooms.get(room);
+  if (!memberIds || memberIds.size === 0) return 0;
   const message = JSON.stringify({
     from: '@poke',
     op: { kind: 'presence', data: { kind: 'poke', feature } },
   });
   let sent = 0;
-  for (const conn of members) {
+  for (const id of memberIds) {
+    const conn = internals.conns.get(id);
+    if (!conn) continue;
     try {
       conn.send(message);
       sent++;
-    } catch {
+    } catch (err) {
       // dead socket — the heartbeat reaps it; poke is best-effort
+      console.warn('[poke] send failed:', err);
     }
   }
   return sent;
@@ -56,15 +61,19 @@ export async function handlePokeRequest(
     res.end();
     return;
   }
-  let raw = '';
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
   for await (const chunk of req) {
-    raw += chunk;
-    if (raw.length > MAX_BODY_BYTES) {
+    const buf = chunk as Buffer;
+    totalBytes += buf.length;
+    if (totalBytes > MAX_BODY_BYTES) {
       res.writeHead(413);
       res.end();
       return;
     }
+    chunks.push(buf);
   }
+  const raw = Buffer.concat(chunks).toString('utf8');
   let body: { room?: unknown; feature?: unknown; token?: unknown };
   try {
     body = JSON.parse(raw) as typeof body;
