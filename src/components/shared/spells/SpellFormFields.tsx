@@ -15,8 +15,17 @@ import {
   SAVING_THROWS,
   DAMAGE_TYPES,
 } from '@/utils/spellConstants';
+import { useSpellAoeAutofill } from './SpellFormFields.hooks';
 import type { SpellFormData, FreeCastMode } from '@/utils/spellConversion';
 import type { SpellActionType } from '@/types/character';
+import type { AoeShape } from '@/types/spellAoe';
+
+const AOE_SIZE_LABEL: Record<AoeShape, string> = {
+  circle: 'Radius (ft)',
+  cone: 'Length (ft)',
+  line: 'Length (ft)',
+  square: 'Side (ft)',
+};
 
 export interface SpellFormFieldsProps {
   formData: SpellFormData;
@@ -41,6 +50,11 @@ export function SpellFormFields({
 }: SpellFormFieldsProps) {
   const set = (patch: Partial<SpellFormData>) =>
     onChange({ ...formData, ...patch });
+
+  const { setDescription, setRange, setAoe } = useSpellAoeAutofill(
+    formData,
+    onChange
+  );
 
   return (
     <div className="space-y-6">
@@ -126,7 +140,7 @@ export function SpellFormFields({
             </label>
             <SelectField
               value={formData.range}
-              onValueChange={value => set({ range: value })}
+              onValueChange={value => setRange(value)}
             >
               {RANGES.map(range => (
                 <SelectItem key={range} value={range}>
@@ -350,7 +364,7 @@ export function SpellFormFields({
           </label>
           <RichTextEditor
             content={formData.description}
-            onChange={content => set({ description: content })}
+            onChange={setDescription}
             placeholder="Describe what the spell does..."
             minHeight="150px"
           />
@@ -449,6 +463,67 @@ export function SpellFormFields({
                 ))}
               </SelectField>
             </div>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div>
+            <label className="text-body mb-2 block text-sm font-medium">
+              AoE Template
+            </label>
+            <SelectField
+              value={formData.aoe?.shape ?? 'none'}
+              onValueChange={value => {
+                if (value === 'none') {
+                  setAoe(null);
+                  return;
+                }
+                const shape = value as AoeShape;
+                setAoe({
+                  shape,
+                  sizeFeet: formData.aoe?.sizeFeet ?? 0,
+                  widthFeet:
+                    shape === 'line'
+                      ? (formData.aoe?.widthFeet ?? 5)
+                      : undefined,
+                });
+              }}
+            >
+              <SelectItem value="none">None</SelectItem>
+              <SelectItem value="circle">Circle (radius)</SelectItem>
+              <SelectItem value="cone">Cone</SelectItem>
+              <SelectItem value="line">Line</SelectItem>
+              <SelectItem value="square">Square (cube)</SelectItem>
+            </SelectField>
+          </div>
+          {formData.aoe && (
+            <Input
+              label={AOE_SIZE_LABEL[formData.aoe.shape]}
+              type="number"
+              min={0}
+              value={formData.aoe.sizeFeet || ''}
+              onChange={e =>
+                setAoe({
+                  ...formData.aoe!,
+                  sizeFeet: Number(e.target.value) || 0,
+                })
+              }
+            />
+          )}
+          {formData.aoe?.shape === 'line' && (
+            <Input
+              label="Width (ft)"
+              type="number"
+              min={0}
+              placeholder="5"
+              value={formData.aoe.widthFeet ?? ''}
+              onChange={e =>
+                setAoe({
+                  ...formData.aoe!,
+                  widthFeet:
+                    e.target.value === '' ? undefined : Number(e.target.value),
+                })
+              }
+            />
           )}
         </div>
       </div>
