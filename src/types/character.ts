@@ -28,6 +28,7 @@ export type SkillName =
 
 import type { SpellbookState } from './spells';
 import type { Summon } from './summon';
+import type { SpellAoe } from './spellAoe';
 
 // Character abilities with scores
 export interface CharacterAbilities {
@@ -280,6 +281,7 @@ export interface Spell {
   freeCastMax?: number; // 0 = at will (unlimited), 1+ = X free casts per long rest
   freeCastsUsed?: number; // how many free casts used since last long rest
   tags?: string[];
+  aoe?: SpellAoe | null; // undefined = never detected; null = no AoE (detected-none or user-cleared)
   createdAt: string;
   updatedAt: string;
 }
