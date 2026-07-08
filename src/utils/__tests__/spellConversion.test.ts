@@ -6,7 +6,6 @@ import {
   createInitialSpellFormData,
   spellToFormData,
   type SpellFormData,
-  type FreeCastMode,
 } from '@/utils/spellConversion';
 import type { ProcessedSpell } from '@/types/spells';
 import type { Spell } from '@/types/character';
