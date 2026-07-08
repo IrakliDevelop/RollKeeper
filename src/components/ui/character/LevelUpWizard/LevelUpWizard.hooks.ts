@@ -22,6 +22,7 @@ import {
   calculateModifier,
 } from '@/utils/calculations';
 import { calculateHitDicePools, migrateToMulticlass } from '@/utils/multiclass';
+import { detectSpellAoe } from '@/utils/spellAoeDetection';
 import {
   matchClassByName,
   getEditionOptions,
@@ -96,6 +97,7 @@ function buildSubclassSpells(
         materialDescription: found.components.materialComponent,
       },
       description: found.description,
+      aoe: detectSpellAoe(found.description, found.range),
       isPrepared: grant.isAlwaysPrepared,
       isAlwaysPrepared: grant.isAlwaysPrepared,
       castingSource: subclassName,
