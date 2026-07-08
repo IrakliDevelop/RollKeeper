@@ -239,6 +239,7 @@ describe('convertFormDataToSpell', () => {
     castingSource: '',
     freeCastMode: 'normal',
     freeCastMax: 1,
+    aoe: null,
   };
 
   it('creates a Spell with an id', () => {
@@ -490,5 +491,83 @@ describe('spellToFormData', () => {
     const spell = makeSpell({ freeCastMax: undefined });
     const result = spellToFormData(spell);
     expect(result.freeCastMode).toBe('normal');
+  });
+});
+
+// =============================================
+// AoE metadata through the conversion pipeline
+// =============================================
+describe('AoE metadata through the conversion pipeline', () => {
+  const fireballProcessed = {
+    id: 'fireball-phb',
+    name: 'Fireball',
+    level: 3,
+    school: 'V',
+    schoolName: 'Evocation',
+    castingTime: '1 action',
+    range: '150 feet',
+    components: {
+      verbal: true,
+      somatic: true,
+      material: true,
+      materialComponent: 'bat guano',
+    },
+    duration: 'Instantaneous',
+    description:
+      'Each creature in a 20-foot-radius sphere centered on that point must make a Dexterity saving throw. A target takes {@damage 8d6} fire damage on a failed save.',
+    concentration: false,
+    isRitual: false,
+    source: 'PHB',
+    saves: ['dexterity'],
+    damage: ['fire'],
+  } as unknown as ProcessedSpell;
+
+  it('convertProcessedSpellToFormData detects AoE from the compendium description', () => {
+    const formData = convertProcessedSpellToFormData(fireballProcessed);
+    expect(formData.aoe).toEqual({ shape: 'circle', sizeFeet: 20 });
+  });
+
+  it('createInitialSpellFormData starts with aoe null', () => {
+    expect(createInitialSpellFormData().aoe).toBeNull();
+  });
+
+  it('convertFormDataToSpell carries aoe (value and explicit null)', () => {
+    const base = createInitialSpellFormData();
+    const withAoe = convertFormDataToSpell({
+      ...base,
+      name: 'Homebrew Burst',
+      aoe: { shape: 'cone', sizeFeet: 30 },
+    });
+    expect(withAoe.aoe).toEqual({ shape: 'cone', sizeFeet: 30 });
+
+    const withoutAoe = convertFormDataToSpell({ ...base, name: 'Plain Spell' });
+    expect(withoutAoe.aoe).toBeNull(); // explicit null, never undefined
+  });
+
+  it('spellToFormData maps stored undefined to null for the form', () => {
+    const legacySpell = {
+      id: 's1',
+      name: 'Old Spell',
+      level: 1,
+      school: 'Evocation',
+      castingTime: '1 action',
+      range: 'Touch',
+      components: { verbal: true, somatic: false, material: false },
+      duration: 'Instantaneous',
+      description: 'A creature you touch regains hit points.',
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-01T00:00:00.000Z',
+    } as Spell;
+    expect(spellToFormData(legacySpell).aoe).toBeNull();
+
+    const withAoe = {
+      ...legacySpell,
+      aoe: { shape: 'line', sizeFeet: 60, widthFeet: 10 },
+    } as Spell;
+    expect(spellToFormData(withAoe).aoe).toEqual({
+      shape: 'line',
+      sizeFeet: 60,
+      widthFeet: 10,
+    });
   });
 });
