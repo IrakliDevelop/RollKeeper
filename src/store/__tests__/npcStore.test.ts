@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useNPCStore } from '@/store/npcStore';
+import { useNPCStore, migrateNpcPersistedState } from '@/store/npcStore';
 
 const CAMPAIGN = 'test-campaign';
 
@@ -530,5 +530,130 @@ describe('npcStore — longRestNPC', () => {
 
     const npc2 = useNPCStore.getState().getNPC(CAMPAIGN, id2);
     expect(npc2?.currentHp).toBe(10);
+  });
+});
+
+describe('migrateNpcPersistedState v2 → v3 (AoE back-fill)', () => {
+  const FIREBALL_DESC =
+    'Each creature in a 20-foot-radius sphere centered on that point must make a Dexterity saving throw.';
+
+  const makeV2State = () =>
+    JSON.parse(
+      JSON.stringify({
+        npcsByCampaign: {
+          'camp-1': [
+            {
+              id: 'npc-1',
+              campaignCode: 'camp-1',
+              name: 'Cult Mage',
+              armorClass: 12,
+              maxHp: 22,
+              speed: '30 ft.',
+              createdAt: '2025-01-01T00:00:00.000Z',
+              updatedAt: '2025-01-01T00:00:00.000Z',
+              spellcasting: {
+                casterLevel: 5,
+                ability: 'intelligence',
+                slotsUsed: {},
+                spells: [
+                  {
+                    id: 'spell-fb',
+                    name: 'Fireball',
+                    level: 3,
+                    school: 'Evocation',
+                    castingTime: '1 action',
+                    range: '150 feet',
+                    components: {
+                      verbal: true,
+                      somatic: true,
+                      material: false,
+                    },
+                    duration: 'Instantaneous',
+                    description: FIREBALL_DESC,
+                    createdAt: '2025-01-01T00:00:00.000Z',
+                    updatedAt: '2025-01-01T00:00:00.000Z',
+                  },
+                  {
+                    id: 'spell-user',
+                    name: 'Custom Blast',
+                    level: 1,
+                    school: 'Evocation',
+                    castingTime: '1 action',
+                    range: '60 feet',
+                    components: {
+                      verbal: true,
+                      somatic: false,
+                      material: false,
+                    },
+                    duration: 'Instantaneous',
+                    description: FIREBALL_DESC,
+                    aoe: null, // DM explicitly cleared it
+                    createdAt: '2025-01-01T00:00:00.000Z',
+                    updatedAt: '2025-01-01T00:00:00.000Z',
+                  },
+                ],
+              },
+            },
+            {
+              id: 'npc-2',
+              campaignCode: 'camp-1',
+              name: 'Guard',
+              armorClass: 16,
+              maxHp: 11,
+              speed: '30 ft.',
+              createdAt: '2025-01-01T00:00:00.000Z',
+              updatedAt: '2025-01-01T00:00:00.000Z',
+              // no spellcasting — must not crash
+            },
+          ],
+        },
+      })
+    );
+
+  it('back-fills aoe on NPC spells when migrating from v2', () => {
+    const migrated = migrateNpcPersistedState(makeV2State(), 2) as {
+      npcsByCampaign: Record<
+        string,
+        { spellcasting?: { spells: { name: string; aoe?: unknown }[] } }[]
+      >;
+    };
+    const spells = migrated.npcsByCampaign['camp-1'][0].spellcasting!.spells;
+    expect(spells.find(s => s.name === 'Fireball')?.aoe).toEqual({
+      shape: 'circle',
+      sizeFeet: 20,
+    });
+  });
+
+  it('preserves explicit null and tolerates NPCs without spellcasting', () => {
+    const migrated = migrateNpcPersistedState(makeV2State(), 2) as {
+      npcsByCampaign: Record<
+        string,
+        { spellcasting?: { spells: { name: string; aoe?: unknown }[] } }[]
+      >;
+    };
+    const spells = migrated.npcsByCampaign['camp-1'][0].spellcasting!.spells;
+    expect(spells.find(s => s.name === 'Custom Blast')?.aoe).toBeNull();
+    expect(migrated.npcsByCampaign['camp-1'][1]).toBeDefined(); // Guard survived
+  });
+
+  it('still handles the legacy v1 flat-array shape', () => {
+    const v1 = {
+      npcs: [
+        {
+          id: 'npc-old',
+          name: 'Old Timer',
+          armorClass: 10,
+          maxHp: 5,
+          speed: '30 ft.',
+          campaignCode: 'camp-x',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+    const migrated = migrateNpcPersistedState(v1, 1) as {
+      npcsByCampaign: Record<string, { name: string }[]>;
+    };
+    expect(migrated.npcsByCampaign['camp-x']).toHaveLength(1);
   });
 });

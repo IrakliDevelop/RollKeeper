@@ -7,6 +7,7 @@ import {
   getNPCSpellSlots,
   resetNPCSpellcasting,
 } from '@/utils/npcSpellcasting';
+import { detectSpellAoe } from '@/utils/spellAoeDetection';
 
 const NPC_STORAGE_KEY = 'rollkeeper-npc-data';
 
@@ -74,6 +75,51 @@ interface NPCStoreState {
     spellId: string
   ) => void;
   longRestNPC: (campaignCode: string, npcId: string) => void;
+}
+
+export function migrateNpcPersistedState(
+  persisted: unknown,
+  version: number
+): NPCStoreState {
+  let state: { npcsByCampaign: Record<string, CampaignNPC[]> };
+
+  if (version < 2) {
+    const old = persisted as { npcs?: CampaignNPC[] } | null;
+    const legacyNpcs = old?.npcs ?? [];
+    const npcsByCampaign: Record<string, CampaignNPC[]> = {};
+
+    for (const npc of legacyNpcs) {
+      const code =
+        (npc as CampaignNPC & { campaignCode?: string }).campaignCode ??
+        '_legacy';
+      if (!npcsByCampaign[code]) npcsByCampaign[code] = [];
+      npcsByCampaign[code].push({ ...npc, campaignCode: code });
+    }
+
+    state = { npcsByCampaign };
+  } else {
+    // Harden against a null persisted value (the old code blind-cast it)
+    state = (persisted ?? { npcsByCampaign: {} }) as {
+      npcsByCampaign: Record<string, CampaignNPC[]>;
+    };
+  }
+
+  if (version < 3) {
+    // Back-fill AoE template metadata for NPC spells saved before the aoe
+    // field existed (same undefined/null contract as character spells).
+    for (const npcs of Object.values(state.npcsByCampaign ?? {})) {
+      for (const npc of npcs) {
+        if (!npc.spellcasting) continue;
+        for (const spell of npc.spellcasting.spells) {
+          if (spell.aoe === undefined) {
+            spell.aoe = detectSpellAoe(spell.description, spell.range);
+          }
+        }
+      }
+    }
+  }
+
+  return state as NPCStoreState;
 }
 
 export const useNPCStore = create<NPCStoreState>()(
@@ -363,25 +409,8 @@ export const useNPCStore = create<NPCStoreState>()(
     {
       name: NPC_STORAGE_KEY,
       storage: createJSONStorage(() => createSafeStorage()),
-      version: 2,
-      migrate: (persisted: unknown, version: number) => {
-        if (version < 2) {
-          const old = persisted as { npcs?: CampaignNPC[] } | null;
-          const legacyNpcs = old?.npcs ?? [];
-          const npcsByCampaign: Record<string, CampaignNPC[]> = {};
-
-          for (const npc of legacyNpcs) {
-            const code =
-              (npc as CampaignNPC & { campaignCode?: string }).campaignCode ??
-              '_legacy';
-            if (!npcsByCampaign[code]) npcsByCampaign[code] = [];
-            npcsByCampaign[code].push({ ...npc, campaignCode: code });
-          }
-
-          return { npcsByCampaign };
-        }
-        return persisted as NPCStoreState;
-      },
+      version: 3,
+      migrate: migrateNpcPersistedState,
     }
   )
 );
