@@ -75,6 +75,7 @@ describe('managed connection onPoke', () => {
       add: () => {},
       update: () => {},
       subscribe: () => () => {},
+      on: () => () => {},
     } as unknown as ElementStore;
 
     const conn = createManagedBattleMapConnection({

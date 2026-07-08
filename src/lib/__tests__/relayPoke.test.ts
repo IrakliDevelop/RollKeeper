@@ -18,11 +18,14 @@ function redisWith(battlemapValue: unknown): MockRedis {
 }
 
 describe('relayHttpUrl', () => {
-  it('converts ws(s) scheme to http(s)', () => {
+  it('converts ws(s) scheme to http(s) and strips trailing slash', () => {
     expect(relayHttpUrl('wss://relay.example.com')).toBe(
       'https://relay.example.com'
     );
     expect(relayHttpUrl('ws://localhost:8787')).toBe('http://localhost:8787');
+    expect(relayHttpUrl('wss://relay.example.com/')).toBe(
+      'https://relay.example.com'
+    );
   });
 });
 
