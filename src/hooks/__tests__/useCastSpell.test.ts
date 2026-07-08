@@ -133,4 +133,14 @@ describe('useCastSpell', () => {
     );
     expect(getChar().reaction?.hasUsedReaction).toBe(true);
   });
+
+  it('usePact without pactMagic spends nothing (defensive guard)', () => {
+    useCharacterStore.getState().updateCharacter({ pactMagic: undefined });
+    const { result } = renderHook(() => useCastSpell());
+    act(() =>
+      result.current.castSpell(makeSpell(), { level: 3, usePact: true })
+    );
+    expect(getChar().spellSlots[3].used).toBe(0);
+    expect(getChar().pactMagic).toBeUndefined();
+  });
 });

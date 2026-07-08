@@ -48,19 +48,25 @@ export function useCastSpell() {
         // at-will (freeCastMax === 0): nothing to track
       } else if (options.isRitual) {
         // ritual casting spends no slot
-      } else if (options.usePact && character.pactMagic) {
-        updateCharacter({
-          pactMagic: {
-            ...character.pactMagic,
-            slots: {
-              ...character.pactMagic.slots,
-              used: Math.min(
-                character.pactMagic.slots.used + 1,
-                character.pactMagic.slots.max
-              ),
+      } else if (options.usePact) {
+        if (!character.pactMagic) {
+          console.warn(
+            '[useCastSpell] usePact without pactMagic — spending nothing'
+          );
+        } else {
+          updateCharacter({
+            pactMagic: {
+              ...character.pactMagic,
+              slots: {
+                ...character.pactMagic.slots,
+                used: Math.min(
+                  character.pactMagic.slots.used + 1,
+                  character.pactMagic.slots.max
+                ),
+              },
             },
-          },
-        });
+          });
+        }
       } else if (spell.level > 0) {
         const level = options.level as keyof SpellSlots;
         updateSpellSlot(level, character.spellSlots[level].used + 1);
