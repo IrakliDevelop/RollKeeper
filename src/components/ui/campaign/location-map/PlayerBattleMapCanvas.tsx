@@ -1,6 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -40,12 +46,27 @@ import {
   tokenAvatarUrl,
   buildCircularTokenUrl,
 } from './PlayerTokenTool';
+import {
+  SpellTemplateTool,
+  type SpellTemplateConfig,
+} from '@/components/ui/campaign/player-vtt/SpellTemplateTool';
 
-interface PlayerBattleMapViewProps {
+interface PlayerBattleMapCanvasProps {
   campaignCode: string;
   battleMapId: string;
   characterId: string;
+  characterName: string;
   characterAvatar?: string;
+  /** Chrome rendered INSIDE the ViewportContext.Provider (may use useActiveTool). */
+  children?: React.ReactNode;
+  /** Connection status surfaced upward (Live chip stays internal too). */
+  onStatus?: (status: BattleMapConnectionStatus) => void;
+  /** Relay poke passthrough (wire to useSharedCampaignState().refetchNow). */
+  onPoke?: (feature: string) => void;
+  /** Mutable config consumed by the registered SpellTemplateTool. */
+  spellTemplateConfigRef?: React.MutableRefObject<SpellTemplateConfig | null>;
+  /** Hide the built-in back-button (the VTT screen renders its own top-left chrome). */
+  hideBackButton?: boolean;
 }
 
 /** Viewport exposes historyRecorder at runtime for batched store ops. */
@@ -121,12 +142,17 @@ function PlayerToolbar({
   );
 }
 
-export function PlayerBattleMapView({
+export function PlayerBattleMapCanvas({
   campaignCode,
   battleMapId,
   characterId,
   characterAvatar,
-}: PlayerBattleMapViewProps) {
+  children,
+  onStatus: onStatusProp,
+  onPoke,
+  spellTemplateConfigRef,
+  hideBackButton = false,
+}: PlayerBattleMapCanvasProps) {
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const [hasSelection, setHasSelection] = useState(false);
@@ -169,8 +195,11 @@ export function PlayerBattleMapView({
         strokeWidth: 2,
         renderStyle: 'geometric',
       }),
+      ...(spellTemplateConfigRef
+        ? [new SpellTemplateTool(spellTemplateConfigRef)]
+        : []),
     ];
-  }, [characterId]);
+  }, [characterId, spellTemplateConfigRef]);
 
   const handleReady = (vp: Viewport) => {
     setViewport(vp);
@@ -222,8 +251,10 @@ export function PlayerBattleMapView({
       tokenRequest: { role: 'player', battleMapId, playerId: characterId },
       onStatus: s => {
         setStatus(s);
+        onStatusProp?.(s);
         if (s === 'live') requestAnimationFrame(() => vp.fitToContent(60));
       },
+      onPoke,
     });
   };
 
@@ -268,17 +299,20 @@ export function PlayerBattleMapView({
             <DmLocationToolOptions mode="battlemap" />
           </div>
         )}
-        <div className="absolute top-3 left-3 z-10">
-          <Link href={`/player/characters/${characterId}`}>
-            <Button
-              variant="ghost"
-              className="flex items-center gap-1.5 text-xs"
-            >
-              <ArrowLeft size={14} />
-              Back to sheet
-            </Button>
-          </Link>
-        </div>
+        {!hideBackButton && (
+          <div className="absolute top-3 left-3 z-10">
+            <Link href={`/player/characters/${characterId}`}>
+              <Button
+                variant="ghost"
+                className="flex items-center gap-1.5 text-xs"
+              >
+                <ArrowLeft size={14} />
+                Back to sheet
+              </Button>
+            </Link>
+          </div>
+        )}
+        {viewport && children}
       </div>
     </ViewportContext.Provider>
   );

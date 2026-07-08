@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { usePlayerStore } from '@/store/playerStore';
 import { useHydration } from '@/hooks/useHydration';
-import { PlayerBattleMapView } from '@/components/ui/campaign/location-map/PlayerBattleMapView';
+import { PlayerBattleMapCanvas } from '@/components/ui/campaign/location-map/PlayerBattleMapCanvas';
 
 function PlayerBattleMapPage() {
   const params = useParams();
@@ -32,10 +32,11 @@ function PlayerBattleMapPage() {
   }
 
   return (
-    <PlayerBattleMapView
+    <PlayerBattleMapCanvas
       campaignCode={code}
       battleMapId={battleMapId}
       characterId={characterId}
+      characterName={character.name}
       characterAvatar={character.avatar}
     />
   );
