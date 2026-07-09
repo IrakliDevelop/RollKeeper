@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { useToast } from '@/components/ui/feedback/Toast';
+import { useNPCStore } from '@/store/npcStore';
 
 import { useCombatantTokens } from './useCombatantTokens';
 import { useDmVttActions } from './useDmVttActions';
@@ -14,6 +15,7 @@ import { useRosterDrag } from './useRosterDrag';
 
 import type { Viewport } from '@fieldnotes/core';
 import type { BattleMapConnectionStatus } from '@/lib/battlemapSync';
+import type { CampaignNPC } from '@/types/encounter';
 
 interface UseDmVttScreenOptions {
   campaignCode: string;
@@ -22,15 +24,13 @@ interface UseDmVttScreenOptions {
 }
 
 /**
- * Composes the DM VTT play-mode screen: linked-encounter roster join
- * (`useDmVttRoster`), followed-encounter initiative (Task 6), entity
- * actions (`useDmVttActions`, mirrors `EncounterView.tsx:177-249`), grid
- * control (`useDmVttGrid`), and tap/drag placement + canvas-selection
- * mapping (`useDmVttPlacementAndSelection`). Split across sibling hook
- * files to stay under the 150-line file cap.
- * `armPlacement` returned here is NOT yet gated on drag — the screen must
- * skip it when `wasDrag()` is true (a completed roster drag-drop fires a
- * trailing synthetic click on the same row).
+ * Composes the DM VTT play-mode screen: linked-encounter roster join,
+ * followed-encounter initiative, entity actions + NPC-dialog state
+ * (`useDmVttActions`, mirrors `EncounterView.tsx:177-249`), grid control,
+ * and tap/drag placement + canvas-selection mapping. Split across sibling
+ * hook files to stay under the 150-line file cap. `armPlacement` is NOT
+ * gated on drag — the screen must skip it when `wasDrag()` is true (a
+ * completed drag-drop fires a trailing synthetic click on the same row).
  */
 export function useDmVttScreen({
   campaignCode,
@@ -50,7 +50,21 @@ export function useDmVttScreen({
     handlePrevTurn,
   } = useDmVttInitiative({ campaignCode, dmId, linkedEncounterIds });
 
-  const actions = useDmVttActions({ campaignCode, dmId, encounter });
+  const { getNPCsForCampaign } = useNPCStore();
+  const npcs = getNPCsForCampaign(campaignCode);
+  const [viewingNpc, setViewingNpc] = useState<{
+    npc: CampaignNPC;
+    entityId: string;
+  } | null>(null);
+  const onViewNPC = useCallback(
+    (npcSourceId: string, entityId: string) => {
+      const npc = npcs.find(n => n.id === npcSourceId);
+      if (npc) setViewingNpc({ npc, entityId });
+    },
+    [npcs]
+  );
+
+  const actions = useDmVttActions({ campaignCode, dmId, encounter, onViewNPC });
 
   const { toasts, addToast, dismissToast } = useToast();
 
@@ -126,5 +140,10 @@ export function useDmVttScreen({
     setGridMode,
     toasts,
     dismissToast,
+    npcDialog: {
+      npc: viewingNpc?.npc ?? null,
+      entityId: viewingNpc?.entityId ?? null,
+      onClose: () => setViewingNpc(null),
+    },
   };
 }
