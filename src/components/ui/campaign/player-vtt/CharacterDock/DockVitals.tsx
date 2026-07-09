@@ -99,21 +99,38 @@ export function DockVitals({ addToast }: DockVitalsProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Fixed input column + three equal flexible buttons: everything always
+          fits the dock's width — a plain flex row clipped the Temp button. */}
+      <div className="grid grid-cols-[3.5rem_repeat(3,minmax(0,1fr))] items-center gap-1.5">
         <Input
           aria-label="HP amount"
           inputMode="numeric"
           value={amount}
           onChange={e => setAmount(e.target.value)}
-          className="w-20"
+          className="w-full min-w-0"
         />
-        <Button variant="danger" size="lg" onClick={handleApplyDamage}>
+        <Button
+          variant="danger"
+          size="lg"
+          className="min-w-0 px-1 text-xs"
+          onClick={handleApplyDamage}
+        >
           Damage
         </Button>
-        <Button variant="success" size="lg" onClick={handleApplyHeal}>
+        <Button
+          variant="success"
+          size="lg"
+          className="min-w-0 px-1 text-xs"
+          onClick={handleApplyHeal}
+        >
           Heal
         </Button>
-        <Button variant="secondary" size="lg" onClick={handleApplyTemp}>
+        <Button
+          variant="secondary"
+          size="lg"
+          className="min-w-0 px-1 text-xs"
+          onClick={handleApplyTemp}
+        >
           Temp
         </Button>
       </div>

@@ -1,9 +1,10 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { usePlayerStore } from '@/store/playerStore';
 import { useHydration } from '@/hooks/useHydration';
+import { markBattleMapJoined } from '@/hooks/useJoinedBattleMap';
 import { PlayerVttScreen } from '@/components/ui/campaign/player-vtt/PlayerVttScreen';
 
 function PlayerBattleMapPage() {
@@ -12,6 +13,12 @@ function PlayerBattleMapPage() {
   const code = params.code as string;
   const battleMapId = params.id as string;
   const characterId = search.get('character') ?? '';
+
+  // Reaching this page at all counts as joining (covers deep links, not just
+  // the sheet's Join banner) — hides the bottom banner back on the sheet.
+  useEffect(() => {
+    if (battleMapId) markBattleMapJoined(battleMapId);
+  }, [battleMapId]);
 
   const hasHydrated = useHydration();
   const character = usePlayerStore(s =>

@@ -32,36 +32,46 @@ export function SpellPlacementController({
   onCancel,
 }: SpellPlacementControllerProps) {
   const [activeTool, setTool] = useActiveTool();
-  const wasArmedRef = useRef(false);
+  // True only once we have OBSERVED the template tool actually active while
+  // this placement is pending. `setTool` propagates to `activeTool` on the
+  // NEXT render, so the steal detector must not react to the stale value in
+  // the arming commit — doing so cancelled every placement instantly.
+  const sawTemplateToolRef = useRef(false);
+  // Latest tool for the disarm branch without re-running it on tool changes.
+  const activeToolRef = useRef(activeTool);
+  activeToolRef.current = activeTool;
 
+  // Arm/disarm strictly on `pending` transitions.
   useEffect(() => {
     if (pending) {
       configRef.current = pending.config;
-      wasArmedRef.current = true;
+      sawTemplateToolRef.current = false;
       setTool('spelltemplate');
-    } else if (wasArmedRef.current) {
+    } else {
       configRef.current = null;
-      wasArmedRef.current = false;
-      // Only force back to select if the tool is still the spelltemplate
-      // this controller armed. If something else already stole it (e.g. the
-      // user picked the pencil, which itself triggered the cancel below),
-      // leave their choice alone instead of stomping it back to select.
-      if (activeTool === 'spelltemplate') setTool('select');
+      // Only force back to select if the template tool is still active; a
+      // steal-cancel already left the user's chosen tool in place.
+      if (activeToolRef.current === 'spelltemplate') setTool('select');
+      sawTemplateToolRef.current = false;
     }
-  }, [pending, configRef, setTool, activeTool]);
+  }, [pending, configRef, setTool]);
 
-  // If something else steals the tool while armed (e.g. user taps a toolbar
-  // button), treat it as a cancel so the banner doesn't dangle.
+  // Observe tool changes: record when arming has actually taken effect, and
+  // treat a change AWAY from the template tool after that as a user cancel
+  // (e.g. tapping a toolbar button).
   // INVARIANT: the success path stays cancel-free ONLY because the tool's
   // onPointerUp calls switchTool('select') and onPlaced() synchronously in
   // one tick, and the parent clears `pending` synchronously inside onPlaced —
-  // React 19 batches both updates into one commit, so this effect never sees
+  // React batches both updates into one commit, so this effect never sees
   // select-with-pending on success. If onPlaced ever gains an async gap
   // before clearing pending, a successful placement will spuriously cancel.
   useEffect(() => {
-    if (pending && wasArmedRef.current && activeTool !== 'spelltemplate') {
-      onCancel();
+    if (!pending) return;
+    if (activeTool === 'spelltemplate') {
+      sawTemplateToolRef.current = true;
+      return;
     }
+    if (sawTemplateToolRef.current) onCancel();
   }, [activeTool, pending, onCancel]);
 
   useEffect(() => {

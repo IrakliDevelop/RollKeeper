@@ -69,11 +69,13 @@ describe('SpellTemplateTool', () => {
     expect(onPlaced).toHaveBeenCalledTimes(1);
   });
 
-  it('squares use sizeFeet as the SIDE (15ft cube @5ft/40px → radius 60px)', () => {
+  it('squares use sizeFeet as the SIDE — the renderer draws side = radius (15ft cube @5ft/40px → radius 120px)', () => {
+    // @fieldnotes/core draws squares as fillRect(cx - r/2, cy - r/2, r, r):
+    // `radius` IS the full side length, so a 15ft cube spans 3 cells.
     const { tool } = armed({ shape: 'square', sizeFeet: 15 });
     tool.onPointerDown(down(0, 0), f.ctx);
     expect(f.added[0].templateShape).toBe('square');
-    expect(f.added[0].radius).toBe(60);
+    expect(f.added[0].radius).toBe(120);
   });
 
   it('cones aim by drag: angle updates on move, final on release', () => {

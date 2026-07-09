@@ -41,7 +41,7 @@ describe('StatusEffectTray', () => {
       concentration: { isConcentrating: false },
     });
     render(<StatusEffectTray />);
-    expect(screen.queryByText(/conc/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/🧠 CON/)).not.toBeInTheDocument();
   });
 
   it('renders a CONC chip while concentrating and ends concentration from the dialog', () => {
@@ -50,7 +50,7 @@ describe('StatusEffectTray', () => {
     });
     render(<StatusEffectTray />);
 
-    fireEvent.click(screen.getByRole('button', { name: /conc/i }));
+    fireEvent.click(screen.getByRole('button', { name: /🧠 CON/ }));
     expect(screen.getByText(/Concentrating on Bless/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /end concentration/i }));

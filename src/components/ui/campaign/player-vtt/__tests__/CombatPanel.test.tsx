@@ -307,7 +307,7 @@ describe('CombatPanel', () => {
       />
     );
 
-    const edgeTab = screen.getByRole('button', { name: /initiative/i });
+    const edgeTab = screen.getByRole('button', { name: /init/i });
     expect(edgeTab).toBeInTheDocument();
     // The full panel (round header) must not be rendered while collapsed.
     expect(screen.queryByText(/ROUND/)).not.toBeInTheDocument();

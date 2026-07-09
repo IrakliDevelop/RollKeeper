@@ -1,7 +1,15 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Swords, User, Skull, Shield, CircleDot } from 'lucide-react';
+import Link from 'next/link';
+import {
+  Swords,
+  User,
+  Skull,
+  Shield,
+  CircleDot,
+  Map as MapIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { useDraggableY } from '@/hooks/useDraggableY';
 import { getHpBarColor, getHpTierTextColor } from '@/utils/hpColor';
@@ -15,6 +23,9 @@ interface InitiativePanelProps {
   state: SharedInitiativeState | null;
   characterId: string; // the open character (its playerCharacterId)
   onEndTurn: (entityId: string) => void;
+  /** When a battle map is live, link to it from the panel (replaces the
+   * bottom banner once the player has joined the map). */
+  battleMapHref?: string;
 }
 
 /** The entity whose turn comes after `fromId` in the turn order (wraps). */
@@ -38,6 +49,7 @@ export function InitiativePanel({
   state,
   characterId,
   onEndTurn,
+  battleMapHref,
 }: InitiativePanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   // Optimistic end-turn: the entity whose turn we locally advanced past while
@@ -144,6 +156,17 @@ export function InitiativePanel({
               Combat · Round {state.round}
             </span>
           </div>
+
+          {/* Battle map shortcut — the join banner hides once joined */}
+          {battleMapHref && (
+            <Link
+              href={battleMapHref}
+              className="border-divider text-accent-emerald-text hover:bg-accent-emerald-bg flex min-h-[36px] flex-shrink-0 items-center gap-2 border-b px-3 text-xs font-medium"
+            >
+              <MapIcon size={14} />
+              Open battle map
+            </Link>
+          )}
 
           {/* Turn order */}
           <ul className="flex-1 overflow-y-auto py-1">

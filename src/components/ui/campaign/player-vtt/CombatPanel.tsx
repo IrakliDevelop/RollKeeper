@@ -32,16 +32,15 @@ export function CombatPanel({
       <button
         onClick={onToggleCollapsed}
         title="Expand combat panel"
-        className="bg-surface-raised border-divider pointer-events-auto fixed top-[78px] left-4 flex min-h-[44px] w-11 items-center justify-center rounded-2xl border py-4 text-xs font-bold tracking-wider shadow-xl"
-        style={{ writingMode: 'vertical-rl' }}
+        className="bg-surface-raised border-divider text-heading pointer-events-auto fixed top-[78px] left-4 flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-3 text-xs font-bold tracking-wider shadow-xl"
       >
-        INITIATIVE
+        <span aria-hidden>⚔</span> INIT
       </button>
     );
   }
 
   return (
-    <div className="bg-surface-raised border-divider pointer-events-auto fixed top-[78px] bottom-6 left-4 flex w-[278px] flex-col overflow-hidden rounded-2xl border shadow-xl">
+    <div className="bg-surface-raised border-divider pointer-events-auto fixed top-[78px] left-4 flex max-h-[calc(100vh-102px)] w-[278px] flex-col overflow-hidden rounded-2xl border shadow-xl">
       <div className="border-divider flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2.5">
         <div className="flex min-w-0 flex-col">
           <span className="text-heading text-sm font-semibold">⚔ Combat</span>
