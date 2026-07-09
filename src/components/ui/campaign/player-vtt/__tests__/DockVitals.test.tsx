@@ -138,4 +138,15 @@ describe('DockVitals', () => {
     );
     expect(getChar().heroicInspiration.count).toBe(1);
   });
+
+  it('opens the armor class editor from the AC card', () => {
+    render(<DockVitals addToast={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /edit armor class/i }));
+    // Both the dialog title and ArmorClassManager's own heading say
+    // "Armor Class" — asserting the dialog itself is unambiguous.
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('heading', { name: /armor class/i }).length
+    ).toBeGreaterThan(0);
+  });
 });

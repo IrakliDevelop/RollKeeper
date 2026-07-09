@@ -39,6 +39,7 @@ import {
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import DmLocationToolOptions from './DmLocationToolOptions';
+import { ensurePlayerLayer } from './playerLayer';
 import {
   PlayerTokenTool,
   PlayerTemplateTool,
@@ -204,6 +205,12 @@ export function PlayerBattleMapCanvas({
 
   const handleReady = (vp: Viewport) => {
     setViewport(vp);
+
+    // Everything this player places lives on a layer whose id is stable
+    // across sessions — after a reload, their own elements from the snapshot
+    // land on this known unlocked layer instead of being mirrored as locked
+    // "DM" content (which made them permanently uncontrollable).
+    ensurePlayerLayer(vp, characterId);
 
     // Layers aren't synced: remote elements reference the DM's layer ids,
     // which don't exist here — and unknown layers count as unlocked, making
