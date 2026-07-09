@@ -218,4 +218,67 @@ describe('useRosterDrag', () => {
 
     expect(result.current.drag).toBeNull();
   });
+
+  it('cleans up window listeners on unmount (mid-drag unmount leaks no listeners)', () => {
+    const { vp, added } = fakeViewport();
+    const canvasEl = fakeCanvasEl({
+      left: 0,
+      top: 0,
+      right: 1000,
+      bottom: 1000,
+    });
+    const onDropPlaced = vi.fn();
+    const spy = vi.spyOn(combatantToken, 'stampCombatantToken');
+    const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+
+    const { result, unmount } = renderHook(() =>
+      useRosterDrag({
+        getViewport: () => vp,
+        getCanvasEl: () => canvasEl,
+        onDropPlaced,
+      })
+    );
+
+    // Start drag and move beyond threshold
+    act(() => {
+      result.current.startDrag(makeEntity(), {
+        clientX: 100,
+        clientY: 100,
+      } as React.PointerEvent);
+    });
+    act(() => {
+      window.dispatchEvent(pointerEvent('pointermove', 130, 140));
+    });
+    expect(result.current.wasDrag()).toBe(true);
+    expect(result.current.drag).not.toBeNull();
+
+    // Unmount mid-drag
+    act(() => {
+      unmount();
+    });
+
+    // Dispatch window events after unmount — should have no effect
+    act(() => {
+      window.dispatchEvent(pointerEvent('pointermove', 150, 150));
+    });
+    act(() => {
+      window.dispatchEvent(pointerEvent('pointerup', 150, 150));
+    });
+
+    // Verify: no stamp, no onDropPlaced, no errors; listeners were cleaned up
+    expect(spy).not.toHaveBeenCalled();
+    expect(onDropPlaced).not.toHaveBeenCalled();
+    expect(added).toHaveLength(0);
+    expect(removeEventListenerSpy).toHaveBeenCalledWith(
+      'pointermove',
+      expect.any(Function)
+    );
+    expect(removeEventListenerSpy).toHaveBeenCalledWith(
+      'pointerup',
+      expect.any(Function)
+    );
+
+    spy.mockRestore();
+    removeEventListenerSpy.mockRestore();
+  });
 });

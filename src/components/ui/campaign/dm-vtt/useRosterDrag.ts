@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { dispositionColor, stampCombatantToken } from './combatantToken';
 
@@ -145,6 +145,16 @@ export function useRosterDrag({
   );
 
   const wasDrag = useCallback(() => movedRef.current, []);
+
+  // Clean up listeners if unmounted mid-drag.
+  useEffect(() => {
+    return () => {
+      cleanupRef.current?.();
+      startPointRef.current = null;
+      movedRef.current = false;
+      setDrag(null);
+    };
+  }, []);
 
   return { drag, startDrag, wasDrag };
 }
