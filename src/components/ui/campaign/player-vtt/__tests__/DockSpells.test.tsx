@@ -27,13 +27,19 @@ function makeSpell(
   };
 }
 
-const FIRE_BOLT = makeSpell({ id: 'firebolt', name: 'Fire Bolt', level: 0 });
+const FIRE_BOLT = makeSpell({
+  id: 'firebolt',
+  name: 'Fire Bolt',
+  level: 0,
+  isPrepared: true,
+});
 const SHIELD = makeSpell({
   id: 'shield',
   name: 'Shield',
   level: 1,
   castingTime: '1 reaction',
   duration: '1 round',
+  isPrepared: true,
 });
 const FIREBALL = makeSpell({
   id: 'fireball',
@@ -42,6 +48,7 @@ const FIREBALL = makeSpell({
   range: '150 feet',
   components: { verbal: true, somatic: true, material: true },
   aoe: { shape: 'circle', sizeFeet: 20 },
+  isPrepared: true,
 });
 const HOLD_PERSON = makeSpell({
   id: 'holdperson',
@@ -49,6 +56,7 @@ const HOLD_PERSON = makeSpell({
   level: 2,
   concentration: true,
   duration: 'Concentration, up to 1 minute',
+  isPrepared: true,
 });
 
 function seedCharacter(overrides: Partial<CharacterState> = {}) {
@@ -228,5 +236,60 @@ describe('DockSpells', () => {
     seedCharacter({ spells: [] });
     const { container } = renderDock();
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('shows only castable spells: prepared/always-prepared spells and prepared cantrips', () => {
+    const preparedCantrip = makeSpell({
+      id: 'mage-hand',
+      name: 'Mage Hand',
+      level: 0,
+      isPrepared: true,
+    });
+    const unpreparedCantrip = makeSpell({
+      id: 'prestidigitation',
+      name: 'Prestidigitation',
+      level: 0,
+      isPrepared: false,
+    });
+    const preparedSpell = makeSpell({
+      id: 'magic-missile',
+      name: 'Magic Missile',
+      level: 1,
+      isPrepared: true,
+    });
+    const unpreparedSpell = makeSpell({
+      id: 'sleep',
+      name: 'Sleep',
+      level: 1,
+      isPrepared: false,
+    });
+    const alwaysPreparedSpell = makeSpell({
+      id: 'hunter-mark',
+      name: "Hunter's Mark",
+      level: 1,
+      isPrepared: false,
+      isAlwaysPrepared: true,
+    });
+
+    seedCharacter({
+      spells: [
+        preparedCantrip,
+        unpreparedCantrip,
+        preparedSpell,
+        unpreparedSpell,
+        alwaysPreparedSpell,
+      ],
+    });
+
+    renderDock();
+
+    // Castable spells should render
+    expect(screen.getByText('Mage Hand')).toBeInTheDocument();
+    expect(screen.getByText('Magic Missile')).toBeInTheDocument();
+    expect(screen.getByText("Hunter's Mark")).toBeInTheDocument();
+
+    // Non-castable spells should NOT render
+    expect(screen.queryByText('Prestidigitation')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sleep')).not.toBeInTheDocument();
   });
 });

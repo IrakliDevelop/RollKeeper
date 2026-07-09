@@ -52,9 +52,17 @@ export function DockSpells(props: DockSpellsProps) {
   const spellSaveDC = calculateSpellSaveDC(character);
 
   const filteredSpells = useMemo(() => {
+    // Only show castable spells (prepared or always-prepared)
+    const castableSpells = character.spells.filter(
+      spell =>
+        (spell.level === 0 && spell.isPrepared) || // Only prepared cantrips
+        (spell.level > 0 && spell.isPrepared) || // Prepared spells
+        spell.isAlwaysPrepared // Always prepared spells
+    );
+
     const query = search.trim().toLowerCase();
-    if (!query) return character.spells;
-    return character.spells.filter(spell =>
+    if (!query) return castableSpells;
+    return castableSpells.filter(spell =>
       spell.name.toLowerCase().includes(query)
     );
   }, [character.spells, search]);
