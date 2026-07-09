@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SelectTool, createImage, createTemplate } from '@fieldnotes/core';
 import { PlayerHandTool } from '@/components/ui/campaign/location-map/PlayerHandTool';
+import { isCombatantToken } from '@/components/ui/campaign/dm-vtt/combatantToken';
 
 import type {
   CanvasElement,
@@ -10,6 +11,19 @@ import type {
 
 const OWN_LAYER = 'player-char-1';
 const DM_LAYER = 'dm-layer';
+
+function combatantToken(x = 0, y = 0): CanvasElement {
+  return {
+    ...createImage({
+      position: { x, y },
+      size: { w: 40, h: 40 },
+      src: 'data:image/png;base64,',
+      layerId: OWN_LAYER,
+    }),
+    entityId: 'entity-1',
+    tokenKind: 'combatant',
+  } as CanvasElement;
+}
 
 function ownToken(x = 0, y = 0): CanvasElement {
   return createImage({
@@ -104,5 +118,23 @@ describe('PlayerHandTool', () => {
     const tool = new PlayerHandTool(selectTool);
     tool.onPointerDown(down(20, 20), ctx);
     expect(ctx.switchTool).not.toHaveBeenCalled();
+  });
+
+  describe('with a custom isGrabbable predicate (e.g. DM canvas)', () => {
+    it('pointer-down on an element matching the predicate hands off to select', () => {
+      const ctx = fakeCtx([combatantToken(0, 0)]);
+      const tool = new PlayerHandTool(selectTool, el => isCombatantToken(el));
+      tool.onPointerDown(down(20, 20), ctx);
+      expect(ctx.switchTool).toHaveBeenCalledWith('select');
+      expect(selectDown).toHaveBeenCalledTimes(1);
+    });
+
+    it('pointer-down on a plain own-layer image (not matching the predicate) pans, even though it would be grabbable under the default predicate', () => {
+      const ctx = fakeCtx([ownToken(0, 0)]);
+      const tool = new PlayerHandTool(selectTool, el => isCombatantToken(el));
+      tool.onPointerDown(down(20, 20), ctx);
+      expect(ctx.switchTool).not.toHaveBeenCalled();
+      expect(selectDown).not.toHaveBeenCalled();
+    });
   });
 });

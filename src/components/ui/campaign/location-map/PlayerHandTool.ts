@@ -15,8 +15,11 @@ const TOKEN_TYPES = new Set(['image', 'shape']);
 
 /** Whether this player could grab the element: a token that is visible and
  * not locked at the element or layer level. Mirrored DM layers are locked on
- * player canvases, so DM content (map image, grid) keeps panning. */
-function isGrabbable(el: CanvasElement, ctx: ToolContext): boolean {
+ * player canvases, so DM content (map image, grid) keeps panning. This is
+ * the DEFAULT predicate — callers may override it entirely (see
+ * `PlayerHandTool`'s constructor) rather than layering additional checks on
+ * top of it. */
+function defaultIsGrabbable(el: CanvasElement, ctx: ToolContext): boolean {
   if (!TOKEN_TYPES.has(el.type)) return false;
   if (el.locked) return false;
   if (el.layerId) {
@@ -39,9 +42,20 @@ function hits(worldX: number, worldY: number, el: CanvasElement): boolean {
  * player can actually move (their TOKEN — see TOKEN_TYPES): the SAME
  * gesture starts dragging the element, and the toolbar flips to Select.
  * Presses on DM content or empty map pan as usual.
+ *
+ * `isGrabbable` is an optional override for what counts as "grabbable" —
+ * when provided it REPLACES `defaultIsGrabbable` entirely (it is not ANDed
+ * with the token-type/lock checks). The DM canvas passes
+ * `el => isCombatantToken(el)` so only combatant tokens hand off to Select.
  */
 export class PlayerHandTool extends HandTool {
-  constructor(private readonly selectTool: SelectTool) {
+  constructor(
+    private readonly selectTool: SelectTool,
+    private readonly isGrabbable: (
+      el: CanvasElement,
+      ctx: ToolContext
+    ) => boolean = defaultIsGrabbable
+  ) {
     super();
   }
 
@@ -49,7 +63,7 @@ export class PlayerHandTool extends HandTool {
     const world = ctx.camera.screenToWorld({ x: state.x, y: state.y });
     const grabbed = ctx.store
       .snapshot()
-      .some(el => isGrabbable(el, ctx) && hits(world.x, world.y, el));
+      .some(el => this.isGrabbable(el, ctx) && hits(world.x, world.y, el));
     if (grabbed) {
       ctx.switchTool?.('select');
       this.selectTool.onPointerDown(state, ctx);
