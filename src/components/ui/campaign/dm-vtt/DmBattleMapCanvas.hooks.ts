@@ -119,6 +119,7 @@ export function useDmBattleMapCanvas({
           .getState()
           .updateBattleMap(campaignCode, battleMapId, {
             canvasState: vp.exportJSON(),
+            updatedAt: new Date().toISOString(),
           });
       };
       vp.store.on('add', saveOnLocalOps);

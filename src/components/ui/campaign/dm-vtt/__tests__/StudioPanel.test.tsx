@@ -236,4 +236,16 @@ describe('StudioPanel', () => {
       screen.getByText(/select a combatant or token/i)
     ).toBeInTheDocument();
   });
+
+  it('renders the follow note when provided', () => {
+    render(
+      <StudioPanel {...baseProps({ followNote: 'Following: Fight A' })} />
+    );
+    expect(screen.getByText('Following: Fight A')).toBeInTheDocument();
+  });
+
+  it('renders no follow note when null/absent', () => {
+    render(<StudioPanel {...baseProps({ followNote: null })} />);
+    expect(screen.queryByText(/^Following:/)).not.toBeInTheDocument();
+  });
 });

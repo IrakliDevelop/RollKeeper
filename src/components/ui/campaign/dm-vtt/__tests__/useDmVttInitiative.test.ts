@@ -75,6 +75,28 @@ describe('useDmVttInitiative', () => {
     expect(result.current.encounter?.id).toBe('enc-1');
   });
 
+  it('falls back to the resolved encounter when one of two linked ids is stale/deleted', () => {
+    useEncounterStore.setState({
+      encounters: [
+        createMockEncounter({
+          id: 'enc-1',
+          campaignCode: 'ABC',
+          isActive: false,
+        }),
+      ],
+    });
+
+    const { result } = renderHook(() =>
+      useDmVttInitiative({
+        campaignCode: 'ABC',
+        dmId: 'dm-1',
+        linkedEncounterIds: ['enc-1', 'deleted-enc'],
+      })
+    );
+
+    expect(result.current.encounter?.id).toBe('enc-1');
+  });
+
   it('returns null when there are no linked encounters', () => {
     const { result } = renderHook(() =>
       useDmVttInitiative({

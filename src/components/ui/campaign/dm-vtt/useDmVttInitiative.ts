@@ -23,16 +23,18 @@ interface UseDmVttInitiativeResult {
 /**
  * Resolve the encounter the DM VTT studio should follow: the first
  * campaign-linked encounter with combat started (`isActive`), else the
- * single linked encounter (not yet started), else null.
+ * single RESOLVED linked encounter (not yet started), else null. Uses
+ * `linked.length` (not `linkedEncounterIds.length`) so a stale/deleted
+ * linked id doesn't block following the one real encounter.
  */
-function resolveFollowed(
-  linked: Encounter[],
-  linkedEncounterIds: string[]
-): { followed: Encounter | null; started: Encounter[] } {
+function resolveFollowed(linked: Encounter[]): {
+  followed: Encounter | null;
+  started: Encounter[];
+} {
   const started = linked.filter(e => e.isActive);
   if (started.length > 0) return { followed: started[0], started };
-  if (linkedEncounterIds.length === 1) {
-    return { followed: linked[0] ?? null, started };
+  if (linked.length === 1) {
+    return { followed: linked[0], started };
   }
   return { followed: null, started };
 }
@@ -62,8 +64,8 @@ export function useDmVttInitiative({
   );
 
   const { followed: encounter, started } = useMemo(
-    () => resolveFollowed(linked, linkedEncounterIds),
-    [linked, linkedEncounterIds]
+    () => resolveFollowed(linked),
+    [linked]
   );
 
   const followNote = useMemo(
