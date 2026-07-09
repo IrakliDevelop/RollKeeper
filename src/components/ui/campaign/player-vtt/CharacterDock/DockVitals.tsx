@@ -2,19 +2,17 @@
 
 import { useState } from 'react';
 
-import { Button } from '@/components/ui/forms/button';
-import { Input } from '@/components/ui/forms/input';
-import { Badge } from '@/components/ui/layout/badge';
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import { useCharacterStore } from '@/store/characterStore';
 import {
   calculateCharacterArmorClass,
   formatModifier,
 } from '@/utils/calculations';
-import { getHpBarColor } from '@/utils/hpColor';
 
-import { getHpCardClasses, parseHpAmount } from './DockVitals.utils';
+import { AcEditDialog } from './AcEditDialog';
+import { parseHpAmount } from './DockVitals.utils';
 import { HeroicInspirationRow } from './HeroicInspirationRow';
+import { HpCard } from './HpCard';
 
 export interface DockVitalsProps {
   addToast: (toast: Omit<ToastData, 'id'>) => void;
@@ -31,6 +29,7 @@ export function DockVitals({ addToast }: DockVitalsProps) {
     useHeroicInspiration: spendHeroicInspiration,
   } = useCharacterStore();
   const [amount, setAmount] = useState('');
+  const [acOpen, setAcOpen] = useState(false);
 
   const {
     current: hpCurrent,
@@ -83,70 +82,37 @@ export function DockVitals({ addToast }: DockVitalsProps) {
   };
 
   return (
-    <div className="space-y-3">
-      <div className={`rounded-xl border p-4 ${getHpCardClasses(hpPercent)}`}>
-        <div className="flex items-baseline gap-2">
-          <span className="text-heading text-3xl font-bold">
-            {hpCurrent}/{hpMax}
-          </span>
-          {hpTemp > 0 && <Badge variant="info">+{hpTemp} temp</Badge>}
-        </div>
-        <div className="bg-surface-secondary mt-2 h-2 w-full overflow-hidden rounded-full">
-          <div
-            className={`h-full rounded-full ${getHpBarColor(hpCurrent, hpMax)}`}
-            style={{ width: `${Math.min(100, Math.max(0, hpPercent))}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Fixed input column + three equal flexible buttons: everything always
-          fits the dock's width — a plain flex row clipped the Temp button. */}
-      <div className="grid grid-cols-[3.5rem_repeat(3,minmax(0,1fr))] items-center gap-1.5">
-        <Input
-          aria-label="HP amount"
-          inputMode="numeric"
-          value={amount}
-          onChange={e => setAmount(e.target.value)}
-          className="w-full min-w-0"
-        />
-        <Button
-          variant="danger"
-          size="lg"
-          className="min-w-0 px-1 text-xs"
-          onClick={handleApplyDamage}
-        >
-          Damage
-        </Button>
-        <Button
-          variant="success"
-          size="lg"
-          className="min-w-0 px-1 text-xs"
-          onClick={handleApplyHeal}
-        >
-          Heal
-        </Button>
-        <Button
-          variant="secondary"
-          size="lg"
-          className="min-w-0 px-1 text-xs"
-          onClick={handleApplyTemp}
-        >
-          Temp
-        </Button>
-      </div>
+    <div className="space-y-2">
+      <HpCard
+        hpCurrent={hpCurrent}
+        hpMax={hpMax}
+        hpTemp={hpTemp}
+        hpPercent={hpPercent}
+        amount={amount}
+        onAmountChange={setAmount}
+        onDamage={handleApplyDamage}
+        onHeal={handleApplyHeal}
+        onTemp={handleApplyTemp}
+      />
 
       <div className="grid grid-cols-2 gap-2">
-        <div className="border-divider rounded-lg border p-3 text-center">
+        <button
+          onClick={() => setAcOpen(true)}
+          title="Edit armor class"
+          aria-label="Edit armor class"
+          className="border-divider hover:bg-surface-secondary min-h-[44px] rounded-lg border p-2 text-center"
+        >
           <div className="text-heading text-xl font-bold">{totalAC}</div>
-          <div className="text-faint text-xs uppercase">AC</div>
-        </div>
-        <div className="border-divider rounded-lg border p-3 text-center">
+          <div className="text-faint text-xs uppercase">AC ✎</div>
+        </button>
+        <div className="border-divider rounded-lg border p-2 text-center">
           <div className="text-heading text-xl font-bold">
             {formatModifier(initiativeModifier)}
           </div>
           <div className="text-faint text-xs uppercase">Init</div>
         </div>
       </div>
+      <AcEditDialog open={acOpen} onOpenChange={setAcOpen} />
 
       <HeroicInspirationRow
         count={heroicCount}

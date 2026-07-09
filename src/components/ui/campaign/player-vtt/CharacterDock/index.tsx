@@ -40,10 +40,9 @@ export function CharacterDock({
       <button
         onClick={onToggleCollapsed}
         title="Expand character dock"
-        className="bg-surface-raised border-divider pointer-events-auto fixed top-[78px] right-4 flex min-h-[44px] w-11 items-center justify-center rounded-2xl border py-4 text-xs font-bold tracking-wider shadow-xl"
-        style={{ writingMode: 'vertical-rl' }}
+        className="bg-surface-raised border-divider text-heading pointer-events-auto fixed top-[78px] right-4 flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-3 text-xs font-bold tracking-wider shadow-xl"
       >
-        CHARACTER
+        <span aria-hidden>👤</span> CHAR
       </button>
     );
   }
