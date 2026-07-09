@@ -161,6 +161,8 @@ export function InitiativePanel({
           {battleMapHref && (
             <Link
               href={battleMapHref}
+              target="_blank"
+              rel="noopener noreferrer"
               className="border-divider text-accent-emerald-text hover:bg-accent-emerald-bg flex min-h-[36px] flex-shrink-0 items-center gap-2 border-b px-3 text-xs font-medium"
             >
               <MapIcon size={14} />
