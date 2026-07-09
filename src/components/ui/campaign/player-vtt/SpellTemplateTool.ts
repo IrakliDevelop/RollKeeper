@@ -43,7 +43,12 @@ export class SpellTemplateTool implements Tool {
     }
     const world = ctx.camera.screenToWorld({ x: state.x, y: state.y });
     const origin = smartSnap(world, ctx);
-    const cellPx = ctx.gridSize ?? 40;
+    // One cell in pixels, matching the SDK's own conversion (TemplateTool
+    // drag-to-size and computeTemplateResize): on hex grids the cell unit is
+    // √3 × gridSize, not gridSize — using the raw value undersized templates
+    // by √3 and the resize snap read them back at half their labeled feet.
+    const gridSize = ctx.gridSize ?? 40;
+    const cellPx = ctx.gridType === 'hex' ? Math.sqrt(3) * gridSize : gridSize;
     // The renderer draws squares as fillRect(cx - r/2, cy - r/2, r, r):
     // `radius` is the FULL side, so a 20ft cube = 20ft across, same formula
     // as circle (where radius really is a radius).

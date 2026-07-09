@@ -97,6 +97,17 @@ describe('SpellTemplateTool', () => {
     expect(f.updates).toHaveLength(0);
   });
 
+  it('hex grids use the SDK cell unit √3·gridSize (20ft @hex/40px → radius 4·√3·40)', () => {
+    // Mirrors TemplateTool/computeTemplateResize: snapUnit on hex grids is
+    // √3 × gridSize. Using raw gridSize undersized templates by √3 and the
+    // resize snap then read a "20 ft" circle back as 10 ft.
+    (f.ctx as { gridType?: string }).gridType = 'hex';
+    const { tool } = armed({ shape: 'circle', sizeFeet: 20 });
+    tool.onPointerDown(down(0, 0), f.ctx);
+    expect(f.added[0].radius).toBeCloseTo(4 * Math.sqrt(3) * 40, 6);
+    expect(f.added[0].radiusFeet).toBe(20);
+  });
+
   it('with a null config, bails to select without placing', () => {
     const ref = { current: null };
     const tool = new SpellTemplateTool(ref);
