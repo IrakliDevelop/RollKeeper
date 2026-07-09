@@ -166,6 +166,65 @@ describe('CombatPanel', () => {
     expect(screen.getByText('18/30')).toBeInTheDocument();
   });
 
+  it('renders enemy hpPercent as text only when enemyHpMode is percent', () => {
+    const percentEnemy: SharedTurnEntry = {
+      entityId: 'goblin-2',
+      displayName: 'Hobgoblin',
+      type: 'monster',
+      disposition: 'enemy',
+      hpPercent: 42,
+      hpTier: 'mid',
+    };
+    render(
+      <CombatPanel
+        state={buildState({
+          enemyHpMode: 'percent',
+          turnOrder: [percentEnemy],
+        })}
+        characterId={CHARACTER_ID}
+        onEndTurn={noop}
+        collapsed={false}
+        onToggleCollapsed={noop}
+      />
+    );
+
+    expect(screen.getByText('42%')).toBeInTheDocument();
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    const rows = screen.getAllByRole('listitem');
+    expect(
+      rows[0].querySelector('.bg-surface-raised.rounded-full')
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders enemy hpPercent as a bar only when enemyHpMode is bar', () => {
+    const barEnemy: SharedTurnEntry = {
+      entityId: 'goblin-3',
+      displayName: 'Bugbear',
+      type: 'monster',
+      disposition: 'enemy',
+      hpPercent: 65,
+      hpTier: 'mid',
+    };
+    render(
+      <CombatPanel
+        state={buildState({
+          enemyHpMode: 'bar',
+          turnOrder: [barEnemy],
+        })}
+        characterId={CHARACTER_ID}
+        onEndTurn={noop}
+        collapsed={false}
+        onToggleCollapsed={noop}
+      />
+    );
+
+    expect(screen.queryByText('65%')).not.toBeInTheDocument();
+    const rows = screen.getAllByRole('listitem');
+    expect(
+      rows[0].querySelector('.bg-surface-raised.rounded-full')
+    ).toBeInTheDocument();
+  });
+
   it('applies defeated styling', () => {
     render(
       <CombatPanel
