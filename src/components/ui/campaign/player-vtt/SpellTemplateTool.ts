@@ -1,8 +1,9 @@
 import { createTemplate, smartSnap } from '@fieldnotes/core';
 
+import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
+
 import type { Point, PointerState, Tool, ToolContext } from '@fieldnotes/core';
 import type { AoeShape } from '@/types/spellAoe';
-import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
 
 export interface SpellTemplateConfig {
   shape: AoeShape;
