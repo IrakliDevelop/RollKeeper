@@ -26,7 +26,6 @@ import {
   useActiveTool,
 } from '@fieldnotes/react';
 import {
-  HandTool,
   SelectTool,
   ArrowTool,
   PencilTool,
@@ -34,6 +33,7 @@ import {
   type Tool,
   type Viewport,
 } from '@fieldnotes/core';
+import { PlayerHandTool } from './PlayerHandTool';
 import {
   createManagedBattleMapConnection,
   type BattleMapConnectionStatus,
@@ -182,9 +182,12 @@ export function PlayerBattleMapCanvas({
 
   const tools = useMemo<Tool[]>(() => {
     const color = tokenColorForId(characterId);
+    // Shared instance: PlayerHandTool hands a press on a movable element off
+    // to this select tool so the same gesture drags it.
+    const selectTool = new SelectTool();
     return [
-      new HandTool(),
-      new SelectTool(),
+      new PlayerHandTool(selectTool),
+      selectTool,
       new PlayerTokenTool(color, tokenSrcRef),
       new PencilTool({ color, width: 3 }),
       new ArrowTool({ color, width: 2 }),
