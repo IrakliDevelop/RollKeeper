@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { useCharacterRosterSync } from '@/hooks/useCharacterRosterSync';
 import { useHydration } from '@/hooks/useHydration';
 import { usePlayerSync } from '@/hooks/usePlayerSync';
 import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
@@ -67,16 +68,16 @@ export function usePlayerVttState(campaignCode: string, characterId: string) {
   );
   const character = useCharacterStore(s => s.character);
   const loadCharacterState = useCharacterStore(s => s.loadCharacterState);
-  const lastLoadedCharacterRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!playerCharacter || !hasHydrated) return;
-    const currentCharacterId = playerCharacter.characterData.id;
-    if (lastLoadedCharacterRef.current !== currentCharacterId) {
-      loadCharacterState(playerCharacter.characterData);
-      lastLoadedCharacterRef.current = currentCharacterId;
-    }
-  }, [playerCharacter, hasHydrated, loadCharacterState]);
-
+  const updateCharacterData = usePlayerStore(s => s.updateCharacterData);
+  // Loads character + writes live edits back to the roster (page.tsx:387-442).
+  useCharacterRosterSync({
+    playerCharacter,
+    hasHydrated,
+    characterId,
+    character,
+    loadCharacterState,
+    updateCharacterData,
+  });
   const playerSync = usePlayerSync({ characterId });
 
   const handleAfterSave = useCallback(() => {
@@ -95,7 +96,6 @@ export function usePlayerVttState(campaignCode: string, characterId: string) {
     campaignCode,
     characterId
   );
-
   const handleEndTurn = useCallback(
     async (entityId: string) => {
       const init = sharedState?.initiative;

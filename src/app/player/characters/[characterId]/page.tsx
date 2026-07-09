@@ -31,6 +31,7 @@ import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
 
 import CharacterSheetHeader from '@/components/ui/character/CharacterSheetHeader';
 import { useHydration } from '@/hooks/useHydration';
+import { useCharacterRosterSync } from '@/hooks/useCharacterRosterSync';
 import { ABILITY_NAMES, SKILL_NAMES } from '@/utils/constants';
 import {
   calculateModifier,
@@ -379,67 +380,35 @@ export default function CharacterSheet() {
 
   const { manualSave } = useAutoSave({ onAfterSave: handleAfterSave });
 
-  const lastLoadedCharacterRef = useRef<string | null>(null);
-  const lastSyncedCharacterRef = useRef<CharacterState | null>(null);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  // Auto-migrate existing traits to extended features once a character loads
+  // (mirrors the same load event the roster-sync hook fires on).
+  const handleCharacterLoaded = useCallback(
+    (loadedCharacterData: CharacterState) => {
+      const hasTraits = (loadedCharacterData.trackableTraits || []).length > 0;
+      const hasExtended =
+        (loadedCharacterData.extendedFeatures || []).length > 0;
 
-  // Load character data into store when component mounts or character changes
-  useEffect(() => {
-    if (playerCharacter && hasHydrated) {
-      const currentCharacterId = playerCharacter.characterData.id;
-
-      // Only load if we haven't loaded this character yet or if it's a different character
-      if (lastLoadedCharacterRef.current !== currentCharacterId) {
-        setIsInitialLoad(true);
-        loadCharacterState(playerCharacter.characterData);
-        lastLoadedCharacterRef.current = currentCharacterId;
-        lastSyncedCharacterRef.current = playerCharacter.characterData;
-
-        // Auto-migrate existing traits to extended features if needed
-        const hasTraits =
-          (playerCharacter.characterData.trackableTraits || []).length > 0;
-        const hasExtended =
-          (playerCharacter.characterData.extendedFeatures || []).length > 0;
-
-        if (hasTraits && !hasExtended) {
-          // Small delay to ensure character state is loaded first
-          setTimeout(() => {
-            migrateTraitsToExtendedFeatures();
-          }, 100);
-        }
-
-        // Mark initial load as complete after state has been set
-        const timer = setTimeout(() => {
-          setIsInitialLoad(false);
-        }, 50);
-
-        return () => clearTimeout(timer);
+      if (hasTraits && !hasExtended) {
+        // Small delay to ensure character state is loaded first
+        setTimeout(() => {
+          migrateTraitsToExtendedFeatures();
+        }, 100);
       }
-    }
-  }, [
+    },
+    [migrateTraitsToExtendedFeatures]
+  );
+
+  // Load character data into the store and sync live edits back to the
+  // roster blob (skipping the initial load) — see useCharacterRosterSync.
+  useCharacterRosterSync({
     playerCharacter,
     hasHydrated,
+    characterId,
+    character,
     loadCharacterState,
-    migrateTraitsToExtendedFeatures,
-  ]);
-
-  // Sync character data back to player store when it changes (skip during initial load)
-  useEffect(() => {
-    if (!isInitialLoad && hasHydrated && character.id === characterId) {
-      // Deep comparison to prevent unnecessary updates and infinite loops
-      const hasActualChanges =
-        !lastSyncedCharacterRef.current ||
-        JSON.stringify(lastSyncedCharacterRef.current) !==
-          JSON.stringify(character);
-
-      if (hasActualChanges) {
-        // Create a deep copy to avoid reference issues
-        const characterCopy = JSON.parse(JSON.stringify(character));
-        updateCharacterData(characterId, characterCopy);
-        lastSyncedCharacterRef.current = characterCopy;
-      }
-    }
-  }, [character, characterId, updateCharacterData, hasHydrated, isInitialLoad]);
+    updateCharacterData,
+    onLoad: handleCharacterLoaded,
+  });
 
   // Calculate derived values (needs to be before early returns due to hooks)
   const totalLevel = character.totalLevel || character.level;
