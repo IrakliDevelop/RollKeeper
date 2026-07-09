@@ -161,6 +161,7 @@ export interface EncounterEntity {
 
   // Visual
   color?: string; // For grouping same monsters
+  avatarUrl?: string; // Portrait shown on DM VTT roster/tokens (players, NPCs, monsters)
   isHidden?: boolean; // DM can hide the real name from players (they see a generic label)
   playerAlias?: string; // Optional name players see instead (DM-controlled entities); takes precedence over the hidden generic label
   playerDisposition?: PlayerDisposition; // Allegiance players see (disguise); defaults to enemy for non-players
