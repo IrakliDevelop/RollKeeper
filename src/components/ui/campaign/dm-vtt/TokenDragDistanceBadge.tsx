@@ -1,11 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  SelectTool,
-  type Viewport,
-  type CanvasElement,
-} from '@fieldnotes/core';
+import { SelectTool, type Viewport } from '@fieldnotes/core';
 import {
   dragDistanceFeet,
   type Point,
@@ -26,8 +22,9 @@ interface BadgeState {
 
 /**
  * Headless canvas child component that displays distance during combatant token drags.
- * Listens to pointer events; when select tool has a combatant token selected,
- * shows a fixed badge tracking the cursor distance from the drag origin.
+ * Listens to pointer events; when the select tool is active with a combatant
+ * token selected, shows a fixed badge tracking the cursor distance from the
+ * drag origin.
  */
 export function TokenDragDistanceBadge({
   viewport,
@@ -40,27 +37,66 @@ export function TokenDragDistanceBadge({
     y: 0,
   });
 
+  // pointerdown only records "a press started" — the SDK hasn't necessarily
+  // processed the click's selection yet at that point. Combatant detection
+  // and the one-time origin capture happen on the first pointermove instead,
+  // gated by captureAttemptedRef so it only ever runs once per gesture.
+  const pointerDownRef = useRef(false);
+  const captureAttemptedRef = useRef(false);
   const originRef = useRef<Point | null>(null);
-  const dragStartedRef = useRef(false);
-  const selectedElementRef = useRef<CanvasElement | null>(null);
+  const selectedIdRef = useRef<string | null>(null);
+
+  const resetGesture = useCallback(() => {
+    pointerDownRef.current = false;
+    captureAttemptedRef.current = false;
+    originRef.current = null;
+    selectedIdRef.current = null;
+  }, []);
 
   const handlePointerMove = useCallback(
     (e: PointerEvent) => {
-      if (!viewport || !dragStartedRef.current || !originRef.current) {
+      if (!viewport || !pointerDownRef.current) {
         return;
       }
 
-      // Get the current world position of the selected element
-      const element = selectedElementRef.current;
-      if (!element || !element.position) {
+      if (!captureAttemptedRef.current) {
+        captureAttemptedRef.current = true;
+
+        const isSelectToolActive =
+          viewport.toolManager.activeTool?.name === 'select';
+        const selectTool = viewport.toolManager.getTool<SelectTool>('select');
+        const firstId = selectTool?.selectedIds[0];
+        const element = firstId ? viewport.store.getById(firstId) : undefined;
+
+        if (
+          isSelectToolActive &&
+          firstId &&
+          element &&
+          isCombatantToken(element)
+        ) {
+          selectedIdRef.current = firstId;
+          originRef.current = { x: element.position.x, y: element.position.y };
+        }
+      }
+
+      const origin = originRef.current;
+      const selectedId = selectedIdRef.current;
+      if (!origin || !selectedId) {
+        return;
+      }
+
+      // Re-fetch by id on every move: the store replaces the element object
+      // on each position update, so a captured reference goes stale.
+      const current = viewport.store.getById(selectedId);
+      if (!current || !current.position) {
         setBadge(prev => ({ ...prev, isVisible: false }));
         return;
       }
 
       // Calculate distance in feet
       const distance = dragDistanceFeet(
-        originRef.current,
-        element.position,
+        origin,
+        current.position,
         viewport.toolContext,
         5
       );
@@ -81,32 +117,18 @@ export function TokenDragDistanceBadge({
       return;
     }
 
-    // Check if select tool is active and has a combatant token selected
-    const selectTool = viewport.toolManager.getTool<SelectTool>('select');
-    if (!selectTool || selectTool.selectedIds.length === 0) {
-      return;
-    }
-
-    // Get the first selected element
-    const firstId = selectTool.selectedIds[0];
-    const element = viewport.store.getById(firstId);
-
-    if (!element || !isCombatantToken(element)) {
-      return;
-    }
-
-    // Capture the drag origin and element
-    selectedElementRef.current = element;
-    originRef.current = element.position as Point;
-    dragStartedRef.current = true;
+    // Only mark that a press started; combatant detection + origin capture
+    // happen on the first subsequent pointermove (see handlePointerMove).
+    pointerDownRef.current = true;
+    captureAttemptedRef.current = false;
+    originRef.current = null;
+    selectedIdRef.current = null;
   }, [viewport, canvasEl]);
 
   const handlePointerUp = useCallback(() => {
-    dragStartedRef.current = false;
-    originRef.current = null;
-    selectedElementRef.current = null;
+    resetGesture();
     setBadge(prev => ({ ...prev, isVisible: false }));
-  }, []);
+  }, [resetGesture]);
 
   useEffect(() => {
     if (!canvasEl) {
