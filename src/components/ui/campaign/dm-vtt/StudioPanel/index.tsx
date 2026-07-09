@@ -20,6 +20,8 @@ export interface StudioPanelProps {
   encounterHref: string; // "Encounter page ↗"
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  /** "Following: {name}" when 2+ linked encounters are active; else null. */
+  followNote?: string | null;
 }
 
 const TABS: { key: 'initiative' | 'selected'; icon: string; label: string }[] =
@@ -43,6 +45,7 @@ export function StudioPanel({
   encounterHref,
   collapsed,
   onToggleCollapsed,
+  followNote,
 }: StudioPanelProps) {
   if (collapsed) {
     return (
@@ -95,6 +98,11 @@ export function StudioPanel({
           </Button>
         </div>
       </div>
+      {followNote && (
+        <p className="text-faint border-divider border-b px-3 py-1 text-xs">
+          {followNote}
+        </p>
+      )}
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'initiative' ? (
           <InitiativeTab

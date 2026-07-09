@@ -105,6 +105,7 @@ export function DmVttScreen({
             encounterHref={`/dm/campaign/${campaignCode}/encounters/${vtt.encounter?.id ?? ''}`}
             collapsed={studioCollapsed}
             onToggleCollapsed={() => setStudioCollapsed(v => !v)}
+            followNote={vtt.followNote}
           />
         )}
         {vtt.encounter?.isActive && (

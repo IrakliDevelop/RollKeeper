@@ -29,8 +29,25 @@ function makeBattleMap(overrides: Partial<BattleMap> = {}): BattleMap {
 }
 
 /** Fake canvas store: `getAll`/`on` satisfy `useCombatantTokens`, `getById`
- * resolves the ids seeded in `tokensById` to combatant-token elements. */
+ * resolves the ids seeded in `tokensById` to combatant-token elements, `add`
+ * records stamped tokens for the drag-to-place tests. Also supplies
+ * `domLayer` (drop-bounds element) and `camera`/`toolContext` so a full
+ * pointer drag-and-drop can be simulated end to end via `startDrag`. */
 function makeFakeViewport(tokensById: Record<string, string>): Viewport {
+  const domLayer = document.createElement('div');
+  domLayer.getBoundingClientRect = () =>
+    ({
+      left: 0,
+      top: 0,
+      right: 1000,
+      bottom: 1000,
+      width: 1000,
+      height: 1000,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }) as DOMRect;
+
   const store = {
     getAll: () => [],
     on: () => () => {},
@@ -38,8 +55,22 @@ function makeFakeViewport(tokensById: Record<string, string>): Viewport {
       const entityId = tokensById[id];
       return entityId ? { id, tokenKind: 'combatant', entityId } : undefined;
     },
+    add: () => {},
   };
-  return { store } as unknown as Viewport;
+  const toolContext = {
+    store,
+    requestRender: () => {},
+    gridSize: 40,
+    gridType: 'square',
+    activeLayerId: 'dm-layer',
+    snapToGrid: false,
+  };
+  return {
+    store,
+    domLayer,
+    camera: { screenToWorld: (p: { x: number; y: number }) => p },
+    toolContext,
+  } as unknown as Viewport;
 }
 
 function makeNPC(overrides: Partial<CampaignNPC> = {}): CampaignNPC {
@@ -164,6 +195,108 @@ describe('useDmVttScreen', () => {
     act(() => result.current.cancelPlacement());
 
     expect(result.current.pendingPlacement).toBeNull();
+  });
+
+  it('startDrag is a no-op while offline and fires the not-connected toast', () => {
+    seed();
+    const { result } = renderHook(() =>
+      useDmVttScreen({ campaignCode: 'ABC', battleMapId: 'bm-1', dmId: 'dm-1' })
+    );
+    act(() => result.current.onViewportReady(makeFakeViewport({})));
+    // Never call onStatus('live') — status stays at its 'connecting' default.
+
+    act(() =>
+      result.current.startDrag(
+        createMockEncounterEntity({
+          id: 'known-1',
+          name: 'Aria',
+          type: 'player',
+        }),
+        { clientX: 100, clientY: 100 } as React.PointerEvent
+      )
+    );
+
+    expect(result.current.drag).toBeNull();
+    expect(
+      result.current.toasts.some(
+        t => t.type === 'info' && t.title === 'Not connected'
+      )
+    ).toBe(true);
+  });
+
+  it("drag-drop of a different entity clears an armed entity's pending placement and selects the dropped one", () => {
+    seed();
+    useEncounterStore.setState({
+      encounters: [
+        createMockEncounter({
+          id: 'enc-1',
+          campaignCode: 'ABC',
+          isActive: true,
+          entities: [
+            createMockEncounterEntity({
+              id: 'known-1',
+              name: 'Aria',
+              type: 'player',
+            }),
+            createMockEncounterEntity({
+              id: 'known-2',
+              name: 'Boss',
+              type: 'monster',
+            }),
+          ],
+        }),
+      ],
+    });
+    const { result } = renderHook(() =>
+      useDmVttScreen({ campaignCode: 'ABC', battleMapId: 'bm-1', dmId: 'dm-1' })
+    );
+    act(() => result.current.onStatus('live'));
+    act(() => result.current.onViewportReady(makeFakeViewport({})));
+
+    // Arm entity A via tap.
+    act(() =>
+      result.current.armPlacement(
+        createMockEncounterEntity({
+          id: 'known-1',
+          name: 'Aria',
+          type: 'player',
+        })
+      )
+    );
+    expect(result.current.pendingPlacement?.config.entityId).toBe('known-1');
+
+    // Drag entity B onto the canvas and drop it.
+    act(() =>
+      result.current.startDrag(
+        createMockEncounterEntity({
+          id: 'known-2',
+          name: 'Boss',
+          type: 'monster',
+        }),
+        { clientX: 100, clientY: 100 } as React.PointerEvent
+      )
+    );
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent('pointermove', {
+          clientX: 130,
+          clientY: 140,
+          bubbles: true,
+        })
+      );
+    });
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent('pointerup', {
+          clientX: 130,
+          clientY: 140,
+          bubbles: true,
+        })
+      );
+    });
+
+    expect(result.current.pendingPlacement).toBeNull();
+    expect(result.current.selectedEntityId).toBe('known-2');
   });
 
   it('onSelectionChange maps a known combatant token to its entity and flips the tab', () => {

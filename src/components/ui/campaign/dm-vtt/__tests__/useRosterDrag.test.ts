@@ -88,6 +88,29 @@ describe('stampAtScreenPoint', () => {
 });
 
 describe('useRosterDrag', () => {
+  it('does not set drag state on bare pointerdown (no ghost flicker before the tap threshold)', () => {
+    const { vp } = fakeViewport();
+    const canvasEl = fakeCanvasEl({});
+    const onDropPlaced = vi.fn();
+
+    const { result } = renderHook(() =>
+      useRosterDrag({
+        getViewport: () => vp,
+        getCanvasEl: () => canvasEl,
+        onDropPlaced,
+      })
+    );
+
+    act(() => {
+      result.current.startDrag(makeEntity(), {
+        clientX: 100,
+        clientY: 100,
+      } as React.PointerEvent);
+    });
+
+    expect(result.current.drag).toBeNull();
+  });
+
   it('does not stamp on a plain tap (movement below the 6px threshold)', () => {
     const { vp } = fakeViewport();
     const canvasEl = fakeCanvasEl({});

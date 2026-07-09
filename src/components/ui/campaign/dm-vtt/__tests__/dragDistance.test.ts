@@ -99,11 +99,13 @@ describe('dragDistanceFeet', () => {
     });
 
     it('uses default gridSize of 40 when not provided', () => {
-      // When gridSize is undefined, cellUnit should default to 40 for square
-      const ctx = makeCtx(40, 'square'); // Explicitly set to 40
+      // gridSize genuinely omitted — cellUnit should default it to 40 for square.
+      const ctx: Pick<ToolContext, 'gridSize' | 'gridType'> = {
+        gridType: 'square',
+      };
       const start: Point = { x: 0, y: 0 };
       const current: Point = { x: 40, y: 0 };
-      // 40px / 40px = 1 cell * 5 ft = 5 ft
+      // 40px / 40px (default) = 1 cell * 5 ft = 5 ft
       expect(dragDistanceFeet(start, current, ctx)).toBe(5);
     });
   });

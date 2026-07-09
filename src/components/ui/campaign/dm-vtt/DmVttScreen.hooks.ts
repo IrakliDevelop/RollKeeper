@@ -7,11 +7,11 @@ import { useNPCStore } from '@/store/npcStore';
 
 import { useCombatantTokens } from './useCombatantTokens';
 import { useDmVttActions } from './useDmVttActions';
+import { useDmVttDragPlacement } from './useDmVttDragPlacement';
 import { useDmVttGrid } from './useDmVttGrid';
 import { useDmVttInitiative } from './useDmVttInitiative';
 import { useDmVttPlacementAndSelection } from './useDmVttPlacementAndSelection';
 import { useDmVttRoster } from './useDmVttRoster';
-import { useRosterDrag } from './useRosterDrag';
 
 import type { Viewport } from '@fieldnotes/core';
 import type { BattleMapConnectionStatus } from '@/lib/battlemapSync';
@@ -28,7 +28,9 @@ interface UseDmVttScreenOptions {
  * followed-encounter initiative, entity actions + NPC-dialog state
  * (`useDmVttActions`, mirrors `EncounterView.tsx:177-249`), grid control,
  * and tap/drag placement + canvas-selection mapping. Split across sibling
- * hook files to stay under the 150-line file cap. `armPlacement` is NOT
+ * hook files to stay under the 150-line file cap — `useDmVttDragPlacement`
+ * gates drag-start on `status === 'live'` (same toast as tap-to-arm) and
+ * clears any tap-armed pending placement on drop. `armPlacement` is NOT
  * gated on drag — the screen must skip it when `wasDrag()` is true (a
  * completed drag-drop fires a trailing synthetic click on the same row).
  */
@@ -97,10 +99,13 @@ export function useDmVttScreen({
     addToast,
   });
 
-  const { drag, startDrag, wasDrag } = useRosterDrag({
+  const { drag, startDrag, wasDrag } = useDmVttDragPlacement({
+    status,
     getViewport,
     getCanvasEl,
-    onDropPlaced: selectEntity,
+    addToast,
+    selectEntity,
+    clearPendingPlacement: cancelPlacement,
   });
 
   const { setGridMode } = useDmVttGrid({

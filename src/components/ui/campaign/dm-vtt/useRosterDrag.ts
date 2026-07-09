@@ -99,14 +99,17 @@ export function useRosterDrag({
       const { clientX, clientY } = e;
       startPointRef.current = { x: clientX, y: clientY };
       movedRef.current = false;
-      setDrag({ entity, x: clientX, y: clientY });
+      // Don't set drag state yet — a bare pointerdown must not flicker the
+      // ghost. It only appears once movement crosses the tap threshold.
 
       const handleMove = (ev: PointerEvent) => {
         const start = startPointRef.current;
         if (start && pastThreshold(start, ev.clientX, ev.clientY)) {
           movedRef.current = true;
         }
-        setDrag({ entity, x: ev.clientX, y: ev.clientY });
+        if (movedRef.current) {
+          setDrag({ entity, x: ev.clientX, y: ev.clientY });
+        }
       };
 
       const handleUp = (ev: PointerEvent) => {
