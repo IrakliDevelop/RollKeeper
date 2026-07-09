@@ -6,6 +6,9 @@ import type { AoeShape } from '@/types/spellAoe';
 export interface SpellTemplateConfig {
   shape: AoeShape;
   sizeFeet: number;
+  /** Line-template width; not yet honored — the canvas SDK's createTemplate
+   * has no width param, so line templates render at its default width until
+   * the SDK gains width support. Kept on the type so callers can pass it. */
   widthFeet?: number;
   /** Called once after the template lands (tool has already switched to select). */
   onPlaced: () => void;

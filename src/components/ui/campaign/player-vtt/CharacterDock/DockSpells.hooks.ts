@@ -38,8 +38,18 @@ export function useDockSpellCasting({
     isRitual?: boolean,
     usePact?: boolean
   ) => {
+    // A second concentration cast always cancels a stale pending placement
+    // first — regardless of whether this cast is itself an AoE, and
+    // regardless of connection state — so a leftover template-arm banner
+    // never survives past the moment concentration would break it.
+    if (spell.concentration && hasPendingPlacement) {
+      onCancelPlacement();
+    }
+
     if (spell.aoe) {
       if (connectionLive) {
+        // Replaces whatever pending placement remains (including the one
+        // just cancelled above) with this cast's own placement.
         onCastPlacement(spell.name, spell.aoe);
       } else {
         addToast({
@@ -56,9 +66,6 @@ export function useDockSpellCasting({
       title: `${spell.name} cast`,
       message: describeCastPayment(level, useFreecast, isRitual, usePact),
     });
-    if (spell.concentration && hasPendingPlacement) {
-      onCancelPlacement();
-    }
   };
 
   const handleCastClick = (spell: Spell) => {

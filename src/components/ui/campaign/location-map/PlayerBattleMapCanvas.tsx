@@ -55,7 +55,8 @@ interface PlayerBattleMapCanvasProps {
   campaignCode: string;
   battleMapId: string;
   characterId: string;
-  characterName: string;
+  /** Unused internally today — reserved for a future map-name/self pill. */
+  characterName?: string;
   characterAvatar?: string;
   /** Chrome rendered INSIDE the ViewportContext.Provider (may use useActiveTool). */
   children?: React.ReactNode;

@@ -47,6 +47,7 @@ describe('DockVitals', () => {
     expect(addToast).toHaveBeenCalledTimes(1);
     expect(addToast.mock.calls[0][0]).toMatchObject({
       title: 'Took 8 damage',
+      message: 'HP 17/30',
     });
     expect(screen.getByRole('textbox', { name: /hp amount/i })).toHaveValue('');
   });

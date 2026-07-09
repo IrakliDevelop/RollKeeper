@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { HPBar } from '@/components/shared/combat/HPBar';
@@ -38,7 +40,19 @@ export function CombatRow({
   const hasHp = entry.currentHp !== undefined && entry.maxHp !== undefined;
   const isMyActiveTurn = isCurrent && isYou;
 
-  const handleEndTurnClick = () => onEndTurn(entry.entityId);
+  // Optimistic end-turn: disable the button the instant it's clicked so a
+  // slow poll can't let the player fire a duplicate request; cleared once
+  // the synced state moves off this entity's turn (mirrors InitiativePanel's
+  // pendingFrom pattern, minimal version — no next-entity highlight here).
+  const [pendingEndTurn, setPendingEndTurn] = useState(false);
+  useEffect(() => {
+    if (pendingEndTurn && !isCurrent) setPendingEndTurn(false);
+  }, [isCurrent, pendingEndTurn]);
+
+  const handleEndTurnClick = () => {
+    onEndTurn(entry.entityId);
+    setPendingEndTurn(true);
+  };
 
   return (
     <li
@@ -92,6 +106,7 @@ export function CombatRow({
           size="lg"
           fullWidth
           onClick={handleEndTurnClick}
+          disabled={pendingEndTurn}
         >
           End my turn
         </Button>

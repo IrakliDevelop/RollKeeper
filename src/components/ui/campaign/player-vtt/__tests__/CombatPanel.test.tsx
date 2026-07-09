@@ -128,6 +128,58 @@ describe('CombatPanel', () => {
     expect(handleEndTurn).toHaveBeenCalledWith('pc-1');
   });
 
+  it('disables End my turn immediately after click, then hides it once the synced turn advances', () => {
+    const handleEndTurn = vi.fn();
+    const { rerender } = render(
+      <CombatPanel
+        state={buildState({ currentEntityId: 'pc-1' })}
+        characterId={CHARACTER_ID}
+        onEndTurn={handleEndTurn}
+        collapsed={false}
+        onToggleCollapsed={noop}
+      />
+    );
+
+    const endTurnButton = screen.getByRole('button', {
+      name: /end my turn/i,
+    });
+    fireEvent.click(endTurnButton);
+    expect(handleEndTurn).toHaveBeenCalledWith('pc-1');
+    // Optimistic pending: disabled while we wait for the poll to catch up,
+    // so a slow sync can't let the player double-fire the request.
+    expect(endTurnButton).toBeDisabled();
+
+    // Server catches up: currentEntityId moves off pc-1 — button disappears
+    // entirely since it's no longer this character's turn.
+    rerender(
+      <CombatPanel
+        state={buildState({ currentEntityId: 'goblin-1' })}
+        characterId={CHARACTER_ID}
+        onEndTurn={handleEndTurn}
+        collapsed={false}
+        onToggleCollapsed={noop}
+      />
+    );
+    expect(
+      screen.queryByRole('button', { name: /end my turn/i })
+    ).not.toBeInTheDocument();
+
+    // Turn comes back around to the player later — button is re-enabled,
+    // not stuck disabled from the earlier click.
+    rerender(
+      <CombatPanel
+        state={buildState({ currentEntityId: 'pc-1' })}
+        characterId={CHARACTER_ID}
+        onEndTurn={handleEndTurn}
+        collapsed={false}
+        onToggleCollapsed={noop}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: /end my turn/i })
+    ).not.toBeDisabled();
+  });
+
   it("hides End my turn when it is not the player's turn", () => {
     render(
       <CombatPanel
