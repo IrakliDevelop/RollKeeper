@@ -42,9 +42,13 @@ export function SpellPlacementController({
     } else if (wasArmedRef.current) {
       configRef.current = null;
       wasArmedRef.current = false;
-      setTool('select');
+      // Only force back to select if the tool is still the spelltemplate
+      // this controller armed. If something else already stole it (e.g. the
+      // user picked the pencil, which itself triggered the cancel below),
+      // leave their choice alone instead of stomping it back to select.
+      if (activeTool === 'spelltemplate') setTool('select');
     }
-  }, [pending, configRef, setTool]);
+  }, [pending, configRef, setTool, activeTool]);
 
   // If something else steals the tool while armed (e.g. user taps a toolbar
   // button), treat it as a cancel so the banner doesn't dangle.

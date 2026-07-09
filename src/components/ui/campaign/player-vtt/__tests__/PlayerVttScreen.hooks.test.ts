@@ -65,7 +65,8 @@ describe('usePlacementFlow', () => {
     expect(addToast).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'info',
-        message: expect.stringContaining('slot stays spent'),
+        title: 'Placement cancelled',
+        message: 'Slot stays spent',
       })
     );
   });

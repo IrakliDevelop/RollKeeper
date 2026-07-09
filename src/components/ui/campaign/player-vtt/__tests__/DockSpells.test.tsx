@@ -213,6 +213,38 @@ describe('DockSpells', () => {
     expect(onCancelPlacement).toHaveBeenCalledTimes(1);
   });
 
+  it('offline concentration AoE cast cancels a stale pending placement before falling into the offline path', () => {
+    const SPIRIT_GUARDIANS = makeSpell({
+      id: 'spiritguardians',
+      name: 'Spirit Guardians',
+      level: 3,
+      concentration: true,
+      duration: 'Concentration, up to 10 minutes',
+      aoe: { shape: 'circle', sizeFeet: 15 },
+      isPrepared: true,
+    });
+    seedCharacter({ spells: [SPIRIT_GUARDIANS] });
+    const { addToast, onCastPlacement, onCancelPlacement } = renderDock({
+      connectionLive: false,
+      hasPendingPlacement: true,
+    });
+
+    fireEvent.click(castButtonFor('Spirit Guardians'));
+    fireEvent.click(
+      screen.getByRole('button', { name: /^cast spirit guardians/i })
+    );
+
+    expect(onCancelPlacement).toHaveBeenCalledTimes(1);
+    expect(onCastPlacement).not.toHaveBeenCalled();
+    expect(addToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'info',
+        title: 'Spirit Guardians cast',
+        message: 'Offline — template not placed',
+      })
+    );
+  });
+
   it('renders nothing for a non-caster', () => {
     seedCharacter({
       class: {

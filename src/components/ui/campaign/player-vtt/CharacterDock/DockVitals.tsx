@@ -55,7 +55,13 @@ export function DockVitals({ addToast }: DockVitalsProps) {
     if (n === null) return;
     apply(n);
     setAmount('');
-    addToast({ type: 'info', title: toastTitle(n), message: '' });
+    // Read the post-apply state back so the toast reflects the actual
+    // result (temp-first damage, heal capping at max, etc.) rather than
+    // just echoing the typed amount.
+    const { current, max, temporary } =
+      useCharacterStore.getState().character.hitPoints;
+    const message = `HP ${current}/${max}${temporary > 0 ? ` +${temporary} temp` : ''}`;
+    addToast({ type: 'info', title: toastTitle(n), message });
   };
 
   const handleApplyDamage = () =>

@@ -53,7 +53,7 @@ export function usePlacementFlow(
     addToast({
       type: 'info',
       title: 'Placement cancelled',
-      message: 'Placement cancelled — slot stays spent',
+      message: 'Slot stays spent',
     });
   }, [addToast]);
 
