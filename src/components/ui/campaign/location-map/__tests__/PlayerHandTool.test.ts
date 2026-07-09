@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SelectTool, createImage } from '@fieldnotes/core';
+import { SelectTool, createImage, createTemplate } from '@fieldnotes/core';
 import { PlayerHandTool } from '@/components/ui/campaign/location-map/PlayerHandTool';
 
 import type {
@@ -76,6 +76,22 @@ describe('PlayerHandTool', () => {
 
   it('pointer-down on empty canvas pans (no switch)', () => {
     const ctx = fakeCtx([ownToken(500, 500)]);
+    const tool = new PlayerHandTool(selectTool);
+    tool.onPointerDown(down(20, 20), ctx);
+    expect(ctx.switchTool).not.toHaveBeenCalled();
+    expect(selectDown).not.toHaveBeenCalled();
+  });
+
+  it('pointer-down on an own TEMPLATE pans — only tokens grab-through', () => {
+    // Templates often cover large map areas; treating them as grabbable made
+    // panning nearly impossible after a big AoE was placed.
+    const template = createTemplate({
+      position: { x: 20, y: 20 },
+      templateShape: 'circle',
+      radius: 200,
+      layerId: OWN_LAYER,
+    });
+    const ctx = fakeCtx([template]);
     const tool = new PlayerHandTool(selectTool);
     tool.onPointerDown(down(20, 20), ctx);
     expect(ctx.switchTool).not.toHaveBeenCalled();
