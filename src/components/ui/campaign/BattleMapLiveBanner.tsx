@@ -30,6 +30,8 @@ export function BattleMapLiveBanner({
     return (
       <Link
         href={href}
+        target="_blank"
+        rel="noopener noreferrer"
         title={`Open battle map${mapName ? ` “${mapName}”` : ''}`}
         aria-label="Open battle map"
         className="border-accent-emerald-border bg-accent-emerald-bg text-accent-emerald-text fixed right-4 bottom-4 z-40 flex h-11 w-11 items-center justify-center rounded-full border shadow-lg"
@@ -45,7 +47,12 @@ export function BattleMapLiveBanner({
       <span className="text-body text-sm">
         Battle map{mapName ? ` “${mapName}”` : ''} is live
       </span>
-      <Link href={href} onClick={onJoin}>
+      <Link
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={onJoin}
+      >
         <Button variant="success" className="px-3 py-1 text-xs">
           Join map
         </Button>
