@@ -7,6 +7,8 @@ import { ArrowLeft, Map } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
+import { DmVttScreen } from '@/components/ui/campaign/dm-vtt/DmVttScreen';
+import { useBattleMapMode } from '@/components/ui/campaign/dm-vtt/useBattleMapMode';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { useHydration } from '@/hooks/useHydration';
 import { useDmStore } from '@/store/dmStore';
@@ -19,7 +21,11 @@ export default function BattleMapEditorPage() {
   const { getBattleMap, updateBattleMap } = useBattleMapStore();
   const { dmId } = useDmStore();
 
-  if (!hasHydrated) {
+  const { mode, handleModeChange } = useBattleMapMode(id, hasHydrated, () =>
+    getBattleMap(code, id)
+  );
+
+  if (!hasHydrated || mode === null) {
     return (
       <div className="bg-surface flex min-h-screen items-center justify-center">
         <div className="text-muted animate-pulse">Loading...</div>
@@ -44,6 +50,18 @@ export default function BattleMapEditorPage() {
     );
   }
 
+  if (mode === 'play') {
+    return (
+      <DmVttScreen
+        campaignCode={code}
+        battleMapId={id}
+        dmId={dmId}
+        mode={mode}
+        onModeChange={handleModeChange}
+      />
+    );
+  }
+
   function handleSave(canvasState: string) {
     updateBattleMap(code, id, {
       canvasState,
@@ -58,6 +76,22 @@ export default function BattleMapEditorPage() {
 
   return (
     <div className="bg-surface flex h-screen flex-col overflow-hidden">
+      <div className="border-divider bg-surface-raised fixed top-4 right-4 z-50 flex items-center gap-0.5 rounded-lg border p-0.5 shadow-lg">
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={() => handleModeChange('setup')}
+        >
+          Setup
+        </Button>
+        <Button
+          variant="ghost"
+          size="lg"
+          onClick={() => handleModeChange('play')}
+        >
+          Play
+        </Button>
+      </div>
       <header className="border-divider bg-surface-secondary border-b shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
