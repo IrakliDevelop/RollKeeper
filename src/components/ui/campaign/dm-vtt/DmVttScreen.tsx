@@ -6,6 +6,7 @@ import { ToastContainer } from '@/components/ui/feedback/Toast';
 
 import { DmBattleMapCanvas } from './DmBattleMapCanvas';
 import { useDmVttScreen } from './DmVttScreen.hooks';
+import { DmVttNpcDialog } from './DmVttNpcDialog';
 import { DmVttTopBar } from './DmVttTopBar';
 import { PlacementBanner } from './PlacementBanner';
 import { RosterDragGhost } from './RosterDragGhost';
@@ -29,7 +30,9 @@ interface DmVttScreenProps {
  * DM VTT play-mode screen: battle map canvas with the roster tray, studio
  * panel, turn control, drag-distance badge, and top chrome composed as
  * canvas children (so they share `useActiveTool` context, per
- * `TokenPlacementController`).
+ * `TokenPlacementController`). The Selected tab's "View NPC details" action
+ * is delegated to `DmVttNpcDialog` (mirrors `EncounterView`'s NPC statblock
+ * viewer).
  */
 export function DmVttScreen({
   campaignCode,
@@ -38,42 +41,12 @@ export function DmVttScreen({
   mode,
   onModeChange,
 }: DmVttScreenProps) {
-  const {
-    battleMap,
-    linkedEntities,
-    placedIndex,
-    encounter,
-    activeEntity,
-    handleNextTurn,
-    handlePrevTurn,
-    actions,
-    viewport,
-    status,
-    onViewportReady,
-    onStatus,
-    onSelectionChange,
-    tokenConfigRef,
-    pendingPlacement,
-    armPlacement,
-    wasDrag,
-    cancelPlacement,
-    selectedEntityId,
-    selectEntity,
-    studioTab,
-    setStudioTab,
-    drag,
-    startDrag,
-    getCanvasEl,
-    setGridMode,
-    toasts,
-    dismissToast,
-  } = useDmVttScreen({ campaignCode, battleMapId, dmId });
-
+  const vtt = useDmVttScreen({ campaignCode, battleMapId, dmId });
   const [rosterCollapsed, setRosterCollapsed] = useState(false);
   const [studioCollapsed, setStudioCollapsed] = useState(false);
 
-  const gridMode: DmVttGridMode = battleMap?.gridEnabled
-    ? (battleMap.gridSettings?.gridType ?? 'hex')
+  const gridMode: DmVttGridMode = vtt.battleMap?.gridEnabled
+    ? (vtt.battleMap.gridSettings?.gridType ?? 'hex')
     : 'off';
 
   return (
@@ -81,20 +54,20 @@ export function DmVttScreen({
       campaignCode={campaignCode}
       battleMapId={battleMapId}
       dmId={dmId}
-      onStatus={onStatus}
-      onViewportReady={onViewportReady}
-      tokenConfigRef={tokenConfigRef}
-      onSelectionChange={onSelectionChange}
+      onStatus={vtt.onStatus}
+      onViewportReady={vtt.onViewportReady}
+      tokenConfigRef={vtt.tokenConfigRef}
+      onSelectionChange={vtt.onSelectionChange}
     >
       <TokenPlacementController
-        pending={pendingPlacement}
-        configRef={tokenConfigRef}
-        onCancel={cancelPlacement}
+        pending={vtt.pendingPlacement}
+        configRef={vtt.tokenConfigRef}
+        onCancel={vtt.cancelPlacement}
       />
-      {pendingPlacement && (
+      {vtt.pendingPlacement && (
         <PlacementBanner
-          entityName={pendingPlacement.entityName}
-          onCancel={cancelPlacement}
+          entityName={vtt.pendingPlacement.entityName}
+          onCancel={vtt.cancelPlacement}
         />
       )}
       <div className="pointer-events-none absolute inset-0 z-10">
@@ -102,49 +75,57 @@ export function DmVttScreen({
           campaignCode={campaignCode}
           battleMapId={battleMapId}
           dmId={dmId}
-          mapName={battleMap?.name ?? 'Battle Map'}
-          status={status}
+          mapName={vtt.battleMap?.name ?? 'Battle Map'}
+          status={vtt.status}
           gridMode={gridMode}
-          onSetGridMode={setGridMode}
+          onSetGridMode={vtt.setGridMode}
           mode={mode}
           onModeChange={onModeChange}
         />
         <RosterTray
-          entities={linkedEntities}
-          placedIndex={placedIndex}
-          armedEntityId={pendingPlacement?.config.entityId ?? null}
-          onArmPlacement={entity => !wasDrag() && armPlacement(entity)}
-          onSelectEntity={selectEntity}
-          onDragStart={startDrag}
+          entities={vtt.linkedEntities}
+          placedIndex={vtt.placedIndex}
+          armedEntityId={vtt.pendingPlacement?.config.entityId ?? null}
+          onArmPlacement={entity => !vtt.wasDrag() && vtt.armPlacement(entity)}
+          onSelectEntity={vtt.selectEntity}
+          onDragStart={vtt.startDrag}
           collapsed={rosterCollapsed}
           onToggleCollapsed={() => setRosterCollapsed(v => !v)}
-          hasLinkedEncounter={linkedEntities.length > 0}
+          hasLinkedEncounter={vtt.linkedEntities.length > 0}
         />
-        <RosterDragGhost drag={drag} />
-        {actions && (
+        <RosterDragGhost drag={vtt.drag} />
+        {vtt.actions && (
           <StudioPanel
-            encounter={encounter}
-            selectedEntityId={selectedEntityId}
-            onSelectEntity={selectEntity}
-            actions={actions}
-            activeTab={studioTab}
-            onTabChange={setStudioTab}
-            encounterHref={`/dm/campaign/${campaignCode}/encounters/${encounter?.id ?? ''}`}
+            encounter={vtt.encounter}
+            selectedEntityId={vtt.selectedEntityId}
+            onSelectEntity={vtt.selectEntity}
+            actions={vtt.actions}
+            activeTab={vtt.studioTab}
+            onTabChange={vtt.setStudioTab}
+            encounterHref={`/dm/campaign/${campaignCode}/encounters/${vtt.encounter?.id ?? ''}`}
             collapsed={studioCollapsed}
             onToggleCollapsed={() => setStudioCollapsed(v => !v)}
           />
         )}
-        {encounter?.isActive && (
+        {vtt.encounter?.isActive && (
           <TurnControl
-            round={encounter.round}
-            activeName={activeEntity?.name ?? '—'}
-            onNext={handleNextTurn}
-            onPrev={handlePrevTurn}
+            round={vtt.encounter.round}
+            activeName={vtt.activeEntity?.name ?? '—'}
+            onNext={vtt.handleNextTurn}
+            onPrev={vtt.handlePrevTurn}
           />
         )}
-        <TokenDragDistanceBadge viewport={viewport} canvasEl={getCanvasEl()} />
+        <TokenDragDistanceBadge
+          viewport={vtt.viewport}
+          canvasEl={vtt.getCanvasEl()}
+        />
       </div>
-      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      <ToastContainer toasts={vtt.toasts} onDismiss={vtt.dismissToast} />
+      <DmVttNpcDialog
+        campaignCode={campaignCode}
+        encounterId={vtt.encounter?.id}
+        {...vtt.npcDialog}
+      />
     </DmBattleMapCanvas>
   );
 }

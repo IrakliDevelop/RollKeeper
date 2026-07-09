@@ -13,19 +13,23 @@ interface UseDmVttActionsOptions {
   campaignCode: string;
   dmId: string;
   encounter: Encounter | null;
+  onViewNPC?: (npcSourceId: string, entityId: string) => void;
 }
 
 /**
  * `EntityActions` for the followed encounter (brief item 4) — mirrors
  * `EncounterView.tsx:177-249`, with `syncPlayerEffects` from
- * `useDmEffectsSync`. Recomputes whenever the followed encounter changes.
- * Sibling extraction from `DmVttScreen.hooks.ts` to stay under the
- * 150-line file cap.
+ * `useDmEffectsSync`. `onViewNPC` is passed through as-is from
+ * `DmVttScreen.hooks`, which owns the NPC-dialog state — this hook only
+ * builds the actions object. Recomputes whenever the followed encounter,
+ * `syncPlayerEffects`, or `onViewNPC` identity changes. Sibling extraction
+ * from `DmVttScreen.hooks.ts` to stay under the 150-line file cap.
  */
 export function useDmVttActions({
   campaignCode,
   dmId,
   encounter,
+  onViewNPC,
 }: UseDmVttActionsOptions): EntityActions | null {
   const { syncPlayerEffects } = useDmEffectsSync({ campaignCode, dmId });
 
@@ -37,8 +41,9 @@ export function useDmVttActions({
             encounter,
             store: useEncounterStore.getState(),
             syncPlayerEffects,
+            onViewNPC,
           })
         : null,
-    [encounter, syncPlayerEffects]
+    [encounter, syncPlayerEffects, onViewNPC]
   );
 }
