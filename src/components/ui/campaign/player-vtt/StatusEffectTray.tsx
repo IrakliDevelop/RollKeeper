@@ -43,7 +43,7 @@ export function StatusEffectTray() {
         <Dialog open={concOpen} onOpenChange={setConcOpen}>
           <DialogTrigger asChild>
             <button className="bg-accent-amber-bg border-accent-amber-border text-accent-amber-text flex min-h-[30px] items-center gap-1 rounded-full border px-2.5 text-xs font-semibold">
-              🧠 CONC
+              🧠 CON
             </button>
           </DialogTrigger>
           <DialogContent size="sm">

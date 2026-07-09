@@ -44,10 +44,10 @@ export class SpellTemplateTool implements Tool {
     const world = ctx.camera.screenToWorld({ x: state.x, y: state.y });
     const origin = smartSnap(world, ctx);
     const cellPx = ctx.gridSize ?? 40;
-    const radiusPx =
-      config.shape === 'square'
-        ? (config.sizeFeet / 2 / FEET_PER_CELL) * cellPx
-        : (config.sizeFeet / FEET_PER_CELL) * cellPx;
+    // The renderer draws squares as fillRect(cx - r/2, cy - r/2, r, r):
+    // `radius` is the FULL side, so a 20ft cube = 20ft across, same formula
+    // as circle (where radius really is a radius).
+    const radiusPx = (config.sizeFeet / FEET_PER_CELL) * cellPx;
 
     const el = createTemplate({
       position: origin,

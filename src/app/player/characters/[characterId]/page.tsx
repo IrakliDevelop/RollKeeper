@@ -60,6 +60,7 @@ import { InitiativePanel } from '@/components/ui/campaign/InitiativePanel';
 import RestDialog from '@/components/ui/character/RestDialog';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
+import { useJoinedBattleMap } from '@/hooks/useJoinedBattleMap';
 import { getMsPerDay, getCampaignDays } from '@/utils/calendarCalculations';
 import TabbedCharacterSheet from '@/components/ui/character/TabbedCharacterSheet';
 import type { TabbedCharacterSheetRef } from '@/components/ui/character/TabbedCharacterSheet';
@@ -548,14 +549,22 @@ export default function CharacterSheet() {
 
   const onSendItem = playerSync.campaignCode ? handleSendItem : undefined;
 
-  // "Combat begins" banner: fire once per encounter when combat reaches round 1.
-  // Reset when combat ends so a later encounter can show it again. round !== 1 is
-  // ignored so loading into an in-progress fight doesn't trigger it.
+  // "Combat begins" banner: fire ONCE per encounter when combat reaches
+  // round 1 — acknowledged in localStorage so reloads during round 1 don't
+  // re-fire it. round !== 1 is ignored so loading into an in-progress fight
+  // doesn't trigger it.
+  const COMBAT_BANNER_ACK_KEY = 'rollkeeper-combat-banner-ack';
   const enableCombatStartBanner = playerSettings.enableCombatStartBanner;
   const combatBannerShownForRef = useRef<string | null>(null);
   const initiativeActive = sharedState?.initiative?.isActive ?? false;
   const initiativeRound = sharedState?.initiative?.round ?? 0;
   const initiativeEncounterId = sharedState?.initiative?.encounterId ?? null;
+
+  // Live battle map join-state: the bottom banner hides once THIS map was
+  // joined (a new map id brings it back).
+  const activeBattleMapId = sharedState?.battleMap?.activeBattleMapId ?? null;
+  const { joined: joinedBattleMap, markJoined: markBattleMapJoinedNow } =
+    useJoinedBattleMap(activeBattleMapId);
   useEffect(() => {
     if (!initiativeActive) {
       combatBannerShownForRef.current = null;
@@ -564,7 +573,24 @@ export default function CharacterSheet() {
     if (initiativeRound !== 1) return;
     if (combatBannerShownForRef.current === initiativeEncounterId) return;
     combatBannerShownForRef.current = initiativeEncounterId;
-    if (enableCombatStartBanner) setShowCombatBanner(true);
+    if (!enableCombatStartBanner) return;
+    if (initiativeEncounterId) {
+      try {
+        if (
+          window.localStorage.getItem(COMBAT_BANNER_ACK_KEY) ===
+          initiativeEncounterId
+        ) {
+          return; // already shown for this encounter (e.g. before a reload)
+        }
+        window.localStorage.setItem(
+          COMBAT_BANNER_ACK_KEY,
+          initiativeEncounterId
+        );
+      } catch {
+        // storage unavailable — fall back to once-per-mount behavior
+      }
+    }
+    setShowCombatBanner(true);
   }, [
     initiativeActive,
     initiativeRound,
@@ -834,6 +860,11 @@ export default function CharacterSheet() {
             state={sharedState?.initiative ?? null}
             characterId={characterId}
             onEndTurn={handleEndTurn}
+            battleMapHref={
+              playerSync.campaignCode && activeBattleMapId
+                ? `/player/campaign/${playerSync.campaignCode}/battlemap/${activeBattleMapId}?character=${encodeURIComponent(characterId)}`
+                : undefined
+            }
           />
 
           {/* "Combat begins" flourish when a fight starts */}
@@ -842,16 +873,28 @@ export default function CharacterSheet() {
             onDone={() => setShowCombatBanner(false)}
           />
 
-          {/* Live battle map join banner — shown when the DM shares a map */}
+          {/* Live battle map banner: full "Join map" until the player joins
+              this map; afterwards the initiative panel carries the link, with
+              a compact corner pill as fallback while combat is inactive. */}
           {playerSync.campaignCode &&
-            sharedState?.battleMap?.activeBattleMapId && (
+            activeBattleMapId &&
+            (!joinedBattleMap ? (
               <BattleMapLiveBanner
                 campaignCode={playerSync.campaignCode}
-                battleMapId={sharedState.battleMap.activeBattleMapId}
-                mapName={sharedState.battleMap.name}
+                battleMapId={activeBattleMapId}
+                mapName={sharedState?.battleMap?.name}
                 characterId={characterId}
+                onJoin={markBattleMapJoinedNow}
               />
-            )}
+            ) : !initiativeActive ? (
+              <BattleMapLiveBanner
+                campaignCode={playerSync.campaignCode}
+                battleMapId={activeBattleMapId}
+                mapName={sharedState?.battleMap?.name}
+                characterId={characterId}
+                compact
+              />
+            ) : null)}
 
           {/* Header */}
           <CharacterSheetHeader

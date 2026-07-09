@@ -38,7 +38,7 @@ export function SpellRow({ spell, onView, onCast }: SpellRowProps) {
           <div className="mt-0.5 flex gap-1">
             {spell.concentration && (
               <Badge variant="warning" size="sm">
-                Conc
+                Con
               </Badge>
             )}
             {spell.ritual && (

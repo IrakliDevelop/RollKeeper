@@ -85,7 +85,7 @@ export function CharacterDock({
         </Button>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
+      <div className="flex-1 space-y-3 overflow-x-hidden overflow-y-auto px-3 py-3">
         <DockVitals addToast={addToast} />
 
         <DockSpells
