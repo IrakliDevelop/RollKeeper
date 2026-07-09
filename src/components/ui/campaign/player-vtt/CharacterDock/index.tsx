@@ -7,15 +7,14 @@ import type { ToastData } from '@/components/ui/feedback/Toast';
 import { useCharacterStore } from '@/store/characterStore';
 import type { SpellAoe } from '@/types/spellAoe';
 
+import { DockSpells } from './DockSpells';
 import { DockVitals } from './DockVitals';
 
 export interface CharacterDockProps {
   collapsed: boolean;
   onToggleCollapsed: () => void;
   addToast: (toast: Omit<ToastData, 'id'>) => void;
-  /** DockSpells wiring (Task 6) — pass-through; render nothing in the spells
-      area until Task 6 fills it. */
-  onCastPlacement?: (spellName: string, aoe: NonNullable<SpellAoe>) => void;
+  onCastPlacement: (spellName: string, aoe: NonNullable<SpellAoe>) => void;
   connectionLive: boolean;
   hasPendingPlacement: boolean;
   onCancelPlacement: () => void;
@@ -23,12 +22,16 @@ export interface CharacterDockProps {
 
 /**
  * Right-edge player VTT panel: avatar/name header + `DockVitals` (HP editor,
- * AC/Init, heroic inspiration) + a spells placeholder slot Task 6 fills in.
+ * AC/Init, heroic inspiration) + `DockSpells` (search, cast flow, slot pips).
  */
 export function CharacterDock({
   collapsed,
   onToggleCollapsed,
   addToast,
+  onCastPlacement,
+  connectionLive,
+  hasPendingPlacement,
+  onCancelPlacement,
 }: CharacterDockProps) {
   const character = useCharacterStore(state => state.character);
 
@@ -85,12 +88,13 @@ export function CharacterDock({
       <div className="flex-1 space-y-3 overflow-y-auto px-3 py-3">
         <DockVitals addToast={addToast} />
 
-        <div>
-          <div className="text-faint mb-1 text-xs font-bold tracking-wider uppercase">
-            Spells
-          </div>
-          <div data-testid="dock-spells-slot" />
-        </div>
+        <DockSpells
+          addToast={addToast}
+          onCastPlacement={onCastPlacement}
+          connectionLive={connectionLive}
+          hasPendingPlacement={hasPendingPlacement}
+          onCancelPlacement={onCancelPlacement}
+        />
       </div>
     </div>
   );
