@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { usePlayerStore } from '@/store/playerStore';
 import { useHydration } from '@/hooks/useHydration';
-import { PlayerBattleMapCanvas } from '@/components/ui/campaign/location-map/PlayerBattleMapCanvas';
+import { PlayerVttScreen } from '@/components/ui/campaign/player-vtt/PlayerVttScreen';
 
 function PlayerBattleMapPage() {
   const params = useParams();
@@ -32,12 +32,10 @@ function PlayerBattleMapPage() {
   }
 
   return (
-    <PlayerBattleMapCanvas
+    <PlayerVttScreen
       campaignCode={code}
       battleMapId={battleMapId}
       characterId={characterId}
-      characterName={character.name}
-      characterAvatar={character.avatar}
     />
   );
 }
