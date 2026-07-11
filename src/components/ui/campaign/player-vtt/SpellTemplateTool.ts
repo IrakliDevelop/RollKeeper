@@ -50,12 +50,20 @@ export class SpellTemplateTool implements Tool {
     // `radius` is the FULL side, so a 20ft cube = 20ft across, same formula
     // as circle (where radius really is a radius).
     const radiusPx = (config.sizeFeet / FEET_PER_CELL) * cellPx;
+    // Line spells render as RECTANGLE templates (core 0.48): a directional
+    // AoE with independent length and width, so Lightning-Bolt-style lines
+    // finally honor their real widthFeet instead of the default line width.
+    const isLine = config.shape === 'line';
+    const widthPx = isLine
+      ? ((config.widthFeet ?? FEET_PER_CELL) / FEET_PER_CELL) * cellPx
+      : undefined;
 
     const el = createTemplate({
       position: origin,
-      templateShape: config.shape,
+      templateShape: isLine ? 'rectangle' : config.shape,
       radius: radiusPx,
       angle: 0,
+      ...(widthPx !== undefined ? { width: widthPx } : {}),
       fillColor: SPELL_FILL,
       strokeColor: SPELL_FILL,
       opacity: 0.28,

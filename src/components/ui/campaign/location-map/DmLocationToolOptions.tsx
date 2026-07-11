@@ -313,22 +313,28 @@ export default function DmLocationToolOptions({
           <div className="bg-divider h-6 w-px" />
           <span className="text-muted text-xs font-medium">Template</span>
           <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
-            {(['circle', 'cone', 'line', 'square'] as TemplateShape[]).map(
-              shape => (
-                <button
-                  key={shape}
-                  type="button"
-                  onClick={() => setTemplateOpts({ templateShape: shape })}
-                  className={`rounded px-2 py-0.5 text-xs capitalize transition-colors ${
-                    (templateOpts.templateShape ?? 'circle') === shape
-                      ? 'bg-accent-blue-bg text-accent-blue-text font-semibold'
-                      : 'text-muted hover:bg-surface-raised hover:text-body'
-                  }`}
-                >
-                  {shape}
-                </button>
-              )
-            )}
+            {(
+              [
+                'circle',
+                'cone',
+                'line',
+                'square',
+                'rectangle',
+              ] as TemplateShape[]
+            ).map(shape => (
+              <button
+                key={shape}
+                type="button"
+                onClick={() => setTemplateOpts({ templateShape: shape })}
+                className={`rounded px-2 py-0.5 text-xs capitalize transition-colors ${
+                  (templateOpts.templateShape ?? 'circle') === shape
+                    ? 'bg-accent-blue-bg text-accent-blue-text font-semibold'
+                    : 'text-muted hover:bg-surface-raised hover:text-body'
+                }`}
+              >
+                {shape}
+              </button>
+            ))}
           </div>
           <div className="bg-divider h-6 w-px" />
           <span className="text-muted text-xs font-medium">Render</span>

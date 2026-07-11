@@ -108,6 +108,34 @@ describe('SpellTemplateTool', () => {
     expect(f.added[0].radiusFeet).toBe(20);
   });
 
+  it('line spells place as RECTANGLE templates honoring widthFeet (100×10ft @5ft/40px)', () => {
+    // core 0.48: rectangle = directional AoE with independent length/width —
+    // finally renders Lightning-Bolt-style lines at their real width.
+    const { tool } = armed({ shape: 'line', sizeFeet: 100, widthFeet: 10 });
+    tool.onPointerDown(down(0, 0), f.ctx);
+    const el = f.added[0];
+    expect(el.templateShape).toBe('rectangle');
+    expect(el.radius).toBe((100 / 5) * 40);
+    expect(el.width).toBe((10 / 5) * 40);
+    expect(el.radiusFeet).toBe(100);
+  });
+
+  it('line spells default to 5ft width (one cell)', () => {
+    const { tool } = armed({ shape: 'line', sizeFeet: 60 });
+    tool.onPointerDown(down(0, 0), f.ctx);
+    expect(f.added[0].templateShape).toBe('rectangle');
+    expect(f.added[0].width).toBe(40);
+  });
+
+  it('line (rectangle) placement aims by drag like cones', () => {
+    const { tool, onPlaced } = armed({ shape: 'line', sizeFeet: 30 });
+    tool.onPointerDown(down(0, 0), f.ctx);
+    tool.onPointerMove(down(0, 10), f.ctx);
+    expect(f.updates[0].patch.angle).toBeCloseTo(Math.PI / 2);
+    tool.onPointerUp(down(0, 10), f.ctx);
+    expect(onPlaced).toHaveBeenCalledTimes(1);
+  });
+
   it('with a null config, bails to select without placing', () => {
     const ref = { current: null };
     const tool = new SpellTemplateTool(ref);
