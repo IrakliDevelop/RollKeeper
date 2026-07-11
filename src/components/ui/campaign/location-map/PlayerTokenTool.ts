@@ -7,6 +7,7 @@ import {
   type ToolContext,
   type PointerState,
 } from '@fieldnotes/core';
+import { cellUnit } from './cellUnit';
 
 const TOKEN_COLORS = [
   '#ef4444',
@@ -26,7 +27,6 @@ export function tokenColorForId(id: string): string {
   return TOKEN_COLORS[h % TOKEN_COLORS.length];
 }
 
-const TOKEN_SIZE = 40; // ≈ one 5-ft cell at default 50px grid
 const TOKEN_RENDER_PX = 128;
 const TOKEN_RING_PX = 8;
 
@@ -140,7 +140,7 @@ export class PlayerTokenTool implements Tool {
   onPointerDown(state: PointerState, ctx: ToolContext): void {
     const world = ctx.camera.screenToWorld({ x: state.x, y: state.y });
     const center = smartSnap(world, ctx);
-    const size = ctx.gridSize ?? TOKEN_SIZE;
+    const size = cellUnit(ctx);
     const src = this.srcRef.current;
 
     if (src) {
