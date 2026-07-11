@@ -34,7 +34,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
         />
         {viewport && <DmVttToolbar onClearDrawings={handleClearDrawings} />}
         {viewport && (
-          <div className="border-divider absolute top-16 left-1/2 z-10 max-w-[92vw] -translate-x-1/2 overflow-hidden rounded-xl border shadow-lg">
+          <div className="border-divider absolute top-[7.25rem] left-1/2 z-10 max-w-[92vw] -translate-x-1/2 overflow-hidden rounded-xl border shadow-lg min-[1350px]:top-16">
             <DmLocationToolOptions mode="battlemap" />
           </div>
         )}

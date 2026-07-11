@@ -37,9 +37,9 @@ const MODE_OPTIONS: { key: DmVttMode; label: string }[] = [
 /**
  * Top chrome bar for the DM VTT play screen: back link, map name, grid
  * segmented control (mirrors `useDmVttGrid`'s `setGridMode`), TV display
- * launcher (Task 1's `openTvDisplay` helper), a live-status chip (mirrors
- * `DmVttToolbar`'s status pill), and the Setup|Play mode switch (state +
- * persistence owned by the page).
+ * launcher (Task 1's `openTvDisplay` helper), a live-status chip (the
+ * chip's single home — the Play toolbar no longer duplicates it), and the
+ * Setup|Play mode switch (state + persistence owned by the page).
  */
 export function DmVttTopBar({
   campaignCode,
