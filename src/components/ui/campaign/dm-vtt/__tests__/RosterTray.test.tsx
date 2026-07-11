@@ -69,6 +69,18 @@ describe('RosterTray', () => {
     expect(screen.queryByText('Aria')).not.toBeInTheDocument();
   });
 
+  it('shows an empty-encounter prompt when linked but no entities', () => {
+    render(
+      <RosterTray {...baseProps({ hasLinkedEncounter: true, entities: [] })} />
+    );
+    expect(
+      screen.getByText(/no combatants in the linked encounter yet/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/link an encounter in setup mode/i)
+    ).not.toBeInTheDocument();
+  });
+
   it('renders group labels and first-word names for each entity', () => {
     render(<RosterTray {...baseProps()} />);
     expect(screen.getByText('PLAYERS')).toBeInTheDocument();
