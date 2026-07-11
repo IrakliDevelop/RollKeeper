@@ -5,7 +5,9 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { usePlayerStore } from '@/store/playerStore';
 import { useHydration } from '@/hooks/useHydration';
 import { markBattleMapJoined } from '@/hooks/useJoinedBattleMap';
+import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { PlayerVttScreen } from '@/components/ui/campaign/player-vtt/PlayerVttScreen';
+import { VttErrorFallback } from '@/components/ui/campaign/dm-vtt/VttErrorFallback';
 
 function PlayerBattleMapPage() {
   const params = useParams();
@@ -39,11 +41,13 @@ function PlayerBattleMapPage() {
   }
 
   return (
-    <PlayerVttScreen
-      campaignCode={code}
-      battleMapId={battleMapId}
-      characterId={characterId}
-    />
+    <ErrorBoundary fallback={<VttErrorFallback />}>
+      <PlayerVttScreen
+        campaignCode={code}
+        battleMapId={battleMapId}
+        characterId={characterId}
+      />
+    </ErrorBoundary>
   );
 }
 

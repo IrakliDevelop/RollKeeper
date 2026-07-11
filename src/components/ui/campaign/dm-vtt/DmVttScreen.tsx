@@ -91,7 +91,7 @@ export function DmVttScreen({
           onDragStart={vtt.startDrag}
           collapsed={rosterCollapsed}
           onToggleCollapsed={() => setRosterCollapsed(v => !v)}
-          hasLinkedEncounter={vtt.linkedEntities.length > 0}
+          hasLinkedEncounter={vtt.linkedEncounterIds.length > 0}
         />
         <RosterDragGhost drag={vtt.drag} />
         {vtt.actions && (

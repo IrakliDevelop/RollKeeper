@@ -117,6 +117,7 @@ export function useDmVttScreen({
 
   return {
     battleMap,
+    linkedEncounterIds,
     linkedEntities,
     placedIndex,
     encounter,

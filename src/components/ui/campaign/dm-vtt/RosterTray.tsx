@@ -75,6 +75,10 @@ export function RosterTray({
           <p className="text-muted px-1 py-2 text-xs">
             Link an encounter in Setup mode
           </p>
+        ) : entities.length === 0 ? (
+          <p className="text-muted px-1 py-2 text-xs">
+            No combatants in the linked encounter yet
+          </p>
         ) : (
           GROUP_SECTIONS.map(({ key, label }) => {
             const list = groups[key];

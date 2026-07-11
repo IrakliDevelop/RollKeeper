@@ -6,8 +6,10 @@ import { useParams } from 'next/navigation';
 import { ArrowLeft, Map } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
 import { DmVttScreen } from '@/components/ui/campaign/dm-vtt/DmVttScreen';
+import { VttErrorFallback } from '@/components/ui/campaign/dm-vtt/VttErrorFallback';
 import { useBattleMapMode } from '@/components/ui/campaign/dm-vtt/useBattleMapMode';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { useHydration } from '@/hooks/useHydration';
@@ -52,13 +54,15 @@ export default function BattleMapEditorPage() {
 
   if (mode === 'play') {
     return (
-      <DmVttScreen
-        campaignCode={code}
-        battleMapId={id}
-        dmId={dmId}
-        mode={mode}
-        onModeChange={handleModeChange}
-      />
+      <ErrorBoundary fallback={<VttErrorFallback />}>
+        <DmVttScreen
+          campaignCode={code}
+          battleMapId={id}
+          dmId={dmId}
+          mode={mode}
+          onModeChange={handleModeChange}
+        />
+      </ErrorBoundary>
     );
   }
 
