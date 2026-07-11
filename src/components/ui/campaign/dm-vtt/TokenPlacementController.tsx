@@ -76,10 +76,20 @@ export function TokenPlacementController({
   useEffect(() => {
     if (!pending) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
+      if (e.key !== 'Escape') return;
+      // Defer to any open dialog: registered in the CAPTURE phase so this
+      // runs BEFORE Radix's document-level listener flushes the dialog
+      // closed — a bubble listener could observe data-state already
+      // "closed" and cancel placement anyway. Escape closes the dialog
+      // first; the next Escape cancels placement.
+      if (document.querySelector('[role="dialog"][data-state="open"]')) {
+        return;
+      }
+      onCancel();
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () =>
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
   }, [pending, onCancel]);
 
   return null;

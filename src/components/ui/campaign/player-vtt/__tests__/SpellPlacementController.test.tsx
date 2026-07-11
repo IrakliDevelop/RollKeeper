@@ -134,4 +134,22 @@ describe('SpellPlacementController', () => {
     });
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
+
+  it('Escape defers to an open dialog (closes it first, does not cancel)', () => {
+    const { onCancel } = setup(makePending());
+    act(() => {});
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('data-state', 'open');
+    document.body.appendChild(dialog);
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+    expect(onCancel).not.toHaveBeenCalled();
+    dialog.remove();
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
 });
