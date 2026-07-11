@@ -56,9 +56,9 @@ export async function POST(
     const redis = getRedis();
 
     const dmAuth = await verifyDmAuthority(redis, code, dmId);
-    if (dmAuth === 'mismatch') {
+    if (dmAuth !== 'ok') {
       return NextResponse.json(
-        { error: 'dmId does not match campaign owner' },
+        { error: 'dmId is not authorized for this campaign' },
         { status: 403 }
       );
     }
@@ -120,9 +120,9 @@ export async function DELETE(
     const redis = getRedis();
 
     const dmAuth = await verifyDmAuthority(redis, code, dmId);
-    if (dmAuth === 'mismatch') {
+    if (dmAuth !== 'ok') {
       return NextResponse.json(
-        { error: 'dmId does not match campaign owner' },
+        { error: 'dmId is not authorized for this campaign' },
         { status: 403 }
       );
     }
