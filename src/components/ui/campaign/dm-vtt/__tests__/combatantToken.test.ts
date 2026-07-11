@@ -23,6 +23,7 @@ function fakeCtx(overrides: Record<string, unknown> = {}) {
         added.push(el);
         return el;
       }),
+      remove: vi.fn(),
     },
     requestRender: vi.fn(),
     switchTool: vi.fn(),
@@ -181,5 +182,24 @@ describe('DmTokenTool', () => {
     expect(ctx.setCursor).toHaveBeenCalledWith('crosshair');
     tool.onDeactivate?.(ctx);
     expect(ctx.setCursor).toHaveBeenCalledWith('default');
+  });
+
+  it('deactivation mid-gesture removes the in-flight token (Escape cancel)', () => {
+    const { ctx, added } = fakeCtx();
+    const tool = new DmTokenTool(ref);
+    tool.onPointerDown(down(10, 10), ctx);
+    expect(added).toHaveLength(1);
+    tool.onDeactivate?.(ctx);
+    expect(ctx.store.remove).toHaveBeenCalledWith(added[0].id);
+  });
+
+  it('deactivation after normal completion removes nothing', () => {
+    const { ctx, added } = fakeCtx();
+    const tool = new DmTokenTool(ref);
+    tool.onPointerDown(down(10, 10), ctx);
+    tool.onPointerUp(down(10, 10), ctx);
+    tool.onDeactivate?.(ctx);
+    expect(ctx.store.remove).not.toHaveBeenCalled();
+    expect(onPlaced).toHaveBeenCalledTimes(1);
   });
 });
