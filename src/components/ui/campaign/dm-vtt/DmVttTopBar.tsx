@@ -68,7 +68,7 @@ export function DmVttTopBar({
             key={key}
             variant={gridMode === key ? 'primary' : 'ghost'}
             onClick={() => onSetGridMode(key)}
-            className="h-8 px-2 text-xs"
+            className="min-h-[44px] px-2 text-xs"
           >
             {label}
           </Button>
@@ -104,7 +104,7 @@ export function DmVttTopBar({
             key={key}
             variant={mode === key ? 'primary' : 'ghost'}
             onClick={() => onModeChange(key)}
-            className="h-8 px-2 text-xs"
+            className="min-h-[44px] px-2 text-xs"
           >
             {label}
           </Button>

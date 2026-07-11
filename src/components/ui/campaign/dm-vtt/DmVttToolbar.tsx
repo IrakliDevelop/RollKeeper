@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { useActiveTool } from '@fieldnotes/react';
-import type { BattleMapConnectionStatus } from '@/lib/battlemapSync';
 
 const DM_TOOLS: { name: string; label: string; Icon: typeof Hand }[] = [
   { name: 'hand', label: 'Pan', Icon: Hand },
@@ -23,18 +22,18 @@ const DM_TOOLS: { name: string; label: string; Icon: typeof Hand }[] = [
 ];
 
 export interface DmVttToolbarProps {
-  status: BattleMapConnectionStatus;
   onClearDrawings: () => void;
 }
 
 /** Top-center tool pill for the DM battle-map canvas — structurally mirrors
  * `PlayerBattleMapCanvas`'s `PlayerToolbar`, minus the token tool (placed via
  * the roster in Task 8, never through this toolbar) plus a Clear-drawings
- * action. */
-export function DmVttToolbar({ status, onClearDrawings }: DmVttToolbarProps) {
+ * action. The connection-status chip lives solely in `DmVttTopBar` now (see
+ * P7c) — this toolbar no longer duplicates it. */
+export function DmVttToolbar({ onClearDrawings }: DmVttToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   return (
-    <div className="bg-surface-raised border-divider absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border p-1 shadow-lg">
+    <div className="bg-surface-raised border-divider absolute top-16 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border p-1 shadow-lg min-[1350px]:top-3">
       {DM_TOOLS.map(({ name, label, Icon }) => (
         <Button
           key={name}
@@ -56,21 +55,6 @@ export function DmVttToolbar({ status, onClearDrawings }: DmVttToolbarProps) {
       >
         <Eraser size={16} />
       </Button>
-      <span
-        className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
-          status === 'live'
-            ? 'bg-accent-emerald-bg text-accent-emerald-text'
-            : status === 'denied'
-              ? 'bg-accent-red-bg text-accent-red-text'
-              : 'bg-accent-amber-bg text-accent-amber-text'
-        }`}
-      >
-        {status === 'live'
-          ? 'Live'
-          : status === 'denied'
-            ? 'Access denied'
-            : 'Connecting…'}
-      </span>
     </div>
   );
 }

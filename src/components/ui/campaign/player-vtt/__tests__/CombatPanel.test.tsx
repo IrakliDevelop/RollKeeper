@@ -240,12 +240,38 @@ describe('CombatPanel', () => {
       />
     );
 
-    expect(screen.getByText('42%')).toBeInTheDocument();
+    const percentText = screen.getByText('42%');
+    expect(percentText).toBeInTheDocument();
+    // 'mid' tier renders with the shared amber tier colour, not the flat faint tone.
+    expect(percentText.className).toMatch(/text-accent-amber-text/);
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     const rows = screen.getAllByRole('listitem');
     expect(
       rows[0].querySelector('.bg-surface-raised.rounded-full')
     ).not.toBeInTheDocument();
+  });
+
+  it('gives a neutral-disposition entry the muted avatar bucket, not the enemy red one', () => {
+    const neutralEntry: SharedTurnEntry = {
+      entityId: 'villager-1',
+      displayName: 'Villager',
+      type: 'npc',
+      disposition: 'neutral',
+      hpState: 'Unharmed',
+    };
+    render(
+      <CombatPanel
+        state={buildState({ turnOrder: [neutralEntry] })}
+        characterId={CHARACTER_ID}
+        onEndTurn={noop}
+        collapsed={false}
+        onToggleCollapsed={noop}
+      />
+    );
+
+    const avatar = screen.getByText('V', { selector: 'span[aria-hidden]' });
+    expect(avatar.className).not.toMatch(/text-accent-red-text/);
+    expect(avatar.className).not.toMatch(/bg-accent-red-bg/);
   });
 
   it('renders enemy hpPercent as a bar only when enemyHpMode is bar', () => {

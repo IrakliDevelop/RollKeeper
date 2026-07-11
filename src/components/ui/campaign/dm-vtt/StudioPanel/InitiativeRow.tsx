@@ -35,9 +35,15 @@ export function InitiativeRow({
         onClick={() => onSelect(entity.id)}
         className={`flex min-h-[44px] w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors ${
           isActive
-            ? 'bg-accent-amber-bg border-accent-amber-border animate-pulse'
-            : 'hover:bg-surface-secondary border-transparent'
-        } ${isSelected ? 'border-accent-blue-border' : ''}`}
+            ? 'bg-accent-amber-bg animate-pulse'
+            : 'hover:bg-surface-secondary'
+        } ${
+          isSelected
+            ? 'border-accent-blue-border'
+            : isActive
+              ? 'border-accent-amber-border'
+              : 'border-divider'
+        }`}
       >
         <span
           className="h-8 w-1 shrink-0 rounded-full"

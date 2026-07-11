@@ -324,4 +324,25 @@ describe('DockSpells', () => {
     expect(screen.queryByText('Prestidigitation')).not.toBeInTheDocument();
     expect(screen.queryByText('Sleep')).not.toBeInTheDocument();
   });
+
+  it('shows a "No spells prepared" hint when the character has spells but none are prepared', () => {
+    const unpreparedSpell = makeSpell({
+      id: 'sleep',
+      name: 'Sleep',
+      level: 1,
+      isPrepared: false,
+    });
+    seedCharacter({ spells: [unpreparedSpell] });
+
+    renderDock();
+
+    expect(screen.getByText('No spells prepared')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Prepare spells in the Spellcasting tab/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('textbox', { name: /search spells/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Sleep')).not.toBeInTheDocument();
+  });
 });

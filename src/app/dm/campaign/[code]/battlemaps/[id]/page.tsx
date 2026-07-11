@@ -80,7 +80,7 @@ export default function BattleMapEditorPage() {
 
   return (
     <div className="bg-surface flex h-screen flex-col overflow-hidden">
-      <div className="border-divider bg-surface-raised fixed top-4 right-4 z-50 flex items-center gap-0.5 rounded-lg border p-0.5 shadow-lg">
+      <div className="border-divider bg-surface-raised fixed top-20 right-4 z-50 flex items-center gap-0.5 rounded-lg border p-0.5 shadow-lg">
         <Button
           variant="primary"
           size="lg"
