@@ -102,6 +102,16 @@ export class SpellTemplateTool implements Tool {
   }
 
   onDeactivate(ctx: ToolContext): void {
+    // An in-flight id here means the gesture was aborted (Escape / disarm)
+    // between pointer-down and pointer-up — remove the half-placed element.
+    // Normal completion clears placedId BEFORE switching tools.
+    if (this.placedId) {
+      ctx.store.remove(this.placedId);
+      this.placedId = null;
+      this.origin = null;
+      this.aiming = false;
+      ctx.requestRender();
+    }
     ctx.setCursor?.('default');
   }
 }

@@ -97,7 +97,7 @@ export function stampCombatantToken(
 export class DmTokenTool implements Tool {
   readonly name = 'dmtoken';
 
-  private placed = false;
+  private placedId: string | null = null;
 
   constructor(private readonly configRef: { current: DmTokenConfig | null }) {}
 
@@ -108,16 +108,16 @@ export class DmTokenTool implements Tool {
       return;
     }
     const world = ctx.camera.screenToWorld({ x: state.x, y: state.y });
-    stampCombatantToken(config, world, ctx);
-    this.placed = true;
+    const token = stampCombatantToken(config, world, ctx);
+    this.placedId = token.id;
   }
 
   onPointerMove(): void {}
 
   onPointerUp(_state: PointerState, ctx: ToolContext): void {
     const config = this.configRef.current;
-    const placed = this.placed;
-    this.placed = false;
+    const placed = this.placedId !== null;
+    this.placedId = null;
     ctx.switchTool?.('select');
     if (placed) config?.onPlaced();
   }
@@ -127,6 +127,11 @@ export class DmTokenTool implements Tool {
   }
 
   onDeactivate(ctx: ToolContext): void {
+    if (this.placedId) {
+      ctx.store.remove(this.placedId);
+      this.placedId = null;
+      ctx.requestRender();
+    }
     ctx.setCursor?.('default');
   }
 }

@@ -22,6 +22,7 @@ function fakeCtx() {
       update: vi.fn((id: string, patch: Record<string, unknown>) => {
         updates.push({ id, patch });
       }),
+      remove: vi.fn(),
     },
     requestRender: vi.fn(),
     switchTool: vi.fn(),
@@ -150,5 +151,22 @@ describe('SpellTemplateTool', () => {
     expect(f.ctx.setCursor).toHaveBeenCalledWith('crosshair');
     tool.onDeactivate?.(f.ctx);
     expect(f.ctx.setCursor).toHaveBeenCalledWith('default');
+  });
+
+  it('deactivation mid-gesture removes the in-flight template (Escape cancel)', () => {
+    const { tool } = armed({ shape: 'circle', sizeFeet: 20 });
+    tool.onPointerDown(down(0, 0), f.ctx);
+    expect(f.added).toHaveLength(1);
+    tool.onDeactivate?.(f.ctx);
+    expect(f.ctx.store.remove).toHaveBeenCalledWith(f.added[0].id);
+  });
+
+  it('deactivation after normal completion removes nothing', () => {
+    const { tool, onPlaced } = armed({ shape: 'circle', sizeFeet: 20 });
+    tool.onPointerDown(down(0, 0), f.ctx);
+    tool.onPointerUp(down(0, 0), f.ctx);
+    tool.onDeactivate?.(f.ctx);
+    expect(f.ctx.store.remove).not.toHaveBeenCalled();
+    expect(onPlaced).toHaveBeenCalledTimes(1);
   });
 });
