@@ -51,21 +51,25 @@ export function DockSpells(props: DockSpellsProps) {
   const spellAttackBonus = calculateSpellAttackBonus(character);
   const spellSaveDC = calculateSpellSaveDC(character);
 
-  const filteredSpells = useMemo(() => {
-    // Only show castable spells (prepared or always-prepared)
-    const castableSpells = character.spells.filter(
-      spell =>
-        (spell.level === 0 && spell.isPrepared) || // Only prepared cantrips
-        (spell.level > 0 && spell.isPrepared) || // Prepared spells
-        spell.isAlwaysPrepared // Always prepared spells
-    );
+  // Only show castable spells (prepared or always-prepared)
+  const castableSpells = useMemo(
+    () =>
+      character.spells.filter(
+        spell =>
+          (spell.level === 0 && spell.isPrepared) || // Only prepared cantrips
+          (spell.level > 0 && spell.isPrepared) || // Prepared spells
+          spell.isAlwaysPrepared // Always prepared spells
+      ),
+    [character.spells]
+  );
 
+  const filteredSpells = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return castableSpells;
     return castableSpells.filter(spell =>
       spell.name.toLowerCase().includes(query)
     );
-  }, [character.spells, search]);
+  }, [castableSpells, search]);
 
   const groups = useMemo(
     () => groupSpellsByLevel(filteredSpells),
@@ -74,6 +78,18 @@ export function DockSpells(props: DockSpellsProps) {
 
   if (spellcastingAbility === null || character.spells.length === 0) {
     return null;
+  }
+
+  if (castableSpells.length === 0) {
+    return (
+      <div className="border-divider bg-surface-raised rounded-lg border-2 p-8 text-center">
+        <div className="mb-3 text-5xl">🔮</div>
+        <p className="text-heading text-lg font-semibold">No spells prepared</p>
+        <p className="text-muted mt-2 text-sm">
+          Prepare spells in the Spellcasting tab to see them here.
+        </p>
+      </div>
+    );
   }
 
   const toggleLevel = (level: number) => {

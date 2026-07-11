@@ -176,6 +176,27 @@ describe('StudioPanel', () => {
     expect(selectedRow.className).toMatch(/border-accent-blue-border/);
   });
 
+  it('gives an active AND selected row the selected (blue) border, not amber', () => {
+    // Sorted order is [Aria(18), Scout(14), Boss(9)] — currentTurn 1 → Scout is active.
+    render(
+      <StudioPanel
+        {...baseProps({
+          encounter: makeEncounter({
+            entities: [aria, goblin1, goblin2],
+            currentTurn: 1,
+          }),
+          selectedEntityId: 'm1',
+        })}
+      />
+    );
+    const row = screen.getByText('Goblin Scout').closest('button')!;
+    expect(row.className).toMatch(/border-accent-blue-border/);
+    expect(row.className).not.toMatch(/border-accent-amber-border/);
+    // Non-border active styling (bg + pulse) is preserved.
+    expect(row.className).toMatch(/bg-accent-amber-bg/);
+    expect(row.className).toMatch(/animate-pulse/);
+  });
+
   it('shows a hidden badge and concentration glyph on the roster row', () => {
     render(<StudioPanel {...baseProps()} />);
     const row = screen.getByText('Goblin Boss').closest('button')!;

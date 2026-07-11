@@ -5,17 +5,21 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { HPBar } from '@/components/shared/combat/HPBar';
+import { getHpTierTextColor } from '@/utils/hpColor';
 import type { EnemyHpDisplay } from '@/types/encounter';
 import type { SharedTurnEntry } from '@/types/sharedState';
 
 /** Disposition-tinted avatar colours: emerald for the player's own row, blue
- * for allies/players, red for everything else (enemies, neutrals). */
+ * for allies/players, muted neutral for neutrals, red for enemies. */
 function avatarColorClasses(entry: SharedTurnEntry, characterId: string) {
   if (entry.playerCharacterId === characterId) {
     return 'bg-accent-emerald-bg text-accent-emerald-text border-accent-emerald-border';
   }
   if (entry.type === 'player' || entry.disposition === 'ally') {
     return 'bg-accent-blue-bg text-accent-blue-text border-accent-blue-border';
+  }
+  if (entry.disposition === 'neutral') {
+    return 'bg-surface-secondary text-muted border-divider';
   }
   return 'bg-accent-red-bg text-accent-red-text border-accent-red-border';
 }
@@ -90,7 +94,11 @@ export function CombatRow({
         ) : entry.hpState ? (
           <span className="text-faint text-xs">{entry.hpState}</span>
         ) : entry.hpPercent !== undefined && enemyHpMode === 'percent' ? (
-          <span className="text-faint text-xs">{entry.hpPercent}%</span>
+          <span
+            className={`text-xs ${entry.hpTier ? getHpTierTextColor(entry.hpTier) : 'text-faint'}`}
+          >
+            {entry.hpPercent}%
+          </span>
         ) : entry.hpPercent !== undefined && enemyHpMode === 'bar' ? (
           <HPBar
             current={entry.hpPercent}
