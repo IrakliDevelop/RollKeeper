@@ -175,9 +175,9 @@ export async function POST(
     // (it would let anyone mint DM battle-map tokens and see hidden elements).
     if (dmId) {
       const dmAuth = await verifyDmAuthority(redis, code, dmId);
-      if (dmAuth === 'mismatch') {
+      if (dmAuth !== 'ok') {
         return NextResponse.json(
-          { error: 'dmId does not match campaign owner' },
+          { error: 'dmId is not authorized for this campaign' },
           { status: 403 }
         );
       }
