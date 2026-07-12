@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, act } from '@testing-library/react';
 
 import { TokenDecorationLayer } from '@/components/ui/campaign/token-overlay';
 import { decorationKey } from '@/components/ui/campaign/token-overlay/TokenDecorationLayer.hooks';
@@ -92,6 +92,25 @@ describe('TokenDecorationLayer', () => {
       '[style*="translate3d"]'
     ) as HTMLElement;
     expect(transformed.style.transform).toContain('scale(1)');
+  });
+
+  it('sizes the chip row to its content and centers it under the token, unclipped', () => {
+    render(<TokenDecorationLayer decorations={deco()} mode="full" />);
+    const item = screen.getByText('Ogre').parentElement as HTMLElement;
+    expect(item.style.width).toBe('max-content');
+    expect(item.style.maxWidth).toBe('160px'); // 4 * 40
+    expect(item.style.transform).toBe('translateX(-50%)');
+    expect(item.style.left).toBe('120px'); // rect.x + rect.w / 2
+  });
+
+  it('renders a long name in full without clipping the text content', () => {
+    render(
+      <TokenDecorationLayer
+        decorations={deco({ name: 'Vecna the Archlich Supreme' })}
+        mode="full"
+      />
+    );
+    expect(screen.getByText('Vecna the Archlich Supreme')).toBeInTheDocument();
   });
 
   it('renders nothing when off, or when the key has no decoration', () => {
@@ -205,10 +224,85 @@ describe('TokenDecorationLayer', () => {
     expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
   });
 
-  it('clamps the chip row width to 0.9×cell on small tokens', () => {
+  it('keeps the chip row content-sized (not clamped to token width) on small tokens', () => {
     mockElements = [tokenEl({ size: { w: 20, h: 20 } })];
     render(<TokenDecorationLayer decorations={deco()} mode="full" />);
     const item = screen.getByText('Ogre').parentElement as HTMLElement;
-    expect(item.style.width).toBe('36px'); // 0.9 × 40 > 20
+    expect(item.style.width).toBe('max-content');
+    expect(item.style.maxWidth).toBe('160px'); // 4 * cell, independent of token size
+  });
+});
+
+function firePointer(type: string, clientX: number, clientY: number) {
+  act(() => {
+    window.dispatchEvent(new PointerEvent(type, { clientX, clientY }));
+  });
+}
+
+describe('TokenDecorationLayer compact-mode reveal', () => {
+  beforeEach(() => {
+    mockElements = [tokenEl()];
+    mockCamera = { x: 0, y: 0, zoom: 1 };
+  });
+
+  afterEach(() => cleanup());
+
+  it('shows no chip row initially in compact mode', () => {
+    render(<TokenDecorationLayer decorations={deco()} mode="compact" />);
+    expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
+  });
+
+  it('reveals the name chip on pointerdown inside the token, and hides it again on pointerdown outside', () => {
+    render(<TokenDecorationLayer decorations={deco()} mode="compact" />);
+    expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
+
+    // Token at (100, 200), size 40x40, camera {x:0,y:0,zoom:1} — (120, 220) is inside.
+    firePointer('pointerdown', 120, 220);
+    expect(screen.getByText('Ogre')).toBeInTheDocument();
+
+    // (10, 10) is well outside the token — clears the reveal.
+    firePointer('pointerdown', 10, 10);
+    expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
+  });
+
+  it('accounts for camera pan/zoom when hit-testing pointerdown', () => {
+    mockCamera = { x: 50, y: 0, zoom: 2 };
+    render(<TokenDecorationLayer decorations={deco()} mode="compact" />);
+
+    // World (120, 220) is inside the 40x40 token at (100,200).
+    // screen = world*zoom + camera => clientX = 120*2+50 = 290, clientY = 220*2+0 = 440.
+    firePointer('pointerdown', 290, 440);
+    expect(screen.getByText('Ogre')).toBeInTheDocument();
+  });
+
+  it('reveals the name chip on hover (pointermove), throttled via rAF', () => {
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0);
+      return 0;
+    });
+    render(<TokenDecorationLayer decorations={deco()} mode="compact" />);
+    expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
+
+    firePointer('pointermove', 120, 220);
+    expect(screen.getByText('Ogre')).toBeInTheDocument();
+
+    firePointer('pointermove', 10, 10);
+    expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('clears both hover and tap reveal state when leaving compact mode', () => {
+    const { rerender } = render(
+      <TokenDecorationLayer decorations={deco()} mode="compact" />
+    );
+    firePointer('pointerdown', 120, 220);
+    expect(screen.getByText('Ogre')).toBeInTheDocument();
+
+    rerender(<TokenDecorationLayer decorations={deco()} mode="full" />);
+    expect(screen.getByText('Ogre')).toBeInTheDocument(); // full mode always shows it
+
+    rerender(<TokenDecorationLayer decorations={deco()} mode="compact" />);
+    expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
   });
 });

@@ -5,7 +5,10 @@ import { useCamera, useViewport } from '@fieldnotes/react';
 import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
 
 import { DecorationItem } from './DecorationItem';
-import { useDecoratedTokenRects } from './TokenDecorationLayer.hooks';
+import {
+  useCompactReveal,
+  useDecoratedTokenRects,
+} from './TokenDecorationLayer.hooks';
 
 import type {
   TokenDecoration,
@@ -39,10 +42,12 @@ export function TokenDecorationLayer({
   const camera = useCamera();
   const viewport = useViewport();
   const rects = useDecoratedTokenRects();
+  const { containerRef, activeId } = useCompactReveal(mode, rects);
   if (mode === 'off') return null;
   const cell = cellUnit(viewport.toolContext);
   return (
     <div
+      ref={containerRef}
       className="pointer-events-none absolute inset-0 overflow-hidden select-none"
       aria-hidden
     >
@@ -62,6 +67,7 @@ export function TokenDecorationLayer({
               deco={deco}
               mode={mode}
               cell={cell}
+              showChipRow={mode === 'compact' && rect.id === activeId}
             />
           );
         })}
