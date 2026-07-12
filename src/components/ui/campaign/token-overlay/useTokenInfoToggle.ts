@@ -2,13 +2,33 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-/** Persisted show/hide state for token decorations. Defaults ON. */
-export function useTokenInfoToggle(storageKey: string): [boolean, () => void] {
-  const [visible, setVisible] = useState(true);
+import type { TokenInfoMode } from './TokenDecorationLayer.types';
+
+/** Cycle order for the toolbar eye button. */
+const CYCLE_ORDER: readonly TokenInfoMode[] = ['full', 'compact', 'off'];
+
+/**
+ * Maps a raw localStorage value to a mode. Handles the pre-mode boolean
+ * strings ('true'/'false') from before this feature, passes through already-
+ * valid mode strings, and falls back to the default for anything else
+ * (missing key, corrupt value).
+ */
+function migrateStoredValue(raw: string | null): TokenInfoMode {
+  if (raw === 'true') return 'full';
+  if (raw === 'false') return 'off';
+  if (raw === 'full' || raw === 'compact' || raw === 'off') return raw;
+  return 'full';
+}
+
+/** Persisted show/hide/compact mode for token decorations. Defaults 'full'. */
+export function useTokenInfoMode(
+  storageKey: string
+): [TokenInfoMode, () => void] {
+  const [mode, setMode] = useState<TokenInfoMode>('full');
 
   useEffect(() => {
     try {
-      if (localStorage.getItem(storageKey) === 'false') setVisible(false);
+      setMode(migrateStoredValue(localStorage.getItem(storageKey)));
     } catch {
       // Ignore localStorage errors
     }
@@ -16,12 +36,18 @@ export function useTokenInfoToggle(storageKey: string): [boolean, () => void] {
 
   useEffect(() => {
     try {
-      localStorage.setItem(storageKey, String(visible));
+      localStorage.setItem(storageKey, mode);
     } catch {
       // Ignore localStorage errors
     }
-  }, [storageKey, visible]);
+  }, [storageKey, mode]);
 
-  const toggle = useCallback(() => setVisible(v => !v), []);
-  return [visible, toggle];
+  const cycle = useCallback(() => {
+    setMode(
+      current =>
+        CYCLE_ORDER[(CYCLE_ORDER.indexOf(current) + 1) % CYCLE_ORDER.length]
+    );
+  }, []);
+
+  return [mode, cycle];
 }

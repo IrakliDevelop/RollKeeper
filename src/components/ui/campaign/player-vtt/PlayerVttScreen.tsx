@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/forms/button';
 import { PlayerBattleMapCanvas } from '@/components/ui/campaign/location-map/PlayerBattleMapCanvas';
 import { TokenDecorationLayer } from '@/components/ui/campaign/token-overlay';
 import { usePlayerTokenDecorations } from '@/components/ui/campaign/token-overlay/usePlayerTokenDecorations';
-import { useTokenInfoToggle } from '@/components/ui/campaign/token-overlay/useTokenInfoToggle';
+import { useTokenInfoMode } from '@/components/ui/campaign/token-overlay/useTokenInfoToggle';
 import { ToastContainer } from '@/components/ui/feedback/Toast';
 
 import { CastingBanner } from './CastingBanner';
@@ -57,7 +57,7 @@ export function PlayerVttScreen({
 
   const [combatCollapsed, setCombatCollapsed] = useState(defaultCollapsed);
   const [dockCollapsed, setDockCollapsed] = useState(defaultCollapsed);
-  const [tokenInfoVisible, toggleTokenInfo] = useTokenInfoToggle(
+  const [tokenInfoMode, cycleTokenInfo] = useTokenInfoMode(
     'rollkeeper-vtt-token-info-player'
   );
   const decorations = usePlayerTokenDecorations(
@@ -82,12 +82,9 @@ export function PlayerVttScreen({
       onStatus={setConnectionStatus}
       onPoke={handlePoke}
       spellTemplateConfigRef={spellTemplateConfigRef}
-      tokenInfoToggle={{ visible: tokenInfoVisible, onToggle: toggleTokenInfo }}
+      tokenInfoToggle={{ mode: tokenInfoMode, onCycle: cycleTokenInfo }}
     >
-      <TokenDecorationLayer
-        decorations={decorations}
-        visible={tokenInfoVisible}
-      />
+      <TokenDecorationLayer decorations={decorations} mode={tokenInfoMode} />
       <SpellPlacementController
         pending={pendingPlacement}
         configRef={spellTemplateConfigRef}

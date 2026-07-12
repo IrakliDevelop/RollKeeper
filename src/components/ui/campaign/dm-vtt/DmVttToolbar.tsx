@@ -9,11 +9,14 @@ import {
   Circle,
   Eraser,
   Eye,
+  Minus,
   EyeOff,
 } from 'lucide-react';
 import { useActiveTool } from '@fieldnotes/react';
 
 import { Button } from '@/components/ui/forms/button';
+
+import type { TokenInfoMode } from '@/components/ui/campaign/token-overlay';
 
 const DM_TOOLS: { name: string; label: string; Icon: typeof Hand }[] = [
   { name: 'hand', label: 'Pan', Icon: Hand },
@@ -26,8 +29,20 @@ const DM_TOOLS: { name: string; label: string; Icon: typeof Hand }[] = [
 
 export interface DmVttToolbarProps {
   onClearDrawings: () => void;
-  tokenInfoToggle: { visible: boolean; onToggle: () => void };
+  tokenInfoToggle: { mode: TokenInfoMode; onCycle: () => void };
 }
+
+const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
+  full: Eye,
+  compact: Minus,
+  off: EyeOff,
+};
+
+const TOKEN_INFO_LABEL: Record<TokenInfoMode, string> = {
+  full: 'Token info: full',
+  compact: 'Token info: compact',
+  off: 'Token info: hidden',
+};
 
 /** Top-center tool pill for the DM battle-map canvas — structurally mirrors
  * `PlayerBattleMapCanvas`'s `PlayerToolbar`, minus the token tool (placed via
@@ -39,6 +54,7 @@ export function DmVttToolbar({
   tokenInfoToggle,
 }: DmVttToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
+  const TokenInfoIcon = TOKEN_INFO_ICON[tokenInfoToggle.mode];
   return (
     <div className="bg-surface-raised border-divider absolute top-16 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border p-1 shadow-lg min-[1350px]:top-3">
       {DM_TOOLS.map(({ name, label, Icon }) => (
@@ -64,15 +80,12 @@ export function DmVttToolbar({
       </Button>
       <Button
         variant="ghost"
-        onClick={tokenInfoToggle.onToggle}
+        onClick={tokenInfoToggle.onCycle}
         className="min-h-[44px] min-w-[44px] p-0"
-        title={tokenInfoToggle.visible ? 'Hide token info' : 'Show token info'}
-        aria-label={
-          tokenInfoToggle.visible ? 'Hide token info' : 'Show token info'
-        }
-        aria-pressed={tokenInfoToggle.visible}
+        title={TOKEN_INFO_LABEL[tokenInfoToggle.mode]}
+        aria-label={TOKEN_INFO_LABEL[tokenInfoToggle.mode]}
       >
-        {tokenInfoToggle.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+        <TokenInfoIcon size={16} />
       </Button>
     </div>
   );
