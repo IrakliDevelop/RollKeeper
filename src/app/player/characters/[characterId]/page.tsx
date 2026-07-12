@@ -886,7 +886,7 @@ export default function CharacterSheet() {
           {initiativePrompt.showPrompt && initiativePrompt.request && (
             <InitiativeRollPrompt
               request={initiativePrompt.request}
-              modifier={character.initiative.value}
+              modifier={getInitiativeModifier()}
               onSubmit={initiativePrompt.handleSubmit}
               onDismiss={initiativePrompt.dismiss}
             />

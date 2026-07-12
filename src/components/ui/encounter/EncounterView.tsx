@@ -263,7 +263,10 @@ export function EncounterView({
 
   const waitingNames = encounter?.pendingInitiativeRequest
     ? encounter.entities
-        .filter(e => e.type === 'player' && e.initiative === null)
+        .filter(
+          e =>
+            e.type === 'player' && e.initiative === null && e.playerCharacterId
+        )
         .map(e => e.name)
     : [];
 

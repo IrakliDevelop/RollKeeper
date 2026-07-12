@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import { InitiativeRollPrompt } from '../InitiativeRollPrompt';
 import type { InitiativeRollRequest } from '@/types/sharedState';
@@ -104,7 +104,7 @@ describe('InitiativeRollPrompt', () => {
 
   it('shows error and keeps prompt open when onSubmit resolves false', async () => {
     const onSubmit = vi.fn(async () => false);
-    const { container } = render(
+    render(
       <InitiativeRollPrompt
         request={req}
         modifier={3}
