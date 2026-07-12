@@ -334,6 +334,30 @@ describe('mergePlayerSyncData', () => {
     });
     expect(mergePlayerSyncData(entity, b64Data)!.avatarUrl).toBeUndefined();
   });
+
+  it('omits the avatarUrl key entirely for base64/absent avatars (no clobber of DM-set portraits)', () => {
+    const entityWithDmPortrait = createMockEncounterEntity({
+      type: 'player',
+      avatarUrl: 'https://s3.amazonaws.com/dm/set.png',
+    });
+    const b64Data = createMockPlayerData({
+      characterData: createMockCharacterState({
+        avatar: 'data:image/png;base64,xyz',
+      }),
+    });
+
+    const result = mergePlayerSyncData(entityWithDmPortrait, b64Data);
+    expect(result).not.toBeNull();
+    expect('avatarUrl' in (result as object)).toBe(false); // key OMITTED, not undefined
+
+    const entity = createMockEncounterEntity({ type: 'player' });
+    const noAvatarData = createMockPlayerData({
+      characterData: createMockCharacterState({ avatar: undefined }),
+    });
+    const result2 = mergePlayerSyncData(entity, noAvatarData);
+    expect(result2).not.toBeNull();
+    expect('avatarUrl' in (result2 as object)).toBe(false);
+  });
 });
 
 describe('hasPlayerDataChanged', () => {
