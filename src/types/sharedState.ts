@@ -100,6 +100,22 @@ export interface TurnEndRequest {
   requestedAt: string; // ISO timestamp
 }
 
+// DM → players request to roll initiative
+export interface InitiativeRollRequest {
+  requestId: string; // crypto.randomUUID() per request; re-requesting mints a new one
+  encounterId: string;
+  encounterName: string; // shown in the player prompt
+  requestedAt: number; // Date.now()
+}
+
+// Player → DM initiative submission (stored per player under one shared key)
+export interface InitiativeSubmission {
+  requestId: string;
+  playerId: string; // characterId (matches EncounterEntity.playerCharacterId)
+  value: number; // FINAL total — modifier already included
+  submittedAt: number;
+}
+
 // Live battle map activation (DM → players via shared state)
 export interface SharedBattleMapState {
   activeBattleMapId: string | null;
@@ -116,6 +132,7 @@ export interface SharedCampaignState {
   transfers: ItemTransfer[];
   initiative: SharedInitiativeState | null;
   battleMap: SharedBattleMapState | null;
+  initiativeRequest: InitiativeRollRequest | null;
 }
 
 // POST body for DM pushing shared state

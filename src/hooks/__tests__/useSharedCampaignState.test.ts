@@ -18,6 +18,7 @@ const makeSharedState = (
   transfers: [],
   initiative: null,
   battleMap: null,
+  initiativeRequest: null,
   ...overrides,
 });
 
