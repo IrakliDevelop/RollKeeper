@@ -6,18 +6,18 @@ import { useTokenInfoMode } from '@/components/ui/campaign/token-overlay/useToke
 describe('useTokenInfoMode', () => {
   beforeEach(() => localStorage.clear());
 
-  it('defaults to full and cycles full -> compact -> off -> full', () => {
+  it('defaults to compact and cycles compact -> off -> full -> compact', () => {
     const { result } = renderHook(() => useTokenInfoMode('test-key'));
-    expect(result.current[0]).toBe('full');
-    act(() => result.current[1]());
     expect(result.current[0]).toBe('compact');
-    expect(localStorage.getItem('test-key')).toBe('compact');
     act(() => result.current[1]());
     expect(result.current[0]).toBe('off');
     expect(localStorage.getItem('test-key')).toBe('off');
     act(() => result.current[1]());
     expect(result.current[0]).toBe('full');
     expect(localStorage.getItem('test-key')).toBe('full');
+    act(() => result.current[1]());
+    expect(result.current[0]).toBe('compact');
+    expect(localStorage.getItem('test-key')).toBe('compact');
   });
 
   it('migrates legacy boolean strings to modes', () => {
@@ -36,9 +36,9 @@ describe('useTokenInfoMode', () => {
     expect(result.current[0]).toBe('compact');
   });
 
-  it('falls back to full for corrupt/unknown stored values', () => {
+  it('falls back to compact for corrupt/unknown stored values', () => {
     localStorage.setItem('test-key', 'garbage');
     const { result } = renderHook(() => useTokenInfoMode('test-key'));
-    expect(result.current[0]).toBe('full');
+    expect(result.current[0]).toBe('compact');
   });
 });

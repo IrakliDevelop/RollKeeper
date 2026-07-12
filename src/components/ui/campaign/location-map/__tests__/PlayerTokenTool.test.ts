@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { PlayerTokenTool } from '@/components/ui/campaign/location-map/PlayerTokenTool';
+import { TOKEN_ELEMENT_ZINDEX } from '@/components/ui/campaign/location-map/tokenSnap';
 
 import type {
   CanvasElement,
@@ -120,6 +121,30 @@ describe('PlayerTokenTool sizing', () => {
     // is the center minus half the size.
     expect(el.size).toEqual({ w: 40, h: 40 });
     expect(el.position).toEqual({ x: 40, y: 40 });
+  });
+
+  it('stamps TOKEN_ELEMENT_ZINDEX on the ellipse fallback (guarantees paint above the map background)', () => {
+    const { ctx, added } = fakeCtx();
+    const tool = new PlayerTokenTool(
+      '#12855C',
+      { current: null },
+      { current: 'char-1' }
+    );
+    tool.onPointerDown(down(0, 0), ctx);
+    const el = added[0] as CanvasElement & { zIndex?: number };
+    expect(el.zIndex).toBe(TOKEN_ELEMENT_ZINDEX);
+  });
+
+  it('stamps TOKEN_ELEMENT_ZINDEX on avatar image tokens too', () => {
+    const { ctx, added } = fakeCtx();
+    const tool = new PlayerTokenTool(
+      '#12855C',
+      { current: 'https://x/a.png' },
+      { current: 'char-1' }
+    );
+    tool.onPointerDown(down(0, 0), ctx);
+    const el = added[0] as CanvasElement & { zIndex?: number };
+    expect(el.zIndex).toBe(TOKEN_ELEMENT_ZINDEX);
   });
 
   it('places an unstamped token when no characterId is known', () => {

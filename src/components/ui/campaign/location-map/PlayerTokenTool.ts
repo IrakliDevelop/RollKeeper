@@ -7,7 +7,7 @@ import {
   type PointerState,
 } from '@fieldnotes/core';
 import { cellUnit } from './cellUnit';
-import { snapTokenCenter } from './tokenSnap';
+import { snapTokenCenter, TOKEN_ELEMENT_ZINDEX } from './tokenSnap';
 
 export const PLAYER_TOKEN_KIND = 'player';
 
@@ -160,6 +160,7 @@ export class PlayerTokenTool implements Tool {
           size: { w: size, h: size },
           src,
           layerId: ctx.activeLayerId ?? '',
+          zIndex: TOKEN_ELEMENT_ZINDEX,
         })
       : createShape({
           position: { x: center.x - size / 2, y: center.y - size / 2 },
@@ -169,6 +170,7 @@ export class PlayerTokenTool implements Tool {
           strokeColor: '#1e293b',
           strokeWidth: 2,
           layerId: ctx.activeLayerId ?? '',
+          zIndex: TOKEN_ELEMENT_ZINDEX,
         });
 
     const characterId = this.characterIdRef.current;
