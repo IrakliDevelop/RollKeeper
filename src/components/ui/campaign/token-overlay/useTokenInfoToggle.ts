@@ -17,14 +17,14 @@ function migrateStoredValue(raw: string | null): TokenInfoMode {
   if (raw === 'true') return 'full';
   if (raw === 'false') return 'off';
   if (raw === 'full' || raw === 'compact' || raw === 'off') return raw;
-  return 'full';
+  return 'compact';
 }
 
-/** Persisted show/hide/compact mode for token decorations. Defaults 'full'. */
+/** Persisted show/hide/compact mode for token decorations. Defaults 'compact'. */
 export function useTokenInfoMode(
   storageKey: string
 ): [TokenInfoMode, () => void] {
-  const [mode, setMode] = useState<TokenInfoMode>('full');
+  const [mode, setMode] = useState<TokenInfoMode>('compact');
 
   useEffect(() => {
     try {

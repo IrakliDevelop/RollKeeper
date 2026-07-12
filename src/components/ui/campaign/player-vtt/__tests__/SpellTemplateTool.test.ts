@@ -65,6 +65,10 @@ describe('SpellTemplateTool', () => {
     expect(el.radiusFeet).toBe(20);
     expect(el.feetPerCell).toBe(5);
     expect(el.position).toEqual({ x: 100, y: 200 });
+    // Below tokens (zIndex 1000), above map background (zIndex 0) — see the
+    // layer-tie paint-order bug documented at tokenSnap.ts's
+    // TOKEN_ELEMENT_ZINDEX.
+    expect(el.zIndex).toBe(900);
     tool.onPointerUp(down(100, 200), f.ctx);
     expect(f.ctx.switchTool).toHaveBeenCalledWith('select');
     expect(onPlaced).toHaveBeenCalledTimes(1);
