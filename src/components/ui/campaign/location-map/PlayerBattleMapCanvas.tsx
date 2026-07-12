@@ -23,6 +23,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import { cn } from '@/utils/cn';
 import type { TokenInfoMode } from '@/components/ui/campaign/token-overlay';
 import {
   FieldNotesCanvas,
@@ -109,7 +110,7 @@ const TOKEN_INFO_LABEL: Record<TokenInfoMode, string> = {
   off: 'Token info: hidden',
 };
 
-function PlayerToolbar({
+export function PlayerToolbar({
   status,
   hasSelection,
   onDeleteSelected,
@@ -138,11 +139,11 @@ function PlayerToolbar({
             key={name}
             variant={activeTool === name ? 'primary' : 'ghost'}
             onClick={() => setTool(name)}
-            className={`min-h-[44px] min-w-[44px] p-0${
-              isTokenHint
-                ? 'bg-accent-emerald-bg text-accent-emerald-text animate-pulse'
-                : ''
-            }`}
+            className={cn(
+              'min-h-[44px] min-w-[44px] p-0',
+              isTokenHint &&
+                'bg-accent-emerald-bg text-accent-emerald-text animate-pulse'
+            )}
             title={isTokenHint ? 'Place your token on the map' : label}
             aria-label={isTokenHint ? 'Place your token on the map' : label}
           >
