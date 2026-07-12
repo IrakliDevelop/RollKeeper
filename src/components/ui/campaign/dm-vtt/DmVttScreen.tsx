@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 
+import { TokenDecorationLayer } from '@/components/ui/campaign/token-overlay';
+import { useDmTokenDecorations } from '@/components/ui/campaign/token-overlay/useDmTokenDecorations';
+import { useTokenInfoToggle } from '@/components/ui/campaign/token-overlay/useTokenInfoToggle';
 import { ToastContainer } from '@/components/ui/feedback/Toast';
 
 import { DmBattleMapCanvas } from './DmBattleMapCanvas';
@@ -44,6 +47,10 @@ export function DmVttScreen({
   const vtt = useDmVttScreen({ campaignCode, battleMapId, dmId });
   const [rosterCollapsed, setRosterCollapsed] = useState(false);
   const [studioCollapsed, setStudioCollapsed] = useState(false);
+  const [tokenInfoVisible, toggleTokenInfo] = useTokenInfoToggle(
+    'rollkeeper-vtt-token-info-dm'
+  );
+  const decorations = useDmTokenDecorations(vtt.linkedEntities);
 
   const gridMode: DmVttGridMode = vtt.battleMap?.gridEnabled
     ? (vtt.battleMap.gridSettings?.gridType ?? 'hex')
@@ -58,7 +65,12 @@ export function DmVttScreen({
       onViewportReady={vtt.onViewportReady}
       tokenConfigRef={vtt.tokenConfigRef}
       onSelectionChange={vtt.onSelectionChange}
+      tokenInfoToggle={{ visible: tokenInfoVisible, onToggle: toggleTokenInfo }}
     >
+      <TokenDecorationLayer
+        decorations={decorations}
+        visible={tokenInfoVisible}
+      />
       <TokenPlacementController
         pending={vtt.pendingPlacement}
         configRef={vtt.tokenConfigRef}

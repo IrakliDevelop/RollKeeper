@@ -32,6 +32,8 @@ export interface DmBattleMapCanvasProps {
   tokenConfigRef: React.MutableRefObject<DmTokenConfig | null>;
   /** Select-tool selection changes (element ids) — Task 8 maps to entities. */
   onSelectionChange?: (selectedIds: string[]) => void;
+  /** Show/hide state for the token decoration layer, surfaced as a toolbar toggle. */
+  tokenInfoToggle: { visible: boolean; onToggle: () => void };
 }
 
 /** Viewport exposes historyRecorder at runtime for batched store ops. */
