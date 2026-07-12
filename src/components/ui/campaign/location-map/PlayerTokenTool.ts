@@ -143,7 +143,9 @@ export class PlayerTokenTool implements Tool {
 
   constructor(
     private readonly color: string,
-    private readonly srcRef: { current: string | null }
+    private readonly srcRef: { current: string | null },
+    /** Read at placement time (canvas keeps the first tool instance). */
+    private readonly characterIdRef: { current: string | null }
   ) {}
 
   onPointerDown(state: PointerState, ctx: ToolContext): void {
@@ -152,18 +154,14 @@ export class PlayerTokenTool implements Tool {
     const size = cellUnit(ctx);
     const src = this.srcRef.current;
 
-    if (src) {
-      ctx.store.add(
-        createImage({
+    const base = src
+      ? createImage({
           position: { x: center.x - size / 2, y: center.y - size / 2 },
           size: { w: size, h: size },
           src,
           layerId: ctx.activeLayerId ?? '',
         })
-      );
-    } else {
-      ctx.store.add(
-        createShape({
+      : createShape({
           position: { x: center.x - size / 2, y: center.y - size / 2 },
           size: { w: size, h: size },
           shape: 'ellipse',
@@ -171,9 +169,18 @@ export class PlayerTokenTool implements Tool {
           strokeColor: '#1e293b',
           strokeWidth: 2,
           layerId: ctx.activeLayerId ?? '',
-        })
-      );
-    }
+        });
+
+    const characterId = this.characterIdRef.current;
+    ctx.store.add(
+      characterId
+        ? ({
+            ...base,
+            characterId,
+            tokenKind: PLAYER_TOKEN_KIND,
+          } as unknown as typeof base)
+        : base
+    );
     ctx.requestRender();
   }
 
