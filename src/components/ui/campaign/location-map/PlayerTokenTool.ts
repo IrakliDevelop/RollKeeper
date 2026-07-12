@@ -172,15 +172,16 @@ export class PlayerTokenTool implements Tool {
         });
 
     const characterId = this.characterIdRef.current;
-    ctx.store.add(
-      characterId
-        ? ({
-            ...base,
-            characterId,
-            tokenKind: PLAYER_TOKEN_KIND,
-          } as unknown as typeof base)
-        : base
-    );
+    if (characterId) {
+      const stamped: typeof base & PlayerTokenKeys = {
+        ...base,
+        characterId,
+        tokenKind: PLAYER_TOKEN_KIND,
+      };
+      ctx.store.add(stamped);
+    } else {
+      ctx.store.add(base);
+    }
     ctx.requestRender();
   }
 
