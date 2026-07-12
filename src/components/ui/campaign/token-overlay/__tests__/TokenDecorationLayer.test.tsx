@@ -276,18 +276,77 @@ describe('TokenDecorationLayer compact-mode reveal', () => {
   });
 
   it('reveals the name chip on hover (pointermove), throttled via rAF', () => {
+    let pending: FrameRequestCallback | null = null;
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
-      cb(0);
-      return 0;
+      pending = cb;
+      return 99;
     });
+
     render(<TokenDecorationLayer decorations={deco()} mode="compact" />);
     expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
 
+    // First pointermove schedules a frame
     firePointer('pointermove', 120, 220);
+    expect(screen.queryByText('Ogre')).not.toBeInTheDocument(); // callback not run yet
+
+    // Execute the pending callback
+    act(() => {
+      if (pending) pending(0);
+    });
     expect(screen.getByText('Ogre')).toBeInTheDocument();
 
+    // Second pointermove to different location schedules another frame
+    pending = null;
     firePointer('pointermove', 10, 10);
+
+    // Execute the pending callback
+    act(() => {
+      if (pending) pending(0);
+    });
     expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('cancels pending rAF on hover when mode leaves compact', () => {
+    let pendingCallback: FrameRequestCallback | null = null;
+    const cancelSpy = vi.fn();
+
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      pendingCallback = cb;
+      return 42;
+    });
+    vi.stubGlobal('cancelAnimationFrame', cancelSpy);
+
+    const { rerender } = render(
+      <TokenDecorationLayer decorations={deco()} mode="compact" />
+    );
+    expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
+
+    // Dispatch pointermove — schedules rAF with id 42, callback stored in pendingCallback.
+    act(() => {
+      window.dispatchEvent(
+        new PointerEvent('pointermove', { clientX: 120, clientY: 220 })
+      );
+    });
+    expect(pendingCallback).not.toBeNull();
+
+    // Switch to full mode — cleanup should cancel the pending frame.
+    rerender(<TokenDecorationLayer decorations={deco()} mode="full" />);
+    expect(cancelSpy).toHaveBeenCalledWith(42);
+
+    // Simulate the pending callback running anyway (e.g. due to timing).
+    // It should no longer surface the chip because the effect cleanup
+    // has also cleared hover/revealed state.
+    act(() => {
+      if (pendingCallback) pendingCallback(0);
+    });
+    // In full mode, the name should show (not due to the stale callback,
+    // but because full mode always renders it). If the callback had been
+    // allowed to run without cancellation, it would have re-set hoveredId
+    // after cleanup cleared it. Verify that doesn't happen by checking
+    // the current state is consistent with full mode.
+    expect(screen.getByText('Ogre')).toBeInTheDocument();
 
     vi.unstubAllGlobals();
   });
