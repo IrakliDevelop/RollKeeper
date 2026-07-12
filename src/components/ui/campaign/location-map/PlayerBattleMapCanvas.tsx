@@ -18,6 +18,8 @@ import {
   Ruler,
   Circle,
   Trash2,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import {
@@ -69,6 +71,8 @@ interface PlayerBattleMapCanvasProps {
   spellTemplateConfigRef?: React.MutableRefObject<SpellTemplateConfig | null>;
   /** Hide the built-in back-button (the VTT screen renders its own top-left chrome). */
   hideBackButton?: boolean;
+  /** Show/hide toggle for the token decoration overlay (optional — non-VTT routes render no toggle). */
+  tokenInfoToggle?: { visible: boolean; onToggle: () => void };
 }
 
 /** Viewport exposes historyRecorder at runtime for batched store ops. */
@@ -94,10 +98,12 @@ function PlayerToolbar({
   status,
   hasSelection,
   onDeleteSelected,
+  tokenInfoToggle,
 }: {
   status: BattleMapConnectionStatus;
   hasSelection: boolean;
   onDeleteSelected: () => void;
+  tokenInfoToggle?: { visible: boolean; onToggle: () => void };
 }) {
   const [activeTool, setTool] = useActiveTool();
   return (
@@ -107,7 +113,7 @@ function PlayerToolbar({
           key={name}
           variant={activeTool === name ? 'primary' : 'ghost'}
           onClick={() => setTool(name)}
-          className="h-8 w-8 p-0"
+          className="min-h-[44px] min-w-[44px] p-0"
           title={label}
           aria-label={label}
         >
@@ -118,11 +124,27 @@ function PlayerToolbar({
         <Button
           variant="danger"
           onClick={onDeleteSelected}
-          className="h-8 w-8 p-0"
+          className="min-h-[44px] min-w-[44px] p-0"
           title="Delete selected"
           aria-label="Delete selected"
         >
           <Trash2 size={16} />
+        </Button>
+      )}
+      {tokenInfoToggle && (
+        <Button
+          variant="ghost"
+          onClick={tokenInfoToggle.onToggle}
+          className="min-h-[44px] min-w-[44px] p-0"
+          title={
+            tokenInfoToggle.visible ? 'Hide token info' : 'Show token info'
+          }
+          aria-label={
+            tokenInfoToggle.visible ? 'Hide token info' : 'Show token info'
+          }
+          aria-pressed={tokenInfoToggle.visible}
+        >
+          {tokenInfoToggle.visible ? <Eye size={16} /> : <EyeOff size={16} />}
         </Button>
       )}
       <span
@@ -154,6 +176,7 @@ export function PlayerBattleMapCanvas({
   onPoke,
   spellTemplateConfigRef,
   hideBackButton = false,
+  tokenInfoToggle,
 }: PlayerBattleMapCanvasProps) {
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
@@ -306,6 +329,7 @@ export function PlayerBattleMapCanvas({
             status={status}
             hasSelection={hasSelection}
             onDeleteSelected={handleDeleteSelected}
+            tokenInfoToggle={tokenInfoToggle}
           />
         )}
         {viewport && (
