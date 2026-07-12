@@ -231,6 +231,67 @@ describe('TokenDecorationLayer', () => {
     expect(item.style.width).toBe('max-content');
     expect(item.style.maxWidth).toBe('160px'); // 4 * cell, independent of token size
   });
+
+  it('renders the chess piece icon centered in the token rect with its color, in full mode', () => {
+    const { container } = render(
+      <TokenDecorationLayer
+        decorations={deco({ chessPiece: 'rook', pieceColor: '#a855f7' })}
+        mode="full"
+      />
+    );
+    const svg = container.querySelector('svg');
+    expect(svg).toBeInTheDocument();
+    expect(svg?.style.color).toBe('rgb(168, 85, 247)');
+    // Centering wrapper matches the token rect at (100, 200), 40x40.
+    const wrapper = svg?.parentElement as HTMLElement;
+    expect(wrapper.style.left).toBe('100px');
+    expect(wrapper.style.top).toBe('200px');
+    expect(wrapper.style.width).toBe('40px');
+    expect(wrapper.style.height).toBe('40px');
+  });
+
+  it('renders the chess piece in compact mode too', () => {
+    const { container } = render(
+      <TokenDecorationLayer
+        decorations={deco({ chessPiece: 'pawn' })}
+        mode="compact"
+      />
+    );
+    expect(container.querySelector('svg')).toBeInTheDocument();
+  });
+
+  it('defaults the piece color to a neutral tone when pieceColor is absent', () => {
+    const { container } = render(
+      <TokenDecorationLayer
+        decorations={deco({ chessPiece: 'pawn' })}
+        mode="full"
+      />
+    );
+    const svg = container.querySelector('svg');
+    expect(svg?.style.color).toBe('rgb(226, 232, 240)'); // #e2e8f0
+  });
+
+  it('renders no piece icon when chessPiece is absent', () => {
+    const { container } = render(
+      <TokenDecorationLayer decorations={deco()} mode="full" />
+    );
+    expect(container.querySelector('svg')).not.toBeInTheDocument();
+  });
+
+  it('hides the piece icon (skull takes precedence) when the token is dead', () => {
+    const { container } = render(
+      <TokenDecorationLayer
+        decorations={deco({
+          chessPiece: 'king',
+          isDead: true,
+          hp: { kind: 'bar', percent: 0, tier: 'critical' },
+        })}
+        mode="full"
+      />
+    );
+    expect(screen.getByText('☠️')).toBeInTheDocument();
+    expect(container.querySelector('svg')).not.toBeInTheDocument();
+  });
 });
 
 function firePointer(type: string, clientX: number, clientY: number) {

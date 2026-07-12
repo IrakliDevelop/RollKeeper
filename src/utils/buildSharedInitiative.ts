@@ -44,6 +44,11 @@ function toEntry(
     type: entity.type as SharedTurnEntry['type'],
   };
 
+  // DM-assigned map-correlation identity — shared for every entity type,
+  // hidden enemies included (that correlation is its whole purpose).
+  if (entity.chessPiece !== undefined) entry.chessPiece = entity.chessPiece;
+  if (entity.color !== undefined) entry.tokenColor = entity.color;
+
   // Players always expose identity + exact HP (their own sheet is authoritative).
   if (isPlayer) {
     entry.playerCharacterId = entity.playerCharacterId;

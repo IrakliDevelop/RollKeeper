@@ -64,7 +64,7 @@ export function useDmVttPlacementAndSelection({
         entityId: entity.id,
         name: entity.name,
         avatarUrl: entity.avatarUrl,
-        color: dispositionColor(entity),
+        color: entity.color ?? dispositionColor(entity),
         tokenSize: entity.tokenSize,
         onPlaced: () => {
           setPendingPlacement(null); // SYNCHRONOUS — see comment above.

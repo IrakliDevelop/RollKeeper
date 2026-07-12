@@ -375,6 +375,48 @@ describe('restampCombatantTokens', () => {
     expect(el.zIndex).toBe(COMBATANT_TOKEN_ZINDEX);
   });
 
+  it('uses entity.color for the fill (in place update) when set, overriding disposition color', () => {
+    const ellipse = {
+      ...imageToken,
+      type: 'shape',
+      shape: 'ellipse',
+      src: undefined,
+    };
+    const f = fakeStore([ellipse]);
+    restampCombatantTokens(
+      f.store,
+      entity({ color: '#a855f7', avatarUrl: undefined }),
+      ctx
+    );
+    expect(f.updates).toHaveLength(1);
+    expect(f.updates[0].patch).toMatchObject({ fillColor: '#a855f7' });
+  });
+
+  it('uses entity.color for the fill on remove+re-add (type transition)', () => {
+    const f = fakeStore([imageToken]); // image -> ellipse transition (no avatarUrl)
+    restampCombatantTokens(
+      f.store,
+      entity({ color: '#a855f7', avatarUrl: undefined }),
+      ctx
+    );
+    expect(f.added).toHaveLength(1);
+    expect(f.added[0]).toMatchObject({ fillColor: '#a855f7' });
+  });
+
+  it('falls back to dispositionColor when entity.color is unset', () => {
+    const ellipse = {
+      ...imageToken,
+      type: 'shape',
+      shape: 'ellipse',
+      src: undefined,
+    };
+    const f = fakeStore([ellipse]);
+    restampCombatantTokens(f.store, entity({ tokenSize: 2 }), ctx);
+    expect(f.updates).toHaveLength(1);
+    // entity() defaults to type: 'monster' with no legendaryActions/disposition -> red
+    expect(f.updates[0].patch).toMatchObject({ fillColor: '#C0392B' });
+  });
+
   it('ignores tokens of other entities', () => {
     const f = fakeStore([{ ...imageToken, entityId: 'other' }]);
     restampCombatantTokens(f.store, entity({ tokenSize: 2 }), ctx);

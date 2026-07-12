@@ -85,6 +85,19 @@ describe('stampAtScreenPoint', () => {
     expect(added).toHaveLength(1);
     expect(added[0].position).toEqual({ x: 30, y: 20 }); // world (50,40) - half cell (20,20)
   });
+
+  it('uses entity.color over the disposition color when set', () => {
+    const { vp, added } = fakeViewport();
+    const canvasEl = fakeCanvasEl({ left: 0, top: 0 });
+    const entity = makeEntity({ color: '#a855f7', avatarUrl: undefined });
+
+    stampAtScreenPoint(vp, canvasEl, entity, { x: 10, y: 10 });
+
+    expect(added).toHaveLength(1);
+    expect((added[0] as unknown as { fillColor?: string }).fillColor).toBe(
+      '#a855f7'
+    );
+  });
 });
 
 describe('useRosterDrag', () => {

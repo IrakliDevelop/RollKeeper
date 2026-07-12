@@ -196,7 +196,7 @@ export function restampCombatantTokens(
               zIndex: COMBATANT_TOKEN_ZINDEX,
             }
           : {
-              fillColor: dispositionColor(entity),
+              fillColor: entity.color ?? dispositionColor(entity),
               size: { w: size, h: size },
               position,
               zIndex: COMBATANT_TOKEN_ZINDEX,
@@ -216,7 +216,7 @@ export function restampCombatantTokens(
             position,
             size: { w: size, h: size },
             shape: 'ellipse',
-            fillColor: dispositionColor(entity),
+            fillColor: entity.color ?? dispositionColor(entity),
             strokeColor: '#1e293b',
             strokeWidth: 2,
             layerId,

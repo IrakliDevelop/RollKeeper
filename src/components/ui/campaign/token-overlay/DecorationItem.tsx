@@ -2,6 +2,8 @@
 
 import { getHpTierBarColor, getHpTierTextColor } from '@/utils/hpColor';
 
+import { DeadGlyph, PieceGlyph } from './TokenGlyphs';
+
 import type { DecoratedTokenRect } from './TokenDecorationLayer.hooks';
 import type {
   TokenDecoration,
@@ -50,25 +52,6 @@ function InTokenBar({
         className={`block h-full ${getHpTierBarColor(hp.tier)}`}
         style={{ width: `${hp.percent}%` }}
       />
-    </span>
-  );
-}
-
-/** Skull glyph centered inside the token rect for a dead entity. */
-function DeadGlyph({ rect, cell }: { rect: DecoratedTokenRect; cell: number }) {
-  return (
-    <span
-      className="absolute flex items-center justify-center"
-      style={{
-        left: rect.x,
-        top: rect.y,
-        width: rect.w,
-        height: rect.h,
-        fontSize: cell * 0.3,
-        lineHeight: 1,
-      }}
-    >
-      ☠️
     </span>
   );
 }
@@ -158,6 +141,9 @@ export function DecorationItem({
       {deco.isDead && <DeadGlyph rect={rect} cell={cell} />}
       {showBar && (
         <InTokenBar rect={rect} cell={cell} hp={deco.hp as BarLikeHp} />
+      )}
+      {!deco.isDead && deco.chessPiece && (
+        <PieceGlyph rect={rect} deco={deco} />
       )}
       {shouldShowChipRow && <ChipRow rect={rect} cell={cell} deco={deco} />}
     </div>

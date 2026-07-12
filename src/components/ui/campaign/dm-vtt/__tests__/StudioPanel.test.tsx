@@ -288,6 +288,103 @@ describe('StudioPanel', () => {
     });
   });
 
+  it('clicking a chess piece calls the handler with { chessPiece }', () => {
+    const onTokenIdentityChange = vi.fn();
+    render(
+      <StudioPanel
+        {...baseProps({
+          activeTab: 'selected',
+          selectedEntityId: 'm1',
+          onTokenIdentityChange,
+        })}
+      />
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Rook' }));
+    expect(onTokenIdentityChange).toHaveBeenCalledWith(goblin1, {
+      chessPiece: 'rook',
+    });
+  });
+
+  it('clicking the selected chess piece again clears it ({ chessPiece: undefined })', () => {
+    const onTokenIdentityChange = vi.fn();
+    render(
+      <StudioPanel
+        {...baseProps({
+          encounter: makeEncounter({
+            entities: [aria, { ...goblin1, chessPiece: 'rook' }, goblin2],
+          }),
+          activeTab: 'selected',
+          selectedEntityId: 'm1',
+          onTokenIdentityChange,
+        })}
+      />
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Rook' }));
+    expect(onTokenIdentityChange).toHaveBeenCalledWith(
+      { ...goblin1, chessPiece: 'rook' },
+      { chessPiece: undefined }
+    );
+  });
+
+  it('clicking "None" clears the chess piece ({ chessPiece: undefined })', () => {
+    const onTokenIdentityChange = vi.fn();
+    render(
+      <StudioPanel
+        {...baseProps({
+          encounter: makeEncounter({
+            entities: [aria, { ...goblin1, chessPiece: 'rook' }, goblin2],
+          }),
+          activeTab: 'selected',
+          selectedEntityId: 'm1',
+          onTokenIdentityChange,
+        })}
+      />
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'None' }));
+    expect(onTokenIdentityChange).toHaveBeenCalledWith(
+      { ...goblin1, chessPiece: 'rook' },
+      { chessPiece: undefined }
+    );
+  });
+
+  it('clicking a color swatch calls the handler with { color }', () => {
+    const onTokenIdentityChange = vi.fn();
+    render(
+      <StudioPanel
+        {...baseProps({
+          activeTab: 'selected',
+          selectedEntityId: 'm1',
+          onTokenIdentityChange,
+        })}
+      />
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Red' }));
+    expect(onTokenIdentityChange).toHaveBeenCalledWith(goblin1, {
+      color: '#ef4444',
+    });
+  });
+
+  it('clicking "Clear" on colors sends { color: undefined }', () => {
+    const onTokenIdentityChange = vi.fn();
+    render(
+      <StudioPanel
+        {...baseProps({
+          encounter: makeEncounter({
+            entities: [aria, { ...goblin1, color: '#ef4444' }, goblin2],
+          }),
+          activeTab: 'selected',
+          selectedEntityId: 'm1',
+          onTokenIdentityChange,
+        })}
+      />
+    );
+    fireEvent.click(screen.getByRole('radio', { name: 'Clear' }));
+    expect(onTokenIdentityChange).toHaveBeenCalledWith(
+      { ...goblin1, color: '#ef4444' },
+      { color: undefined }
+    );
+  });
+
   it('does not render the Token settings section when onTokenIdentityChange is absent', () => {
     render(
       <StudioPanel

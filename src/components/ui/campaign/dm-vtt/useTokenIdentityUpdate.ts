@@ -23,7 +23,10 @@ export function useTokenIdentityUpdate({
   return useCallback(
     (
       entity: EncounterEntity,
-      updates: Pick<EncounterEntity, 'avatarUrl' | 'tokenSize'>
+      updates: Pick<
+        EncounterEntity,
+        'avatarUrl' | 'tokenSize' | 'chessPiece' | 'color'
+      >
     ) => {
       if (!encounterId) return;
       updateEntity(encounterId, entity.id, updates);

@@ -57,4 +57,20 @@ describe('useDmTokenDecorations', () => {
     );
     expect(result.current.size).toBe(0);
   });
+
+  it('carries chessPiece and color through as chessPiece/pieceColor', () => {
+    const { result } = renderHook(() =>
+      useDmTokenDecorations([entity({ chessPiece: 'rook', color: '#a855f7' })])
+    );
+    const d = result.current.get('e1');
+    expect(d?.chessPiece).toBe('rook');
+    expect(d?.pieceColor).toBe('#a855f7');
+  });
+
+  it('leaves chessPiece/pieceColor undefined when unset', () => {
+    const { result } = renderHook(() => useDmTokenDecorations([entity({})]));
+    const d = result.current.get('e1');
+    expect(d?.chessPiece).toBeUndefined();
+    expect(d?.pieceColor).toBeUndefined();
+  });
 });
