@@ -106,6 +106,9 @@ export type ChessPiece =
 // disguised as an ally until the DM reveals the twist).
 export type PlayerDisposition = 'ally' | 'enemy' | 'neutral';
 
+/** Token side length in grid cells: Tiny/Small/Medium 1, Large 2, Huge 3, Gargantuan 4. */
+export type TokenCellSize = 1 | 2 | 3 | 4;
+
 export interface EncounterEntity {
   id: string;
   type: EntityType;
@@ -166,6 +169,7 @@ export interface EncounterEntity {
   playerAlias?: string; // Optional name players see instead (DM-controlled entities); takes precedence over the hidden generic label
   playerDisposition?: PlayerDisposition; // Allegiance players see (disguise); defaults to enemy for non-players
   chessPiece?: ChessPiece; // Chess piece icon for map correlation
+  tokenSize?: TokenCellSize; // Battle-map token footprint; absent = 1 (no migration needed)
 
   // Player sync reference
   playerCharacterId?: string; // Link to playerStore character

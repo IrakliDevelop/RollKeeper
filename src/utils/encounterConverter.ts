@@ -5,6 +5,7 @@ import {
   MonsterStatBlock,
   LegendaryActionPool,
   MonsterSpellcasting,
+  TokenCellSize,
 } from '@/types/encounter';
 
 function generateId(): string {
@@ -214,6 +215,20 @@ function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
 
+/** 5eTools size code → token cells: T/S/M 1, L 2, H 3, G 4 (unknown → 1). */
+export function sizeCodeToTokenCells(code: string | undefined): TokenCellSize {
+  switch (code) {
+    case 'L':
+      return 2;
+    case 'H':
+      return 3;
+    case 'G':
+      return 4;
+    default:
+      return 1;
+  }
+}
+
 /**
  * Build a full stat block from a ProcessedMonster for display in the encounter tracker.
  */
@@ -298,6 +313,7 @@ export function monsterToEncounterEntity(
     spellcasting: buildMonsterSpellcasting(monster),
     color: options?.color,
     isHidden: false,
+    tokenSize: sizeCodeToTokenCells(monster.size[0]),
   };
 }
 

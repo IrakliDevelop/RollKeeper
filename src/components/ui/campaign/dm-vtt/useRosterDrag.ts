@@ -71,6 +71,7 @@ export function stampAtScreenPoint(
     name: entity.name,
     avatarUrl: entity.avatarUrl,
     color: dispositionColor(entity),
+    tokenSize: entity.tokenSize,
   };
   stampCombatantToken(config, world, vp.toolContext);
 }
