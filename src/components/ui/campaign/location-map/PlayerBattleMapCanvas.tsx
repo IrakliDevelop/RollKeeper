@@ -51,6 +51,7 @@ import {
   tokenAvatarUrl,
   buildCircularTokenUrl,
 } from './PlayerTokenTool';
+import { useOwnTokenPresent } from './useOwnTokenPresent';
 import {
   SpellTemplateTool,
   type SpellTemplateConfig,
@@ -113,30 +114,42 @@ function PlayerToolbar({
   hasSelection,
   onDeleteSelected,
   tokenInfoToggle,
+  characterId,
 }: {
   status: BattleMapConnectionStatus;
   hasSelection: boolean;
   onDeleteSelected: () => void;
   tokenInfoToggle?: { mode: TokenInfoMode; onCycle: () => void };
+  characterId: string;
 }) {
   const [activeTool, setTool] = useActiveTool();
   const TokenInfoIcon = tokenInfoToggle
     ? TOKEN_INFO_ICON[tokenInfoToggle.mode]
     : null;
+  const hasOwnToken = useOwnTokenPresent(characterId);
+  const needsTokenHint =
+    status === 'live' && !hasOwnToken && activeTool !== 'token';
   return (
     <div className="bg-surface-raised border-divider absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border p-1 shadow-lg">
-      {PLAYER_TOOLS.map(({ name, label, Icon }) => (
-        <Button
-          key={name}
-          variant={activeTool === name ? 'primary' : 'ghost'}
-          onClick={() => setTool(name)}
-          className="min-h-[44px] min-w-[44px] p-0"
-          title={label}
-          aria-label={label}
-        >
-          <Icon size={16} />
-        </Button>
-      ))}
+      {PLAYER_TOOLS.map(({ name, label, Icon }) => {
+        const isTokenHint = name === 'token' && needsTokenHint;
+        return (
+          <Button
+            key={name}
+            variant={activeTool === name ? 'primary' : 'ghost'}
+            onClick={() => setTool(name)}
+            className={`min-h-[44px] min-w-[44px] p-0${
+              isTokenHint
+                ? 'bg-accent-emerald-bg text-accent-emerald-text animate-pulse'
+                : ''
+            }`}
+            title={isTokenHint ? 'Place your token on the map' : label}
+            aria-label={isTokenHint ? 'Place your token on the map' : label}
+          >
+            <Icon size={16} />
+          </Button>
+        );
+      })}
       {hasSelection && (
         <Button
           variant="danger"
@@ -342,6 +355,7 @@ export function PlayerBattleMapCanvas({
             hasSelection={hasSelection}
             onDeleteSelected={handleDeleteSelected}
             tokenInfoToggle={tokenInfoToggle}
+            characterId={characterId}
           />
         )}
         {viewport && (
