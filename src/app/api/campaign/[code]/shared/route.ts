@@ -171,8 +171,11 @@ export async function POST(
 
     const { feature, data, dmId } = body;
 
-    // null is a valid payload (initiativeRequest uses it to clear); only undefined is missing.
-    if (!feature || data === undefined) {
+    // null is a valid payload ONLY for initiativeRequest (it means "clear the
+    // request"); every other feature requires a real object — a null would crash
+    // the feature branches that destructure data. undefined is always missing.
+    const allowsNullData = feature === 'initiativeRequest';
+    if (!feature || data === undefined || (data === null && !allowsNullData)) {
       return NextResponse.json(
         { error: 'feature and data are required' },
         { status: 400 }

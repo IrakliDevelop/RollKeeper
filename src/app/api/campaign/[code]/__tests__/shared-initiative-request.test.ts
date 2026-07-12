@@ -89,4 +89,16 @@ describe('shared route — initiativeRequest feature', () => {
     );
     expect((await get.json()).initiativeRequest).toBeNull();
   });
+
+  it('still rejects data: null for other features with 400', async () => {
+    const req = createNextRequest('/api/campaign/ABC123/shared', {
+      method: 'POST',
+      body: { feature: 'message', data: null, dmId: 'dm-1' },
+    });
+    const res = await POST(
+      req as NextRequest,
+      createRouteParams({ code: 'ABC123' })
+    );
+    expect(res.status).toBe(400);
+  });
 });
