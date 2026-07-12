@@ -152,6 +152,29 @@ describe('useDmVttScreen', () => {
     });
   });
 
+  it('armPlacement uses entity.color over the disposition color when set', () => {
+    seed();
+    const { result } = renderHook(() =>
+      useDmVttScreen({ campaignCode: 'ABC', battleMapId: 'bm-1', dmId: 'dm-1' })
+    );
+
+    act(() => result.current.onStatus('live'));
+    act(() =>
+      result.current.armPlacement(
+        createMockEncounterEntity({
+          id: 'known-1',
+          name: 'Aria',
+          type: 'player',
+          color: '#a855f7',
+        })
+      )
+    );
+
+    expect(result.current.pendingPlacement?.config).toMatchObject({
+      color: '#a855f7',
+    });
+  });
+
   it('config.onPlaced clears pending SYNCHRONOUSLY and selects the entity', () => {
     seed();
     const { result } = renderHook(() =>

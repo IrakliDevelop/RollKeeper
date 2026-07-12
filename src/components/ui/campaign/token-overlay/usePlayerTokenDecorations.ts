@@ -71,6 +71,8 @@ export function usePlayerTokenDecorations(
         name: entry.displayName,
         hp: hpViewFor(entry, initiative.enemyHpMode),
         isDead: entry.isDead ?? false,
+        chessPiece: entry.chessPiece,
+        pieceColor: entry.tokenColor,
       };
       map.set(entry.entityId, deco);
       if (entry.playerCharacterId) map.set(entry.playerCharacterId, deco);

@@ -5,6 +5,8 @@ import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 
+import { TokenAppearanceRow } from './TokenAppearanceRow';
+
 import type { EncounterEntity, TokenCellSize } from '@/types/encounter';
 
 const SIZES: { cells: TokenCellSize; label: string }[] = [
@@ -16,7 +18,12 @@ const SIZES: { cells: TokenCellSize; label: string }[] = [
 
 export interface TokenSettingsProps {
   entity: EncounterEntity;
-  onChange: (updates: Pick<EncounterEntity, 'avatarUrl' | 'tokenSize'>) => void;
+  onChange: (
+    updates: Pick<
+      EncounterEntity,
+      'avatarUrl' | 'tokenSize' | 'chessPiece' | 'color'
+    >
+  ) => void;
 }
 
 /** Studio-panel section: entity portrait (URL or upload) + token footprint. */
@@ -98,6 +105,7 @@ export function TokenSettings({ entity, onChange }: TokenSettingsProps) {
           Upload failed — check S3 config or try a URL.
         </p>
       )}
+      <TokenAppearanceRow entity={entity} onChange={onChange} />
       <div
         className="flex items-center gap-1"
         role="radiogroup"

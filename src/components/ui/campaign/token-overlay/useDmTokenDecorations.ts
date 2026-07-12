@@ -26,6 +26,8 @@ export function useDmTokenDecorations(
           tier: hpTier(percent),
         },
         isDead: e.currentHp <= 0,
+        chessPiece: e.chessPiece,
+        pieceColor: e.color,
       };
       map.set(e.id, deco);
       if (e.playerCharacterId) map.set(e.playerCharacterId, deco);

@@ -129,4 +129,24 @@ describe('usePlayerTokenDecorations', () => {
     );
     expect(result.current.get('e1')?.isDead).toBe(true);
   });
+
+  it('maps chessPiece and tokenColor to chessPiece/pieceColor', () => {
+    const { result } = renderHook(() =>
+      usePlayerTokenDecorations(
+        state('off', [enemy({ chessPiece: 'bishop', tokenColor: '#22c55e' })])
+      )
+    );
+    const d = result.current.get('e1');
+    expect(d?.chessPiece).toBe('bishop');
+    expect(d?.pieceColor).toBe('#22c55e');
+  });
+
+  it('leaves chessPiece/pieceColor undefined when absent', () => {
+    const { result } = renderHook(() =>
+      usePlayerTokenDecorations(state('off', [enemy({})]))
+    );
+    const d = result.current.get('e1');
+    expect(d?.chessPiece).toBeUndefined();
+    expect(d?.pieceColor).toBeUndefined();
+  });
 });

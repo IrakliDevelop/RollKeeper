@@ -26,7 +26,10 @@ export interface StudioPanelProps {
   /** Persist portrait/size edits + restamp placed tokens (Selected tab section). */
   onTokenIdentityChange?: (
     entity: EncounterEntity,
-    updates: Pick<EncounterEntity, 'avatarUrl' | 'tokenSize'>
+    updates: Pick<
+      EncounterEntity,
+      'avatarUrl' | 'tokenSize' | 'chessPiece' | 'color'
+    >
   ) => void;
 }
 

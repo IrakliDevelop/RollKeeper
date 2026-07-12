@@ -1,6 +1,6 @@
 import type { CalendarConfig, WeatherType } from './calendar';
 import type { InventoryItem } from './character';
-import type { EnemyHpDisplay } from './encounter';
+import type { ChessPiece, EnemyHpDisplay } from './encounter';
 
 // Stored in Redis — DM's calendar data (events stay local, not synced)
 export interface SharedCalendar {
@@ -71,6 +71,11 @@ export interface SharedTurnEntry {
   hpTier?: 'high' | 'mid' | 'low' | 'critical';
   isDead?: boolean; // current HP <= 0 (players always; enemies when HP is shared)
   disposition?: 'ally' | 'enemy' | 'neutral'; // player-facing allegiance (non-players)
+  // DM-assigned map-correlation identity — lets players match a token on the
+  // battle map to its initiative row even when the entity is a hidden enemy;
+  // that correlation is the whole purpose, so it's safe to always share.
+  chessPiece?: ChessPiece;
+  tokenColor?: string;
 }
 
 // Initiative/turn state pushed by the DM, read by players

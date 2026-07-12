@@ -194,6 +194,43 @@ describe('buildSharedInitiative', () => {
     expect(buildSharedInitiative(enc).turnOrder[0].displayName).toBe('Aragorn');
   });
 
+  it('includes chessPiece and tokenColor when set, for players and non-players alike', () => {
+    const enc = encounter([
+      entity({
+        id: 'p',
+        name: 'Aragorn',
+        type: 'player',
+        initiative: 20,
+        playerCharacterId: 'char-a',
+        chessPiece: 'king',
+        color: '#a855f7',
+      }),
+      entity({
+        id: 'm',
+        name: 'Goblin',
+        initiative: 5,
+        isHidden: true,
+        chessPiece: 'pawn',
+        color: '#ef4444',
+      }),
+    ]);
+    const rows = buildSharedInitiative(enc).turnOrder;
+    const player = rows.find(r => r.entityId === 'p')!;
+    const monster = rows.find(r => r.entityId === 'm')!;
+    expect(player.chessPiece).toBe('king');
+    expect(player.tokenColor).toBe('#a855f7');
+    expect(monster.chessPiece).toBe('pawn');
+    expect(monster.tokenColor).toBe('#ef4444');
+    expect(monster.displayName).toBe('Enemy'); // still hidden — identity is separate
+  });
+
+  it('omits chessPiece/tokenColor when unset', () => {
+    const enc = encounter([entity({ id: 'm', name: 'Goblin', initiative: 5 })]);
+    const row = buildSharedInitiative(enc).turnOrder[0];
+    expect(row.chessPiece).toBeUndefined();
+    expect(row.tokenColor).toBeUndefined();
+  });
+
   it('includes HP for player entities only', () => {
     const enc = encounter([
       entity({

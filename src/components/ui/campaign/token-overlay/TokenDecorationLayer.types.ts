@@ -1,3 +1,4 @@
+import type { ChessPiece } from '@/types/encounter';
 import type { HpTier } from '@/utils/hpState';
 
 /** Token decoration visibility: full (bar + chips), compact (bar only), off (nothing). */
@@ -22,4 +23,8 @@ export interface TokenDecoration {
   hp?: TokenHpView;
   /** Dim the decoration and replace the HP row with a skull glyph. */
   isDead?: boolean;
+  /** Chess piece icon for map correlation — omit → no piece glyph. */
+  chessPiece?: ChessPiece;
+  /** Piece tint; falls back to a neutral color when omitted. */
+  pieceColor?: string;
 }
