@@ -12,6 +12,7 @@ import { useDmVttGrid } from './useDmVttGrid';
 import { useDmVttInitiative } from './useDmVttInitiative';
 import { useDmVttPlacementAndSelection } from './useDmVttPlacementAndSelection';
 import { useDmVttRoster } from './useDmVttRoster';
+import { useTokenIdentityUpdate } from './useTokenIdentityUpdate';
 
 import type { Viewport } from '@fieldnotes/core';
 import type { BattleMapConnectionStatus } from '@/lib/battlemapSync';
@@ -115,6 +116,11 @@ export function useDmVttScreen({
     getViewport,
   });
 
+  const updateTokenIdentity = useTokenIdentityUpdate({
+    encounterId: encounter?.id,
+    getViewport,
+  });
+
   return {
     battleMap,
     linkedEncounterIds,
@@ -144,6 +150,7 @@ export function useDmVttScreen({
     startDrag,
     getCanvasEl,
     setGridMode,
+    updateTokenIdentity,
     toasts,
     dismissToast,
     npcDialog: {

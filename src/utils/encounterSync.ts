@@ -85,6 +85,12 @@ export function mergePlayerSyncData(
     source: s.source,
   }));
 
+  // Only http(s) avatars — a base64 data-URL must never reach a synced
+  // ImageElement src (it would ride every sync upsert). Same guard as
+  // tokenAvatarUrl; kept inline to keep this util canvas-agnostic.
+  const avatarUrl =
+    char.avatar && /^https?:\/\//.test(char.avatar) ? char.avatar : undefined;
+
   return {
     currentHp,
     maxHp,
@@ -95,6 +101,7 @@ export function mergePlayerSyncData(
     inspirationCount,
     hasUsedReaction,
     deathSaves,
+    avatarUrl,
     conditions: mergedConditions,
     suppressedConditions:
       updatedSuppressed.length > 0 ? updatedSuppressed : undefined,
@@ -127,6 +134,8 @@ export function hasPlayerDataChanged(
   if (updates.concentrationSpell !== entity.concentrationSpell) return true;
   if (updates.inspirationCount !== entity.inspirationCount) return true;
   if (updates.hasUsedReaction !== entity.hasUsedReaction) return true;
+  if (updates.avatarUrl !== undefined && updates.avatarUrl !== entity.avatarUrl)
+    return true;
 
   // Compare death saves
   if (updates.deathSaves !== undefined || entity.deathSaves !== undefined) {

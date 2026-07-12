@@ -269,4 +269,31 @@ describe('StudioPanel', () => {
     render(<StudioPanel {...baseProps({ followNote: null })} />);
     expect(screen.queryByText(/^Following:/)).not.toBeInTheDocument();
   });
+
+  it('renders the Token settings section on the selected tab when the prop is provided, and calls the handler with the entity + update', () => {
+    const onTokenIdentityChange = vi.fn();
+    render(
+      <StudioPanel
+        {...baseProps({
+          activeTab: 'selected',
+          selectedEntityId: 'm1',
+          onTokenIdentityChange,
+        })}
+      />
+    );
+    expect(screen.getByText('Token')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: 'L 2×2' }));
+    expect(onTokenIdentityChange).toHaveBeenCalledWith(goblin1, {
+      tokenSize: 2,
+    });
+  });
+
+  it('does not render the Token settings section when onTokenIdentityChange is absent', () => {
+    render(
+      <StudioPanel
+        {...baseProps({ activeTab: 'selected', selectedEntityId: 'm1' })}
+      />
+    );
+    expect(screen.queryByText('Token')).not.toBeInTheDocument();
+  });
 });
