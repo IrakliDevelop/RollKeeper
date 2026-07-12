@@ -1,5 +1,8 @@
 import type { HpTier } from '@/utils/hpState';
 
+/** Token decoration visibility: full (bar + chips), compact (bar only), off (nothing). */
+export type TokenInfoMode = 'full' | 'compact' | 'off';
+
 /** How a token's HP renders: bar-only, bar+numbers, or a state chip ("Bloodied"). */
 export type TokenHpView =
   | { kind: 'bar'; percent: number; tier: HpTier }

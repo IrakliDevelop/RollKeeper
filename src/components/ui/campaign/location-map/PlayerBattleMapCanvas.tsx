@@ -19,9 +19,11 @@ import {
   Circle,
   Trash2,
   Eye,
+  Minus,
   EyeOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import type { TokenInfoMode } from '@/components/ui/campaign/token-overlay';
 import {
   FieldNotesCanvas,
   ViewportContext,
@@ -71,8 +73,8 @@ interface PlayerBattleMapCanvasProps {
   spellTemplateConfigRef?: React.MutableRefObject<SpellTemplateConfig | null>;
   /** Hide the built-in back-button (the VTT screen renders its own top-left chrome). */
   hideBackButton?: boolean;
-  /** Show/hide toggle for the token decoration overlay (optional — non-VTT routes render no toggle). */
-  tokenInfoToggle?: { visible: boolean; onToggle: () => void };
+  /** Show/hide/compact toggle for the token decoration overlay (optional — non-VTT routes render no toggle). */
+  tokenInfoToggle?: { mode: TokenInfoMode; onCycle: () => void };
 }
 
 /** Viewport exposes historyRecorder at runtime for batched store ops. */
@@ -94,6 +96,18 @@ const PLAYER_TOOLS: {
   { name: 'template', label: 'Spell template', Icon: Circle },
 ];
 
+const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
+  full: Eye,
+  compact: Minus,
+  off: EyeOff,
+};
+
+const TOKEN_INFO_LABEL: Record<TokenInfoMode, string> = {
+  full: 'Token info: full',
+  compact: 'Token info: compact',
+  off: 'Token info: hidden',
+};
+
 function PlayerToolbar({
   status,
   hasSelection,
@@ -103,9 +117,12 @@ function PlayerToolbar({
   status: BattleMapConnectionStatus;
   hasSelection: boolean;
   onDeleteSelected: () => void;
-  tokenInfoToggle?: { visible: boolean; onToggle: () => void };
+  tokenInfoToggle?: { mode: TokenInfoMode; onCycle: () => void };
 }) {
   const [activeTool, setTool] = useActiveTool();
+  const TokenInfoIcon = tokenInfoToggle
+    ? TOKEN_INFO_ICON[tokenInfoToggle.mode]
+    : null;
   return (
     <div className="bg-surface-raised border-divider absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border p-1 shadow-lg">
       {PLAYER_TOOLS.map(({ name, label, Icon }) => (
@@ -131,20 +148,15 @@ function PlayerToolbar({
           <Trash2 size={16} />
         </Button>
       )}
-      {tokenInfoToggle && (
+      {tokenInfoToggle && TokenInfoIcon && (
         <Button
           variant="ghost"
-          onClick={tokenInfoToggle.onToggle}
+          onClick={tokenInfoToggle.onCycle}
           className="min-h-[44px] min-w-[44px] p-0"
-          title={
-            tokenInfoToggle.visible ? 'Hide token info' : 'Show token info'
-          }
-          aria-label={
-            tokenInfoToggle.visible ? 'Hide token info' : 'Show token info'
-          }
-          aria-pressed={tokenInfoToggle.visible}
+          title={TOKEN_INFO_LABEL[tokenInfoToggle.mode]}
+          aria-label={TOKEN_INFO_LABEL[tokenInfoToggle.mode]}
         >
-          {tokenInfoToggle.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+          <TokenInfoIcon size={16} />
         </Button>
       )}
       <span

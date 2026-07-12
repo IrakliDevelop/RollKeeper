@@ -21,6 +21,8 @@ import {
   type DmTokenConfig,
 } from '@/components/ui/campaign/dm-vtt/combatantToken';
 
+import type { TokenInfoMode } from '@/components/ui/campaign/token-overlay';
+
 export interface DmBattleMapCanvasProps {
   campaignCode: string;
   battleMapId: string;
@@ -32,8 +34,8 @@ export interface DmBattleMapCanvasProps {
   tokenConfigRef: React.MutableRefObject<DmTokenConfig | null>;
   /** Select-tool selection changes (element ids) — Task 8 maps to entities. */
   onSelectionChange?: (selectedIds: string[]) => void;
-  /** Show/hide state for the token decoration layer, surfaced as a toolbar toggle. */
-  tokenInfoToggle: { visible: boolean; onToggle: () => void };
+  /** Show/hide/compact state for the token decoration layer, surfaced as a toolbar toggle. */
+  tokenInfoToggle: { mode: TokenInfoMode; onCycle: () => void };
 }
 
 /** Viewport exposes historyRecorder at runtime for batched store ops. */
