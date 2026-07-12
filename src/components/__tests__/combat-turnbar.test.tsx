@@ -66,6 +66,10 @@ const baseProps = {
   onNextTurn: vi.fn(),
   onPrevTurn: vi.fn(),
   onRollAllInitiatives: vi.fn(),
+  onRequestPlayerRolls: vi.fn(),
+  requestActive: false,
+  waitingNames: [] as string[],
+  canRequestRolls: true,
 };
 
 describe('CombatTurnBar — pre-combat', () => {

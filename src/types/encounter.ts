@@ -193,6 +193,11 @@ export interface Encounter {
 
   // Settings
   sortOrder: 'initiative' | 'manual';
+
+  // Active "roll initiative" request sent to players during setup (null/absent = none).
+  // Persisted so a DM reload keeps the waiting-list; Redis carries the transport copy.
+  pendingInitiativeRequest?: { requestId: string; requestedAt: number } | null;
+
   // Timestamps
   createdAt: string;
   updatedAt: string;

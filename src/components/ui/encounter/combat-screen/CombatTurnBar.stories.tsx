@@ -63,6 +63,10 @@ const baseActions = {
   onNextTurn: fn(),
   onPrevTurn: fn(),
   onRollAllInitiatives: fn(),
+  onRequestPlayerRolls: fn(),
+  requestActive: false,
+  waitingNames: [],
+  canRequestRolls: true,
 };
 
 const meta: Meta<typeof CombatTurnBar> = {

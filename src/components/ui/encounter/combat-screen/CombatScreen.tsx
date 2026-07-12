@@ -22,6 +22,10 @@ export interface CombatScreenProps {
   onNextTurn: () => void;
   onPrevTurn: () => void;
   onRollAllInitiatives: () => void;
+  onRequestPlayerRolls: () => void;
+  requestActive: boolean;
+  waitingNames: string[];
+  canRequestRolls: boolean;
   onRename: (name: string) => void;
   onOpenAdd: () => void;
   onOpenConfig: () => void;
@@ -39,6 +43,10 @@ export function CombatScreen({
   onNextTurn,
   onPrevTurn,
   onRollAllInitiatives,
+  onRequestPlayerRolls,
+  requestActive,
+  waitingNames,
+  canRequestRolls,
   onRename,
   onOpenAdd,
   onOpenConfig,
@@ -90,6 +98,10 @@ export function CombatScreen({
       onNextTurn={onNextTurn}
       onPrevTurn={onPrevTurn}
       onRollAllInitiatives={onRollAllInitiatives}
+      onRequestPlayerRolls={onRequestPlayerRolls}
+      requestActive={requestActive}
+      waitingNames={waitingNames}
+      canRequestRolls={canRequestRolls}
     />
   );
 

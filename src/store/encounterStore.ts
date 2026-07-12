@@ -81,6 +81,10 @@ interface EncounterStoreState {
   rollInitiative: (encounterId: string, entityId: string) => number;
   rollAllInitiatives: (encounterId: string) => void;
   reorderEntities: (encounterId: string, entityIds: string[]) => void;
+  setPendingInitiativeRequest: (
+    encounterId: string,
+    req: { requestId: string; requestedAt: number } | null
+  ) => void;
 
   // HP management
   damageEntity: (encounterId: string, entityId: string, amount: number) => void;
@@ -529,6 +533,20 @@ export const useEncounterStore = create<EncounterStoreState>()(
               updatedAt: new Date().toISOString(),
             };
           }),
+        }));
+      },
+
+      setPendingInitiativeRequest: (encounterId, req) => {
+        set(state => ({
+          encounters: updateEncounterById(
+            state.encounters,
+            encounterId,
+            enc => ({
+              ...enc,
+              pendingInitiativeRequest: req,
+              updatedAt: new Date().toISOString(),
+            })
+          ),
         }));
       },
 
