@@ -7,7 +7,11 @@ import {
   type PointerState,
 } from '@fieldnotes/core';
 import { cellUnit } from './cellUnit';
-import { snapTokenCenter, TOKEN_ELEMENT_ZINDEX } from './tokenSnap';
+import {
+  snapTokenCenter,
+  TOKEN_ELEMENT_ZINDEX,
+  TEMPLATE_ELEMENT_ZINDEX,
+} from './tokenSnap';
 
 export const PLAYER_TOKEN_KIND = 'player';
 
@@ -200,6 +204,21 @@ export class PlayerTokenTool implements Tool {
  * so a follow-up drag adjusts/moves instead of stamping another template.
  */
 export class PlayerTemplateTool extends TemplateTool {
+  onPointerDown(state: PointerState, ctx: ToolContext): void {
+    // The base class's createTemplate call has no zIndex option, so a
+    // manually drag-sized template lands at the default (0) and can paint
+    // under the map image on remote screens — the same tie-break bug
+    // documented at tokenSnap.ts's TOKEN_ELEMENT_ZINDEX. Elevate any newly
+    // created template element after the base handler runs.
+    const existingIds = new Set(ctx.store.getAll().map(el => el.id));
+    super.onPointerDown(state, ctx);
+    for (const el of ctx.store.getAll()) {
+      if (!existingIds.has(el.id) && el.type === 'template') {
+        ctx.store.update(el.id, { zIndex: TEMPLATE_ELEMENT_ZINDEX });
+      }
+    }
+  }
+
   onPointerUp(state: PointerState, ctx: ToolContext): void {
     super.onPointerUp(state, ctx);
     ctx.switchTool?.('select');
