@@ -162,6 +162,9 @@ export function PlayerBattleMapCanvas({
   // Read by the (single, canvas-retained) token tool at placement time;
   // starts as the square avatar and upgrades to the circular render async.
   const tokenSrcRef = useRef<string | null>(tokenAvatarUrl(characterAvatar));
+  // Read at placement time by the (single, canvas-retained) token tool.
+  const characterIdRef = useRef<string | null>(characterId);
+  characterIdRef.current = characterId;
 
   useEffect(() => {
     const avatar = tokenAvatarUrl(characterAvatar);
@@ -188,7 +191,7 @@ export function PlayerBattleMapCanvas({
     return [
       new PlayerHandTool(selectTool),
       selectTool,
-      new PlayerTokenTool(color, tokenSrcRef),
+      new PlayerTokenTool(color, tokenSrcRef, characterIdRef),
       new PencilTool({ color, width: 3 }),
       new ArrowTool({ color, width: 2 }),
       new MeasureTool({ feetPerCell: 5 }),
