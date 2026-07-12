@@ -88,6 +88,10 @@ export function mergePlayerSyncData(
   // Only http(s) avatars — a base64 data-URL must never reach a synced
   // ImageElement src (it would ride every sync upsert). Same guard as
   // tokenAvatarUrl; kept inline to keep this util canvas-agnostic.
+  // Precedence consequence: a player's own http(s) avatar wins over a
+  // DM-set portrait on the next poll; base64/absent avatars omit the key
+  // so DM-set portraits survive. Sync updates never restamp already-placed
+  // tokens — only studio edits do.
   const avatarUrl =
     char.avatar && /^https?:\/\//.test(char.avatar) ? char.avatar : undefined;
 

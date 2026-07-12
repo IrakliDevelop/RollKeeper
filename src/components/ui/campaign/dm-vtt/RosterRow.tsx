@@ -2,6 +2,8 @@
 
 import { dispositionColor } from './combatantToken';
 
+import { tokenAvatarUrl } from '@/components/ui/campaign/location-map/PlayerTokenTool';
+
 import type { PointerEvent } from 'react';
 import type { EncounterEntity } from '@/types/encounter';
 
@@ -30,7 +32,7 @@ export function RosterRow({
 }: RosterRowProps) {
   const color = dispositionColor(entity);
   const firstName = entity.name.split(' ')[0];
-  const isImage = entity.avatarUrl?.startsWith('http') ?? false;
+  const isImage = tokenAvatarUrl(entity.avatarUrl) !== null;
 
   const handleClick = () => {
     if (placed) onSelectEntity(entity.id);

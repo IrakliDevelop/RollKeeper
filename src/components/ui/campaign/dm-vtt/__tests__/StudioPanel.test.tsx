@@ -296,4 +296,45 @@ describe('StudioPanel', () => {
     );
     expect(screen.queryByText('Token')).not.toBeInTheDocument();
   });
+
+  it('resets the portrait input when the selected entity changes (no state bleed)', () => {
+    const entityA = makeEntity({
+      id: 'm1',
+      name: 'Goblin Scout',
+      avatarUrl: 'https://example.com/goblin-a.png',
+    });
+    const entityB = makeEntity({
+      id: 'm2',
+      name: 'Goblin Boss',
+      avatarUrl: undefined,
+    });
+    const onTokenIdentityChange = vi.fn();
+    const { rerender } = render(
+      <StudioPanel
+        {...baseProps({
+          encounter: makeEncounter({ entities: [entityA, entityB] }),
+          activeTab: 'selected',
+          selectedEntityId: 'm1',
+          onTokenIdentityChange,
+        })}
+      />
+    );
+
+    expect(screen.getByLabelText('Portrait URL')).toHaveValue(
+      'https://example.com/goblin-a.png'
+    );
+
+    rerender(
+      <StudioPanel
+        {...baseProps({
+          encounter: makeEncounter({ entities: [entityA, entityB] }),
+          activeTab: 'selected',
+          selectedEntityId: 'm2',
+          onTokenIdentityChange,
+        })}
+      />
+    );
+
+    expect(screen.getByLabelText('Portrait URL')).toHaveValue('');
+  });
 });
