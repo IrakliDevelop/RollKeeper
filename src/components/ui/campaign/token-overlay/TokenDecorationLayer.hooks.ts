@@ -163,13 +163,12 @@ export function useCompactReveal(
       };
     }
 
-    let framePending = false;
+    let frameId: number | null = null;
 
     function handlePointerMove(e: PointerEvent) {
-      if (framePending) return;
-      framePending = true;
-      requestAnimationFrame(() => {
-        framePending = false;
+      if (frameId !== null) return;
+      frameId = requestAnimationFrame(() => {
+        frameId = null;
         const world = toWorldPoint(e.clientX, e.clientY);
         setHoveredId(hitTestRects(rectsRef.current, world.x, world.y));
       });
@@ -185,6 +184,9 @@ export function useCompactReveal(
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerdown', handlePointerDown);
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
     };
   }, [mode]);
 
