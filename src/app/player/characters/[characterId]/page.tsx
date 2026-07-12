@@ -57,6 +57,8 @@ import { RollSummary } from '@/types/dice';
 import NotHydrated from '@/components/ui/feedback/NotHydrated';
 import CharacterHUD from '@/components/ui/character/CharacterHUD';
 import { InitiativePanel } from '@/components/ui/campaign/InitiativePanel';
+import { InitiativeRollPrompt } from '@/components/ui/campaign/InitiativeRollPrompt';
+import { useInitiativePrompt } from '@/components/ui/campaign/useInitiativePrompt';
 import RestDialog from '@/components/ui/character/RestDialog';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
@@ -262,6 +264,13 @@ export default function CharacterSheet() {
     clearPendingTransfer,
   } = useSharedCampaignState(playerSync.campaignCode, characterId);
   const sharedCalendar = sharedState?.calendar ?? null;
+
+  // DM → player "roll for initiative" prompt
+  const initiativePrompt = useInitiativePrompt({
+    campaignCode: playerSync.campaignCode,
+    characterId,
+    sharedState,
+  });
 
   // Auto-save DM messages to notes on arrival so they're never lost
   const savedMessageIdsRef = useRef<Set<string>>(new Set());
@@ -872,6 +881,16 @@ export default function CharacterSheet() {
             isVisible={showCombatBanner}
             onDone={() => setShowCombatBanner(false)}
           />
+
+          {/* DM → player "roll for initiative" request */}
+          {initiativePrompt.showPrompt && initiativePrompt.request && (
+            <InitiativeRollPrompt
+              request={initiativePrompt.request}
+              modifier={character.initiative.value}
+              onSubmit={initiativePrompt.handleSubmit}
+              onDismiss={initiativePrompt.dismiss}
+            />
+          )}
 
           {/* Live battle map banner: full "Join map" until the player joins
               this map; afterwards the initiative panel carries the link, with
