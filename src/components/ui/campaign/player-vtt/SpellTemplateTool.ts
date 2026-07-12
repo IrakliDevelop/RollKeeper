@@ -1,6 +1,7 @@
 import { createTemplate, smartSnap } from '@fieldnotes/core';
 
 import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
+import { TEMPLATE_ELEMENT_ZINDEX } from '@/components/ui/campaign/location-map/tokenSnap';
 
 import type { Point, PointerState, Tool, ToolContext } from '@fieldnotes/core';
 import type { AoeShape } from '@/types/spellAoe';
@@ -18,11 +19,6 @@ export interface SpellTemplateConfig {
 
 const FEET_PER_CELL = 5;
 const SPELL_FILL = '#7C3AB7';
-/** Below tokens (COMBATANT_TOKEN_ZINDEX / TOKEN_ELEMENT_ZINDEX = 1000 in
- * dm-vtt/combatantToken.ts and location-map/tokenSnap.ts), above the map
- * background and drawings (zIndex 0) — see the tie-break bug documented at
- * tokenSnap.ts's TOKEN_ELEMENT_ZINDEX. */
-const TEMPLATE_ZINDEX = 900;
 
 /**
  * One-shot fixed-size AoE placement, armed by the casting flow via the
@@ -76,7 +72,7 @@ export class SpellTemplateTool implements Tool {
       radiusFeet: config.sizeFeet,
       renderStyle: 'geometric',
       layerId: ctx.activeLayerId ?? '',
-      zIndex: TEMPLATE_ZINDEX,
+      zIndex: TEMPLATE_ELEMENT_ZINDEX,
     });
     ctx.store.add(el);
     this.placedId = el.id;

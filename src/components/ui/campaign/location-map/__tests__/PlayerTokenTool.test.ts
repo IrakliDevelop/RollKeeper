@@ -1,6 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
-import { PlayerTokenTool } from '@/components/ui/campaign/location-map/PlayerTokenTool';
-import { TOKEN_ELEMENT_ZINDEX } from '@/components/ui/campaign/location-map/tokenSnap';
+import { TemplateTool } from '@fieldnotes/core';
+import {
+  PlayerTokenTool,
+  PlayerTemplateTool,
+} from '@/components/ui/campaign/location-map/PlayerTokenTool';
+import {
+  TOKEN_ELEMENT_ZINDEX,
+  TEMPLATE_ELEMENT_ZINDEX,
+} from '@/components/ui/campaign/location-map/tokenSnap';
 
 import type {
   CanvasElement,
@@ -10,11 +17,18 @@ import type {
 
 function fakeCtx(overrides: Record<string, unknown> = {}) {
   const added: CanvasElement[] = [];
+  const elements: CanvasElement[] = [];
+  const updates: Array<{ id: string; patch: Record<string, unknown> }> = [];
   const ctx = {
     camera: { screenToWorld: (p: { x: number; y: number }) => p },
     store: {
       add: vi.fn((el: CanvasElement) => {
         added.push(el);
+        elements.push(el);
+      }),
+      getAll: vi.fn(() => elements),
+      update: vi.fn((id: string, patch: Record<string, unknown>) => {
+        updates.push({ id, patch });
       }),
     },
     requestRender: vi.fn(),
@@ -25,7 +39,7 @@ function fakeCtx(overrides: Record<string, unknown> = {}) {
     snapToGrid: false,
     ...overrides,
   } as unknown as ToolContext;
-  return { ctx, added };
+  return { ctx, added, elements, updates };
 }
 
 const down = (x: number, y: number) => ({ x, y }) as PointerState;
@@ -161,5 +175,36 @@ describe('PlayerTokenTool sizing', () => {
     };
     expect(el.characterId).toBeUndefined();
     expect(el.tokenKind).toBeUndefined();
+  });
+});
+
+describe('PlayerTemplateTool zIndex stamping', () => {
+  it('stamps TEMPLATE_ELEMENT_ZINDEX on the newly created template, leaving pre-existing elements untouched', () => {
+    const { ctx, elements, updates } = fakeCtx();
+    const preExisting = {
+      id: 'existing-1',
+      type: 'template',
+    } as unknown as CanvasElement;
+    elements.push(preExisting);
+
+    // The SDK base class has no zIndex option; simulate it creating a new
+    // template element via the store, the way the real onPointerDown does.
+    const spy = vi
+      .spyOn(TemplateTool.prototype, 'onPointerDown')
+      .mockImplementation((_state, c) => {
+        c.store.add({
+          id: 'new-template-1',
+          type: 'template',
+        } as unknown as CanvasElement);
+      });
+
+    const tool = new PlayerTemplateTool();
+    tool.onPointerDown(down(10, 10), ctx);
+
+    expect(updates).toEqual([
+      { id: 'new-template-1', patch: { zIndex: TEMPLATE_ELEMENT_ZINDEX } },
+    ]);
+
+    spy.mockRestore();
   });
 });

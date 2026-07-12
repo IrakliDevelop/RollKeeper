@@ -14,6 +14,9 @@ import type { Point, ToolContext } from '@fieldnotes/core';
  */
 export const TOKEN_ELEMENT_ZINDEX = 1000;
 
+/** Templates paint above the map background, below tokens. */
+export const TEMPLATE_ELEMENT_ZINDEX = 900;
+
 /**
  * Grid-aware token CENTER snap for an N×N-cell footprint.
  *
