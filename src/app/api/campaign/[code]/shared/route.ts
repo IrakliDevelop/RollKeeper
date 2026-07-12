@@ -21,6 +21,7 @@ import type {
   ItemTransfer,
   SharedInitiativeState,
   SharedBattleMapState,
+  InitiativeRollRequest,
 } from '@/types/sharedState';
 
 export async function GET(
@@ -56,6 +57,17 @@ export async function GET(
         typeof battleMapRaw === 'string'
           ? JSON.parse(battleMapRaw)
           : battleMapRaw;
+    }
+
+    const initiativeRequestRaw = await redis.get<string>(
+      campaignSharedKey(code, 'initiativeRequest')
+    );
+    let initiativeRequest: InitiativeRollRequest | null = null;
+    if (initiativeRequestRaw) {
+      initiativeRequest =
+        typeof initiativeRequestRaw === 'string'
+          ? JSON.parse(initiativeRequestRaw)
+          : initiativeRequestRaw;
     }
 
     let calendar: SharedCalendarPlayer | null = null;
@@ -130,6 +142,7 @@ export async function GET(
       transfers,
       initiative,
       battleMap,
+      initiativeRequest,
     };
     return NextResponse.json(state);
   } catch (error) {
@@ -158,7 +171,8 @@ export async function POST(
 
     const { feature, data, dmId } = body;
 
-    if (!feature || !data) {
+    // null is a valid payload (initiativeRequest uses it to clear); only undefined is missing.
+    if (!feature || data === undefined) {
       return NextResponse.json(
         { error: 'feature and data are required' },
         { status: 400 }
@@ -292,7 +306,7 @@ export async function POST(
     // Latency shave: nudge connected battle-map clients to refetch now.
     // Awaited (serverless may drop un-awaited work) but never throws; the
     // adaptive poll remains the guarantee.
-    if (feature === 'initiative') {
+    if (feature === 'initiative' || feature === 'initiativeRequest') {
       await sendInitiativePoke(code, redis);
     }
 
