@@ -9,6 +9,8 @@ import { PlayerBattleMapCanvas } from '@/components/ui/campaign/location-map/Pla
 import { TokenDecorationLayer } from '@/components/ui/campaign/token-overlay';
 import { usePlayerTokenDecorations } from '@/components/ui/campaign/token-overlay/usePlayerTokenDecorations';
 import { useTokenInfoMode } from '@/components/ui/campaign/token-overlay/useTokenInfoToggle';
+import { InitiativeRollPrompt } from '@/components/ui/campaign/InitiativeRollPrompt';
+import { useInitiativePrompt } from '@/components/ui/campaign/useInitiativePrompt';
 import { ToastContainer } from '@/components/ui/feedback/Toast';
 
 import { CastingBanner } from './CastingBanner';
@@ -63,6 +65,11 @@ export function PlayerVttScreen({
   const decorations = usePlayerTokenDecorations(
     sharedState?.initiative ?? null
   );
+  const initiativePrompt = useInitiativePrompt({
+    campaignCode,
+    characterId,
+    sharedState,
+  });
 
   const handlePoke = useCallback(
     (feature: string) => {
@@ -126,6 +133,14 @@ export function PlayerVttScreen({
           onCancelPlacement={cancelPlacement}
         />
         <StatusEffectTray />
+        {initiativePrompt.showPrompt && initiativePrompt.request && (
+          <InitiativeRollPrompt
+            request={initiativePrompt.request}
+            modifier={character.initiative.value}
+            onSubmit={initiativePrompt.handleSubmit}
+            onDismiss={initiativePrompt.dismiss}
+          />
+        )}
       </div>
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </PlayerBattleMapCanvas>
