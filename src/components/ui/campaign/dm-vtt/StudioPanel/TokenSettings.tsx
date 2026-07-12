@@ -23,6 +23,7 @@ export interface TokenSettingsProps {
 export function TokenSettings({ entity, onChange }: TokenSettingsProps) {
   const [url, setUrl] = useState(entity.avatarUrl ?? '');
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const cells = entity.tokenSize ?? 1;
 
@@ -33,6 +34,7 @@ export function TokenSettings({ entity, onChange }: TokenSettingsProps) {
 
   const handleFile = async (file: File) => {
     setUploading(true);
+    setUploadError(false);
     try {
       const formData = new FormData();
       formData.append('file', file, file.name);
@@ -41,12 +43,17 @@ export function TokenSettings({ entity, onChange }: TokenSettingsProps) {
         method: 'POST',
         body: formData,
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        setUploadError(true);
+        return;
+      }
       const data = (await res.json()) as { url?: string };
       if (data.url) {
         setUrl(data.url);
         onChange({ avatarUrl: data.url });
       }
+    } catch {
+      setUploadError(true);
     } finally {
       setUploading(false);
     }
@@ -86,6 +93,11 @@ export function TokenSettings({ entity, onChange }: TokenSettingsProps) {
           }}
         />
       </div>
+      {uploadError && (
+        <p className="text-accent-red-text mt-1 text-xs">
+          Upload failed — check S3 config or try a URL.
+        </p>
+      )}
       <div
         className="flex items-center gap-1"
         role="radiogroup"

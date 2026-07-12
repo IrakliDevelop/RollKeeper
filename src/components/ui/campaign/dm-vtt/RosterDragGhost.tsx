@@ -2,6 +2,8 @@
 
 import { dispositionColor } from './combatantToken';
 
+import { tokenAvatarUrl } from '@/components/ui/campaign/location-map/PlayerTokenTool';
+
 import type { RosterDragState } from './useRosterDrag';
 
 export interface RosterDragGhostProps {
@@ -21,7 +23,7 @@ export function RosterDragGhost({ drag }: RosterDragGhostProps) {
   const { entity, x, y } = drag;
   const color = dispositionColor(entity);
   const firstName = entity.name.split(' ')[0];
-  const isImage = entity.avatarUrl?.startsWith('http') ?? false;
+  const isImage = tokenAvatarUrl(entity.avatarUrl) !== null;
   const cells = entity.tokenSize ?? 1;
 
   return (
