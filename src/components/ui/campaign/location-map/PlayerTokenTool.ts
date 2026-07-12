@@ -9,6 +9,15 @@ import {
 } from '@fieldnotes/core';
 import { cellUnit } from './cellUnit';
 
+export const PLAYER_TOKEN_KIND = 'player';
+
+/** Extra top-level keys stamped on player self-placed tokens (Task 2 stamps
+ * them) — like CombatantTokenKeys, they survive store/export/sync round-trips. */
+export interface PlayerTokenKeys {
+  characterId: string;
+  tokenKind: typeof PLAYER_TOKEN_KIND;
+}
+
 const TOKEN_COLORS = [
   '#ef4444',
   '#3b82f6',
