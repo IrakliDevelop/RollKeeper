@@ -101,7 +101,7 @@ export function mergePlayerSyncData(
     inspirationCount,
     hasUsedReaction,
     deathSaves,
-    avatarUrl,
+    ...(avatarUrl !== undefined ? { avatarUrl } : {}),
     conditions: mergedConditions,
     suppressedConditions:
       updatedSuppressed.length > 0 ? updatedSuppressed : undefined,
