@@ -136,7 +136,11 @@ export function PlayerVttScreen({
         {initiativePrompt.showPrompt && initiativePrompt.request && (
           <InitiativeRollPrompt
             request={initiativePrompt.request}
-            modifier={character.initiative.value}
+            modifier={
+              character.initiative.isOverridden
+                ? character.initiative.value
+                : Math.floor((character.abilities.dexterity - 10) / 2)
+            }
             onSubmit={initiativePrompt.handleSubmit}
             onDismiss={initiativePrompt.dismiss}
           />

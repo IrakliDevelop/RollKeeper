@@ -31,6 +31,7 @@ export function useInitiativeSubmissionSync({
     if (!campaignCode || !encounterId || !requestId || isActive) return;
     let cancelled = false;
 
+    // A failed DELETE re-applies next poll with the SAME absolute total — idempotent, so swallowing is safe.
     const deleteSubmission = (playerId: string) =>
       fetch(
         `/api/campaign/${campaignCode}/initiative-submission?playerId=${encodeURIComponent(playerId)}`,
@@ -46,14 +47,16 @@ export function useInitiativeSubmissionSync({
         const { submissions } = (await res.json()) as {
           submissions: Record<string, InitiativeSubmission>;
         };
+        if (cancelled) return;
         if (!submissions || Object.keys(submissions).length === 0) return;
 
-        // Re-read the freshest encounter at apply time.
+        // Re-read the freshest encounter (and requestId) at apply time.
         const live = useEncounterStore.getState().getEncounter(encounterId);
-        if (!live) return;
+        const liveRequestId = live?.pendingInitiativeRequest?.requestId;
+        if (!live || !liveRequestId) return;
         const { apply, discard } = resolveSubmissionTargets(
           submissions,
-          { requestId, encounterId },
+          { requestId: liveRequestId, encounterId },
           live
         );
         for (const a of apply) {
