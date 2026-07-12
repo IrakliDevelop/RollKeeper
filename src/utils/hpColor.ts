@@ -26,3 +26,21 @@ export function getHpTierTextColor(tier: HpTier): string {
       return 'text-accent-red-text';
   }
 }
+
+/**
+ * Bar-fill class for a coarse health tier. Raw Tailwind colors are the
+ * established precedent for HP-bar fills (see getHpBarColor above) — these
+ * are canvas-adjacent paint, not themed UI chrome.
+ */
+export function getHpTierBarColor(tier: HpTier): string {
+  switch (tier) {
+    case 'high':
+      return 'bg-green-600 dark:bg-green-500';
+    case 'mid':
+      return 'bg-amber-500 dark:bg-amber-400';
+    case 'low':
+      return 'bg-orange-500 dark:bg-orange-400';
+    case 'critical':
+      return 'bg-red-600 dark:bg-red-500';
+  }
+}

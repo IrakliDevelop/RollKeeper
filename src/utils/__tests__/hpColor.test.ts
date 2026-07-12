@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getHpBarColor } from '../hpColor';
+import { getHpBarColor, getHpTierBarColor } from '../hpColor';
 
 describe('getHpBarColor', () => {
   it('is green above 50%', () => {
@@ -16,5 +16,16 @@ describe('getHpBarColor', () => {
 
   it('falls back to a neutral token when max is 0', () => {
     expect(getHpBarColor(0, 0)).toBe('bg-surface-secondary');
+  });
+});
+
+describe('getHpTierBarColor', () => {
+  it('maps each tier to a distinct bar fill', () => {
+    const classes = (['high', 'mid', 'low', 'critical'] as const).map(
+      getHpTierBarColor
+    );
+    expect(new Set(classes).size).toBe(4);
+    expect(classes[0]).toContain('green');
+    expect(classes[3]).toContain('red');
   });
 });
