@@ -1,13 +1,13 @@
 import {
   createImage,
   createShape,
-  smartSnap,
   TemplateTool,
   type Tool,
   type ToolContext,
   type PointerState,
 } from '@fieldnotes/core';
 import { cellUnit } from './cellUnit';
+import { snapTokenCenter } from './tokenSnap';
 
 export const PLAYER_TOKEN_KIND = 'player';
 
@@ -150,7 +150,7 @@ export class PlayerTokenTool implements Tool {
 
   onPointerDown(state: PointerState, ctx: ToolContext): void {
     const world = ctx.camera.screenToWorld({ x: state.x, y: state.y });
-    const center = smartSnap(world, ctx);
+    const center = snapTokenCenter(world, 1, ctx);
     const size = cellUnit(ctx);
     const src = this.srcRef.current;
 

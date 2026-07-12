@@ -1,6 +1,8 @@
-import { createImage, createShape, smartSnap } from '@fieldnotes/core';
+import { createImage, createShape } from '@fieldnotes/core';
 
 import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
+import { tokenAvatarUrl } from '@/components/ui/campaign/location-map/PlayerTokenTool';
+import { snapTokenCenter } from '@/components/ui/campaign/location-map/tokenSnap';
 
 import type {
   CanvasElement,
@@ -9,7 +11,7 @@ import type {
   Tool,
   ToolContext,
 } from '@fieldnotes/core';
-import type { EncounterEntity } from '@/types/encounter';
+import type { EncounterEntity, TokenCellSize } from '@/types/encounter';
 
 export const COMBATANT_TOKEN_KIND = 'combatant';
 
@@ -46,38 +48,41 @@ export interface DmTokenConfig {
   name: string;
   avatarUrl?: string;
   color: string;
+  /** Footprint in cells (Large=2 …); absent = 1. */
+  tokenSize?: TokenCellSize;
   /** Fired once after placement (tool has handed back to select). */
   onPlaced: () => void;
 }
 
-/** Stamps a grid-snapped one-cell combatant token and adds it to the store. */
+/** Stamps a grid-snapped, creature-size-aware combatant token and adds it to the store. */
 export function stampCombatantToken(
   config: Omit<DmTokenConfig, 'onPlaced'>,
   world: Point,
   ctx: ToolContext
 ): CanvasElement {
-  const center = smartSnap(world, ctx);
-  const size = cellUnit(ctx);
+  const cells = config.tokenSize ?? 1;
+  const center = snapTokenCenter(world, cells, ctx);
+  const size = cells * cellUnit(ctx);
   const position = { x: center.x - size / 2, y: center.y - size / 2 };
   const layerId = ctx.activeLayerId ?? '';
+  const src = tokenAvatarUrl(config.avatarUrl);
 
-  const base =
-    config.avatarUrl && config.avatarUrl.startsWith('http')
-      ? createImage({
-          position,
-          size: { w: size, h: size },
-          src: config.avatarUrl,
-          layerId,
-        })
-      : createShape({
-          position,
-          size: { w: size, h: size },
-          shape: 'ellipse',
-          fillColor: config.color,
-          strokeColor: '#1e293b',
-          strokeWidth: 2,
-          layerId,
-        });
+  const base = src
+    ? createImage({
+        position,
+        size: { w: size, h: size },
+        src,
+        layerId,
+      })
+    : createShape({
+        position,
+        size: { w: size, h: size },
+        shape: 'ellipse',
+        fillColor: config.color,
+        strokeColor: '#1e293b',
+        strokeWidth: 2,
+        layerId,
+      });
 
   const token: CanvasElement & CombatantTokenKeys = {
     ...base,

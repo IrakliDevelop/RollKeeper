@@ -104,6 +104,24 @@ describe('PlayerTokenTool sizing', () => {
     expect(el.tokenKind).toBe('player');
   });
 
+  it('centers the token in the CELL on square grids (not the old four-cell intersection)', () => {
+    const { ctx, added } = fakeCtx({ snapToGrid: true });
+    const tool = new PlayerTokenTool(
+      '#12855C',
+      { current: null },
+      { current: 'char-1' }
+    );
+    tool.onPointerDown(down(55, 70), ctx);
+    const el = added[0] as CanvasElement & {
+      position?: { x: number; y: number };
+      size?: { w: number; h: number };
+    };
+    // cell (40,40)-(80,80) center is (60,60); one-cell size is 40 → position
+    // is the center minus half the size.
+    expect(el.size).toEqual({ w: 40, h: 40 });
+    expect(el.position).toEqual({ x: 40, y: 40 });
+  });
+
   it('places an unstamped token when no characterId is known', () => {
     const { ctx, added } = fakeCtx();
     const tool = new PlayerTokenTool(

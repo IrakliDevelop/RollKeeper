@@ -22,6 +22,7 @@ export function RosterDragGhost({ drag }: RosterDragGhostProps) {
   const color = dispositionColor(entity);
   const firstName = entity.name.split(' ')[0];
   const isImage = entity.avatarUrl?.startsWith('http') ?? false;
+  const cells = entity.tokenSize ?? 1;
 
   return (
     <div
@@ -45,6 +46,11 @@ export function RosterDragGhost({ drag }: RosterDragGhostProps) {
       </span>
       <span className="text-heading text-xs font-medium whitespace-nowrap">
         {firstName}
+        {cells > 1 && (
+          <span className="text-muted ml-1">
+            {cells}×{cells}
+          </span>
+        )}
       </span>
     </div>
   );

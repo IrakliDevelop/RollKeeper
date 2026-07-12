@@ -115,6 +115,74 @@ describe('stampCombatantToken', () => {
     const el = added[0] as CanvasElement & { size?: { w: number } };
     expect(el.size?.w).toBeCloseTo(Math.sqrt(3) * 40, 6);
   });
+
+  it('a 1×1 token centers in the CELL (not the old four-cell intersection)', () => {
+    const { ctx, added } = fakeCtx({ snapToGrid: true });
+    stampCombatantToken(
+      { entityId: 'e4', name: 'Goblin', color: '#C0392B' },
+      { x: 55, y: 70 },
+      ctx
+    );
+    const el = added[0] as CanvasElement & {
+      position?: { x: number; y: number };
+      size?: { w: number; h: number };
+    };
+    // cell (40,40)-(80,80) center is (60,60); one-cell size is 40 → position
+    // is the center minus half the size.
+    expect(el.size).toEqual({ w: 40, h: 40 });
+    expect(el.position).toEqual({ x: 40, y: 40 });
+  });
+
+  it('a 2×2 token (tokenSize: 2) fills 80×80 and centers on the intersection', () => {
+    const { ctx, added } = fakeCtx({ snapToGrid: true });
+    stampCombatantToken(
+      { entityId: 'e5', name: 'Ogre', color: '#C0392B', tokenSize: 2 },
+      { x: 55, y: 70 },
+      ctx
+    );
+    const el = added[0] as CanvasElement & {
+      position?: { x: number; y: number };
+      size?: { w: number; h: number };
+    };
+    // intersection nearest (55,70) is (40,80); 2-cell size is 80 → position
+    // is the intersection minus half the size.
+    expect(el.size).toEqual({ w: 80, h: 80 });
+    expect(el.position).toEqual({ x: 0, y: 40 });
+  });
+
+  it('rejects a base64 data-URL avatar (strict guard) — falls back to ellipse', () => {
+    const { ctx, added } = fakeCtx();
+    stampCombatantToken(
+      {
+        entityId: 'e6',
+        name: 'Sneaky',
+        avatarUrl: 'data:image/png;base64,xyz',
+        color: '#6B7280',
+      },
+      { x: 0, y: 0 },
+      ctx
+    );
+    const el = added[0] as CanvasElement & { shape?: string };
+    expect(el.type).toBe('shape');
+    expect(el.shape).toBe('ellipse');
+  });
+
+  it('rejects a lookalike scheme like httpx:// (sharper than the old startsWith("http") guard) — falls back to ellipse', () => {
+    const { ctx, added } = fakeCtx();
+    stampCombatantToken(
+      {
+        entityId: 'e7',
+        name: 'Sneakier',
+        avatarUrl: 'httpx://evil',
+        color: '#6B7280',
+      },
+      { x: 0, y: 0 },
+      ctx
+    );
+    const el = added[0] as CanvasElement & { shape?: string };
+    expect(el.type).toBe('shape');
+    expect(el.shape).toBe('ellipse');
+  });
 });
 
 describe('isCombatantToken', () => {
