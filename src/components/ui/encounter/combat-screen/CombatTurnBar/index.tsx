@@ -16,6 +16,10 @@ export interface CombatTurnBarProps {
   onNextTurn: () => void;
   onPrevTurn: () => void;
   onRollAllInitiatives: () => void;
+  onRequestPlayerRolls: () => void;
+  requestActive: boolean;
+  waitingNames: string[];
+  canRequestRolls: boolean;
 }
 
 export function CombatTurnBar({
@@ -28,6 +32,10 @@ export function CombatTurnBar({
   onNextTurn,
   onPrevTurn,
   onRollAllInitiatives,
+  onRequestPlayerRolls,
+  requestActive,
+  waitingNames,
+  canRequestRolls,
 }: CombatTurnBarProps): React.JSX.Element {
   return (
     <div className="bg-surface-secondary border-divider flex flex-wrap items-center gap-2 border-b px-4 py-3">
@@ -56,6 +64,10 @@ export function CombatTurnBar({
           encounter={encounter}
           onStartCombat={onStartCombat}
           onRollAllInitiatives={onRollAllInitiatives}
+          onRequestPlayerRolls={onRequestPlayerRolls}
+          requestActive={requestActive}
+          waitingNames={waitingNames}
+          canRequestRolls={canRequestRolls}
         />
       )}
     </div>

@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+} from 'react';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useEncounterStore } from '@/store/encounterStore';
@@ -16,6 +22,7 @@ import { useDmEffectsSync } from '@/hooks/useDmEffectsSync';
 import { useDmCounterSync } from '@/hooks/useDmCounterSync';
 import { useDmInitiativeSync } from '@/hooks/useDmInitiativeSync';
 import { useTurnRequestSync } from '@/hooks/useTurnRequestSync';
+import { useInitiativeSubmissionSync } from '@/hooks/useInitiativeSubmissionSync';
 import { buildSharedInitiative } from '@/utils/buildSharedInitiative';
 import { Button } from '@/components/ui/forms/button';
 import { CombatScreen } from './combat-screen/CombatScreen';
@@ -76,6 +83,7 @@ export function EncounterView({
     useLairAction: expendLairAction,
     setInitiative,
     longRestEntity,
+    setPendingInitiativeRequest,
   } = useEncounterStore();
 
   const { getNPCsForCampaign, getNPC } = useNPCStore();
@@ -89,7 +97,10 @@ export function EncounterView({
 
   const combatConfig = useEncounterStore(state => state.combatConfig);
 
-  const { pushInitiative } = useDmInitiativeSync({ campaignCode, dmId });
+  const { pushInitiative, pushInitiativeRequest } = useDmInitiativeSync({
+    campaignCode,
+    dmId,
+  });
 
   useTurnRequestSync({
     campaignCode,
@@ -97,6 +108,8 @@ export function EncounterView({
     isActive: !!encounter?.isActive,
     // No onApplied: EncounterView has no toast mechanism.
   });
+
+  useInitiativeSubmissionSync({ campaignCode, encounter });
 
   // Push initiative state to Redis whenever turn/round/entities change.
   // Only fires for campaign-linked encounters; safe when encounter is undefined.
@@ -248,6 +261,45 @@ export function EncounterView({
     ]
   );
 
+  const waitingNames = encounter?.pendingInitiativeRequest
+    ? encounter.entities
+        .filter(e => e.type === 'player' && e.initiative === null)
+        .map(e => e.name)
+    : [];
+
+  const handleRequestPlayerRolls = useCallback(() => {
+    if (!encounter || !encounter.campaignCode) return;
+    const req = {
+      requestId: crypto.randomUUID(),
+      encounterId: encounter.id,
+      encounterName: encounter.name,
+      requestedAt: Date.now(),
+    };
+    setPendingInitiativeRequest(encounter.id, {
+      requestId: req.requestId,
+      requestedAt: req.requestedAt,
+    });
+    void pushInitiativeRequest(req);
+  }, [encounter, pushInitiativeRequest, setPendingInitiativeRequest]);
+
+  const handleStartCombat = useCallback(() => {
+    if (encounter?.pendingInitiativeRequest) {
+      setPendingInitiativeRequest(encounterId, null);
+      void pushInitiativeRequest(null);
+      void fetch(`/api/campaign/${campaignCode}/initiative-submission`, {
+        method: 'DELETE',
+      }).catch(() => {});
+    }
+    startCombat(encounterId);
+  }, [
+    encounter?.pendingInitiativeRequest,
+    encounterId,
+    campaignCode,
+    pushInitiativeRequest,
+    setPendingInitiativeRequest,
+    startCombat,
+  ]);
+
   if (!encounter || !actions) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -269,11 +321,15 @@ export function EncounterView({
         customCounterLabel={campaign?.customCounterLabel}
         playerCounterValues={campaign?.playerCounters}
         actions={actions}
-        onStartCombat={() => startCombat(encounterId)}
+        onStartCombat={handleStartCombat}
         onEndCombat={() => endCombat(encounterId)}
         onNextTurn={() => nextTurn(encounterId)}
         onPrevTurn={() => prevTurn(encounterId)}
         onRollAllInitiatives={() => rollAllInitiatives(encounterId)}
+        onRequestPlayerRolls={handleRequestPlayerRolls}
+        requestActive={!!encounter.pendingInitiativeRequest}
+        waitingNames={waitingNames}
+        canRequestRolls={!!encounter.campaignCode}
         onRename={name => updateEncounter(encounterId, { name })}
         onOpenAdd={() => setAddDialogOpen(true)}
         onOpenConfig={() => setConfigOpen(true)}
