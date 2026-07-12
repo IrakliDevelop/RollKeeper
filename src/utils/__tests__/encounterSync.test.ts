@@ -315,6 +315,25 @@ describe('mergePlayerSyncData', () => {
     const result = mergePlayerSyncData(entity, playerData)!;
     expect(result.deathSaves).toBeUndefined();
   });
+
+  it('copies http(s) avatars into avatarUrl and rejects base64', () => {
+    const entity = createMockEncounterEntity({ type: 'player' });
+    const httpData = createMockPlayerData({
+      characterData: createMockCharacterState({
+        avatar: 'https://s3.amazonaws.com/x/a.png',
+      }),
+    });
+    expect(mergePlayerSyncData(entity, httpData)!.avatarUrl).toBe(
+      'https://s3.amazonaws.com/x/a.png'
+    );
+
+    const b64Data = createMockPlayerData({
+      characterData: createMockCharacterState({
+        avatar: 'data:image/png;base64,xyz',
+      }),
+    });
+    expect(mergePlayerSyncData(entity, b64Data)!.avatarUrl).toBeUndefined();
+  });
 });
 
 describe('hasPlayerDataChanged', () => {
@@ -400,6 +419,51 @@ describe('hasPlayerDataChanged', () => {
         armorClass: 15,
         concentrationSpell: undefined,
         conditions: [...conditions],
+      })
+    ).toBe(false);
+  });
+
+  it('returns true when the avatar changed', () => {
+    const entity = createMockEncounterEntity({
+      avatarUrl: undefined,
+      currentHp: 20,
+      maxHp: 20,
+      tempHp: 0,
+      armorClass: 15,
+      concentrationSpell: undefined,
+      conditions: [],
+    });
+    expect(
+      hasPlayerDataChanged(entity, {
+        currentHp: 20,
+        maxHp: 20,
+        tempHp: 0,
+        armorClass: 15,
+        concentrationSpell: undefined,
+        conditions: [],
+        avatarUrl: 'https://s3.amazonaws.com/x/a.png',
+      })
+    ).toBe(true);
+  });
+
+  it('does not flag unchanged when avatarUrl is absent from updates', () => {
+    const entity = createMockEncounterEntity({
+      avatarUrl: 'https://s3.amazonaws.com/x/a.png',
+      currentHp: 20,
+      maxHp: 20,
+      tempHp: 0,
+      armorClass: 15,
+      concentrationSpell: undefined,
+      conditions: [],
+    });
+    expect(
+      hasPlayerDataChanged(entity, {
+        currentHp: 20,
+        maxHp: 20,
+        tempHp: 0,
+        armorClass: 15,
+        concentrationSpell: undefined,
+        conditions: [],
       })
     ).toBe(false);
   });

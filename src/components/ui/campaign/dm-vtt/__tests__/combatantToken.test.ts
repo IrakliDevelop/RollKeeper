@@ -4,15 +4,18 @@ import {
   isCombatantToken,
   dispositionColor,
   stampCombatantToken,
+  restampCombatantTokens,
   DmTokenTool,
   type DmTokenConfig,
 } from '@/components/ui/campaign/dm-vtt/combatantToken';
 
 import type {
   CanvasElement,
+  ElementStore,
   PointerState,
   ToolContext,
 } from '@fieldnotes/core';
+import type { EncounterEntity } from '@/types/encounter';
 
 function fakeCtx(overrides: Record<string, unknown> = {}) {
   const added: CanvasElement[] = [];
@@ -269,5 +272,107 @@ describe('DmTokenTool', () => {
     tool.onDeactivate?.(ctx);
     expect(ctx.store.remove).not.toHaveBeenCalled();
     expect(onPlaced).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('restampCombatantTokens', () => {
+  const ctx = {
+    gridSize: 40,
+    gridType: 'square',
+    snapToGrid: true,
+  } as unknown as ToolContext;
+
+  function fakeStore(seed: Record<string, unknown>[]) {
+    const updates: Array<{ id: string; patch: Record<string, unknown> }> = [];
+    const added: Record<string, unknown>[] = [];
+    const removed: string[] = [];
+    return {
+      store: {
+        getAll: () => seed,
+        update: (id: string, patch: Record<string, unknown>) =>
+          updates.push({ id, patch }),
+        add: (el: Record<string, unknown>) => added.push(el),
+        remove: (id: string) => removed.push(id),
+      } as unknown as ElementStore,
+      updates,
+      added,
+      removed,
+    };
+  }
+
+  const imageToken = {
+    id: 'tok-1',
+    type: 'image',
+    position: { x: 40, y: 40 },
+    size: { w: 40, h: 40 },
+    layerId: 'l1',
+    src: 'https://x/old.png',
+    entityId: 'ent-1',
+    tokenKind: 'combatant',
+  };
+
+  const entity = (o: Partial<EncounterEntity>): EncounterEntity =>
+    ({
+      id: 'ent-1',
+      type: 'monster',
+      name: 'Ogre',
+      currentHp: 30,
+      maxHp: 60,
+      tempHp: 0,
+      armorClass: 11,
+      initiative: null,
+      initiativeModifier: 0,
+      conditions: [],
+      ...o,
+    }) as EncounterEntity;
+
+  it('updates src, size, and re-snapped position in place for same-type', () => {
+    const f = fakeStore([imageToken]);
+    restampCombatantTokens(
+      f.store,
+      entity({ avatarUrl: 'https://x/new.png', tokenSize: 2 }),
+      ctx
+    );
+    expect(f.removed).toHaveLength(0);
+    expect(f.added).toHaveLength(0);
+    expect(f.updates).toHaveLength(1);
+    expect(f.updates[0].id).toBe('tok-1');
+    // old center {60,60}; even footprint snaps to the nearest intersection:
+    // Math.round(60/40)*40 = 80 → center {80,80}, size 80 → position {40,40}
+    expect(f.updates[0].patch).toEqual({
+      src: 'https://x/new.png',
+      size: { w: 80, h: 80 },
+      position: { x: 40, y: 40 },
+    });
+  });
+
+  it('removes + re-adds preserving keys/layer when ellipse gains a portrait', () => {
+    const ellipse = {
+      ...imageToken,
+      type: 'shape',
+      shape: 'ellipse',
+      src: undefined,
+    };
+    const f = fakeStore([ellipse]);
+    restampCombatantTokens(
+      f.store,
+      entity({ avatarUrl: 'https://x/new.png' }),
+      ctx
+    );
+    expect(f.removed).toEqual(['tok-1']);
+    expect(f.added).toHaveLength(1);
+    const el = f.added[0] as Record<string, unknown>;
+    expect(el.type).toBe('image');
+    expect(el.entityId).toBe('ent-1');
+    expect(el.tokenKind).toBe('combatant');
+    expect(el.layerId).toBe('l1');
+  });
+
+  it('ignores tokens of other entities', () => {
+    const f = fakeStore([{ ...imageToken, entityId: 'other' }]);
+    restampCombatantTokens(f.store, entity({ tokenSize: 2 }), ctx);
+    expect(f.updates).toHaveLength(0);
+    expect(f.added).toHaveLength(0);
+    expect(f.removed).toHaveLength(0);
   });
 });

@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/forms/button';
 import { CombatantDetail } from '@/components/ui/encounter/combat-screen/detail/CombatantDetail';
 
 import { InitiativeTab } from './InitiativeTab';
+import { TokenSettings } from './TokenSettings';
 
-import type { Encounter } from '@/types/encounter';
+import type { Encounter, EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
 
 export interface StudioPanelProps {
@@ -22,6 +23,11 @@ export interface StudioPanelProps {
   onToggleCollapsed: () => void;
   /** "Following: {name}" when 2+ linked encounters are active; else null. */
   followNote?: string | null;
+  /** Persist portrait/size edits + restamp placed tokens (Selected tab section). */
+  onTokenIdentityChange?: (
+    entity: EncounterEntity,
+    updates: Pick<EncounterEntity, 'avatarUrl' | 'tokenSize'>
+  ) => void;
 }
 
 const TABS: { key: 'initiative' | 'selected'; icon: string; label: string }[] =
@@ -46,6 +52,7 @@ export function StudioPanel({
   collapsed,
   onToggleCollapsed,
   followNote,
+  onTokenIdentityChange,
 }: StudioPanelProps) {
   if (collapsed) {
     return (
@@ -112,7 +119,17 @@ export function StudioPanel({
             encounterHref={encounterHref}
           />
         ) : selectedEntity ? (
-          <CombatantDetail entity={selectedEntity} actions={actions} />
+          <>
+            <CombatantDetail entity={selectedEntity} actions={actions} />
+            {onTokenIdentityChange && (
+              <TokenSettings
+                entity={selectedEntity}
+                onChange={updates =>
+                  onTokenIdentityChange(selectedEntity, updates)
+                }
+              />
+            )}
+          </>
         ) : (
           <p className="text-muted px-3 py-4 text-xs">
             Select a combatant or token.

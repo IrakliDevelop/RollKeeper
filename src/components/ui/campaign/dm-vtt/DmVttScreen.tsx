@@ -118,6 +118,7 @@ export function DmVttScreen({
             collapsed={studioCollapsed}
             onToggleCollapsed={() => setStudioCollapsed(v => !v)}
             followNote={vtt.followNote}
+            onTokenIdentityChange={vtt.updateTokenIdentity}
           />
         )}
         {vtt.encounter?.isActive && (

@@ -6,6 +6,7 @@ import { snapTokenCenter } from '@/components/ui/campaign/location-map/tokenSnap
 
 import type {
   CanvasElement,
+  ElementStore,
   Point,
   PointerState,
   Tool,
@@ -138,5 +139,78 @@ export class DmTokenTool implements Tool {
       ctx.requestRender();
     }
     ctx.setCursor?.('default');
+  }
+}
+
+/**
+ * Re-applies an entity's portrait/size to its already-placed tokens.
+ * Same element type → narrow store.update (NEVER spread a captured element
+ * into the patch — update() shallow-merges and stale fields would resurrect).
+ * Ellipse↔image transitions → remove + re-add preserving keys/layer/center.
+ */
+export function restampCombatantTokens(
+  store: ElementStore,
+  entity: EncounterEntity,
+  ctx: ToolContext
+): void {
+  const cells = entity.tokenSize ?? 1;
+  const size = cells * cellUnit(ctx);
+  const src = tokenAvatarUrl(entity.avatarUrl);
+  for (const el of store.getAll()) {
+    if (!isCombatantToken(el) || el.entityId !== entity.id) continue;
+    const rect = el as unknown as {
+      id: string;
+      type: string;
+      layerId?: string;
+      position: Point;
+      size?: { w: number; h: number };
+    };
+    const oldSize = rect.size ?? { w: size, h: size };
+    const oldCenter = {
+      x: rect.position.x + oldSize.w / 2,
+      y: rect.position.y + oldSize.h / 2,
+    };
+    const center = snapTokenCenter(oldCenter, cells, ctx);
+    const position = { x: center.x - size / 2, y: center.y - size / 2 };
+    const wantsImage = src !== null;
+    const isImage = rect.type === 'image';
+
+    if (wantsImage === isImage) {
+      store.update(
+        rect.id,
+        wantsImage
+          ? { src: src as string, size: { w: size, h: size }, position }
+          : {
+              fillColor: dispositionColor(entity),
+              size: { w: size, h: size },
+              position,
+            }
+      );
+    } else {
+      const layerId = rect.layerId ?? '';
+      const base = wantsImage
+        ? createImage({
+            position,
+            size: { w: size, h: size },
+            src: src as string,
+            layerId,
+          })
+        : createShape({
+            position,
+            size: { w: size, h: size },
+            shape: 'ellipse',
+            fillColor: dispositionColor(entity),
+            strokeColor: '#1e293b',
+            strokeWidth: 2,
+            layerId,
+          });
+      const token: CanvasElement & CombatantTokenKeys = {
+        ...base,
+        entityId: entity.id,
+        tokenKind: COMBATANT_TOKEN_KIND,
+      };
+      store.remove(rect.id);
+      store.add(token);
+    }
   }
 }
