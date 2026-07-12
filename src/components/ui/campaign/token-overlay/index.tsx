@@ -81,7 +81,10 @@ export function TokenDecorationLayer({
   if (!visible) return null;
   const cell = cellUnit(viewport.toolContext);
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden select-none">
+    <div
+      className="pointer-events-none absolute inset-0 overflow-hidden select-none"
+      aria-hidden
+    >
       <div
         style={{
           transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})`,
