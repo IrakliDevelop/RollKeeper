@@ -18,7 +18,7 @@ export type { DmBattleMapCanvasProps };
  * init/persistence/connection wiring.
  */
 export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
-  const { children } = props;
+  const { children, tokenInfoToggle } = props;
   const { viewport, tools, handleReady, handleClearDrawings } =
     useDmBattleMapCanvas(props);
 
@@ -32,7 +32,12 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
           className="h-full w-full"
           snapToGrid
         />
-        {viewport && <DmVttToolbar onClearDrawings={handleClearDrawings} />}
+        {viewport && (
+          <DmVttToolbar
+            onClearDrawings={handleClearDrawings}
+            tokenInfoToggle={tokenInfoToggle}
+          />
+        )}
         {viewport && (
           <div className="border-divider absolute top-[7.25rem] left-1/2 z-10 max-w-[92vw] -translate-x-1/2 overflow-hidden rounded-xl border shadow-lg min-[1350px]:top-16">
             <DmLocationToolOptions mode="battlemap" />
