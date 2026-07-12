@@ -14,6 +14,8 @@ interface DecorationItemProps {
   deco: TokenDecoration;
   mode: TokenInfoMode;
   cell: number;
+  /** Compact mode only: render the chip row for this rect (hovered/revealed). */
+  showChipRow?: boolean;
 }
 
 type BarLikeHp = Extract<TokenHpView, { kind: 'bar' | 'exact' }>;
@@ -71,7 +73,13 @@ function DeadGlyph({ rect, cell }: { rect: DecoratedTokenRect; cell: number }) {
   );
 }
 
-/** One chip row centered below the token: name + exact numbers/label chip. */
+/**
+ * One chip row centered below the token: name + exact numbers/label chip.
+ * The row is sized to its content (`width: max-content`) rather than clamped
+ * to the token width, so short-to-medium names render unclipped; it's capped
+ * at 4 cells so it never runs away, and each chip keeps its own
+ * overflow/ellipsis as a safety net for a truly huge name.
+ */
 function ChipRow({
   rect,
   cell,
@@ -81,16 +89,16 @@ function ChipRow({
   cell: number;
   deco: TokenDecoration;
 }) {
-  // Min-width clamp keeps chips legible on 1×1 tokens.
-  const width = Math.max(rect.w, 0.9 * cell);
   const showHpChip = !deco.isDead && deco.hp;
   return (
     <div
       className="absolute flex flex-row flex-wrap items-center justify-center"
       style={{
-        left: rect.x + rect.w / 2 - width / 2,
+        left: rect.x + rect.w / 2,
         top: rect.y + rect.h + cell * 0.06,
-        width,
+        transform: 'translateX(-50%)',
+        width: 'max-content',
+        maxWidth: 4 * cell,
         gap: cell * 0.05,
       }}
     >
@@ -100,7 +108,7 @@ function ChipRow({
           style={{
             fontSize: cell * 0.24,
             padding: `0 ${cell * 0.15}px`,
-            maxWidth: 3 * cell,
+            maxWidth: 4 * cell,
           }}
         >
           {deco.name}
@@ -128,26 +136,30 @@ function ChipRow({
 
 /**
  * One token's decoration: an in-token HP bar (full/compact, bar/exact kinds),
- * a centered skull when dead, and — full mode only — a single chip row below
- * the token with the name plus an exact-numbers or label-state chip.
+ * a centered skull when dead, and a chip row below the token with the name
+ * plus an exact-numbers or label-state chip. In full mode the chip row is
+ * always shown; in compact mode it only appears when `showChipRow` is set
+ * (the token is hovered or tap-revealed — see `useCompactReveal`).
  */
 export function DecorationItem({
   rect,
   deco,
   mode,
   cell,
+  showChipRow,
 }: DecorationItemProps) {
   const showBar =
     !deco.isDead &&
     deco.hp &&
     (deco.hp.kind === 'bar' || deco.hp.kind === 'exact');
+  const shouldShowChipRow = mode === 'full' || showChipRow === true;
   return (
     <div style={{ opacity: deco.isDead ? 0.75 : 1 }}>
       {deco.isDead && <DeadGlyph rect={rect} cell={cell} />}
       {showBar && (
         <InTokenBar rect={rect} cell={cell} hp={deco.hp as BarLikeHp} />
       )}
-      {mode === 'full' && <ChipRow rect={rect} cell={cell} deco={deco} />}
+      {shouldShowChipRow && <ChipRow rect={rect} cell={cell} deco={deco} />}
     </div>
   );
 }
