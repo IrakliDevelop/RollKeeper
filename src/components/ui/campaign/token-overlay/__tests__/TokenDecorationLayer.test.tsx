@@ -1,12 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 
 import { TokenDecorationLayer } from '@/components/ui/campaign/token-overlay';
-import {
-  decorationKey,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  useDecoratedTokenRects,
-} from '@/components/ui/campaign/token-overlay/TokenDecorationLayer.hooks';
+import { decorationKey } from '@/components/ui/campaign/token-overlay/TokenDecorationLayer.hooks';
 
 import type { CanvasElement } from '@fieldnotes/core';
 import type { TokenDecoration } from '@/components/ui/campaign/token-overlay';
@@ -57,10 +53,11 @@ describe('decorationKey', () => {
 
 describe('TokenDecorationLayer', () => {
   beforeEach(() => {
-    cleanup();
     mockElements = [tokenEl()];
     mockCamera = { x: 0, y: 0, zoom: 1 };
   });
+
+  afterEach(() => cleanup());
 
   it('renders the name chip positioned under the token rect', () => {
     const { container } = render(
@@ -96,7 +93,7 @@ describe('TokenDecorationLayer', () => {
         visible
       />
     );
-    expect(screen.getByRole('progressbar')).toHaveAttribute(
+    expect(screen.getByRole('progressbar', { hidden: true })).toHaveAttribute(
       'aria-valuenow',
       '50'
     );
@@ -110,7 +107,9 @@ describe('TokenDecorationLayer', () => {
       />
     );
     expect(screen.getByText('Bloodied')).toBeInTheDocument();
-    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('progressbar', { hidden: true })
+    ).not.toBeInTheDocument();
   });
 
   it('dead tokens show a skull instead of the HP row', () => {
@@ -124,7 +123,9 @@ describe('TokenDecorationLayer', () => {
       />
     );
     expect(screen.getByText('☠️')).toBeInTheDocument();
-    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('progressbar', { hidden: true })
+    ).not.toBeInTheDocument();
   });
 
   it('clamps decoration width to 0.9×cell on small tokens', () => {
