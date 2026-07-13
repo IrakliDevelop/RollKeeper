@@ -73,4 +73,30 @@ describe('useDmTokenDecorations', () => {
     expect(d?.chessPiece).toBeUndefined();
     expect(d?.pieceColor).toBeUndefined();
   });
+
+  it('carries projected conditions and concentration from the entity', () => {
+    const { result } = renderHook(() =>
+      useDmTokenDecorations([
+        entity({
+          conditions: [
+            { id: 'c1', name: 'Poisoned', kind: 'debuff', source: 'dm' },
+          ],
+          concentrationSpell: 'Hold Person',
+        }),
+      ])
+    );
+    expect(result.current.get('e1')?.conditions).toEqual([
+      { name: 'Poisoned', kind: 'debuff' },
+    ]);
+    expect(result.current.get('e1')?.isConcentrating).toBe(true);
+  });
+
+  it('omits conditions when empty and isConcentrating when not concentrating', () => {
+    const { result } = renderHook(() =>
+      useDmTokenDecorations([entity({ conditions: [] })])
+    );
+    const d = result.current.get('e1');
+    expect(d?.conditions).toBeUndefined();
+    expect(d?.isConcentrating).toBeUndefined();
+  });
 });

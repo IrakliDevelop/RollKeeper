@@ -73,6 +73,8 @@ export function usePlayerTokenDecorations(
         isDead: entry.isDead ?? false,
         chessPiece: entry.chessPiece,
         pieceColor: entry.tokenColor,
+        conditions: entry.conditions,
+        isConcentrating: entry.isConcentrating,
       };
       map.set(entry.entityId, deco);
       if (entry.playerCharacterId) map.set(entry.playerCharacterId, deco);

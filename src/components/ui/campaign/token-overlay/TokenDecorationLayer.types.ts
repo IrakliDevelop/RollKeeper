@@ -1,4 +1,5 @@
 import type { ChessPiece } from '@/types/encounter';
+import type { SharedCondition } from '@/types/sharedState';
 import type { HpTier } from '@/utils/hpState';
 
 /** Token decoration visibility: full (bar + chips), compact (bar only), off (nothing). */
@@ -27,4 +28,8 @@ export interface TokenDecoration {
   chessPiece?: ChessPiece;
   /** Piece tint; falls back to a neutral color when omitted. */
   pieceColor?: string;
+  /** Active conditions, already policy-filtered. Omit/empty → no strip. */
+  conditions?: SharedCondition[];
+  /** Entity is concentrating → purple ring around the token. */
+  isConcentrating?: boolean;
 }
