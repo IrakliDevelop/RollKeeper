@@ -3,10 +3,12 @@ import {
   DEFAULT_COMBAT_CONFIG,
   type CombatConfig,
   type Encounter,
+  type EncounterCondition,
   type EncounterEntity,
 } from '@/types/encounter';
 import { hpPercent, hpStateLabel, hpTier } from '@/utils/hpState';
 import type {
+  SharedCondition,
   SharedInitiativeState,
   SharedTurnEntry,
 } from '@/types/sharedState';
@@ -31,6 +33,19 @@ function playerFacingName(entity: EncounterEntity): string {
   return entity.name;
 }
 
+/** Display-only projection of encounter conditions — see SharedCondition. */
+export function toSharedConditions(
+  conditions: EncounterCondition[]
+): SharedCondition[] {
+  return conditions.map(c => {
+    const shared: SharedCondition = { name: c.name };
+    if (c.kind !== undefined) shared.kind = c.kind;
+    if (c.stackCount !== undefined && c.stackCount > 1)
+      shared.stackCount = c.stackCount;
+    return shared;
+  });
+}
+
 function toEntry(
   entity: EncounterEntity,
   config: CombatConfig
@@ -48,6 +63,17 @@ function toEntry(
   // hidden enemies included (that correlation is its whole purpose).
   if (entity.chessPiece !== undefined) entry.chessPiece = entity.chessPiece;
   if (entity.color !== undefined) entry.tokenColor = entity.color;
+
+  // Conditions & concentration: players always; non-players only when the
+  // DM has turned sharing on. Legacy persisted configs lack the field →
+  // default off.
+  const shareConditions =
+    isPlayer || (config.enemyConditionsDisplay ?? 'off') === 'on';
+  if (shareConditions) {
+    if (entity.conditions.length > 0)
+      entry.conditions = toSharedConditions(entity.conditions);
+    if (entity.concentrationSpell) entry.isConcentrating = true;
+  }
 
   // Players always expose identity + exact HP (their own sheet is authoritative).
   if (isPlayer) {
@@ -107,6 +133,7 @@ export function buildSharedInitiative(
     currentEntityId: current ? current.id : null,
     turnOrder: sorted.map(e => toEntry(e, config)),
     enemyHpMode: config.enemyHpDisplay,
+    enemyConditionsMode: config.enemyConditionsDisplay ?? 'off',
     updatedAt: new Date().toISOString(),
   };
 }

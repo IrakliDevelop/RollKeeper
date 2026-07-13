@@ -49,6 +49,7 @@ function buildState(
     currentEntityId: 'goblin-1',
     turnOrder: [enemyEntry, playerEntry, defeatedEntry],
     enemyHpMode: 'label',
+    enemyConditionsMode: 'off',
     updatedAt: '2026-07-08T12:00:00.000Z',
     ...overrides,
   };

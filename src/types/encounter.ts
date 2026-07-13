@@ -206,6 +206,9 @@ export interface Encounter {
 // How much of an enemy's (non-player) HP players may see during combat.
 export type EnemyHpDisplay = 'off' | 'label' | 'bar' | 'percent' | 'exact';
 
+// Whether players may see non-player conditions and concentration status.
+export type EnemyConditionsDisplay = 'on' | 'off';
+
 // A named HP band shown to players when enemyHpDisplay is 'label'. `minPercent`
 // is the lowest HP percentage (inclusive) at which this label applies.
 export interface HpStateBand {
@@ -217,6 +220,7 @@ export interface HpStateBand {
 export interface CombatConfig {
   enemyHpDisplay: EnemyHpDisplay;
   hpStateBands: HpStateBand[];
+  enemyConditionsDisplay: EnemyConditionsDisplay;
 }
 
 export const DEFAULT_HP_STATE_BANDS: HpStateBand[] = [
@@ -231,6 +235,7 @@ export const DEFAULT_HP_STATE_BANDS: HpStateBand[] = [
 export const DEFAULT_COMBAT_CONFIG: CombatConfig = {
   enemyHpDisplay: 'off',
   hpStateBands: DEFAULT_HP_STATE_BANDS,
+  enemyConditionsDisplay: 'off',
 };
 
 export interface NPCInventoryItem {

@@ -260,6 +260,113 @@ describe('buildSharedInitiative', () => {
     expect(monster.maxHp).toBeUndefined();
     expect(monster.playerCharacterId).toBeUndefined();
   });
+
+  it('always shares player conditions and concentration, projected to name/kind/stackCount', () => {
+    const shared = buildSharedInitiative(
+      encounter([
+        entity({
+          id: 'p1',
+          type: 'player',
+          playerCharacterId: 'char-1',
+          conditions: [
+            {
+              id: 'c1',
+              name: 'Poisoned',
+              kind: 'debuff',
+              duration: '1 minute',
+              sourceEntity: 'Spider',
+              sourceSpell: 'Venom',
+              source: 'dm',
+              rounds: 3,
+              stackCount: 2,
+            },
+          ],
+          concentrationSpell: 'Bless',
+        }),
+      ])
+      // no config arg — DEFAULT_COMBAT_CONFIG has enemyConditionsDisplay 'off'
+    );
+    const entry = shared.turnOrder[0];
+    expect(entry.conditions).toEqual([
+      { name: 'Poisoned', kind: 'debuff', stackCount: 2 },
+    ]);
+    expect(entry.isConcentrating).toBe(true);
+  });
+
+  it('omits non-player conditions/concentration when enemyConditionsDisplay is off', () => {
+    const shared = buildSharedInitiative(
+      encounter([
+        entity({
+          id: 'm1',
+          conditions: [{ id: 'c1', name: 'Prone' }],
+          concentrationSpell: 'Hold Person',
+        }),
+      ])
+    );
+    const entry = shared.turnOrder[0];
+    expect('conditions' in entry).toBe(false);
+    expect('isConcentrating' in entry).toBe(false);
+    expect(shared.enemyConditionsMode).toBe('off');
+  });
+
+  it('shares non-player (and hidden-enemy) conditions/concentration when mode is on', () => {
+    const shared = buildSharedInitiative(
+      encounter([
+        entity({
+          id: 'm1',
+          isHidden: true,
+          conditions: [{ id: 'c1', name: 'Prone' }],
+          concentrationSpell: 'Hold Person',
+        }),
+      ]),
+      {
+        enemyHpDisplay: 'off',
+        hpStateBands: [],
+        enemyConditionsDisplay: 'on',
+      }
+    );
+    const entry = shared.turnOrder[0];
+    expect(entry.conditions).toEqual([{ name: 'Prone' }]);
+    expect(entry.isConcentrating).toBe(true);
+    expect(shared.enemyConditionsMode).toBe('on');
+  });
+
+  it('omits empty conditions, stackCount <= 1, and isConcentrating when not concentrating', () => {
+    const shared = buildSharedInitiative(
+      encounter([
+        entity({
+          id: 'p1',
+          type: 'player',
+          playerCharacterId: 'char-1',
+          conditions: [{ id: 'c1', name: 'Blessed', stackCount: 1 }],
+        }),
+        entity({
+          id: 'p2',
+          type: 'player',
+          playerCharacterId: 'char-2',
+          conditions: [],
+        }),
+      ])
+    );
+    expect(shared.turnOrder[0].conditions).toEqual([{ name: 'Blessed' }]);
+    expect(shared.turnOrder[0].isConcentrating).toBeUndefined();
+    expect('conditions' in shared.turnOrder[1]).toBe(false);
+  });
+
+  it('defaults enemyConditionsMode to off for legacy persisted configs missing the field', () => {
+    const legacyConfig = {
+      enemyHpDisplay: 'off',
+      hpStateBands: [],
+    } as unknown as import('@/types/encounter').CombatConfig;
+    const shared = buildSharedInitiative(
+      encounter([
+        entity({ id: 'm1', conditions: [{ id: 'c1', name: 'Prone' }] }),
+      ]),
+      legacyConfig
+    );
+    expect(shared.enemyConditionsMode).toBe('off');
+    expect('conditions' in shared.turnOrder[0]).toBe(false);
+  });
 });
 
 describe('buildSharedInitiative — enemy HP config', () => {
@@ -301,6 +408,7 @@ describe('buildSharedInitiative — enemy HP config', () => {
     const result = buildSharedInitiative(enc(), {
       enemyHpDisplay: 'label',
       hpStateBands: bands,
+      enemyConditionsDisplay: 'off',
     });
     expect(result.enemyHpMode).toBe('label');
     expect(result.turnOrder.find(r => r.entityId === 'm')!.hpState).toBe(
@@ -316,6 +424,7 @@ describe('buildSharedInitiative — enemy HP config', () => {
       const result = buildSharedInitiative(enc(), {
         enemyHpDisplay: mode,
         hpStateBands: bands,
+        enemyConditionsDisplay: 'off',
       });
       const monster = result.turnOrder.find(r => r.entityId === 'm')!;
       expect(monster.hpPercent).toBe(25);
@@ -328,6 +437,7 @@ describe('buildSharedInitiative — enemy HP config', () => {
     const result = buildSharedInitiative(enc(), {
       enemyHpDisplay: 'exact',
       hpStateBands: bands,
+      enemyConditionsDisplay: 'off',
     });
     const monster = result.turnOrder.find(r => r.entityId === 'm')!;
     expect(monster.currentHp).toBe(5);
@@ -338,6 +448,7 @@ describe('buildSharedInitiative — enemy HP config', () => {
     const result = buildSharedInitiative(enc(), {
       enemyHpDisplay: 'label',
       hpStateBands: bands,
+      enemyConditionsDisplay: 'off',
     });
     // 5/20 = 25% -> 'critical'
     expect(result.turnOrder.find(r => r.entityId === 'm')!.hpTier).toBe(
@@ -358,6 +469,7 @@ describe('buildSharedInitiative — enemy HP config', () => {
     const monster = buildSharedInitiative(e, {
       enemyHpDisplay: 'label',
       hpStateBands: bands,
+      enemyConditionsDisplay: 'off',
     }).turnOrder[0];
     expect(monster.isDead).toBe(true);
     expect(monster.hpTier).toBeUndefined();
