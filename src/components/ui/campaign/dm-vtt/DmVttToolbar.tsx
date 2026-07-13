@@ -56,37 +56,41 @@ export function DmVttToolbar({
   const [activeTool, setTool] = useActiveTool();
   const TokenInfoIcon = TOKEN_INFO_ICON[tokenInfoToggle.mode ?? 'compact'];
   return (
-    <div className="bg-surface-raised border-divider absolute top-16 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border p-1 shadow-lg min-[1350px]:top-3">
-      {DM_TOOLS.map(({ name, label, Icon }) => (
+    <div className="bg-surface-raised border-divider absolute top-16 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-xl border p-1 shadow-lg min-[1350px]:top-3">
+      <div className="flex items-center gap-1">
+        {DM_TOOLS.map(({ name, label, Icon }) => (
+          <Button
+            key={name}
+            variant={activeTool === name ? 'primary' : 'ghost'}
+            onClick={() => setTool(name)}
+            className="min-h-[44px] min-w-[44px] p-0"
+            title={label}
+            aria-label={label}
+          >
+            <Icon size={16} />
+          </Button>
+        ))}
+      </div>
+      <div className="flex items-center gap-1">
         <Button
-          key={name}
-          variant={activeTool === name ? 'primary' : 'ghost'}
-          onClick={() => setTool(name)}
+          variant="ghost"
+          onClick={onClearDrawings}
           className="min-h-[44px] min-w-[44px] p-0"
-          title={label}
-          aria-label={label}
+          title="Clear drawings"
+          aria-label="Clear drawings"
         >
-          <Icon size={16} />
+          <Eraser size={16} />
         </Button>
-      ))}
-      <Button
-        variant="ghost"
-        onClick={onClearDrawings}
-        className="min-h-[44px] min-w-[44px] p-0"
-        title="Clear drawings"
-        aria-label="Clear drawings"
-      >
-        <Eraser size={16} />
-      </Button>
-      <Button
-        variant="ghost"
-        onClick={tokenInfoToggle.onCycle}
-        className="min-h-[44px] min-w-[44px] p-0"
-        title={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
-        aria-label={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
-      >
-        <TokenInfoIcon size={16} />
-      </Button>
+        <Button
+          variant="ghost"
+          onClick={tokenInfoToggle.onCycle}
+          className="min-h-[44px] min-w-[44px] p-0"
+          title={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
+          aria-label={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
+        >
+          <TokenInfoIcon size={16} />
+        </Button>
+      </div>
     </div>
   );
 }

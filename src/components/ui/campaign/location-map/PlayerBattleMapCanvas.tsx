@@ -133,47 +133,53 @@ export function PlayerToolbar({
   const needsTokenHint =
     status === 'live' && !hasOwnToken && activeTool !== 'token';
   return (
-    <div className="bg-surface-raised border-divider absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border p-1 shadow-lg">
-      {PLAYER_TOOLS.map(({ name, label, Icon }) => {
-        const isTokenHint = name === 'token' && needsTokenHint;
-        return (
-          <Button
-            key={name}
-            variant={activeTool === name ? 'primary' : 'ghost'}
-            onClick={() => setTool(name)}
-            className={cn(
-              'min-h-[44px] min-w-[44px] p-0',
-              isTokenHint &&
-                'bg-accent-emerald-bg text-accent-emerald-text animate-pulse'
-            )}
-            title={isTokenHint ? 'Place your token on the map' : label}
-            aria-label={isTokenHint ? 'Place your token on the map' : label}
-          >
-            <Icon size={16} />
-          </Button>
-        );
-      })}
-      {hasSelection && (
-        <Button
-          variant="danger"
-          onClick={onDeleteSelected}
-          className="min-h-[44px] min-w-[44px] p-0"
-          title="Delete selected"
-          aria-label="Delete selected"
-        >
-          <Trash2 size={16} />
-        </Button>
-      )}
-      {tokenInfoToggle && TokenInfoIcon && (
-        <Button
-          variant="ghost"
-          onClick={tokenInfoToggle.onCycle}
-          className="min-h-[44px] min-w-[44px] p-0"
-          title={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
-          aria-label={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
-        >
-          <TokenInfoIcon size={16} />
-        </Button>
+    <div className="bg-surface-raised border-divider absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-xl border p-1 shadow-lg">
+      <div className="flex items-center gap-1">
+        {PLAYER_TOOLS.map(({ name, label, Icon }) => {
+          const isTokenHint = name === 'token' && needsTokenHint;
+          return (
+            <Button
+              key={name}
+              variant={activeTool === name ? 'primary' : 'ghost'}
+              onClick={() => setTool(name)}
+              className={cn(
+                'min-h-[44px] min-w-[44px] p-0',
+                isTokenHint &&
+                  'bg-accent-emerald-bg text-accent-emerald-text animate-pulse'
+              )}
+              title={isTokenHint ? 'Place your token on the map' : label}
+              aria-label={isTokenHint ? 'Place your token on the map' : label}
+            >
+              <Icon size={16} />
+            </Button>
+          );
+        })}
+      </div>
+      {(hasSelection || (tokenInfoToggle && TokenInfoIcon)) && (
+        <div className="flex items-center gap-1">
+          {hasSelection && (
+            <Button
+              variant="danger"
+              onClick={onDeleteSelected}
+              className="min-h-[44px] min-w-[44px] p-0"
+              title="Delete selected"
+              aria-label="Delete selected"
+            >
+              <Trash2 size={16} />
+            </Button>
+          )}
+          {tokenInfoToggle && TokenInfoIcon && (
+            <Button
+              variant="ghost"
+              onClick={tokenInfoToggle.onCycle}
+              className="min-h-[44px] min-w-[44px] p-0"
+              title={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
+              aria-label={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
+            >
+              <TokenInfoIcon size={16} />
+            </Button>
+          )}
+        </div>
       )}
       <span
         className={`ml-2 rounded-full px-2 py-0.5 text-xs ${

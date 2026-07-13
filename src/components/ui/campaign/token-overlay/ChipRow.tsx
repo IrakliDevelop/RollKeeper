@@ -67,8 +67,12 @@ export function ChipRow({
       )}
       {conditionNames && conditionNames.length > 0 && (
         <span
-          className="bg-surface-raised/90 border-divider text-body rounded-full border whitespace-nowrap"
-          style={{ fontSize: cell * 0.2, padding: `0 ${cell * 0.12}px` }}
+          className="bg-surface-raised/90 border-divider text-body overflow-hidden rounded-full border text-ellipsis whitespace-nowrap"
+          style={{
+            fontSize: cell * 0.2,
+            padding: `0 ${cell * 0.12}px`,
+            maxWidth: 4 * cell,
+          }}
         >
           {conditionNames.join(' · ')}
         </span>

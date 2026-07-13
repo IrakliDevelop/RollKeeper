@@ -28,7 +28,7 @@ export function ConditionStrip({
   const overflow = conditions.length - shown.length;
   return (
     <span
-      className="absolute flex flex-row items-center"
+      className="absolute flex flex-row items-center overflow-hidden"
       style={{
         left: rect.x + inset,
         top: rect.y + inset,
@@ -41,7 +41,7 @@ export function ConditionStrip({
         return (
           <span
             key={`${c.name}-${i}`}
-            className="bg-surface-raised/90 border-divider text-body relative flex items-center justify-center rounded-full border"
+            className="bg-surface-raised/90 border-divider text-body relative flex shrink-0 items-center justify-center rounded-full border"
             style={{ width: size, height: size }}
           >
             <Icon style={{ width: size * 0.7, height: size * 0.7 }} />
@@ -63,7 +63,7 @@ export function ConditionStrip({
       })}
       {overflow > 0 && (
         <span
-          className="bg-surface-raised/90 border-divider text-body flex items-center justify-center rounded-full border font-semibold"
+          className="bg-surface-raised/90 border-divider text-body flex shrink-0 items-center justify-center rounded-full border font-semibold"
           style={{
             height: size,
             fontSize: size * 0.55,

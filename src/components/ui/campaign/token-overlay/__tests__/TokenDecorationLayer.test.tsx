@@ -323,6 +323,10 @@ describe('TokenDecorationLayer', () => {
     expect(strip.style.left).toBe('102px');
     expect(strip.style.top).toBe('202px');
     expect(container.querySelectorAll('svg').length).toBeGreaterThanOrEqual(4);
+    expect(strip.className).toContain('overflow-hidden');
+    expect((screen.getByText('+2') as HTMLElement).className).toContain(
+      'shrink-0'
+    );
   });
 
   it('renders both bubbles when duplicate same-name conditions are present (no key collision)', () => {
