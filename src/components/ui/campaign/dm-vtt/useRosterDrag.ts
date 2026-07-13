@@ -4,8 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { dispositionColor, stampCombatantToken } from './combatantToken';
 
+import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
+
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import type { Viewport } from '@fieldnotes/core';
+import type { ToolContext, Viewport } from '@fieldnotes/core';
 import type { EncounterEntity } from '@/types/encounter';
 import type { DmTokenConfig } from './combatantToken';
 
@@ -14,6 +16,22 @@ export interface RosterDragState {
   entity: EncounterEntity;
   x: number;
   y: number;
+  /** Screen-px footprint square, null → text-hint fallback (hex/off-grid). */
+  footprintPx: number | null;
+}
+
+/**
+ * Screen-px footprint for the drag ghost. Square grids only — hex and
+ * off-grid maps return null (footprint square is meaningless there; the
+ * ghost falls back to the N×N text hint).
+ */
+export function ghostFootprintPx(
+  cells: number,
+  ctx: ToolContext | null | undefined,
+  zoom: number
+): number | null {
+  if (!ctx || ctx.gridType !== 'square') return null;
+  return cells * cellUnit(ctx) * zoom;
 }
 
 export interface UseRosterDragOptions {
@@ -103,13 +121,25 @@ export function useRosterDrag({
       // Don't set drag state yet — a bare pointerdown must not flicker the
       // ghost. It only appears once movement crosses the tap threshold.
 
+      // Computed once at drag start, not re-derived per pointermove. Zoom
+      // changing mid-drag is not worth tracking — the ghost is a hint, not
+      // a placement preview.
+      const vp = getViewport();
+      const footprintPx = vp
+        ? ghostFootprintPx(
+            entity.tokenSize ?? 1,
+            vp.toolContext,
+            vp.camera.zoom
+          )
+        : null;
+
       const handleMove = (ev: PointerEvent) => {
         const start = startPointRef.current;
         if (start && pastThreshold(start, ev.clientX, ev.clientY)) {
           movedRef.current = true;
         }
         if (movedRef.current) {
-          setDrag({ entity, x: ev.clientX, y: ev.clientY });
+          setDrag({ entity, x: ev.clientX, y: ev.clientY, footprintPx });
         }
       };
 
