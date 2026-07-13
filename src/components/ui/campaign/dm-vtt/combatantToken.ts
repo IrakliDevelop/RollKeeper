@@ -156,7 +156,9 @@ export class DmTokenTool implements Tool {
  * Re-applies an entity's portrait/size to its already-placed tokens.
  * Same element type → narrow store.update (NEVER spread a captured element
  * into the patch — update() shallow-merges and stale fields would resurrect).
- * Ellipse↔image transitions → remove + re-add preserving keys/layer/center.
+ * Ellipse↔image transitions → remove + re-add preserving keys/layer/center,
+ * and the element id itself — selection and decoration keying stay stable
+ * across the type switch.
  */
 export function restampCombatantTokens(
   store: ElementStore,
@@ -224,6 +226,8 @@ export function restampCombatantTokens(
           });
       const token: CanvasElement & CombatantTokenKeys = {
         ...base,
+        id: rect.id, // preserve identity across the type switch — selection
+        // and decoration keying stay stable (was: known accepted quirk)
         entityId: entity.id,
         tokenKind: COMBATANT_TOKEN_KIND,
       };

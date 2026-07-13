@@ -424,4 +424,34 @@ describe('restampCombatantTokens', () => {
     expect(f.added).toHaveLength(0);
     expect(f.removed).toHaveLength(0);
   });
+
+  it('preserves the element id across an ellipse→image restamp', () => {
+    const ellipse = {
+      ...imageToken,
+      type: 'shape',
+      shape: 'ellipse',
+      src: undefined,
+    };
+    const f = fakeStore([ellipse]);
+    restampCombatantTokens(
+      f.store,
+      entity({ avatarUrl: 'https://x/new.png' }),
+      ctx
+    );
+    expect(f.removed).toEqual(['tok-1']);
+    expect(f.added).toHaveLength(1);
+    const el = f.added[0] as Record<string, unknown>;
+    expect(el.type).toBe('image');
+    expect(el.id).toBe('tok-1');
+  });
+
+  it('preserves the element id across an image→ellipse restamp', () => {
+    const f = fakeStore([imageToken]); // image -> ellipse transition (no avatarUrl)
+    restampCombatantTokens(f.store, entity({ avatarUrl: undefined }), ctx);
+    expect(f.removed).toEqual(['tok-1']);
+    expect(f.added).toHaveLength(1);
+    const el = f.added[0] as Record<string, unknown>;
+    expect(el.type).toBe('shape');
+    expect(el.id).toBe('tok-1');
+  });
 });
