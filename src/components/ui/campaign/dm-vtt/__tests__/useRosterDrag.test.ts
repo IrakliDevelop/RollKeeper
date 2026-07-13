@@ -60,7 +60,7 @@ function fakeViewport(overrides: Partial<ToolContext> = {}): {
     ...overrides,
   } as unknown as ToolContext;
   const vp = {
-    camera: toolContext.camera,
+    camera: { ...toolContext.camera, zoom: 1 },
     toolContext,
   } as unknown as Viewport;
   return { vp, added };
@@ -183,7 +183,12 @@ describe('useRosterDrag', () => {
     act(() => {
       window.dispatchEvent(pointerEvent('pointermove', 130, 140));
     });
-    expect(result.current.drag).toEqual({ entity, x: 130, y: 140 });
+    expect(result.current.drag).toEqual({
+      entity,
+      x: 130,
+      y: 140,
+      footprintPx: 40, // tokenSize 1 * gridSize 40 * zoom 1
+    });
 
     act(() => {
       window.dispatchEvent(pointerEvent('pointerup', 130, 140));
