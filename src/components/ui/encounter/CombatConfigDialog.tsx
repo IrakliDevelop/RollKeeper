@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { Switch } from '@/components/ui/forms/switch';
 import {
   RadioGroupField,
   RadioGroupItem,
@@ -20,6 +21,7 @@ import {
 import { useEncounterStore } from '@/store/encounterStore';
 import {
   type EnemyHpDisplay,
+  type EnemyConditionsDisplay,
   type HpStateBand,
   DEFAULT_HP_STATE_BANDS,
 } from '@/types/encounter';
@@ -73,12 +75,17 @@ export function CombatConfigDialog({
   const [hpDisplay, setHpDisplay] = useState<EnemyHpDisplay>(
     combatConfig.enemyHpDisplay
   );
+  const [conditionsDisplay, setConditionsDisplay] =
+    useState<EnemyConditionsDisplay>(
+      combatConfig.enemyConditionsDisplay ?? 'off'
+    );
   const [bands, setBands] = useState<HpStateBand[]>(combatConfig.hpStateBands);
 
   // Re-sync local state when dialog opens or store changes
   useEffect(() => {
     if (open) {
       setHpDisplay(combatConfig.enemyHpDisplay);
+      setConditionsDisplay(combatConfig.enemyConditionsDisplay ?? 'off');
       setBands(combatConfig.hpStateBands);
     }
   }, [open, combatConfig]);
@@ -120,7 +127,11 @@ export function CombatConfigDialog({
       .filter(b => b.label.trim() !== '')
       .sort((a, b) => b.minPercent - a.minPercent);
 
-    setCombatConfig({ enemyHpDisplay: hpDisplay, hpStateBands: cleaned });
+    setCombatConfig({
+      enemyHpDisplay: hpDisplay,
+      hpStateBands: cleaned,
+      enemyConditionsDisplay: conditionsDisplay,
+    });
     onOpenChange(false);
   };
 
@@ -134,7 +145,7 @@ export function CombatConfigDialog({
         <DialogHeader>
           <DialogTitle>Combat Configuration</DialogTitle>
           <DialogDescription>
-            Controls what players see for enemy HP during combat.
+            Controls what players see for enemy HP and conditions during combat.
           </DialogDescription>
         </DialogHeader>
 
@@ -229,6 +240,26 @@ export function CombatConfigDialog({
               </Button>
             </div>
           )}
+
+          {/* Enemy conditions sharing */}
+          <div className="border-divider flex items-center justify-between gap-4 border-t pt-4">
+            <div>
+              <span className="text-heading block text-sm font-medium">
+                Share enemy conditions with players
+              </span>
+              <span className="text-muted text-xs">
+                Players see condition icons and concentration on enemy tokens.
+                Your own party&apos;s conditions are always visible to them.
+              </span>
+            </div>
+            <Switch
+              checked={conditionsDisplay === 'on'}
+              onCheckedChange={checked =>
+                setConditionsDisplay(checked ? 'on' : 'off')
+              }
+              aria-label="Share enemy conditions with players"
+            />
+          </div>
         </DialogBody>
 
         <DialogFooter>
