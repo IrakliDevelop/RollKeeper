@@ -18,8 +18,11 @@ vi.mock('@fieldnotes/react', () => ({
     return selector(mockElements);
   },
   // useOwnTokenBackfill (mounted alongside useOwnTokenPresent) reads the
-  // store off the viewport — a no-op stub is enough for these render tests.
-  useViewport: () => ({ toolContext: { store: { update: vi.fn() } } }),
+  // store off the viewport — a stub returning the same mock elements is
+  // enough for these render tests.
+  useViewport: () => ({
+    toolContext: { store: { update: vi.fn(), getAll: () => mockElements } },
+  }),
 }));
 
 function ownTokenEl(characterId: string): CanvasElement {

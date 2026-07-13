@@ -98,7 +98,7 @@ export default function DmLocationToolbar({
   };
 
   return (
-    <div className="border-divider bg-surface-raised flex items-center gap-1 border-b px-2 py-1">
+    <div className="border-divider bg-surface-raised flex items-center gap-3 border-b px-2 py-1">
       {/* Left group: Tool buttons */}
       <div className="flex items-center gap-0.5">
         {toolDefs.map(({ name, icon: Icon, label }) => (

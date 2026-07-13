@@ -32,8 +32,23 @@ export function isLegacyOwnToken(
   );
 }
 
-// Module scope — useElements selectors must be referentially stable.
-const selectAll = (els: CanvasElement[]) => els;
+// Module scope — useElements selectors must be referentially stable. Cheap
+// pre-filter only (tokenKind + missing characterId): characterId isn't
+// available at module scope, so the own-layer check happens in the effect
+// via isLegacyOwnToken. Joining matching ids into one string means the
+// subscription only re-renders the host when that set actually changes,
+// instead of on every element mutation (e.g. drag pointermoves).
+function selectUnstampedPlayerTokenIds(els: CanvasElement[]): string {
+  return els
+    .filter(el => {
+      const rec = el as Partial<{ tokenKind: unknown; characterId: unknown }>;
+      return (
+        rec.tokenKind === PLAYER_TOKEN_KIND && rec.characterId === undefined
+      );
+    })
+    .map(el => el.id)
+    .join(',');
+}
 
 /** The extra top-level key the backfill stamps (mirrors CombatantTokenKeys). */
 interface OwnTokenKeys {
@@ -43,17 +58,17 @@ interface OwnTokenKeys {
 /**
  * One-shot idempotent backfill: stamps characterId onto legacy own-layer
  * self-tokens via narrow update patches (extra top-level keys survive
- * store/export/sync). Runs whenever the element list changes; already-
- * stamped tokens no longer match, so re-runs are no-ops.
+ * store/export/sync). Runs whenever the set of unstamped player tokens
+ * changes; already-stamped tokens no longer match, so re-runs are no-ops.
  */
 export function useOwnTokenBackfill(characterId: string): void {
   const viewport = useViewport();
-  const elements = useElements(selectAll);
+  const unstampedIds = useElements(selectUnstampedPlayerTokenIds);
 
   useEffect(() => {
     if (!characterId) return;
     const store = viewport.toolContext.store;
-    for (const el of elements) {
+    for (const el of store.getAll()) {
       if (isLegacyOwnToken(el, characterId)) {
         // `characterId` is an extra top-level key (like PlayerTokenKeys),
         // not a declared CanvasElement field — the intersection type gives
@@ -66,5 +81,5 @@ export function useOwnTokenBackfill(characterId: string): void {
         store.update(el.id, patch);
       }
     }
-  }, [viewport, elements, characterId]);
+  }, [viewport, unstampedIds, characterId]);
 }
