@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 
+import { toSharedConditions } from '@/utils/buildSharedInitiative';
 import { hpPercent, hpTier } from '@/utils/hpState';
 
 import type { EncounterEntity } from '@/types/encounter';
@@ -29,6 +30,9 @@ export function useDmTokenDecorations(
         chessPiece: e.chessPiece,
         pieceColor: e.color,
       };
+      if (e.conditions.length > 0)
+        deco.conditions = toSharedConditions(e.conditions);
+      if (e.concentrationSpell) deco.isConcentrating = true;
       map.set(e.id, deco);
       if (e.playerCharacterId) map.set(e.playerCharacterId, deco);
     }

@@ -149,4 +149,29 @@ describe('usePlayerTokenDecorations', () => {
     expect(d?.chessPiece).toBeUndefined();
     expect(d?.pieceColor).toBeUndefined();
   });
+
+  it('passes through shared conditions and concentration from the entry', () => {
+    const { result } = renderHook(() =>
+      usePlayerTokenDecorations(
+        state('off', [
+          enemy({
+            conditions: [{ name: 'Prone' }],
+            isConcentrating: true,
+          }),
+        ])
+      )
+    );
+    const d = result.current.get('e1');
+    expect(d?.conditions).toEqual([{ name: 'Prone' }]);
+    expect(d?.isConcentrating).toBe(true);
+  });
+
+  it('leaves conditions/isConcentrating undefined when the share omits them', () => {
+    const { result } = renderHook(() =>
+      usePlayerTokenDecorations(state('off', [enemy({})]))
+    );
+    const d = result.current.get('e1');
+    expect(d?.conditions).toBeUndefined();
+    expect(d?.isConcentrating).toBeUndefined();
+  });
 });
