@@ -242,22 +242,15 @@ export function CombatConfigDialog({
           )}
 
           {/* Enemy conditions sharing */}
-          <div className="border-divider flex items-center justify-between gap-4 border-t pt-4">
-            <div>
-              <span className="text-heading block text-sm font-medium">
-                Share enemy conditions with players
-              </span>
-              <span className="text-muted text-xs">
-                Players see condition icons and concentration on enemy tokens.
-                Your own party&apos;s conditions are always visible to them.
-              </span>
-            </div>
+          <div className="border-divider border-t pt-4">
             <Switch
               checked={conditionsDisplay === 'on'}
               onCheckedChange={checked =>
                 setConditionsDisplay(checked ? 'on' : 'off')
               }
-              aria-label="Share enemy conditions with players"
+              label="Share enemy conditions with players"
+              description="Players see condition icons and concentration on enemy tokens. Your own party's conditions are always visible to them."
+              wrapperClassName="gap-4"
             />
           </div>
         </DialogBody>
