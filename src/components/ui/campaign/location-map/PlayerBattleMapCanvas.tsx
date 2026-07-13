@@ -52,6 +52,7 @@ import {
   tokenAvatarUrl,
   buildCircularTokenUrl,
 } from './PlayerTokenTool';
+import { useOwnTokenBackfill } from './useOwnTokenBackfill';
 import { useOwnTokenPresent } from './useOwnTokenPresent';
 import {
   SpellTemplateTool,
@@ -128,6 +129,7 @@ export function PlayerToolbar({
     ? TOKEN_INFO_ICON[tokenInfoToggle.mode ?? 'compact']
     : null;
   const hasOwnToken = useOwnTokenPresent(characterId);
+  useOwnTokenBackfill(characterId);
   const needsTokenHint =
     status === 'live' && !hasOwnToken && activeTool !== 'token';
   return (
