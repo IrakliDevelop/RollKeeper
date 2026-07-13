@@ -182,7 +182,7 @@ export function PlayerToolbar({
         </div>
       )}
       <span
-        className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
+        className={`rounded-full px-2 py-0.5 text-xs ${
           status === 'live'
             ? 'bg-accent-emerald-bg text-accent-emerald-text'
             : status === 'denied'
