@@ -1,6 +1,10 @@
 import type { CalendarConfig, WeatherType } from './calendar';
 import type { InventoryItem } from './character';
-import type { ChessPiece, EnemyHpDisplay } from './encounter';
+import type {
+  ChessPiece,
+  EnemyConditionsDisplay,
+  EnemyHpDisplay,
+} from './encounter';
 
 // Stored in Redis — DM's calendar data (events stay local, not synced)
 export interface SharedCalendar {
@@ -55,6 +59,15 @@ export interface SharedCustomCounter {
   updatedAt: string; // ISO timestamp
 }
 
+// Display-only projection of an EncounterCondition. Deliberately excludes
+// id, duration, rounds, sourceEntity, sourceSpell, and source — none of
+// that leaves the DM.
+export interface SharedCondition {
+  name: string;
+  kind?: 'buff' | 'debuff' | 'neutral';
+  stackCount?: number;
+}
+
 // A single combatant row shown to players during combat
 export interface SharedTurnEntry {
   entityId: string;
@@ -76,6 +89,12 @@ export interface SharedTurnEntry {
   // that correlation is the whole purpose, so it's safe to always share.
   chessPiece?: ChessPiece;
   tokenColor?: string;
+  // Active conditions. Players always; non-players only when the DM's
+  // enemyConditionsDisplay is 'on' (hidden enemies included — a visible
+  // "prone" marker is fiction-visible information).
+  conditions?: SharedCondition[];
+  // Boolean only — the concentrated spell's name never leaves the DM.
+  isConcentrating?: boolean;
 }
 
 // Initiative/turn state pushed by the DM, read by players
@@ -88,6 +107,8 @@ export interface SharedInitiativeState {
   // How non-player HP is presented to players; tells the panel how to render
   // hpState / hpPercent / currentHp on enemy rows. Defaults to 'off'.
   enemyHpMode: EnemyHpDisplay;
+  // Whether non-player conditions/concentration are being shared.
+  enemyConditionsMode: EnemyConditionsDisplay;
   updatedAt: string; // ISO timestamp
 }
 
