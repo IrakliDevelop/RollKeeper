@@ -80,22 +80,6 @@ export default function BattleMapEditorPage() {
 
   return (
     <div className="bg-surface flex h-screen flex-col overflow-hidden">
-      <div className="border-divider bg-surface-raised fixed top-20 right-4 z-50 flex items-center gap-0.5 rounded-lg border p-0.5 shadow-lg">
-        <Button
-          variant="primary"
-          size="lg"
-          onClick={() => handleModeChange('setup')}
-        >
-          Setup
-        </Button>
-        <Button
-          variant="ghost"
-          size="lg"
-          onClick={() => handleModeChange('play')}
-        >
-          Play
-        </Button>
-      </div>
       <header className="border-divider bg-surface-secondary border-b shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
@@ -116,7 +100,25 @@ export default function BattleMapEditorPage() {
                 </h1>
               </div>
             </div>
-            <ThemeToggle showSystemOption />
+            <div className="flex items-center gap-3">
+              <div className="border-divider bg-surface-raised flex items-center gap-0.5 rounded-lg border p-0.5">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  onClick={() => handleModeChange('setup')}
+                >
+                  Setup
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  onClick={() => handleModeChange('play')}
+                >
+                  Play
+                </Button>
+              </div>
+              <ThemeToggle showSystemOption />
+            </div>
           </div>
         </div>
       </header>
