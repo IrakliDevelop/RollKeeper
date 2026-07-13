@@ -35,6 +35,11 @@ export function isLegacyOwnToken(
 // Module scope — useElements selectors must be referentially stable.
 const selectAll = (els: CanvasElement[]) => els;
 
+/** The extra top-level key the backfill stamps (mirrors CombatantTokenKeys). */
+interface OwnTokenKeys {
+  characterId: string;
+}
+
 /**
  * One-shot idempotent backfill: stamps characterId onto legacy own-layer
  * self-tokens via narrow update patches (extra top-level keys survive
@@ -51,12 +56,13 @@ export function useOwnTokenBackfill(characterId: string): void {
     for (const el of elements) {
       if (isLegacyOwnToken(el, characterId)) {
         // `characterId` is an extra top-level key (like PlayerTokenKeys),
-        // not a declared CanvasElement field, so the patch shares no
-        // property with Partial<CanvasElement> and TS's weak-type check
-        // rejects it outright — go through `unknown`, same as the read-side
-        // cast in isLegacyOwnToken above. Extra keys still survive the
+        // not a declared CanvasElement field — the intersection type gives
+        // the weak-type check a shared property while keeping the key name
+        // checked (a typo would fail to compile). Extra keys survive the
         // store's shallow merge at runtime (as they do via store.add).
-        const patch = { characterId } as unknown as Partial<CanvasElement>;
+        const patch: Partial<CanvasElement> & Partial<OwnTokenKeys> = {
+          characterId,
+        };
         store.update(el.id, patch);
       }
     }
