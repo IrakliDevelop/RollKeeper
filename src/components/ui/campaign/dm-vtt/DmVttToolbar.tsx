@@ -29,7 +29,7 @@ const DM_TOOLS: { name: string; label: string; Icon: typeof Hand }[] = [
 
 export interface DmVttToolbarProps {
   onClearDrawings: () => void;
-  tokenInfoToggle: { mode: TokenInfoMode; onCycle: () => void };
+  tokenInfoToggle: { mode: TokenInfoMode | null; onCycle: () => void };
 }
 
 const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
@@ -54,7 +54,7 @@ export function DmVttToolbar({
   tokenInfoToggle,
 }: DmVttToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
-  const TokenInfoIcon = TOKEN_INFO_ICON[tokenInfoToggle.mode];
+  const TokenInfoIcon = TOKEN_INFO_ICON[tokenInfoToggle.mode ?? 'compact'];
   return (
     <div className="bg-surface-raised border-divider absolute top-16 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-xl border p-1 shadow-lg min-[1350px]:top-3">
       {DM_TOOLS.map(({ name, label, Icon }) => (
@@ -82,8 +82,8 @@ export function DmVttToolbar({
         variant="ghost"
         onClick={tokenInfoToggle.onCycle}
         className="min-h-[44px] min-w-[44px] p-0"
-        title={TOKEN_INFO_LABEL[tokenInfoToggle.mode]}
-        aria-label={TOKEN_INFO_LABEL[tokenInfoToggle.mode]}
+        title={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
+        aria-label={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
       >
         <TokenInfoIcon size={16} />
       </Button>

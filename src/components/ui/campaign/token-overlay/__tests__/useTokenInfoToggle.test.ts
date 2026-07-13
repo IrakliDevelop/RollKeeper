@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 import { useTokenInfoMode } from '@/components/ui/campaign/token-overlay/useTokenInfoToggle';
@@ -40,5 +40,15 @@ describe('useTokenInfoMode', () => {
     localStorage.setItem('test-key', 'garbage');
     const { result } = renderHook(() => useTokenInfoMode('test-key'));
     expect(result.current[0]).toBe('compact');
+  });
+
+  it('does not persist before the stored value has been read', () => {
+    localStorage.setItem('test-key', 'off');
+    const setItem = vi.spyOn(Storage.prototype, 'setItem');
+    renderHook(() => useTokenInfoMode('test-key'));
+    // The only write after mount must be the resolved value, never the
+    // pre-resolution default.
+    expect(setItem).not.toHaveBeenCalledWith('test-key', 'compact');
+    setItem.mockRestore();
   });
 });

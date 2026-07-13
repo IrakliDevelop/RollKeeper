@@ -113,6 +113,13 @@ describe('TokenDecorationLayer', () => {
     expect(screen.getByText('Vecna the Archlich Supreme')).toBeInTheDocument();
   });
 
+  it('renders nothing while the mode is unresolved (null)', () => {
+    const { container } = render(
+      <TokenDecorationLayer decorations={deco()} mode={null} />
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('renders nothing when off, or when the key has no decoration', () => {
     const hidden = render(
       <TokenDecorationLayer decorations={deco()} mode="off" />

@@ -20,21 +20,28 @@ function migrateStoredValue(raw: string | null): TokenInfoMode {
   return 'compact';
 }
 
-/** Persisted show/hide/compact mode for token decorations. Defaults 'compact'. */
+/**
+ * Persisted show/hide/compact mode for token decorations. Defaults 'compact'.
+ * Returns null until the persisted value has been read (post-mount) so
+ * consumers can render nothing instead of flashing the default for one
+ * frame when the stored mode is 'off'. (A lazy useState initializer reading
+ * localStorage would hydration-mismatch — this component tree is SSR'd.)
+ */
 export function useTokenInfoMode(
   storageKey: string
-): [TokenInfoMode, () => void] {
-  const [mode, setMode] = useState<TokenInfoMode>('compact');
+): [TokenInfoMode | null, () => void] {
+  const [mode, setMode] = useState<TokenInfoMode | null>(null);
 
   useEffect(() => {
     try {
       setMode(migrateStoredValue(localStorage.getItem(storageKey)));
     } catch {
-      // Ignore localStorage errors
+      setMode('compact');
     }
   }, [storageKey]);
 
   useEffect(() => {
+    if (mode === null) return;
     try {
       localStorage.setItem(storageKey, mode);
     } catch {
@@ -43,9 +50,10 @@ export function useTokenInfoMode(
   }, [storageKey, mode]);
 
   const cycle = useCallback(() => {
-    setMode(
-      current =>
-        CYCLE_ORDER[(CYCLE_ORDER.indexOf(current) + 1) % CYCLE_ORDER.length]
+    setMode(current =>
+      current === null
+        ? current
+        : CYCLE_ORDER[(CYCLE_ORDER.indexOf(current) + 1) % CYCLE_ORDER.length]
     );
   }, []);
 

@@ -76,7 +76,7 @@ interface PlayerBattleMapCanvasProps {
   /** Hide the built-in back-button (the VTT screen renders its own top-left chrome). */
   hideBackButton?: boolean;
   /** Show/hide/compact toggle for the token decoration overlay (optional — non-VTT routes render no toggle). */
-  tokenInfoToggle?: { mode: TokenInfoMode; onCycle: () => void };
+  tokenInfoToggle?: { mode: TokenInfoMode | null; onCycle: () => void };
 }
 
 /** Viewport exposes historyRecorder at runtime for batched store ops. */
@@ -120,12 +120,12 @@ export function PlayerToolbar({
   status: BattleMapConnectionStatus;
   hasSelection: boolean;
   onDeleteSelected: () => void;
-  tokenInfoToggle?: { mode: TokenInfoMode; onCycle: () => void };
+  tokenInfoToggle?: { mode: TokenInfoMode | null; onCycle: () => void };
   characterId: string;
 }) {
   const [activeTool, setTool] = useActiveTool();
   const TokenInfoIcon = tokenInfoToggle
-    ? TOKEN_INFO_ICON[tokenInfoToggle.mode]
+    ? TOKEN_INFO_ICON[tokenInfoToggle.mode ?? 'compact']
     : null;
   const hasOwnToken = useOwnTokenPresent(characterId);
   const needsTokenHint =
@@ -167,8 +167,8 @@ export function PlayerToolbar({
           variant="ghost"
           onClick={tokenInfoToggle.onCycle}
           className="min-h-[44px] min-w-[44px] p-0"
-          title={TOKEN_INFO_LABEL[tokenInfoToggle.mode]}
-          aria-label={TOKEN_INFO_LABEL[tokenInfoToggle.mode]}
+          title={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
+          aria-label={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
         >
           <TokenInfoIcon size={16} />
         </Button>
