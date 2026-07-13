@@ -1,3 +1,5 @@
+import { NextRequest } from 'next/server';
+
 import {
   CampaignData,
   CampaignPlayerData,
@@ -128,6 +130,24 @@ export function createNextRequest(
 
 export function createRouteParams<T extends Record<string, string>>(params: T) {
   return { params: Promise.resolve(params) };
+}
+
+export function createGetRequest(url: string) {
+  const req = createNextRequest(url);
+  const urlObj = new URL(req.url);
+
+  // Manually add nextUrl property that NextRequest would have
+  Object.defineProperty(req, 'nextUrl', {
+    value: {
+      searchParams: urlObj.searchParams,
+      pathname: urlObj.pathname,
+      href: urlObj.href,
+    },
+    writable: true,
+    configurable: true,
+  });
+
+  return req as NextRequest;
 }
 
 export function createMockProcessedMonster(

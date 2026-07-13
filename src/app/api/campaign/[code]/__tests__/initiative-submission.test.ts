@@ -2,26 +2,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 import { resetRedis } from '@/test/mocks/redis';
-import { createNextRequest, createRouteParams } from '@/test/helpers';
+import {
+  createNextRequest,
+  createRouteParams,
+  createGetRequest,
+} from '@/test/helpers';
 import { DELETE, GET, POST } from '../initiative-submission/route';
-
-function createGetRequest(url: string) {
-  const req = createNextRequest(url);
-  const urlObj = new URL(req.url);
-
-  // Manually add nextUrl property that NextRequest would have
-  Object.defineProperty(req, 'nextUrl', {
-    value: {
-      searchParams: urlObj.searchParams,
-      pathname: urlObj.pathname,
-      href: urlObj.href,
-    },
-    writable: true,
-    configurable: true,
-  });
-
-  return req as NextRequest;
-}
 
 const post = (body: Record<string, unknown>) =>
   POST(

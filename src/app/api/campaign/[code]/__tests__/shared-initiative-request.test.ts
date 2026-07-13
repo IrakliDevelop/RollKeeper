@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 import { resetRedis, getRedisStore } from '@/test/mocks/redis';
-import { createNextRequest, createRouteParams } from '@/test/helpers';
+import {
+  createNextRequest,
+  createRouteParams,
+  createGetRequest,
+} from '@/test/helpers';
 import { GET, POST } from '../shared/route';
 
 async function postFeature(data: unknown) {
@@ -11,24 +15,6 @@ async function postFeature(data: unknown) {
     body: { feature: 'initiativeRequest', data, dmId: 'dm-1' },
   });
   return POST(req as NextRequest, createRouteParams({ code: 'ABC123' }));
-}
-
-function createGetRequest(url: string) {
-  const req = createNextRequest(url);
-  const urlObj = new URL(req.url);
-
-  // Manually add nextUrl property that NextRequest would have
-  Object.defineProperty(req, 'nextUrl', {
-    value: {
-      searchParams: urlObj.searchParams,
-      pathname: urlObj.pathname,
-      href: urlObj.href,
-    },
-    writable: true,
-    configurable: true,
-  });
-
-  return req as NextRequest;
 }
 
 describe('shared route — initiativeRequest feature', () => {
