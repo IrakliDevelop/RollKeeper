@@ -36,11 +36,11 @@ export function ConditionStrip({
         maxWidth: rect.w - 2 * inset,
       }}
     >
-      {shown.map(c => {
+      {shown.map((c, i) => {
         const Icon = getConditionIcon(c.name, c.kind);
         return (
           <span
-            key={c.name}
+            key={`${c.name}-${i}`}
             className="bg-surface-raised/90 border-divider text-body relative flex items-center justify-center rounded-full border"
             style={{ width: size, height: size }}
           >

@@ -318,6 +318,19 @@ describe('TokenDecorationLayer', () => {
     expect(container.querySelectorAll('svg').length).toBeGreaterThanOrEqual(4);
   });
 
+  it('renders both bubbles when duplicate same-name conditions are present (no key collision)', () => {
+    const { container } = render(
+      <TokenDecorationLayer
+        decorations={deco({
+          conditions: [{ name: 'Marked' }, { name: 'Marked' }],
+        })}
+        mode="full"
+      />
+    );
+    // Two condition icon bubbles should render distinctly despite sharing a name.
+    expect(container.querySelectorAll('svg').length).toBe(2);
+  });
+
   it('shows a stack count on stacked conditions', () => {
     render(
       <TokenDecorationLayer
