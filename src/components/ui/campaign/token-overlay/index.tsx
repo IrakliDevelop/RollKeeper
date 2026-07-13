@@ -24,7 +24,8 @@ export type {
 export interface TokenDecorationLayerProps {
   /** Keyed by entityId AND/OR characterId — resolvers double-key player entries. */
   decorations: ReadonlyMap<string, TokenDecoration>;
-  mode: TokenInfoMode;
+  /** null = persisted mode not yet resolved — render nothing (no flash). */
+  mode: TokenInfoMode | null;
 }
 
 /**
@@ -42,8 +43,8 @@ export function TokenDecorationLayer({
   const camera = useCamera();
   const viewport = useViewport();
   const rects = useDecoratedTokenRects();
-  const { containerRef, activeId } = useCompactReveal(mode, rects);
-  if (mode === 'off') return null;
+  const { containerRef, activeId } = useCompactReveal(mode ?? 'off', rects);
+  if (mode === null || mode === 'off') return null;
   const cell = cellUnit(viewport.toolContext);
   return (
     <div

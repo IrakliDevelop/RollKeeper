@@ -35,7 +35,7 @@ export interface DmBattleMapCanvasProps {
   /** Select-tool selection changes (element ids) — Task 8 maps to entities. */
   onSelectionChange?: (selectedIds: string[]) => void;
   /** Show/hide/compact state for the token decoration layer, surfaced as a toolbar toggle. */
-  tokenInfoToggle: { mode: TokenInfoMode; onCycle: () => void };
+  tokenInfoToggle: { mode: TokenInfoMode | null; onCycle: () => void };
 }
 
 /** Viewport exposes historyRecorder at runtime for batched store ops. */
