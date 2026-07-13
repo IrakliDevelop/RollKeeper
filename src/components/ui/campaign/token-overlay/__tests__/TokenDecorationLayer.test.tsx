@@ -292,6 +292,85 @@ describe('TokenDecorationLayer', () => {
     expect(screen.getByText('☠️')).toBeInTheDocument();
     expect(container.querySelector('svg')).not.toBeInTheDocument();
   });
+
+  it('renders condition icons inside the token top edge in full mode, capped at 4 with overflow', () => {
+    const { container } = render(
+      <TokenDecorationLayer
+        decorations={deco({
+          conditions: [
+            { name: 'Poisoned' },
+            { name: 'Prone' },
+            { name: 'Stunned' },
+            { name: 'Blinded' },
+            { name: 'Charmed' },
+            { name: 'Deafened' },
+          ],
+        })}
+        mode="full"
+      />
+    );
+    // 4 icon bubbles + one "+2" overflow chip
+    expect(screen.getByText('+2')).toBeInTheDocument();
+    const strip = screen.getByText('+2').parentElement as HTMLElement;
+    // inset = max(2, 0.05*40) = 2 → strip anchored at rect.x+2 / rect.y+2
+    expect(strip.style.left).toBe('102px');
+    expect(strip.style.top).toBe('202px');
+    expect(container.querySelectorAll('svg').length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('shows a stack count on stacked conditions', () => {
+    render(
+      <TokenDecorationLayer
+        decorations={deco({
+          conditions: [{ name: 'Exhaustion', stackCount: 3 }],
+        })}
+        mode="full"
+      />
+    );
+    expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('hides the condition strip in compact mode until revealed, and lists names in the reveal', () => {
+    render(
+      <TokenDecorationLayer
+        decorations={deco({
+          conditions: [{ name: 'Poisoned' }, { name: 'Prone' }],
+        })}
+        mode="compact"
+      />
+    );
+    // Nothing revealed: no name chip row, no condition names
+    expect(screen.queryByText('Poisoned · Prone')).not.toBeInTheDocument();
+  });
+
+  it('renders a concentration ring in full and compact modes, but not when dead', () => {
+    const ringSelector = '[data-testid="concentration-ring"]';
+    const full = render(
+      <TokenDecorationLayer
+        decorations={deco({ isConcentrating: true })}
+        mode="full"
+      />
+    );
+    expect(full.container.querySelector(ringSelector)).toBeInTheDocument();
+    cleanup();
+
+    const compact = render(
+      <TokenDecorationLayer
+        decorations={deco({ isConcentrating: true })}
+        mode="compact"
+      />
+    );
+    expect(compact.container.querySelector(ringSelector)).toBeInTheDocument();
+    cleanup();
+
+    const dead = render(
+      <TokenDecorationLayer
+        decorations={deco({ isConcentrating: true, isDead: true })}
+        mode="full"
+      />
+    );
+    expect(dead.container.querySelector(ringSelector)).not.toBeInTheDocument();
+  });
 });
 
 function firePointer(type: string, clientX: number, clientY: number) {
@@ -424,5 +503,20 @@ describe('TokenDecorationLayer compact-mode reveal', () => {
 
     rerender(<TokenDecorationLayer decorations={deco()} mode="compact" />);
     expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
+  });
+
+  it('lists condition names in the chip row once the token is revealed', () => {
+    render(
+      <TokenDecorationLayer
+        decorations={deco({
+          conditions: [{ name: 'Poisoned' }, { name: 'Prone' }],
+        })}
+        mode="compact"
+      />
+    );
+    expect(screen.queryByText('Poisoned · Prone')).not.toBeInTheDocument();
+
+    firePointer('pointerdown', 120, 220);
+    expect(screen.getByText('Poisoned · Prone')).toBeInTheDocument();
   });
 });

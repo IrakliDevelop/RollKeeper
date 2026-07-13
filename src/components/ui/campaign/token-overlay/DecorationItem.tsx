@@ -3,6 +3,8 @@
 import { getHpTierBarColor } from '@/utils/hpColor';
 
 import { ChipRow } from './ChipRow';
+import { ConcentrationRing } from './ConcentrationRing';
+import { ConditionStrip } from './ConditionStrip';
 import { DeadGlyph, PieceGlyph } from './TokenGlyphs';
 
 import type { DecoratedTokenRect } from './TokenDecorationLayer.hooks';
@@ -59,10 +61,14 @@ function InTokenBar({
 
 /**
  * One token's decoration: an in-token HP bar (full/compact, bar/exact kinds),
- * a centered skull when dead, and a chip row below the token with the name
- * plus an exact-numbers or label-state chip. In full mode the chip row is
- * always shown; in compact mode it only appears when `showChipRow` is set
- * (the token is hovered or tap-revealed — see `useCompactReveal`).
+ * a centered skull when dead, a condition icon strip inside the top edge, a
+ * concentration ring around the token, and a chip row below the token with
+ * the name plus an exact-numbers or label-state chip. In full mode the chip
+ * row and condition strip are always shown; in compact mode they only appear
+ * when `showChipRow` is set (the token is hovered or tap-revealed — see
+ * `useCompactReveal`), where the chip row instead lists condition names. The
+ * concentration ring shows in both full and compact modes. Dead entities keep
+ * skull precedence: no strip, no ring, no piece glyph.
  */
 export function DecorationItem({
   rect,
@@ -76,8 +82,13 @@ export function DecorationItem({
     deco.hp &&
     (deco.hp.kind === 'bar' || deco.hp.kind === 'exact');
   const shouldShowChipRow = mode === 'full' || showChipRow === true;
+  const conditions = deco.isDead ? undefined : deco.conditions;
+  const hasConditions = conditions !== undefined && conditions.length > 0;
   return (
     <div style={{ opacity: deco.isDead ? 0.75 : 1 }}>
+      {!deco.isDead && deco.isConcentrating && (
+        <ConcentrationRing rect={rect} />
+      )}
       {deco.isDead && <DeadGlyph rect={rect} cell={cell} />}
       {showBar && (
         <InTokenBar rect={rect} cell={cell} hp={deco.hp as BarLikeHp} />
@@ -85,7 +96,21 @@ export function DecorationItem({
       {!deco.isDead && deco.chessPiece && (
         <PieceGlyph rect={rect} deco={deco} />
       )}
-      {shouldShowChipRow && <ChipRow rect={rect} cell={cell} deco={deco} />}
+      {hasConditions && shouldShowChipRow && (
+        <ConditionStrip rect={rect} cell={cell} conditions={conditions} />
+      )}
+      {shouldShowChipRow && (
+        <ChipRow
+          rect={rect}
+          cell={cell}
+          deco={deco}
+          conditionNames={
+            mode === 'compact' && hasConditions
+              ? conditions.map(c => c.name)
+              : undefined
+          }
+        />
+      )}
     </div>
   );
 }

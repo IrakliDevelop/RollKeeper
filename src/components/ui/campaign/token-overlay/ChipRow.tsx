@@ -16,10 +16,13 @@ export function ChipRow({
   rect,
   cell,
   deco,
+  conditionNames,
 }: {
   rect: DecoratedTokenRect;
   cell: number;
   deco: TokenDecoration;
+  /** Compact-reveal only: joined condition names shown as one chip. */
+  conditionNames?: string[];
 }) {
   const showHpChip = !deco.isDead && deco.hp;
   return (
@@ -60,6 +63,14 @@ export function ChipRow({
           style={{ fontSize: cell * 0.22, padding: `0 ${cell * 0.15}px` }}
         >
           {deco.hp.text}
+        </span>
+      )}
+      {conditionNames && conditionNames.length > 0 && (
+        <span
+          className="bg-surface-raised/90 border-divider text-body rounded-full border whitespace-nowrap"
+          style={{ fontSize: cell * 0.2, padding: `0 ${cell * 0.12}px` }}
+        >
+          {conditionNames.join(' · ')}
         </span>
       )}
     </div>
