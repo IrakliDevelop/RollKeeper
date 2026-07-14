@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   Plus,
@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
 import { CombatConfigDialog } from '@/components/ui/encounter/CombatConfigDialog';
+import { findLinkedBattleMap } from '@/utils/battleMapLinks';
 import { Encounter } from '@/types/encounter';
 import type { BattleMap } from '@/types/battlemap';
 
@@ -29,15 +30,6 @@ interface EncounterListProps {
 export function EncounterList({ campaignCode }: EncounterListProps) {
   const { encounters, createEncounter, deleteEncounter } = useEncounterStore();
   const battleMaps = useBattleMapStore(s => s.getBattleMaps)(campaignCode);
-  const encounterToMap = React.useMemo(() => {
-    const map = new globalThis.Map<string, BattleMap>();
-    for (const bm of battleMaps) {
-      for (const eid of bm.linkedEncounterIds) {
-        map.set(eid, bm);
-      }
-    }
-    return map;
-  }, [battleMaps]);
   const [newName, setNewName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
@@ -129,7 +121,7 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
               key={encounter.id}
               encounter={encounter}
               campaignCode={campaignCode}
-              linkedBattleMap={encounterToMap.get(encounter.id)}
+              linkedBattleMap={findLinkedBattleMap(battleMaps, encounter.id)}
               onDelete={() => {
                 if (
                   confirm(`Delete "${encounter.name}"? This cannot be undone.`)
