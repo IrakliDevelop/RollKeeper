@@ -106,4 +106,42 @@ describe('BattleMapPickerDialog', () => {
       `/dm/campaign/ABC123/battlemaps/${created?.id}`
     );
   });
+
+  it('creates the map when Enter is pressed in the name input', () => {
+    renderDialog();
+    const input = screen.getByLabelText('New battle map name');
+    fireEvent.change(input, { target: { value: 'Goblin Ambush' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    const created = useBattleMapStore
+      .getState()
+      .getBattleMaps('ABC123')
+      .find(m => m.name === 'Goblin Ambush');
+    expect(created).toBeDefined();
+    expect(created?.linkedEncounterIds).toContain('e1');
+    expect(pushMock).toHaveBeenCalledWith(
+      `/dm/campaign/ABC123/battlemaps/${created?.id}`
+    );
+  });
+
+  it('disables the create button when the name is empty or whitespace', () => {
+    renderDialog();
+    const input = screen.getByLabelText('New battle map name');
+    const createButton = screen.getByRole('button', { name: /create & open/i });
+    expect(createButton).toBeDisabled();
+
+    fireEvent.change(input, { target: { value: '   ' } });
+    expect(createButton).toBeDisabled();
+
+    fireEvent.change(input, { target: { value: 'Goblin Ambush' } });
+    expect(createButton).not.toBeDisabled();
+  });
+
+  it('shows an empty-state message when the campaign has no battle maps', () => {
+    renderDialog();
+    expect(
+      screen.getByText(
+        'No battle maps in this campaign yet — create one below.'
+      )
+    ).toBeInTheDocument();
+  });
 });
