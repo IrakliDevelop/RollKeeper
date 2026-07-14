@@ -6,7 +6,8 @@ import type { BattleMap } from '@/types/battlemap';
 
 export type BattleMapPageMode = 'setup' | 'play';
 
-function modeStorageKey(battleMapId: string): string {
+/** localStorage key for a map's persisted Setup|Play mode. */
+export function modeStorageKey(battleMapId: string): string {
   return `rollkeeper-battlemap-mode:${battleMapId}`;
 }
 
