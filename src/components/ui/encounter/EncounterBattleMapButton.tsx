@@ -34,12 +34,9 @@ export function EncounterBattleMapButton({
       {linked ? (
         <div className="flex items-center gap-0.5">
           <Link href={`/dm/campaign/${campaignCode}/battlemaps/${linked.id}`}>
-            <Button
-              variant="secondary"
-              size="sm"
-              leftIcon={<MapIcon size={16} />}
-            >
-              Open Battle Map
+            <Button variant="secondary" size="sm" aria-label="Open battle map">
+              <MapIcon size={16} aria-hidden="true" />
+              <span className="hidden sm:inline">Open Battle Map</span>
             </Button>
           </Link>
           <Button
@@ -57,9 +54,10 @@ export function EncounterBattleMapButton({
           variant="secondary"
           size="sm"
           onClick={() => setPickerOpen(true)}
-          leftIcon={<MapIcon size={16} />}
+          aria-label="Battle map"
         >
-          Battle Map
+          <MapIcon size={16} aria-hidden="true" />
+          <span className="hidden sm:inline">Battle Map</span>
         </Button>
       )}
       <BattleMapPickerDialog
