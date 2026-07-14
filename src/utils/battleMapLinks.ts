@@ -1,9 +1,11 @@
 import type { BattleMap } from '@/types/battlemap';
 
 /**
- * The battle map an encounter is linked to: first map whose
- * linkedEncounterIds contains the encounter — the same first-wins rule
- * EncounterList has always used for its "Map: X" chip.
+ * First map whose linkedEncounterIds contains the encounter.
+ * Deliberately first-wins: the old EncounterList memo was incidentally
+ * last-wins when an encounter was linked from several maps, a degenerate
+ * state the picker's switch flow (link new + unlink old) prevents;
+ * first-wins makes the resolution deterministic by list order.
  */
 export function findLinkedBattleMap(
   battleMaps: BattleMap[],
