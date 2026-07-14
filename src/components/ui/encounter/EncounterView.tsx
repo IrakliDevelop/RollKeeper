@@ -26,6 +26,7 @@ import { useInitiativeSubmissionSync } from '@/hooks/useInitiativeSubmissionSync
 import { buildSharedInitiative } from '@/utils/buildSharedInitiative';
 import { Button } from '@/components/ui/forms/button';
 import { CombatScreen } from './combat-screen/CombatScreen';
+import { EncounterBattleMapButton } from './EncounterBattleMapButton';
 import type { EntityActions } from './combat-screen/types';
 import { buildEntityActions } from './combat-screen/buildEntityActions';
 import { AddCombatantDialog } from './combat-screen/AddCombatantDialog';
@@ -337,6 +338,12 @@ export function EncounterView({
         onOpenAdd={() => setAddDialogOpen(true)}
         onOpenConfig={() => setConfigOpen(true)}
         backHref={`/dm/campaign/${campaignCode}/encounters`}
+        mapAction={
+          <EncounterBattleMapButton
+            campaignCode={campaignCode}
+            encounterId={encounterId}
+          />
+        }
       />
 
       {/* Add combatant dialog */}
