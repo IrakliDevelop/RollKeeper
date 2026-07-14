@@ -11,6 +11,8 @@ export interface CombatAppBarProps {
   onRename: (name: string) => void;
   onOpenAdd: () => void;
   onOpenConfig: () => void;
+  /** Optional battle-map action rendered before the Add button. */
+  mapAction?: React.ReactNode;
 }
 
 export function CombatAppBar({
@@ -19,6 +21,7 @@ export function CombatAppBar({
   onRename,
   onOpenAdd,
   onOpenConfig,
+  mapAction,
 }: CombatAppBarProps): React.JSX.Element {
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -85,6 +88,7 @@ export function CombatAppBar({
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        {mapAction}
         <Button
           variant="primary"
           size="sm"

@@ -30,6 +30,8 @@ export interface CombatScreenProps {
   onOpenAdd: () => void;
   onOpenConfig: () => void;
   backHref: string;
+  /** Optional battle-map action rendered in the header before the Add button. */
+  mapAction?: React.ReactNode;
 }
 
 export function CombatScreen({
@@ -51,6 +53,7 @@ export function CombatScreen({
   onOpenAdd,
   onOpenConfig,
   backHref,
+  mapAction,
 }: CombatScreenProps): React.JSX.Element {
   const isRail = useMediaQuery('(min-width: 1024px)');
   const [railSelectionId, setRailSelectionId] = useState<string | null>(null);
@@ -84,6 +87,7 @@ export function CombatScreen({
       onRename={onRename}
       onOpenAdd={onOpenAdd}
       onOpenConfig={onOpenConfig}
+      mapAction={mapAction}
     />
   );
 
