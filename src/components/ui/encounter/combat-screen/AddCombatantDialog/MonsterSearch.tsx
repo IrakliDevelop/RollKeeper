@@ -2,22 +2,31 @@
 
 import React from 'react';
 import { Search } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
 import type { ProcessedMonster } from '@/types/bestiary';
 
 interface MonsterSearchProps {
   query: string;
   onQueryChange: (q: string) => void;
   results: ProcessedMonster[];
+  total: number;
+  hasMore: boolean;
   loading: boolean;
+  loadingMore: boolean;
   onSelect: (m: ProcessedMonster) => void;
+  onLoadMore: () => void;
 }
 
 export function MonsterSearch({
   query,
   onQueryChange,
   results,
+  total,
+  hasMore,
   loading,
+  loadingMore,
   onSelect,
+  onLoadMore,
 }: MonsterSearchProps) {
   return (
     <div className="space-y-3 pb-4">
@@ -67,6 +76,22 @@ export function MonsterSearch({
           );
         })}
       </div>
+
+      {!loading && hasMore && (
+        <div className="flex flex-col items-center gap-1 pt-1">
+          <p className="text-muted text-xs font-medium">
+            Showing {results.length} of {total}
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onLoadMore}
+            disabled={loadingMore}
+          >
+            {loadingMore ? 'Loading…' : 'Load more'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

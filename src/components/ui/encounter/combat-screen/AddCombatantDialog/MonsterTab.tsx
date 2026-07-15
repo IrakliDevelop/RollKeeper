@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import type { ProcessedMonster } from '@/types/bestiary';
 import type { PlayerDisposition } from '@/types/encounter';
 import { MonsterSearch } from './MonsterSearch';
 import { MonsterDetail } from './MonsterDetail';
+import { useMonsterSearch } from '@/hooks/useMonsterSearch';
 
 interface MonsterTabProps {
   selected: ProcessedMonster | null;
@@ -39,35 +40,16 @@ export function MonsterTab({
   disposition,
   onDispositionChange,
 }: MonsterTabProps) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<ProcessedMonster[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const search = useCallback(async (q: string) => {
-    if (q.length < 2) {
-      setResults([]);
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/api/bestiary/search?q=${encodeURIComponent(q)}&limit=20`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setResults(data.monsters ?? []);
-      }
-    } catch {
-      // silently fail
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const t = setTimeout(() => search(query), 300);
-    return () => clearTimeout(t);
-  }, [query, search]);
+  const {
+    query,
+    setQuery,
+    results,
+    total,
+    hasMore,
+    loading,
+    loadingMore,
+    loadMore,
+  } = useMonsterSearch();
 
   const handleSelect = (m: ProcessedMonster) => {
     onSelect(m);
@@ -102,8 +84,12 @@ export function MonsterTab({
       query={query}
       onQueryChange={setQuery}
       results={results}
+      total={total}
+      hasMore={hasMore}
       loading={loading}
+      loadingMore={loadingMore}
       onSelect={handleSelect}
+      onLoadMore={loadMore}
     />
   );
 }
