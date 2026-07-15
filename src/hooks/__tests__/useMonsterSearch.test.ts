@@ -164,6 +164,62 @@ describe('useMonsterSearch', () => {
     expect(result.current.loadingMore).toBe(false);
   });
 
+  it('ignores a stale response whose body parses after a newer search settles', async () => {
+    // Two-level deferred: resolve the response object (headers) and the
+    // json() body independently, so the guard-vs-parse ordering is pinned.
+    interface DeferredCall {
+      resolveResponse: () => void;
+      resolveBody: (body: unknown) => void;
+    }
+    const calls: DeferredCall[] = [];
+    const fetchFn = vi.fn(() => {
+      let resolveRes!: (value: unknown) => void;
+      let resolveBody!: (value: unknown) => void;
+      const bodyPromise = new Promise(r => {
+        resolveBody = r;
+      });
+      const resPromise = new Promise(r => {
+        resolveRes = r;
+      });
+      calls.push({
+        resolveResponse: () =>
+          resolveRes({ ok: true, status: 200, json: () => bodyPromise }),
+        resolveBody,
+      });
+      return resPromise;
+    });
+    global.fetch = fetchFn as unknown as typeof global.fetch;
+
+    const { result } = renderHook(() => useMonsterSearch());
+
+    // Search A: headers arrive while A is still current; body keeps parsing
+    act(() => result.current.setQuery('guard'));
+    await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      calls[0].resolveResponse();
+    });
+
+    // Search B fires and fully settles
+    act(() => result.current.setQuery('drake'));
+    await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2));
+    await act(async () => {
+      calls[1].resolveResponse();
+      calls[1].resolveBody({ monsters: [drake], total: 1, hasMore: false });
+    });
+    await waitFor(() =>
+      expect(result.current.results[0]?.name).toBe('Guard Drake')
+    );
+
+    // A's body finally finishes parsing — its data must be ignored
+    await act(async () => {
+      calls[0].resolveBody({ monsters: [guard], total: 3, hasMore: true });
+    });
+
+    expect(result.current.results.map(m => m.name)).toEqual(['Guard Drake']);
+    expect(result.current.total).toBe(1);
+    expect(result.current.hasMore).toBe(false);
+  });
+
   it('fails silently on fetch error', async () => {
     mockFetchResponse(500, { error: 'boom' });
     const { result } = renderHook(() => useMonsterSearch());
