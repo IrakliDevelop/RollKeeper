@@ -54,11 +54,15 @@ export function useMonsterSearch(): UseMonsterSearchResult {
       const res = await fetch(
         `/api/bestiary/search?q=${encodeURIComponent(q)}&limit=${PAGE_SIZE}`
       );
-      if (res.ok && searchId === searchIdRef.current) {
+      if (res.ok) {
+        // Parse first, then guard: json() awaits the body, and a newer
+        // search may supersede this one while it is still parsing.
         const data: SearchResponse = await res.json();
-        setResults(data.monsters ?? []);
-        setTotal(data.total ?? 0);
-        setHasMore(data.hasMore ?? false);
+        if (searchId === searchIdRef.current) {
+          setResults(data.monsters ?? []);
+          setTotal(data.total ?? 0);
+          setHasMore(data.hasMore ?? false);
+        }
       }
     } catch {
       // silently fail
@@ -77,11 +81,15 @@ export function useMonsterSearch(): UseMonsterSearchResult {
       const res = await fetch(
         `/api/bestiary/search?q=${encodeURIComponent(query)}&limit=${PAGE_SIZE}&offset=${results.length}`
       );
-      if (res.ok && searchId === searchIdRef.current) {
+      if (res.ok) {
+        // Parse first, then guard: json() awaits the body, and a newer
+        // search may supersede this request while it is still parsing.
         const data: SearchResponse = await res.json();
-        setResults(prev => [...prev, ...(data.monsters ?? [])]);
-        setTotal(data.total ?? 0);
-        setHasMore(data.hasMore ?? false);
+        if (searchId === searchIdRef.current) {
+          setResults(prev => [...prev, ...(data.monsters ?? [])]);
+          setTotal(data.total ?? 0);
+          setHasMore(data.hasMore ?? false);
+        }
       }
     } catch {
       // silently fail
