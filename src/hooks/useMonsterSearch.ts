@@ -13,12 +13,25 @@ interface SearchResponse {
   hasMore?: boolean;
 }
 
+export interface UseMonsterSearchResult {
+  query: string;
+  setQuery: (q: string) => void;
+  results: ProcessedMonster[];
+  total: number;
+  hasMore: boolean;
+  /** Initial search in flight. */
+  loading: boolean;
+  /** Load-more request in flight. */
+  loadingMore: boolean;
+  loadMore: () => void;
+}
+
 /**
  * Debounced bestiary search with load-more pagination for the
  * Add Combatant monster tab. Results come back relevance-ranked
  * from /api/bestiary/search.
  */
-export function useMonsterSearch() {
+export function useMonsterSearch(): UseMonsterSearchResult {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ProcessedMonster[]>([]);
   const [total, setTotal] = useState(0);
@@ -50,9 +63,9 @@ export function useMonsterSearch() {
     } catch {
       // silently fail
     } finally {
-      if (searchId === searchIdRef.current) {
-        setLoading(false);
-      }
+      // Unconditional: a superseded search must never leave the flag
+      // stuck (the stale-response guard above still protects the data).
+      setLoading(false);
     }
   }, []);
 
@@ -73,9 +86,10 @@ export function useMonsterSearch() {
     } catch {
       // silently fail
     } finally {
-      if (searchId === searchIdRef.current) {
-        setLoadingMore(false);
-      }
+      // Unconditional: if a new query superseded this request, the
+      // searchId guard above already ignored its data, but the flag
+      // must still clear or loadMore would be blocked forever.
+      setLoadingMore(false);
     }
   }, [query, results.length, hasMore, loading, loadingMore]);
 
