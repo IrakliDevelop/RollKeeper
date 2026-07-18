@@ -60,8 +60,12 @@ export async function DELETE(
       }
     }
 
-    // Marker first: a concurrent player sync either lands before it (its
-    // write is deleted just below) or sees it and gets 410.
+    // Marker first: this closes most of the kick-vs-sync race — a concurrent
+    // player sync either lands before it (its write is deleted just below)
+    // or sees it and gets 410. A narrow interleaving remains: a sync that
+    // passed its marker check but writes after our deletes below can briefly
+    // resurrect the entry until TTL. The client's self-DELETE on 410 cleans
+    // that up.
     await redis.set(campaignRemovedKey(code, playerId), '1', {
       ex: SLIDING_TTL_SECONDS,
     });

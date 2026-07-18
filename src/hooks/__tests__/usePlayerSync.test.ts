@@ -228,13 +228,37 @@ describe('usePlayerSync', () => {
     });
 
     expect(onRemoved).toHaveBeenCalledTimes(1);
-    // exactly one fetch: the sync call — no /join rejoin attempt
-    expect(fetchFn).toHaveBeenCalledTimes(1);
+    // two fetches: the sync call, then the self-removal DELETE
+    // (closes the kick-vs-sync resurrection race) — no /join rejoin attempt
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    const [secondUrl, secondOpts] = (fetchFn as ReturnType<typeof vi.fn>).mock
+      .calls[1];
+    expect(secondUrl).toBe('/api/campaign/ABC123/players/char-1');
+    expect(secondOpts.method).toBe('DELETE');
 
     const char = usePlayerStore.getState().characters[0];
     expect(char.campaignCode).toBeUndefined();
     expect(char.syncEnabled).toBeUndefined();
     expect(result.current.syncStatus).toBe('idle');
+  });
+
+  it('queued pending sync during a 410 does not fire the removal callback twice', async () => {
+    const characterData = seedLinkedCharacter();
+    mockFetchResponse(410, { error: 'removed' });
+    const onRemoved = vi.fn();
+
+    const { result } = renderHook(() =>
+      usePlayerSync({ characterId: 'char-1', onRemovedFromCampaign: onRemoved })
+    );
+
+    await act(async () => {
+      const first = result.current.syncNow(characterData);
+      // second call while first is in flight → queued into pendingSyncData
+      const second = result.current.syncNow(characterData);
+      await Promise.all([first, second]);
+    });
+
+    expect(onRemoved).toHaveBeenCalledTimes(1);
   });
 
   it('non-410 failure still attempts rejoin (existing behavior preserved)', async () => {
