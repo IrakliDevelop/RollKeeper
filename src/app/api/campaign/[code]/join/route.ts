@@ -4,6 +4,7 @@ import {
   campaignKey,
   campaignPlayersKey,
   campaignPlayerKey,
+  campaignRemovedKey,
   refreshCampaignTTL,
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
@@ -56,6 +57,7 @@ export async function POST(
       redis.set(campaignPlayerKey(code, playerId), JSON.stringify(playerData), {
         ex: SLIDING_TTL_SECONDS,
       }),
+      redis.del(campaignRemovedKey(code, playerId)),
       refreshCampaignTTL(redis, code),
     ]);
 

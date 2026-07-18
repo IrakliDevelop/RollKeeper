@@ -84,4 +84,28 @@ describe('POST /api/campaign/[code]/join', () => {
     );
     expect(res.status).toBe(400);
   });
+
+  it('clears the removal marker so a kicked player can rejoin', async () => {
+    seedRedis('campaign:ABC123', createMockCampaignData());
+    seedRedis('campaign:ABC123:removed:player-1', '1');
+
+    const req = createNextRequest('/api/campaign/ABC123/join', {
+      method: 'POST',
+      body: {
+        playerId: 'player-1',
+        playerName: 'Alice',
+        characterId: 'char-1',
+        characterName: 'Thorn',
+        characterData: createMockCharacterState(),
+      },
+    });
+
+    const res = await POST(
+      req as NextRequest,
+      createRouteParams({ code: 'ABC123' })
+    );
+
+    expect(res.status).toBe(200);
+    expect(getRedisStore().has('campaign:ABC123:removed:player-1')).toBe(false);
+  });
 });
