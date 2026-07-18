@@ -1,8 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  cleanup,
+} from '@testing-library/react';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 import type { CampaignPlayerData } from '@/types/campaign';
 import type { DmMessage } from '@/types/sharedState';
+
+afterEach(cleanup);
 
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => {
@@ -92,6 +100,35 @@ describe('PlayerSummaryCard', () => {
   it('displays race', () => {
     render(<PlayerSummaryCard player={mockPlayer} />);
     expect(screen.getAllByText('Dwarf').length).toBeGreaterThan(0);
+  });
+});
+
+describe('PlayerSummaryCard remove action', () => {
+  it('renders remove button when onRemove is provided and calls it without triggering card onClick', () => {
+    const onRemove = vi.fn();
+    const onClick = vi.fn();
+    render(
+      <PlayerSummaryCard
+        player={mockPlayer}
+        onRemove={onRemove}
+        onClick={onClick}
+      />
+    );
+
+    const btn = screen.getByRole('button', {
+      name: /remove .* from campaign/i,
+    });
+    fireEvent.click(btn);
+
+    expect(onRemove).toHaveBeenCalledTimes(1);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('does not render remove button without onRemove', () => {
+    render(<PlayerSummaryCard player={mockPlayer} />);
+    expect(
+      screen.queryByRole('button', { name: /remove .* from campaign/i })
+    ).toBeNull();
   });
 });
 

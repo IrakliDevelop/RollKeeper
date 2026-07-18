@@ -15,6 +15,7 @@ import {
   Eye,
   Lightbulb,
   Search,
+  UserX,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import { CampaignPlayerData } from '@/types/campaign';
@@ -97,6 +98,7 @@ interface PlayerSummaryCardProps {
   counterValue?: number;
   onAdjustCounter?: (delta: number) => void;
   onClick?: () => void;
+  onRemove?: () => void;
 }
 
 function ensureArray<T>(value: unknown): T[] {
@@ -109,6 +111,7 @@ export function PlayerSummaryCard({
   counterValue = 0,
   onAdjustCounter,
   onClick,
+  onRemove,
 }: PlayerSummaryCardProps) {
   const { characterData: char } = player;
   const weapons = ensureArray<(typeof char.weapons)[number]>(char.weapons);
@@ -186,8 +189,24 @@ export function PlayerSummaryCard({
                   </span>
                 </div>
               </div>
-              <div className="text-muted max-w-[40%] shrink-0 truncate text-right text-[10px] leading-tight">
-                {player.playerName}
+              <div className="flex shrink-0 items-start gap-1">
+                <div className="text-muted max-w-[8rem] truncate text-right text-[10px] leading-tight">
+                  {player.playerName}
+                </div>
+                {onRemove && (
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      onRemove();
+                    }}
+                    onKeyDown={e => e.stopPropagation()}
+                    className="text-muted hover:text-accent-red-text hover:bg-accent-red-bg -mt-0.5 rounded p-1 transition-colors"
+                    title="Remove from campaign"
+                    aria-label={`Remove ${char.name || player.characterName} from campaign`}
+                  >
+                    <UserX size={14} />
+                  </button>
+                )}
               </div>
             </div>
 

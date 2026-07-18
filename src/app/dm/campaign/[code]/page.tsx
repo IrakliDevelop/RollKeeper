@@ -37,6 +37,7 @@ import { useDmCounterSync } from '@/hooks/useDmCounterSync';
 import { useDmStore } from '@/store/dmStore';
 import { BannerUpload } from '@/components/ui/campaign/BannerUpload';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
+import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
 import { CampaignPlayerData } from '@/types/campaign';
 import {
   SendItemDialog,
@@ -98,6 +99,8 @@ export default function CampaignViewPage() {
   const [messageTarget, setMessageTarget] = useState<
     CampaignPlayerData | null | 'all'
   >(null);
+  const [playerToRemove, setPlayerToRemove] =
+    useState<CampaignPlayerData | null>(null);
   const { toasts, addToast, dismissToast } = useToast();
   const knownPlayerIdsRef = useRef<Set<string>>(new Set());
 
@@ -191,6 +194,40 @@ export default function CampaignViewPage() {
     },
     [code, dmId, npcSendingNpcName, addToast]
   );
+
+  const handleRemovePlayer = useCallback(async () => {
+    if (!playerToRemove) return;
+    const target = playerToRemove;
+    try {
+      const res = await fetch(
+        `/api/campaign/${code}/players/${target.playerId}`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dmId }),
+        }
+      );
+      if (!res.ok) throw new Error('Failed to remove player');
+
+      // Prevent a "Player Joined" toast if they later rejoin legitimately,
+      // and keep the known-set consistent with the refreshed list.
+      knownPlayerIdsRef.current.delete(target.playerId);
+
+      addToast({
+        type: 'success',
+        title: 'Player Removed',
+        message: `${target.characterName} was removed from the campaign.`,
+      });
+      await refresh();
+    } catch (err) {
+      console.error('Failed to remove player:', err);
+      addToast({
+        type: 'error',
+        title: 'Failed',
+        message: 'Could not remove player. Try again.',
+      });
+    }
+  }, [playerToRemove, code, dmId, addToast, refresh]);
 
   const displayName = campaignName || localCampaign?.name || 'Campaign';
 
@@ -557,6 +594,7 @@ export default function CampaignViewPage() {
                         : undefined
                     }
                     onClick={() => setSelectedPlayer(player)}
+                    onRemove={() => setPlayerToRemove(player)}
                   />
                 ))}
               </div>
@@ -622,6 +660,16 @@ export default function CampaignViewPage() {
         targetPlayer={messageTarget === 'all' ? null : messageTarget}
         campaignCode={code}
         dmId={dmId}
+      />
+
+      <ConfirmationModal
+        isOpen={playerToRemove !== null}
+        onClose={() => setPlayerToRemove(null)}
+        onConfirm={handleRemovePlayer}
+        title="Remove Player"
+        message={`Remove ${playerToRemove?.characterName ?? 'this player'} from the campaign? Their synced data will be deleted. They can rejoin with the campaign code.`}
+        confirmText="Remove"
+        type="danger"
       />
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
