@@ -76,3 +76,11 @@ export const WithoutAvatarDark: Story = {
   ...WithoutAvatar,
   globals: { theme: 'dark' },
 };
+
+export const WithRemoveAction: Story = {
+  args: {
+    player: basePlayer,
+    onRemove: fn(),
+    onClick: fn(),
+  },
+};
