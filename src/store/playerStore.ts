@@ -296,6 +296,20 @@ export const usePlayerStore = create<PlayerStoreState>()(
       },
 
       deleteCharacter: characterId => {
+        const character = get().characters.find(c => c.id === characterId);
+        if (character?.campaignCode) {
+          // Best-effort: remove this character from the campaign so the DM's
+          // player list doesn't keep a stale entry. Local delete proceeds
+          // regardless of network state.
+          fetch(
+            `/api/campaign/${character.campaignCode}/players/${characterId}`,
+            {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ playerId: characterId }),
+            }
+          ).catch(() => {});
+        }
         set(state => ({
           characters: state.characters.filter(c => c.id !== characterId),
           activeCharacterId:

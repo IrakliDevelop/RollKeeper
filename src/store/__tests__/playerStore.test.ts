@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { vi } from 'vitest';
+import { mockFetchResponse } from '@/test/mocks/fetch';
 import { usePlayerStore } from '@/store/playerStore';
 
 function resetStore() {
@@ -82,6 +84,42 @@ describe('playerStore', () => {
       usePlayerStore.getState().createCharacter('Hero');
       usePlayerStore.getState().deleteCharacter('non-existent-id');
       expect(usePlayerStore.getState().characters).toHaveLength(1);
+    });
+
+    it('fires server-side campaign removal when character is campaign-linked', () => {
+      const fetchFn = mockFetchResponse(200, { success: true });
+      const id = usePlayerStore.getState().createCharacter('Linked Hero');
+      usePlayerStore.getState().updateCharacter(id, { campaignCode: 'ABC123' });
+
+      usePlayerStore.getState().deleteCharacter(id);
+
+      expect(fetchFn).toHaveBeenCalledWith(
+        `/api/campaign/ABC123/players/${id}`,
+        expect.objectContaining({ method: 'DELETE' })
+      );
+      expect(usePlayerStore.getState().characters).toHaveLength(0);
+    });
+
+    it('does not call the API when character has no campaign', () => {
+      const fetchFn = mockFetchResponse(200, { success: true });
+      const id = usePlayerStore.getState().createCharacter('Loner Hero');
+
+      usePlayerStore.getState().deleteCharacter(id);
+
+      expect(fetchFn).not.toHaveBeenCalled();
+      expect(usePlayerStore.getState().characters).toHaveLength(0);
+    });
+
+    it('still deletes locally when the removal request fails', () => {
+      global.fetch = vi.fn(() =>
+        Promise.reject(new Error('network down'))
+      ) as unknown as typeof global.fetch;
+      const id = usePlayerStore.getState().createCharacter('Offline Hero');
+      usePlayerStore.getState().updateCharacter(id, { campaignCode: 'ABC123' });
+
+      usePlayerStore.getState().deleteCharacter(id);
+
+      expect(usePlayerStore.getState().characters).toHaveLength(0);
     });
   });
 
