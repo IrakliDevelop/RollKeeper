@@ -1,14 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { usePlayerSync } from '@/hooks/usePlayerSync';
-import { usePlayerStore } from '@/store/playerStore';
+import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
 import {
   mockFetchResponse,
   mockFetchSequence,
   resetFetch,
 } from '@/test/mocks/fetch';
 import { createMockCharacterState } from '@/test/helpers';
-import type { CharacterState } from '@/types/character';
 
 function seedCharacter(overrides: Record<string, unknown> = {}) {
   const charData = createMockCharacterState({ id: 'char-test' });
@@ -34,6 +33,34 @@ function seedCharacter(overrides: Record<string, unknown> = {}) {
       },
     ],
   });
+}
+
+function seedLinkedCharacter() {
+  const characterData = createMockCharacterState({ id: 'char-1' });
+  usePlayerStore.setState({
+    characters: [
+      {
+        id: 'char-1',
+        name: 'Test Hero',
+        race: 'Human',
+        class: 'Fighter',
+        level: 5,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastPlayed: new Date(),
+        characterData,
+        tags: [],
+        isArchived: false,
+        campaignCode: 'ABC123',
+        campaignName: 'Test Campaign',
+        syncEnabled: true,
+        autoSync: true,
+      } as PlayerCharacter,
+    ],
+    activeCharacterId: 'char-1',
+    lastSelectedCharacterId: 'char-1',
+  });
+  return characterData;
 }
 
 describe('usePlayerSync', () => {
@@ -185,5 +212,87 @@ describe('usePlayerSync', () => {
     expect(char.campaignName).toBeUndefined();
     expect(char.syncEnabled).toBeUndefined();
     expect(result.current.syncStatus).toBe('idle');
+  });
+
+  it('on 410 clears campaign link, notifies, and does NOT attempt rejoin', async () => {
+    const characterData = seedLinkedCharacter();
+    const fetchFn = mockFetchResponse(410, { error: 'removed' });
+    const onRemoved = vi.fn();
+
+    const { result } = renderHook(() =>
+      usePlayerSync({ characterId: 'char-1', onRemovedFromCampaign: onRemoved })
+    );
+
+    await act(async () => {
+      await result.current.syncNow(characterData);
+    });
+
+    expect(onRemoved).toHaveBeenCalledTimes(1);
+    // exactly one fetch: the sync call — no /join rejoin attempt
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+
+    const char = usePlayerStore.getState().characters[0];
+    expect(char.campaignCode).toBeUndefined();
+    expect(char.syncEnabled).toBeUndefined();
+    expect(result.current.syncStatus).toBe('idle');
+  });
+
+  it('non-410 failure still attempts rejoin (existing behavior preserved)', async () => {
+    const characterData = seedLinkedCharacter();
+    const fetchFn = mockFetchResponse(500, { error: 'boom' });
+    const onRemoved = vi.fn();
+
+    const { result } = renderHook(() =>
+      usePlayerSync({ characterId: 'char-1', onRemovedFromCampaign: onRemoved })
+    );
+
+    await act(async () => {
+      await result.current.syncNow(characterData);
+    });
+
+    expect(onRemoved).not.toHaveBeenCalled();
+    // sync call + rejoin attempt
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(usePlayerStore.getState().characters[0].campaignCode).toBe('ABC123');
+  });
+
+  it('leaveCampaign fires server-side removal and clears local link', async () => {
+    seedLinkedCharacter();
+    const fetchFn = mockFetchResponse(200, { success: true });
+
+    const { result } = renderHook(() =>
+      usePlayerSync({ characterId: 'char-1' })
+    );
+
+    act(() => {
+      result.current.leaveCampaign();
+    });
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      '/api/campaign/ABC123/players/char-1',
+      expect.objectContaining({ method: 'DELETE' })
+    );
+    expect(
+      usePlayerStore.getState().characters[0].campaignCode
+    ).toBeUndefined();
+  });
+
+  it('leaveCampaign still clears local link when the server call fails', async () => {
+    seedLinkedCharacter();
+    global.fetch = vi.fn(() =>
+      Promise.reject(new Error('network down'))
+    ) as unknown as typeof global.fetch;
+
+    const { result } = renderHook(() =>
+      usePlayerSync({ characterId: 'char-1' })
+    );
+
+    act(() => {
+      result.current.leaveCampaign();
+    });
+
+    expect(
+      usePlayerStore.getState().characters[0].campaignCode
+    ).toBeUndefined();
   });
 });

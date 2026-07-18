@@ -4,6 +4,7 @@ import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
 
 interface UsePlayerSyncOptions {
   characterId: string;
+  onRemovedFromCampaign?: () => void;
 }
 
 interface UsePlayerSyncResult {
@@ -20,6 +21,7 @@ interface UsePlayerSyncResult {
 
 export function usePlayerSync({
   characterId,
+  onRemovedFromCampaign,
 }: UsePlayerSyncOptions): UsePlayerSyncResult {
   const { getCharacterById, updateCharacter } = usePlayerStore();
   const character = getCharacterById(characterId);
@@ -37,6 +39,17 @@ export function usePlayerSync({
   const lastSyncedAt = character?.lastSyncedAt ?? null;
 
   const rejoinInFlight = useRef(false);
+
+  const clearCampaignLink = useCallback(() => {
+    updateCharacter(characterId, {
+      campaignCode: undefined,
+      campaignName: undefined,
+      syncEnabled: undefined,
+      autoSync: undefined,
+      lastSyncedAt: undefined,
+    } as Partial<PlayerCharacter>);
+    setSyncStatus('idle');
+  }, [characterId, updateCharacter]);
 
   const attemptRejoin = useCallback(
     async (characterData: CharacterState) => {
@@ -89,6 +102,13 @@ export function usePlayerSync({
           }),
         });
 
+        if (res.status === 410) {
+          // DM removed this player. Do not rejoin; unlink locally.
+          clearCampaignLink();
+          onRemovedFromCampaign?.();
+          return;
+        }
+
         if (!res.ok) {
           const rejoined = await attemptRejoin(characterData);
           if (!rejoined) {
@@ -114,7 +134,15 @@ export function usePlayerSync({
         }
       }
     },
-    [campaignCode, syncEnabled, characterId, updateCharacter, attemptRejoin]
+    [
+      campaignCode,
+      syncEnabled,
+      characterId,
+      updateCharacter,
+      attemptRejoin,
+      clearCampaignLink,
+      onRemovedFromCampaign,
+    ]
   );
 
   const toggleAutoSync = useCallback(() => {
@@ -123,15 +151,17 @@ export function usePlayerSync({
   }, [character, characterId, autoSync, updateCharacter]);
 
   const leaveCampaign = useCallback(() => {
-    updateCharacter(characterId, {
-      campaignCode: undefined,
-      campaignName: undefined,
-      syncEnabled: undefined,
-      autoSync: undefined,
-      lastSyncedAt: undefined,
-    } as Partial<PlayerCharacter>);
-    setSyncStatus('idle');
-  }, [characterId, updateCharacter]);
+    if (campaignCode) {
+      // Best-effort server-side cleanup so the DM's list doesn't keep a
+      // stale entry for 60 days; local unlink proceeds regardless.
+      fetch(`/api/campaign/${campaignCode}/players/${characterId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: characterId }),
+      }).catch(() => {});
+    }
+    clearCampaignLink();
+  }, [campaignCode, characterId, clearCampaignLink]);
 
   return {
     syncStatus,

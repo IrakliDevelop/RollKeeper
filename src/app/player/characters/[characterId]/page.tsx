@@ -103,6 +103,15 @@ export default function CharacterSheet() {
     addToast,
   } = useToast();
 
+  const handleRemovedFromCampaign = useCallback(() => {
+    addToast({
+      type: 'info',
+      title: 'Removed from Campaign',
+      message: 'The DM removed this character from the campaign.',
+      duration: 8000,
+    });
+  }, [addToast]);
+
   // Warn if a save fails because localStorage is full (auto-save writes here).
   useStorageQuotaListener(
     useCallback(() => {
@@ -241,7 +250,10 @@ export default function CharacterSheet() {
   const [isSendingItem, setIsSendingItem] = useState(false);
   const tabbedSheetRef = useRef<TabbedCharacterSheetRef>(null);
 
-  const playerSync = usePlayerSync({ characterId });
+  const playerSync = usePlayerSync({
+    characterId,
+    onRemovedFromCampaign: handleRemovedFromCampaign,
+  });
 
   // Location sync — used to conditionally show Map tab
   const { locations: syncedLocations } = useLocationSync(
