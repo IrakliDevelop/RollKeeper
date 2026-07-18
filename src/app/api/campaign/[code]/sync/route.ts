@@ -3,6 +3,7 @@ import {
   getRedis,
   campaignPlayersKey,
   campaignPlayerKey,
+  campaignRemovedKey,
   refreshCampaignTTL,
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
@@ -26,6 +27,11 @@ export async function POST(
     }
 
     const redis = getRedis();
+
+    const removed = await redis.exists(campaignRemovedKey(code, playerId));
+    if (removed) {
+      return NextResponse.json({ error: 'removed' }, { status: 410 });
+    }
 
     const playerData: CampaignPlayerData = {
       playerId,
