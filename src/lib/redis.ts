@@ -52,6 +52,10 @@ export function campaignTransfersKey(code: string, playerId: string): string {
   return `campaign:${code}:transfers:${playerId}`;
 }
 
+export function campaignRemovedKey(code: string, playerId: string): string {
+  return `campaign:${code}:removed:${playerId}`;
+}
+
 export function campaignLocationsKey(code: string): string {
   return `campaign:${code}:locations`;
 }

@@ -178,6 +178,8 @@ vi.mock('@/lib/redis', () => ({
     `campaign:${code}:effects:${playerId}`,
   campaignTransfersKey: (code: string, playerId: string) =>
     `campaign:${code}:transfers:${playerId}`,
+  campaignRemovedKey: (code: string, playerId: string) =>
+    `campaign:${code}:removed:${playerId}`,
   campaignLocationsKey: (code: string) => `campaign:${code}:locations`,
   campaignLocationKey: (code: string, locationId: string) =>
     `campaign:${code}:location:${locationId}`,
