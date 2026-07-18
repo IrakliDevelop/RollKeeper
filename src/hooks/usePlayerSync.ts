@@ -51,6 +51,19 @@ export function usePlayerSync({
     setSyncStatus('idle');
   }, [characterId, updateCharacter]);
 
+  const leaveCampaign = useCallback(() => {
+    if (campaignCode) {
+      // Best-effort server-side cleanup so the DM's list doesn't keep a
+      // stale entry for 60 days; local unlink proceeds regardless.
+      fetch(`/api/campaign/${campaignCode}/players/${characterId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: characterId }),
+      }).catch(() => {});
+    }
+    clearCampaignLink();
+  }, [campaignCode, characterId, clearCampaignLink]);
+
   const attemptRejoin = useCallback(
     async (characterData: CharacterState) => {
       if (rejoinInFlight.current || !campaignCode) return false;
@@ -103,8 +116,11 @@ export function usePlayerSync({
         });
 
         if (res.status === 410) {
-          // DM removed this player. Do not rejoin; unlink locally.
-          clearCampaignLink();
+          // DM removed this player. Do not rejoin; clean up server side
+          // (closes the kick-vs-sync race that can resurrect our entry)
+          // and unlink locally.
+          pendingSyncData.current = null;
+          leaveCampaign();
           onRemovedFromCampaign?.();
           return;
         }
@@ -140,7 +156,7 @@ export function usePlayerSync({
       characterId,
       updateCharacter,
       attemptRejoin,
-      clearCampaignLink,
+      leaveCampaign,
       onRemovedFromCampaign,
     ]
   );
@@ -149,19 +165,6 @@ export function usePlayerSync({
     if (!character) return;
     updateCharacter(characterId, { autoSync: !autoSync });
   }, [character, characterId, autoSync, updateCharacter]);
-
-  const leaveCampaign = useCallback(() => {
-    if (campaignCode) {
-      // Best-effort server-side cleanup so the DM's list doesn't keep a
-      // stale entry for 60 days; local unlink proceeds regardless.
-      fetch(`/api/campaign/${campaignCode}/players/${characterId}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerId: characterId }),
-      }).catch(() => {});
-    }
-    clearCampaignLink();
-  }, [campaignCode, characterId, clearCampaignLink]);
 
   return {
     syncStatus,
