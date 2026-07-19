@@ -165,21 +165,27 @@ export const Caster: Story = {
     await waitFor(() =>
       expect(screen.getByText('Aria the Wise')).toBeInTheDocument()
     );
-    // Overview is the default tab
-    await expect(screen.getByText('Skills')).toBeInTheDocument();
-    // SpellSlotsSection still lives on Overview until Task 4
-    await expect(screen.getByText('Spell Slots')).toBeInTheDocument();
+    // Spell Slots section no longer on Overview
+    await expect(screen.queryByText('Spell Slots')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /spells/i }));
+    // Stats header from character utils: wizard INT 18, level 5 → DC 15, Atk +7
+    await expect(screen.getByText(/save dc: 15/i)).toBeInTheDocument();
+    await expect(screen.getByText(/spell attack: \+7/i)).toBeInTheDocument();
+    // Level groups
+    await expect(screen.getByText('Cantrips')).toBeInTheDocument();
+    await expect(screen.getByText('Level 1')).toBeInTheDocument();
+    await expect(screen.getByText('Level 2')).toBeInTheDocument();
+    // Slot counts: remaining/max
     await expect(screen.getByText('3/4')).toBeInTheDocument();
     await expect(screen.getByText('1/3')).toBeInTheDocument();
-    await expect(
-      screen.getByRole('button', { name: /inventory/i })
-    ).toBeInTheDocument();
-    // Inventory content hidden until its tab is clicked
-    await expect(screen.queryByText('Quarterstaff')).not.toBeInTheDocument();
+    // Spells listed, prepared marking
+    await expect(screen.getByText('Shield')).toBeInTheDocument();
+    await expect(screen.getByText('Identify')).toBeInTheDocument();
+    const notPrepared = screen.getAllByText('Not prepared');
+    await expect(notPrepared).toHaveLength(2); // Identify, Web
+    // Inventory still works
     await userEvent.click(screen.getByRole('button', { name: /inventory/i }));
-    await expect(screen.getByText('Weapons')).toBeInTheDocument();
     await expect(screen.getByText('Quarterstaff')).toBeInTheDocument();
-    await expect(screen.queryByText('Skills')).not.toBeInTheDocument();
   },
 };
 
@@ -188,7 +194,13 @@ export const Warlock: Story = {
   play: async ({ canvasElement }) => {
     const screen = body(canvasElement);
     await waitFor(() => expect(screen.getByText('Vex')).toBeInTheDocument());
-    await expect(screen.getByText('Skills')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /spells/i }));
+    await expect(screen.getByText('Pact Magic (Lv 3)')).toBeInTheDocument();
+    // 2 pact slots, 1 used → 1/2
+    await expect(screen.getByText('1/2')).toBeInTheDocument();
+    await expect(screen.getByText('Eldritch Blast')).toBeInTheDocument();
+    // Warlock has no per-spell isPrepared flags → no prepared/unprepared marking
+    await expect(screen.queryByText('Not prepared')).not.toBeInTheDocument();
   },
 };
 
@@ -197,9 +209,9 @@ export const NonCaster: Story = {
   play: async ({ canvasElement }) => {
     const screen = body(canvasElement);
     await waitFor(() => expect(screen.getByText('Grunk')).toBeInTheDocument());
-    await expect(screen.getByText('Skills')).toBeInTheDocument();
-    // Non-caster: no spell slots section
-    await expect(screen.queryByText('Spell Slots')).not.toBeInTheDocument();
+    await expect(
+      screen.queryByRole('button', { name: /spells/i })
+    ).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /inventory/i }));
     await expect(screen.getByText('Greataxe')).toBeInTheDocument();
   },
