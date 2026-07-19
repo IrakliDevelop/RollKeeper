@@ -52,11 +52,31 @@ export async function POST(
       lastSynced: new Date().toISOString(),
     };
 
+    // Rejoin must not clobber a newer snapshot pushed by another tab:
+    // keep whichever blob has the higher character revision.
+    const existingRaw = await redis.get<string>(
+      campaignPlayerKey(code, playerId)
+    );
+    let dataToStore = playerData;
+    if (existingRaw) {
+      const existing: CampaignPlayerData =
+        typeof existingRaw === 'string' ? JSON.parse(existingRaw) : existingRaw;
+      const storedRevision = existing.characterData?.revision ?? 0;
+      const incomingRevision = characterData.revision ?? 0;
+      if (incomingRevision < storedRevision) {
+        dataToStore = existing;
+      }
+    }
+
     await Promise.all([
       redis.sadd(campaignPlayersKey(code), playerId),
-      redis.set(campaignPlayerKey(code, playerId), JSON.stringify(playerData), {
-        ex: SLIDING_TTL_SECONDS,
-      }),
+      redis.set(
+        campaignPlayerKey(code, playerId),
+        JSON.stringify(dataToStore),
+        {
+          ex: SLIDING_TTL_SECONDS,
+        }
+      ),
       redis.del(campaignRemovedKey(code, playerId)),
       refreshCampaignTTL(redis, code),
     ]);

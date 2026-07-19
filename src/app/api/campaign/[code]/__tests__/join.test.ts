@@ -108,4 +108,41 @@ describe('POST /api/campaign/[code]/join', () => {
     expect(res.status).toBe(200);
     expect(getRedisStore().has('campaign:ABC123:removed:player-1')).toBe(false);
   });
+
+  it('keeps the newer stored blob when a stale tab rejoins', async () => {
+    // (reuse this file's existing campaign seeding — join 404s without it)
+    const base = createMockCharacterState();
+    seedRedis(
+      'campaign:ABC123:player:player-1',
+      JSON.stringify({
+        playerId: 'player-1',
+        playerName: 'Alice',
+        characterId: 'char-1',
+        characterName: 'Thorn',
+        characterData: { ...base, revision: 5 },
+        lastSynced: '2026-07-19T00:00:00.000Z',
+      })
+    );
+
+    const req = createNextRequest('/api/campaign/ABC123/join', {
+      method: 'POST',
+      body: {
+        playerId: 'player-1',
+        playerName: 'Alice',
+        characterId: 'char-1',
+        characterName: 'Thorn',
+        characterData: { ...base, revision: 2 },
+      },
+    });
+    const res = await POST(
+      req as NextRequest,
+      createRouteParams({ code: 'ABC123' })
+    );
+    expect(res.status).toBe(200);
+
+    const stored = JSON.parse(
+      getRedisStore().get('campaign:ABC123:player:player-1')!
+    );
+    expect(stored.characterData.revision).toBe(5);
+  });
 });
