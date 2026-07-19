@@ -110,7 +110,7 @@ const warlockPlayer: CampaignPlayerData = {
       makeSpell({ name: 'Eldritch Blast', level: 0 }),
       makeSpell({ name: 'Hex', level: 1, concentration: true }),
     ],
-    spellSlots: emptySlots,
+    spellSlots: { ...emptySlots },
     pactMagic: { slots: { max: 2, used: 1 }, level: 3 },
   }),
 };
@@ -124,7 +124,7 @@ const nonCasterPlayer: CampaignPlayerData = {
   characterData: makeCharacter({
     name: 'Grunk',
     spells: [],
-    spellSlots: emptySlots,
+    spellSlots: { ...emptySlots },
     weapons: [
       {
         id: 'w2',

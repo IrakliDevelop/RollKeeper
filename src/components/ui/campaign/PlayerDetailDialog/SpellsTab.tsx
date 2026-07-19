@@ -206,9 +206,14 @@ export function SpellsTab({ char }: SpellsTabProps) {
     [spells]
   );
 
-  const ability = getCharacterSpellcastingAbility(char);
-  const spellAttack = calculateSpellAttackBonus(char);
-  const spellDC = calculateSpellSaveDC(char);
+  const hasSpellcastingStats = !!char.spellcastingStats;
+  const ability = hasSpellcastingStats
+    ? getCharacterSpellcastingAbility(char)
+    : null;
+  const spellAttack = hasSpellcastingStats
+    ? calculateSpellAttackBonus(char)
+    : null;
+  const spellDC = hasSpellcastingStats ? calculateSpellSaveDC(char) : null;
   const pact = char.pactMagic;
   const hasPact = (pact?.slots.max ?? 0) > 0;
 
