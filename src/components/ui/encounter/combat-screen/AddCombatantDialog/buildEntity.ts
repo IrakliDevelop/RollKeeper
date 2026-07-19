@@ -81,6 +81,7 @@ export function buildNpcEntity(
           : npc.abilityScores
             ? Math.floor((npc.abilityScores.dex - 10) / 2)
             : 0,
+    proficiencyBonus: npc.proficiencyBonus,
     currentHp: npc.currentHp ?? npc.maxHp,
     maxHp: npc.maxHp,
     tempHp: 0,

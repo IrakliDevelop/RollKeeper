@@ -215,6 +215,22 @@ function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
 
+/** Parse a CR string ("1/8", "1/4", "1/2", "3", "24") to a number. */
+function crToNumber(cr: string): number {
+  if (!cr) return 0;
+  if (cr.includes('/')) {
+    const [numerator, denominator] = cr.split('/');
+    return parseInt(numerator, 10) / parseInt(denominator, 10);
+  }
+  return parseFloat(cr) || 0;
+}
+
+/** Standard 5e proficiency-bonus-by-CR formula (CR 0–4 → +2). */
+export function proficiencyBonusForCr(cr: string): number {
+  const crNum = crToNumber(cr);
+  return 2 + Math.floor(Math.max(crNum - 1, 0) / 4);
+}
+
 /** 5eTools size code → token cells: T/S/M 1, L 2, H 3, G 4 (unknown → 1). */
 export function sizeCodeToTokenCells(code: string | undefined): TokenCellSize {
   switch (code) {
@@ -301,6 +317,7 @@ export function monsterToEncounterEntity(
     name: options?.nameOverride ?? monster.name,
     initiative: null,
     initiativeModifier: abilityModifier(dex),
+    proficiencyBonus: proficiencyBonusForCr(monster.cr),
     currentHp: hp,
     maxHp: hp,
     tempHp: 0,

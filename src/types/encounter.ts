@@ -115,6 +115,7 @@ export interface EncounterEntity {
   name: string;
   initiative: number | null;
   initiativeModifier: number;
+  proficiencyBonus?: number; // Auto-derived from CR for monsters; overridable by DM
 
   // Combat stats
   currentHp: number;
