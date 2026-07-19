@@ -11,6 +11,7 @@ import { useDmVttDragPlacement } from './useDmVttDragPlacement';
 import { useDmVttGrid } from './useDmVttGrid';
 import { useDmVttInitiative } from './useDmVttInitiative';
 import { useDmVttPlacementAndSelection } from './useDmVttPlacementAndSelection';
+import { useDmVttPlayersRefresh } from './useDmVttPlayersRefresh';
 import { useDmVttRoster } from './useDmVttRoster';
 import { useTokenIdentityUpdate } from './useTokenIdentityUpdate';
 
@@ -52,6 +53,17 @@ export function useDmVttScreen({
     handleNextTurn,
     handlePrevTurn,
   } = useDmVttInitiative({ campaignCode, dmId, linkedEncounterIds });
+
+  const { onPlayersPoke } = useDmVttPlayersRefresh(
+    campaignCode,
+    encounter?.id ?? null
+  );
+  const handlePoke = useCallback(
+    (feature: string) => {
+      if (feature === 'players') onPlayersPoke();
+    },
+    [onPlayersPoke]
+  );
 
   const { getNPCsForCampaign } = useNPCStore();
   const npcs = getNPCsForCampaign(campaignCode);
@@ -136,6 +148,7 @@ export function useDmVttScreen({
     status,
     onViewportReady: setViewport,
     onStatus: setStatus,
+    onPoke: handlePoke,
     onSelectionChange: handleSelectionChange,
     tokenConfigRef,
     pendingPlacement,
