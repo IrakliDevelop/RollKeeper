@@ -369,4 +369,55 @@ describe('usePartySync', () => {
       ).toBeGreaterThan(callsAfterIdle);
     });
   });
+
+  // ── refetchNow ──────────────────────────────────────────────────────────────
+
+  describe('refetchNow', () => {
+    it('fetches immediately on refetchNow', async () => {
+      const fetchFn = mockFetchResponse(200, { members: [] });
+
+      const { result } = renderHook(() => usePartySync(defaultOptions));
+
+      await waitFor(() => {
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+      });
+
+      act(() => {
+        result.current.refetchNow();
+      });
+
+      await waitFor(() => {
+        expect(fetchFn).toHaveBeenCalledTimes(2);
+      });
+
+      const url = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[1][0];
+      expect(url).toBe(`/api/campaign/${CAMPAIGN_CODE}/party-hp`);
+    });
+
+    it('debounces a second refetchNow within 1s', async () => {
+      const fetchFn = mockFetchResponse(200, { members: [] });
+
+      const { result } = renderHook(() => usePartySync(defaultOptions));
+
+      await waitFor(() => {
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+      });
+
+      act(() => {
+        result.current.refetchNow();
+        result.current.refetchNow(); // within the same second — swallowed
+      });
+
+      await waitFor(() => {
+        expect(fetchFn).toHaveBeenCalledTimes(2);
+      });
+
+      // No additional fetch even after some time short of the debounce window
+      await act(async () => {
+        vi.advanceTimersByTime(500);
+      });
+
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+    });
+  });
 });

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { PartyMemberHP } from '@/app/api/campaign/[code]/party-hp/route';
 
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+const PARTY_REFETCH_DEBOUNCE_MS = 1000;
 const ACTIVITY_EVENTS = [
   'mousemove',
   'keydown',
@@ -20,6 +21,8 @@ interface UsePartySyncOptions {
 interface UsePartySyncResult {
   partyMembers: PartyMemberHP[];
   loading: boolean;
+  /** Immediate refetch (e.g. on a relay poke). Debounced: at most one per second. */
+  refetchNow: () => void;
 }
 
 export function usePartySync({
@@ -51,6 +54,16 @@ export function usePartySync({
       setLoading(false);
     }
   }, [campaignCode, currentCharacterId]);
+
+  const lastManualFetchRef = useRef(0);
+  /** Immediate refetch (poke-triggered), at most once per second. */
+  const refetchNow = useCallback(() => {
+    if (!campaignCode) return;
+    const now = Date.now();
+    if (now - lastManualFetchRef.current < PARTY_REFETCH_DEBOUNCE_MS) return;
+    lastManualFetchRef.current = now;
+    fetchPartyHP();
+  }, [campaignCode, fetchPartyHP]);
 
   const stopPolling = useCallback(() => {
     if (intervalRef.current) {
@@ -142,5 +155,5 @@ export function usePartySync({
     };
   }, [campaignCode, enabled, fetchPartyHP, startPolling, stopPolling]);
 
-  return { partyMembers, loading };
+  return { partyMembers, loading, refetchNow };
 }
