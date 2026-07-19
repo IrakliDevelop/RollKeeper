@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, waitFor, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { PlayerDetailDialog } from './index';
 import {
   makeCharacter,
@@ -165,14 +165,21 @@ export const Caster: Story = {
     await waitFor(() =>
       expect(screen.getByText('Aria the Wise')).toBeInTheDocument()
     );
+    // Overview is the default tab
     await expect(screen.getByText('Skills')).toBeInTheDocument();
+    // SpellSlotsSection still lives on Overview until Task 4
+    await expect(screen.getByText('Spell Slots')).toBeInTheDocument();
+    await expect(screen.getByText('3/4')).toBeInTheDocument();
+    await expect(screen.getByText('1/3')).toBeInTheDocument();
+    await expect(
+      screen.getByRole('button', { name: /inventory/i })
+    ).toBeInTheDocument();
+    // Inventory content hidden until its tab is clicked
+    await expect(screen.queryByText('Quarterstaff')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /inventory/i }));
     await expect(screen.getByText('Weapons')).toBeInTheDocument();
     await expect(screen.getByText('Quarterstaff')).toBeInTheDocument();
-    await expect(screen.getByText('Spell Slots')).toBeInTheDocument();
-    // Level 1: 4 slots, 1 used → 3/4 remaining
-    await expect(screen.getByText('3/4')).toBeInTheDocument();
-    // Level 2: 3 slots, 2 used → 1/3 remaining
-    await expect(screen.getByText('1/3')).toBeInTheDocument();
+    await expect(screen.queryByText('Skills')).not.toBeInTheDocument();
   },
 };
 
@@ -191,8 +198,9 @@ export const NonCaster: Story = {
     const screen = body(canvasElement);
     await waitFor(() => expect(screen.getByText('Grunk')).toBeInTheDocument());
     await expect(screen.getByText('Skills')).toBeInTheDocument();
-    await expect(screen.getByText('Greataxe')).toBeInTheDocument();
     // Non-caster: no spell slots section
     await expect(screen.queryByText('Spell Slots')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /inventory/i }));
+    await expect(screen.getByText('Greataxe')).toBeInTheDocument();
   },
 };
