@@ -61,6 +61,7 @@ import {
 import { detectSpellAoe } from '@/utils/spellAoeDetection';
 import { usePlayerStore } from '@/store/playerStore';
 import { isApplyingExternal, withExternalApply } from '@/lib/characterRevision';
+import { initCrossTabCharacterSync } from '@/lib/crossTabCharacterSync';
 
 // Function to migrate weapon damage from old format to new array format
 function migrateWeaponDamage(weapon: Record<string, unknown>): Weapon {
@@ -5105,12 +5106,14 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       loadCharacter: character => {
-        set({
-          character,
-          saveStatus: 'saved',
-          lastSaved: new Date(),
-          hasUnsavedChanges: false,
-        });
+        withExternalApply(() =>
+          set({
+            character,
+            saveStatus: 'saved',
+            lastSaved: new Date(),
+            hasUnsavedChanges: false,
+          })
+        );
       },
 
       resetCharacter: () => {
@@ -5207,3 +5210,7 @@ export const useCharacterStore = create<CharacterStore>()(
     }
   )
 );
+
+// Cross-tab convergence: apply newer-revision persists from other tabs
+// (battle map opens in its own tab — see BattleMapLiveBanner).
+initCrossTabCharacterSync(useCharacterStore);
