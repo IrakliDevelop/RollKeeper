@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, fn, waitFor, within } from 'storybook/test';
-import { PlayerDetailDialog } from './PlayerDetailDialog';
+import { PlayerDetailDialog } from './index';
 import {
   makeCharacter,
   makeWizard,
