@@ -47,19 +47,40 @@ export function useCharacterRosterSync({
   const lastSyncedCharacterRef = useRef<CharacterState | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
+  // Latest-value ref for `character` — read (not reactively depended on) by
+  // the load effect below. `character` is expected to change on nearly every
+  // local mutation, and making the load effect depend on it directly would
+  // re-run it (and cancel the in-flight initial-load timer) on every one of
+  // those changes instead of only on character-switch.
+  const characterRef = useRef(character);
+  characterRef.current = character;
+
   // Load character data into store when component mounts or character changes
   useEffect(() => {
     if (playerCharacter && hasHydrated) {
       const currentCharacterId = playerCharacter.characterData.id;
+      const liveCharacter = characterRef.current;
 
       // Only load if we haven't loaded this character yet or if it's a different character
       if (lastLoadedCharacterRef.current !== currentCharacterId) {
+        // The roster blob (playerStore) has no cross-tab convergence, unlike
+        // the live characterStore state, which the storage listener keeps
+        // fresh. If the roster blob is the same character but at a stale
+        // (lower or equal) revision, adopting it here would clobber newer
+        // local state. Skip the load but still arm the write-back effect so
+        // the fresher characterStore state gets written back to the roster.
+        const isStaleRosterBlob =
+          playerCharacter.characterData.id === liveCharacter.id &&
+          (playerCharacter.characterData.revision ?? 0) <=
+            (liveCharacter.revision ?? 0);
+
         setIsInitialLoad(true);
-        loadCharacterState(playerCharacter.characterData);
+        if (!isStaleRosterBlob) {
+          loadCharacterState(playerCharacter.characterData);
+          onLoad?.(playerCharacter.characterData);
+        }
         lastLoadedCharacterRef.current = currentCharacterId;
         lastSyncedCharacterRef.current = playerCharacter.characterData;
-
-        onLoad?.(playerCharacter.characterData);
 
         // Mark initial load as complete after state has been set
         const timer = setTimeout(() => {

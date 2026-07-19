@@ -143,4 +143,65 @@ describe('useCharacterRosterSync', () => {
     expect(onLoad).toHaveBeenCalledTimes(1);
     expect(onLoad).toHaveBeenCalledWith(rosterData);
   });
+
+  it('does not load a stale roster blob over fresher store state', () => {
+    const rosterData = makeCharacter({ id: 'char-1', revision: 5 });
+    const liveCharacter = makeCharacter({ id: 'char-1', revision: 10 });
+    const loadCharacterState = vi.fn();
+    const onLoad = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      character: liveCharacter,
+      loadCharacterState,
+      onLoad,
+    });
+
+    renderHook(p => useCharacterRosterSync(p), { initialProps: props });
+
+    expect(loadCharacterState).not.toHaveBeenCalled();
+    expect(onLoad).not.toHaveBeenCalled();
+  });
+
+  it('still loads a newer roster blob', () => {
+    const rosterData = makeCharacter({ id: 'char-1', revision: 12 });
+    const liveCharacter = makeCharacter({ id: 'char-1', revision: 10 });
+    const loadCharacterState = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      character: liveCharacter,
+      loadCharacterState,
+    });
+
+    renderHook(p => useCharacterRosterSync(p), { initialProps: props });
+
+    expect(loadCharacterState).toHaveBeenCalledTimes(1);
+    expect(loadCharacterState).toHaveBeenCalledWith(rosterData);
+  });
+
+  it('still writes fresher store state back to the roster when a stale load is skipped', () => {
+    const rosterData = makeCharacter({ id: 'char-1', revision: 5 });
+    const liveCharacter = makeCharacter({ id: 'char-1', revision: 10 });
+    const updateCharacterData = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      character: liveCharacter,
+      updateCharacterData,
+    });
+
+    const { rerender } = renderHook(p => useCharacterRosterSync(p), {
+      initialProps: props,
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(60);
+    });
+
+    const updatedLive = { ...liveCharacter, revision: 11 };
+    rerender({ ...props, character: updatedLive });
+
+    expect(updateCharacterData).toHaveBeenCalledWith(
+      'char-1',
+      expect.objectContaining({ revision: 11 })
+    );
+  });
 });
