@@ -17,14 +17,17 @@ interface RedisReader {
   get<T = unknown>(key: string): Promise<T | null>;
 }
 
+export type BattleMapPokeFeature = 'initiative' | 'players';
+
 /**
- * Best-effort WS poke after an initiative write: tells clients in the active
- * battle-map room to refetch /shared immediately. Never throws — the 5s poll
- * is the source-of-truth fallback; this only shaves latency.
+ * Best-effort WS poke after a write: tells clients in the active battle-map
+ * room to refetch /shared immediately for the given feature. Never throws —
+ * the 5s poll is the source-of-truth fallback; this only shaves latency.
  */
-export async function sendInitiativePoke(
+export async function sendBattleMapPoke(
   code: string,
   redis: RedisReader,
+  feature: BattleMapPokeFeature,
   deps: { fetchFn?: typeof fetch; now?: number } = {}
 ): Promise<void> {
   const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
@@ -53,10 +56,19 @@ export async function sendInitiativePoke(
     await fetchFn(`${relayHttpUrl(relayUrl)}/poke`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ room, feature: 'initiative', token }),
+      body: JSON.stringify({ room, feature, token }),
       signal: AbortSignal.timeout(POKE_TIMEOUT_MS),
     });
   } catch (err) {
     console.warn('[relayPoke] poke failed (poll remains fallback):', err);
   }
+}
+
+/** Back-compat wrapper — the shared route's call sites keep this name. */
+export async function sendInitiativePoke(
+  code: string,
+  redis: RedisReader,
+  deps: { fetchFn?: typeof fetch; now?: number } = {}
+): Promise<void> {
+  return sendBattleMapPoke(code, redis, 'initiative', deps);
 }
