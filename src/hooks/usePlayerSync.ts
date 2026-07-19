@@ -146,6 +146,9 @@ export function usePlayerSync({
           ) {
             loadCharacterState(serverCharacter);
           }
+          updateCharacter(characterId, {
+            lastSyncedAt: new Date().toISOString(),
+          });
           setSyncStatus('synced');
           return;
         }

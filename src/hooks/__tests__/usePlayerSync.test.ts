@@ -352,6 +352,9 @@ describe('usePlayerSync', () => {
       // exactly one fetch — no /join rejoin attempt
       expect(fetchFn).toHaveBeenCalledTimes(1);
       expect(result.current.syncStatus).toBe('synced');
+      expect(usePlayerStore.getState().characters[0].lastSyncedAt).toEqual(
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/)
+      );
     });
 
     it('keeps local state when the 409 blob is not newer', async () => {
