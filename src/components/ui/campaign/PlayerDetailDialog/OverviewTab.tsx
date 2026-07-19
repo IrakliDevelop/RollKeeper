@@ -358,8 +358,6 @@ export function OverviewTab({
           )}
         </div>
       </div>
-
-      <SpellSlotsSection char={char} />
     </div>
   );
 }
@@ -581,70 +579,6 @@ function CurrencySection({ char }: { char: CharacterState }) {
             {coin.label}
           </span>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function SpellSlotsSection({ char }: { char: CharacterState }) {
-  const slots = char.spellSlots;
-  if (!slots || typeof slots !== 'object') return null;
-
-  const levels = Object.entries(slots).filter(
-    ([, data]) =>
-      typeof data === 'object' &&
-      data !== null &&
-      typeof (data as { max?: number }).max === 'number' &&
-      (data as { max: number }).max > 0
-  );
-  if (levels.length === 0) return null;
-
-  return (
-    <div>
-      <SectionTitle icon={<Sparkles size={14} />}>Spell Slots</SectionTitle>
-      <div className="flex flex-wrap gap-3">
-        {levels.map(([level, data]) => {
-          const slotData = data as { max: number; used: number };
-          const remaining = slotData.max - slotData.used;
-          const allSpent = remaining === 0;
-          return (
-            <div
-              key={level}
-              className={`rounded-lg px-3 py-2 text-center ${
-                allSpent
-                  ? 'bg-accent-red-bg border-accent-red-border border'
-                  : 'bg-surface-secondary'
-              }`}
-            >
-              <div className="text-muted mb-1 text-[10px] font-bold">
-                Lv {level}
-              </div>
-              <div className="flex items-center justify-center gap-1">
-                {Array.from({ length: slotData.max }, (_, i) => {
-                  const isFilled = i < remaining;
-                  return (
-                    <div
-                      key={i}
-                      className={`h-3 w-3 rounded-full border ${
-                        isFilled
-                          ? 'border-accent-blue-border bg-accent-blue-text'
-                          : 'border-accent-red-border bg-accent-red-bg'
-                      }`}
-                      title={isFilled ? 'Available' : 'Spent'}
-                    />
-                  );
-                })}
-              </div>
-              <div
-                className={`mt-1 text-[10px] font-medium ${
-                  allSpent ? 'text-accent-red-text' : 'text-muted'
-                }`}
-              >
-                {remaining}/{slotData.max}
-              </div>
-            </div>
-          );
-        })}
       </div>
     </div>
   );

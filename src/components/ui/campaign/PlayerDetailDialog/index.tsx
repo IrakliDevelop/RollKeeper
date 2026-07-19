@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { MessageSquare, Package, ScrollText } from 'lucide-react';
+import { MessageSquare, Package, ScrollText, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import {
   Dialog,
@@ -13,6 +13,7 @@ import {
 import { Badge } from '@/components/ui/layout/badge';
 import { OverviewTab } from './OverviewTab';
 import { InventoryTab } from './InventoryTab';
+import { SpellsTab, characterHasSpellsToShow } from './SpellsTab';
 import { ensureArray } from './shared';
 import { CampaignPlayerData } from '@/types/campaign';
 
@@ -54,6 +55,8 @@ export function PlayerDetailDialog({
     ? classes.map(c => `${c.className} ${c.level}`).join(' / ')
     : `${char.class?.name || 'Unknown'} ${level}`;
 
+  const showSpellsTab = characterHasSpellsToShow(char);
+
   const tabs: Array<{ key: DetailTab; icon: React.ReactNode; label: string }> =
     [
       {
@@ -61,6 +64,15 @@ export function PlayerDetailDialog({
         icon: <ScrollText className="h-3.5 w-3.5" />,
         label: 'Overview',
       },
+      ...(showSpellsTab
+        ? [
+            {
+              key: 'spells' as DetailTab,
+              icon: <Wand2 className="h-3.5 w-3.5" />,
+              label: 'Spells',
+            },
+          ]
+        : []),
       {
         key: 'inventory',
         icon: <Package className="h-3.5 w-3.5" />,
@@ -126,6 +138,7 @@ export function PlayerDetailDialog({
               onAdjustCounter={onAdjustCounter}
             />
           )}
+          {activeTab === 'spells' && showSpellsTab && <SpellsTab char={char} />}
           {activeTab === 'inventory' && <InventoryTab char={char} />}
         </DialogBody>
       </DialogContent>
