@@ -33,6 +33,23 @@ export async function POST(
       return NextResponse.json({ error: 'removed' }, { status: 410 });
     }
 
+    // Revision gate: a stale tab must not clobber a newer snapshot.
+    const existingRaw = await redis.get<string>(
+      campaignPlayerKey(code, playerId)
+    );
+    if (existingRaw) {
+      const existing: CampaignPlayerData =
+        typeof existingRaw === 'string' ? JSON.parse(existingRaw) : existingRaw;
+      const storedRevision = existing.characterData?.revision ?? 0;
+      const incomingRevision = characterData.revision ?? 0;
+      if (incomingRevision < storedRevision) {
+        return NextResponse.json(
+          { error: 'stale', current: existing },
+          { status: 409 }
+        );
+      }
+    }
+
     const playerData: CampaignPlayerData = {
       playerId,
       playerName: playerName || 'Unknown Player',
