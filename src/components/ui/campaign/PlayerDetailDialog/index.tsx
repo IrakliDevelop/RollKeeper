@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { MessageSquare } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { MessageSquare, Package, ScrollText } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import {
   Dialog,
@@ -15,6 +15,8 @@ import { OverviewTab } from './OverviewTab';
 import { InventoryTab } from './InventoryTab';
 import { ensureArray } from './shared';
 import { CampaignPlayerData } from '@/types/campaign';
+
+type DetailTab = 'overview' | 'spells' | 'inventory';
 
 interface PlayerDetailDialogProps {
   open: boolean;
@@ -35,6 +37,13 @@ export function PlayerDetailDialog({
   onAdjustCounter,
   onSendMessage,
 }: PlayerDetailDialogProps) {
+  const [activeTab, setActiveTab] = useState<DetailTab>('overview');
+
+  // Reset to Overview each time the dialog opens
+  useEffect(() => {
+    if (open) setActiveTab('overview');
+  }, [open]);
+
   const char = player.characterData;
   if (!char) return null;
   const classes = ensureArray<{ className?: string; level?: number }>(
@@ -44,6 +53,20 @@ export function PlayerDetailDialog({
   const charClass = classes.length
     ? classes.map(c => `${c.className} ${c.level}`).join(' / ')
     : `${char.class?.name || 'Unknown'} ${level}`;
+
+  const tabs: Array<{ key: DetailTab; icon: React.ReactNode; label: string }> =
+    [
+      {
+        key: 'overview',
+        icon: <ScrollText className="h-3.5 w-3.5" />,
+        label: 'Overview',
+      },
+      {
+        key: 'inventory',
+        icon: <Package className="h-3.5 w-3.5" />,
+        label: 'Inventory',
+      },
+    ];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -75,16 +98,35 @@ export function PlayerDetailDialog({
           </div>
         </DialogHeader>
 
+        {/* Tab bar */}
+        <div className="bg-surface-secondary flex rounded-lg p-1">
+          {tabs.map(tab => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === tab.key
+                  ? 'bg-surface-raised text-heading shadow-sm'
+                  : 'text-muted hover:text-body'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         <DialogBody>
-          <div className="space-y-6">
+          {activeTab === 'overview' && (
             <OverviewTab
               char={char}
               customCounterLabel={customCounterLabel}
               counterValue={counterValue}
               onAdjustCounter={onAdjustCounter}
             />
-            <InventoryTab char={char} />
-          </div>
+          )}
+          {activeTab === 'inventory' && <InventoryTab char={char} />}
         </DialogBody>
       </DialogContent>
     </Dialog>
