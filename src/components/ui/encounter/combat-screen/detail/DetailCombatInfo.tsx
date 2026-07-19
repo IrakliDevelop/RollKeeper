@@ -8,10 +8,17 @@ interface InfoRowProps {
   label: string;
   value?: string;
   editable?: boolean;
+  type?: 'text' | 'number';
   onChange?: (v: string) => void;
 }
 
-function InfoRow({ label, value, editable, onChange }: InfoRowProps) {
+function InfoRow({
+  label,
+  value,
+  editable,
+  type = 'text',
+  onChange,
+}: InfoRowProps) {
   if (!editable && !value) return null;
   return (
     <div className="flex items-start gap-3 py-1">
@@ -20,7 +27,7 @@ function InfoRow({ label, value, editable, onChange }: InfoRowProps) {
       </span>
       {editable ? (
         <input
-          type="text"
+          type={type}
           defaultValue={value ?? ''}
           onBlur={e => onChange?.(e.target.value)}
           className="bg-surface-raised border-divider text-body flex-1 rounded border px-2 py-0.5 text-xs"
@@ -59,6 +66,7 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
   const sb = entity.monsterStatBlock;
   const isPlayer = entity.type === 'player';
   const canEdit = !isPlayer && sb != null;
+  const canEditBasics = !isPlayer;
 
   const resistances =
     (sb != null ? sbField(sb, 'resistances') : undefined) ??
@@ -73,8 +81,19 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
     (sb != null ? sbField(sb, 'senses') : undefined) ??
     entity.senses?.map(s => `${s.name} ${s.range} ft.`).join(', ');
 
+  const initiativeValue =
+    entity.initiative != null ? String(entity.initiative) : undefined;
+  const proficiencyBonusValue =
+    entity.proficiencyBonus != null
+      ? String(entity.proficiencyBonus)
+      : undefined;
+  const passivePerceptionValue =
+    sb?.passivePerception != null ? String(sb.passivePerception) : undefined;
+
   const hasAnyData =
     sb != null ||
+    entity.initiative != null ||
+    entity.proficiencyBonus != null ||
     (entity.damageResistances?.length ?? 0) > 0 ||
     (entity.damageImmunities?.length ?? 0) > 0 ||
     (entity.conditionImmunities?.length ?? 0) > 0 ||
@@ -89,11 +108,72 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
     });
   };
 
+  const updatePassivePerception = (value: string) => {
+    if (!sb) return;
+    const num = parseInt(value, 10);
+    if (Number.isNaN(num)) return;
+    actions.onUpdate(entity.id, {
+      monsterStatBlock: { ...sb, passivePerception: num },
+    });
+  };
+
+  const updateConditionImmunities = (value: string) => {
+    if (!sb) return;
+    const list = value
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    actions.onUpdate(entity.id, {
+      monsterStatBlock: { ...sb, conditionImmunities: list },
+    });
+  };
+
+  const updateInitiative = (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed === '') {
+      actions.onUpdate(entity.id, { initiative: null });
+      return;
+    }
+    const num = parseFloat(trimmed);
+    if (!Number.isNaN(num)) actions.onUpdate(entity.id, { initiative: num });
+  };
+
+  const updateProficiencyBonus = (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed === '') return;
+    const num = parseInt(trimmed, 10);
+    if (!Number.isNaN(num))
+      actions.onUpdate(entity.id, { proficiencyBonus: num });
+  };
+
   return (
     <div className="border-divider space-y-0 border-t p-4">
       <h3 className="text-heading mb-1 text-xs font-semibold tracking-wider uppercase">
         Combat Details
       </h3>
+      {canEditBasics ? (
+        <>
+          <InfoRow
+            label="Initiative"
+            value={initiativeValue}
+            editable
+            type="number"
+            onChange={updateInitiative}
+          />
+          <InfoRow
+            label="Proficiency Bonus"
+            value={proficiencyBonusValue}
+            editable
+            type="number"
+            onChange={updateProficiencyBonus}
+          />
+        </>
+      ) : (
+        <>
+          <StaticRow label="Initiative" value={initiativeValue} />
+          <StaticRow label="Proficiency Bonus" value={proficiencyBonusValue} />
+        </>
+      )}
       {canEdit ? (
         <>
           <InfoRow
@@ -108,25 +188,72 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
             editable
             onChange={v => updateSb('saves', v)}
           />
+          <InfoRow
+            label="Skills"
+            value={sb?.skills}
+            editable
+            onChange={v => updateSb('skills', v)}
+          />
+          <InfoRow
+            label="Resistances"
+            value={resistances}
+            editable
+            onChange={v => updateSb('resistances', v)}
+          />
+          <InfoRow
+            label="Immunities"
+            value={immunities}
+            editable
+            onChange={v => updateSb('immunities', v)}
+          />
+          <InfoRow
+            label="Vulnerabilities"
+            value={sb?.vulnerabilities}
+            editable
+            onChange={v => updateSb('vulnerabilities', v)}
+          />
+          <InfoRow
+            label="Condition Immunities"
+            value={condImmunities}
+            editable
+            onChange={updateConditionImmunities}
+          />
+          <InfoRow
+            label="Senses"
+            value={senses}
+            editable
+            onChange={v => updateSb('senses', v)}
+          />
+          <InfoRow
+            label="Languages"
+            value={sb?.languages}
+            editable
+            onChange={v => updateSb('languages', v)}
+          />
+          <InfoRow
+            label="Passive Perception"
+            value={passivePerceptionValue}
+            editable
+            type="number"
+            onChange={updatePassivePerception}
+          />
         </>
       ) : (
         <>
           <StaticRow label="Speed" value={sb?.speed} />
           <StaticRow label="Saving Throws" value={sb?.saves} />
+          <StaticRow label="Skills" value={sb?.skills} />
+          <StaticRow label="Resistances" value={resistances} />
+          <StaticRow label="Immunities" value={immunities} />
+          <StaticRow label="Vulnerabilities" value={sb?.vulnerabilities} />
+          <StaticRow label="Condition Immunities" value={condImmunities} />
+          <StaticRow label="Senses" value={senses} />
+          <StaticRow label="Languages" value={sb?.languages} />
+          <StaticRow
+            label="Passive Perception"
+            value={passivePerceptionValue}
+          />
         </>
-      )}
-      <StaticRow label="Skills" value={sb?.skills} />
-      <StaticRow label="Resistances" value={resistances} />
-      <StaticRow label="Immunities" value={immunities} />
-      <StaticRow label="Vulnerabilities" value={sb?.vulnerabilities} />
-      <StaticRow label="Condition Immunities" value={condImmunities} />
-      <StaticRow label="Senses" value={senses} />
-      <StaticRow label="Languages" value={sb?.languages} />
-      {sb?.passivePerception != null && (
-        <StaticRow
-          label="Passive Perception"
-          value={String(sb.passivePerception)}
-        />
       )}
     </div>
   );
