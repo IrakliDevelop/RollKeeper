@@ -216,6 +216,12 @@ export function PlayerBattleMapCanvas({
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const [hasSelection, setHasSelection] = useState(false);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
+  // The connection is created once inside the fire-once `handleReady`
+  // callback; a plain closure over `onPoke` would go stale if the prop's
+  // identity changes later after the connection is already established.
+  // Read the latest value via a ref instead.
+  const onPokeRef = useRef(onPoke);
+  onPokeRef.current = onPoke;
   // Read by the (single, canvas-retained) token tool at placement time;
   // starts as the square avatar and upgrades to the circular render async.
   const tokenSrcRef = useRef<string | null>(tokenAvatarUrl(characterAvatar));
@@ -325,7 +331,7 @@ export function PlayerBattleMapCanvas({
         onStatusProp?.(s);
         if (s === 'live') requestAnimationFrame(() => vp.fitToContent(60));
       },
-      onPoke,
+      onPoke: feature => onPokeRef.current?.(feature),
     });
   };
 

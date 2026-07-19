@@ -394,7 +394,46 @@ describe('usePartySync', () => {
       expect(url).toBe(`/api/campaign/${CAMPAIGN_CODE}/party-hp`);
     });
 
-    it('debounces a second refetchNow within 1s', async () => {
+    it('a second refetchNow within 1s does not fetch immediately, but schedules a trailing fetch at window expiry', async () => {
+      const fetchFn = mockFetchResponse(200, { members: [] });
+
+      const { result } = renderHook(() => usePartySync(defaultOptions));
+
+      await waitFor(() => {
+        expect(fetchFn).toHaveBeenCalledTimes(1); // initial mount fetch
+      });
+
+      act(() => {
+        result.current.refetchNow(); // outside the debounce window — leading fetch
+      });
+
+      await waitFor(() => {
+        expect(fetchFn).toHaveBeenCalledTimes(2);
+      });
+
+      act(() => {
+        result.current.refetchNow(); // within the window — schedules a trailing fetch
+        result.current.refetchNow(); // still within the window — coalesces, no second timeout
+      });
+
+      // No immediate fetch from either of the two pokes above.
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+
+      // Just short of the debounce window — trailing fetch not due yet.
+      await act(async () => {
+        vi.advanceTimersByTime(900);
+      });
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+
+      // Window expires — exactly one trailing fetch fires (the burst's last
+      // poke is not silently dropped).
+      await act(async () => {
+        vi.advanceTimersByTime(200);
+      });
+      expect(fetchFn).toHaveBeenCalledTimes(3);
+    });
+
+    it('fetches immediately again once the debounce window reopens', async () => {
       const fetchFn = mockFetchResponse(200, { members: [] });
 
       const { result } = renderHook(() => usePartySync(defaultOptions));
@@ -405,18 +444,50 @@ describe('usePartySync', () => {
 
       act(() => {
         result.current.refetchNow();
-        result.current.refetchNow(); // within the same second — swallowed
       });
-
       await waitFor(() => {
         expect(fetchFn).toHaveBeenCalledTimes(2);
       });
 
-      // No additional fetch even after some time short of the debounce window
+      // Let the debounce window fully close with no further pokes.
       await act(async () => {
-        vi.advanceTimersByTime(500);
+        vi.advanceTimersByTime(1100);
+      });
+      expect(fetchFn).toHaveBeenCalledTimes(2);
+
+      // A fresh poke after the window reopens fetches immediately again.
+      act(() => {
+        result.current.refetchNow();
+      });
+      await waitFor(() => {
+        expect(fetchFn).toHaveBeenCalledTimes(3);
+      });
+    });
+
+    it('clears a pending trailing fetch on unmount', async () => {
+      const fetchFn = mockFetchResponse(200, { members: [] });
+
+      const { result, unmount } = renderHook(() =>
+        usePartySync(defaultOptions)
+      );
+
+      await waitFor(() => {
+        expect(fetchFn).toHaveBeenCalledTimes(1);
       });
 
+      act(() => {
+        result.current.refetchNow(); // leading
+        result.current.refetchNow(); // schedules trailing
+      });
+      await waitFor(() => {
+        expect(fetchFn).toHaveBeenCalledTimes(2);
+      });
+
+      unmount();
+
+      await act(async () => {
+        vi.advanceTimersByTime(1100);
+      });
       expect(fetchFn).toHaveBeenCalledTimes(2);
     });
   });

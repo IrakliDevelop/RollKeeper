@@ -56,13 +56,30 @@ export function usePartySync({
   }, [campaignCode, currentCharacterId]);
 
   const lastManualFetchRef = useRef(0);
-  /** Immediate refetch (poke-triggered), at most once per second. */
+  const trailingFetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  /**
+   * Immediate refetch (poke-triggered). Leading-edge fires immediately; a
+   * poke landing inside the debounce window schedules ONE trailing fetch at
+   * window expiry instead of being dropped — otherwise the last poke of a
+   * burst (e.g. two players hit by one AoE) leaves party HP stale. Repeated
+   * pokes inside the window coalesce onto the single pending timeout.
+   */
   const refetchNow = useCallback(() => {
     if (!campaignCode) return;
     const now = Date.now();
-    if (now - lastManualFetchRef.current < PARTY_REFETCH_DEBOUNCE_MS) return;
-    lastManualFetchRef.current = now;
-    fetchPartyHP();
+    const elapsed = now - lastManualFetchRef.current;
+    if (elapsed >= PARTY_REFETCH_DEBOUNCE_MS) {
+      lastManualFetchRef.current = now;
+      fetchPartyHP();
+      return;
+    }
+    if (trailingFetchTimeoutRef.current) return;
+    trailingFetchTimeoutRef.current = setTimeout(() => {
+      trailingFetchTimeoutRef.current = null;
+      lastManualFetchRef.current = Date.now();
+      fetchPartyHP();
+    }, PARTY_REFETCH_DEBOUNCE_MS - elapsed);
   }, [campaignCode, fetchPartyHP]);
 
   const stopPolling = useCallback(() => {
@@ -154,6 +171,16 @@ export function usePartySync({
       stopPolling();
     };
   }, [campaignCode, enabled, fetchPartyHP, startPolling, stopPolling]);
+
+  // Clear any pending trailing refetchNow fetch on unmount.
+  useEffect(() => {
+    return () => {
+      if (trailingFetchTimeoutRef.current) {
+        clearTimeout(trailingFetchTimeoutRef.current);
+        trailingFetchTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   return { partyMembers, loading, refetchNow };
 }
