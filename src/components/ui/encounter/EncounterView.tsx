@@ -13,11 +13,7 @@ import { useEncounterStore } from '@/store/encounterStore';
 import { useNPCStore } from '@/store/npcStore';
 import { useDmStore } from '@/store/dmStore';
 import { useCampaignSync } from '@/hooks/useCampaignSync';
-import {
-  mergePlayerSyncData,
-  hasPlayerDataChanged,
-  syncSummonsToEncounter,
-} from '@/utils/encounterSync';
+import { applyPlayersToEncounter } from '@/utils/encounterSync';
 import { useDmEffectsSync } from '@/hooks/useDmEffectsSync';
 import { useDmCounterSync } from '@/hooks/useDmCounterSync';
 import { useDmInitiativeSync } from '@/hooks/useDmInitiativeSync';
@@ -161,30 +157,7 @@ export function EncounterView({
       return;
     }
 
-    for (const entity of encounter.entities) {
-      if (entity.type === 'player' && entity.playerCharacterId) {
-        const playerData = campaignPlayers.find(
-          p => p.playerId === entity.playerCharacterId
-        );
-        if (playerData) {
-          // Sync player HP/AC/conditions
-          const updates = mergePlayerSyncData(entity, playerData);
-          if (updates && hasPlayerDataChanged(entity, updates)) {
-            updateEntity(encounterId, entity.id, updates);
-          }
-          // Sync player's summons into encounter
-          const playerSummons = playerData.characterData?.summons ?? [];
-          syncSummonsToEncounter(
-            encounter,
-            entity,
-            playerSummons,
-            addEntity,
-            updateEntity,
-            removeEntity
-          );
-        }
-      }
-    }
+    applyPlayersToEncounter(encounterId, campaignPlayers);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignPlayers]);
 

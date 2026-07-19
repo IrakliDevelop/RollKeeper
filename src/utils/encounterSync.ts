@@ -6,6 +6,7 @@ import {
 import type { Summon } from '@/types/summon';
 import { CampaignPlayerData } from '@/types/campaign';
 import { calculateCharacterArmorClass } from '@/utils/calculations';
+import { useEncounterStore } from '@/store/encounterStore';
 
 /**
  * Merge live player data from campaign sync into an encounter entity.
@@ -344,6 +345,49 @@ export function syncSummonsToEncounter(
   for (const entity of existingSummonEntities) {
     if (entity.summonId && !activeSummonIds.has(entity.summonId)) {
       removeEntity(encounter.id, entity.id);
+    }
+  }
+}
+
+/**
+ * Merge live campaign player data into an encounter's player-linked entities
+ * and their summons. Reads/writes `useEncounterStore.getState()` directly so
+ * it is callable outside React (e.g. from a poke-driven refresh hook) as well
+ * as from a component effect. No-ops silently for an unknown encounter id or
+ * an empty player list. Extracted verbatim from `EncounterView`'s player-sync
+ * effect — see `applyPlayersToEncounter`'s callers for the two use sites.
+ */
+export function applyPlayersToEncounter(
+  encounterId: string,
+  players: CampaignPlayerData[]
+): void {
+  const { encounters, addEntity, updateEntity, removeEntity } =
+    useEncounterStore.getState();
+  const encounter = encounters.find(e => e.id === encounterId);
+  if (!encounter) return;
+
+  for (const entity of encounter.entities) {
+    if (entity.type === 'player' && entity.playerCharacterId) {
+      const playerData = players.find(
+        p => p.playerId === entity.playerCharacterId
+      );
+      if (playerData) {
+        // Sync player HP/AC/conditions
+        const updates = mergePlayerSyncData(entity, playerData);
+        if (updates && hasPlayerDataChanged(entity, updates)) {
+          updateEntity(encounterId, entity.id, updates);
+        }
+        // Sync player's summons into encounter
+        const playerSummons = playerData.characterData?.summons ?? [];
+        syncSummonsToEncounter(
+          encounter,
+          entity,
+          playerSummons,
+          addEntity,
+          updateEntity,
+          removeEntity
+        );
+      }
     }
   }
 }
