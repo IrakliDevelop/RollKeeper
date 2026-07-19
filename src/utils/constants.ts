@@ -363,6 +363,7 @@ export const BACKGROUNDS = [
 // Default character state
 export const DEFAULT_CHARACTER_STATE = {
   name: '',
+  revision: 0,
   race: '',
   class: {
     name: '',
