@@ -368,6 +368,9 @@ export function applyPlayersToEncounter(
 
   for (const entity of encounter.entities) {
     if (entity.type === 'player' && entity.playerCharacterId) {
+      // Matches on playerId === playerCharacterId; this is only correct
+      // because usePlayerSync sends `playerId: characterId` — the player-VTT
+      // overlay keys by characterId, so the two are coupled by convention.
       const playerData = players.find(
         p => p.playerId === entity.playerCharacterId
       );

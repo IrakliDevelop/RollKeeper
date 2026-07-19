@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { applyPlayersToEncounter } from '@/utils/encounterSync';
 import type { CampaignPlayerData } from '@/types/campaign';
@@ -19,12 +19,11 @@ export function useDmVttPlayersRefresh(
   encounterId: string | null
 ): { onPlayersPoke: () => void } {
   const lastFetchRef = useRef(0);
+  const trailingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const onPlayersPoke = useCallback(() => {
+  const doFetch = useCallback(() => {
     if (!encounterId) return;
-    const now = Date.now();
-    if (now - lastFetchRef.current < PLAYERS_REFETCH_DEBOUNCE_MS) return;
-    lastFetchRef.current = now;
+    lastFetchRef.current = Date.now();
     void (async () => {
       try {
         const res = await fetch(`/api/campaign/${campaignCode}/players`);
@@ -37,6 +36,35 @@ export function useDmVttPlayersRefresh(
       }
     })();
   }, [campaignCode, encounterId]);
+
+  // Leading-edge fire immediately; a poke inside the debounce window
+  // schedules ONE trailing fetch at window expiry instead of being dropped
+  // (a burst of pokes — e.g. two players hit by one AoE — must not leave
+  // the second player's HP stale indefinitely). Repeated pokes inside the
+  // window coalesce onto the single pending timeout rather than stacking.
+  const onPlayersPoke = useCallback(() => {
+    if (!encounterId) return;
+    const now = Date.now();
+    const elapsed = now - lastFetchRef.current;
+    if (elapsed >= PLAYERS_REFETCH_DEBOUNCE_MS) {
+      doFetch();
+      return;
+    }
+    if (trailingTimeoutRef.current) return;
+    trailingTimeoutRef.current = setTimeout(() => {
+      trailingTimeoutRef.current = null;
+      doFetch();
+    }, PLAYERS_REFETCH_DEBOUNCE_MS - elapsed);
+  }, [encounterId, doFetch]);
+
+  useEffect(() => {
+    return () => {
+      if (trailingTimeoutRef.current) {
+        clearTimeout(trailingTimeoutRef.current);
+        trailingTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   return { onPlayersPoke };
 }

@@ -76,6 +76,12 @@ export function useDmBattleMapCanvas({
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const autoSaveRef = useRef<AutoSave | null>(null);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
+  // The connection is created once inside the fire-once `handleReady`
+  // callback; a plain closure over `onPoke` would go stale if the prop's
+  // identity changes later (e.g. encounterId change) after the connection
+  // is already established. Read the latest value via a ref instead.
+  const onPokeRef = useRef(onPoke);
+  onPokeRef.current = onPoke;
 
   const tools = useMemo<Tool[]>(() => {
     const selectTool = new SelectTool();
@@ -160,7 +166,7 @@ export function useDmBattleMapCanvas({
             setStatus(s);
             onStatusProp?.(s);
           },
-          onPoke,
+          onPoke: feature => onPokeRef.current?.(feature),
         });
       }
 
@@ -171,7 +177,6 @@ export function useDmBattleMapCanvas({
       battleMapId,
       dmId,
       onStatusProp,
-      onPoke,
       onViewportReady,
       onSelectionChange,
     ]
