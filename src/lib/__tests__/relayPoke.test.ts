@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { sendInitiativePoke, relayHttpUrl } from '@/lib/relayPoke';
+import {
+  sendInitiativePoke,
+  sendBattleMapPoke,
+  relayHttpUrl,
+} from '@/lib/relayPoke';
 import { verifyBattleMapToken } from '@/lib/battlemapToken';
 
 const CODE = 'CAMP1';
@@ -98,5 +102,46 @@ describe('sendInitiativePoke', () => {
     const redis = redisWith({ activeBattleMapId: 'map-42' });
     await sendInitiativePoke(CODE, redis, { fetchFn });
     expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('sendBattleMapPoke posts the given feature to the relay poke endpoint', async () => {
+    const fetchFn = vi.fn(async () => new Response('{"sent":1}'));
+    const redis = redisWith(
+      JSON.stringify({ activeBattleMapId: 'map-42', activatedAt: 'x' })
+    );
+
+    await sendBattleMapPoke(CODE, redis, 'players', {
+      fetchFn,
+      now: 1_000_000,
+    });
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    const call = fetchFn.mock.calls[0];
+    if (!call || call.length < 2) {
+      throw new Error('fetchFn not called with expected arguments');
+    }
+    const [url, init] = call as unknown as [string, RequestInit];
+    expect(url).toBe('https://relay.example.com/poke');
+    const body = JSON.parse(init.body as string);
+    expect(body.room).toBe('CAMP1:map-42');
+    expect(body.feature).toBe('players');
+  });
+
+  it('sendInitiativePoke still posts feature "initiative" (wrapper)', async () => {
+    const fetchFn = vi.fn(async () => new Response('{"sent":1}'));
+    const redis = redisWith(
+      JSON.stringify({ activeBattleMapId: 'map-42', activatedAt: 'x' })
+    );
+
+    await sendInitiativePoke(CODE, redis, { fetchFn, now: 1_000_000 });
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    const call = fetchFn.mock.calls[0];
+    if (!call || call.length < 2) {
+      throw new Error('fetchFn not called with expected arguments');
+    }
+    const [, init] = call as unknown as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.feature).toBe('initiative');
   });
 });
