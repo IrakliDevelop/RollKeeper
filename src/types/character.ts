@@ -552,6 +552,10 @@ export interface Currency {
 // Main character state interface
 export interface CharacterState {
   id: string;
+  /** Monotonic per-character mutation counter. Every consumer (other tab,
+   * Redis, DM view) accepts a snapshot only if its revision is newer.
+   * Optional for backwards compat — readers must treat missing as 0. */
+  revision?: number;
   // Basic Information
   name: string;
   race: string;

@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create, StateCreator } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { createSafeStorage } from '@/lib/safeStorage';
 import {
@@ -60,6 +60,7 @@ import {
 } from '@/utils/hpCalculations';
 import { detectSpellAoe } from '@/utils/spellAoeDetection';
 import { usePlayerStore } from '@/store/playerStore';
+import { isApplyingExternal, withExternalApply } from '@/lib/characterRevision';
 
 // Function to migrate weapon damage from old format to new array format
 function migrateWeaponDamage(weapon: Record<string, unknown>): Weapon {
@@ -115,6 +116,10 @@ function migrateCharacterData(character: unknown): CharacterState {
     // Ensure spellSlots exist
     if (!result.spellSlots) {
       result.spellSlots = DEFAULT_CHARACTER_STATE.spellSlots;
+    }
+    // Ensure revision exists (pre-revision saves)
+    if (typeof result.revision !== 'number') {
+      result.revision = 0;
     }
     // Ensure features and traits are arrays
     if (!Array.isArray(result.features)) {
@@ -746,9 +751,44 @@ interface CharacterStore {
 const generateId = () =>
   Date.now().toString(36) + Math.random().toString(36).substr(2);
 
+type CharacterStoreCreator = StateCreator<
+  CharacterStore,
+  [],
+  [],
+  CharacterStore
+>;
+
+// Wraps the store creator's `set` so every local mutation that changes
+// `state.character` bumps `character.revision` by exactly 1. External
+// applies (loadCharacterState, cross-tab) run under withExternalApply and
+// adopt the incoming revision instead of bumping it. Implemented as a
+// middleware (rather than inline in the creator) so the creator's object
+// literal keeps its original shape/indentation.
+function withRevisionBump(
+  creator: CharacterStoreCreator
+): CharacterStoreCreator {
+  return (rawSet, get, store) => {
+    const set = ((...args: Parameters<typeof rawSet>) => {
+      const prev = get()?.character;
+      rawSet(...args);
+      if (isApplyingExternal()) return;
+      const next = get().character;
+      if (prev && next && next !== prev && next.revision === prev.revision) {
+        rawSet(state => ({
+          character: {
+            ...state.character,
+            revision: (state.character.revision ?? 0) + 1,
+          },
+        }));
+      }
+    }) as typeof rawSet;
+    return creator(set, get, store);
+  };
+}
+
 export const useCharacterStore = create<CharacterStore>()(
   persist(
-    (set, get) => ({
+    withRevisionBump((set, get) => ({
       // Initial state
       character: {
         ...DEFAULT_CHARACTER_STATE,
@@ -774,12 +814,14 @@ export const useCharacterStore = create<CharacterStore>()(
       loadCharacterState: characterState => {
         const migratedCharacter = migrateCharacterData(characterState);
         const multiclassCharacter = migrateToMulticlass(migratedCharacter);
-        set({
-          character: multiclassCharacter,
-          hasUnsavedChanges: false,
-          saveStatus: 'saved',
-          lastSaved: new Date(),
-        });
+        withExternalApply(() =>
+          set({
+            character: multiclassCharacter,
+            hasUnsavedChanges: false,
+            saveStatus: 'saved',
+            lastSaved: new Date(),
+          })
+        );
       },
 
       updateAbilityScore: (ability, value) => {
@@ -5143,7 +5185,7 @@ export const useCharacterStore = create<CharacterStore>()(
           saveStatus: 'saving',
         });
       },
-    }),
+    })),
     {
       name: STORAGE_KEY,
       storage: createJSONStorage(() => createSafeStorage()),
