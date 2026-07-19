@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Eye, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Eye, Pencil, X } from 'lucide-react';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '../types';
 import { HeaderControls } from './HeaderControls';
@@ -42,6 +42,9 @@ export function DetailHeader({
   actions,
   onOpenSheet,
 }: DetailSectionProps & { onOpenSheet?: () => void }) {
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+
   const isPlayer = entity.type === 'player';
   const isSummon = !!entity.summonId;
   const badge = isSummon
@@ -72,13 +75,52 @@ export function DetailHeader({
     }
   };
 
+  const commitName = () => {
+    const trimmed = nameInput.trim();
+    if (trimmed && trimmed !== entity.name) {
+      actions.onUpdate(entity.id, { name: trimmed });
+    }
+    setIsEditingName(false);
+  };
+
   return (
     <div className="space-y-2 p-4">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <h2 className="font-display text-heading text-2xl leading-tight font-bold">
-            {entity.name}
-          </h2>
+          {isEditingName ? (
+            <input
+              type="text"
+              value={nameInput}
+              onChange={e => setNameInput(e.target.value)}
+              onBlur={commitName}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitName();
+                if (e.key === 'Escape') setIsEditingName(false);
+              }}
+              className="font-display text-heading bg-surface-raised border-divider w-full rounded border px-2 py-0.5 text-2xl leading-tight font-bold"
+              aria-label="Combatant name"
+              autoFocus
+            />
+          ) : (
+            <div className="flex items-center gap-1">
+              <h2 className="font-display text-heading min-w-0 truncate text-2xl leading-tight font-bold">
+                {entity.name}
+              </h2>
+              {!isPlayer && (
+                <button
+                  onClick={() => {
+                    setNameInput(entity.name);
+                    setIsEditingName(true);
+                  }}
+                  aria-label="Rename"
+                  title="Rename"
+                  className="text-faint hover:text-body hover:bg-surface-raised flex h-11 w-11 shrink-0 items-center justify-center rounded transition-colors"
+                >
+                  <Pencil size={14} />
+                </button>
+              )}
+            </div>
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <span
               className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${badge.bg} ${badge.text} ${badge.border}`}
