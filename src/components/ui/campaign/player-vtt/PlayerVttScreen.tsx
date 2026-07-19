@@ -45,6 +45,8 @@ export function PlayerVttScreen({
     character,
     sharedState,
     refetchNow,
+    liveInitiative,
+    refetchPartyHpNow,
     handleEndTurn,
     pendingPlacement,
     requestPlacement,
@@ -62,9 +64,7 @@ export function PlayerVttScreen({
   const [tokenInfoMode, cycleTokenInfo] = useTokenInfoMode(
     'rollkeeper-vtt-token-info-player'
   );
-  const decorations = usePlayerTokenDecorations(
-    sharedState?.initiative ?? null
-  );
+  const decorations = usePlayerTokenDecorations(liveInitiative);
   const initiativePrompt = useInitiativePrompt({
     campaignCode,
     characterId,
@@ -74,8 +74,9 @@ export function PlayerVttScreen({
   const handlePoke = useCallback(
     (feature: string) => {
       if (feature === 'initiative') refetchNow();
+      if (feature === 'players') refetchPartyHpNow();
     },
-    [refetchNow]
+    [refetchNow, refetchPartyHpNow]
   );
 
   return (
@@ -117,7 +118,7 @@ export function PlayerVttScreen({
           </Link>
         </div>
         <CombatPanel
-          state={sharedState?.initiative ?? null}
+          state={liveInitiative}
           characterId={characterId}
           onEndTurn={handleEndTurn}
           collapsed={combatCollapsed}
