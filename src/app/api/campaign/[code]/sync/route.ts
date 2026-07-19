@@ -8,6 +8,7 @@ import {
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
 import { CampaignPlayerData } from '@/types/campaign';
+import { sendBattleMapPoke } from '@/lib/relayPoke';
 
 export async function POST(
   request: NextRequest,
@@ -67,6 +68,10 @@ export async function POST(
       }),
       refreshCampaignTTL(redis, code),
     ]);
+
+    // Latency shave: nudge battle-map clients (other players' VTTs, the DM
+    // VTT) to refetch player data now. Best-effort; polling is the fallback.
+    await sendBattleMapPoke(code, redis, 'players');
 
     return NextResponse.json({
       success: true,
