@@ -135,7 +135,10 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
       return;
     }
     const num = parseFloat(trimmed);
-    if (!Number.isNaN(num)) actions.onUpdate(entity.id, { initiative: num });
+    // Route through onSetInitiative (not the generic onUpdate) — it also
+    // re-sorts entities and remaps currentTurn when combat is active with a
+    // non-manual sort order, which a plain entity patch would silently skip.
+    if (!Number.isNaN(num)) actions.onSetInitiative(entity.id, num);
   };
 
   const updateProficiencyBonus = (value: string) => {

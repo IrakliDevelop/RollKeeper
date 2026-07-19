@@ -113,7 +113,7 @@ describe('DetailCombatInfo — field inventory', () => {
     expect(screen.getByLabelText('Passive Perception')).toHaveValue(13);
   });
 
-  it('editing Initiative commits via onUpdate on blur', async () => {
+  it('editing Initiative to a non-empty value commits via onSetInitiative (keeps turn order sorted)', async () => {
     const actions = makeActions();
     const user = userEvent.setup();
     render(<DetailCombatInfo entity={monsterEntity} actions={actions} />);
@@ -123,9 +123,26 @@ describe('DetailCombatInfo — field inventory', () => {
     await user.type(input, '22');
     await user.tab();
 
+    expect(actions.onSetInitiative).toHaveBeenCalledWith('monster-1', 22);
+    expect(actions.onUpdate).not.toHaveBeenCalledWith(
+      'monster-1',
+      expect.objectContaining({ initiative: expect.anything() })
+    );
+  });
+
+  it('clearing Initiative to empty commits null via onUpdate (onSetInitiative takes a number)', async () => {
+    const actions = makeActions();
+    const user = userEvent.setup();
+    render(<DetailCombatInfo entity={monsterEntity} actions={actions} />);
+
+    const input = screen.getByLabelText('Initiative');
+    await user.clear(input);
+    await user.tab();
+
     expect(actions.onUpdate).toHaveBeenCalledWith('monster-1', {
-      initiative: 22,
+      initiative: null,
     });
+    expect(actions.onSetInitiative).not.toHaveBeenCalled();
   });
 
   it('editing Proficiency Bonus commits via onUpdate on blur', async () => {
