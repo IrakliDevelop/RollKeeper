@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { CharacterState } from '@/types/character';
+import { CampaignPlayerData } from '@/types/campaign';
 import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
+import { useCharacterStore } from '@/store/characterStore';
 
 interface UsePlayerSyncOptions {
   characterId: string;
@@ -122,6 +124,29 @@ export function usePlayerSync({
           pendingSyncData.current = null;
           leaveCampaign();
           onRemovedFromCampaign?.();
+          return;
+        }
+
+        if (res.status === 409) {
+          // Our copy was stale (another tab pushed newer). Adopt the
+          // server's blob instead of clobbering — revision-gated, and via
+          // loadCharacterState so no bump/echo. Never rejoin on 409:
+          // rejoin would overwrite the newer blob with the stale one.
+          pendingSyncData.current = null;
+          const body = (await res.json().catch(() => null)) as {
+            current?: CampaignPlayerData;
+          } | null;
+          const serverCharacter = body?.current?.characterData;
+          const { character: localCharacter, loadCharacterState } =
+            useCharacterStore.getState();
+          if (
+            serverCharacter &&
+            serverCharacter.id === localCharacter.id &&
+            (serverCharacter.revision ?? 0) > (localCharacter.revision ?? 0)
+          ) {
+            loadCharacterState(serverCharacter);
+          }
+          setSyncStatus('synced');
           return;
         }
 
