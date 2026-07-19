@@ -30,6 +30,8 @@ export interface DmBattleMapCanvasProps {
   /** Chrome rendered inside the ViewportContext.Provider. */
   children?: React.ReactNode;
   onStatus?: (status: BattleMapConnectionStatus) => void;
+  /** Fires when the relay pokes this room (e.g. 'players' → refetch live HP). */
+  onPoke?: (feature: string) => void;
   onViewportReady?: (vp: Viewport) => void;
   tokenConfigRef: React.MutableRefObject<DmTokenConfig | null>;
   /** Select-tool selection changes (element ids) — Task 8 maps to entities. */
@@ -65,6 +67,7 @@ export function useDmBattleMapCanvas({
   battleMapId,
   dmId,
   onStatus: onStatusProp,
+  onPoke,
   onViewportReady,
   tokenConfigRef,
   onSelectionChange,
@@ -157,6 +160,7 @@ export function useDmBattleMapCanvas({
             setStatus(s);
             onStatusProp?.(s);
           },
+          onPoke,
         });
       }
 
@@ -167,6 +171,7 @@ export function useDmBattleMapCanvas({
       battleMapId,
       dmId,
       onStatusProp,
+      onPoke,
       onViewportReady,
       onSelectionChange,
     ]

@@ -62,6 +62,7 @@ export function DmVttScreen({
       battleMapId={battleMapId}
       dmId={dmId}
       onStatus={vtt.onStatus}
+      onPoke={vtt.onPoke}
       onViewportReady={vtt.onViewportReady}
       tokenConfigRef={vtt.tokenConfigRef}
       onSelectionChange={vtt.onSelectionChange}
