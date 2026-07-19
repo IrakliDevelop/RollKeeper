@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import type {
   EncounterEntity,
   EntityType,
@@ -70,20 +70,10 @@ export function CombatantRow({
   actions,
   onSelect,
 }: CombatantRowProps): React.JSX.Element {
-  const [editingName, setEditingName] = useState(false);
-  const [nameInput, setNameInput] = useState('');
-
   const isDead = getIsDead(entity);
   const isRail = density === 'rail';
   const stripeClass = getStripeClass(entity.playerDisposition, entity.type);
   const rowClass = getRowClass(isActive, isSelected, isOnDeck);
-
-  function commitName() {
-    const trimmed = nameInput.trim();
-    if (trimmed && trimmed !== entity.name)
-      actions.onUpdate(entity.id, { name: trimmed });
-    setEditingName(false);
-  }
 
   return (
     <div
@@ -113,35 +103,11 @@ export function CombatantRow({
 
         <div className="min-w-0 flex-1">
           <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
-            {editingName ? (
-              <input
-                type="text"
-                value={nameInput}
-                onChange={e => setNameInput(e.target.value)}
-                onBlur={commitName}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') commitName();
-                  if (e.key === 'Escape') setEditingName(false);
-                }}
-                onClick={e => e.stopPropagation()}
-                className="bg-surface-raised text-heading max-w-[200px] min-w-0 rounded px-1.5 py-0.5 font-semibold shadow-sm"
-                autoFocus
-              />
-            ) : (
-              <span
-                className={`font-display text-heading truncate text-sm font-bold ${isDead ? 'line-through' : ''} ${entity.type !== 'player' ? 'hover:text-body cursor-pointer rounded transition-colors' : ''}`}
-                onClick={e => {
-                  if (entity.type !== 'player') {
-                    e.stopPropagation();
-                    setNameInput(entity.name);
-                    setEditingName(true);
-                  }
-                }}
-                title={entity.type !== 'player' ? 'Click to rename' : undefined}
-              >
-                {entity.name}
-              </span>
-            )}
+            <span
+              className={`font-display text-heading truncate text-sm font-bold ${isDead ? 'line-through' : ''}`}
+            >
+              {entity.name}
+            </span>
             <RowBadges
               entity={entity}
               isOnDeck={isOnDeck}

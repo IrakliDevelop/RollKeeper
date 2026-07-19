@@ -241,4 +241,79 @@ describe('DetailHeader', () => {
     expect(actions.onRemove).not.toHaveBeenCalled();
     vi.restoreAllMocks();
   });
+
+  it('non-player: Rename button swaps name for an input, commits on Enter', async () => {
+    const actions = makeActions();
+    const user = userEvent.setup();
+    render(<DetailHeader entity={npcEntity} actions={actions} />);
+
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    const input = screen.getByRole('textbox', { name: 'Combatant name' });
+    expect(input).toHaveValue('Goblin');
+
+    await user.clear(input);
+    await user.type(input, 'Goblin Boss');
+    await user.keyboard('{Enter}');
+
+    expect(actions.onUpdate).toHaveBeenCalledWith('npc-1', {
+      name: 'Goblin Boss',
+    });
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('non-player: rename commits on blur too', async () => {
+    const actions = makeActions();
+    const user = userEvent.setup();
+    render(<DetailHeader entity={npcEntity} actions={actions} />);
+
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    const input = screen.getByRole('textbox', { name: 'Combatant name' });
+    await user.clear(input);
+    await user.type(input, 'Renamed Goblin');
+    await user.tab();
+
+    expect(actions.onUpdate).toHaveBeenCalledWith('npc-1', {
+      name: 'Renamed Goblin',
+    });
+  });
+
+  it('non-player: Escape cancels the rename without committing', async () => {
+    const actions = makeActions();
+    const user = userEvent.setup();
+    render(<DetailHeader entity={npcEntity} actions={actions} />);
+
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    const input = screen.getByRole('textbox', { name: 'Combatant name' });
+    await user.clear(input);
+    await user.type(input, 'Should not save');
+    await user.keyboard('{Escape}');
+
+    expect(actions.onUpdate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.getByText('Goblin')).toBeInTheDocument();
+  });
+
+  it('non-player: empty/whitespace name is ignored (trimmed, not committed)', async () => {
+    const actions = makeActions();
+    const user = userEvent.setup();
+    render(<DetailHeader entity={npcEntity} actions={actions} />);
+
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    const input = screen.getByRole('textbox', { name: 'Combatant name' });
+    await user.clear(input);
+    await user.type(input, '   ');
+    await user.keyboard('{Enter}');
+
+    expect(actions.onUpdate).not.toHaveBeenCalled();
+    expect(screen.getByText('Goblin')).toBeInTheDocument();
+  });
+
+  it('player entities have no rename affordance', () => {
+    const actions = makeActions();
+    render(<DetailHeader entity={playerEntity} actions={actions} />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Rename' })
+    ).not.toBeInTheDocument();
+  });
 });

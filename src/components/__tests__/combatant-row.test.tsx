@@ -236,6 +236,24 @@ describe('CombatantRow', () => {
     expect(buffBadge).not.toBeNull();
   });
 
+  it('clicking the name selects the row rather than starting a rename', () => {
+    const actions = makeMockActions();
+    const onSelect = vi.fn();
+    render(
+      <CombatantRow
+        {...defaultProps}
+        entity={mockEntity}
+        actions={actions}
+        onSelect={onSelect}
+      />
+    );
+    fireEvent.click(screen.getByText('Goblin'));
+    expect(onSelect).toHaveBeenCalled();
+    // No inline rename affordance left on the row
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(actions.onUpdate).not.toHaveBeenCalled();
+  });
+
   it('lair entity hides HP and AC', () => {
     const actions = makeMockActions();
     render(
