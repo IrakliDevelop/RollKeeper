@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { usePlayerSync } from '@/hooks/usePlayerSync';
 import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
+import { useCharacterStore } from '@/store/characterStore';
 import {
   mockFetchResponse,
   mockFetchSequence,
@@ -318,5 +319,69 @@ describe('usePlayerSync', () => {
     expect(
       usePlayerStore.getState().characters[0].campaignCode
     ).toBeUndefined();
+  });
+
+  describe('409 stale handling', () => {
+    it('adopts the server blob when it is newer, without rejoining', async () => {
+      seedLinkedCharacter();
+      const localCharacter = createMockCharacterState({
+        id: 'char-1',
+        revision: 1,
+      });
+      useCharacterStore.setState({ character: localCharacter });
+
+      const serverCharacter = createMockCharacterState({
+        id: 'char-1',
+        revision: 4,
+        armorClass: 19,
+      });
+      const fetchFn = mockFetchResponse(409, {
+        error: 'stale',
+        current: { characterData: serverCharacter },
+      });
+
+      const { result } = renderHook(() =>
+        usePlayerSync({ characterId: 'char-1' })
+      );
+      await act(async () => {
+        await result.current.syncNow(localCharacter);
+      });
+
+      expect(useCharacterStore.getState().character.revision).toBe(4);
+      expect(useCharacterStore.getState().character.armorClass).toBe(19);
+      // exactly one fetch — no /join rejoin attempt
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(result.current.syncStatus).toBe('synced');
+    });
+
+    it('keeps local state when the 409 blob is not newer', async () => {
+      seedLinkedCharacter();
+      const localCharacter = createMockCharacterState({
+        id: 'char-1',
+        revision: 6,
+      });
+      useCharacterStore.setState({ character: localCharacter });
+
+      mockFetchResponse(409, {
+        error: 'stale',
+        current: {
+          characterData: createMockCharacterState({
+            id: 'char-1',
+            revision: 6,
+            armorClass: 3,
+          }),
+        },
+      });
+
+      const { result } = renderHook(() =>
+        usePlayerSync({ characterId: 'char-1' })
+      );
+      await act(async () => {
+        await result.current.syncNow(localCharacter);
+      });
+
+      expect(useCharacterStore.getState().character.armorClass).not.toBe(3);
+      expect(useCharacterStore.getState().character.revision).toBe(6);
+    });
   });
 });
