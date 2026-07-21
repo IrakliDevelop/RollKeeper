@@ -5,7 +5,9 @@ import type { ProcessedMonster } from '@/types/bestiary';
 import type { PlayerDisposition } from '@/types/encounter';
 import { MonsterSearch } from './MonsterSearch';
 import { MonsterDetail } from './MonsterDetail';
+import { StatBlockEditor } from './StatBlockEditor';
 import { useMonsterSearch } from '@/hooks/useMonsterSearch';
+import type { MonsterEditDraft } from './monsterEditDraft';
 
 interface MonsterTabProps {
   selected: ProcessedMonster | null;
@@ -22,6 +24,12 @@ interface MonsterTabProps {
   onPlayerAliasChange: (v: string) => void;
   disposition: PlayerDisposition;
   onDispositionChange: (v: PlayerDisposition) => void;
+  draft: MonsterEditDraft | null;
+  editing: boolean;
+  onEditStatBlock: () => void;
+  onDraftChange: (d: MonsterEditDraft) => void;
+  onEditorBack: () => void;
+  onEditorReset: () => void;
 }
 
 export function MonsterTab({
@@ -39,6 +47,12 @@ export function MonsterTab({
   onPlayerAliasChange,
   disposition,
   onDispositionChange,
+  draft,
+  editing,
+  onEditStatBlock,
+  onDraftChange,
+  onEditorBack,
+  onEditorReset,
 }: MonsterTabProps) {
   const {
     query,
@@ -58,6 +72,18 @@ export function MonsterTab({
     onCountChange(1);
   };
 
+  if (selected && editing && draft) {
+    return (
+      <StatBlockEditor
+        monsterName={selected.name}
+        draft={draft}
+        onDraftChange={onDraftChange}
+        onReset={onEditorReset}
+        onBack={onEditorBack}
+      />
+    );
+  }
+
   if (selected) {
     return (
       <MonsterDetail
@@ -75,6 +101,8 @@ export function MonsterTab({
         disposition={disposition}
         onDispositionChange={onDispositionChange}
         onBack={() => onSelect(null)}
+        onEditStatBlock={onEditStatBlock}
+        hasEdits={draft !== null}
       />
     );
   }
