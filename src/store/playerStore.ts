@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { createSafeStorage } from '@/lib/safeStorage';
+import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
 import { CharacterState, CharacterExport } from '@/types/character';
 import { DEFAULT_CHARACTER_STATE, STORAGE_KEY } from '@/utils/constants';
 
@@ -498,5 +499,7 @@ export const usePlayerStore = create<PlayerStoreState>()(
     }
   )
 );
+
+exposeStoreForE2E('player', usePlayerStore);
 
 export default usePlayerStore;
