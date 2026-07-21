@@ -107,6 +107,20 @@ describe('plainTextToBadgedHtml', () => {
     const spanCount = (result.match(/<span /g) || []).length;
     expect(spanCount).toBe(4);
   });
+
+  test('is collision-proof against user text containing the literal placeholder token', () => {
+    const result = plainTextToBadgedHtml(
+      'Weird <<SBT_BADGE_0>> text, +3 to hit'
+    );
+    // The literal token is HTML-escaped, so it can never collide with the
+    // internal `<<SBT_BADGE_N>>` substitution sentinel (which is only ever
+    // introduced after escaping).
+    expect(result).toContain('&lt;&lt;SBT_BADGE_0&gt;&gt;');
+    expect(result).toContain(
+      'bg-emerald-600/10 text-emerald-400 border border-emerald-600/20 hover:bg-emerald-600/20" title="+3">🎯 +3</span>'
+    );
+    expect(result).not.toContain('undefined');
+  });
 });
 
 describe('renderStatBlockEntryText', () => {
