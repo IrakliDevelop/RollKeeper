@@ -279,20 +279,23 @@ export const usePlayerStore = create<PlayerStoreState>()(
         set(state => ({
           characters: state.characters.map(char =>
             char.id === characterId
-              ? {
-                  ...char,
-                  characterData,
-                  name: characterData.name || char.name,
-                  race: characterData.race || char.race,
-                  class: characterData.class?.name || char.class,
-                  level:
-                    characterData.totalLevel ||
-                    characterData.level ||
-                    char.level,
-                  avatar: characterData.avatar, // Update top-level avatar from characterData
-                  updatedAt: new Date(),
-                  lastPlayed: new Date(),
-                }
+              ? (characterData.revision ?? 0) <
+                (char.characterData?.revision ?? 0)
+                ? char // stale write-back (outdated tab copy) — keep the newer entry
+                : {
+                    ...char,
+                    characterData,
+                    name: characterData.name || char.name,
+                    race: characterData.race || char.race,
+                    class: characterData.class?.name || char.class,
+                    level:
+                      characterData.totalLevel ||
+                      characterData.level ||
+                      char.level,
+                    avatar: characterData.avatar, // Update top-level avatar from characterData
+                    updatedAt: new Date(),
+                    lastPlayed: new Date(),
+                  }
               : char
           ),
         }));
