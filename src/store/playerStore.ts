@@ -2,11 +2,13 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { createSafeStorage } from '@/lib/safeStorage';
 import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
+import { initCrossTabRosterSync } from '@/lib/crossTabRosterSync';
 import { CharacterState, CharacterExport } from '@/types/character';
-import { DEFAULT_CHARACTER_STATE, STORAGE_KEY } from '@/utils/constants';
-
-// Storage configuration
-const PLAYER_STORAGE_KEY = 'rollkeeper-player-data';
+import {
+  DEFAULT_CHARACTER_STATE,
+  STORAGE_KEY,
+  PLAYER_STORAGE_KEY,
+} from '@/utils/constants';
 
 // Player character interface - contains full CharacterState
 export interface PlayerCharacter {
@@ -501,5 +503,7 @@ export const usePlayerStore = create<PlayerStoreState>()(
 );
 
 exposeStoreForE2E('player', usePlayerStore);
+
+initCrossTabRosterSync(usePlayerStore);
 
 export default usePlayerStore;
