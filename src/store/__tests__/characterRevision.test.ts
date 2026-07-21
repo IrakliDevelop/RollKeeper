@@ -42,4 +42,24 @@ describe('characterStore — revision bumping', () => {
     useCharacterStore.getState().updateAbilityScore('strength', 18);
     expect(useCharacterStore.getState().character.revision).toBe(1);
   });
+
+  it('does not bump revision when recalculateMaxHP is a no-op', () => {
+    // makeCharacter's default (auto mode, level 5, Fighter d10, CON 14) already
+    // has hitPoints.max equal to what calculateMaxHP produces, so the first
+    // call is already a no-op — but exercise it once anyway to mirror how the
+    // real app calls this unconditionally on every sheet mount, then confirm
+    // the second call stays a no-op.
+    useCharacterStore.getState().recalculateMaxHP();
+    const { character: characterAfterFirst, revision: revisionAfterFirst } = {
+      character: useCharacterStore.getState().character,
+      revision: useCharacterStore.getState().character.revision,
+    };
+    expect(characterAfterFirst.hitPoints.max).toBe(44);
+    expect(revisionAfterFirst).toBe(3);
+
+    useCharacterStore.getState().recalculateMaxHP();
+
+    expect(useCharacterStore.getState().character.revision).toBe(3);
+    expect(useCharacterStore.getState().character).toBe(characterAfterFirst);
+  });
 });

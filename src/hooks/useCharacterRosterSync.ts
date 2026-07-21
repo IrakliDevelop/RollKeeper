@@ -105,6 +105,11 @@ export function useCharacterRosterSync({
         // Create a deep copy to avoid reference issues
         const characterCopy = JSON.parse(JSON.stringify(character));
         updateCharacterData(characterId, characterCopy);
+        // `updateCharacterData` may refuse a stale-revision write, so this
+        // ref only records what THIS tab attempted, not confirmed roster
+        // state. That's benign: the live characterStore state (which the
+        // storage listener keeps fresh) is what other consumers converge
+        // on, not this ref.
         lastSyncedCharacterRef.current = characterCopy;
       }
     }
