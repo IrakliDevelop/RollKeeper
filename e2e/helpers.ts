@@ -94,6 +94,33 @@ export async function storeHp(
   });
 }
 
+/** Live in-memory revision for whichever character is currently loaded in
+ * this tab's characterStore. The revision bump happens synchronously inside
+ * the same `set` call as the mutation, so this can be read immediately after
+ * a damage call with no polling — unlike the roster blob (`readRosterEntry`),
+ * which only reflects the write-back once the debounced sync effect fires. */
+export async function storeRevision(page: Page): Promise<number | undefined> {
+  return page.evaluate(
+    () => window.__rkStores!.character.getState().character.revision
+  );
+}
+
+/** Id of the character currently occupying the single-character
+ * `rollkeeper-character` localStorage slot (the live characterStore's
+ * persisted blob) — distinct from the whole-roster `rollkeeper-player-data`
+ * blob read by `readRosterEntry`. Used to confirm a tab's write-back has
+ * actually landed before another tab reloads. */
+export async function characterSlotId(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const raw = window.localStorage.getItem('rollkeeper-character');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {
+      state?: { character?: { id?: string } };
+    };
+    return parsed.state?.character?.id ?? null;
+  });
+}
+
 /** Applies damage via the live characterStore handle (same mechanism as the
  * app's damage controls, bypassing the UI for speed/determinism). */
 export async function damageCharacter(

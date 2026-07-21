@@ -6,6 +6,8 @@ import {
   waitForStoresReady,
   readRosterEntry,
   storeHp,
+  storeRevision,
+  characterSlotId,
   damageCharacter,
 } from './helpers';
 
@@ -50,6 +52,10 @@ test("a tab holding another character must not revert this character's roster en
   const { max: hpMaxB } = await storeHp(tab2);
 
   // --- Interleave: tab1 dmg A (-3); tab2 dmg B (-4); tab1 dmg A (-2) ---
+  // Revisions are captured from the live characterStore handle right after
+  // each damage call (the bump is synchronous with the mutation) rather than
+  // from the roster blob, which only reflects a write-back once the debounced
+  // sync effect fires.
   await damageCharacter(tab1, 3);
   await expect
     .poll(async () => (await readRosterEntry(tab1, idA))?.hpCurrent, {
@@ -59,6 +65,7 @@ test("a tab holding another character must not revert this character's roster en
     .toBe(hpMaxA - 3);
 
   await damageCharacter(tab2, 4);
+  const revB = await storeRevision(tab2);
   await expect
     .poll(async () => (await readRosterEntry(tab2, idB))?.hpCurrent, {
       message: "tab2's write-back of B(-4) should land in the roster blob",
@@ -67,6 +74,7 @@ test("a tab holding another character must not revert this character's roster en
     .toBe(hpMaxB - 4);
 
   await damageCharacter(tab1, 2);
+  const revA = await storeRevision(tab1);
   await expect
     .poll(async () => (await readRosterEntry(tab1, idA))?.hpCurrent, {
       message: "tab1's write-back of A(-2) should land in the roster blob",
@@ -75,17 +83,24 @@ test("a tab holding another character must not revert this character's roster en
     .toBe(hpMaxA - 5);
 
   // --- Assert 1 (roster integrity): both entries must carry their LATEST
-  // hp/revision. Pre-fix: tab1's last write-back (A) re-persists tab1's
-  // stale in-memory copy of B (captured at creation, hp = hpMaxB),
-  // reverting B's roster entry back to full hp — this assertion fails.
+  // hp AND revision. Pre-fix: tab1's last write-back (A) re-persists tab1's
+  // stale in-memory copy of B (captured at creation, hp = hpMaxB, revision =
+  // its creation-time revision), reverting B's roster entry back to full hp
+  // and a stale revision — this assertion fails.
   const finalA = await readRosterEntry(tab1, idA);
   const finalB = await readRosterEntry(tab1, idB);
   expect
     .soft(finalA?.hpCurrent, "A's roster entry must reflect its latest damage")
     .toBe(hpMaxA - 5);
   expect
+    .soft(finalA?.revision, "A's roster entry must carry its latest revision")
+    .toBe(revA);
+  expect
     .soft(finalB?.hpCurrent, "B's roster entry must reflect its latest damage")
     .toBe(hpMaxB - 4);
+  expect
+    .soft(finalB?.revision, "B's roster entry must carry its latest revision")
+    .toBe(revB);
 
   // Mirrors evidence.md's Evidence Set 2: tab1 reloads (control case — A
   // comes back correct because tab1 was the last writer of A throughout),
@@ -98,6 +113,29 @@ test("a tab holding another character must not revert this character's roster en
   await tab1.goto('/player', { waitUntil: 'networkidle' });
   await tab1.goto(urlA, { waitUntil: 'networkidle' });
   await waitForStoresReady(tab1);
+
+  // Force the ordering explicitly rather than relying on navigation overhead
+  // outlasting useCharacterRosterSync's 50ms initial-load timer: confirm
+  // tab1's final write-back (the single `rollkeeper-character` slot holding
+  // A, and A's roster entry reflecting tab1's last write) has actually landed
+  // before tab2 reloads next. (Revision is not asserted here: remounting the
+  // sheet after `reload`/navigation legitimately re-runs mount-time effects
+  // that can bump revision again with no change in hp — that's unrelated to
+  // the clobber bug this spec targets, so only hp/id are checked.)
+  await expect
+    .poll(async () => characterSlotId(tab1), {
+      message:
+        "tab1's reload round-trip must finish writing A into the rollkeeper-character slot before tab2 reloads",
+      timeout: 10_000,
+    })
+    .toBe(idA);
+  await expect
+    .poll(async () => (await readRosterEntry(tab1, idA))?.hpCurrent, {
+      message:
+        "tab1's reload round-trip must finish writing A's roster entry before tab2 reloads",
+      timeout: 10_000,
+    })
+    .toBe(hpMaxA - 5);
 
   // --- Assert 2 (user-visible data loss): reloading tab2 (B's sheet) must
   // NOT undo B's damage. Pre-fix: characterStore rehydrates from the single
