@@ -1345,6 +1345,17 @@ export const useCharacterStore = create<CharacterStore>()(
             state.character.abilities.constitution
           );
 
+          // No-op guard: recalculation runs unconditionally on every
+          // sheet mount, so when the recalculated max matches the current
+          // max, return the untouched state. Otherwise `withRevisionBump`
+          // sees a fresh (but content-identical) character object on every
+          // mount and mints a revision bump with zero real change, which
+          // degrades every revision-comparison site (roster merge,
+          // cross-tab apply, server 409 gate).
+          if (newMaxHP === state.character.hitPoints.max) {
+            return state;
+          }
+
           return {
             character: {
               ...state.character,
