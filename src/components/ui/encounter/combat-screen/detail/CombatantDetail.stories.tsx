@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { CombatantDetail } from './CombatantDetail';
 import type { EncounterEntity, MonsterStatBlock } from '@/types/encounter';
 import type { EntityActions } from '../types';
@@ -272,4 +272,27 @@ export const PlayerSynced: Story = {
 export const LairEntity: Story = {
   name: 'Lair — actions + regional effects',
   args: { entity: lairEntity },
+};
+
+export const EditStatBlockActions: Story = {
+  name: 'Monster — edit actions & traits',
+  args: {
+    entity: monsterEntity,
+    actions: { ...defaultActions, onUpdate: fn() },
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole('button', { name: /edit actions & traits/i })
+    );
+    const nameInputs = canvas.getAllByLabelText(/entry name/i);
+    await userEvent.type(nameInputs[0], '!');
+    await expect(args.actions.onUpdate).toHaveBeenCalled();
+    const [entityId, updates] = (args.actions.onUpdate as ReturnType<typeof fn>)
+      .mock.lastCall!;
+    await expect(entityId).toBe(args.entity.id);
+    await expect(
+      (updates as Partial<EncounterEntity>).monsterStatBlock
+    ).toBeDefined();
+  },
 };
