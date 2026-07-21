@@ -19,6 +19,8 @@ import { useDmCounterSync } from '@/hooks/useDmCounterSync';
 import { useDmInitiativeSync } from '@/hooks/useDmInitiativeSync';
 import { useTurnRequestSync } from '@/hooks/useTurnRequestSync';
 import { useInitiativeSubmissionSync } from '@/hooks/useInitiativeSubmissionSync';
+import { useActiveBattleMapId } from '@/hooks/useActiveBattleMapId';
+import { useBattleMapPokes } from '@/hooks/useBattleMapPokes';
 import { buildSharedInitiative } from '@/utils/buildSharedInitiative';
 import { Button } from '@/components/ui/forms/button';
 import { CombatScreen } from './combat-screen/CombatScreen';
@@ -35,6 +37,20 @@ import type { CampaignNPC } from '@/types/encounter';
 interface EncounterViewProps {
   encounterId: string;
   campaignCode: string;
+}
+
+/**
+ * `useBattleMapPokes` onPoke handler, extracted so the wiring is unit
+ * testable without a full `EncounterView` render harness. EncounterView is
+ * the initiative author for its own encounters, so 'initiative' pokes are
+ * ignored here — only a 'players' poke (DM battle-map activity nudging
+ * player HP/state) triggers an immediate campaign-sync refresh.
+ */
+export function handleEncounterPoke(
+  feature: string,
+  refresh: () => void
+): void {
+  if (feature === 'players') refresh();
 }
 
 export function EncounterView({
@@ -123,12 +139,29 @@ export function EncounterView({
     pushInitiative,
   ]);
 
-  const { players: campaignPlayers } = useCampaignSync({
-    code: campaignCode,
-    dmId,
-    campaignName: campaign?.name ?? 'Campaign',
-    createdAt: campaign?.createdAt ?? new Date().toISOString(),
-    interval: 15000,
+  const { players: campaignPlayers, refresh: refreshPlayers } = useCampaignSync(
+    {
+      code: campaignCode,
+      dmId,
+      campaignName: campaign?.name ?? 'Campaign',
+      createdAt: campaign?.createdAt ?? new Date().toISOString(),
+      interval: 15000,
+    }
+  );
+
+  // Slow-poll discovery of which battle map is currently live to players
+  // (see useActiveBattleMapId) — only used to pick the poke room below.
+  const activeBattleMapId = useActiveBattleMapId(campaignCode);
+
+  // Best-effort relay listener: a 'players' poke shaves latency off the
+  // next player-HP refresh instead of waiting on the 15s poll. 'initiative'
+  // pokes are ignored — EncounterView authors initiative, it doesn't
+  // consume it.
+  useBattleMapPokes({
+    campaignCode,
+    battleMapId: activeBattleMapId,
+    tokenRequest: dmId ? { role: 'dm', dmId } : null,
+    onPoke: feature => handleEncounterPoke(feature, refreshPlayers),
   });
 
   const mappedPlayers = campaignPlayers.map(p => ({
