@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { vi } from 'vitest';
 import { mockFetchResponse } from '@/test/mocks/fetch';
+import { makeCharacter } from '@/utils/__tests__/test-utils';
 import { usePlayerStore } from '@/store/playerStore';
 
 function resetStore() {
@@ -314,6 +315,75 @@ describe('playerStore', () => {
         .updateCharacterData(id, { ...original, name: 'Synced' });
       expect(usePlayerStore.getState().getCharacterById(id)?.name).toBe(
         'Synced'
+      );
+    });
+
+    it('refuses stale-revision write-backs (strictly lower)', () => {
+      const id = usePlayerStore.getState().createCharacter('Hero');
+      // Seed with revision 5
+      const charWithRevision5 = makeCharacter({ revision: 5, name: 'Fresh' });
+      usePlayerStore.getState().updateCharacterData(id, charWithRevision5);
+      expect(
+        usePlayerStore.getState().getCharacterById(id)?.characterData.revision
+      ).toBe(5);
+      expect(usePlayerStore.getState().getCharacterById(id)?.name).toBe(
+        'Fresh'
+      );
+
+      // Try to update with revision 3 (stale) - should be a no-op
+      const staleChar = makeCharacter({ revision: 3, name: 'Stale' });
+      usePlayerStore.getState().updateCharacterData(id, staleChar);
+      // Entry should remain unchanged
+      expect(
+        usePlayerStore.getState().getCharacterById(id)?.characterData.revision
+      ).toBe(5);
+      expect(usePlayerStore.getState().getCharacterById(id)?.name).toBe(
+        'Fresh'
+      );
+
+      // Update with same revision (5) - should write (idempotent)
+      const sameRevisionChar = makeCharacter({
+        revision: 5,
+        name: 'Same Revision',
+      });
+      usePlayerStore.getState().updateCharacterData(id, sameRevisionChar);
+      expect(
+        usePlayerStore.getState().getCharacterById(id)?.characterData.revision
+      ).toBe(5);
+      expect(usePlayerStore.getState().getCharacterById(id)?.name).toBe(
+        'Same Revision'
+      );
+
+      // Update with higher revision (7) - should write
+      const newerChar = makeCharacter({ revision: 7, name: 'Newer' });
+      usePlayerStore.getState().updateCharacterData(id, newerChar);
+      expect(
+        usePlayerStore.getState().getCharacterById(id)?.characterData.revision
+      ).toBe(7);
+      expect(usePlayerStore.getState().getCharacterById(id)?.name).toBe(
+        'Newer'
+      );
+    });
+
+    it('treats missing revision as 0', () => {
+      const id = usePlayerStore.getState().createCharacter('Hero');
+      // Seed with revision 3
+      const charWithRevision3 = makeCharacter({ revision: 3, name: 'Fresh' });
+      usePlayerStore.getState().updateCharacterData(id, charWithRevision3);
+      expect(
+        usePlayerStore.getState().getCharacterById(id)?.characterData.revision
+      ).toBe(3);
+
+      // Try to update with missing revision (treated as 0) - should be a no-op
+      const noRevisionChar = makeCharacter({ name: 'No Revision' });
+      delete (noRevisionChar as Partial<typeof noRevisionChar>).revision;
+      usePlayerStore.getState().updateCharacterData(id, noRevisionChar);
+      // Entry should remain unchanged
+      expect(
+        usePlayerStore.getState().getCharacterById(id)?.characterData.revision
+      ).toBe(3);
+      expect(usePlayerStore.getState().getCharacterById(id)?.name).toBe(
+        'Fresh'
       );
     });
   });
