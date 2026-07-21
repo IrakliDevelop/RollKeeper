@@ -169,4 +169,45 @@ describe('useDmVttPlayersRefresh', () => {
 
     expect(applyPlayersToEncounter).not.toHaveBeenCalled();
   });
+
+  it('polls every 45s even when no poke ever arrives (relay-down fallback)', async () => {
+    const fetchFn = mockFetchResponse(200, { players: PLAYERS });
+    renderHook(() => useDmVttPlayersRefresh(CAMPAIGN_CODE, ENCOUNTER_ID));
+
+    // No poke — only the passive interval should drive fetches.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(45_000);
+    });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(applyPlayersToEncounter).toHaveBeenCalledWith(ENCOUNTER_ID, PLAYERS);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(45_000);
+    });
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops polling after unmount', async () => {
+    const fetchFn = mockFetchResponse(200, { players: PLAYERS });
+    const { unmount } = renderHook(() =>
+      useDmVttPlayersRefresh(CAMPAIGN_CODE, ENCOUNTER_ID)
+    );
+
+    unmount();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(45_000);
+    });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('does not poll when encounterId is null', async () => {
+    const fetchFn = mockFetchResponse(200, { players: PLAYERS });
+    renderHook(() => useDmVttPlayersRefresh(CAMPAIGN_CODE, null));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(45_000);
+    });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
 });
