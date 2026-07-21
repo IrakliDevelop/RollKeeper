@@ -2,6 +2,7 @@ import type {
   EncounterEntity,
   CampaignNPC,
   PlayerDisposition,
+  MonsterStatBlock,
 } from '@/types/encounter';
 import type { ProcessedMonster } from '@/types/bestiary';
 import {
@@ -107,6 +108,9 @@ export interface MonsterBuildOpts {
   playerAlias?: string;
   playerDisposition: PlayerDisposition;
   colorIdx: number;
+  statBlockOverride?: MonsterStatBlock;
+  initiativeModifierOverride?: number;
+  proficiencyBonusOverride?: number;
 }
 
 export function buildMonsterEntities(
@@ -127,6 +131,9 @@ export function buildMonsterEntities(
       color,
       hpOverride,
       acOverride,
+      statBlockOverride: opts.statBlockOverride,
+      initiativeModifierOverride: opts.initiativeModifierOverride,
+      proficiencyBonusOverride: opts.proficiencyBonusOverride,
     });
     return {
       ...entity,
