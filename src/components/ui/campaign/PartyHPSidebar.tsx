@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Users, User, Heart, Skull, EyeOff, Shield } from 'lucide-react';
-import { usePartySync } from '@/hooks/usePartySync';
 import { useDraggableY } from '@/hooks/useDraggableY';
 import { getHpBarColor } from '@/utils/hpColor';
 import { PartyMemberHP } from '@/app/api/campaign/[code]/party-hp/route';
@@ -142,19 +141,24 @@ function PartyMemberRow({ member }: { member: PartyMemberHP }) {
 
 interface PartyHPSidebarProps {
   campaignCode: string | null;
-  currentCharacterId: string;
+  partyMembers: PartyMemberHP[];
+  loading: boolean;
 }
 
+/**
+ * Presentational — the party-sync polling instance lives one level up
+ * (page-level `usePartySync`) so the sidebar and the initiative panel share
+ * ONE poll/poke-fed data source instead of each running its own; a second
+ * instance here would never see poke-driven refreshes and would double the
+ * polling traffic.
+ */
 export function PartyHPSidebar({
   campaignCode,
-  currentCharacterId,
+  partyMembers,
+  loading,
 }: PartyHPSidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { topPx, containerRef: sidebarRef, startDrag } = useDraggableY(POS_KEY);
-  const { partyMembers, loading } = usePartySync({
-    campaignCode,
-    currentCharacterId,
-  });
 
   // Load persisted open state
   useEffect(() => {

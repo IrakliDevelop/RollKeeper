@@ -28,6 +28,14 @@ const PROACTIVE_REFRESH_MS = 4 * 60 * 1000;
 export function createBattleMapPokeListener(
   opts: PokeListenerOptions
 ): () => void {
+  // NEXT_PUBLIC_* env vars are inlined at build time, so if this is absent
+  // now it can never become available at runtime — retrying for it would
+  // just be a pointless perpetual backoff loop. No-op immediately instead.
+  const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+  if (!relayUrl) {
+    return () => {};
+  }
+
   let stopped = false;
   let socket: WebSocket | null = null;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -111,11 +119,6 @@ export function createBattleMapPokeListener(
     connecting = true;
     const myGeneration = generation;
     try {
-      const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
-      if (!relayUrl) {
-        scheduleRetry(() => void connect());
-        return;
-      }
       const token = await mintBattleMapToken(opts.campaignCode, {
         ...opts.tokenRequest,
         battleMapId: opts.battleMapId,
@@ -130,7 +133,10 @@ export function createBattleMapPokeListener(
       const url = `${relayUrl}?room=${encodeURIComponent(room)}&token=${encodeURIComponent(token)}`;
       openSocket(url);
     } finally {
-      connecting = false;
+      // A stale, superseded attempt (generation bumped by rebuild() while
+      // this one was still awaiting its mint) must not clear the flag for
+      // its successor, which may still be genuinely in-flight.
+      if (myGeneration === generation) connecting = false;
     }
   };
 
