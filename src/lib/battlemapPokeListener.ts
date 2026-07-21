@@ -1,7 +1,6 @@
 import {
   mintBattleMapToken,
   pokeFeatureFromEnvelope,
-  type BattleMapTokenRequest,
 } from '@/lib/battlemapSync';
 
 export interface PokeListenerOptions {
@@ -38,6 +37,11 @@ export function createBattleMapPokeListener(
   // Each fresh token gets exactly one same-token reconnect attempt before
   // the next transient close forces a re-mint.
   let usedSameTokenRetry = false;
+  // Guards connect() against overlapping with itself; bumped by rebuild()
+  // so a superseded in-flight connect() discards its (stale) mint result
+  // instead of racing rebuild's own connect() to open a second socket.
+  let connecting = false;
+  let generation = 0;
 
   const room = `${opts.campaignCode}:${opts.battleMapId}`;
 
@@ -62,10 +66,15 @@ export function createBattleMapPokeListener(
     lastUrl = url;
     const ws = new WebSocket(url);
     socket = ws;
-    ws.onopen = (): void => {
-      attempt = 0;
-    };
     ws.onmessage = (event: MessageEvent): void => {
+      // Any message — poke, snapshot, or op — proves this is an
+      // authenticated, live room connection, so it's the right signal to
+      // reset backoff. A bare `open` event is NOT enough: a relay that
+      // accepts the transport handshake but immediately rejects the token
+      // (repeated 4401s) would otherwise reset `attempt` to 0 on every
+      // cycle and retry every ~1s forever instead of escalating.
+      attempt = 0;
+      usedSameTokenRetry = false;
       const raw = typeof event.data === 'string' ? event.data : '';
       const feature = pokeFeatureFromEnvelope(raw);
       if (feature) opts.onPoke(feature);
@@ -98,27 +107,37 @@ export function createBattleMapPokeListener(
   };
 
   const connect = async (): Promise<void> => {
-    if (stopped) return;
-    const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
-    if (!relayUrl) {
-      scheduleRetry(() => void connect());
-      return;
+    if (stopped || connecting) return;
+    connecting = true;
+    const myGeneration = generation;
+    try {
+      const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+      if (!relayUrl) {
+        scheduleRetry(() => void connect());
+        return;
+      }
+      const token = await mintBattleMapToken(opts.campaignCode, {
+        ...opts.tokenRequest,
+        battleMapId: opts.battleMapId,
+      });
+      // Discard a stale result: rebuild()/stop() ran while we were
+      // awaiting the mint and superseded this attempt.
+      if (stopped || myGeneration !== generation) return;
+      if (!token) {
+        scheduleRetry(() => void connect());
+        return;
+      }
+      const url = `${relayUrl}?room=${encodeURIComponent(room)}&token=${encodeURIComponent(token)}`;
+      openSocket(url);
+    } finally {
+      connecting = false;
     }
-    const token = await mintBattleMapToken(opts.campaignCode, {
-      ...opts.tokenRequest,
-      battleMapId: opts.battleMapId,
-    } as BattleMapTokenRequest);
-    if (stopped) return;
-    if (!token) {
-      scheduleRetry(() => void connect());
-      return;
-    }
-    const url = `${relayUrl}?room=${encodeURIComponent(room)}&token=${encodeURIComponent(token)}`;
-    openSocket(url);
   };
 
   const rebuild = (): void => {
     if (stopped) return;
+    generation += 1;
+    connecting = false;
     clearRetryTimer();
     teardownSocket();
     attempt = 0;
