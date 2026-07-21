@@ -64,6 +64,7 @@ import RestDialog from '@/components/ui/character/RestDialog';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
 import { useJoinedBattleMap } from '@/hooks/useJoinedBattleMap';
+import { useBattleMapPokes } from '@/hooks/useBattleMapPokes';
 import { getMsPerDay, getCampaignDays } from '@/utils/calendarCalculations';
 import TabbedCharacterSheet from '@/components/ui/character/TabbedCharacterSheet';
 import type { TabbedCharacterSheetRef } from '@/components/ui/character/TabbedCharacterSheet';
@@ -262,7 +263,7 @@ export default function CharacterSheet() {
   );
 
   // Party sync — used for send-item targets
-  const { partyMembers, refetchNow } = usePartySync({
+  const { partyMembers, refetchNow: refetchPartyHpNow } = usePartySync({
     campaignCode: playerSync.campaignCode ?? null,
     currentCharacterId: characterId,
   });
@@ -275,8 +276,29 @@ export default function CharacterSheet() {
     acknowledgeTransfers,
     pendingTransfers,
     clearPendingTransfer,
+    refetchNow,
   } = useSharedCampaignState(playerSync.campaignCode, characterId);
   const sharedCalendar = sharedState?.calendar ?? null;
+
+  // Live battle map join-state derives from this too — derived here (rather
+  // than lower in the file, where it used to live) so it's available before
+  // the poke listener hook below without violating hook-order rules.
+  const activeBattleMapId = sharedState?.battleMap?.activeBattleMapId ?? null;
+
+  // Best-effort relay listener: a DM poke shaves latency off the next
+  // initiative/party-HP refetch instead of waiting on the poll interval.
+  // Polling remains the source-of-truth guarantee if this never connects.
+  useBattleMapPokes({
+    campaignCode: playerSync.campaignCode,
+    battleMapId: activeBattleMapId,
+    tokenRequest: characterId
+      ? { role: 'player', playerId: characterId }
+      : null,
+    onPoke: feature => {
+      if (feature === 'initiative') refetchNow();
+      if (feature === 'players') refetchPartyHpNow();
+    },
+  });
 
   // DM → player "roll for initiative" prompt
   const initiativePrompt = useInitiativePrompt({
@@ -593,8 +615,8 @@ export default function CharacterSheet() {
   );
 
   // Live battle map join-state: the bottom banner hides once THIS map was
-  // joined (a new map id brings it back).
-  const activeBattleMapId = sharedState?.battleMap?.activeBattleMapId ?? null;
+  // joined (a new map id brings it back). `activeBattleMapId` is derived
+  // earlier in this file (see the poke listener wiring above).
   const { joined: joinedBattleMap, markJoined: markBattleMapJoinedNow } =
     useJoinedBattleMap(activeBattleMapId);
   useEffect(() => {
