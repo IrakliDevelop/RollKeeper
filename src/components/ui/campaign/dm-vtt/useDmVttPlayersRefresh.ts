@@ -6,6 +6,7 @@ import { applyPlayersToEncounter } from '@/utils/encounterSync';
 import type { CampaignPlayerData } from '@/types/campaign';
 
 const PLAYERS_REFETCH_DEBOUNCE_MS = 1000;
+const FALLBACK_POLL_MS = 45_000;
 
 /**
  * Poke-driven player refresh for the DM VTT. The DM VTT has no player
@@ -65,6 +66,17 @@ export function useDmVttPlayersRefresh(
       }
     };
   }, []);
+
+  // Passive polling fallback: without this, if pokes never arrive (relay
+  // env unset, relay down, no active battlemap key) player HP freezes
+  // forever. No document.hidden gating — background operation is the point.
+  useEffect(() => {
+    if (!encounterId) return;
+    const id = setInterval(() => {
+      onPlayersPoke(); // same debounced path — poke+poll coalesce
+    }, FALLBACK_POLL_MS);
+    return () => clearInterval(id);
+  }, [encounterId, onPlayersPoke]);
 
   return { onPlayersPoke };
 }
