@@ -266,4 +266,100 @@ describe('createBattleMapPokeListener', () => {
 
     stop();
   });
+
+  it('8. backoff keeps escalating across repeated fatal closes when no message is ever received (open alone must not reset it)', async () => {
+    const opts = baseOpts();
+    const stop = createBattleMapPokeListener(opts);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mockMint).toHaveBeenCalledTimes(1);
+
+    // cycle 1: open, never a message, fatal close -> next retry after 1s
+    FakeWebSocket.instances[0].triggerOpen();
+    FakeWebSocket.instances[0].triggerClose(4401);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(FakeWebSocket.instances).toHaveLength(2);
+
+    // cycle 2: same story -> next retry after 2s (escalated, not reset to 1s)
+    FakeWebSocket.instances[1].triggerOpen();
+    FakeWebSocket.instances[1].triggerClose(4401);
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(FakeWebSocket.instances).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(FakeWebSocket.instances).toHaveLength(3);
+
+    // cycle 3: -> next retry after 4s (still escalating)
+    FakeWebSocket.instances[2].triggerOpen();
+    FakeWebSocket.instances[2].triggerClose(4401);
+    await vi.advanceTimersByTimeAsync(3999);
+    expect(FakeWebSocket.instances).toHaveLength(3);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(FakeWebSocket.instances).toHaveLength(4);
+
+    stop();
+  });
+
+  it('9. a received message resets backoff so the next close retries after 1s again', async () => {
+    const opts = baseOpts();
+    const stop = createBattleMapPokeListener(opts);
+    await vi.advanceTimersByTimeAsync(0);
+
+    // cycle 1: no message, fatal close -> escalates attempt (next delay would be 2s)
+    FakeWebSocket.instances[0].triggerOpen();
+    FakeWebSocket.instances[0].triggerClose(4401);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(FakeWebSocket.instances).toHaveLength(2);
+
+    // cycle 2: this time a message arrives -> proves the room is live, resets backoff
+    FakeWebSocket.instances[1].triggerOpen();
+    FakeWebSocket.instances[1].triggerMessage(pokeEnvelope('players'));
+    FakeWebSocket.instances[1].triggerClose(4401);
+
+    // if backoff had NOT reset, the next delay would be 4s; it should be 1s
+    await vi.advanceTimersByTimeAsync(999);
+    expect(FakeWebSocket.instances).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(FakeWebSocket.instances).toHaveLength(3);
+
+    stop();
+  });
+
+  it('10. a proactive rebuild firing while a connect is still awaiting its token mint yields exactly one live socket', async () => {
+    mockMint.mockReset();
+    let resolveFirst!: (token: string | null) => void;
+    let resolveSecond!: (token: string | null) => void;
+    const firstMint = new Promise<string | null>(res => {
+      resolveFirst = res;
+    });
+    const secondMint = new Promise<string | null>(res => {
+      resolveSecond = res;
+    });
+    mockMint.mockImplementationOnce(() => firstMint);
+    mockMint.mockImplementationOnce(() => secondMint);
+
+    const opts = baseOpts();
+    const stop = createBattleMapPokeListener(opts);
+    // initial connect() is in flight, awaiting firstMint — never resolved yet
+    await vi.advanceTimersByTimeAsync(0);
+    expect(FakeWebSocket.instances).toHaveLength(0);
+
+    // proactive rebuild fires before the first mint resolves, starting a
+    // second connect() (awaiting secondMint) concurrently
+    await vi.advanceTimersByTimeAsync(4 * 60 * 1000);
+    expect(mockMint).toHaveBeenCalledTimes(2);
+    expect(FakeWebSocket.instances).toHaveLength(0);
+
+    // resolve the stale (first) mint after it has been superseded, then the
+    // fresh (second) one
+    resolveFirst('tok-stale');
+    await vi.advanceTimersByTimeAsync(0);
+    resolveSecond('tok-fresh');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(FakeWebSocket.instances).toHaveLength(1);
+    expect(FakeWebSocket.instances[0].url).toContain('token=tok-fresh');
+
+    stop();
+  });
 });
