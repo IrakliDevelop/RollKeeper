@@ -234,7 +234,7 @@ describe('createBattleMapPokeListener', () => {
     expect(mockMint).toHaveBeenCalledTimes(1);
   });
 
-  it('7. missing relay URL schedules a retry with backoff and never throws', async () => {
+  it('7. missing relay URL at creation returns a no-op listener — no timers, no mint, ever', async () => {
     delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
     const opts = baseOpts();
     const stop = createBattleMapPokeListener(opts);
@@ -243,12 +243,19 @@ describe('createBattleMapPokeListener', () => {
     expect(mockMint).not.toHaveBeenCalled();
     expect(FakeWebSocket.instances).toHaveLength(0);
 
-    process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.example';
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(mockMint).toHaveBeenCalledTimes(1);
-    expect(FakeWebSocket.instances).toHaveLength(1);
+    // NEXT_PUBLIC_* is build-time inlined — it can never appear at runtime,
+    // so no retry should ever be scheduled, no matter how long we wait, even
+    // if the var is (unrealistically) set afterward.
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+    expect(mockMint).not.toHaveBeenCalled();
+    expect(FakeWebSocket.instances).toHaveLength(0);
 
-    stop();
+    process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.example';
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+    expect(mockMint).not.toHaveBeenCalled();
+    expect(FakeWebSocket.instances).toHaveLength(0);
+
+    expect(() => stop()).not.toThrow();
   });
 
   it('7b. a token-mint failure schedules a retry with backoff and never throws', async () => {

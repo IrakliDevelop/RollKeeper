@@ -262,8 +262,14 @@ export default function CharacterSheet() {
     playerSync.campaignCode ?? undefined
   );
 
-  // Party sync — used for send-item targets
-  const { partyMembers, refetchNow: refetchPartyHpNow } = usePartySync({
+  // Party sync — used for send-item targets, the party HP sidebar, and the
+  // initiative panel. A single instance shared across all three so poke-
+  // driven refreshes reach everything and polling isn't duplicated.
+  const {
+    partyMembers,
+    loading: partyMembersLoading,
+    refetchNow: refetchPartyHpNow,
+  } = usePartySync({
     campaignCode: playerSync.campaignCode ?? null,
     currentCharacterId: characterId,
   });
@@ -906,7 +912,8 @@ export default function CharacterSheet() {
           {/* Party HP Sidebar */}
           <PartyHPSidebar
             campaignCode={playerSync.campaignCode ?? null}
-            currentCharacterId={characterId}
+            partyMembers={partyMembers}
+            loading={partyMembersLoading}
           />
 
           {/* Shared initiative panel — shown during active combat */}

@@ -21,6 +21,7 @@ import { useTurnRequestSync } from '@/hooks/useTurnRequestSync';
 import { useInitiativeSubmissionSync } from '@/hooks/useInitiativeSubmissionSync';
 import { useActiveBattleMapId } from '@/hooks/useActiveBattleMapId';
 import { useBattleMapPokes } from '@/hooks/useBattleMapPokes';
+import { useDebouncedRefetch } from '@/hooks/useDebouncedRefetch';
 import { buildSharedInitiative } from '@/utils/buildSharedInitiative';
 import { Button } from '@/components/ui/forms/button';
 import { CombatScreen } from './combat-screen/CombatScreen';
@@ -153,6 +154,11 @@ export function EncounterView({
   // (see useActiveBattleMapId) — only used to pick the poke room below.
   const activeBattleMapId = useActiveBattleMapId(campaignCode);
 
+  // A poke burst (one per party member autosave) must not fan out into an
+  // uncoalesced fetch of the heaviest campaign endpoint per poke — debounce
+  // to a single leading + trailing refresh per window.
+  const refreshPlayersDebounced = useDebouncedRefetch(refreshPlayers);
+
   // Best-effort relay listener: a 'players' poke shaves latency off the
   // next player-HP refresh instead of waiting on the 15s poll. 'initiative'
   // pokes are ignored — EncounterView authors initiative, it doesn't
@@ -161,7 +167,7 @@ export function EncounterView({
     campaignCode,
     battleMapId: activeBattleMapId,
     tokenRequest: dmId ? { role: 'dm', dmId } : null,
-    onPoke: feature => handleEncounterPoke(feature, refreshPlayers),
+    onPoke: feature => handleEncounterPoke(feature, refreshPlayersDebounced),
   });
 
   const mappedPlayers = campaignPlayers.map(p => ({
