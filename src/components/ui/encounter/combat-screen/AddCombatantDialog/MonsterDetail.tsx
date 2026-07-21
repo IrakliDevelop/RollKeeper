@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { ArrowLeft, Plus, Minus } from 'lucide-react';
+import { ArrowLeft, Plus, Minus, FilePen } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
 import type { ProcessedMonster } from '@/types/bestiary';
 import type { PlayerDisposition } from '@/types/encounter';
 import { SharedOptions } from './SharedOptions';
@@ -21,6 +22,8 @@ interface MonsterDetailProps {
   disposition: PlayerDisposition;
   onDispositionChange: (v: PlayerDisposition) => void;
   onBack: () => void;
+  onEditStatBlock: () => void;
+  hasEdits: boolean;
 }
 
 export function MonsterDetail({
@@ -38,6 +41,8 @@ export function MonsterDetail({
   disposition,
   onDispositionChange,
   onBack,
+  onEditStatBlock,
+  hasEdits,
 }: MonsterDetailProps) {
   const mType =
     typeof selected.type === 'string' ? selected.type : selected.type.type;
@@ -145,6 +150,15 @@ export function MonsterDetail({
             : ''}
         </p>
       </div>
+
+      <Button
+        variant="outline"
+        fullWidth
+        onClick={onEditStatBlock}
+        leftIcon={<FilePen size={14} />}
+      >
+        Edit stat block{hasEdits ? ' (edited)' : ''}
+      </Button>
 
       <SharedOptions
         hideName={hideName}

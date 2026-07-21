@@ -19,6 +19,8 @@ import { NpcTab } from './NpcTab';
 import { MonsterTab } from './MonsterTab';
 import { CustomTab } from './CustomTab';
 import { buildMonsterEntities, buildCustomEntity } from './buildEntity';
+import { createMonsterEditDraft } from './monsterEditDraft';
+import type { MonsterEditDraft } from './monsterEditDraft';
 
 export interface AddCombatantDialogProps {
   open: boolean;
@@ -74,6 +76,8 @@ export function AddCombatantDialog({
   const [mHideName, setMHideName] = useState(false);
   const [mAlias, setMAlias] = useState('');
   const [mDisposition, setMDisposition] = useState<PlayerDisposition>('enemy');
+  const [mDraft, setMDraft] = useState<MonsterEditDraft | null>(null);
+  const [mEditing, setMEditing] = useState(false);
 
   // Custom form state (lifted for anchored footer)
   const [cName, setCName] = useState('');
@@ -93,6 +97,8 @@ export function AddCombatantDialog({
     setMHideName(false);
     setMAlias('');
     setMDisposition('enemy');
+    setMDraft(null);
+    setMEditing(false);
   };
 
   const resetCustomState = () => {
@@ -104,6 +110,24 @@ export function AddCombatantDialog({
     setCHideName(false);
     setCAlias('');
     setCDisposition('enemy');
+  };
+
+  // Selecting a (different) monster always discards any stat block draft.
+  const handleMonsterSelect = (m: ProcessedMonster | null) => {
+    setSelMonster(m);
+    setMDraft(null);
+    setMEditing(false);
+  };
+
+  const handleEditStatBlock = () => {
+    if (!selMonster) return;
+    setMDraft(d => d ?? createMonsterEditDraft(selMonster));
+    setMEditing(true);
+  };
+
+  const handleResetDraft = () => {
+    if (!selMonster) return;
+    setMDraft(createMonsterEditDraft(selMonster));
   };
 
   const handleOpenChange = (v: boolean) => {
@@ -142,6 +166,9 @@ export function AddCombatantDialog({
         playerAlias: mAlias || undefined,
         playerDisposition: mDisposition,
         colorIdx: monsterColorIdx,
+        statBlockOverride: mDraft?.statBlock,
+        initiativeModifierOverride: mDraft?.initiativeModifier,
+        proficiencyBonusOverride: mDraft?.proficiencyBonus,
       })
     );
   };
@@ -234,7 +261,7 @@ export function AddCombatantDialog({
           {tab === 'monster' && (
             <MonsterTab
               selected={selMonster}
-              onSelect={setSelMonster}
+              onSelect={handleMonsterSelect}
               hp={mHp}
               onHpChange={setMHp}
               ac={mAc}
@@ -247,6 +274,12 @@ export function AddCombatantDialog({
               onPlayerAliasChange={setMAlias}
               disposition={mDisposition}
               onDispositionChange={setMDisposition}
+              draft={mDraft}
+              editing={mEditing}
+              onEditStatBlock={handleEditStatBlock}
+              onDraftChange={setMDraft}
+              onEditorBack={() => setMEditing(false)}
+              onEditorReset={handleResetDraft}
             />
           )}
           {tab === 'custom' && (
