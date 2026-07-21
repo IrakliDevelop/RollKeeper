@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { renderStatBlockEntryText } from '@/utils/statBlockText';
 import type { MonsterStatBlock, MonsterSpellcasting } from '@/types/encounter';
 
 interface TraitBlockProps {
@@ -22,7 +23,9 @@ function TraitBlock({ title, entries }: TraitBlockProps) {
           </span>{' '}
           <span
             className="text-body"
-            dangerouslySetInnerHTML={{ __html: entry.text }}
+            dangerouslySetInnerHTML={{
+              __html: renderStatBlockEntryText(entry.text),
+            }}
           />
         </div>
       ))}
