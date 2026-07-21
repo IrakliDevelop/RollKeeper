@@ -27,3 +27,32 @@ jobs:
 
       - name: Unit tests
         run: npm run test
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      # playwright.config.ts starts the dev server itself (webServer) and
+      # refuses to reuse a stale one on CI (reuseExistingServer: !CI).
+      # The e2e specs are relay/Redis-free — no service env needed.
+      - name: E2E tests
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
