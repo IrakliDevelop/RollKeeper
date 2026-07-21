@@ -50,6 +50,7 @@ import {
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { NavigationContext } from '@/contexts/NavigationContext';
 import { useSimpleDiceRoll } from '@/hooks/useSimpleDiceRoll';
+import { useLiveInitiative } from '@/hooks/useLiveInitiative';
 import { useLocationSync } from '@/hooks/useLocationSync';
 import { usePartySync } from '@/hooks/usePartySync';
 
@@ -261,7 +262,7 @@ export default function CharacterSheet() {
   );
 
   // Party sync — used for send-item targets
-  const { partyMembers } = usePartySync({
+  const { partyMembers, refetchNow } = usePartySync({
     campaignCode: playerSync.campaignCode ?? null,
     currentCharacterId: characterId,
   });
@@ -581,6 +582,16 @@ export default function CharacterSheet() {
   const initiativeRound = sharedState?.initiative?.round ?? 0;
   const initiativeEncounterId = sharedState?.initiative?.encounterId ?? null;
 
+  // Overlay live player HP onto the DM-published initiative snapshot so the
+  // InitiativePanel doesn't wait on the DM tab's poll -> merge -> push
+  // round trip (mirrors the player VTT screen's usePlayerVttState).
+  const liveInitiative = useLiveInitiative(
+    sharedState?.initiative ?? null,
+    character,
+    characterId,
+    partyMembers
+  );
+
   // Live battle map join-state: the bottom banner hides once THIS map was
   // joined (a new map id brings it back).
   const activeBattleMapId = sharedState?.battleMap?.activeBattleMapId ?? null;
@@ -878,7 +889,7 @@ export default function CharacterSheet() {
 
           {/* Shared initiative panel — shown during active combat */}
           <InitiativePanel
-            state={sharedState?.initiative ?? null}
+            state={liveInitiative}
             characterId={characterId}
             onEndTurn={handleEndTurn}
             battleMapHref={

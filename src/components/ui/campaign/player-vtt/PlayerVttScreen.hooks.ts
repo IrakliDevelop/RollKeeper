@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useCharacterRosterSync } from '@/hooks/useCharacterRosterSync';
 import { useHydration } from '@/hooks/useHydration';
+import { useLiveInitiative } from '@/hooks/useLiveInitiative';
 import { usePartySync } from '@/hooks/usePartySync';
 import { usePlayerSync } from '@/hooks/usePlayerSync';
 import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
@@ -13,7 +14,6 @@ import { useCharacterStore } from '@/store/characterStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { ToastData, useToast } from '@/components/ui/feedback/Toast';
 import type { SpellAoe } from '@/types/spellAoe';
-import { overlayLiveHp, type LiveHp } from '@/utils/sharedInitiativeOverlay';
 
 import type { PendingPlacement } from './SpellPlacementController';
 import type { SpellTemplateConfig } from './SpellTemplateTool';
@@ -102,26 +102,11 @@ export function usePlayerVttState(campaignCode: string, characterId: string) {
     campaignCode,
     currentCharacterId: characterId,
   });
-  const liveHp = useMemo(() => {
-    const map: Record<string, LiveHp> = {};
-    for (const member of partyMembers) {
-      if (!member.hitPoints) continue;
-      map[member.characterId] = {
-        current: member.hitPoints.current,
-        max: member.hitPoints.max,
-      };
-    }
-    if (character && character.id === characterId) {
-      map[characterId] = {
-        current: character.hitPoints.current,
-        max: character.hitPoints.max,
-      };
-    }
-    return map;
-  }, [partyMembers, character, characterId]);
-  const liveInitiative = useMemo(
-    () => overlayLiveHp(sharedState?.initiative ?? null, liveHp),
-    [sharedState?.initiative, liveHp]
+  const liveInitiative = useLiveInitiative(
+    sharedState?.initiative ?? null,
+    character,
+    characterId,
+    partyMembers
   );
   const handleEndTurn = useCallback(
     async (entityId: string) => {
