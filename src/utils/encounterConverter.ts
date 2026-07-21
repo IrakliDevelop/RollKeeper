@@ -16,6 +16,7 @@ function generateId(): string {
  * Parse recharge notation from action name.
  * Examples: "Fire Breath {@recharge 5}" → rechargeOn: 5
  *           "Animate Chains (Recharges after a Short or Long Rest)" → restType: 'short'
+ *           "Fire Breath (Recharge 5-6)" → rechargeOn: 5
  */
 export function parseRechargeFromName(name: string): {
   cleanName: string;
@@ -31,6 +32,16 @@ export function parseRechargeFromName(name: string): {
       cleanName: name.replace(/\s*\{@recharge\s+\d+\}\s*/g, '').trim(),
       usageType: 'recharge',
       rechargeOn: parseInt(rechargeMatch[1], 10),
+    };
+  }
+
+  // "(Recharge N-N)" pattern — e.g., "(Recharge 5-6)"
+  const rechargeRangeMatch = name.match(/\(Recharge\s+(\d+)-(\d+)\)/i);
+  if (rechargeRangeMatch) {
+    return {
+      cleanName: name.replace(rechargeRangeMatch[0], '').trim(),
+      usageType: 'recharge',
+      rechargeOn: parseInt(rechargeRangeMatch[1], 10),
     };
   }
 
@@ -211,7 +222,7 @@ function buildMonsterSpellcasting(
 /**
  * Calculate ability modifier from score
  */
-function abilityModifier(score: number): number {
+export function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
 }
 
@@ -298,6 +309,10 @@ export interface MonsterOverrides {
   abilityScoreOverrides?: Partial<
     Record<'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha', number>
   >;
+  /** Fully edited stat block (pre-add editor). Adopted verbatim; abilities are rebuilt from it. */
+  statBlockOverride?: MonsterStatBlock;
+  initiativeModifierOverride?: number;
+  proficiencyBonusOverride?: number;
 }
 
 /**
@@ -310,22 +325,32 @@ export function monsterToEncounterEntity(
 ): Omit<EncounterEntity, 'id'> {
   const hp = options?.hpOverride ?? monster.hpAverage;
   const ac = options?.acOverride ?? monster.acValue;
-  const dex = options?.abilityScoreOverrides?.dex ?? monster.dex;
+  const statBlock =
+    options?.statBlockOverride ?? buildMonsterStatBlock(monster, options);
+  const dex =
+    options?.statBlockOverride?.dex ??
+    options?.abilityScoreOverrides?.dex ??
+    monster.dex;
 
   return {
     type: 'monster',
     name: options?.nameOverride ?? monster.name,
     initiative: null,
-    initiativeModifier: abilityModifier(dex),
-    proficiencyBonus: proficiencyBonusForCr(monster.cr),
+    initiativeModifier:
+      options?.initiativeModifierOverride ?? abilityModifier(dex),
+    proficiencyBonus:
+      options?.proficiencyBonusOverride ??
+      proficiencyBonusForCr(options?.statBlockOverride?.cr ?? monster.cr),
     currentHp: hp,
     maxHp: hp,
     tempHp: 0,
     armorClass: ac,
     conditions: [],
     monsterSourceId: monster.id,
-    monsterStatBlock: buildMonsterStatBlock(monster, options),
-    abilities: buildMonsterAbilities(monster),
+    monsterStatBlock: statBlock,
+    abilities: options?.statBlockOverride
+      ? buildAbilitiesFromStatBlock(options.statBlockOverride)
+      : buildMonsterAbilities(monster),
     legendaryActions: buildLegendaryActionPool(monster),
     spellcasting: buildMonsterSpellcasting(monster),
     color: options?.color,
