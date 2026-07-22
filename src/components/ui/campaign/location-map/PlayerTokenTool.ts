@@ -48,12 +48,24 @@ const TOKEN_RING_PX = 8;
  * /api/bestiary/token route) may become token images: a base64 data-URL
  * avatar would ride along in every sync upsert for the token (huge
  * payloads). Protocol-relative "//host/…" is rejected — that is an
- * external host, not our origin.
+ * external host, not our origin. Root-relative candidates are resolved
+ * against a sentinel origin and re-checked, since a prefix check alone is
+ * bypassable (WHATWG URL parsing normalizes backslashes to slashes and
+ * strips tab/newline for http(s) schemes, so e.g. "/\evil.example/x" or
+ * tab/newline-smuggled "//host" forms pass a naive startsWith check but
+ * resolve to an external host in <img src> / new URL()).
  */
 export function tokenAvatarUrl(avatar: string | undefined): string | null {
   if (!avatar) return null;
   if (/^https?:\/\//.test(avatar)) return avatar;
-  if (avatar.startsWith('/') && !avatar.startsWith('//')) return avatar;
+  if (avatar.startsWith('/')) {
+    try {
+      const resolved = new URL(avatar, 'http://internal.invalid');
+      if (resolved.origin === 'http://internal.invalid') return avatar;
+    } catch {
+      return null;
+    }
+  }
   return null;
 }
 
