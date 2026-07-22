@@ -5,6 +5,7 @@ import { ArrowLeft, Plus, Minus, FilePen } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import type { ProcessedMonster } from '@/types/bestiary';
 import type { PlayerDisposition } from '@/types/encounter';
+import { bestiaryTokenUrl } from '@/utils/bestiaryTokenUrl';
 import { SharedOptions } from './SharedOptions';
 
 interface MonsterDetailProps {
@@ -59,14 +60,27 @@ export function MonsterDetail({
       {/* Stat card */}
       <div className="border-accent-purple-border bg-surface-raised rounded-[16px] border-[1.5px] p-[18px]">
         <div className="flex items-start justify-between gap-2">
-          <div>
-            <h4 className="font-display text-heading text-[21px] leading-tight font-extrabold">
-              {selected.name}
-            </h4>
-            <p className="text-muted text-[12.5px]">
-              {selected.size.join('/')} {mType}
-              {selected.alignment ? `, ${selected.alignment}` : ''}
-            </p>
+          <div className="flex min-w-0 items-start gap-3">
+            {selected.hasToken && selected.tokenSource && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={bestiaryTokenUrl(selected.tokenSource, selected.name)}
+                alt=""
+                className="border-divider h-12 w-12 shrink-0 rounded-full border object-cover"
+                onError={e => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            )}
+            <div className="min-w-0">
+              <h4 className="font-display text-heading text-[21px] leading-tight font-extrabold">
+                {selected.name}
+              </h4>
+              <p className="text-muted text-[12.5px]">
+                {selected.size.join('/')} {mType}
+                {selected.alignment ? `, ${selected.alignment}` : ''}
+              </p>
+            </div>
           </div>
           <span className="bg-accent-purple-bg text-accent-purple-text shrink-0 rounded-full px-2 py-0.5 text-[11px] font-extrabold">
             CR {selected.cr}
