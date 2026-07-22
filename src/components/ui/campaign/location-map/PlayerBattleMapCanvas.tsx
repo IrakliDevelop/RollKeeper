@@ -46,6 +46,11 @@ import {
 import DmLocationToolOptions from './DmLocationToolOptions';
 import { ensurePlayerLayer } from './playerLayer';
 import {
+  ensureCanonicalLayers,
+  mirrorUnknownLayer,
+  subscribePinCanonicalLayers,
+} from './layerContract';
+import {
   PlayerTokenTool,
   PlayerTemplateTool,
   tokenColorForId,
@@ -275,29 +280,22 @@ export function PlayerBattleMapCanvas({
   const handleReady = (vp: Viewport) => {
     setViewport(vp);
 
-    // Everything this player places lives on a layer whose id is stable
-    // across sessions — after a reload, their own elements from the snapshot
-    // land on this known unlocked layer instead of being mirrored as locked
-    // "DM" content (which made them permanently uncontrollable).
+    // Canonical bands: map (locked) at the bottom, DM annotations (locked
+    // for players) above it, this player's own layer in the player band on
+    // top — see layerContract.ts. ensurePlayerLayer runs AFTER ensure so the
+    // player's own layer ends up active.
+    ensureCanonicalLayers(vp, 'player');
     ensurePlayerLayer(vp, characterId);
+    subscribePinCanonicalLayers(vp);
 
-    // Layers aren't synced: remote elements reference the DM's layer ids,
-    // which don't exist here — and unknown layers count as unlocked, making
-    // the (locked) map image hit-testable, so it swallowed every click and
-    // marquee multi-select never started. Mirror each unknown remote layer
-    // locally as a LOCKED layer: hit-test and marquee then skip DM content
-    // entirely (players couldn't move it anyway — the relay rejects that),
-    // and clicking the map pans/marquees like it does for the DM.
+    // Layers aren't synced: remote elements can reference layer ids that
+    // don't exist here (old clients, other players). Mirror each unknown
+    // layer locked into its band — hit-test and marquee skip remote content
+    // (the relay rejects player writes to it anyway), and stacking matches
+    // the DM's view.
     vp.store.on('add', el => {
       if (el.layerId && !vp.layerManager.getLayer(el.layerId)) {
-        vp.layerManager.addLayerDirect({
-          id: el.layerId,
-          name: 'DM layer',
-          visible: true,
-          locked: true,
-          order: -1,
-          opacity: 1,
-        });
+        mirrorUnknownLayer(vp, el.layerId, 'player');
         vp.requestRender();
       }
     });

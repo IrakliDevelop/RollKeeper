@@ -1,4 +1,5 @@
 import type { Viewport } from '@fieldnotes/core';
+import { PLAYER_BAND_ORDER } from './layerContract';
 
 /** Deterministic layer id for a player's own canvas elements. */
 export function playerLayerId(characterId: string): string {
@@ -24,7 +25,7 @@ export function ensurePlayerLayer(vp: Viewport, characterId: string): string {
       name: 'My elements',
       visible: true,
       locked: false,
-      order: 1,
+      order: PLAYER_BAND_ORDER,
       opacity: 1,
     });
   }

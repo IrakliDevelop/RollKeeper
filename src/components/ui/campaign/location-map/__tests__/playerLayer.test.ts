@@ -4,6 +4,8 @@ import {
   playerLayerId,
 } from '@/components/ui/campaign/location-map/playerLayer';
 
+import { PLAYER_BAND_ORDER } from '@/components/ui/campaign/location-map/layerContract';
+
 import type { Viewport, Layer } from '@fieldnotes/core';
 
 function fakeViewport(existing: Layer[] = []) {
@@ -32,6 +34,7 @@ describe('ensurePlayerLayer', () => {
     expect(layer.locked).toBe(false);
     expect(layer.visible).toBe(true);
     expect(activeId()).toBe(id);
+    expect(layer.order).toBe(PLAYER_BAND_ORDER);
   });
 
   it('is idempotent: an existing layer is reused, not recreated (reload case)', () => {
