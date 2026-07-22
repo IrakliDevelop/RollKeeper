@@ -178,6 +178,10 @@ export function useDmLocationEditor(
   const [arrangeMapsActive, setArrangeMapsActive] = useState(false);
   const arrangeActiveRef = useRef(false);
   const arrangeSessionRef = useRef<ArrangeMapsSession | null>(null);
+  /** Live viewport for unmount-time cleanup — canvasRef is already nulled by
+   * React (child refs detach before ancestor effect cleanup) when the
+   * cleanup effect runs, so it cannot be used there. */
+  const vpRef = useRef<Viewport | null>(null);
 
   const [viewport, setViewport] = useState<Viewport | null>(null);
 
@@ -275,6 +279,7 @@ export function useDmLocationEditor(
   const handleReady = useCallback(
     async (vp: Viewport) => {
       setViewport(vp);
+      vpRef.current = vp;
 
       // Track selected element for DM-only toggle
       const syncSelection = () => {
@@ -469,7 +474,7 @@ export function useDmLocationEditor(
   // persisted lock flags would stay unlocked.
   useEffect(() => {
     return () => {
-      const vp = getVp();
+      const vp = vpRef.current;
       if (arrangeActiveRef.current && arrangeSessionRef.current && vp) {
         arrangeActiveRef.current = false;
         exitArrangeMaps(vp, arrangeSessionRef.current);
@@ -479,7 +484,7 @@ export function useDmLocationEditor(
       connectionRef.current?.stop();
       pinUnsubRef.current?.();
     };
-  }, [getVp]);
+  }, []);
 
   const handlePickImage = useCallback(() => {
     fileInputRef.current?.click();
