@@ -21,6 +21,7 @@ import {
   ExternalLink,
   Maximize,
   Map as MapIcon,
+  Move,
 } from 'lucide-react';
 import { useActiveTool, useHistory } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
@@ -82,6 +83,8 @@ export default function DmLocationToolbar({
   syncStatus,
   sharedWithPlayers,
   onToggleShareWithPlayers,
+  arrangeMapsActive,
+  onToggleArrangeMaps,
 }: DmLocationToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
@@ -171,12 +174,28 @@ export default function DmLocationToolbar({
           <Button
             variant="ghost"
             onClick={onPickMapImage}
+            disabled={arrangeMapsActive}
             title="Add map image"
             className="flex items-center gap-1.5 px-2 py-1 text-xs"
           >
             <MapIcon size={15} />
             Add map
           </Button>
+          {onToggleArrangeMaps && (
+            <Button
+              variant={arrangeMapsActive ? 'warning' : 'ghost'}
+              onClick={onToggleArrangeMaps}
+              title={
+                arrangeMapsActive
+                  ? 'Finish arranging — re-locks map images'
+                  : 'Arrange map images (unlocks the map layer)'
+              }
+              className="flex items-center gap-1.5 px-2 py-1 text-xs"
+            >
+              <Move size={15} />
+              {arrangeMapsActive ? 'Done arranging' : 'Arrange maps'}
+            </Button>
+          )}
         </>
       )}
 
