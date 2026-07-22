@@ -1,5 +1,7 @@
 'use client';
 
+import { Eye } from 'lucide-react';
+
 import { dispositionColor } from './combatantToken';
 
 import { tokenAvatarUrl } from '@/components/ui/campaign/location-map/PlayerTokenTool';
@@ -14,6 +16,7 @@ export interface RosterRowProps {
   onArmPlacement: (entity: EncounterEntity) => void;
   onSelectEntity: (entityId: string) => void;
   onDragStart: (entity: EncounterEntity, e: PointerEvent) => void;
+  onViewPlayer?: (playerCharacterId: string) => void;
 }
 
 /**
@@ -21,6 +24,8 @@ export interface RosterRowProps {
  * line. Unplaced rows arm placement on click and forward pointerdown to
  * `onDragStart` (Task 4's drag logic decides tap-vs-drag by movement
  * threshold — this row just forwards both). Placed rows select the token.
+ * Player rows linked to a character get a sibling eye button (never nest
+ * buttons) that opens `PlayerDetailDialog` without disturbing placement.
  */
 export function RosterRow({
   entity,
@@ -29,6 +34,7 @@ export function RosterRow({
   onArmPlacement,
   onSelectEntity,
   onDragStart,
+  onViewPlayer,
 }: RosterRowProps) {
   const color = dispositionColor(entity);
   const firstName = entity.name.split(' ')[0];
@@ -43,13 +49,18 @@ export function RosterRow({
     if (!placed) onDragStart(entity, e);
   };
 
+  const viewablePcId =
+    entity.type === 'player' && entity.playerCharacterId && onViewPlayer
+      ? entity.playerCharacterId
+      : null;
+
   return (
-    <li>
+    <li className="flex items-center gap-0.5">
       <button
         type="button"
         onClick={handleClick}
         onPointerDown={handlePointerDown}
-        className={`flex min-h-[44px] w-full items-center gap-2 rounded-lg border border-transparent px-1.5 py-1 text-left transition-colors ${
+        className={`flex min-h-[44px] min-w-0 flex-1 items-center gap-2 rounded-lg border border-transparent px-1.5 py-1 text-left transition-colors ${
           placed ? 'opacity-60' : ''
         } ${
           armed
@@ -81,6 +92,17 @@ export function RosterRow({
           </span>
         </span>
       </button>
+      {viewablePcId && (
+        <button
+          type="button"
+          onClick={() => onViewPlayer?.(viewablePcId)}
+          aria-label={`View ${firstName} details`}
+          title="View character details"
+          className="text-muted hover:text-heading hover:bg-surface-secondary flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
+        >
+          <Eye size={14} aria-hidden="true" />
+        </button>
+      )}
     </li>
   );
 }

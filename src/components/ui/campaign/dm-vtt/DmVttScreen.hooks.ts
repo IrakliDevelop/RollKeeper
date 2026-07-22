@@ -54,7 +54,7 @@ export function useDmVttScreen({
     handlePrevTurn,
   } = useDmVttInitiative({ campaignCode, dmId, linkedEncounterIds });
 
-  const { onPlayersPoke } = useDmVttPlayersRefresh(
+  const { onPlayersPoke, players } = useDmVttPlayersRefresh(
     campaignCode,
     encounter?.id ?? null
   );
@@ -77,6 +77,12 @@ export function useDmVttScreen({
       if (npc) setViewingNpc({ npc, entityId });
     },
     [npcs]
+  );
+
+  const [viewingPlayerId, setViewingPlayerId] = useState<string | null>(null);
+  const onViewPlayer = useCallback(
+    (playerCharacterId: string) => setViewingPlayerId(playerCharacterId),
+    []
   );
 
   const actions = useDmVttActions({ campaignCode, dmId, encounter, onViewNPC });
@@ -170,6 +176,13 @@ export function useDmVttScreen({
       npc: viewingNpc?.npc ?? null,
       entityId: viewingNpc?.entityId ?? null,
       onClose: () => setViewingNpc(null),
+    },
+    onViewPlayer,
+    // Looked up at render time so each poke-driven players refresh
+    // live-updates an open dialog (same freshness as the encounter page).
+    playerDialog: {
+      player: players.find(p => p.playerId === viewingPlayerId) ?? null,
+      onClose: () => setViewingPlayerId(null),
     },
   };
 }

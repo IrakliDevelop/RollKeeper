@@ -156,3 +156,59 @@ describe('RosterTray', () => {
     expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('RosterRow player eye button', () => {
+  afterEach(() => cleanup());
+
+  const playerWithPc = makeEntity({
+    id: 'p2',
+    type: 'player',
+    name: 'Aria Windrider',
+    playerCharacterId: 'char-9',
+  });
+
+  it('renders an eye for player rows with a playerCharacterId and fires onViewPlayer', () => {
+    const onViewPlayer = vi.fn();
+    render(
+      <RosterTray {...baseProps({ entities: [playerWithPc], onViewPlayer })} />
+    );
+
+    fireEvent.click(screen.getByLabelText('View Aria details'));
+    expect(onViewPlayer).toHaveBeenCalledWith('char-9');
+  });
+
+  it('renders no eye for monsters, players without playerCharacterId, or when onViewPlayer is absent', () => {
+    const onViewPlayer = vi.fn();
+    const bareplayer = makeEntity({ id: 'p3', type: 'player', name: 'Bo' });
+    const { unmount } = render(
+      <RosterTray
+        {...baseProps({ entities: [monster, bareplayer], onViewPlayer })}
+      />
+    );
+    expect(screen.queryByLabelText(/View .* details/)).not.toBeInTheDocument();
+    unmount();
+
+    render(<RosterTray {...baseProps({ entities: [playerWithPc] })} />);
+    expect(screen.queryByLabelText(/View .* details/)).not.toBeInTheDocument();
+  });
+
+  it('eye click does not arm placement; the row click still does', () => {
+    const onViewPlayer = vi.fn();
+    const onArmPlacement = vi.fn();
+    render(
+      <RosterTray
+        {...baseProps({
+          entities: [playerWithPc],
+          onViewPlayer,
+          onArmPlacement,
+        })}
+      />
+    );
+
+    fireEvent.click(screen.getByLabelText('View Aria details'));
+    expect(onArmPlacement).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText('Aria'));
+    expect(onArmPlacement).toHaveBeenCalledTimes(1);
+  });
+});

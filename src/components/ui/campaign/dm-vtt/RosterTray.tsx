@@ -19,6 +19,7 @@ export interface RosterTrayProps {
   collapsed: boolean;
   onToggleCollapsed: () => void;
   hasLinkedEncounter: boolean;
+  onViewPlayer?: (playerCharacterId: string) => void;
 }
 
 const GROUP_SECTIONS: { key: keyof RosterGroups; label: string }[] = [
@@ -42,6 +43,7 @@ export function RosterTray({
   collapsed,
   onToggleCollapsed,
   hasLinkedEncounter,
+  onViewPlayer,
 }: RosterTrayProps) {
   if (collapsed) {
     return (
@@ -98,6 +100,7 @@ export function RosterTray({
                       onArmPlacement={onArmPlacement}
                       onSelectEntity={onSelectEntity}
                       onDragStart={onDragStart}
+                      onViewPlayer={onViewPlayer}
                     />
                   ))}
                 </ul>

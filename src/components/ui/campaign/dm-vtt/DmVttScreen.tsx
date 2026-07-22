@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
 import { TokenDecorationLayer } from '@/components/ui/campaign/token-overlay';
 import { useDmTokenDecorations } from '@/components/ui/campaign/token-overlay/useDmTokenDecorations';
 import { useTokenInfoMode } from '@/components/ui/campaign/token-overlay/useTokenInfoToggle';
@@ -99,6 +100,7 @@ export function DmVttScreen({
           onArmPlacement={entity => !vtt.wasDrag() && vtt.armPlacement(entity)}
           onSelectEntity={vtt.selectEntity}
           onDragStart={vtt.startDrag}
+          onViewPlayer={vtt.onViewPlayer}
           collapsed={rosterCollapsed}
           onToggleCollapsed={() => setRosterCollapsed(v => !v)}
           hasLinkedEncounter={vtt.linkedEncounterIds.length > 0}
@@ -138,6 +140,15 @@ export function DmVttScreen({
         encounterId={vtt.encounter?.id}
         {...vtt.npcDialog}
       />
+      {vtt.playerDialog.player && (
+        <PlayerDetailDialog
+          open
+          onOpenChange={open => {
+            if (!open) vtt.playerDialog.onClose();
+          }}
+          player={vtt.playerDialog.player}
+        />
+      )}
     </DmBattleMapCanvas>
   );
 }
