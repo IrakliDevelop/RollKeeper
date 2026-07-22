@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { applyPlayersToEncounter } from '@/utils/encounterSync';
 import type { CampaignPlayerData } from '@/types/campaign';
@@ -18,7 +18,8 @@ const FALLBACK_POLL_MS = 45_000;
 export function useDmVttPlayersRefresh(
   campaignCode: string,
   encounterId: string | null
-): { onPlayersPoke: () => void } {
+): { onPlayersPoke: () => void; players: CampaignPlayerData[] } {
+  const [players, setPlayers] = useState<CampaignPlayerData[]>([]);
   const lastFetchRef = useRef(0);
   const trailingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -30,13 +31,22 @@ export function useDmVttPlayersRefresh(
         const res = await fetch(`/api/campaign/${campaignCode}/players`);
         if (!res.ok) return;
         const data = await res.json();
-        const players: CampaignPlayerData[] = data.players ?? [];
-        applyPlayersToEncounter(encounterId, players);
+        const fetched: CampaignPlayerData[] = data.players ?? [];
+        applyPlayersToEncounter(encounterId, fetched);
+        setPlayers(fetched);
       } catch {
         // silent — poke is best-effort
       }
     })();
   }, [campaignCode, encounterId]);
+
+  // Leading mount fetch: without it, both player HP and the roster's
+  // player-detail dialog would be up to FALLBACK_POLL_MS stale right
+  // after the map opens (pokes only fire on player activity).
+  useEffect(() => {
+    if (!encounterId) return;
+    doFetch();
+  }, [encounterId, doFetch]);
 
   // Leading-edge fire immediately; a poke inside the debounce window
   // schedules ONE trailing fetch at window expiry instead of being dropped
@@ -78,5 +88,5 @@ export function useDmVttPlayersRefresh(
     return () => clearInterval(id);
   }, [encounterId, onPlayersPoke]);
 
-  return { onPlayersPoke };
+  return { onPlayersPoke, players };
 }
