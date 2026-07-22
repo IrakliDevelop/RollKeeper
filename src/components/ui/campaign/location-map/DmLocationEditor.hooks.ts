@@ -18,12 +18,12 @@ import {
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useLocationStore } from '@/store/locationStore';
 import { useBattleMapStore } from '@/store/battleMapStore';
-import { useDmBattleMapSync } from '@/hooks/useDmBattleMapSync';
 import {
   createManagedBattleMapConnection,
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import { openTvDisplay } from '@/lib/openTvDisplay';
+import { useShareWithPlayers } from './useShareWithPlayers';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
 import type { GridSettings } from '@/types/location';
 
@@ -215,20 +215,9 @@ export function useDmLocationEditor(
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(true);
 
-  // Share with players (battlemap mode only)
-  const { pushActive } = useDmBattleMapSync(campaignCode, dmId);
-  const [sharedWithPlayers, setSharedWithPlayers] = useState(false);
-
-  const handleToggleShareWithPlayers = useCallback(() => {
-    setSharedWithPlayers(prev => {
-      const next = !prev;
-      void pushActive(
-        next ? location.id : null,
-        next ? location.name : undefined
-      );
-      return next;
-    });
-  }, [pushActive, location.id, location.name]);
+  // Share with players (battlemap mode only) — hydrated from server truth
+  const { sharedWithPlayers, handleToggleShareWithPlayers } =
+    useShareWithPlayers(campaignCode, dmId, location, mode === 'battlemap');
 
   // Build tools once — no PencilTool or EraserTool for the location editor
   const tools = useMemo<Tool[]>(() => {
