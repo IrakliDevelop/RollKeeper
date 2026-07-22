@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, test } from 'vitest';
 import { TemplateTool } from '@fieldnotes/core';
 import {
   PlayerTokenTool,
   PlayerTemplateTool,
+  tokenAvatarUrl,
 } from '@/components/ui/campaign/location-map/PlayerTokenTool';
 import {
   TOKEN_ELEMENT_ZINDEX,
@@ -206,5 +207,33 @@ describe('PlayerTemplateTool zIndex stamping', () => {
     ]);
 
     spy.mockRestore();
+  });
+});
+
+describe('tokenAvatarUrl', () => {
+  test('accepts http(s) URLs', () => {
+    expect(tokenAvatarUrl('https://example.com/a.png')).toBe(
+      'https://example.com/a.png'
+    );
+    expect(tokenAvatarUrl('http://example.com/a.png')).toBe(
+      'http://example.com/a.png'
+    );
+  });
+
+  test('accepts root-relative paths (bestiary token route)', () => {
+    expect(tokenAvatarUrl('/api/bestiary/token/XMM/Zombie')).toBe(
+      '/api/bestiary/token/XMM/Zombie'
+    );
+  });
+
+  test('rejects protocol-relative URLs — external host, not our origin', () => {
+    expect(tokenAvatarUrl('//evil.example/a.png')).toBeNull();
+  });
+
+  test('rejects data URLs, garbage, and undefined', () => {
+    expect(tokenAvatarUrl('data:image/png;base64,AAAA')).toBeNull();
+    expect(tokenAvatarUrl('not a url')).toBeNull();
+    expect(tokenAvatarUrl(undefined)).toBeNull();
+    expect(tokenAvatarUrl('')).toBeNull();
   });
 });
