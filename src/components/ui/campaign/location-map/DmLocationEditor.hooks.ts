@@ -33,6 +33,11 @@ import {
 } from './layerContract';
 import { pinGridToMapLayer } from './gridPin';
 import { nextMapImagePosition } from './mapImagePlacement';
+import {
+  enterArrangeMaps,
+  exitArrangeMaps,
+  type ArrangeMapsSession,
+} from './arrangeMaps';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
 import type { GridSettings } from '@/types/location';
 
@@ -149,6 +154,10 @@ export interface DmLocationEditorState {
   ) => Promise<void>;
   handleOpenTvDisplay: () => Promise<void>;
   handleFitToMap: () => void;
+
+  // Arrange maps (battlemap mode only)
+  arrangeMapsActive: boolean;
+  handleToggleArrangeMaps: () => void;
 }
 
 export function useDmLocationEditor(
@@ -166,6 +175,9 @@ export function useDmLocationEditor(
   const [syncStatus, setSyncStatus] = useState<
     BattleMapConnectionStatus | 'disabled'
   >('disabled');
+  const [arrangeMapsActive, setArrangeMapsActive] = useState(false);
+  const arrangeActiveRef = useRef(false);
+  const arrangeSessionRef = useRef<ArrangeMapsSession | null>(null);
 
   const [viewport, setViewport] = useState<Viewport | null>(null);
 
@@ -349,7 +361,9 @@ export function useDmLocationEditor(
         }
       });
       pinUnsubRef.current?.();
-      pinUnsubRef.current = subscribePinCanonicalLayers(vp);
+      pinUnsubRef.current = subscribePinCanonicalLayers(vp, () => ({
+        mapUnlocked: arrangeActiveRef.current,
+      }));
 
       // Live sync — battlemap mode only; resolver reads Zustand LIVE via
       // getState() (a captured snapshot would go stale after the first toggle).
@@ -450,18 +464,44 @@ export function useDmLocationEditor(
     img.src = proxied;
   }
 
-  // Cleanup autosave and sync connection on unmount
+  // Cleanup autosave and sync connection on unmount. Also exits arrange-maps
+  // mid-arrange so leaving the page re-locks everything — otherwise the
+  // persisted lock flags would stay unlocked.
   useEffect(() => {
     return () => {
+      const vp = getVp();
+      if (arrangeActiveRef.current && arrangeSessionRef.current && vp) {
+        arrangeActiveRef.current = false;
+        exitArrangeMaps(vp, arrangeSessionRef.current);
+        arrangeSessionRef.current = null;
+      }
       autoSaveRef.current?.stop();
       connectionRef.current?.stop();
       pinUnsubRef.current?.();
     };
-  }, []);
+  }, [getVp]);
 
   const handlePickImage = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
+
+  const handleToggleArrangeMaps = useCallback(() => {
+    const vp = getVp();
+    if (!vp) return;
+    if (arrangeActiveRef.current) {
+      arrangeActiveRef.current = false;
+      if (arrangeSessionRef.current) {
+        exitArrangeMaps(vp, arrangeSessionRef.current);
+        arrangeSessionRef.current = null;
+      }
+      setArrangeMapsActive(false);
+    } else {
+      arrangeActiveRef.current = true;
+      arrangeSessionRef.current = enterArrangeMaps(vp);
+      vp.setTool('select');
+      setArrangeMapsActive(true);
+    }
+  }, [getVp]);
 
   // ─── Handlers ────────────────────────────────────────────────
 
@@ -899,5 +939,7 @@ export function useDmLocationEditor(
     handleMapImageFileSelect,
     handleOpenTvDisplay,
     handleFitToMap,
+    arrangeMapsActive,
+    handleToggleArrangeMaps,
   };
 }

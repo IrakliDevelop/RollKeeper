@@ -51,6 +51,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     mode,
     handleOpenTvDisplay,
     handleFitToMap,
+    arrangeMapsActive,
+    handleToggleArrangeMaps,
   } = useDmLocationEditor(props);
 
   return (
@@ -98,12 +100,19 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             syncStatus={syncStatus}
             sharedWithPlayers={sharedWithPlayers}
             onToggleShareWithPlayers={handleToggleShareWithPlayers}
+            arrangeMapsActive={arrangeMapsActive}
+            onToggleArrangeMaps={handleToggleArrangeMaps}
           />
         )}
 
         {viewport && <DmLocationToolOptions mode={mode} />}
 
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
+          {arrangeMapsActive && (
+            <div className="border-accent-amber-border bg-accent-amber-bg text-accent-amber-text absolute top-2 left-1/2 z-20 -translate-x-1/2 rounded-lg border px-3 py-1.5 text-xs font-medium shadow-lg">
+              Arranging maps — other layers are locked
+            </div>
+          )}
           <div className="flex-1 overflow-hidden">
             <Canvas
               ref={canvasRef}

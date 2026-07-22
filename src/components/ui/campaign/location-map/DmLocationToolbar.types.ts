@@ -37,4 +37,8 @@ export interface DmLocationToolbarProps {
   onToggleShareWithPlayers?: () => void;
   /** Add a map image onto the locked map layer (battlemap mode only). */
   onPickMapImage?: () => void;
+  /** Whether arrange-maps mode is active (battlemap mode only). */
+  arrangeMapsActive?: boolean;
+  /** Toggle arrange-maps mode, which temporarily unlocks the map layer. */
+  onToggleArrangeMaps?: () => void;
 }
