@@ -131,3 +131,17 @@ export async function damageCharacter(
     window.__rkStores!.character.getState().applyDamageToCharacter(dmg);
   }, amount);
 }
+
+/** Waits until the dev-only `__rkStores.encounter` handle exists and the
+ * encounter store has finished rehydrating from localStorage. The encounter
+ * store has no `hasHydrated` state flag (unlike characterStore), so this
+ * reads zustand's own persist API instead. */
+export async function waitForEncounterStore(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () =>
+      !!window.__rkStores?.encounter &&
+      window.__rkStores.encounter.persist.hasHydrated(),
+    undefined,
+    { timeout: 15_000 }
+  );
+}

@@ -10,6 +10,7 @@ import {
 } from '@/types/encounter';
 import { useNPCStore } from './npcStore';
 import { initCrossTabEncounterSync } from '@/lib/crossTabEncounterSync';
+import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
 import { ENCOUNTER_STORAGE_KEY } from '@/utils/constants';
 
 function generateId(): string {
@@ -990,6 +991,8 @@ export const useEncounterStore = create<EncounterStoreState>()(
     }
   )
 );
+
+exposeStoreForE2E('encounter', useEncounterStore);
 
 initCrossTabEncounterSync(useEncounterStore);
 
