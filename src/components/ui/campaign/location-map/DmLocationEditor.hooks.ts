@@ -31,6 +31,7 @@ import {
   subscribePinCanonicalLayers,
   MAP_LAYER_ID,
 } from './layerContract';
+import { pinGridToMapLayer } from './gridPin';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
 import type { GridSettings } from '@/types/location';
 
@@ -59,21 +60,6 @@ function proxyUrl(url: string): string {
 type ViewportHistoryAccess = {
   historyRecorder: { begin: () => void; commit: () => void };
 };
-
-/**
- * Map + grid must live on the layer-locked map layer so hit-testing skips
- * them (see @fieldnotes/core InputHandler / SelectTool + `isLayerLocked`).
- * Grid elements must also be `locked` so Select cannot drag them (otherwise
- * they appear to slide when panning/zooming).
- */
-function pinGridToMapLayer(vp: Viewport) {
-  ensureCanonicalLayers(vp, 'dm');
-  for (const g of vp.store.getElementsByType('grid')) {
-    vp.layerManager.moveElementToLayer(g.id, MAP_LAYER_ID);
-    vp.store.update(g.id, { locked: true });
-  }
-  vp.requestRender();
-}
 
 export interface DmLocationEditorState {
   // Mode
