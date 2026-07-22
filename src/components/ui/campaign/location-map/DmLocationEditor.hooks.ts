@@ -32,6 +32,7 @@ import {
   MAP_LAYER_ID,
 } from './layerContract';
 import { pinGridToMapLayer } from './gridPin';
+import { nextMapImagePosition } from './mapImagePlacement';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
 import type { GridSettings } from '@/types/location';
 
@@ -61,6 +62,30 @@ type ViewportHistoryAccess = {
   historyRecorder: { begin: () => void; commit: () => void };
 };
 
+/** Upload to S3 via /api/assets/upload; base64 data-URL fallback when S3 is
+ *  not configured. Returns the canonical (non-proxied) src to store. */
+async function uploadCanvasImage(file: File): Promise<string> {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('assetId', `canvas-${Date.now()}`);
+    const res = await fetch('/api/assets/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) throw new Error('Upload failed');
+    const data = await res.json();
+    return data.url as string;
+  } catch {
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+}
+
 export interface DmLocationEditorState {
   // Mode
   mode: 'location' | 'battlemap';
@@ -68,6 +93,7 @@ export interface DmLocationEditorState {
   // Refs
   canvasRef: React.RefObject<FieldNotesCanvasRef | null>;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
+  mapImageInputRef: React.RefObject<HTMLInputElement | null>;
 
   /** Shared with `ViewportContext` for @fieldnotes/react hooks */
   viewport: Viewport | null;
@@ -117,6 +143,10 @@ export interface DmLocationEditorState {
   handleImageFileSelect: (
     e: React.ChangeEvent<HTMLInputElement>
   ) => Promise<void>;
+  handlePickMapImage: () => void;
+  handleMapImageFileSelect: (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => Promise<void>;
   handleOpenTvDisplay: () => Promise<void>;
   handleFitToMap: () => void;
 }
@@ -129,6 +159,7 @@ export function useDmLocationEditor(
 
   const canvasRef = useRef<FieldNotesCanvasRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mapImageInputRef = useRef<HTMLInputElement>(null);
   const autoSaveRef = useRef<AutoSave | null>(null);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
@@ -753,28 +784,7 @@ export function useDmLocationEditor(
       e.target.value = '';
 
       setImageUploading(true);
-
-      let src: string;
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('assetId', `canvas-${Date.now()}`);
-        const res = await fetch('/api/assets/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        if (!res.ok) throw new Error('Upload failed');
-        const data = await res.json();
-        src = data.url as string;
-      } catch {
-        // Fall back to base64 if S3 not configured
-        src = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-      }
+      const src = await uploadCanvasImage(file);
 
       const proxiedSrc = proxyUrl(src);
       const img = new window.Image();
@@ -803,6 +813,43 @@ export function useDmLocationEditor(
     [getVp]
   );
 
+  const handlePickMapImage = useCallback(() => {
+    mapImageInputRef.current?.click();
+  }, []);
+
+  const handleMapImageFileSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      const vp = getVp();
+      if (!file || !vp) return;
+      e.target.value = '';
+
+      setImageUploading(true);
+      const src = await uploadCanvasImage(file);
+
+      const proxiedSrc = proxyUrl(src);
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        // Natural size (it's a map, not an annotation) at the right edge of
+        // the existing map images. Store the canonical URL, render the proxy.
+        const position = nextMapImagePosition(vp.store.getAll());
+        const before = new Set(vp.store.getAll().map(el => el.id));
+        vp.addImage(src, position, { w: img.width, h: img.height });
+        const added = vp.store.getAll().find(el => !before.has(el.id));
+        if (added) {
+          vp.store.update(added.id, { locked: true });
+          vp.layerManager.moveElementToLayer(added.id, MAP_LAYER_ID);
+        }
+        vp.requestRender();
+        setImageUploading(false);
+      };
+      img.onerror = () => setImageUploading(false);
+      img.src = proxiedSrc;
+    },
+    [getVp]
+  );
+
   const handleOpenTvDisplay = useCallback(
     () => openTvDisplay(campaignCode, location.id, dmId),
     [campaignCode, dmId, location.id]
@@ -817,6 +864,7 @@ export function useDmLocationEditor(
     mode,
     canvasRef,
     fileInputRef,
+    mapImageInputRef,
     viewport,
     tools,
     layersPanelOpen,
@@ -847,6 +895,8 @@ export function useDmLocationEditor(
     handleSyncToPlayers,
     handleDownloadExport,
     handleImageFileSelect,
+    handlePickMapImage,
+    handleMapImageFileSelect,
     handleOpenTvDisplay,
     handleFitToMap,
   };

@@ -35,4 +35,6 @@ export interface DmLocationToolbarProps {
   /** Whether the battle map is currently shared with players (battlemap mode only) */
   sharedWithPlayers?: boolean;
   onToggleShareWithPlayers?: () => void;
+  /** Add a map image onto the locked map layer (battlemap mode only). */
+  onPickMapImage?: () => void;
 }

@@ -17,6 +17,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
   const {
     canvasRef,
     fileInputRef,
+    mapImageInputRef,
     viewport,
     tools,
     layersPanelOpen,
@@ -45,6 +46,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handleSyncToPlayers,
     handleDownloadExport,
     handleImageFileSelect,
+    handlePickMapImage,
+    handleMapImageFileSelect,
     mode,
     handleOpenTvDisplay,
     handleFitToMap,
@@ -60,10 +63,18 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
           className="hidden"
           onChange={handleImageFileSelect}
         />
+        <input
+          ref={mapImageInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleMapImageFileSelect}
+        />
 
         {viewport && (
           <DmLocationToolbar
             onPickImage={handlePickImage}
+            onPickMapImage={handlePickMapImage}
             onDelete={handleDeleteSelected}
             onClear={handleClear}
             onFitToMap={handleFitToMap}

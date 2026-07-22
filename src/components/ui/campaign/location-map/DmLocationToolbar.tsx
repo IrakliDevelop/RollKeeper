@@ -20,6 +20,7 @@ import {
   AlertCircle,
   ExternalLink,
   Maximize,
+  Map as MapIcon,
 } from 'lucide-react';
 import { useActiveTool, useHistory } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
@@ -57,6 +58,7 @@ function formatSyncTime(iso: string): string {
 
 export default function DmLocationToolbar({
   onPickImage,
+  onPickMapImage,
   onDelete,
   onClear,
   onFitToMap,
@@ -162,6 +164,21 @@ export default function DmLocationToolbar({
           <Eraser size={15} />
         </Button>
       </div>
+
+      {mode === 'battlemap' && onPickMapImage && (
+        <>
+          <div className="bg-divider mx-1 h-6 w-px" />
+          <Button
+            variant="ghost"
+            onClick={onPickMapImage}
+            title="Add map image"
+            className="flex items-center gap-1.5 px-2 py-1 text-xs"
+          >
+            <MapIcon size={15} />
+            Add map
+          </Button>
+        </>
+      )}
 
       {/* Spacer */}
       <div className="flex-1" />
