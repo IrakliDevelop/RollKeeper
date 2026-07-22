@@ -230,7 +230,7 @@ function processSpellcasting(raw: RawSpellcasting[]): ProcessedSpellcasting[] {
   });
 }
 
-function processMonster(monster: RawMonsterData): ProcessedMonster {
+export function processMonster(monster: RawMonsterData): ProcessedMonster {
   const id = generateMonsterId(monster.name, monster.source);
   const typeData =
     typeof monster.type === 'object'
@@ -292,6 +292,8 @@ function processMonster(monster: RawMonsterData): ProcessedMonster {
     legendaryActions: processTraits(monster.legendary),
     source: formatSourceForDisplay(monster.source),
     page: monster.page ?? 0,
+    hasToken: monster.hasToken ?? false,
+    tokenSource: monster.source,
 
     // Numeric encounter fields
     acValue: extractAcValue(monster.ac),
