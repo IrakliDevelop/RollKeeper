@@ -81,7 +81,10 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
     (sb != null ? sbField(sb, 'senses') : undefined) ??
     entity.senses?.map(s => `${s.name} ${s.range} ft.`).join(', ');
 
-  const initiativeModValue =
+  // Editable input is type="number" — a "+" prefix is invalid number syntax
+  // and the browser blanks the field, so only the static display gets the sign.
+  const initiativeModValue = String(entity.initiativeModifier);
+  const initiativeModDisplay =
     entity.initiativeModifier >= 0
       ? `+${entity.initiativeModifier}`
       : String(entity.initiativeModifier);
@@ -170,7 +173,7 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
         </>
       ) : (
         <>
-          <StaticRow label="Initiative Mod" value={initiativeModValue} />
+          <StaticRow label="Initiative Mod" value={initiativeModDisplay} />
           <StaticRow label="Proficiency Bonus" value={proficiencyBonusValue} />
         </>
       )}
