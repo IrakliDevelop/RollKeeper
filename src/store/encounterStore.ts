@@ -9,8 +9,8 @@ import {
   DEFAULT_COMBAT_CONFIG,
 } from '@/types/encounter';
 import { useNPCStore } from './npcStore';
-
-const ENCOUNTER_STORAGE_KEY = 'rollkeeper-encounter-data';
+import { initCrossTabEncounterSync } from '@/lib/crossTabEncounterSync';
+import { ENCOUNTER_STORAGE_KEY } from '@/utils/constants';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -990,6 +990,8 @@ export const useEncounterStore = create<EncounterStoreState>()(
     }
   )
 );
+
+initCrossTabEncounterSync(useEncounterStore);
 
 export { getSortedEntities };
 export default useEncounterStore;
