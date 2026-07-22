@@ -88,12 +88,12 @@ const playerEntity: EncounterEntity = {
 };
 
 describe('DetailCombatInfo — field inventory', () => {
-  it('monster with a stat block: renders all fields including Initiative and Proficiency Bonus', () => {
+  it('monster with a stat block: renders all fields including Initiative Mod and Proficiency Bonus', () => {
     const actions = makeActions();
     render(<DetailCombatInfo entity={monsterEntity} actions={actions} />);
 
     expect(screen.getByText('Combat Details')).toBeInTheDocument();
-    expect(screen.getByLabelText('Initiative')).toHaveValue(15);
+    expect(screen.getByLabelText('Initiative Mod')).toHaveValue(1);
     expect(screen.getByLabelText('Proficiency Bonus')).toHaveValue(2);
     expect(screen.getByLabelText('Speed')).toHaveValue('30 ft.');
     expect(screen.getByLabelText('Saving Throws')).toHaveValue(
@@ -113,35 +113,39 @@ describe('DetailCombatInfo — field inventory', () => {
     expect(screen.getByLabelText('Passive Perception')).toHaveValue(13);
   });
 
-  it('editing Initiative to a non-empty value commits via onSetInitiative (keeps turn order sorted)', async () => {
+  it('editing Initiative Mod commits initiativeModifier via onUpdate (rolled initiative untouched)', async () => {
     const actions = makeActions();
     const user = userEvent.setup();
     render(<DetailCombatInfo entity={monsterEntity} actions={actions} />);
 
-    const input = screen.getByLabelText('Initiative');
+    const input = screen.getByLabelText('Initiative Mod');
     await user.clear(input);
-    await user.type(input, '22');
+    await user.type(input, '3');
     await user.tab();
 
-    expect(actions.onSetInitiative).toHaveBeenCalledWith('monster-1', 22);
+    expect(actions.onUpdate).toHaveBeenCalledWith('monster-1', {
+      initiativeModifier: 3,
+    });
+    expect(actions.onSetInitiative).not.toHaveBeenCalled();
     expect(actions.onUpdate).not.toHaveBeenCalledWith(
       'monster-1',
       expect.objectContaining({ initiative: expect.anything() })
     );
   });
 
-  it('clearing Initiative to empty commits null via onUpdate (onSetInitiative takes a number)', async () => {
+  it('clearing Initiative Mod to empty is a no-op (modifier cannot be null)', async () => {
     const actions = makeActions();
     const user = userEvent.setup();
     render(<DetailCombatInfo entity={monsterEntity} actions={actions} />);
 
-    const input = screen.getByLabelText('Initiative');
+    const input = screen.getByLabelText('Initiative Mod');
     await user.clear(input);
     await user.tab();
 
-    expect(actions.onUpdate).toHaveBeenCalledWith('monster-1', {
-      initiative: null,
-    });
+    expect(actions.onUpdate).not.toHaveBeenCalledWith(
+      'monster-1',
+      expect.objectContaining({ initiativeModifier: expect.anything() })
+    );
     expect(actions.onSetInitiative).not.toHaveBeenCalled();
   });
 
@@ -218,13 +222,13 @@ describe('DetailCombatInfo — field inventory', () => {
 });
 
 describe('DetailCombatInfo — player entities stay read-only', () => {
-  it('player with initiative only: Initiative renders as static text, Proficiency Bonus is hidden', () => {
+  it('player: Initiative Mod renders as signed static text, Proficiency Bonus is hidden', () => {
     const actions = makeActions();
     render(<DetailCombatInfo entity={playerEntity} actions={actions} />);
 
-    expect(screen.getByText('Initiative')).toBeInTheDocument();
-    expect(screen.getByText('18')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Initiative')).not.toBeInTheDocument();
+    expect(screen.getByText('Initiative Mod')).toBeInTheDocument();
+    expect(screen.getByText('+3')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Initiative Mod')).not.toBeInTheDocument();
     expect(screen.queryByText('Proficiency Bonus')).not.toBeInTheDocument();
   });
 
