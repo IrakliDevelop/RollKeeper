@@ -236,4 +236,10 @@ describe('tokenAvatarUrl', () => {
     expect(tokenAvatarUrl(undefined)).toBeNull();
     expect(tokenAvatarUrl('')).toBeNull();
   });
+
+  test('rejects backslash and control-char tricks that resolve off-origin', () => {
+    expect(tokenAvatarUrl('/\\evil.example/a.png')).toBeNull();
+    expect(tokenAvatarUrl('/\t/evil.example/a.png')).toBeNull();
+    expect(tokenAvatarUrl('/\n/evil.example/a.png')).toBeNull();
+  });
 });
