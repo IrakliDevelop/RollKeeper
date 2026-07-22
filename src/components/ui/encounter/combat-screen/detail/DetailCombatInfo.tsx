@@ -81,8 +81,10 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
     (sb != null ? sbField(sb, 'senses') : undefined) ??
     entity.senses?.map(s => `${s.name} ${s.range} ft.`).join(', ');
 
-  const initiativeValue =
-    entity.initiative != null ? String(entity.initiative) : undefined;
+  const initiativeModValue =
+    entity.initiativeModifier >= 0
+      ? `+${entity.initiativeModifier}`
+      : String(entity.initiativeModifier);
   const proficiencyBonusValue =
     entity.proficiencyBonus != null
       ? String(entity.proficiencyBonus)
@@ -92,7 +94,7 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
 
   const hasAnyData =
     sb != null ||
-    entity.initiative != null ||
+    entity.initiativeModifier !== 0 ||
     entity.proficiencyBonus != null ||
     (entity.damageResistances?.length ?? 0) > 0 ||
     (entity.damageImmunities?.length ?? 0) > 0 ||
@@ -128,17 +130,12 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
     });
   };
 
-  const updateInitiative = (value: string) => {
+  const updateInitiativeModifier = (value: string) => {
     const trimmed = value.trim();
-    if (trimmed === '') {
-      actions.onUpdate(entity.id, { initiative: null });
-      return;
-    }
-    const num = parseFloat(trimmed);
-    // Route through onSetInitiative (not the generic onUpdate) — it also
-    // re-sorts entities and remaps currentTurn when combat is active with a
-    // non-manual sort order, which a plain entity patch would silently skip.
-    if (!Number.isNaN(num)) actions.onSetInitiative(entity.id, num);
+    if (trimmed === '') return;
+    const num = parseInt(trimmed, 10);
+    if (!Number.isNaN(num))
+      actions.onUpdate(entity.id, { initiativeModifier: num });
   };
 
   const updateProficiencyBonus = (value: string) => {
@@ -157,11 +154,11 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
       {canEditBasics ? (
         <>
           <InfoRow
-            label="Initiative"
-            value={initiativeValue}
+            label="Initiative Mod"
+            value={initiativeModValue}
             editable
             type="number"
-            onChange={updateInitiative}
+            onChange={updateInitiativeModifier}
           />
           <InfoRow
             label="Proficiency Bonus"
@@ -173,7 +170,7 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
         </>
       ) : (
         <>
-          <StaticRow label="Initiative" value={initiativeValue} />
+          <StaticRow label="Initiative Mod" value={initiativeModValue} />
           <StaticRow label="Proficiency Bonus" value={proficiencyBonusValue} />
         </>
       )}
