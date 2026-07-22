@@ -20,6 +20,11 @@ import {
   isCombatantToken,
   type DmTokenConfig,
 } from '@/components/ui/campaign/dm-vtt/combatantToken';
+import {
+  migrateCanvasToContract,
+  mirrorUnknownLayer,
+  subscribePinCanonicalLayers,
+} from '@/components/ui/campaign/location-map/layerContract';
 
 import type { TokenInfoMode } from '@/components/ui/campaign/token-overlay';
 
@@ -76,6 +81,7 @@ export function useDmBattleMapCanvas({
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const autoSaveRef = useRef<AutoSave | null>(null);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
+  const pinUnsubRef = useRef<(() => void) | null>(null);
   // The connection is created once inside the fire-once `handleReady`
   // callback; a plain closure over `onPoke` would go stale if the prop's
   // identity changes later (e.g. encounterId change) after the connection
@@ -115,6 +121,19 @@ export function useDmBattleMapCanvas({
         }
       }
 
+      // Canonical bands + one-shot migration. Runs before the save listeners
+      // attach so element moves don't trigger a full-JSON save per element;
+      // if anything migrated, persist the result once.
+      const migrated = migrateCanvasToContract(vp, 'dm');
+      if (migrated) {
+        useBattleMapStore
+          .getState()
+          .updateBattleMap(campaignCode, battleMapId, {
+            canvasState: vp.exportJSON(),
+            updatedAt: new Date().toISOString(),
+          });
+      }
+
       const autoSave = new AutoSave(vp.store, vp.camera, {
         key: `battlemap-canvas-${battleMapId}`,
         debounceMs: 1500,
@@ -138,6 +157,17 @@ export function useDmBattleMapCanvas({
       vp.store.on('add', saveOnLocalOps);
       vp.store.on('remove', saveOnLocalOps);
       vp.store.on('update', saveOnLocalOps);
+
+      // Mirror unknown remote layers (player tokens) into the player band —
+      // without this they sort at layer order 0, under DM-added images.
+      vp.store.on('add', el => {
+        if (el.layerId && !vp.layerManager.getLayer(el.layerId)) {
+          mirrorUnknownLayer(vp, el.layerId, 'dm');
+          vp.requestRender();
+        }
+      });
+      pinUnsubRef.current?.();
+      pinUnsubRef.current = subscribePinCanonicalLayers(vp);
 
       const selectTool = vp.toolManager.getTool<SelectTool>('select');
       selectTool?.onSelectionChange(() => {
@@ -186,6 +216,7 @@ export function useDmBattleMapCanvas({
     return () => {
       autoSaveRef.current?.stop();
       connectionRef.current?.stop();
+      pinUnsubRef.current?.();
     };
   }, []);
 

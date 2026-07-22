@@ -24,6 +24,13 @@ import {
 } from '@/lib/battlemapSync';
 import { openTvDisplay } from '@/lib/openTvDisplay';
 import { useShareWithPlayers } from './useShareWithPlayers';
+import {
+  ensureCanonicalLayers,
+  migrateCanvasToContract,
+  mirrorUnknownLayer,
+  subscribePinCanonicalLayers,
+  MAP_LAYER_ID,
+} from './layerContract';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
 import type { GridSettings } from '@/types/location';
 
@@ -54,37 +61,17 @@ type ViewportHistoryAccess = {
 };
 
 /**
- * Map + grid must live on a layer-locked background so hit-testing skips them
- * (see @fieldnotes/core InputHandler / SelectTool + `isLayerLocked`).
- * Grid elements must also be `locked` so Select cannot drag them (otherwise they
- * appear to slide when panning/zooming).
+ * Map + grid must live on the layer-locked map layer so hit-testing skips
+ * them (see @fieldnotes/core InputHandler / SelectTool + `isLayerLocked`).
+ * Grid elements must also be `locked` so Select cannot drag them (otherwise
+ * they appear to slide when panning/zooming).
  */
-function pinGridToMapBackgroundLayer(vp: Viewport) {
-  let layers = vp.layerManager.getLayers();
-  if (layers.length === 0) return;
-
-  if (layers.length === 1) {
-    vp.layerManager.createLayer('Annotations');
-    layers = vp.layerManager.getLayers();
-  }
-
-  const bgLayer = layers[0];
-  vp.layerManager.renameLayer(bgLayer.id, 'Map Background');
-
-  if (vp.layerManager.activeLayerId === bgLayer.id) {
-    const fallback = layers.find(l => l.id !== bgLayer.id);
-    if (fallback) {
-      vp.layerManager.setActiveLayer(fallback.id);
-    }
-  }
-
-  vp.layerManager.setLayerLocked(bgLayer.id, true);
-
+function pinGridToMapLayer(vp: Viewport) {
+  ensureCanonicalLayers(vp, 'dm');
   for (const g of vp.store.getElementsByType('grid')) {
-    vp.layerManager.moveElementToLayer(g.id, bgLayer.id);
+    vp.layerManager.moveElementToLayer(g.id, MAP_LAYER_ID);
     vp.store.update(g.id, { locked: true });
   }
-
   vp.requestRender();
 }
 
@@ -158,6 +145,7 @@ export function useDmLocationEditor(
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autoSaveRef = useRef<AutoSave | null>(null);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
+  const pinUnsubRef = useRef<(() => void) | null>(null);
   const [syncStatus, setSyncStatus] = useState<
     BattleMapConnectionStatus | 'disabled'
   >('disabled');
@@ -294,10 +282,15 @@ export function useDmLocationEditor(
       if (location.canvasState && location.canvasState.trim().length > 0) {
         try {
           vp.loadJSON(location.canvasState);
-          pinGridToMapBackgroundLayer(vp);
+          const migrated = migrateCanvasToContract(vp, 'dm');
+          pinGridToMapLayer(vp);
           _fitCameraToMap(vp, location.mapImageSize);
           // Clear stale localStorage data after successful load
           await autoSave.clear();
+          if (migrated) {
+            onSave(vp.exportJSON());
+            setHasUnsyncedChanges(true);
+          }
         } catch {
           // Corrupt state — start fresh
           _initializeBackground(
@@ -307,7 +300,7 @@ export function useDmLocationEditor(
           );
         }
       } else {
-        // New location — place the map image as a locked background on the base layer
+        // New location — place the map image as a locked background on the map layer
         _initializeBackground(vp, location.mapImageUrl, location.mapImageSize);
       }
 
@@ -327,6 +320,19 @@ export function useDmLocationEditor(
       vp.store.on('add', saveAndMarkDirty);
       vp.store.on('remove', saveAndMarkDirty);
       vp.store.on('update', saveAndMarkDirty);
+
+      // Layers aren't synced: player tokens arrive referencing player-*
+      // layer ids that don't exist on this canvas and would sort at layer
+      // order 0 — UNDER the annotations layer where DM-added images live.
+      // Mirror unknown layers into their canonical band instead.
+      vp.store.on('add', el => {
+        if (el.layerId && !vp.layerManager.getLayer(el.layerId)) {
+          mirrorUnknownLayer(vp, el.layerId, 'dm');
+          vp.requestRender();
+        }
+      });
+      pinUnsubRef.current?.();
+      pinUnsubRef.current = subscribePinCanonicalLayers(vp);
 
       // Live sync — battlemap mode only; resolver reads Zustand LIVE via
       // getState() (a captured snapshot would go stale after the first toggle).
@@ -385,16 +391,12 @@ export function useDmLocationEditor(
     mapImageUrl: string,
     mapImageSize: { w: number; h: number }
   ) {
-    // Set up layers synchronously so they're always created on the
-    // active viewport, even if image loading completes asynchronously
-    // on a different (StrictMode-destroyed) viewport.
-    const baseLayer = vp.layerManager.getLayers()[0];
-    if (baseLayer) {
-      vp.layerManager.renameLayer(baseLayer.id, 'Map Background');
-      vp.layerManager.setLayerLocked(baseLayer.id, true);
-    }
-    const annotationLayer = vp.layerManager.createLayer('Annotations');
-    vp.layerManager.setActiveLayer(annotationLayer.id);
+    // Canonical layers are created synchronously so they always exist on the
+    // active viewport, even if image loading completes asynchronously on a
+    // different (StrictMode-destroyed) viewport. Migration drops the SDK's
+    // empty default "Layer 1".
+    ensureCanonicalLayers(vp, 'dm');
+    migrateCanvasToContract(vp, 'dm');
 
     if (!mapImageUrl) return;
 
@@ -409,10 +411,7 @@ export function useDmLocationEditor(
       const bgImage = allElements[allElements.length - 1];
       if (bgImage) {
         vp.store.update(bgImage.id, { locked: true });
-        // Ensure image is on the background layer
-        if (baseLayer) {
-          vp.layerManager.moveElementToLayer(bgImage.id, baseLayer.id);
-        }
+        vp.layerManager.moveElementToLayer(bgImage.id, MAP_LAYER_ID);
       }
       _fitCameraToMap(vp, mapImageSize);
       vp.requestRender();
@@ -439,6 +438,7 @@ export function useDmLocationEditor(
     return () => {
       autoSaveRef.current?.stop();
       connectionRef.current?.stop();
+      pinUnsubRef.current?.();
     };
   }, []);
 
@@ -476,7 +476,7 @@ export function useDmLocationEditor(
       };
       vp.addGrid(settings);
 
-      pinGridToMapBackgroundLayer(vp);
+      pinGridToMapLayer(vp);
 
       setGridEnabled(true);
       setGridType(type);

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { ElementStore, LayerManager, createShape } from '@fieldnotes/core';
 import type { Viewport } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useDmLocationEditor } from '../DmLocationEditor.hooks';
@@ -20,34 +21,27 @@ vi.mock('@fieldnotes/core', async importOriginal => {
 });
 
 /**
- * Minimal viewport stub covering only what `handleReady` (with empty
- * canvasState + empty mapImageUrl, so both load paths are skipped) and
- * `handleToggleDmOnly` touch.
+ * Viewport stub covering what `handleReady` (with empty canvasState + empty
+ * mapImageUrl, so both load paths are skipped) and `handleToggleDmOnly`
+ * touch. `store`/`layerManager` are the real SDK classes (not hand-mocked)
+ * because `handleReady` now runs `ensureCanonicalLayers` /
+ * `migrateCanvasToContract` / `subscribePinCanonicalLayers` unconditionally —
+ * see layerContract.test.ts, which exercises those against the same real
+ * classes.
  */
 function makeStubViewport() {
-  const selectTool = { name: 'select', selectedIds: ['el-1'] };
-  const store = {
-    on: vi.fn(() => vi.fn()),
-    onChange: vi.fn(() => vi.fn()),
-    getById: vi.fn((id: string) =>
-      id === 'el-1' ? { id: 'el-1', type: 'shape' } : undefined
-    ),
-    update: vi.fn(),
-    getAll: vi.fn(() => []),
-    getElementsByType: vi.fn(() => []),
-    snapshot: vi.fn(() => []),
-    count: 0,
-    clear: vi.fn(),
-  };
-  const layerManager = {
-    getLayers: vi.fn(() => [{ id: 'layer-1', name: 'Layer 1' }]),
-    createLayer: vi.fn(() => ({ id: 'layer-2', name: 'Annotations' })),
-    renameLayer: vi.fn(),
-    setLayerLocked: vi.fn(),
-    setActiveLayer: vi.fn(),
-    moveElementToLayer: vi.fn(),
-    activeLayerId: 'layer-1',
-  };
+  const store = new ElementStore();
+  const layerManager = new LayerManager(store);
+
+  // One pre-existing element so syncSelection (filters selectedIds against
+  // the store) and handleToggleDmOnly (`store.getById` guard) have something
+  // real to select. The id is SDK-generated, not a fixed string.
+  const el = createShape({ position: { x: 0, y: 0 }, size: { w: 10, h: 10 } });
+  store.add(el);
+  const elementId = el.id;
+  vi.spyOn(store, 'update');
+
+  const selectTool = { name: 'select', selectedIds: [elementId] };
   const vp = {
     store,
     layerManager,
@@ -72,7 +66,7 @@ function makeStubViewport() {
     updateGrid: vi.fn(),
     requestRender: vi.fn(),
   };
-  return { vp: vp as unknown as Viewport, store };
+  return { vp: vp as unknown as Viewport, store, elementId };
 }
 
 const baseLocation: LocationMap = {
@@ -89,7 +83,7 @@ const baseLocation: LocationMap = {
 };
 
 async function setup(mode: 'location' | 'battlemap') {
-  const { vp, store } = makeStubViewport();
+  const { vp, store, elementId } = makeStubViewport();
   const onSave = vi.fn();
   const { result } = renderHook(() =>
     useDmLocationEditor({
@@ -109,8 +103,8 @@ async function setup(mode: 'location' | 'battlemap') {
     await result.current.handleReady(vp);
   });
   // Sanity: syncSelection picked up the stub's single selected element.
-  expect(result.current.selectedElementId).toBe('el-1');
-  return { store, result };
+  expect(result.current.selectedElementId).toBe(elementId);
+  return { store, result, elementId };
 }
 
 describe('useDmLocationEditor — handleToggleDmOnly mode gating', () => {
@@ -139,14 +133,14 @@ describe('useDmLocationEditor — handleToggleDmOnly mode gating', () => {
   });
 
   it('battlemap mode: toggling visibility re-emits the element so the sync client re-stamps its audience', async () => {
-    const { store, result } = await setup('battlemap');
+    const { store, result, elementId } = await setup('battlemap');
 
     act(() => {
       result.current.handleToggleDmOnly();
     });
 
     expect(store.update).toHaveBeenCalledTimes(1);
-    expect(store.update).toHaveBeenCalledWith('el-1', {});
+    expect(store.update).toHaveBeenCalledWith(elementId, {});
   });
 });
 
