@@ -46,7 +46,9 @@ export async function GET(
 ) {
   const { source, name } = await params;
 
-  if (!isValidTokenSource(source) || name.trim() === '') {
+  // No bestiary monster name contains a slash; rejecting them keeps
+  // %2F-smuggled dot-segments out of S3 keys entirely.
+  if (!isValidTokenSource(source) || name.trim() === '' || name.includes('/')) {
     return NextResponse.json({ error: 'Invalid token path' }, { status: 400 });
   }
 
