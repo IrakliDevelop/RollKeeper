@@ -44,11 +44,17 @@ const TOKEN_RENDER_PX = 128;
 const TOKEN_RING_PX = 8;
 
 /**
- * Only http(s) avatars may become token images: a base64 data-URL avatar
- * would ride along in every sync upsert for the token (huge payloads).
+ * Only http(s) avatars or same-origin root-relative paths (e.g. the
+ * /api/bestiary/token route) may become token images: a base64 data-URL
+ * avatar would ride along in every sync upsert for the token (huge
+ * payloads). Protocol-relative "//host/…" is rejected — that is an
+ * external host, not our origin.
  */
 export function tokenAvatarUrl(avatar: string | undefined): string | null {
-  return avatar && /^https?:\/\//.test(avatar) ? avatar : null;
+  if (!avatar) return null;
+  if (/^https?:\/\//.test(avatar)) return avatar;
+  if (avatar.startsWith('/') && !avatar.startsWith('//')) return avatar;
+  return null;
 }
 
 /** Same-origin proxy for S3 URLs so canvas compositing isn't CORS-tainted. */
