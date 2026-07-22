@@ -635,6 +635,7 @@ export const SPELL_SOURCE_BOOKS: Record<string, string> = {
 export const AUTOSAVE_DELAY = 500; // ms
 export const STORAGE_KEY = 'rollkeeper-character';
 export const PLAYER_STORAGE_KEY = 'rollkeeper-player-data';
+export const ENCOUNTER_STORAGE_KEY = 'rollkeeper-encounter-data';
 export const APP_VERSION = '1.0.0';
 
 // Avatar upload settings
