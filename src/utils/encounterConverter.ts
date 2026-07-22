@@ -7,6 +7,7 @@ import {
   MonsterSpellcasting,
   TokenCellSize,
 } from '@/types/encounter';
+import { bestiaryTokenUrl } from '@/utils/bestiaryTokenUrl';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -356,6 +357,10 @@ export function monsterToEncounterEntity(
     color: options?.color,
     isHidden: false,
     tokenSize: sizeCodeToTokenCells(monster.size[0]),
+    avatarUrl:
+      monster.hasToken && monster.tokenSource
+        ? bestiaryTokenUrl(monster.tokenSource, monster.name)
+        : undefined,
   };
 }
 

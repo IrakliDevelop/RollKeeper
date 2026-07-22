@@ -158,3 +158,38 @@ describe('abilityModifier export', () => {
     expect(abilityModifier(8)).toBe(-1);
   });
 });
+
+describe('monster token avatarUrl', () => {
+  test('sets root-relative token URL when hasToken and tokenSource present', () => {
+    const monster = makeMonster({
+      name: 'Adult Crystal Dragon',
+      hasToken: true,
+      tokenSource: 'FTD',
+    });
+    const entity = monsterToEncounterEntity(monster);
+    expect(entity.avatarUrl).toBe(
+      '/api/bestiary/token/FTD/Adult%20Crystal%20Dragon'
+    );
+  });
+
+  test('leaves avatarUrl undefined without hasToken', () => {
+    const entity = monsterToEncounterEntity(
+      makeMonster({ hasToken: false, tokenSource: 'XMM' })
+    );
+    expect(entity.avatarUrl).toBeUndefined();
+  });
+
+  test('leaves avatarUrl undefined without tokenSource (legacy data)', () => {
+    const entity = monsterToEncounterEntity(makeMonster({ hasToken: true }));
+    expect(entity.avatarUrl).toBeUndefined();
+  });
+
+  test('URL uses original monster name even with nameOverride', () => {
+    const entity = monsterToEncounterEntity(
+      makeMonster({ name: 'Zombie', hasToken: true, tokenSource: 'XMM' }),
+      { nameOverride: 'Zombie A' }
+    );
+    expect(entity.name).toBe('Zombie A');
+    expect(entity.avatarUrl).toBe('/api/bestiary/token/XMM/Zombie');
+  });
+});
