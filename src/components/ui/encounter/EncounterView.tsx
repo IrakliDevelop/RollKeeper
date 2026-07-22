@@ -22,6 +22,10 @@ import { useInitiativeSubmissionSync } from '@/hooks/useInitiativeSubmissionSync
 import { useActiveBattleMapId } from '@/hooks/useActiveBattleMapId';
 import { useBattleMapPokes } from '@/hooks/useBattleMapPokes';
 import { useDebouncedRefetch } from '@/hooks/useDebouncedRefetch';
+import { useBattleMapStore } from '@/store/battleMapStore';
+import { useDmBattleMapSync } from '@/hooks/useDmBattleMapSync';
+import { findLinkedBattleMap } from '@/utils/battleMapLinks';
+import type { BattleMap } from '@/types/battlemap';
 import { buildSharedInitiative } from '@/utils/buildSharedInitiative';
 import { Button } from '@/components/ui/forms/button';
 import { CombatScreen } from './combat-screen/CombatScreen';
@@ -52,6 +56,25 @@ export function handleEncounterPoke(
   refresh: () => void
 ): void {
   if (feature === 'players') refresh();
+}
+
+/**
+ * Start-combat side effect, extracted for unit testability (same pattern
+ * as `handleEncounterPoke`). Starting combat makes the encounter's linked
+ * battle map the campaign's live map, so players who tap the banner land
+ * on the map the DM is actually fighting on — previously the only writer
+ * of activeBattleMapId was the editor's manual share toggle, and a map
+ * shared in an earlier session stayed live forever (with two same-named
+ * maps, players joined the wrong one). No linked map → no push: never
+ * clear a share the DM set up manually.
+ */
+export function pushLinkedMapLive(
+  battleMaps: BattleMap[],
+  encounterId: string,
+  pushActive: (battleMapId: string | null, name?: string) => Promise<void>
+): void {
+  const linked = findLinkedBattleMap(battleMaps, encounterId);
+  if (linked) void pushActive(linked.id, linked.name);
 }
 
 export function EncounterView({
@@ -115,6 +138,9 @@ export function EncounterView({
     campaignCode,
     dmId,
   });
+
+  const { pushActive } = useDmBattleMapSync(campaignCode, dmId);
+  const getBattleMaps = useBattleMapStore(state => state.getBattleMaps);
 
   useTurnRequestSync({
     campaignCode,
@@ -307,6 +333,7 @@ export function EncounterView({
       }).catch(() => {});
     }
     startCombat(encounterId);
+    pushLinkedMapLive(getBattleMaps(campaignCode), encounterId, pushActive);
   }, [
     encounter?.pendingInitiativeRequest,
     encounterId,
@@ -314,6 +341,8 @@ export function EncounterView({
     pushInitiativeRequest,
     setPendingInitiativeRequest,
     startCombat,
+    getBattleMaps,
+    pushActive,
   ]);
 
   if (!encounter || !actions) {
