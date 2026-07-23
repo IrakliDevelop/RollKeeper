@@ -243,10 +243,17 @@ export function migrateCanvasToContract(
   // or a long-deleted layer id — invisible to the name-based absorption
   // above AND to arrange-mode's layer-scoped unlock, leaving them
   // permanently element-locked. A locked image is background-class by
-  // construction (nothing else element-locks images), so adopt it.
+  // construction (nothing else element-locks images), so adopt it. The
+  // legacy init's moveElementToLayer could silently no-op (StrictMode-
+  // destroyed viewport), stranding the locked background on the annotations
+  // layer; locked images on annotations or unknown layers are adopted,
+  // custom layers left alone. Accepted caveat — the SDK context menu can
+  // element-lock images, such an image on annotations would be adopted too.
   for (const el of vp.store.getAll()) {
     if (el.type !== 'image' || !el.locked) continue;
-    if (el.layerId && lm.getLayer(el.layerId)) continue;
+    const onKnownLayer = Boolean(el.layerId && lm.getLayer(el.layerId));
+    if (onKnownLayer && el.layerId !== ANNOTATIONS_LAYER_ID) continue;
+    if (el.layerId === MAP_LAYER_ID) continue;
     vp.store.update(el.id, { layerId: MAP_LAYER_ID });
     changed = true;
   }

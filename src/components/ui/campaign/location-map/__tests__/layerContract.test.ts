@@ -308,6 +308,47 @@ describe('migrateCanvasToContract', () => {
     expect(vp.store.getById(strayDangling.id)?.layerId).toBe(MAP_LAYER_ID);
     expect(vp.store.getById(unlockedStray.id)?.layerId).toBe('');
   });
+
+  it('adopts stranded locked background images from the annotations layer, not from custom layers', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    const strandedBg = createImage({
+      position: { x: 0, y: 0 },
+      size: { w: 100, h: 100 },
+      src: 'map.png',
+      layerId: ANNOTATIONS_LAYER_ID,
+      zIndex: 0,
+    });
+    vp.store.add(strandedBg);
+    vp.store.update(strandedBg.id, { locked: true });
+    const custom = vp.layerManager.createLayer('Traps');
+    const customLocked = createImage({
+      position: { x: 0, y: 0 },
+      size: { w: 10, h: 10 },
+      src: 'trap.png',
+      layerId: custom.id,
+      zIndex: 0,
+    });
+    vp.store.add(customLocked);
+    vp.store.update(customLocked.id, { locked: true });
+    const plainAnnotation = createImage({
+      position: { x: 50, y: 0 },
+      size: { w: 10, h: 10 },
+      src: 'sketch.png',
+      layerId: ANNOTATIONS_LAYER_ID,
+      zIndex: 0,
+    });
+    vp.store.add(plainAnnotation);
+
+    const changed = migrateCanvasToContract(vp, 'dm');
+
+    expect(changed).toBe(true);
+    expect(vp.store.getById(strandedBg.id)?.layerId).toBe(MAP_LAYER_ID);
+    expect(vp.store.getById(customLocked.id)?.layerId).toBe(custom.id);
+    expect(vp.store.getById(plainAnnotation.id)?.layerId).toBe(
+      ANNOTATIONS_LAYER_ID
+    );
+  });
 });
 
 describe('bug regression: DM-added image vs player token', () => {
