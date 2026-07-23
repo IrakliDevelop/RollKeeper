@@ -107,4 +107,9 @@ describe('DmLocationToolbar rotation buttons', () => {
     const { container } = render(<DmLocationToolbar {...baseProps} />);
     expect(container.firstElementChild?.className).toContain('flex-wrap');
   });
+
+  it('renders the Align trigger in the center group', () => {
+    render(<DmLocationToolbar {...baseProps} />);
+    expect(screen.getByTitle('Align & distribute')).toBeInTheDocument();
+  });
 });

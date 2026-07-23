@@ -28,6 +28,7 @@ import {
 import { useActiveTool, useHistory, useSelectionOps } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
 import DmLocationGridPopover from './DmLocationGridPopover';
+import DmLocationAlignMenu from './DmLocationAlignMenu';
 import DmOnlyToggle from './DmOnlyToggle';
 import { useSelectToolSelectionCount } from './useSelectToolSelectionCount';
 import type { DmLocationToolbarProps } from './DmLocationToolbar.types';
@@ -180,6 +181,7 @@ export default function DmLocationToolbar({
         >
           <RotateCw size={15} />
         </Button>
+        <DmLocationAlignMenu />
         <Button
           variant="ghost"
           onClick={onClear}
