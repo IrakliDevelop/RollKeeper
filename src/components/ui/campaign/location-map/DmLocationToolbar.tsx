@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { useActiveTool, useHistory, useSelectionOps } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
+import DmLocationGridPopover from './DmLocationGridPopover';
 import DmOnlyToggle from './DmOnlyToggle';
 import { useSelectToolSelectionCount } from './useSelectToolSelectionCount';
 import type { DmLocationToolbarProps } from './DmLocationToolbar.types';
@@ -106,7 +107,7 @@ export default function DmLocationToolbar({
   };
 
   return (
-    <div className="border-divider bg-surface-raised flex items-center gap-3 border-b px-2 py-1">
+    <div className="border-divider bg-surface-raised flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-2 py-1">
       {/* Left group: Tool buttons */}
       <div className="flex items-center gap-0.5">
         {toolDefs.map(({ name, icon: Icon, label }) => (
@@ -230,142 +231,15 @@ export default function DmLocationToolbar({
           <DmOnlyToggle isDmOnly={isDmOnly} onToggle={onToggleDmOnly} />
         )}
 
-        {/* Grid type selector */}
-        <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
-          <button
-            onClick={() => onSetGridType('off')}
-            title="No grid"
-            className={`rounded px-2 py-1 text-xs transition-colors ${
-              !gridEnabled
-                ? 'bg-accent-blue-bg text-accent-blue-text font-semibold'
-                : 'text-muted hover:bg-surface-raised hover:text-body'
-            }`}
-          >
-            Off
-          </button>
-          <button
-            onClick={() => onSetGridType('hex')}
-            title="Hex grid"
-            className={`rounded px-2 py-1 text-xs transition-colors ${
-              gridEnabled && gridType === 'hex'
-                ? 'bg-accent-blue-bg text-accent-blue-text font-semibold'
-                : 'text-muted hover:bg-surface-raised hover:text-body'
-            }`}
-          >
-            Hex
-          </button>
-          <button
-            onClick={() => onSetGridType('square')}
-            title="Square grid"
-            className={`rounded px-2 py-1 text-xs transition-colors ${
-              gridEnabled && gridType === 'square'
-                ? 'bg-accent-blue-bg text-accent-blue-text font-semibold'
-                : 'text-muted hover:bg-surface-raised hover:text-body'
-            }`}
-          >
-            Square
-          </button>
-        </div>
-
-        {/* Grid settings — visible when grid is enabled */}
-        {gridEnabled && (
-          <div className="flex items-center gap-2">
-            <div className="bg-divider h-6 w-px" />
-
-            {/* Grid color */}
-            <label
-              className="relative h-6 w-6 cursor-pointer"
-              title="Grid color"
-            >
-              <input
-                type="color"
-                value={gridColor}
-                onChange={e =>
-                  onUpdateGridSettings({ strokeColor: e.target.value })
-                }
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              />
-              <div
-                className="border-divider h-6 w-6 rounded border"
-                style={{ backgroundColor: gridColor }}
-              />
-            </label>
-
-            {/* Cell size */}
-            <span className="text-muted text-xs">Size</span>
-            <button
-              onClick={() =>
-                onUpdateGridSettings({
-                  cellSize: Math.max(20, gridCellSize - 1),
-                })
-              }
-              className="text-muted hover:text-body hover:bg-surface-secondary flex h-5 w-5 items-center justify-center rounded text-xs"
-              title="Decrease grid size"
-            >
-              −
-            </button>
-            <input
-              type="range"
-              min={20}
-              max={150}
-              value={gridCellSize}
-              onChange={e =>
-                onUpdateGridSettings({ cellSize: Number(e.target.value) })
-              }
-              className="w-16"
-            />
-            <button
-              onClick={() =>
-                onUpdateGridSettings({
-                  cellSize: Math.min(150, gridCellSize + 1),
-                })
-              }
-              className="text-muted hover:text-body hover:bg-surface-secondary flex h-5 w-5 items-center justify-center rounded text-xs"
-              title="Increase grid size"
-            >
-              +
-            </button>
-            <span className="text-muted w-7 text-xs">{gridCellSize}</span>
-
-            {/* Opacity */}
-            <span className="text-muted text-xs">Opacity</span>
-            <button
-              onClick={() =>
-                onUpdateGridSettings({
-                  opacity: Math.max(0.1, gridOpacity - 0.01),
-                })
-              }
-              className="text-muted hover:text-body hover:bg-surface-secondary flex h-5 w-5 items-center justify-center rounded text-xs"
-              title="Decrease opacity"
-            >
-              −
-            </button>
-            <input
-              type="range"
-              min={10}
-              max={100}
-              value={Math.round(gridOpacity * 100)}
-              onChange={e =>
-                onUpdateGridSettings({ opacity: Number(e.target.value) / 100 })
-              }
-              className="w-16"
-            />
-            <button
-              onClick={() =>
-                onUpdateGridSettings({
-                  opacity: Math.min(1, gridOpacity + 0.01),
-                })
-              }
-              className="text-muted hover:text-body hover:bg-surface-secondary flex h-5 w-5 items-center justify-center rounded text-xs"
-              title="Increase opacity"
-            >
-              +
-            </button>
-            <span className="text-muted w-8 text-xs">
-              {Math.round(gridOpacity * 100)}%
-            </span>
-          </div>
-        )}
+        <DmLocationGridPopover
+          gridEnabled={gridEnabled}
+          gridType={gridType}
+          gridCellSize={gridCellSize}
+          gridColor={gridColor}
+          gridOpacity={gridOpacity}
+          onSetGridType={onSetGridType}
+          onUpdateGridSettings={onUpdateGridSettings}
+        />
 
         {/* Sync status indicator */}
         <div className="flex items-center gap-1.5">

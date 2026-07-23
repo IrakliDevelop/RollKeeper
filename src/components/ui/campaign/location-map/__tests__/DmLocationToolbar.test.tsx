@@ -92,4 +92,19 @@ describe('DmLocationToolbar rotation buttons', () => {
     expect(rotateCW).toHaveBeenCalledTimes(1);
     expect(rotateCCW).toHaveBeenCalledTimes(1);
   });
+
+  it('collapses grid controls into the popover (no inline sliders)', () => {
+    render(<DmLocationToolbar {...baseProps} gridEnabled={true} />);
+    // Trigger present, inline strip gone even with grid enabled.
+    expect(screen.getByTitle('Grid settings')).toBeInTheDocument();
+    expect(screen.queryByTitle('Grid cell size')).not.toBeInTheDocument();
+    // Opening the popover reveals the controls.
+    fireEvent.click(screen.getByTitle('Grid settings'));
+    expect(screen.getByTitle('Grid cell size')).toBeInTheDocument();
+  });
+
+  it('wraps instead of clipping (flex-wrap on the container)', () => {
+    const { container } = render(<DmLocationToolbar {...baseProps} />);
+    expect(container.firstElementChild?.className).toContain('flex-wrap');
+  });
 });
