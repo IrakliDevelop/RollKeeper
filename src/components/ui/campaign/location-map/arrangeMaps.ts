@@ -46,6 +46,21 @@ export function exitArrangeMaps(
   for (const id of session.unlockedElementIds) {
     if (vp.store.getById(id)) vp.store.update(id, { locked: true });
   }
+  // While arranging, the active layer is layer-map — every other creation
+  // path (drag-drop/paste ImageTool, drawing tools, the annotation image
+  // button, DmTokenTool) creates onto the active layer, not just the map
+  // image tool. Sweep anything that isn't a map image or grid off layer-map
+  // before re-locking it, or those elements get trapped on the locked
+  // bottom band.
+  for (const el of vp.store.getAll()) {
+    if (
+      el.layerId === MAP_LAYER_ID &&
+      el.type !== 'image' &&
+      el.type !== 'grid'
+    ) {
+      lm.moveElementToLayer(el.id, ANNOTATIONS_LAYER_ID);
+    }
+  }
   lm.updateLayerDirect(ANNOTATIONS_LAYER_ID, {
     locked: session.annotationsWasLocked,
   });

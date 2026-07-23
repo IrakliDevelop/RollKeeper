@@ -4,7 +4,11 @@ import { Plus, Eye, EyeOff, Lock, Unlock, X } from 'lucide-react';
 import { useElements, useLayers, useViewport } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
 import EncounterLinkingPanel from '../battle-map/EncounterLinkingPanel';
-import { MAP_LAYER_ID, PLAYER_LAYER_PREFIX } from './layerContract';
+import {
+  MAP_LAYER_ID,
+  ANNOTATIONS_LAYER_ID,
+  PLAYER_LAYER_PREFIX,
+} from './layerContract';
 import type { EditorMode } from './DmLocationEditor.types';
 
 interface DmLocationLayersPanelProps {
@@ -70,6 +74,12 @@ export default function DmLocationLayersPanel({
           .map(layer => {
             const isActive = layer.id === activeLayerId;
             const isBgLayer = layer.id === MAP_LAYER_ID;
+            // SDK removeLayer reparents a deleted layer's elements to the
+            // highest-order fallback layer (a player-* mirror on DM
+            // canvases) — deleting layer-annotations would merge DM content
+            // into a player-owned layer id. Never offer delete for it.
+            const isProtectedLayer =
+              isBgLayer || layer.id === ANNOTATIONS_LAYER_ID;
 
             return (
               <div
@@ -138,10 +148,11 @@ export default function DmLocationLayersPanel({
 
                 <span className="min-w-0 flex-1 truncate">{layer.name}</span>
 
-                {!isBgLayer &&
+                {!isProtectedLayer &&
                   layers.filter(
                     l =>
                       l.id !== MAP_LAYER_ID &&
+                      l.id !== ANNOTATIONS_LAYER_ID &&
                       !l.id.startsWith(PLAYER_LAYER_PREFIX)
                   ).length > 1 && (
                     <button

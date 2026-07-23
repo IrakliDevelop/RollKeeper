@@ -4,6 +4,8 @@ import {
   LayerManager,
   createImage,
   createGrid,
+  createShape,
+  createNote,
 } from '@fieldnotes/core';
 import {
   MAP_LAYER_ID,
@@ -86,5 +88,47 @@ describe('enter/exitArrangeMaps', () => {
     const session = enterArrangeMaps(vp);
     vp.store.remove(imageId);
     expect(() => exitArrangeMaps(vp, session)).not.toThrow();
+  });
+
+  it('sweeps non-image/grid elements created on layer-map (active layer while arranging) to annotations on exit, leaving images and grid in place', () => {
+    // Regression (I1): while arranging, active layer = layer-map. Any other
+    // creation path (drag-drop/paste ImageTool, drawing tools, annotation
+    // image button, DmTokenTool) targets the active layer, so shapes/notes/
+    // tokens can land on layer-map — after exit, that layer is locked again
+    // and those elements would be trapped under the map images.
+    const vp = makeVp();
+    const imageId = addLockedMapImage(vp);
+    const grid = createGrid({
+      gridType: 'square',
+      cellSize: 50,
+      strokeColor: '#000',
+      strokeWidth: 1,
+      opacity: 0.5,
+      layerId: MAP_LAYER_ID,
+    });
+    vp.store.add(grid);
+
+    const session = enterArrangeMaps(vp);
+
+    // Simulate a stray creation path (e.g. drawing/note tool) that dropped
+    // an element onto the currently-active map layer mid-arrange.
+    const shape = createShape({
+      position: { x: 0, y: 0 },
+      size: { w: 10, h: 10 },
+      layerId: MAP_LAYER_ID,
+    });
+    vp.store.add(shape);
+    const note = createNote({
+      position: { x: 0, y: 0 },
+      layerId: MAP_LAYER_ID,
+    });
+    vp.store.add(note);
+
+    exitArrangeMaps(vp, session);
+
+    expect(vp.store.getById(shape.id)?.layerId).toBe(ANNOTATIONS_LAYER_ID);
+    expect(vp.store.getById(note.id)?.layerId).toBe(ANNOTATIONS_LAYER_ID);
+    expect(vp.store.getById(imageId)?.layerId).toBe(MAP_LAYER_ID);
+    expect(vp.store.getById(grid.id)?.layerId).toBe(MAP_LAYER_ID);
   });
 });
