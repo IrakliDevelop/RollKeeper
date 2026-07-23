@@ -221,11 +221,8 @@ export default function DmLocationToolbar({
         </>
       )}
 
-      {/* Spacer */}
-      <div className="flex-1" />
-
       {/* Right group */}
-      <div className="flex items-center gap-1">
+      <div className="ml-auto flex items-center gap-1">
         {/* DM-only toggle — only shown when a single element is selected */}
         {selectedElementId != null && (
           <DmOnlyToggle isDmOnly={isDmOnly} onToggle={onToggleDmOnly} />
