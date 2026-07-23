@@ -239,6 +239,18 @@ export function migrateCanvasToContract(
     }
   }
 
+  // Pre-contract canvases can carry background images whose layerId is ''
+  // or a long-deleted layer id — invisible to the name-based absorption
+  // above AND to arrange-mode's layer-scoped unlock, leaving them
+  // permanently element-locked. A locked image is background-class by
+  // construction (nothing else element-locks images), so adopt it.
+  for (const el of vp.store.getAll()) {
+    if (el.type !== 'image' || !el.locked) continue;
+    if (el.layerId && lm.getLayer(el.layerId)) continue;
+    vp.store.update(el.id, { layerId: MAP_LAYER_ID });
+    changed = true;
+  }
+
   // removeLayerDirect doesn't repair a dangling active layer.
   if (!lm.getLayer(lm.activeLayerId)) {
     lm.setActiveLayer(ANNOTATIONS_LAYER_ID);

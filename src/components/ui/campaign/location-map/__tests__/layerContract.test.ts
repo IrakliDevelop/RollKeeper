@@ -270,6 +270,44 @@ describe('migrateCanvasToContract', () => {
     ).toBeDefined();
     expect(migrateCanvasToContract(vp, 'dm')).toBe(false);
   });
+
+  it('adopts stray locked images with empty or dangling layerIds onto layer-map', () => {
+    const vp = makeVp();
+    const strayEmpty = createImage({
+      position: { x: 0, y: 0 },
+      size: { w: 10, h: 10 },
+      src: 'bg.png',
+      layerId: '',
+      zIndex: 0,
+    });
+    vp.store.add(strayEmpty);
+    vp.store.update(strayEmpty.id, { locked: true });
+    const strayDangling = createImage({
+      position: { x: 20, y: 0 },
+      size: { w: 10, h: 10 },
+      src: 'bg2.png',
+      layerId: 'layer-deleted-legacy',
+      zIndex: 0,
+    });
+    vp.store.add(strayDangling);
+    vp.store.update(strayDangling.id, { locked: true });
+    // Unlocked stray image is NOT background-class — left untouched.
+    const unlockedStray = createImage({
+      position: { x: 40, y: 0 },
+      size: { w: 10, h: 10 },
+      src: 'note.png',
+      layerId: '',
+      zIndex: 0,
+    });
+    vp.store.add(unlockedStray);
+
+    const changed = migrateCanvasToContract(vp, 'dm');
+
+    expect(changed).toBe(true);
+    expect(vp.store.getById(strayEmpty.id)?.layerId).toBe(MAP_LAYER_ID);
+    expect(vp.store.getById(strayDangling.id)?.layerId).toBe(MAP_LAYER_ID);
+    expect(vp.store.getById(unlockedStray.id)?.layerId).toBe('');
+  });
 });
 
 describe('bug regression: DM-added image vs player token', () => {
