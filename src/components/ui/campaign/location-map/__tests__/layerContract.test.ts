@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   ElementStore,
   LayerManager,
@@ -16,6 +16,7 @@ import {
   pinCanonicalLayers,
   subscribePinCanonicalLayers,
   mirrorUnknownLayer,
+  attachUnknownLayerMirror,
   migrateCanvasToContract,
   type ViewportLike,
 } from '@/components/ui/campaign/location-map/layerContract';
@@ -166,6 +167,56 @@ describe('mirrorUnknownLayer', () => {
     const vp = makeCleanVp();
     mirrorUnknownLayer(vp, 'layer-oldclient', 'dm');
     expect(layer(vp, 'layer-oldclient').order).toBe(CUSTOM_BAND_ORDER);
+  });
+});
+
+describe('attachUnknownLayerMirror', () => {
+  it('mirrors an unknown layerId on add', () => {
+    const vp = makeCleanVp();
+    const onMirrored = vi.fn();
+    attachUnknownLayerMirror(vp, 'dm', onMirrored);
+    addImageOn(vp, 'player-remote');
+    expect(vp.layerManager.getLayer('player-remote')).toBeDefined();
+    expect(onMirrored).toHaveBeenCalledTimes(1);
+  });
+
+  it('mirrors an unknown layerId when an existing element is moved via update (relay snapshot reconcile regression)', () => {
+    // Regression for C1: relay snapshot reconcile re-applies remote elements
+    // via store.update(id, el) — a full replace including layerId — not
+    // store.add. An add-only mirror misses this and the element ends up
+    // referencing a layer this canvas no longer has.
+    const vp = makeCleanVp();
+    const elId = addImageOn(vp, ANNOTATIONS_LAYER_ID);
+    const onMirrored = vi.fn();
+    attachUnknownLayerMirror(vp, 'dm', onMirrored);
+    vp.store.update(elId, { layerId: 'player-ghost' });
+    expect(vp.layerManager.getLayer('player-ghost')).toBeDefined();
+    expect(layer(vp, 'player-ghost').order).toBe(PLAYER_BAND_ORDER);
+    expect(onMirrored).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not create a layer when an update targets a known layer', () => {
+    const vp = makeCleanVp();
+    const elId = addImageOn(vp, ANNOTATIONS_LAYER_ID);
+    const before = vp.layerManager.getLayers().length;
+    const onMirrored = vi.fn();
+    attachUnknownLayerMirror(vp, 'dm', onMirrored);
+    vp.store.update(elId, { zIndex: 5 });
+    expect(vp.layerManager.getLayers().length).toBe(before);
+    expect(onMirrored).not.toHaveBeenCalled();
+  });
+
+  it('unsubscribe stops both the add and update mirror paths', () => {
+    const vp = makeCleanVp();
+    const elId = addImageOn(vp, ANNOTATIONS_LAYER_ID);
+    const unsubscribe = attachUnknownLayerMirror(vp, 'dm');
+    unsubscribe();
+    addImageOn(vp, 'player-after-unsub-add');
+    vp.store.update(elId, { layerId: 'player-after-unsub-update' });
+    expect(vp.layerManager.getLayer('player-after-unsub-add')).toBeUndefined();
+    expect(
+      vp.layerManager.getLayer('player-after-unsub-update')
+    ).toBeUndefined();
   });
 });
 

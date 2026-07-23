@@ -27,7 +27,7 @@ import { useShareWithPlayers } from './useShareWithPlayers';
 import {
   ensureCanonicalLayers,
   migrateCanvasToContract,
-  mirrorUnknownLayer,
+  attachUnknownLayerMirror,
   subscribePinCanonicalLayers,
   MAP_LAYER_ID,
 } from './layerContract';
@@ -358,13 +358,10 @@ export function useDmLocationEditor(
       // Layers aren't synced: player tokens arrive referencing player-*
       // layer ids that don't exist on this canvas and would sort at layer
       // order 0 — UNDER the annotations layer where DM-added images live.
-      // Mirror unknown layers into their canonical band instead.
-      vp.store.on('add', el => {
-        if (el.layerId && !vp.layerManager.getLayer(el.layerId)) {
-          mirrorUnknownLayer(vp, el.layerId, 'dm');
-          vp.requestRender();
-        }
-      });
+      // Mirror unknown layers into their canonical band instead. Covers both
+      // new elements (add) and relay snapshot reconcile re-applying remote
+      // elements as full updates (including layerId) on reconnect.
+      attachUnknownLayerMirror(vp, 'dm', () => vp.requestRender());
       pinUnsubRef.current?.();
       pinUnsubRef.current = subscribePinCanonicalLayers(vp, () => ({
         mapUnlocked: arrangeActiveRef.current,

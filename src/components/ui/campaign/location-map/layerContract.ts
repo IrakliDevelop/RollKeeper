@@ -164,6 +164,35 @@ export function mirrorUnknownLayer(
 }
 
 /**
+ * Register the unknown-layer mirror on a store. Both 'add' AND 'update' must
+ * be covered: relay snapshot reconcile re-applies remote elements as full
+ * updates (including layerId), so a layerId referencing a layer this canvas
+ * no longer has (e.g. pre-migration legacy ids restored from the relay's
+ * persisted room state) can arrive on either event. Returns an unsubscribe
+ * for both listeners.
+ */
+export function attachUnknownLayerMirror(
+  vp: ViewportLike,
+  role: CanvasRole,
+  onMirrored?: () => void
+): () => void {
+  const check = (layerId: string | undefined) => {
+    if (layerId && !vp.layerManager.getLayer(layerId)) {
+      mirrorUnknownLayer(vp, layerId, role);
+      onMirrored?.();
+    }
+  };
+  const unsubAdd = vp.store.on('add', el => check(el.layerId));
+  const unsubUpdate = vp.store.on('update', ({ current }) =>
+    check(current.layerId)
+  );
+  return () => {
+    unsubAdd();
+    unsubUpdate();
+  };
+}
+
+/**
  * Lazy per-load migration of pre-contract canvases: legacy name-matched
  * layers are absorbed into the canonical ids (elements moved — the element
  * updates flow through the relay, which is what teaches OTHER canvases the

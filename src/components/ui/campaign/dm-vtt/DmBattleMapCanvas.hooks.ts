@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/campaign/dm-vtt/combatantToken';
 import {
   migrateCanvasToContract,
-  mirrorUnknownLayer,
+  attachUnknownLayerMirror,
   subscribePinCanonicalLayers,
 } from '@/components/ui/campaign/location-map/layerContract';
 
@@ -160,12 +160,9 @@ export function useDmBattleMapCanvas({
 
       // Mirror unknown remote layers (player tokens) into the player band —
       // without this they sort at layer order 0, under DM-added images.
-      vp.store.on('add', el => {
-        if (el.layerId && !vp.layerManager.getLayer(el.layerId)) {
-          mirrorUnknownLayer(vp, el.layerId, 'dm');
-          vp.requestRender();
-        }
-      });
+      // Covers both new elements (add) and relay snapshot reconcile
+      // re-applying remote elements as full updates (including layerId).
+      attachUnknownLayerMirror(vp, 'dm', () => vp.requestRender());
       pinUnsubRef.current?.();
       pinUnsubRef.current = subscribePinCanonicalLayers(vp);
 

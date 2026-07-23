@@ -47,7 +47,7 @@ import DmLocationToolOptions from './DmLocationToolOptions';
 import { ensurePlayerLayer } from './playerLayer';
 import {
   ensureCanonicalLayers,
-  mirrorUnknownLayer,
+  attachUnknownLayerMirror,
   subscribePinCanonicalLayers,
 } from './layerContract';
 import {
@@ -292,13 +292,10 @@ export function PlayerBattleMapCanvas({
     // don't exist here (old clients, other players). Mirror each unknown
     // layer locked into its band — hit-test and marquee skip remote content
     // (the relay rejects player writes to it anyway), and stacking matches
-    // the DM's view.
-    vp.store.on('add', el => {
-      if (el.layerId && !vp.layerManager.getLayer(el.layerId)) {
-        mirrorUnknownLayer(vp, el.layerId, 'player');
-        vp.requestRender();
-      }
-    });
+    // the DM's view. Covers both new elements (add) and relay snapshot
+    // reconcile re-applying remote elements as full updates (including
+    // layerId) on reconnect.
+    attachUnknownLayerMirror(vp, 'player', () => vp.requestRender());
 
     // Selection state for the touch-friendly delete button.
     const selectTool = vp.toolManager.getTool<SelectTool>('select');
