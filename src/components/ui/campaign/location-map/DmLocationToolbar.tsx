@@ -22,8 +22,10 @@ import {
   Maximize,
   Map as MapIcon,
   Move,
+  RotateCcw,
+  RotateCw,
 } from 'lucide-react';
-import { useActiveTool, useHistory } from '@fieldnotes/react';
+import { useActiveTool, useHistory, useSelectionOps } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
 import DmOnlyToggle from './DmOnlyToggle';
 import { useSelectToolSelectionCount } from './useSelectToolSelectionCount';
@@ -89,6 +91,7 @@ export default function DmLocationToolbar({
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
   const selectionCount = useSelectToolSelectionCount();
+  const { selectedCount, rotateCW, rotateCCW } = useSelectionOps();
   const toolDefs =
     mode === 'battlemap'
       ? [...BASE_TOOL_DEFS, ...BATTLEMAP_TOOL_DEFS]
@@ -157,6 +160,24 @@ export default function DmLocationToolbar({
           className="h-8 w-8 p-0"
         >
           <Trash2 size={15} />
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={rotateCCW}
+          disabled={selectedCount === 0}
+          title="Rotate 90° counter-clockwise"
+          className="h-8 w-8 p-0"
+        >
+          <RotateCcw size={15} />
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={rotateCW}
+          disabled={selectedCount === 0}
+          title="Rotate 90° clockwise"
+          className="h-8 w-8 p-0"
+        >
+          <RotateCw size={15} />
         </Button>
         <Button
           variant="ghost"
