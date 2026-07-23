@@ -148,26 +148,20 @@ export default function DmLocationLayersPanel({
 
                 <span className="min-w-0 flex-1 truncate">{layer.name}</span>
 
-                {!isProtectedLayer &&
-                  layers.filter(
-                    l =>
-                      l.id !== MAP_LAYER_ID &&
-                      l.id !== ANNOTATIONS_LAYER_ID &&
-                      !l.id.startsWith(PLAYER_LAYER_PREFIX)
-                  ).length > 1 && (
-                    <button
-                      type="button"
-                      onClick={e => {
-                        e.stopPropagation();
-                        removeLayer(layer.id);
-                        viewport.requestRender();
-                      }}
-                      className="text-muted hover:text-accent-red-text shrink-0"
-                      title="Delete layer"
-                    >
-                      <X size={11} />
-                    </button>
-                  )}
+                {!isProtectedLayer && (
+                  <button
+                    type="button"
+                    onClick={e => {
+                      e.stopPropagation();
+                      removeLayer(layer.id);
+                      viewport.requestRender();
+                    }}
+                    className="text-muted hover:text-accent-red-text shrink-0"
+                    title="Delete layer"
+                  >
+                    <X size={11} />
+                  </button>
+                )}
               </div>
             );
           })}
