@@ -17,16 +17,27 @@ import {
 import {
   enterArrangeMaps,
   exitArrangeMaps,
+  type ArrangeViewport,
 } from '@/components/ui/campaign/location-map/arrangeMaps';
 
 // migrateCanvasToContract (in addition to ensureCanonicalLayers) drops the
 // SDK's empty default "Layer 1", which otherwise stays active and breaks the
 // "previous active layer" assertions below — same fixture pattern as
 // makeCleanVp in layerContract.test.ts.
-function makeVp(): ViewportLike {
+function makeVp(): ArrangeViewport {
   const store = new ElementStore();
   const layerManager = new LayerManager(store);
-  const vp = { store, layerManager };
+  let smartGuides = false;
+  const vp: ArrangeViewport = {
+    store,
+    layerManager,
+    get smartGuides() {
+      return smartGuides;
+    },
+    setSmartGuides(enabled: boolean) {
+      smartGuides = enabled;
+    },
+  };
   ensureCanonicalLayers(vp, 'dm');
   migrateCanvasToContract(vp, 'dm');
   return vp;
@@ -130,5 +141,23 @@ describe('enter/exitArrangeMaps', () => {
     expect(vp.store.getById(note.id)?.layerId).toBe(ANNOTATIONS_LAYER_ID);
     expect(vp.store.getById(imageId)?.layerId).toBe(MAP_LAYER_ID);
     expect(vp.store.getById(grid.id)?.layerId).toBe(MAP_LAYER_ID);
+  });
+
+  it('enables smart guides on enter and restores the previous value on exit', () => {
+    const vp = makeVp();
+    const session = enterArrangeMaps(vp);
+    expect(vp.smartGuides).toBe(true);
+    expect(session.smartGuidesWasEnabled).toBe(false);
+    exitArrangeMaps(vp, session);
+    expect(vp.smartGuides).toBe(false);
+  });
+
+  it('keeps smart guides on after exit when they were already enabled', () => {
+    const vp = makeVp();
+    vp.setSmartGuides(true);
+    const session = enterArrangeMaps(vp);
+    expect(session.smartGuidesWasEnabled).toBe(true);
+    exitArrangeMaps(vp, session);
+    expect(vp.smartGuides).toBe(true);
   });
 });
