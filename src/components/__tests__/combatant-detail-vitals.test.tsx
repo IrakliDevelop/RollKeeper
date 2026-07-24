@@ -86,7 +86,7 @@ describe('DetailVitals', () => {
     await user.clear(amountInput);
     await user.type(amountInput, '10');
     await user.click(screen.getByRole('button', { name: '½×' }));
-    expect(amountInput).toHaveValue(5);
+    expect(amountInput).toHaveValue('5');
     expect(actions.onDamage).not.toHaveBeenCalled();
   });
 
@@ -99,7 +99,7 @@ describe('DetailVitals', () => {
     await user.clear(amountInput);
     await user.type(amountInput, '6');
     await user.click(screen.getByRole('button', { name: '2×' }));
-    expect(amountInput).toHaveValue(12);
+    expect(amountInput).toHaveValue('12');
     expect(actions.onDamage).not.toHaveBeenCalled();
   });
 
