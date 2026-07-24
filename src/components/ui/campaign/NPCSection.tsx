@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/layout/badge';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { Input } from '@/components/ui/forms/input';
 import { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
+import { parseAcBonus } from '@/utils/calculations';
 import { NPCFormDialog } from './NPCFormDialog';
 import { NPCDetailDialog } from './NPCDetailDialog';
 
@@ -546,7 +547,9 @@ function NPCCard({
               <span className="flex items-center gap-0.5">
                 <Shield size={11} className="text-accent-blue-text shrink-0" />
                 {npc.armorClass}
-                {(npc.tempAc ?? 0) > 0 ? ` (+${npc.tempAc})` : ''}
+                {parseAcBonus(npc.tempAc) !== 0
+                  ? ` (+${parseAcBonus(npc.tempAc)})`
+                  : ''}
               </span>
               <span className="flex items-center gap-0.5">
                 <Footprints size={11} className="text-muted shrink-0" />
@@ -710,7 +713,9 @@ function NPCCard({
             <span className="flex items-center gap-1">
               <Shield size={12} className="text-accent-blue-text" />
               AC {npc.armorClass}
-              {(npc.tempAc ?? 0) > 0 ? ` (+${npc.tempAc})` : ''}
+              {parseAcBonus(npc.tempAc) !== 0
+                ? ` (+${parseAcBonus(npc.tempAc)})`
+                : ''}
             </span>
             <span className="flex items-center gap-1">
               <Footprints size={12} className="text-muted" />

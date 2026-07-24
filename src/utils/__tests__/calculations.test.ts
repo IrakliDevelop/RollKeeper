@@ -7,6 +7,7 @@ import {
   calculateInitiativeModifier,
   calculateTotalArmorClass,
   parseArmorClass,
+  parseAcBonus,
   calculateCharacterArmorClass,
   getBuffMaxHPBonus,
   getBuffSpeedBonus,
@@ -320,6 +321,23 @@ describe('parseArmorClass', () => {
 
   it('parses a number embedded after leading words', () => {
     expect(parseArmorClass('AC 13 leather')).toBe(13);
+  });
+});
+
+describe('parseAcBonus', () => {
+  it('extracts the leading number from free text', () => {
+    expect(parseAcBonus('2 (shield spell)')).toBe(2);
+    expect(parseAcBonus('5 (mage armor)')).toBe(5);
+  });
+
+  it('accepts a plain number (legacy data)', () => {
+    expect(parseAcBonus(3)).toBe(3);
+  });
+
+  it('returns 0 for empty, undefined, or no number', () => {
+    expect(parseAcBonus('')).toBe(0);
+    expect(parseAcBonus(undefined)).toBe(0);
+    expect(parseAcBonus('shield')).toBe(0);
   });
 });
 
