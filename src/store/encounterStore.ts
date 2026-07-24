@@ -33,7 +33,9 @@ function syncNPCEntityToStore(
     useNPCStore.getState().updateNPC(entity.campaignCode, entity.npcSourceId, {
       currentHp: entity.currentHp,
       tempHp: entity.tempHp,
-      tempAc: entity.tempAc,
+      // tempAc is intentionally not synced back: the NPC's temp AC is
+      // free text (with source annotation) and must not be overwritten by
+      // the entity's numeric combat value.
       deathSaves: entity.deathSaves
         ? {
             successes: entity.deathSaves.successes,

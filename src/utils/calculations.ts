@@ -157,6 +157,18 @@ export const parseArmorClass = (value: string | number): number => {
 };
 
 /**
+ * Parse a numeric AC bonus out of a free-text temp-AC field, e.g.
+ * "2 (shield spell)" → 2. Accepts a plain number (legacy data); returns 0
+ * for empty/undefined or when no number is present.
+ */
+export const parseAcBonus = (value?: string | number): number => {
+  if (value == null || value === '') return 0;
+  if (typeof value === 'number') return value;
+  const match = String(value).match(/-?\d+/);
+  return match ? parseInt(match[0], 10) : 0;
+};
+
+/**
  * Calculate total armor class from character state, including temporary buff effects.
  * Buff modes:
  *   - 'add'   → additive bonus on top of base AC

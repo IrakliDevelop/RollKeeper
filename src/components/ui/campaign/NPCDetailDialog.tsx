@@ -44,7 +44,7 @@ import { useItemsData } from '@/hooks/useItemsData';
 import { useMagicItemsData } from '@/hooks/useMagicItemsData';
 import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
 import { formatCurrencyFromCopper } from '@/utils/currency';
-import { parseArmorClass } from '@/utils/calculations';
+import { parseArmorClass, parseAcBonus } from '@/utils/calculations';
 import {
   npcInventoryItemToFormData,
   formDataToNpcInventoryPatch,
@@ -211,10 +211,10 @@ function CombatSummaryBar({ npc }: { npc: CampaignNPC }) {
           <span className="text-heading text-sm font-semibold">
             {npc.armorClass}
           </span>
-          {(npc.tempAc ?? 0) > 0 && (
+          {parseAcBonus(npc.tempAc) !== 0 && (
             <span className="text-accent-blue-text text-xs font-medium">
               +{npc.tempAc} ={' '}
-              {parseArmorClass(npc.armorClass) + (npc.tempAc ?? 0)}
+              {parseArmorClass(npc.armorClass) + parseAcBonus(npc.tempAc)}
             </span>
           )}
         </div>

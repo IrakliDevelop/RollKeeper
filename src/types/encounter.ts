@@ -267,7 +267,10 @@ export interface CampaignNPC {
   maxHp: number;
   currentHp?: number; // Persistent HP tracking (defaults to maxHp if undefined)
   tempHp?: number; // Temporary HP
-  tempAc?: number; // Temporary AC bonus (additive on top of parsed armorClass)
+  // Temporary AC bonus, free text so the DM can note the source
+  // (e.g. "2 (shield spell)"). The leading number is parsed via parseAcBonus()
+  // and added on top of the parsed armorClass. Older data may be a number.
+  tempAc?: string;
   speed: string;
 
   // Full stat block (from bestiary import or manual entry)

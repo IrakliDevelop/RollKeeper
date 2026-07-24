@@ -248,7 +248,7 @@ export function NPCFormDialog({
   const [ac, setAc] = useState('10');
   const [hp, setHp] = useState(10);
   const [tempHp, setTempHp] = useState(0);
-  const [tempAc, setTempAc] = useState(0);
+  const [tempAc, setTempAc] = useState('');
   const [xp, setXp] = useState(0);
   const [hpFormula, setHpFormula] = useState('');
   const [speed, setSpeed] = useState('30 ft.');
@@ -363,7 +363,7 @@ export function NPCFormDialog({
       setAc(String(editingNpc.armorClass ?? '10'));
       setHp(editingNpc.maxHp);
       setTempHp(editingNpc.tempHp ?? 0);
-      setTempAc(editingNpc.tempAc ?? 0);
+      setTempAc(editingNpc.tempAc != null ? String(editingNpc.tempAc) : '');
       setXp(editingNpc.xp ?? 0);
       setSpeed(editingNpc.speed);
       setAvatarUrl(editingNpc.avatarUrl ?? '');
@@ -542,7 +542,7 @@ export function NPCFormDialog({
     setAc('10');
     setHp(10);
     setTempHp(0);
-    setTempAc(0);
+    setTempAc('');
     setXp(0);
     setHpFormula('');
     setSpeed('30 ft.');
@@ -630,7 +630,7 @@ export function NPCFormDialog({
     setAc(String(monster.acValue));
     setHp(monster.hpAverage);
     setTempHp(0);
-    setTempAc(0);
+    setTempAc('');
     setXp(0);
     setHpFormula(monster.hpFormula);
     setSpeed(sb.speed);
@@ -835,7 +835,7 @@ export function NPCFormDialog({
       armorClass: ac.trim() || '10',
       maxHp: hp,
       tempHp: tempHp > 0 ? tempHp : undefined,
-      tempAc: tempAc > 0 ? tempAc : undefined,
+      tempAc: tempAc.trim() || undefined,
       speed: speed.trim() || '30 ft.',
       description: description.trim() || undefined,
       xp: xp > 0 ? xp : undefined,
@@ -1210,13 +1210,12 @@ export function NPCFormDialog({
                         placeholder="0"
                         title="Temporary hit points (absorbed before real HP)"
                       />
-                      <NumberInput
+                      <Input
                         value={tempAc}
-                        onChange={v => setTempAc(v ?? 0)}
+                        onChange={e => setTempAc(e.target.value)}
                         label="Temp AC"
-                        min={0}
-                        placeholder="0"
-                        title="Temporary AC bonus added on top of base AC"
+                        placeholder="2 (shield spell)"
+                        title="Temporary AC bonus; leading number is added to AC. Note the source."
                       />
                     </div>
                     <div className="grid grid-cols-3 gap-2">
