@@ -272,6 +272,9 @@ export interface CampaignNPC {
   // Lore (DM-written HTML from rich text editor)
   loreHtml?: string;
 
+  // XP reward for defeating this NPC
+  xp?: number;
+
   // Portrait (S3 URL)
   avatarUrl?: string;
 

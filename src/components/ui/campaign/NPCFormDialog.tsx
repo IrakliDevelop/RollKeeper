@@ -246,6 +246,7 @@ export function NPCFormDialog({
   const [alignment, setAlignment] = useState('');
   const [ac, setAc] = useState(10);
   const [hp, setHp] = useState(10);
+  const [xp, setXp] = useState(0);
   const [hpFormula, setHpFormula] = useState('');
   const [speed, setSpeed] = useState('30 ft.');
 
@@ -354,6 +355,7 @@ export function NPCFormDialog({
       setDescription(editingNpc.description ?? '');
       setAc(editingNpc.armorClass);
       setHp(editingNpc.maxHp);
+      setXp(editingNpc.xp ?? 0);
       setSpeed(editingNpc.speed);
       setAvatarUrl(editingNpc.avatarUrl ?? '');
       setBestiarySourceId(editingNpc.bestiarySourceId ?? null);
@@ -538,6 +540,7 @@ export function NPCFormDialog({
     setDescription('');
     setAc(10);
     setHp(10);
+    setXp(0);
     setHpFormula('');
     setSpeed('30 ft.');
     setSize('Medium');
@@ -623,6 +626,7 @@ export function NPCFormDialog({
     setDescription('');
     setAc(monster.acValue);
     setHp(monster.hpAverage);
+    setXp(0);
     setHpFormula(monster.hpFormula);
     setSpeed(sb.speed);
     setSize(sb.size);
@@ -827,6 +831,7 @@ export function NPCFormDialog({
       maxHp: hp,
       speed: speed.trim() || '30 ft.',
       description: description.trim() || undefined,
+      xp: xp > 0 ? xp : undefined,
       monsterStatBlock,
       bestiarySourceId: bestiarySourceId ?? undefined,
       loreHtml: loreHtml.trim() || undefined,
@@ -1191,7 +1196,7 @@ export function NPCFormDialog({
                         placeholder="2d8+2"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <Input
                         value={speed}
                         onChange={e => setSpeed(e.target.value)}
@@ -1207,6 +1212,15 @@ export function NPCFormDialog({
                         }}
                         label="Init Mod"
                         title="Initiative modifier (auto-calculated from DEX, overridable)"
+                      />
+                      <Input
+                        type="number"
+                        value={xp}
+                        onChange={e => setXp(parseInt(e.target.value) || 0)}
+                        label="XP"
+                        min={0}
+                        placeholder="0"
+                        title="XP awarded for defeating this NPC"
                       />
                     </div>
                   </div>

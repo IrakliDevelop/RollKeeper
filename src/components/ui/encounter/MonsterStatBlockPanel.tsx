@@ -50,7 +50,7 @@ function TraitBlock({
             {entry.name}.
           </span>{' '}
           <span
-            className="text-body"
+            className="text-body statblock-rich-text"
             dangerouslySetInnerHTML={{ __html: entry.text }}
           />
         </div>
