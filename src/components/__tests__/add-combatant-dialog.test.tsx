@@ -41,7 +41,7 @@ const npcs: CampaignNPC[] = [
     id: 'npc1',
     campaignCode: 'CAMP1',
     name: 'Town Guard',
-    armorClass: 13,
+    armorClass: '13',
     maxHp: 20,
     speed: '30 ft.',
     createdAt: '2024-01-01',

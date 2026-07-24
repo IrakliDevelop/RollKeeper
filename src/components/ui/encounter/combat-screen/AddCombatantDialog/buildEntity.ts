@@ -10,6 +10,7 @@ import {
   buildAbilitiesFromStatBlock,
 } from '@/utils/encounterConverter';
 import { buildNpcSpellcasting } from './buildNpcSpellcasting';
+import { parseArmorClass } from '@/utils/calculations';
 
 export const GROUP_COLORS = [
   '#ef4444',
@@ -86,7 +87,7 @@ export function buildNpcEntity(
     currentHp: npc.currentHp ?? npc.maxHp,
     maxHp: npc.maxHp,
     tempHp: npc.tempHp ?? 0,
-    armorClass: npc.armorClass,
+    armorClass: parseArmorClass(npc.armorClass),
     tempAc: npc.tempAc,
     conditions: [],
     isHidden: opts.isHidden,

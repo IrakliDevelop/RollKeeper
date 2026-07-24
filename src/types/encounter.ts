@@ -260,11 +260,14 @@ export interface CampaignNPC {
   description?: string;
 
   // Core combat stats
-  armorClass: number;
+  // Free-text AC so the DM can annotate it (e.g. "16 (natural armor)",
+  // "21 (shield spell)"). The numeric value for combat is parsed from the
+  // leading number via parseArmorClass(). Older data may still be a number.
+  armorClass: string;
   maxHp: number;
   currentHp?: number; // Persistent HP tracking (defaults to maxHp if undefined)
   tempHp?: number; // Temporary HP
-  tempAc?: number; // Temporary AC bonus (additive on top of armorClass)
+  tempAc?: number; // Temporary AC bonus (additive on top of parsed armorClass)
   speed: string;
 
   // Full stat block (from bestiary import or manual entry)

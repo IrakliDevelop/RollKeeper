@@ -146,6 +146,17 @@ export const effectiveAc = (baseAC: number, tempAc?: number): number =>
   baseAC + (tempAc ?? 0);
 
 /**
+ * Parse a numeric armor class out of a free-text NPC AC field, e.g.
+ * "16 (natural armor)" → 16, "21 (shield spell)" → 21. Accepts a plain
+ * number (legacy data) as-is; falls back to 10 when no number is present.
+ */
+export const parseArmorClass = (value: string | number): number => {
+  if (typeof value === 'number') return value;
+  const match = String(value ?? '').match(/-?\d+/);
+  return match ? parseInt(match[0], 10) : 10;
+};
+
+/**
  * Calculate total armor class from character state, including temporary buff effects.
  * Buff modes:
  *   - 'add'   → additive bonus on top of base AC
