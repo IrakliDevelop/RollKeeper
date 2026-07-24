@@ -10,6 +10,7 @@ import type {
   PlayerDisposition,
 } from '@/types/encounter';
 import { useNPCStore } from '@/store/npcStore';
+import { effectiveAc } from '@/utils/calculations';
 import { buildNpcEntity } from './buildEntity';
 import { SharedOptions } from './SharedOptions';
 
@@ -181,7 +182,7 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
               )}
             </div>
             <div className="text-muted shrink-0 text-right text-[12.5px] font-bold tabular-nums">
-              {npc.maxHp} HP · AC {npc.armorClass}
+              {npc.maxHp} HP · AC {effectiveAc(npc.armorClass, npc.tempAc)}
             </div>
           </button>
           <button

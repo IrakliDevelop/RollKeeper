@@ -139,6 +139,13 @@ export const calculateTotalArmorClass = (
 };
 
 /**
+ * Effective armor class for NPCs / encounter entities: base AC plus an
+ * additive temporary AC bonus (mirrors the player temp-AC model).
+ */
+export const effectiveAc = (baseAC: number, tempAc?: number): number =>
+  baseAC + (tempAc ?? 0);
+
+/**
  * Calculate total armor class from character state, including temporary buff effects.
  * Buff modes:
  *   - 'add'   → additive bonus on top of base AC

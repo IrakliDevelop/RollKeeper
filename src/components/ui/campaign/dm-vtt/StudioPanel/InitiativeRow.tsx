@@ -2,6 +2,7 @@
 
 import { Badge } from '@/components/ui/layout/badge';
 import { HPBar } from '@/components/shared/combat/HPBar';
+import { effectiveAc } from '@/utils/calculations';
 
 import { dispositionColor } from '../combatantToken';
 
@@ -77,7 +78,7 @@ export function InitiativeRow({
           />
         </span>
         <span className="text-faint shrink-0 text-[10px] font-semibold">
-          AC {entity.armorClass}
+          AC {effectiveAc(entity.armorClass, entity.tempAc)}
         </span>
       </button>
     </li>

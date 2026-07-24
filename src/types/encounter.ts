@@ -122,6 +122,7 @@ export interface EncounterEntity {
   maxHp: number;
   tempHp: number;
   armorClass: number;
+  tempAc?: number; // Temporary AC bonus (additive on top of armorClass)
 
   // Conditions
   conditions: EncounterCondition[];
@@ -263,6 +264,7 @@ export interface CampaignNPC {
   maxHp: number;
   currentHp?: number; // Persistent HP tracking (defaults to maxHp if undefined)
   tempHp?: number; // Temporary HP
+  tempAc?: number; // Temporary AC bonus (additive on top of armorClass)
   speed: string;
 
   // Full stat block (from bestiary import or manual entry)

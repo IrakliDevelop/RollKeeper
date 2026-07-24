@@ -33,6 +33,7 @@ function syncNPCEntityToStore(
     useNPCStore.getState().updateNPC(entity.campaignCode, entity.npcSourceId, {
       currentHp: entity.currentHp,
       tempHp: entity.tempHp,
+      tempAc: entity.tempAc,
       deathSaves: entity.deathSaves
         ? {
             successes: entity.deathSaves.successes,
