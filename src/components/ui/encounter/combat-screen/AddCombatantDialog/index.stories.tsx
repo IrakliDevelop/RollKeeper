@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn } from 'storybook/test';
+import { fn, screen } from 'storybook/test';
 import { AddCombatantDialog } from './index';
 import type { CampaignNPC } from '@/types/encounter';
 
@@ -93,9 +93,10 @@ export const PlayerTab: Story = {
     ...sharedProps,
     campaignPlayers,
   },
-  play: async ({ canvas }) => {
-    const { getByRole } = canvas;
-    getByRole('button', { name: /player/i }).click();
+  play: async () => {
+    // Dialog content renders in a Radix portal (outside canvasElement),
+    // so query the whole document via `screen`.
+    screen.getByRole('button', { name: /player/i }).click();
   },
 };
 
@@ -105,8 +106,8 @@ export const NpcTab: Story = {
     ...sharedProps,
     campaignPlayers: [],
   },
-  play: async ({ canvas }) => {
-    canvas.getByRole('button', { name: /npc/i }).click();
+  play: async () => {
+    screen.getByRole('button', { name: /npc/i }).click();
   },
 };
 
@@ -125,7 +126,7 @@ export const CustomTab: Story = {
     ...sharedProps,
     campaignPlayers: [],
   },
-  play: async ({ canvas }) => {
-    canvas.getByRole('button', { name: /custom/i }).click();
+  play: async () => {
+    screen.getByRole('button', { name: /custom/i }).click();
   },
 };
