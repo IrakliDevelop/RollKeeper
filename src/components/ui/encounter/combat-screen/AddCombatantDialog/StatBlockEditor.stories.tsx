@@ -83,7 +83,7 @@ export const DexEditUpdatesInitiative: Story = {
     await userEvent.clear(dexInput);
     await userEvent.type(dexInput, '20');
     const initInput = canvas.getByLabelText('Initiative modifier');
-    await expect(initInput).toHaveValue(5);
+    await expect(initInput).toHaveValue('5');
   },
 };
 
@@ -96,7 +96,7 @@ export const ManualInitiativeStopsFollowing: Story = {
     const dexInput = canvas.getByLabelText('dex score');
     await userEvent.clear(dexInput);
     await userEvent.type(dexInput, '20');
-    await expect(initInput).toHaveValue(7);
+    await expect(initInput).toHaveValue('7');
   },
 };
 

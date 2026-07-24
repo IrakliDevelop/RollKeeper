@@ -144,7 +144,7 @@ describe('CombatantDetail — monster with full stat block', () => {
     const actions = makeActions();
     render(<CombatantDetail entity={monsterEntity} actions={actions} />);
 
-    const strInput = screen.getByRole('spinbutton', { name: 'STR' });
+    const strInput = screen.getByRole('textbox', { name: 'STR' });
     fireEvent.change(strInput, { target: { value: '20' } });
 
     expect(actions.onUpdate).toHaveBeenCalledWith(
@@ -282,7 +282,7 @@ describe('CombatantDetail — player entity', () => {
       screen.getByText(/synced from character sheet/i)
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('spinbutton', { name: 'STR' })
+      screen.queryByRole('textbox', { name: 'STR' })
     ).not.toBeInTheDocument();
   });
 });
