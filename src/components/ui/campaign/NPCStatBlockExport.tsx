@@ -4,6 +4,7 @@ import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { toPng } from 'html-to-image';
 import { Camera, Download, Loader2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import { formatUsesLabel } from '@/utils/encounterConverter';
 import type { CampaignNPC, MonsterStatBlock } from '@/types/encounter';
 
 // ── Dark-theme colour palette (hardcoded for image export) ──────────
@@ -150,7 +151,7 @@ function InlineStatBlock({ sb }: { sb: MonsterStatBlock }) {
 
   const traitSection = (
     title: string,
-    entries: Array<{ name: string; text: string }>
+    entries: Array<{ name: string; text: string; uses?: number }>
   ) => {
     if (!entries?.length) return null;
     return (
@@ -169,19 +170,26 @@ function InlineStatBlock({ sb }: { sb: MonsterStatBlock }) {
         >
           {title}
         </div>
-        {entries.map((e, i) => (
-          <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>
-            <span
-              style={{ fontWeight: 600, fontStyle: 'italic', color: C.heading }}
-            >
-              {e.name}.
-            </span>{' '}
-            <span
-              style={{ color: C.body }}
-              dangerouslySetInnerHTML={{ __html: cleanHtmlForExport(e.text) }}
-            />
-          </div>
-        ))}
+        {entries.map((e, i) => {
+          const usesLabel = formatUsesLabel(e.name, e.uses);
+          return (
+            <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>
+              <span
+                style={{
+                  fontWeight: 600,
+                  fontStyle: 'italic',
+                  color: C.heading,
+                }}
+              >
+                {e.name}.{usesLabel ? ` (${usesLabel})` : ''}
+              </span>{' '}
+              <span
+                style={{ color: C.body }}
+                dangerouslySetInnerHTML={{ __html: cleanHtmlForExport(e.text) }}
+              />
+            </div>
+          );
+        })}
       </div>
     );
   };
