@@ -58,6 +58,8 @@ import {
   npcInventoryItemToFormData,
   formDataToNpcInventoryPatch,
 } from '@/utils/npcInventoryItemForm';
+import { NPCSpellListEditor } from './NPCSpellListEditor';
+import type { Spell } from '@/types/character';
 
 interface NamedText {
   name: string;
@@ -322,6 +324,7 @@ export function NPCFormDialog({
   const [spellSlotOverrides, setSpellSlotOverrides] = useState<
     Record<number, number | undefined>
   >({});
+  const [spells, setSpells] = useState<Spell[]>([]);
 
   // ---------- Auto-calc initiative from DEX ----------
 
@@ -389,6 +392,7 @@ export function NPCFormDialog({
           }
         }
         setSpellSlotOverrides(overrides);
+        setSpells(editingNpc.spellcasting.spells ?? []);
       } else {
         setSpellcastingEnabled(false);
         setCasterLevel(1);
@@ -396,6 +400,7 @@ export function NPCFormDialog({
         setSpellAttackOverride(undefined);
         setSpellDCOverride(undefined);
         setSpellSlotOverrides({});
+        setSpells([]);
       }
 
       // Group & tags
@@ -567,6 +572,7 @@ export function NPCFormDialog({
     setSpellAttackOverride(undefined);
     setSpellDCOverride(undefined);
     setSpellSlotOverrides({});
+    setSpells([]);
     resetAbilityScores();
     resetDetailFields();
   }
@@ -876,7 +882,7 @@ export function NPCFormDialog({
                   )
                 : undefined,
             slotsUsed: editingNpc?.spellcasting?.slotsUsed ?? {},
-            spells: editingNpc?.spellcasting?.spells ?? [],
+            spells,
           }
         : undefined,
     };
@@ -1791,6 +1797,15 @@ export function NPCFormDialog({
                               })()}
                             </div>
                           </div>
+                        </div>
+                        <div>
+                          <label className="text-muted mb-1 block text-xs font-medium">
+                            Spell List
+                          </label>
+                          <NPCSpellListEditor
+                            spells={spells}
+                            onChange={setSpells}
+                          />
                         </div>
                       </div>
                     )}
