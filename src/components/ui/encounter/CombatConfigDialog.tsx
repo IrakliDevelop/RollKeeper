@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { Switch } from '@/components/ui/forms/switch';
 import {
   RadioGroupField,
@@ -195,11 +196,14 @@ export function CombatConfigDialog({
               <div className="space-y-2">
                 {bands.map((band, index) => (
                   <div key={index} className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      value={band.minPercent.toString()}
-                      onChange={e =>
-                        handleBandChange(index, 'minPercent', e.target.value)
+                    <NumberInput
+                      value={band.minPercent}
+                      onChange={v =>
+                        setBands(prev =>
+                          prev.map((b, i) =>
+                            i === index ? { ...b, minPercent: v ?? 0 } : b
+                          )
+                        )
                       }
                       min={0}
                       max={100}

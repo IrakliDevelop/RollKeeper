@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Checkbox } from '@/components/ui/forms/checkbox';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
@@ -255,43 +256,39 @@ export function ArmorFormDialog({
                 Armor Stats
               </h4>
               <div className="grid grid-cols-3 gap-4">
-                <Input
+                <NumberInput
                   label="Base AC"
-                  type="number"
-                  value={formData.baseAC.toString()}
-                  onChange={e =>
+                  value={formData.baseAC}
+                  onChange={v =>
                     setFormData({
                       ...formData,
-                      baseAC: parseInt(e.target.value) || 10,
+                      baseAC: v ?? 10,
                     })
                   }
                   min={0}
                   max={30}
                 />
-                <Input
+                <NumberInput
                   label="Max Dex Bonus"
-                  type="number"
-                  value={formData.maxDexBonus?.toString() || ''}
-                  onChange={e =>
+                  allowEmpty
+                  value={formData.maxDexBonus}
+                  onChange={v =>
                     setFormData({
                       ...formData,
-                      maxDexBonus: e.target.value
-                        ? parseInt(e.target.value)
-                        : undefined,
+                      maxDexBonus: v,
                     })
                   }
                   placeholder="Unlimited"
                   min={0}
                   max={10}
                 />
-                <Input
+                <NumberInput
                   label="Enhancement"
-                  type="number"
-                  value={formData.enhancementBonus.toString()}
-                  onChange={e =>
+                  value={formData.enhancementBonus}
+                  onChange={v =>
                     setFormData({
                       ...formData,
-                      enhancementBonus: parseInt(e.target.value) || 0,
+                      enhancementBonus: v ?? 0,
                     })
                   }
                   min={0}

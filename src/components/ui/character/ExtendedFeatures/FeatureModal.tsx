@@ -23,6 +23,7 @@ import {
   DialogTitle,
   DialogBody,
 } from '@/components/ui/feedback/dialog';
+import { NumberField } from '@/components/ui/forms/NumberInput';
 
 interface FeatureModalProps {
   feature: ExtendedFeature;
@@ -422,14 +423,13 @@ export default function FeatureModal({
                               <label className="text-body mb-2 block text-sm font-semibold">
                                 Maximum Uses
                               </label>
-                              <input
-                                type="number"
+                              <NumberField
                                 min="0"
                                 value={editData.maxUses || 0}
-                                onChange={e =>
+                                onChange={v =>
                                   setEditData({
                                     ...editData,
-                                    maxUses: parseInt(e.target.value) || 0,
+                                    maxUses: v ?? 0,
                                   })
                                 }
                                 className="border-divider-strong bg-surface-raised text-heading focus:border-accent-indigo-border-strong focus:ring-accent-indigo-bg w-full rounded-lg border px-3 py-2 text-sm transition-colors focus:ring-2"
@@ -489,16 +489,15 @@ export default function FeatureModal({
                                 <label className="text-body mb-2 block text-sm font-semibold">
                                   Proficiency Multiplier
                                 </label>
-                                <input
-                                  type="number"
+                                <NumberField
                                   min="0.5"
                                   step="0.5"
+                                  integer={false}
                                   value={editData.proficiencyMultiplier || 1}
-                                  onChange={e =>
+                                  onChange={v =>
                                     setEditData({
                                       ...editData,
-                                      proficiencyMultiplier:
-                                        parseFloat(e.target.value) || 1,
+                                      proficiencyMultiplier: v ?? 1,
                                     })
                                   }
                                   className="border-divider-strong bg-surface-raised text-heading focus:border-accent-indigo-border-strong focus:ring-accent-indigo-bg w-32 rounded-lg border px-3 py-2 text-sm transition-colors focus:ring-2"

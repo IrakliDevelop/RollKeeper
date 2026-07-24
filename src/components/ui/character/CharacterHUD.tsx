@@ -23,6 +23,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import { CharacterState } from '@/types/character';
+import { NumberField } from '@/components/ui/forms/NumberInput';
 import {
   calculateCharacterArmorClass,
   calculateModifier,
@@ -534,10 +535,10 @@ function SpeedRow({
         >
           <Minus size={12} />
         </button>
-        <input
-          type="number"
+        <NumberField
           value={value}
-          onChange={e => onChange(Math.max(0, parseInt(e.target.value) || 0))}
+          onChange={v => onChange(Math.max(0, v ?? 0))}
+          min={0}
           className="text-heading bg-surface-secondary w-14 [appearance:textfield] rounded px-1.5 py-0.5 text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         <button

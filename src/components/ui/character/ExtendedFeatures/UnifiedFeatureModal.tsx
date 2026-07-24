@@ -28,6 +28,7 @@ import { useSpellsData } from '@/hooks/useSpellsData';
 import { FeatureAutocomplete } from '@/components/ui/forms/FeatureAutocomplete';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
 import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import {
   Dialog,
@@ -719,15 +720,14 @@ export default function UnifiedFeatureModal({
                         {!formData.isPassive && (
                           <div className="border-divider space-y-3 border-l-2 pl-6">
                             <div className="grid grid-cols-2 gap-4">
-                              <Input
+                              <NumberInput
                                 label="Maximum Uses"
-                                type="number"
                                 min="0"
-                                value={formData.maxUses.toString()}
-                                onChange={e =>
+                                value={formData.maxUses}
+                                onChange={v =>
                                   setFormData({
                                     ...formData,
-                                    maxUses: parseInt(e.target.value) || 0,
+                                    maxUses: v ?? 0,
                                   })
                                 }
                                 helperText="Set to 0 for unlimited uses"
@@ -772,20 +772,16 @@ export default function UnifiedFeatureModal({
 
                               {formData.scaleWithProficiency && (
                                 <div className="pl-6">
-                                  <Input
+                                  <NumberInput
                                     label="Proficiency Multiplier"
-                                    type="number"
                                     min="0.5"
                                     step="0.5"
-                                    value={
-                                      formData.proficiencyMultiplier?.toString() ||
-                                      '1'
-                                    }
-                                    onChange={e =>
+                                    integer={false}
+                                    value={formData.proficiencyMultiplier || 1}
+                                    onChange={v =>
                                       setFormData({
                                         ...formData,
-                                        proficiencyMultiplier:
-                                          parseFloat(e.target.value) || 1,
+                                        proficiencyMultiplier: v ?? 1,
                                       })
                                     }
                                     helperText="Maximum uses = base uses + (proficiency × multiplier)"

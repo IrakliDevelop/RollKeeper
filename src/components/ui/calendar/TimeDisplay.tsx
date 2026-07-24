@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
+import { NumberField } from '@/components/ui/forms/NumberInput';
 import { MoonPhaseIcon } from './MoonPhaseIcon';
 import type {
   CalendarDate,
@@ -97,12 +98,9 @@ export function TimeDisplay({
         <div className="flex items-center gap-3">
           {editing ? (
             <div className="flex items-center gap-1.5">
-              <input
-                type="number"
+              <NumberField
                 value={editHour}
-                onChange={e =>
-                  setEditHour(clamp(parseInt(e.target.value) || 0, maxHour))
-                }
+                onChange={v => setEditHour(clamp(v ?? 0, maxHour))}
                 min={0}
                 max={maxHour}
                 autoFocus
@@ -111,12 +109,9 @@ export function TimeDisplay({
               <span className="text-heading font-mono text-3xl font-bold">
                 :
               </span>
-              <input
-                type="number"
+              <NumberField
                 value={editMinute}
-                onChange={e =>
-                  setEditMinute(clamp(parseInt(e.target.value) || 0, maxMinute))
-                }
+                onChange={v => setEditMinute(clamp(v ?? 0, maxMinute))}
                 min={0}
                 max={maxMinute}
                 className="text-heading border-divider focus:border-divider-strong w-20 rounded-md border bg-transparent px-3 py-2 text-center font-mono text-3xl font-bold focus:outline-none"

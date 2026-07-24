@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { CompactRichTextEditor } from '@/components/ui/forms/CompactRichTextEditor';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { ProcessedItem, ProcessedMagicItem } from '@/types/items';
@@ -213,19 +214,13 @@ export function ItemForm({
                   </SelectField>
                 </div>
 
-                <Input
+                <NumberInput
                   label="Quantity"
-                  type="number"
-                  value={
-                    formData.quantity > 0 ? formData.quantity.toString() : ''
-                  }
-                  onChange={e =>
+                  value={formData.quantity}
+                  onChange={v =>
                     setFormData({
                       ...formData,
-                      quantity:
-                        e.target.value === ''
-                          ? 0
-                          : parseInt(e.target.value) || 0,
+                      quantity: v ?? 0,
                     })
                   }
                   min={1}
@@ -355,33 +350,30 @@ export function ItemForm({
               </h4>
 
               <div className="grid grid-cols-2 gap-4">
-                <Input
+                <NumberInput
                   label="Weight (lbs)"
-                  type="number"
+                  integer={false}
+                  allowEmpty
                   step="0.001"
-                  value={formData.weight?.toString() || ''}
-                  onChange={e =>
+                  value={formData.weight}
+                  onChange={v =>
                     setFormData({
                       ...formData,
-                      weight: e.target.value
-                        ? parseFloat(e.target.value)
-                        : undefined,
+                      weight: v,
                     })
                   }
                   placeholder="Per item"
                   min={0}
                 />
 
-                <Input
+                <NumberInput
                   label="Value (cp)"
-                  type="number"
-                  value={formData.value?.toString() || ''}
-                  onChange={e =>
+                  allowEmpty
+                  value={formData.value}
+                  onChange={v =>
                     setFormData({
                       ...formData,
-                      value: e.target.value
-                        ? parseInt(e.target.value)
-                        : undefined,
+                      value: v,
                     })
                   }
                   placeholder="Per item"

@@ -3,6 +3,7 @@
 import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import { NumberField } from '@/components/ui/forms/NumberInput';
 import {
   parseAttackTokens,
   replaceDamage,
@@ -157,18 +158,12 @@ export function StatBlockEntriesEditor({
                 placeholder="Name"
                 className={`${FIELD_BASE} min-w-0 flex-1 font-semibold`}
               />
-              <input
+              <NumberField
                 aria-label={`${title} entry uses`}
-                type="number"
-                value={entry.uses ?? ''}
-                onChange={e =>
-                  update(i, {
-                    uses:
-                      e.target.value === ''
-                        ? undefined
-                        : parseInt(e.target.value, 10) || undefined,
-                  })
-                }
+                value={entry.uses}
+                onChange={v => update(i, { uses: v })}
+                allowEmpty
+                min={0}
                 placeholder="Uses"
                 className={`${FIELD_BASE} w-20 shrink-0`}
               />

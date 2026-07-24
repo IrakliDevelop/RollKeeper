@@ -12,7 +12,7 @@ import {
   isSpellcaster,
 } from '@/utils/calculations';
 import { Button } from '@/components/ui/forms/button';
-import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { Switch } from '@/components/ui/forms/switch';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Badge } from '@/components/ui/layout/badge';
@@ -67,8 +67,7 @@ export const SpellcastingStats: React.FC = () => {
     });
   };
 
-  const handleAttackBonusOverride = (value: string) => {
-    const bonus = value === '' ? undefined : parseInt(value);
+  const handleAttackBonusOverride = (bonus: number | undefined) => {
     updateCharacter({
       spellcastingStats: {
         ...character.spellcastingStats,
@@ -77,8 +76,7 @@ export const SpellcastingStats: React.FC = () => {
     });
   };
 
-  const handleSaveDCOverride = (value: string) => {
-    const dc = value === '' ? undefined : parseInt(value);
+  const handleSaveDCOverride = (dc: number | undefined) => {
     updateCharacter({
       spellcastingStats: {
         ...character.spellcastingStats,
@@ -183,13 +181,10 @@ export const SpellcastingStats: React.FC = () => {
                 Spell Attack
               </div>
               {showOverrides ? (
-                <Input
-                  type="number"
-                  value={
-                    character.spellcastingStats.spellAttackBonus?.toString() ||
-                    ''
-                  }
-                  onChange={e => handleAttackBonusOverride(e.target.value)}
+                <NumberInput
+                  value={character.spellcastingStats.spellAttackBonus}
+                  onChange={handleAttackBonusOverride}
+                  allowEmpty
                   placeholder="Auto"
                   className="mb-2 w-full text-center text-xl font-bold"
                   size="sm"
@@ -222,12 +217,10 @@ export const SpellcastingStats: React.FC = () => {
                 Spell Save DC
               </div>
               {showOverrides ? (
-                <Input
-                  type="number"
-                  value={
-                    character.spellcastingStats.spellSaveDC?.toString() || ''
-                  }
-                  onChange={e => handleSaveDCOverride(e.target.value)}
+                <NumberInput
+                  value={character.spellcastingStats.spellSaveDC}
+                  onChange={handleSaveDCOverride}
+                  allowEmpty
                   placeholder="Auto"
                   className="mb-2 w-full text-center text-xl font-bold"
                   size="sm"

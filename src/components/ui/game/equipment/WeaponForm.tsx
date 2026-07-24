@@ -11,6 +11,7 @@ import {
 import { Plus, Trash2, Sparkles, Zap, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Checkbox } from '@/components/ui/forms/checkbox';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
@@ -204,42 +205,42 @@ export function WeaponForm({
             </SelectField>
           </div>
 
-          <Input
+          <NumberInput
             label="Enhancement Bonus"
-            type="number"
-            value={formData.enhancementBonus.toString()}
-            onChange={e =>
+            value={formData.enhancementBonus}
+            onChange={v =>
               setFormData({
                 ...formData,
-                enhancementBonus: parseInt(e.target.value) || 0,
+                enhancementBonus: v ?? 0,
               })
             }
             min={0}
             max={3}
           />
-          <Input
+          <NumberInput
             label="Weight (lb)"
-            type="number"
-            value={(formData.weight ?? '').toString()}
-            onChange={e =>
+            value={formData.weight}
+            onChange={v =>
               setFormData({
                 ...formData,
-                weight: e.target.value ? parseFloat(e.target.value) : undefined,
+                weight: v,
               })
             }
+            allowEmpty
+            integer={false}
             min={0}
             step={0.1}
           />
-          <Input
+          <NumberInput
             label="Value (cp)"
-            type="number"
-            value={(formData.value ?? '').toString()}
-            onChange={e =>
+            value={formData.value}
+            onChange={v =>
               setFormData({
                 ...formData,
-                value: e.target.value ? parseInt(e.target.value) : undefined,
+                value: v,
               })
             }
+            allowEmpty
             min={0}
           />
         </div>
@@ -541,14 +542,13 @@ export function WeaponForm({
 
                 {/* Max Charges and Rest Type */}
                 <div className="mb-3 grid grid-cols-2 gap-3">
-                  <Input
+                  <NumberInput
                     label="Max Charges"
-                    type="number"
                     min={1}
-                    value={charge.maxCharges.toString()}
-                    onChange={e =>
+                    value={charge.maxCharges}
+                    onChange={v =>
                       updateCharge(index, {
-                        maxCharges: parseInt(e.target.value) || 1,
+                        maxCharges: v ?? 1,
                       })
                     }
                     helperText="Total charges when fully recharged"
@@ -592,16 +592,15 @@ export function WeaponForm({
 
                   {charge.scaleWithProficiency && (
                     <div className="mt-2 pl-6">
-                      <Input
+                      <NumberInput
                         label="Proficiency Multiplier"
-                        type="number"
+                        integer={false}
                         min={0.5}
                         step={0.5}
-                        value={(charge.proficiencyMultiplier || 1).toString()}
-                        onChange={e =>
+                        value={charge.proficiencyMultiplier || 1}
+                        onChange={v =>
                           updateCharge(index, {
-                            proficiencyMultiplier:
-                              parseFloat(e.target.value) || 1,
+                            proficiencyMultiplier: v ?? 1,
                           })
                         }
                         helperText="Max charges = proficiency bonus × multiplier"
@@ -628,18 +627,17 @@ export function WeaponForm({
 
           <div className="border-accent-amber-border bg-accent-amber-bg rounded-lg border p-4">
             <div className="mb-4 grid grid-cols-3 gap-3">
-              <Input
+              <NumberInput
                 label="Max Charges"
-                type="number"
                 min={0}
-                value={formData.chargePool.maxCharges.toString()}
-                onChange={e =>
+                value={formData.chargePool.maxCharges}
+                onChange={v =>
                   setFormData(prev => ({
                     ...prev,
                     chargePool: prev.chargePool
                       ? {
                           ...prev.chargePool,
-                          maxCharges: parseInt(e.target.value) || 0,
+                          maxCharges: v ?? 0,
                         }
                       : undefined,
                   }))
@@ -768,32 +766,26 @@ export function WeaponForm({
             Spell Bonuses
           </h4>
           <div className="grid grid-cols-2 gap-4">
-            <Input
+            <NumberInput
               label="Bonus to Spell Attack"
-              type="number"
               min={0}
               max={5}
-              value={(formData.bonusSpellAttack ?? '').toString()}
-              onChange={e => {
-                const val = e.target.value
-                  ? parseInt(e.target.value)
-                  : undefined;
-                setFormData(prev => ({ ...prev, bonusSpellAttack: val }));
+              allowEmpty
+              value={formData.bonusSpellAttack}
+              onChange={v => {
+                setFormData(prev => ({ ...prev, bonusSpellAttack: v }));
               }}
               placeholder="+0"
               helperText="Added to spell attack rolls"
             />
-            <Input
+            <NumberInput
               label="Bonus to Spell Save DC"
-              type="number"
               min={0}
               max={5}
-              value={(formData.bonusSpellSaveDc ?? '').toString()}
-              onChange={e => {
-                const val = e.target.value
-                  ? parseInt(e.target.value)
-                  : undefined;
-                setFormData(prev => ({ ...prev, bonusSpellSaveDc: val }));
+              allowEmpty
+              value={formData.bonusSpellSaveDc}
+              onChange={v => {
+                setFormData(prev => ({ ...prev, bonusSpellSaveDc: v }));
               }}
               placeholder="+0"
               helperText="Added to spell save DC"

@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { NumberInput, NumberField } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { CompactRichTextEditor } from '@/components/ui/forms/CompactRichTextEditor';
 import { Badge } from '@/components/ui/layout/badge';
@@ -312,10 +313,14 @@ export function NPCFormDialog({
   const [casterLevel, setCasterLevel] = useState(1);
   const [spellcastingAbility, setSpellcastingAbility] =
     useState<NPCSpellcastingAbility>('intelligence');
-  const [spellAttackOverride, setSpellAttackOverride] = useState<string>('');
-  const [spellDCOverride, setSpellDCOverride] = useState<string>('');
+  const [spellAttackOverride, setSpellAttackOverride] = useState<
+    number | undefined
+  >(undefined);
+  const [spellDCOverride, setSpellDCOverride] = useState<number | undefined>(
+    undefined
+  );
   const [spellSlotOverrides, setSpellSlotOverrides] = useState<
-    Record<number, string>
+    Record<number, number | undefined>
   >({});
 
   // ---------- Auto-calc initiative from DEX ----------
@@ -373,22 +378,14 @@ export function NPCFormDialog({
         setSpellcastingEnabled(true);
         setCasterLevel(editingNpc.spellcasting.casterLevel);
         setSpellcastingAbility(editingNpc.spellcasting.ability);
-        setSpellAttackOverride(
-          editingNpc.spellcasting.spellAttackBonus !== undefined
-            ? String(editingNpc.spellcasting.spellAttackBonus)
-            : ''
-        );
-        setSpellDCOverride(
-          editingNpc.spellcasting.spellSaveDC !== undefined
-            ? String(editingNpc.spellcasting.spellSaveDC)
-            : ''
-        );
-        const overrides: Record<number, string> = {};
+        setSpellAttackOverride(editingNpc.spellcasting.spellAttackBonus);
+        setSpellDCOverride(editingNpc.spellcasting.spellSaveDC);
+        const overrides: Record<number, number | undefined> = {};
         if (editingNpc.spellcasting.slotOverrides) {
           for (const [lvl, count] of Object.entries(
             editingNpc.spellcasting.slotOverrides
           )) {
-            overrides[Number(lvl)] = String(count);
+            overrides[Number(lvl)] = Number(count);
           }
         }
         setSpellSlotOverrides(overrides);
@@ -396,8 +393,8 @@ export function NPCFormDialog({
         setSpellcastingEnabled(false);
         setCasterLevel(1);
         setSpellcastingAbility('intelligence');
-        setSpellAttackOverride('');
-        setSpellDCOverride('');
+        setSpellAttackOverride(undefined);
+        setSpellDCOverride(undefined);
         setSpellSlotOverrides({});
       }
 
@@ -567,8 +564,8 @@ export function NPCFormDialog({
     setSpellcastingEnabled(false);
     setCasterLevel(1);
     setSpellcastingAbility('intelligence');
-    setSpellAttackOverride('');
-    setSpellDCOverride('');
+    setSpellAttackOverride(undefined);
+    setSpellDCOverride(undefined);
     setSpellSlotOverrides({});
     resetAbilityScores();
     resetDetailFields();
@@ -865,18 +862,17 @@ export function NPCFormDialog({
         ? {
             casterLevel,
             ability: spellcastingAbility,
-            spellAttackBonus: spellAttackOverride
-              ? parseInt(spellAttackOverride)
-              : undefined,
-            spellSaveDC: spellDCOverride
-              ? parseInt(spellDCOverride)
-              : undefined,
+            spellAttackBonus: spellAttackOverride,
+            spellSaveDC: spellDCOverride,
             slotOverrides:
               Object.keys(spellSlotOverrides).length > 0
                 ? Object.fromEntries(
                     Object.entries(spellSlotOverrides)
-                      .filter(([, v]) => v !== '')
-                      .map(([k, v]) => [Number(k), parseInt(v)])
+                      .filter(
+                        (entry): entry is [string, number] =>
+                          entry[1] !== undefined
+                      )
+                      .map(([k, v]) => [Number(k), v])
                   )
                 : undefined,
             slotsUsed: editingNpc?.spellcasting?.slotsUsed ?? {},
@@ -1185,17 +1181,15 @@ export function NPCFormDialog({
                       />
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                      <Input
-                        type="number"
+                      <NumberInput
                         value={ac}
-                        onChange={e => setAc(parseInt(e.target.value) || 0)}
+                        onChange={v => setAc(v ?? 0)}
                         label="AC"
                         min={0}
                       />
-                      <Input
-                        type="number"
+                      <NumberInput
                         value={hp}
-                        onChange={e => setHp(parseInt(e.target.value) || 1)}
+                        onChange={v => setHp(v ?? 1)}
                         label="HP"
                         min={1}
                       />
@@ -1207,19 +1201,17 @@ export function NPCFormDialog({
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        type="number"
+                      <NumberInput
                         value={tempHp}
-                        onChange={e => setTempHp(parseInt(e.target.value) || 0)}
+                        onChange={v => setTempHp(v ?? 0)}
                         label="Temp HP"
                         min={0}
                         placeholder="0"
                         title="Temporary hit points (absorbed before real HP)"
                       />
-                      <Input
-                        type="number"
+                      <NumberInput
                         value={tempAc}
-                        onChange={e => setTempAc(parseInt(e.target.value) || 0)}
+                        onChange={v => setTempAc(v ?? 0)}
                         label="Temp AC"
                         min={0}
                         placeholder="0"
@@ -1233,20 +1225,18 @@ export function NPCFormDialog({
                         label="Speed"
                         placeholder="30 ft., fly 60 ft."
                       />
-                      <Input
-                        type="number"
+                      <NumberInput
                         value={initiativeModifier}
-                        onChange={e => {
-                          setInitiativeModifier(parseInt(e.target.value) || 0);
+                        onChange={v => {
+                          setInitiativeModifier(v ?? 0);
                           setInitiativeOverridden(true);
                         }}
                         label="Init Mod"
                         title="Initiative modifier (auto-calculated from DEX, overridable)"
                       />
-                      <Input
-                        type="number"
+                      <NumberInput
                         value={xp}
-                        onChange={e => setXp(parseInt(e.target.value) || 0)}
+                        onChange={v => setXp(v ?? 0)}
                         label="XP"
                         min={0}
                         placeholder="0"
@@ -1279,15 +1269,14 @@ export function NPCFormDialog({
                           <span className="text-muted block text-[10px] font-medium uppercase">
                             {label}
                           </span>
-                          <input
-                            type="number"
+                          <NumberField
                             value={value}
-                            onChange={e =>
+                            onChange={v =>
                               (
                                 setter as React.Dispatch<
                                   React.SetStateAction<number>
                                 >
-                              )(parseInt(e.target.value) || 0)
+                              )(v ?? 0)
                             }
                             min={1}
                             max={30}
@@ -1364,11 +1353,10 @@ export function NPCFormDialog({
                           placeholder="0"
                         />
                       </div>
-                      <Input
-                        type="number"
+                      <NumberInput
                         value={proficiencyBonus}
-                        onChange={e => {
-                          setProficiencyBonus(parseInt(e.target.value) || 2);
+                        onChange={v => {
+                          setProficiencyBonus(v ?? 2);
                           setProficiencyOverridden(true);
                         }}
                         label="Prof Bonus"
@@ -1384,12 +1372,9 @@ export function NPCFormDialog({
                         Hit Dice
                       </label>
                       <div className="grid grid-cols-3 gap-2">
-                        <Input
-                          type="number"
+                        <NumberInput
                           value={hitDiceMax}
-                          onChange={e =>
-                            setHitDiceMax(parseInt(e.target.value) || 0)
-                          }
+                          onChange={v => setHitDiceMax(v ?? 0)}
                           label="Max"
                           min={0}
                           placeholder="8"
@@ -1405,12 +1390,9 @@ export function NPCFormDialog({
                             </SelectItem>
                           ))}
                         </SelectField>
-                        <Input
-                          type="number"
+                        <NumberInput
                           value={hitDieCurrent}
-                          onChange={e =>
-                            setHitDieCurrent(parseInt(e.target.value) || 0)
-                          }
+                          onChange={v => setHitDieCurrent(v ?? 0)}
                           label="Current"
                           min={0}
                           placeholder="8"
@@ -1427,33 +1409,28 @@ export function NPCFormDialog({
                         </span>
                       </label>
                       <div className="grid grid-cols-3 gap-2">
-                        <Input
-                          type="number"
+                        <NumberInput
                           value={passivePerception}
-                          onChange={e => {
-                            setPassivePerception(parseInt(e.target.value) || 0);
+                          onChange={v => {
+                            setPassivePerception(v ?? 0);
                             setPassivesOverridden(true);
                           }}
                           label="Passive Perception"
                           min={1}
                         />
-                        <Input
-                          type="number"
+                        <NumberInput
                           value={passiveInsight}
-                          onChange={e => {
-                            setPassiveInsight(parseInt(e.target.value) || 0);
+                          onChange={v => {
+                            setPassiveInsight(v ?? 0);
                             setPassivesOverridden(true);
                           }}
                           label="Passive Insight"
                           min={1}
                         />
-                        <Input
-                          type="number"
+                        <NumberInput
                           value={passiveInvestigation}
-                          onChange={e => {
-                            setPassiveInvestigation(
-                              parseInt(e.target.value) || 0
-                            );
+                          onChange={v => {
+                            setPassiveInvestigation(v ?? 0);
                             setPassivesOverridden(true);
                           }}
                           label="Passive Investigation"
@@ -1547,15 +1524,14 @@ export function NPCFormDialog({
                                 placeholder="Item name"
                                 className="flex-1"
                               />
-                              <input
-                                type="number"
+                              <NumberField
                                 min={1}
                                 value={item.quantity}
-                                onChange={e => {
+                                onChange={v => {
                                   const updated = [...inventoryItems];
                                   updated[index] = {
                                     ...item,
-                                    quantity: parseInt(e.target.value) || 1,
+                                    quantity: v ?? 1,
                                   };
                                   setInventoryItems(updated);
                                 }}
@@ -1678,19 +1654,11 @@ export function NPCFormDialog({
                             <label className="text-muted mb-1 block text-xs font-medium">
                               Caster Level
                             </label>
-                            <Input
-                              type="number"
+                            <NumberInput
                               min={1}
                               max={20}
                               value={casterLevel}
-                              onChange={e =>
-                                setCasterLevel(
-                                  Math.max(
-                                    1,
-                                    Math.min(20, parseInt(e.target.value) || 1)
-                                  )
-                                )
-                              }
+                              onChange={v => setCasterLevel(v ?? 1)}
                             />
                           </div>
                           <div>
@@ -1748,24 +1716,22 @@ export function NPCFormDialog({
                             <label className="text-muted mb-1 block text-xs font-medium">
                               Spell Attack Override
                             </label>
-                            <Input
-                              type="number"
+                            <NumberInput
                               placeholder="Auto"
                               value={spellAttackOverride}
-                              onChange={e =>
-                                setSpellAttackOverride(e.target.value)
-                              }
+                              onChange={v => setSpellAttackOverride(v)}
+                              allowEmpty
                             />
                           </div>
                           <div>
                             <label className="text-muted mb-1 block text-xs font-medium">
                               Save DC Override
                             </label>
-                            <Input
-                              type="number"
+                            <NumberInput
                               placeholder="Auto"
                               value={spellDCOverride}
-                              onChange={e => setSpellDCOverride(e.target.value)}
+                              onChange={v => setSpellDCOverride(v)}
+                              allowEmpty
                             />
                           </div>
                         </div>
@@ -1787,7 +1753,7 @@ export function NPCFormDialog({
                                 const activeLevels = levels.filter(
                                   lvl =>
                                     (baseSlots[lvl] ?? 0) > 0 ||
-                                    spellSlotOverrides[lvl]
+                                    spellSlotOverrides[lvl] !== undefined
                                 );
                                 if (activeLevels.length === 0) {
                                   return (
@@ -1804,17 +1770,17 @@ export function NPCFormDialog({
                                     <span className="text-body w-20 text-xs font-medium">
                                       Level {lvl}: {baseSlots[lvl] ?? 0}
                                     </span>
-                                    <Input
-                                      type="number"
+                                    <NumberInput
                                       min={0}
                                       placeholder={String(baseSlots[lvl] ?? 0)}
-                                      value={spellSlotOverrides[lvl] ?? ''}
-                                      onChange={e => {
+                                      value={spellSlotOverrides[lvl]}
+                                      onChange={v => {
                                         setSpellSlotOverrides(prev => ({
                                           ...prev,
-                                          [lvl]: e.target.value,
+                                          [lvl]: v,
                                         }));
                                       }}
+                                      allowEmpty
                                       className="h-7 w-20 text-xs"
                                     />
                                     <span className="text-muted text-xs">
@@ -1894,10 +1860,9 @@ function AbilityListEditor({
     onChange(updated);
   };
 
-  const handleUsesChange = (index: number, value: string) => {
-    const num = value === '' ? undefined : parseInt(value, 10);
+  const handleUsesChange = (index: number, value: number | undefined) => {
     const updated = items.map((item, i) =>
-      i === index ? { ...item, uses: num } : item
+      i === index ? { ...item, uses: value } : item
     );
     onChange(updated);
   };
@@ -1967,11 +1932,11 @@ function AbilityListEditor({
                   placeholder={`${label.slice(0, -1)} name`}
                   className="flex-1"
                 />
-                <Input
-                  type="number"
+                <NumberInput
                   min={0}
-                  value={item.uses ?? ''}
-                  onChange={e => handleUsesChange(index, e.target.value)}
+                  value={item.uses}
+                  onChange={v => handleUsesChange(index, v)}
+                  allowEmpty
                   placeholder="Uses"
                   className="w-18"
                   title="Uses per day (leave empty for unlimited)"

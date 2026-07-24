@@ -1,7 +1,7 @@
 'use client';
 
 import { Heart } from 'lucide-react';
-import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { calculateModifier } from '@/utils/calculations';
 
 interface HPStepProps {
@@ -39,15 +39,12 @@ export default function HPStep({
         </div>
 
         <div className="mt-3 flex items-center justify-center gap-3">
-          <Input
-            type="number"
+          <NumberInput
             min={1}
             max={hitDie}
-            value={hpRollResult ?? ''}
-            onChange={e => {
-              const val = e.target.value;
-              onRollResultChange(val ? parseInt(val, 10) : undefined);
-            }}
+            allowEmpty
+            value={hpRollResult}
+            onChange={v => onRollResultChange(v)}
             placeholder={`1-${hitDie}`}
             className="w-24 text-center"
           />

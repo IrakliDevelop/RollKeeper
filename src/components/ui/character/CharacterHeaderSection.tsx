@@ -5,6 +5,7 @@ import { useCharacterStore } from '@/store/characterStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { SaveIndicator } from '@/components/ui/feedback/SaveIndicator';
 import { Button } from '@/components/ui/forms';
+import { NumberField } from '@/components/ui/forms/NumberInput';
 import { Save, Download, Upload, RotateCcw } from 'lucide-react';
 
 export default function CharacterHeaderSection() {
@@ -81,14 +82,11 @@ export default function CharacterHeaderSection() {
                 <label className="mb-2 block text-sm font-medium text-slate-300">
                   Level
                 </label>
-                <input
-                  type="number"
+                <NumberField
                   min="1"
                   max="20"
                   value={character.level}
-                  onChange={e =>
-                    updateCharacter({ level: parseInt(e.target.value) || 1 })
-                  }
+                  onChange={v => updateCharacter({ level: v ?? 1 })}
                   className="w-full rounded-lg border border-slate-600 bg-slate-700 px-3 py-2 text-white placeholder-slate-400 focus:border-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
@@ -149,11 +147,7 @@ export default function CharacterHeaderSection() {
                 Export
               </Button>
 
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-              >
+              <Button asChild variant="outline" size="sm">
                 <label className="cursor-pointer">
                   <span className="flex items-center gap-2">
                     <Upload className="h-4 w-4" />
