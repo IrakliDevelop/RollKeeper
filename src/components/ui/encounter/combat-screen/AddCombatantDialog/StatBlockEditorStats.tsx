@@ -7,6 +7,7 @@ import {
   updateDraftStatBlock,
 } from './monsterEditDraft';
 import { abilityModifier } from '@/utils/encounterConverter';
+import { NumberField } from '@/components/ui/forms/NumberInput';
 import type { MonsterEditDraft } from './monsterEditDraft';
 import type { MonsterStatBlock } from '@/types/encounter';
 
@@ -73,14 +74,12 @@ export function StatBlockEditorStats({
             <label htmlFor={`ab-${ab}`} className={LABEL_CLASSES}>
               {ab}
             </label>
-            <input
+            <NumberField
               id={`ab-${ab}`}
               aria-label={`${ab} score`}
-              type="number"
               value={draft.statBlock[ab]}
-              onChange={e =>
-                patchBlock({ [ab]: parseInt(e.target.value, 10) || 0 })
-              }
+              onChange={v => patchBlock({ [ab]: v ?? 0 })}
+              min={0}
               className={`${FIELD_CLASSES} text-center font-bold`}
             />
             <span className="text-faint text-[11px] font-semibold">
@@ -97,16 +96,11 @@ export function StatBlockEditorStats({
           <label htmlFor="edit-init" className={LABEL_CLASSES}>
             Initiative
           </label>
-          <input
+          <NumberField
             id="edit-init"
             aria-label="Initiative modifier"
-            type="number"
             value={draft.initiativeModifier}
-            onChange={e =>
-              onDraftChange(
-                setDraftInitiative(draft, parseInt(e.target.value, 10) || 0)
-              )
-            }
+            onChange={v => onDraftChange(setDraftInitiative(draft, v ?? 0))}
             className={FIELD_CLASSES}
           />
         </div>
@@ -114,16 +108,11 @@ export function StatBlockEditorStats({
           <label htmlFor="edit-pb" className={LABEL_CLASSES}>
             Prof. Bonus
           </label>
-          <input
+          <NumberField
             id="edit-pb"
             aria-label="Proficiency bonus"
-            type="number"
             value={draft.proficiencyBonus}
-            onChange={e =>
-              onDraftChange(
-                setDraftProficiency(draft, parseInt(e.target.value, 10) || 0)
-              )
-            }
+            onChange={v => onDraftChange(setDraftProficiency(draft, v ?? 0))}
             className={FIELD_CLASSES}
           />
         </div>
@@ -131,16 +120,11 @@ export function StatBlockEditorStats({
           <label htmlFor="edit-pp" className={LABEL_CLASSES}>
             Passive Perc.
           </label>
-          <input
+          <NumberField
             id="edit-pp"
             aria-label="Passive perception"
-            type="number"
             value={draft.statBlock.passivePerception}
-            onChange={e =>
-              patchBlock({
-                passivePerception: parseInt(e.target.value, 10) || 0,
-              })
-            }
+            onChange={v => patchBlock({ passivePerception: v ?? 0 })}
             className={FIELD_CLASSES}
           />
         </div>

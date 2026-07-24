@@ -10,7 +10,7 @@ import {
 import { Checkbox } from '@/components/ui/forms/checkbox';
 import { Card, CardContent } from '@/components/ui/layout/card';
 import { Button } from '@/components/ui/forms/button';
-import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { Filter, Skull, X } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 
@@ -52,9 +52,11 @@ export default function BestiaryFiltersPanel({
     onFilterChange({ alignments: newAlignments });
   };
 
-  const handleCRRangeChange = (type: 'min' | 'max', value: string) => {
-    const numValue = value === '' ? undefined : parseFloat(value);
-    onFilterChange({ crRange: { ...filters.crRange, [type]: numValue } });
+  const handleCRRangeChange = (
+    type: 'min' | 'max',
+    value: number | undefined
+  ) => {
+    onFilterChange({ crRange: { ...filters.crRange, [type]: value } });
   };
 
   const crOptions = [
@@ -142,18 +144,20 @@ export default function BestiaryFiltersPanel({
               })}
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="number"
+              <NumberInput
                 label="Min CR"
-                value={filters.crRange.min?.toString() ?? ''}
-                onChange={e => handleCRRangeChange('min', e.target.value)}
+                allowEmpty
+                integer={false}
+                value={filters.crRange.min}
+                onChange={v => handleCRRangeChange('min', v)}
                 placeholder="0"
               />
-              <Input
-                type="number"
+              <NumberInput
                 label="Max CR"
-                value={filters.crRange.max?.toString() ?? ''}
-                onChange={e => handleCRRangeChange('max', e.target.value)}
+                allowEmpty
+                integer={false}
+                value={filters.crRange.max}
+                onChange={v => handleCRRangeChange('max', v)}
                 placeholder="30"
               />
             </div>

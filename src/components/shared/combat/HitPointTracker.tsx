@@ -18,6 +18,7 @@ import {
 import { HitPoints, ClassInfo } from '@/types/character';
 import { isDying, isDead, isStabilized } from '@/utils/hpCalculations';
 import { Button } from '@/components/ui/forms';
+import { NumberField } from '@/components/ui/forms/NumberInput';
 
 interface HitPointTrackerProps {
   hitPoints: HitPoints;
@@ -63,9 +64,15 @@ export function HitPointTracker({
   hideLabels = false,
   className = '',
 }: HitPointTrackerProps) {
-  const [damageAmount, setDamageAmount] = useState('');
-  const [healingAmount, setHealingAmount] = useState('');
-  const [tempHPAmount, setTempHPAmount] = useState('');
+  const [damageAmount, setDamageAmount] = useState<number | undefined>(
+    undefined
+  );
+  const [healingAmount, setHealingAmount] = useState<number | undefined>(
+    undefined
+  );
+  const [tempHPAmount, setTempHPAmount] = useState<number | undefined>(
+    undefined
+  );
 
   const isCharacterDying = isDying(hitPoints);
   const isCharacterDead = isDead(hitPoints);
@@ -73,26 +80,23 @@ export function HitPointTracker({
   const isUnconscious = hitPoints.current === 0;
 
   const handleDamage = () => {
-    const damage = parseInt(damageAmount);
-    if (!isNaN(damage) && damage > 0 && onApplyDamage) {
-      onApplyDamage(damage);
-      setDamageAmount('');
+    if (damageAmount != null && damageAmount > 0 && onApplyDamage) {
+      onApplyDamage(damageAmount);
+      setDamageAmount(undefined);
     }
   };
 
   const handleHealing = () => {
-    const healing = parseInt(healingAmount);
-    if (!isNaN(healing) && healing > 0 && onApplyHealing) {
-      onApplyHealing(healing);
-      setHealingAmount('');
+    if (healingAmount != null && healingAmount > 0 && onApplyHealing) {
+      onApplyHealing(healingAmount);
+      setHealingAmount(undefined);
     }
   };
 
   const handleTempHP = () => {
-    const tempHP = parseInt(tempHPAmount);
-    if (!isNaN(tempHP) && tempHP > 0 && onAddTemporaryHP) {
-      onAddTemporaryHP(tempHP);
-      setTempHPAmount('');
+    if (tempHPAmount != null && tempHPAmount > 0 && onAddTemporaryHP) {
+      onAddTemporaryHP(tempHPAmount);
+      setTempHPAmount(undefined);
     }
   };
 
@@ -246,16 +250,11 @@ export function HitPointTracker({
                 {hitPoints.current}
               </div>
             ) : (
-              <input
-                type="number"
+              <NumberField
                 value={hitPoints.current}
-                onChange={e =>
-                  onUpdateHitPoints?.({
-                    current: parseInt(e.target.value) || 0,
-                  })
-                }
+                onChange={v => onUpdateHitPoints?.({ current: v ?? 0 })}
                 className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} w-full rounded-lg border-none bg-transparent text-center font-bold outline-none ${getCurrentHPTextColor()} leading-tight`}
-                min="0"
+                min={0}
                 max={hitPoints.max}
                 style={{ maxWidth: '100%' }}
               />
@@ -291,15 +290,12 @@ export function HitPointTracker({
                 {hitPoints.max}
               </div>
             ) : (
-              <input
-                type="number"
+              <NumberField
                 value={hitPoints.max}
-                onChange={e =>
-                  onUpdateHitPoints?.({ max: parseInt(e.target.value) || 0 })
-                }
+                onChange={v => onUpdateHitPoints?.({ max: v ?? 0 })}
                 className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-red-text w-full rounded-lg border-none bg-transparent text-center leading-tight font-bold outline-none`}
                 disabled={hitPoints.calculationMode === 'auto'}
-                min="1"
+                min={1}
                 style={{ maxWidth: '100%' }}
               />
             )}
@@ -327,16 +323,11 @@ export function HitPointTracker({
                 {hitPoints.temporary}
               </div>
             ) : (
-              <input
-                type="number"
+              <NumberField
                 value={hitPoints.temporary}
-                onChange={e =>
-                  onUpdateHitPoints?.({
-                    temporary: parseInt(e.target.value) || 0,
-                  })
-                }
+                onChange={v => onUpdateHitPoints?.({ temporary: v ?? 0 })}
                 className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-blue-text w-full rounded-lg border-none bg-transparent text-center leading-tight font-bold outline-none`}
-                min="0"
+                min={0}
                 style={{ maxWidth: '100%' }}
               />
             )}
@@ -353,19 +344,18 @@ export function HitPointTracker({
               Apply Damage
             </label>
             <div className="flex gap-2">
-              <input
-                type="number"
+              <NumberField
                 value={damageAmount}
-                onChange={e => setDamageAmount(e.target.value)}
+                onChange={setDamageAmount}
+                allowEmpty
                 placeholder="Amount"
                 className="border-accent-red-border bg-surface-raised text-heading focus:border-accent-red-border-strong focus:ring-accent-red-bg-strong min-w-0 flex-1 rounded-md border px-3 py-2 text-center text-lg font-semibold focus:ring-2"
-                min="1"
+                min={1}
               />
               <button
                 onClick={() => {
-                  const val = parseInt(damageAmount);
-                  if (!isNaN(val) && val > 0)
-                    setDamageAmount(String(Math.floor(val / 2)));
+                  if (damageAmount != null && damageAmount > 0)
+                    setDamageAmount(Math.floor(damageAmount / 2));
                 }}
                 className="bg-surface-secondary text-muted hover:text-heading min-h-[44px] min-w-[44px] rounded-md px-3 py-2 text-sm font-bold shadow-sm transition-colors"
                 title="Half (resistance)"
@@ -374,8 +364,8 @@ export function HitPointTracker({
               </button>
               <button
                 onClick={() => {
-                  const val = parseInt(damageAmount);
-                  if (!isNaN(val) && val > 0) setDamageAmount(String(val * 2));
+                  if (damageAmount != null && damageAmount > 0)
+                    setDamageAmount(damageAmount * 2);
                 }}
                 className="bg-surface-secondary text-muted hover:text-heading min-h-[44px] min-w-[44px] rounded-md px-3 py-2 text-sm font-bold shadow-sm transition-colors"
                 title="Double (vulnerability)"
@@ -384,7 +374,7 @@ export function HitPointTracker({
               </button>
               <button
                 onClick={handleDamage}
-                disabled={!damageAmount || parseInt(damageAmount) <= 0}
+                disabled={damageAmount == null || damageAmount <= 0}
                 className="disabled:bg-surface-hover disabled:text-muted flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed"
               >
                 <Minus size={16} />
@@ -399,17 +389,17 @@ export function HitPointTracker({
               Apply Healing
             </label>
             <div className="flex gap-2">
-              <input
-                type="number"
+              <NumberField
                 value={healingAmount}
-                onChange={e => setHealingAmount(e.target.value)}
+                onChange={setHealingAmount}
+                allowEmpty
                 placeholder="Amount"
                 className="border-accent-green-border bg-surface-raised text-heading focus:border-accent-green-border-strong focus:ring-accent-green-bg-strong min-w-0 flex-1 rounded-md border px-3 py-2 text-center text-lg font-semibold focus:ring-2"
-                min="1"
+                min={1}
               />
               <button
                 onClick={handleHealing}
-                disabled={!healingAmount || parseInt(healingAmount) <= 0}
+                disabled={healingAmount == null || healingAmount <= 0}
                 className="disabled:bg-surface-hover disabled:text-muted flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed"
               >
                 <Plus size={16} />
@@ -424,17 +414,17 @@ export function HitPointTracker({
               Add Temporary HP
             </label>
             <div className="flex gap-2">
-              <input
-                type="number"
+              <NumberField
                 value={tempHPAmount}
-                onChange={e => setTempHPAmount(e.target.value)}
+                onChange={setTempHPAmount}
+                allowEmpty
                 placeholder="Amount"
                 className="border-accent-blue-border bg-surface-raised text-heading focus:border-accent-blue-border-strong focus:ring-accent-blue-bg-strong min-w-0 flex-1 rounded-md border px-3 py-2 text-center text-lg font-semibold focus:ring-2"
-                min="1"
+                min={1}
               />
               <button
                 onClick={handleTempHP}
-                disabled={!tempHPAmount || parseInt(tempHPAmount) <= 0}
+                disabled={tempHPAmount == null || tempHPAmount <= 0}
                 className="disabled:bg-surface-hover disabled:text-muted flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed"
               >
                 <Shield size={16} />

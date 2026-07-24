@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { NumberField } from '@/components/ui/forms/NumberInput';
 import type { DetailSectionProps } from './DetailHeader';
 
 const ABILITY_LABELS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const;
@@ -18,9 +19,8 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
 
   const isPlayer = entity.type === 'player';
 
-  const handleChange = (key: AbilityKey, raw: string) => {
-    const val = parseInt(raw, 10);
-    if (!isNaN(val) && sb) {
+  const handleChange = (key: AbilityKey, val: number | undefined) => {
+    if (val !== undefined && sb) {
       actions.onUpdate(entity.id, {
         monsterStatBlock: { ...sb, [key]: val },
       });
@@ -48,10 +48,9 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
                   {score}
                 </span>
               ) : (
-                <input
-                  type="number"
+                <NumberField
                   value={score}
-                  onChange={e => handleChange(key, e.target.value)}
+                  onChange={v => handleChange(key, v)}
                   aria-label={ABILITY_LABELS[i]}
                   className="bg-surface-raised text-heading w-full rounded px-0.5 py-0.5 text-center text-sm font-bold tabular-nums"
                 />

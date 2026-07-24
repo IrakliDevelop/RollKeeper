@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { NumberField } from '@/components/ui/forms/NumberInput';
 import { MonsterStatBlock } from '@/types/encounter';
 import { formatUsesLabel } from '@/utils/encounterConverter';
 
@@ -90,13 +91,12 @@ export function MonsterStatBlockPanel({
               {ability}
             </span>
             {onUpdate ? (
-              <input
-                type="number"
+              <NumberField
                 value={statBlock[ability]}
-                onChange={e => {
-                  const val = parseInt(e.target.value);
-                  if (!isNaN(val)) onUpdate({ [ability]: val });
+                onChange={v => {
+                  if (v !== undefined) onUpdate({ [ability]: v });
                 }}
+                allowEmpty
                 className="bg-surface-secondary text-heading mx-auto w-full rounded px-0.5 py-0.5 text-center text-sm font-medium"
               />
             ) : (

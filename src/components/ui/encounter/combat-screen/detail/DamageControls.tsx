@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
+import { NumberField } from '@/components/ui/forms/NumberInput';
 
 interface DamageControlsProps {
   entityId: string;
@@ -16,38 +17,37 @@ export function DamageControls({
   onHeal,
   onAddTempHp,
 }: DamageControlsProps) {
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState<number | undefined>(undefined);
 
-  const parsed = parseInt(amount, 10);
-  const valid = !isNaN(parsed) && parsed > 0;
+  const valid = amount != null && amount > 0;
 
   const handleDamage = () => {
-    if (valid) {
-      onDamage(entityId, parsed);
-      setAmount('');
+    if (amount != null && amount > 0) {
+      onDamage(entityId, amount);
+      setAmount(undefined);
     }
   };
 
   const handleHeal = () => {
-    if (valid) {
-      onHeal(entityId, parsed);
-      setAmount('');
+    if (amount != null && amount > 0) {
+      onHeal(entityId, amount);
+      setAmount(undefined);
     }
   };
 
   const handleTemp = () => {
-    if (valid) {
-      onAddTempHp(entityId, parsed);
-      setAmount('');
+    if (amount != null && amount > 0) {
+      onAddTempHp(entityId, amount);
+      setAmount(undefined);
     }
   };
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <input
-        type="number"
+      <NumberField
         value={amount}
-        onChange={e => setAmount(e.target.value)}
+        onChange={setAmount}
+        allowEmpty
         onKeyDown={e => {
           if (e.key === 'Enter') handleDamage();
         }}
@@ -59,8 +59,7 @@ export function DamageControls({
       <div className="flex gap-1">
         <button
           onClick={() => {
-            const val = parseInt(amount, 10);
-            if (!isNaN(val) && val > 0) setAmount(String(Math.floor(val / 2)));
+            if (amount != null && amount > 0) setAmount(Math.floor(amount / 2));
           }}
           className="bg-surface-raised text-muted hover:text-heading rounded-md px-2.5 py-1.5 text-xs font-bold shadow-sm transition-colors"
           title="Half damage (resistance)"
@@ -69,8 +68,7 @@ export function DamageControls({
         </button>
         <button
           onClick={() => {
-            const val = parseInt(amount, 10);
-            if (!isNaN(val) && val > 0) setAmount(String(val * 2));
+            if (amount != null && amount > 0) setAmount(amount * 2);
           }}
           className="bg-surface-raised text-muted hover:text-heading rounded-md px-2.5 py-1.5 text-xs font-bold shadow-sm transition-colors"
           title="Double damage (vulnerability)"

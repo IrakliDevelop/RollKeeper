@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Shield, Plus, X } from 'lucide-react';
 import { HPBar } from '@/components/shared/combat/HPBar';
 import { effectiveAc } from '@/utils/calculations';
+import { NumberField } from '@/components/ui/forms/NumberInput';
 import { rollHitDie } from '../spendHitDie';
 import type { DetailSectionProps } from './DetailHeader';
 import { DamageControls } from './DamageControls';
@@ -117,29 +118,26 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
             </div>
           ) : (
             <div className="flex items-center gap-1">
-              <input
-                type="number"
+              <NumberField
                 value={entity.armorClass}
-                onChange={e =>
-                  actions.onUpdate(entity.id, {
-                    armorClass: parseInt(e.target.value, 10) || 0,
-                  })
+                onChange={v =>
+                  actions.onUpdate(entity.id, { armorClass: v ?? 0 })
                 }
+                min={0}
                 className="bg-surface-raised text-heading w-12 rounded px-1 py-0.5 text-center text-sm font-bold shadow-sm"
                 aria-label="Armor class"
                 title="Base armor class"
               />
               <span className="text-faint text-xs">+</span>
-              <input
-                type="number"
-                min={0}
-                value={entity.tempAc ?? 0}
-                onChange={e => {
-                  const n = parseInt(e.target.value, 10) || 0;
+              <NumberField
+                value={entity.tempAc}
+                onChange={v =>
                   actions.onUpdate(entity.id, {
-                    tempAc: n > 0 ? n : undefined,
-                  });
-                }}
+                    tempAc: v && v > 0 ? v : undefined,
+                  })
+                }
+                min={0}
+                allowEmpty
                 className="bg-surface-raised text-accent-blue-text w-10 rounded px-1 py-0.5 text-center text-sm font-medium shadow-sm"
                 aria-label="Temporary AC bonus"
                 title="Temporary AC bonus"

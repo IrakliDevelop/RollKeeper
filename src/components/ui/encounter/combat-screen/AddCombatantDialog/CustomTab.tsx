@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import type { PlayerDisposition } from '@/types/encounter';
 import { SharedOptions } from './SharedOptions';
 
@@ -90,23 +90,25 @@ export function CustomTab({
 
       {/* HP / AC / Init Mod grid */}
       <div className="grid grid-cols-3 gap-3">
-        <Input
-          value={hp}
-          onChange={e => onHpChange(e.target.value)}
+        <NumberInput
+          value={hp === '' ? undefined : Number(hp)}
+          onChange={v => onHpChange(v === undefined ? '' : String(v))}
+          allowEmpty
           label="HP"
-          type="number"
+          min={0}
         />
-        <Input
-          value={ac}
-          onChange={e => onAcChange(e.target.value)}
+        <NumberInput
+          value={ac === '' ? undefined : Number(ac)}
+          onChange={v => onAcChange(v === undefined ? '' : String(v))}
+          allowEmpty
           label="AC"
-          type="number"
+          min={0}
         />
-        <Input
-          value={initMod}
-          onChange={e => onInitModChange(e.target.value)}
+        <NumberInput
+          value={initMod === '' ? undefined : Number(initMod)}
+          onChange={v => onInitModChange(v === undefined ? '' : String(v))}
+          allowEmpty
           label="Init Mod"
-          type="number"
         />
       </div>
 

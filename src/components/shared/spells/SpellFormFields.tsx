@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Checkbox } from '@/components/ui/forms/checkbox';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
@@ -330,13 +331,10 @@ export function SpellFormFields({
           </p>
         </div>
         {formData.freeCastMode === 'innate' && (
-          <Input
+          <NumberInput
             label="Free Casts per Long Rest"
-            type="number"
-            value={formData.freeCastMax.toString()}
-            onChange={e =>
-              set({ freeCastMax: Math.max(1, parseInt(e.target.value) || 1) })
-            }
+            value={formData.freeCastMax}
+            onChange={v => set({ freeCastMax: Math.max(1, v ?? 1) })}
             min={1}
             max={10}
             helperText="How many times this spell can be cast without a slot before needing a long rest"
@@ -496,31 +494,31 @@ export function SpellFormFields({
             </SelectField>
           </div>
           {formData.aoe && (
-            <Input
+            <NumberInput
               label={AOE_SIZE_LABEL[formData.aoe.shape]}
-              type="number"
               min={0}
-              value={formData.aoe.sizeFeet || ''}
-              onChange={e =>
+              integer={false}
+              value={formData.aoe.sizeFeet}
+              onChange={v =>
                 setAoe({
                   ...formData.aoe!,
-                  sizeFeet: Number(e.target.value) || 0,
+                  sizeFeet: v ?? 0,
                 })
               }
             />
           )}
           {formData.aoe?.shape === 'line' && (
-            <Input
+            <NumberInput
               label="Width (ft)"
-              type="number"
               min={0}
+              integer={false}
+              allowEmpty
               placeholder="5"
-              value={formData.aoe.widthFeet ?? ''}
-              onChange={e =>
+              value={formData.aoe.widthFeet}
+              onChange={v =>
                 setAoe({
                   ...formData.aoe!,
-                  widthFeet:
-                    e.target.value === '' ? undefined : Number(e.target.value),
+                  widthFeet: v,
                 })
               }
             />

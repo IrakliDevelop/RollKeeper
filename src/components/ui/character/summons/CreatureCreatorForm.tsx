@@ -5,6 +5,7 @@ import { Plus, Trash2, ArrowLeft } from 'lucide-react';
 import type { SavedCreature } from '@/types/summon';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { NumberInput, NumberField } from '@/components/ui/forms/NumberInput';
 import { CompactRichTextEditor } from '@/components/ui/forms/CompactRichTextEditor';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 
@@ -206,17 +207,15 @@ export function CreatureCreatorForm({
         </div>
 
         <div className="grid grid-cols-3 gap-2">
-          <Input
-            type="number"
+          <NumberInput
             value={ac}
-            onChange={e => setAc(parseInt(e.target.value) || 0)}
+            onChange={v => setAc(v ?? 0)}
             label="AC"
             min={0}
           />
-          <Input
-            type="number"
+          <NumberInput
             value={hp}
-            onChange={e => setHp(parseInt(e.target.value) || 1)}
+            onChange={v => setHp(v ?? 1)}
             label="HP"
             min={1}
           />
@@ -256,12 +255,11 @@ export function CreatureCreatorForm({
               <span className="text-muted block text-[10px] font-medium uppercase">
                 {label}
               </span>
-              <input
-                type="number"
+              <NumberField
                 value={value}
-                onChange={e =>
+                onChange={v =>
                   (setter as React.Dispatch<React.SetStateAction<number>>)(
-                    parseInt(e.target.value) || 0
+                    v ?? 0
                   )
                 }
                 min={1}
@@ -403,10 +401,9 @@ function AbilityListEditor({
     onChange(updated);
   };
 
-  const handleUsesChange = (index: number, value: string) => {
-    const num = value === '' ? undefined : parseInt(value, 10);
+  const handleUsesChange = (index: number, value: number | undefined) => {
     const updated = items.map((item, i) =>
-      i === index ? { ...item, uses: num } : item
+      i === index ? { ...item, uses: value } : item
     );
     onChange(updated);
   };
@@ -443,14 +440,14 @@ function AbilityListEditor({
                   placeholder={`${label.slice(0, -1)} name`}
                   className="flex-1"
                 />
-                <Input
-                  type="number"
+                <NumberInput
                   min={0}
-                  value={item.uses ?? ''}
-                  onChange={e => handleUsesChange(index, e.target.value)}
+                  value={item.uses}
+                  onChange={v => handleUsesChange(index, v)}
                   placeholder="Uses"
                   className="w-18"
                   title="Uses per day (leave empty for unlimited)"
+                  allowEmpty
                 />
                 <button
                   onClick={() => handleRemove(index)}

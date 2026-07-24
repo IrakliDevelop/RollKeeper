@@ -10,14 +10,8 @@ import {
 } from '@/components/ui/layout/card';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
-import type {
-  CalendarConfig,
-  WeekDay,
-  CalendarMonth,
-  Season,
-  Moon,
-  Era,
-} from '@/types/calendar';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
+import type { CalendarConfig } from '@/types/calendar';
 
 interface CalendarSettingsPanelProps {
   config: CalendarConfig;
@@ -47,39 +41,36 @@ export function CalendarSettingsPanel({
           <CardTitle>Clock</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-3 gap-4 p-4">
-          <Input
+          <NumberInput
             label="Hours per Day"
-            type="number"
             min={1}
             value={draft.clock.hoursPerDay}
-            onChange={e =>
+            onChange={v =>
               update('clock', {
                 ...draft.clock,
-                hoursPerDay: Number(e.target.value) || 1,
+                hoursPerDay: v ?? 1,
               })
             }
           />
-          <Input
+          <NumberInput
             label="Minutes per Hour"
-            type="number"
             min={1}
             value={draft.clock.minutesPerHour}
-            onChange={e =>
+            onChange={v =>
               update('clock', {
                 ...draft.clock,
-                minutesPerHour: Number(e.target.value) || 1,
+                minutesPerHour: v ?? 1,
               })
             }
           />
-          <Input
+          <NumberInput
             label="Seconds per Minute"
-            type="number"
             min={1}
             value={draft.clock.secondsPerMinute}
-            onChange={e =>
+            onChange={v =>
               update('clock', {
                 ...draft.clock,
-                secondsPerMinute: Number(e.target.value) || 1,
+                secondsPerMinute: v ?? 1,
               })
             }
           />
@@ -151,13 +142,12 @@ export function CalendarSettingsPanel({
                 }}
                 wrapperClassName="flex-1 min-w-0"
               />
-              <Input
-                type="number"
+              <NumberInput
                 min={1}
                 value={m.days}
-                onChange={e => {
+                onChange={v => {
                   const next = [...draft.months];
-                  next[i] = { ...next[i], days: Number(e.target.value) || 1 };
+                  next[i] = { ...next[i], days: v ?? 1 };
                   update('months', next);
                 }}
                 wrapperClassName="w-24"
@@ -215,58 +205,54 @@ export function CalendarSettingsPanel({
                 }}
                 wrapperClassName="flex-1 min-w-0"
               />
-              <Input
+              <NumberInput
                 label="Start Day"
-                type="number"
                 min={0}
                 value={s.startDay}
-                onChange={e => {
+                onChange={v => {
                   const next = [...draft.seasons];
                   next[i] = {
                     ...next[i],
-                    startDay: Number(e.target.value) || 0,
+                    startDay: v ?? 0,
                   };
                   update('seasons', next);
                 }}
                 wrapperClassName="w-20"
               />
-              <Input
+              <NumberInput
                 label="End Day"
-                type="number"
                 min={0}
                 value={s.endDay}
-                onChange={e => {
+                onChange={v => {
                   const next = [...draft.seasons];
-                  next[i] = { ...next[i], endDay: Number(e.target.value) || 0 };
+                  next[i] = { ...next[i], endDay: v ?? 0 };
                   update('seasons', next);
                 }}
                 wrapperClassName="w-20"
               />
-              <Input
+              <NumberInput
                 label="Sunrise"
-                type="number"
                 min={0}
                 value={s.sunriseHour}
-                onChange={e => {
+                onChange={v => {
                   const next = [...draft.seasons];
                   next[i] = {
                     ...next[i],
-                    sunriseHour: Number(e.target.value) || 0,
+                    sunriseHour: v ?? 0,
                   };
                   update('seasons', next);
                 }}
                 wrapperClassName="w-20"
               />
-              <Input
+              <NumberInput
                 label="Sunset"
-                type="number"
                 min={0}
                 value={s.sunsetHour}
-                onChange={e => {
+                onChange={v => {
                   const next = [...draft.seasons];
                   next[i] = {
                     ...next[i],
-                    sunsetHour: Number(e.target.value) || 0,
+                    sunsetHour: v ?? 0,
                   };
                   update('seasons', next);
                 }}
@@ -330,28 +316,26 @@ export function CalendarSettingsPanel({
                 wrapperClassName="flex-1 min-w-0"
                 helperText="&nbsp;"
               />
-              <Input
+              <NumberInput
                 label="Period"
-                type="number"
                 min={1}
                 value={m.period}
-                onChange={e => {
+                onChange={v => {
                   const next = [...draft.moons];
-                  next[i] = { ...next[i], period: Number(e.target.value) || 1 };
+                  next[i] = { ...next[i], period: v ?? 1 };
                   update('moons', next);
                 }}
                 wrapperClassName="w-20"
                 helperText="Days per cycle"
               />
-              <Input
+              <NumberInput
                 label="Offset"
-                type="number"
                 value={m.phaseOffset}
-                onChange={e => {
+                onChange={v => {
                   const next = [...draft.moons];
                   next[i] = {
                     ...next[i],
-                    phaseOffset: Number(e.target.value) || 0,
+                    phaseOffset: v ?? 0,
                   };
                   update('moons', next);
                 }}
@@ -422,30 +406,26 @@ export function CalendarSettingsPanel({
                 }}
                 wrapperClassName="w-20"
               />
-              <Input
+              <NumberInput
                 label="Start Year"
-                type="number"
                 value={e.startYear}
-                onChange={ev => {
+                onChange={v => {
                   const next = [...draft.eras];
                   next[i] = {
                     ...next[i],
-                    startYear: Number(ev.target.value) || 0,
+                    startYear: v ?? 0,
                   };
                   update('eras', next);
                 }}
                 wrapperClassName="w-24"
               />
-              <Input
+              <NumberInput
                 label="End Year"
-                type="number"
-                value={e.endYear ?? ''}
-                onChange={ev => {
+                allowEmpty
+                value={e.endYear}
+                onChange={v => {
                   const next = [...draft.eras];
-                  const val = ev.target.value
-                    ? Number(ev.target.value)
-                    : undefined;
-                  next[i] = { ...next[i], endYear: val };
+                  next[i] = { ...next[i], endYear: v };
                   update('eras', next);
                 }}
                 wrapperClassName="w-24"
@@ -486,57 +466,50 @@ export function CalendarSettingsPanel({
           <CardTitle>Year & Mechanics</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4 p-4 lg:grid-cols-3">
-          <Input
+          <NumberInput
             label="Starting Year"
-            type="number"
             value={draft.yearOffset}
-            onChange={e => update('yearOffset', Number(e.target.value) || 0)}
+            onChange={v => update('yearOffset', v ?? 0)}
             helperText="The year number shown at time zero"
           />
-          <Input
+          <NumberInput
             label="First Day of Week"
-            type="number"
             min={0}
             max={draft.weekDays.length - 1}
             value={draft.yearStartWeekdayOffset}
-            onChange={e =>
-              update('yearStartWeekdayOffset', Number(e.target.value) || 0)
-            }
+            onChange={v => update('yearStartWeekdayOffset', v ?? 0)}
             helperText={`0 = ${draft.weekDays[0]?.name ?? 'first day'}`}
           />
-          <Input
+          <NumberInput
             label="Long Rest (hours)"
-            type="number"
             min={1}
             value={draft.mechanics.hoursPerLongRest}
-            onChange={e =>
+            onChange={v =>
               update('mechanics', {
                 ...draft.mechanics,
-                hoursPerLongRest: Number(e.target.value) || 1,
+                hoursPerLongRest: v ?? 1,
               })
             }
           />
-          <Input
+          <NumberInput
             label="Short Rest (minutes)"
-            type="number"
             min={1}
             value={draft.mechanics.minutesPerShortRest}
-            onChange={e =>
+            onChange={v =>
               update('mechanics', {
                 ...draft.mechanics,
-                minutesPerShortRest: Number(e.target.value) || 1,
+                minutesPerShortRest: v ?? 1,
               })
             }
           />
-          <Input
+          <NumberInput
             label="Round (seconds)"
-            type="number"
             min={1}
             value={draft.mechanics.secondsPerRound}
-            onChange={e =>
+            onChange={v =>
               update('mechanics', {
                 ...draft.mechanics,
-                secondsPerRound: Number(e.target.value) || 1,
+                secondsPerRound: v ?? 1,
               })
             }
           />

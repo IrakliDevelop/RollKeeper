@@ -10,7 +10,7 @@ import {
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
-import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import type { CalendarConfig, CalendarDate } from '@/types/calendar';
 
@@ -70,11 +70,7 @@ export function JumpToDateDialog({
               <label className="text-body mb-1 block text-sm font-medium">
                 Year
               </label>
-              <Input
-                type="number"
-                value={year}
-                onChange={e => setYear(Number(e.target.value))}
-              />
+              <NumberInput value={year} onChange={v => setYear(v ?? 0)} />
             </div>
             <SelectField
               label="Month"
