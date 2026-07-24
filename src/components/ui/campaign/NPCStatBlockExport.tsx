@@ -76,6 +76,23 @@ function cleanHtmlForExport(html: string): string {
           // Unstyled element — clean up attrs but keep structure
           el.removeAttribute('style');
           el.removeAttribute('class');
+          // Re-apply list markers inline (Tailwind Preflight strips them)
+          if (el.tagName === 'UL') {
+            el.setAttribute(
+              'style',
+              'list-style-type:disc;padding-left:20px;margin:4px 0;'
+            );
+          } else if (el.tagName === 'OL') {
+            el.setAttribute(
+              'style',
+              'list-style-type:decimal;padding-left:20px;margin:4px 0;'
+            );
+          } else if (el.tagName === 'LI') {
+            el.setAttribute(
+              'style',
+              'display:list-item;list-style-position:outside;'
+            );
+          }
         }
       }
     }

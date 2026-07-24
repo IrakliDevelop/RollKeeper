@@ -34,6 +34,7 @@ import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { MonsterStatBlockPanel } from '@/components/ui/encounter/MonsterStatBlockPanel';
 import { NPCStatBlockExport } from './NPCStatBlockExport';
+import RichTextRenderer from '@/components/ui/utils/RichTextRenderer';
 import {
   ItemForm,
   initialInventoryFormData,
@@ -107,6 +108,7 @@ function AbilityScoreGrid({
 
 function ExtraStatsBadges({ npc }: { npc: CampaignNPC }) {
   const hasExtras =
+    npc.xp !== undefined ||
     npc.proficiencyBonus !== undefined ||
     npc.hitDice !== undefined ||
     npc.passivePerception !== undefined ||
@@ -125,6 +127,14 @@ function ExtraStatsBadges({ npc }: { npc: CampaignNPC }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {npc.xp !== undefined && (
+        <span className="bg-surface-secondary text-muted rounded-full px-2.5 py-0.5 text-xs font-medium">
+          XP{' '}
+          <span className="text-heading font-semibold">
+            {npc.xp.toLocaleString()}
+          </span>
+        </span>
+      )}
       {npc.proficiencyBonus !== undefined && (
         <span className="bg-surface-secondary text-muted rounded-full px-2.5 py-0.5 text-xs font-medium">
           PB{' '}
@@ -516,10 +526,7 @@ function NPCItemViewModal({
               <h4 className="text-heading mb-1.5 text-sm font-semibold">
                 Description
               </h4>
-              <div
-                className="prose prose-sm text-body max-w-none leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: item.description }}
-              />
+              <RichTextRenderer content={item.description} />
             </div>
           )}
         </DialogBody>
@@ -839,10 +846,7 @@ export function NPCDetailDialog({
 
           {activeTab === 'lore' &&
             (npc.loreHtml ? (
-              <div
-                className="prose prose-sm text-body max-w-none"
-                dangerouslySetInnerHTML={{ __html: npc.loreHtml }}
-              />
+              <RichTextRenderer content={npc.loreHtml} />
             ) : (
               <div className="flex flex-1 items-center justify-center text-center">
                 <div>

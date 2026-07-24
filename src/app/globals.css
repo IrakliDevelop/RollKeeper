@@ -606,6 +606,23 @@ button {
   color: var(--heading) !important;
 }
 
+/* Restore list markers for rich-text HTML rendered outside RichTextRenderer
+   (Tailwind Preflight resets ul/ol to list-style:none; typography plugin not installed) */
+.statblock-rich-text ul {
+  list-style-type: disc;
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+}
+.statblock-rich-text ol {
+  list-style-type: decimal;
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+}
+.statblock-rich-text li {
+  display: list-item;
+  list-style-position: outside;
+}
+
 /* Fix text inputs in editor mode */
 .prose input[type='text'] {
   color: var(--input-text) !important;
