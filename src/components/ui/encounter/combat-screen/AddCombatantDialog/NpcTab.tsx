@@ -10,7 +10,6 @@ import type {
   PlayerDisposition,
 } from '@/types/encounter';
 import { useNPCStore } from '@/store/npcStore';
-import { effectiveAc } from '@/utils/calculations';
 import { buildNpcEntity } from './buildEntity';
 import { SharedOptions } from './SharedOptions';
 
@@ -43,7 +42,7 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
     createNPC(campaignCode, {
       name: npcName.trim(),
       maxHp: parseInt(npcHp) || 10,
-      armorClass: parseInt(npcAc) || 10,
+      armorClass: npcAc.trim() || '10',
       speed: npcSpeed.trim() || '30 ft.',
       description: npcDescription.trim() || undefined,
     });
@@ -98,7 +97,7 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
               value={npcAc}
               onChange={e => setNpcAc(e.target.value)}
               label="AC"
-              type="number"
+              placeholder="16 (natural armor)"
             />
             <Input
               value={npcSpeed}
@@ -182,7 +181,7 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
               )}
             </div>
             <div className="text-muted shrink-0 text-right text-[12.5px] font-bold tabular-nums">
-              {npc.maxHp} HP · AC {effectiveAc(npc.armorClass, npc.tempAc)}
+              {npc.maxHp} HP · AC {npc.armorClass}
             </div>
           </button>
           <button

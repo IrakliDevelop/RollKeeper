@@ -78,7 +78,7 @@ function makeNPC(overrides: Partial<CampaignNPC> = {}): CampaignNPC {
     id: 'npc-1',
     campaignCode: 'ABC',
     name: 'Grizzlebeard',
-    armorClass: 14,
+    armorClass: '14',
     maxHp: 22,
     speed: '30 ft.',
     createdAt: '2026-01-01T00:00:00.000Z',

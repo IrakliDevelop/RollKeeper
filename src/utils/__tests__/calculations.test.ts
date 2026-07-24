@@ -6,6 +6,7 @@ import {
   calculateSavingThrowModifier,
   calculateInitiativeModifier,
   calculateTotalArmorClass,
+  parseArmorClass,
   calculateCharacterArmorClass,
   getBuffMaxHPBonus,
   getBuffSpeedBonus,
@@ -298,6 +299,30 @@ describe('calculateInitiativeModifier', () => {
 // =============================================
 // calculateTotalArmorClass
 // =============================================
+describe('parseArmorClass', () => {
+  it('extracts the leading number from free text', () => {
+    expect(parseArmorClass('16 (natural armor)')).toBe(16);
+    expect(parseArmorClass('21 (shield spell)')).toBe(21);
+  });
+
+  it('handles a bare number string', () => {
+    expect(parseArmorClass('18')).toBe(18);
+  });
+
+  it('accepts a plain number (legacy data) unchanged', () => {
+    expect(parseArmorClass(15)).toBe(15);
+  });
+
+  it('falls back to 10 when no number is present', () => {
+    expect(parseArmorClass('natural armor')).toBe(10);
+    expect(parseArmorClass('')).toBe(10);
+  });
+
+  it('parses a number embedded after leading words', () => {
+    expect(parseArmorClass('AC 13 leather')).toBe(13);
+  });
+});
+
 describe('calculateTotalArmorClass', () => {
   it('base AC with no temp and no shield', () => {
     expect(calculateTotalArmorClass(16, 0, false)).toBe(16);

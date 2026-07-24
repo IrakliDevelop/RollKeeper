@@ -245,7 +245,7 @@ export function NPCFormDialog({
   const [size, setSize] = useState('Medium');
   const [creatureType, setCreatureType] = useState('Humanoid');
   const [alignment, setAlignment] = useState('');
-  const [ac, setAc] = useState(10);
+  const [ac, setAc] = useState('10');
   const [hp, setHp] = useState(10);
   const [tempHp, setTempHp] = useState(0);
   const [tempAc, setTempAc] = useState(0);
@@ -360,7 +360,7 @@ export function NPCFormDialog({
     if (editingNpc) {
       setName(editingNpc.name);
       setDescription(editingNpc.description ?? '');
-      setAc(editingNpc.armorClass);
+      setAc(String(editingNpc.armorClass ?? '10'));
       setHp(editingNpc.maxHp);
       setTempHp(editingNpc.tempHp ?? 0);
       setTempAc(editingNpc.tempAc ?? 0);
@@ -539,7 +539,7 @@ export function NPCFormDialog({
     setActiveFormTab('basic');
     setName('');
     setDescription('');
-    setAc(10);
+    setAc('10');
     setHp(10);
     setTempHp(0);
     setTempAc(0);
@@ -627,7 +627,7 @@ export function NPCFormDialog({
     const sb = buildMonsterStatBlock(monster);
     setName(monster.name);
     setDescription('');
-    setAc(monster.acValue);
+    setAc(String(monster.acValue));
     setHp(monster.hpAverage);
     setTempHp(0);
     setTempAc(0);
@@ -832,7 +832,7 @@ export function NPCFormDialog({
       'id' | 'campaignCode' | 'createdAt' | 'updatedAt'
     > = {
       name: name.trim(),
-      armorClass: ac,
+      armorClass: ac.trim() || '10',
       maxHp: hp,
       tempHp: tempHp > 0 ? tempHp : undefined,
       tempAc: tempAc > 0 ? tempAc : undefined,
@@ -1180,13 +1180,14 @@ export function NPCFormDialog({
                         placeholder="Unaligned"
                       />
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <NumberInput
-                        value={ac}
-                        onChange={v => setAc(v ?? 0)}
-                        label="AC"
-                        min={0}
-                      />
+                    <Input
+                      value={ac}
+                      onChange={e => setAc(e.target.value)}
+                      label="AC"
+                      placeholder="16 (natural armor)"
+                      helperText="Free text — the leading number is used in combat."
+                    />
+                    <div className="grid grid-cols-2 gap-2">
                       <NumberInput
                         value={hp}
                         onChange={v => setHp(v ?? 1)}

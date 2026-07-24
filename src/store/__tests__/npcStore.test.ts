@@ -12,7 +12,7 @@ describe('npcStore (campaign-scoped)', () => {
     it('returns an id and adds the NPC to the campaign bucket', () => {
       const id = useNPCStore.getState().createNPC(CAMPAIGN, {
         name: 'Bartender Bob',
-        armorClass: 10,
+        armorClass: '10',
         maxHp: 8,
         speed: '30 ft.',
       });
@@ -27,7 +27,7 @@ describe('npcStore (campaign-scoped)', () => {
     it('sets createdAt and updatedAt timestamps', () => {
       useNPCStore.getState().createNPC(CAMPAIGN, {
         name: 'Guard',
-        armorClass: 16,
+        armorClass: '16',
         maxHp: 11,
         speed: '30 ft.',
       });
@@ -41,13 +41,13 @@ describe('npcStore (campaign-scoped)', () => {
     it('isolates NPCs between campaigns', () => {
       useNPCStore.getState().createNPC('campaign-a', {
         name: 'NPC A',
-        armorClass: 10,
+        armorClass: '10',
         maxHp: 5,
         speed: '30 ft.',
       });
       useNPCStore.getState().createNPC('campaign-b', {
         name: 'NPC B',
-        armorClass: 12,
+        armorClass: '12',
         maxHp: 10,
         speed: '25 ft.',
       });
@@ -68,31 +68,31 @@ describe('npcStore (campaign-scoped)', () => {
     it('merges updates and preserves unchanged fields', () => {
       const id = useNPCStore.getState().createNPC(CAMPAIGN, {
         name: 'Old Name',
-        armorClass: 10,
+        armorClass: '10',
         maxHp: 5,
         speed: '30 ft.',
       });
 
       useNPCStore
         .getState()
-        .updateNPC(CAMPAIGN, id, { name: 'New Name', armorClass: 14 });
+        .updateNPC(CAMPAIGN, id, { name: 'New Name', armorClass: '14' });
 
       const npc = useNPCStore.getState().getNPCsForCampaign(CAMPAIGN)[0];
       expect(npc.name).toBe('New Name');
-      expect(npc.armorClass).toBe(14);
+      expect(npc.armorClass).toBe('14');
       expect(npc.maxHp).toBe(5);
     });
 
     it('does not affect other NPCs', () => {
       const id1 = useNPCStore.getState().createNPC(CAMPAIGN, {
         name: 'First',
-        armorClass: 10,
+        armorClass: '10',
         maxHp: 5,
         speed: '30 ft.',
       });
       useNPCStore.getState().createNPC(CAMPAIGN, {
         name: 'Second',
-        armorClass: 12,
+        armorClass: '12',
         maxHp: 10,
         speed: '30 ft.',
       });
@@ -111,7 +111,7 @@ describe('npcStore (campaign-scoped)', () => {
     it('removes the NPC by id within the campaign', () => {
       const id = useNPCStore.getState().createNPC(CAMPAIGN, {
         name: 'Doomed NPC',
-        armorClass: 10,
+        armorClass: '10',
         maxHp: 1,
         speed: '30 ft.',
       });
@@ -125,7 +125,7 @@ describe('npcStore (campaign-scoped)', () => {
     it('is a no-op for unknown id', () => {
       useNPCStore.getState().createNPC(CAMPAIGN, {
         name: 'Safe NPC',
-        armorClass: 10,
+        armorClass: '10',
         maxHp: 5,
         speed: '30 ft.',
       });
@@ -141,7 +141,7 @@ describe('npcStore (campaign-scoped)', () => {
     it('returns matching NPC within the campaign', () => {
       const id = useNPCStore.getState().createNPC(CAMPAIGN, {
         name: 'Findable',
-        armorClass: 10,
+        armorClass: '10',
         maxHp: 5,
         speed: '30 ft.',
       });
@@ -158,7 +158,7 @@ describe('npcStore (campaign-scoped)', () => {
     it('returns undefined when searching wrong campaign', () => {
       const id = useNPCStore.getState().createNPC('campaign-a', {
         name: 'Wrong Campaign',
-        armorClass: 10,
+        armorClass: '10',
         maxHp: 5,
         speed: '30 ft.',
       });
@@ -201,7 +201,7 @@ const SPELLCASTING_BASE = {
 function createNPCWithSpellcasting(campaignCode: string) {
   const id = useNPCStore.getState().createNPC(campaignCode, {
     name: 'Mage',
-    armorClass: 12,
+    armorClass: '12',
     maxHp: 40,
     speed: '30 ft.',
     spellcasting: { ...SPELLCASTING_BASE },
@@ -217,19 +217,19 @@ describe('npcStore — reorderNPCsSubset', () => {
   it('moves an NPC from one position to another within the subset', () => {
     const id1 = useNPCStore.getState().createNPC(CAMPAIGN, {
       name: 'Alpha',
-      armorClass: 10,
+      armorClass: '10',
       maxHp: 5,
       speed: '30 ft.',
     });
     const id2 = useNPCStore.getState().createNPC(CAMPAIGN, {
       name: 'Beta',
-      armorClass: 10,
+      armorClass: '10',
       maxHp: 5,
       speed: '30 ft.',
     });
     const id3 = useNPCStore.getState().createNPC(CAMPAIGN, {
       name: 'Gamma',
-      armorClass: 10,
+      armorClass: '10',
       maxHp: 5,
       speed: '30 ft.',
     });
@@ -246,13 +246,13 @@ describe('npcStore — reorderNPCsSubset', () => {
   it('is a no-op when fromIndex equals toIndex', () => {
     const id1 = useNPCStore.getState().createNPC(CAMPAIGN, {
       name: 'Alpha',
-      armorClass: 10,
+      armorClass: '10',
       maxHp: 5,
       speed: '30 ft.',
     });
     const id2 = useNPCStore.getState().createNPC(CAMPAIGN, {
       name: 'Beta',
-      armorClass: 10,
+      armorClass: '10',
       maxHp: 5,
       speed: '30 ft.',
     });
@@ -273,7 +273,7 @@ describe('npcStore — updateDeathSaves', () => {
   it('sets death saves on the target NPC', () => {
     const id = useNPCStore.getState().createNPC(CAMPAIGN, {
       name: 'Dying Hero',
-      armorClass: 10,
+      armorClass: '10',
       maxHp: 10,
       speed: '30 ft.',
     });
@@ -289,13 +289,13 @@ describe('npcStore — updateDeathSaves', () => {
   it('does not affect other NPCs', () => {
     const id1 = useNPCStore.getState().createNPC(CAMPAIGN, {
       name: 'NPC 1',
-      armorClass: 10,
+      armorClass: '10',
       maxHp: 10,
       speed: '30 ft.',
     });
     const id2 = useNPCStore.getState().createNPC(CAMPAIGN, {
       name: 'NPC 2',
-      armorClass: 10,
+      armorClass: '10',
       maxHp: 10,
       speed: '30 ft.',
     });
@@ -327,7 +327,7 @@ describe('npcStore — spell management', () => {
     it('does nothing when NPC has no spellcasting block', () => {
       const id = useNPCStore.getState().createNPC(CAMPAIGN, {
         name: 'Warrior',
-        armorClass: 16,
+        armorClass: '16',
         maxHp: 50,
         speed: '30 ft.',
       });
@@ -464,7 +464,7 @@ describe('npcStore — longRestNPC', () => {
   it('restores HP to max and clears tempHp and deathSaves', () => {
     const id = useNPCStore.getState().createNPC(CAMPAIGN, {
       name: 'Battered Fighter',
-      armorClass: 16,
+      armorClass: '16',
       maxHp: 40,
       currentHp: 5,
       tempHp: 3,
@@ -485,7 +485,7 @@ describe('npcStore — longRestNPC', () => {
   it('restores hit dice to max', () => {
     const id = useNPCStore.getState().createNPC(CAMPAIGN, {
       name: 'Fighter',
-      armorClass: 16,
+      armorClass: '16',
       maxHp: 40,
       speed: '30 ft.',
       hitDice: { current: 2, max: 5, dieType: 'd10' },
@@ -513,14 +513,14 @@ describe('npcStore — longRestNPC', () => {
   it('does not affect other NPCs', () => {
     const id1 = useNPCStore.getState().createNPC(CAMPAIGN, {
       name: 'Resting',
-      armorClass: 10,
+      armorClass: '10',
       maxHp: 30,
       currentHp: 1,
       speed: '30 ft.',
     });
     const id2 = useNPCStore.getState().createNPC(CAMPAIGN, {
       name: 'Not Resting',
-      armorClass: 10,
+      armorClass: '10',
       maxHp: 30,
       currentHp: 10,
       speed: '30 ft.',
@@ -546,7 +546,7 @@ describe('migrateNpcPersistedState v2 → v3 (AoE back-fill)', () => {
               id: 'npc-1',
               campaignCode: 'camp-1',
               name: 'Cult Mage',
-              armorClass: 12,
+              armorClass: '12',
               maxHp: 22,
               speed: '30 ft.',
               createdAt: '2025-01-01T00:00:00.000Z',
@@ -598,7 +598,7 @@ describe('migrateNpcPersistedState v2 → v3 (AoE back-fill)', () => {
               id: 'npc-2',
               campaignCode: 'camp-1',
               name: 'Guard',
-              armorClass: 16,
+              armorClass: '16',
               maxHp: 11,
               speed: '30 ft.',
               createdAt: '2025-01-01T00:00:00.000Z',
@@ -642,7 +642,7 @@ describe('migrateNpcPersistedState v2 → v3 (AoE back-fill)', () => {
         {
           id: 'npc-old',
           name: 'Old Timer',
-          armorClass: 10,
+          armorClass: '10',
           maxHp: 5,
           speed: '30 ft.',
           campaignCode: 'camp-x',
