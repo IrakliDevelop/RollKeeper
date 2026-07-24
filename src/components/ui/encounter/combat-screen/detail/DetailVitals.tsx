@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Shield, Plus, X } from 'lucide-react';
 import { HPBar } from '@/components/shared/combat/HPBar';
+import { effectiveAc } from '@/utils/calculations';
 import { rollHitDie } from '../spendHitDie';
 import type { DetailSectionProps } from './DetailHeader';
 import { DamageControls } from './DamageControls';
@@ -115,17 +116,43 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
               <p className="text-faint text-[10px]">synced</p>
             </div>
           ) : (
-            <input
-              type="number"
-              value={entity.armorClass}
-              onChange={e =>
-                actions.onUpdate(entity.id, {
-                  armorClass: parseInt(e.target.value, 10) || 0,
-                })
-              }
-              className="bg-surface-raised text-heading w-12 rounded px-1 py-0.5 text-center text-sm font-bold shadow-sm"
-              aria-label="Armor class"
-            />
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                value={entity.armorClass}
+                onChange={e =>
+                  actions.onUpdate(entity.id, {
+                    armorClass: parseInt(e.target.value, 10) || 0,
+                  })
+                }
+                className="bg-surface-raised text-heading w-12 rounded px-1 py-0.5 text-center text-sm font-bold shadow-sm"
+                aria-label="Armor class"
+                title="Base armor class"
+              />
+              <span className="text-faint text-xs">+</span>
+              <input
+                type="number"
+                min={0}
+                value={entity.tempAc ?? 0}
+                onChange={e => {
+                  const n = parseInt(e.target.value, 10) || 0;
+                  actions.onUpdate(entity.id, {
+                    tempAc: n > 0 ? n : undefined,
+                  });
+                }}
+                className="bg-surface-raised text-accent-blue-text w-10 rounded px-1 py-0.5 text-center text-sm font-medium shadow-sm"
+                aria-label="Temporary AC bonus"
+                title="Temporary AC bonus"
+              />
+              {(entity.tempAc ?? 0) > 0 && (
+                <span
+                  className="text-accent-blue-text text-xs font-semibold"
+                  title="Effective AC"
+                >
+                  = {effectiveAc(entity.armorClass, entity.tempAc)}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>

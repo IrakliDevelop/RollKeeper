@@ -246,6 +246,8 @@ export function NPCFormDialog({
   const [alignment, setAlignment] = useState('');
   const [ac, setAc] = useState(10);
   const [hp, setHp] = useState(10);
+  const [tempHp, setTempHp] = useState(0);
+  const [tempAc, setTempAc] = useState(0);
   const [xp, setXp] = useState(0);
   const [hpFormula, setHpFormula] = useState('');
   const [speed, setSpeed] = useState('30 ft.');
@@ -355,6 +357,8 @@ export function NPCFormDialog({
       setDescription(editingNpc.description ?? '');
       setAc(editingNpc.armorClass);
       setHp(editingNpc.maxHp);
+      setTempHp(editingNpc.tempHp ?? 0);
+      setTempAc(editingNpc.tempAc ?? 0);
       setXp(editingNpc.xp ?? 0);
       setSpeed(editingNpc.speed);
       setAvatarUrl(editingNpc.avatarUrl ?? '');
@@ -540,6 +544,8 @@ export function NPCFormDialog({
     setDescription('');
     setAc(10);
     setHp(10);
+    setTempHp(0);
+    setTempAc(0);
     setXp(0);
     setHpFormula('');
     setSpeed('30 ft.');
@@ -626,6 +632,8 @@ export function NPCFormDialog({
     setDescription('');
     setAc(monster.acValue);
     setHp(monster.hpAverage);
+    setTempHp(0);
+    setTempAc(0);
     setXp(0);
     setHpFormula(monster.hpFormula);
     setSpeed(sb.speed);
@@ -829,6 +837,8 @@ export function NPCFormDialog({
       name: name.trim(),
       armorClass: ac,
       maxHp: hp,
+      tempHp: tempHp > 0 ? tempHp : undefined,
+      tempAc: tempAc > 0 ? tempAc : undefined,
       speed: speed.trim() || '30 ft.',
       description: description.trim() || undefined,
       xp: xp > 0 ? xp : undefined,
@@ -1194,6 +1204,26 @@ export function NPCFormDialog({
                         onChange={e => setHpFormula(e.target.value)}
                         label="HP Formula"
                         placeholder="2d8+2"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="number"
+                        value={tempHp}
+                        onChange={e => setTempHp(parseInt(e.target.value) || 0)}
+                        label="Temp HP"
+                        min={0}
+                        placeholder="0"
+                        title="Temporary hit points (absorbed before real HP)"
+                      />
+                      <Input
+                        type="number"
+                        value={tempAc}
+                        onChange={e => setTempAc(parseInt(e.target.value) || 0)}
+                        label="Temp AC"
+                        min={0}
+                        placeholder="0"
+                        title="Temporary AC bonus added on top of base AC"
                       />
                     </div>
                     <div className="grid grid-cols-3 gap-2">

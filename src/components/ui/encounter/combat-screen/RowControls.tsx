@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Shield, Eye, Minus, Plus, Angry } from 'lucide-react';
+import { effectiveAc } from '@/utils/calculations';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from './types';
 
@@ -42,7 +43,7 @@ export function RowControls({
           >
             <Shield size={13} className="text-muted" />
             <span className="font-display text-heading text-sm font-bold tabular-nums">
-              {entity.armorClass}
+              {effectiveAc(entity.armorClass, entity.tempAc)}
             </span>
             {isRail && (
               <span className="text-faint text-[8px] font-semibold tracking-widest">
