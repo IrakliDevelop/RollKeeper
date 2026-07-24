@@ -81,6 +81,19 @@ export function parseRechargeFromName(name: string): {
   return { cleanName: name, usageType: 'unlimited' };
 }
 
+/**
+ * Build a short read-mode usage label for a stat block entry (e.g. "3/Day").
+ * Returns null when the entry has no configured uses, or when the entry name
+ * already conveys the usage (e.g. "(1/Day)", "(Recharge 5-6)") so we don't
+ * duplicate it in the display.
+ */
+export function formatUsesLabel(name: string, uses?: number): string | null {
+  if (uses == null || uses <= 0) return null;
+  // Name already carries a usage marker — the DM's uses count is redundant.
+  if (parseRechargeFromName(name).usageType !== 'unlimited') return null;
+  return `${uses}/Day`;
+}
+
 function buildMonsterAbilities(monster: ProcessedMonster): MonsterAbility[] {
   const abilities: MonsterAbility[] = [];
 

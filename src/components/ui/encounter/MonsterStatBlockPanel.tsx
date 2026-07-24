@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { MonsterStatBlock } from '@/types/encounter';
+import { formatUsesLabel } from '@/utils/encounterConverter';
 
 interface MonsterStatBlockPanelProps {
   statBlock: MonsterStatBlock;
@@ -36,7 +37,7 @@ function TraitBlock({
   entries,
 }: {
   title: string;
-  entries: Array<{ name: string; text: string }>;
+  entries: Array<{ name: string; text: string; uses?: number }>;
 }) {
   if (!entries || entries.length === 0) return null;
   return (
@@ -44,17 +45,26 @@ function TraitBlock({
       <h5 className="text-heading border-divider border-b pb-1 text-xs font-semibold tracking-wider uppercase">
         {title}
       </h5>
-      {entries.map((entry, i) => (
-        <div key={i} className="text-sm">
-          <span className="text-heading font-semibold italic">
-            {entry.name}.
-          </span>{' '}
-          <span
-            className="text-body statblock-rich-text"
-            dangerouslySetInnerHTML={{ __html: entry.text }}
-          />
-        </div>
-      ))}
+      {entries.map((entry, i) => {
+        const usesLabel = formatUsesLabel(entry.name, entry.uses);
+        return (
+          <div key={i} className="text-sm">
+            <span className="text-heading font-semibold italic">
+              {entry.name}.
+            </span>
+            {usesLabel && (
+              <span className="text-heading font-semibold italic">
+                {' '}
+                ({usesLabel})
+              </span>
+            )}{' '}
+            <span
+              className="text-body statblock-rich-text"
+              dangerouslySetInnerHTML={{ __html: entry.text }}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }

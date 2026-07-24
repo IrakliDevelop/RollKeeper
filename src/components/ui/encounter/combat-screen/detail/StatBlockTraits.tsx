@@ -2,11 +2,12 @@
 
 import React from 'react';
 import { renderStatBlockEntryText } from '@/utils/statBlockText';
+import { formatUsesLabel } from '@/utils/encounterConverter';
 import type { MonsterStatBlock, MonsterSpellcasting } from '@/types/encounter';
 
 interface TraitBlockProps {
   title: string;
-  entries: Array<{ name: string; text: string }>;
+  entries: Array<{ name: string; text: string; uses?: number }>;
 }
 
 function TraitBlock({ title, entries }: TraitBlockProps) {
@@ -16,19 +17,28 @@ function TraitBlock({ title, entries }: TraitBlockProps) {
       <h5 className="text-heading border-divider border-b pb-0.5 text-xs font-semibold tracking-wider uppercase">
         {title}
       </h5>
-      {entries.map((entry, i) => (
-        <div key={i} className="text-sm">
-          <span className="text-heading font-semibold italic">
-            {entry.name}.
-          </span>{' '}
-          <span
-            className="text-body"
-            dangerouslySetInnerHTML={{
-              __html: renderStatBlockEntryText(entry.text),
-            }}
-          />
-        </div>
-      ))}
+      {entries.map((entry, i) => {
+        const usesLabel = formatUsesLabel(entry.name, entry.uses);
+        return (
+          <div key={i} className="text-sm">
+            <span className="text-heading font-semibold italic">
+              {entry.name}.
+            </span>
+            {usesLabel && (
+              <span className="text-heading font-semibold italic">
+                {' '}
+                ({usesLabel})
+              </span>
+            )}{' '}
+            <span
+              className="text-body"
+              dangerouslySetInnerHTML={{
+                __html: renderStatBlockEntryText(entry.text),
+              }}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
