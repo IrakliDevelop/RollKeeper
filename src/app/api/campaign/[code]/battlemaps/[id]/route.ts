@@ -3,11 +3,14 @@ import {
   getRedis,
   campaignBattleMapsKey,
   campaignBattleMapKey,
+  campaignSharedKey,
   refreshCampaignTTL,
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
 import { verifyDmAuthority } from '@/lib/dmAuth';
+import { shouldClearActiveBattleMap } from '@/lib/activeBattleMap';
 import type { BattleMapMetadata, SyncedBattleMap } from '@/types/battlemap';
+import type { SharedBattleMapState } from '@/types/sharedState';
 
 export async function GET(
   _request: NextRequest,
@@ -123,6 +126,16 @@ export async function DELETE(
       );
     }
     await redis.del(campaignBattleMapKey(code, id));
+
+    // The shared "live map" pointer is sticky — never cleared by a relink or
+    // delete. If it still references the map being deleted, clear it so players
+    // don't get stranded opening a dead map (they'd see the old/removed one).
+    const sharedRaw = await redis.get<string | SharedBattleMapState>(
+      campaignSharedKey(code, 'battlemap')
+    );
+    if (shouldClearActiveBattleMap(sharedRaw, id)) {
+      await redis.del(campaignSharedKey(code, 'battlemap'));
+    }
 
     const existingRaw = await redis.get<BattleMapMetadata[]>(
       campaignBattleMapsKey(code)

@@ -286,7 +286,10 @@ export function PlayerBattleMapCanvas({
     // player's own layer ends up active.
     ensureCanonicalLayers(vp, 'player');
     ensurePlayerLayer(vp, characterId);
-    subscribePinCanonicalLayers(vp);
+    // Players never edit the DM annotations layer — keep it pinned locked so
+    // their hit-testing and marquee skip DM content (the relay rejects their
+    // writes to it anyway).
+    subscribePinCanonicalLayers(vp, () => ({ annotationsLocked: true }));
 
     // Layers aren't synced: remote elements can reference layer ids that
     // don't exist here (old clients, other players). Mirror each unknown
