@@ -131,6 +131,64 @@ describe('pinCanonicalLayers', () => {
   });
 });
 
+describe('annotations lock invariant (dm can never be trapped on a locked annotations layer)', () => {
+  it('ensureCanonicalLayers unlocks an already-locked annotations layer for dm (self-heal of corrupt persisted state)', () => {
+    // Simulates loading a canvasState persisted mid-arrange, where the
+    // annotations layer was saved locked=true. A DM must never inherit that.
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    vp.layerManager.updateLayerDirect(ANNOTATIONS_LAYER_ID, { locked: true });
+    ensureCanonicalLayers(vp, 'dm');
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(false);
+  });
+
+  it('ensureCanonicalLayers keeps annotations locked for player', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'player');
+    vp.layerManager.updateLayerDirect(ANNOTATIONS_LAYER_ID, { locked: false });
+    ensureCanonicalLayers(vp, 'player');
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(true);
+  });
+
+  it('migrateCanvasToContract reports change and unlocks annotations for dm when persisted locked (so the heal persists)', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    migrateCanvasToContract(vp, 'dm');
+    vp.layerManager.updateLayerDirect(ANNOTATIONS_LAYER_ID, { locked: true });
+    const changed = migrateCanvasToContract(vp, 'dm');
+    expect(changed).toBe(true);
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(false);
+  });
+
+  it('pinCanonicalLayers pins the annotations lock when annotationsLocked is given', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    vp.layerManager.updateLayerDirect(ANNOTATIONS_LAYER_ID, { locked: true });
+    pinCanonicalLayers(vp, { annotationsLocked: false });
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(false);
+    pinCanonicalLayers(vp, { annotationsLocked: true });
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(true);
+  });
+
+  it('pinCanonicalLayers leaves the annotations lock untouched when annotationsLocked is omitted', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    vp.layerManager.updateLayerDirect(ANNOTATIONS_LAYER_ID, { locked: true });
+    pinCanonicalLayers(vp);
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(true);
+  });
+
+  it('subscribePinCanonicalLayers enforces annotationsLocked from getOpts on change', () => {
+    const vp = makeCleanVp();
+    const unsubscribe = subscribePinCanonicalLayers(vp, () => ({
+      annotationsLocked: false,
+    }));
+    vp.layerManager.updateLayerDirect(ANNOTATIONS_LAYER_ID, { locked: true });
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(false);
+    unsubscribe();
+  });
+});
+
 describe('subscribePinCanonicalLayers', () => {
   it('pins on layer changes without infinite recursion', () => {
     const vp = makeCleanVp();

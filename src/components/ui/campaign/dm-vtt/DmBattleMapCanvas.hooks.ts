@@ -164,7 +164,12 @@ export function useDmBattleMapCanvas({
       // re-applying remote elements as full updates (including layerId).
       attachUnknownLayerMirror(vp, 'dm', () => vp.requestRender());
       pinUnsubRef.current?.();
-      pinUnsubRef.current = subscribePinCanonicalLayers(vp);
+      // Play canvas never arranges maps — the annotations layer (DM tokens,
+      // notes, text) must stay unlocked, repairing any state persisted locked
+      // by the setup editor's arrange-maps mode.
+      pinUnsubRef.current = subscribePinCanonicalLayers(vp, () => ({
+        annotationsLocked: false,
+      }));
 
       const selectTool = vp.toolManager.getTool<SelectTool>('select');
       selectTool?.onSelectionChange(() => {

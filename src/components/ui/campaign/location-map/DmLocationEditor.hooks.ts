@@ -365,6 +365,9 @@ export function useDmLocationEditor(
       pinUnsubRef.current?.();
       pinUnsubRef.current = subscribePinCanonicalLayers(vp, () => ({
         mapUnlocked: arrangeActiveRef.current,
+        // Annotations is locked only while arranging maps; pinned unlocked
+        // otherwise so the DM is never trapped on a locked annotations layer.
+        annotationsLocked: arrangeActiveRef.current,
       }));
 
       // Live sync — battlemap mode only; resolver reads Zustand LIVE via

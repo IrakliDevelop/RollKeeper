@@ -66,20 +66,24 @@ export function ensureCanonicalLayers(
       opacity: 1,
     });
   }
-  pinCanonicalLayers(vp);
+  pinCanonicalLayers(vp, { annotationsLocked: role === 'player' });
   if (lm.activeLayerId === MAP_LAYER_ID || !lm.getLayer(lm.activeLayerId)) {
     lm.setActiveLayer(ANNOTATIONS_LAYER_ID);
   }
 }
 
 /**
- * Re-assert band invariants. Lock state of annotations/custom/player layers
- * is NOT pinned (role- and user-controlled); only the map lock is, because
- * only arrange-maps mode may relax it (opts.mapUnlocked).
+ * Re-assert band invariants. The map lock is always pinned (only arrange-maps
+ * mode relaxes it via opts.mapUnlocked). The annotations lock is pinned only
+ * when opts.annotationsLocked is supplied — DMs pin it OPEN (a DM must never
+ * be trapped on a locked annotations layer, e.g. one persisted mid-arrange),
+ * players pin it CLOSED, and setup arrange-maps pins it closed for the
+ * duration. Omitted → left user-controlled. Custom/player lock state is never
+ * pinned.
  */
 export function pinCanonicalLayers(
   vp: ViewportLike,
-  opts?: { mapUnlocked?: boolean }
+  opts?: { mapUnlocked?: boolean; annotationsLocked?: boolean }
 ): void {
   const lm = vp.layerManager;
   const map = lm.getLayer(MAP_LAYER_ID);
@@ -92,11 +96,25 @@ export function pinCanonicalLayers(
       });
     }
   }
+  // The annotations lock is pinned only when a lock intent is supplied
+  // (dm → unlocked, player → locked, setup arrange-maps → locked for the
+  // duration). Omitting annotationsLocked leaves it user-controlled — the
+  // caller has no stake in the lock, only the band order.
   const annotations = lm.getLayer(ANNOTATIONS_LAYER_ID);
-  if (annotations && annotations.order !== ANNOTATIONS_LAYER_ORDER) {
-    lm.updateLayerDirect(ANNOTATIONS_LAYER_ID, {
-      order: ANNOTATIONS_LAYER_ORDER,
-    });
+  if (annotations) {
+    const patch: { order?: number; locked?: boolean } = {};
+    if (annotations.order !== ANNOTATIONS_LAYER_ORDER) {
+      patch.order = ANNOTATIONS_LAYER_ORDER;
+    }
+    if (
+      opts?.annotationsLocked !== undefined &&
+      annotations.locked !== opts.annotationsLocked
+    ) {
+      patch.locked = opts.annotationsLocked;
+    }
+    if (patch.order !== undefined || patch.locked !== undefined) {
+      lm.updateLayerDirect(ANNOTATIONS_LAYER_ID, patch);
+    }
   }
   // getLayers() is order-sorted (stable), so renumbering by enumeration
   // index preserves each band's relative order.
@@ -124,7 +142,7 @@ export function pinCanonicalLayers(
  */
 export function subscribePinCanonicalLayers(
   vp: ViewportLike,
-  getOpts?: () => { mapUnlocked?: boolean }
+  getOpts?: () => { mapUnlocked?: boolean; annotationsLocked?: boolean }
 ): () => void {
   let pinning = false;
   return vp.layerManager.on('change', () => {
@@ -204,8 +222,15 @@ export function migrateCanvasToContract(
   role: CanvasRole
 ): boolean {
   const lm = vp.layerManager;
+  // Capture the annotations lock before ensureCanonicalLayers heals it, so a
+  // canvasState persisted with a locked annotations layer (the mid-arrange
+  // save that trapped every DM token/note) is reported as changed and the
+  // caller re-persists the repaired state.
+  const annotationsLockedBefore = lm.getLayer(ANNOTATIONS_LAYER_ID)?.locked;
   ensureCanonicalLayers(vp, role);
-  let changed = false;
+  let changed =
+    annotationsLockedBefore !== undefined &&
+    annotationsLockedBefore !== lm.getLayer(ANNOTATIONS_LAYER_ID)?.locked;
 
   for (const legacy of lm.getLayers()) {
     if (legacy.id === MAP_LAYER_ID || legacy.id === ANNOTATIONS_LAYER_ID) {
