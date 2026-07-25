@@ -11,6 +11,11 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
+const pushActiveMock = vi.fn();
+vi.mock('@/hooks/useDmBattleMapSync', () => ({
+  useDmBattleMapSync: () => ({ pushActive: pushActiveMock }),
+}));
+
 function map(id: string, linked: string[] = []): BattleMap {
   return {
     id,
@@ -48,6 +53,7 @@ describe('BattleMapPickerDialog', () => {
   beforeEach(() => {
     localStorage.clear();
     pushMock.mockClear();
+    pushActiveMock.mockClear();
     // Reset the persisted store between tests: remove every seeded map.
     const state = useBattleMapStore.getState();
     for (const m of state.getBattleMaps('ABC123')) {
@@ -75,6 +81,22 @@ describe('BattleMapPickerDialog', () => {
       'e1'
     );
     expect(pushMock).toHaveBeenCalledWith('/dm/campaign/ABC123/battlemaps/m2');
+  });
+
+  it('pushes the switched map live so players follow without a combat restart', () => {
+    seed([map('m1', ['e1']), map('m2')]);
+    renderDialog();
+    fireEvent.click(screen.getByRole('button', { name: /switch & open/i }));
+    expect(pushActiveMock).toHaveBeenCalledWith('m2', 'Map m2');
+  });
+
+  it('does not push a freshly created blank map live (would strand players on an empty canvas)', () => {
+    renderDialog();
+    fireEvent.change(screen.getByLabelText('New battle map name'), {
+      target: { value: 'Cave of Chaos' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /create & open/i }));
+    expect(pushActiveMock).not.toHaveBeenCalled();
   });
 
   it('unlinks the current map without navigating', () => {
