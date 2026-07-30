@@ -103,6 +103,10 @@ describe('DockVitals', () => {
   });
 
   it('spends heroic inspiration and fires an advantage toast', () => {
+    seedCharacter({
+      stackableInspiration: true,
+      heroicInspiration: { count: 2, maxCount: 3 },
+    });
     const addToast = vi.fn();
     render(<DockVitals addToast={addToast} />);
     const useButton = screen.getByRole('button', { name: /^use$/i });
@@ -116,7 +120,10 @@ describe('DockVitals', () => {
   });
 
   it('disables the + stepper once maxCount is reached', () => {
-    seedCharacter({ heroicInspiration: { count: 3, maxCount: 3 } });
+    seedCharacter({
+      stackableInspiration: true,
+      heroicInspiration: { count: 3, maxCount: 3 },
+    });
     render(<DockVitals addToast={vi.fn()} />);
     expect(
       screen.getByRole('button', { name: /add heroic inspiration/i })
@@ -124,6 +131,10 @@ describe('DockVitals', () => {
   });
 
   it('increments heroic inspiration via the + stepper when under max', () => {
+    seedCharacter({
+      stackableInspiration: true,
+      heroicInspiration: { count: 2, maxCount: 3 },
+    });
     render(<DockVitals addToast={vi.fn()} />);
     fireEvent.click(
       screen.getByRole('button', { name: /add heroic inspiration/i })
@@ -132,11 +143,25 @@ describe('DockVitals', () => {
   });
 
   it('decrements heroic inspiration via the − stepper', () => {
+    seedCharacter({
+      stackableInspiration: true,
+      heroicInspiration: { count: 2, maxCount: 3 },
+    });
     render(<DockVitals addToast={vi.fn()} />);
     fireEvent.click(
       screen.getByRole('button', { name: /remove heroic inspiration/i })
     );
     expect(getChar().heroicInspiration.count).toBe(1);
+  });
+
+  it('disables the heroic + button at 1 when stacking is off', () => {
+    seedCharacter({
+      stackableInspiration: false,
+      heroicInspiration: { count: 1, maxCount: 3 },
+    });
+    render(<DockVitals addToast={vi.fn()} />);
+    const addBtn = screen.getByLabelText('Add heroic inspiration');
+    expect(addBtn).toBeDisabled();
   });
 
   it('opens the armor class editor from the AC card', () => {
