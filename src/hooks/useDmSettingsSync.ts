@@ -11,7 +11,7 @@ export function useDmSettingsSync(campaignCode: string, dmId: string) {
   const pushSettings = useCallback(
     async (stackableInspiration: boolean) => {
       try {
-        await fetch(`/api/campaign/${campaignCode}/shared`, {
+        const res = await fetch(`/api/campaign/${campaignCode}/shared`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -20,8 +20,10 @@ export function useDmSettingsSync(campaignCode: string, dmId: string) {
             dmId,
           }),
         });
+        return res.ok;
       } catch (err) {
         console.warn('Failed to sync campaign settings:', err);
+        return false;
       }
     },
     [campaignCode, dmId]
@@ -35,9 +37,12 @@ export function useDmSettingsSync(campaignCode: string, dmId: string) {
     if (fingerprint === lastPushedRef.current) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      lastPushedRef.current = fingerprint;
-      pushSettings(stackableInspiration);
+    // Only fingerprint a delivered push — otherwise an offline/rejected POST
+    // is remembered as sent and the house rule never reaches players.
+    debounceRef.current = setTimeout(async () => {
+      if (await pushSettings(stackableInspiration)) {
+        lastPushedRef.current = fingerprint;
+      }
     }, DEBOUNCE_MS);
 
     return () => {

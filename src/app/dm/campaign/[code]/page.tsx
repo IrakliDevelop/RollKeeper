@@ -129,9 +129,12 @@ export default function CampaignViewPage() {
   const customCounterLabel = localCampaign?.customCounterLabel;
   const stackableInspiration = localCampaign?.stackableInspiration ?? false;
 
-  const handleToggleStackableInspiration = (enabled: boolean) => {
-    updateCampaign(code, { stackableInspiration: enabled });
-  };
+  const handleToggleStackableInspiration = useCallback(
+    (enabled: boolean) => {
+      updateCampaign(code, { stackableInspiration: enabled });
+    },
+    [updateCampaign, code]
+  );
 
   useEffect(() => {
     if (loading) return;
@@ -617,35 +620,40 @@ export default function CampaignViewPage() {
           </>
         )}
 
-        {/* House Rules — always visible */}
-        <Card>
-          <CardHeader>
-            <CardTitle>House Rules</CardTitle>
-            <CardDescription>
-              Rules that apply to every player in this campaign.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-heading font-medium">
-                  Stackable heroic inspiration
-                </p>
-                <p className="text-muted text-sm">
-                  When on, players can hold more than one Heroic Inspiration.
-                  When off, they follow classic rules (at most one).
-                </p>
+        {/* House Rules */}
+        {!loading && !error && (
+          <Card>
+            <CardHeader>
+              <CardTitle>House Rules</CardTitle>
+              <CardDescription>
+                Rules that apply to every player in this campaign.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p
+                    id="stackable-inspiration-label"
+                    className="text-heading font-medium"
+                  >
+                    Stackable heroic inspiration
+                  </p>
+                  <p className="text-muted text-sm">
+                    When on, players can hold more than one Heroic Inspiration.
+                    When off, they follow classic rules (at most one).
+                  </p>
+                </div>
+                <Switch
+                  checked={stackableInspiration}
+                  onCheckedChange={handleToggleStackableInspiration}
+                  aria-labelledby="stackable-inspiration-label"
+                />
               </div>
-              <Switch
-                checked={stackableInspiration}
-                onCheckedChange={handleToggleStackableInspiration}
-                aria-label="Toggle stackable heroic inspiration"
-              />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* NPC Management — always visible */}
+        {/* NPC Management */}
         {!loading && !error && (
           <NPCSection
             campaignCode={code}
