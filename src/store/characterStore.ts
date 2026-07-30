@@ -196,6 +196,10 @@ function migrateCharacterData(character: unknown): CharacterState {
     ) {
       result.heroicInspiration = DEFAULT_CHARACTER_STATE.heroicInspiration;
     }
+    // House-rule: stackable inspiration defaults to off (classic rules).
+    if (typeof result.stackableInspiration !== 'boolean') {
+      result.stackableInspiration = false;
+    }
     // Ensure bardic inspiration exists (initialize for existing characters)
     if (
       !result.bardicInspiration ||
@@ -425,6 +429,7 @@ interface CharacterStore {
   addHeroicInspiration: (amount?: number) => void;
   useHeroicInspiration: () => void;
   resetHeroicInspiration: () => void;
+  setStackableInspiration: (enabled: boolean) => void;
 
   // Bardic inspiration management
   useBardicInspiration: () => void;
@@ -835,12 +840,21 @@ export const useCharacterStore = create<CharacterStore>()(
           );
         }
 
+        const clampedInspirationCount =
+          multiclassCharacter.stackableInspiration === false
+            ? Math.min(multiclassCharacter.heroicInspiration.count, 1)
+            : multiclassCharacter.heroicInspiration.count;
+
         withExternalApply(() =>
           set({
             character: {
               ...multiclassCharacter,
               spellSlots: recalculatedSpellSlots,
               pactMagic: recalculatedPactMagic,
+              heroicInspiration: {
+                ...multiclassCharacter.heroicInspiration,
+                count: clampedInspirationCount,
+              },
             },
             hasUnsavedChanges: false,
             saveStatus: 'saved',
@@ -1052,10 +1066,12 @@ export const useCharacterStore = create<CharacterStore>()(
       addHeroicInspiration: (amount = 1) => {
         set(state => {
           const current = state.character.heroicInspiration.count;
-          const max = state.character.heroicInspiration.maxCount;
-          const newCount = max
-            ? Math.min(current + amount, max)
-            : current + amount;
+          const stackable = state.character.stackableInspiration ?? false;
+          const userMax = state.character.heroicInspiration.maxCount;
+          // Classic rules cap at 1; stacking respects the optional user max.
+          const hardMax = stackable ? userMax : 1;
+          const target = current + amount;
+          const newCount = hardMax != null ? Math.min(target, hardMax) : target;
 
           return {
             character: {
@@ -1064,6 +1080,22 @@ export const useCharacterStore = create<CharacterStore>()(
                 ...state.character.heroicInspiration,
                 count: Math.max(0, newCount),
               },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      setStackableInspiration: enabled => {
+        set(state => {
+          const insp = state.character.heroicInspiration;
+          const count = enabled ? insp.count : Math.min(insp.count, 1);
+          return {
+            character: {
+              ...state.character,
+              stackableInspiration: enabled,
+              heroicInspiration: { ...insp, count },
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',

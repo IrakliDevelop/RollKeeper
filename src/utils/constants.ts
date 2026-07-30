@@ -463,6 +463,7 @@ export const DEFAULT_CHARACTER_STATE = {
     count: 0,
     maxCount: undefined,
   },
+  stackableInspiration: false,
 
   bardicInspiration: {
     usesExpended: 0,
