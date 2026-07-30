@@ -63,7 +63,7 @@ export default function CharacterSheetHeader({
   onAddToast,
   extraHeaderContent,
 }: CharacterSheetHeaderProps) {
-  const { exportCharacter } = useCharacterStore();
+  const { exportCharacter, updateCharacter } = useCharacterStore();
   const { getCharacterById, updateCharacterData } = usePlayerStore();
 
   // Get character data for avatar
@@ -71,12 +71,18 @@ export default function CharacterSheetHeader({
 
   // Handle avatar change
   const handleAvatarChange = (newAvatar: string | undefined) => {
+    // Update the live character store first — it is the source of truth that
+    // useCharacterRosterSync writes back to the roster. Without this, the roster
+    // write-back would overwrite (clobber) the uploaded avatar on the next edit
+    // or reload.
+    updateCharacter({ avatar: newAvatar });
+
+    // Also update the roster blob directly for immediate display feedback.
     if (playerCharacter?.characterData) {
       updateCharacterData(characterId, {
         ...playerCharacter.characterData,
         avatar: newAvatar,
       });
-    } else {
     }
   };
 

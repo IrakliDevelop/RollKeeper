@@ -194,6 +194,70 @@ describe('characterStore — class, level, multiclass, hit dice, XP', () => {
     });
   });
 
+  // ─── loadCharacterState ───────────────────────────────────────────────────
+
+  describe('loadCharacterState', () => {
+    it('recalculates spell slots for a freshly-created full caster whose stored slots are all zero', () => {
+      const newDruid = makeCharacter({
+        class: {
+          name: 'Druid',
+          isCustom: false,
+          spellcaster: 'full',
+          hitDie: 8,
+        },
+        level: 1,
+        totalLevel: 1,
+        classes: undefined,
+        spellSlots: {
+          1: { max: 0, used: 0 },
+          2: { max: 0, used: 0 },
+          3: { max: 0, used: 0 },
+          4: { max: 0, used: 0 },
+          5: { max: 0, used: 0 },
+          6: { max: 0, used: 0 },
+          7: { max: 0, used: 0 },
+          8: { max: 0, used: 0 },
+          9: { max: 0, used: 0 },
+        },
+      });
+
+      useCharacterStore.getState().loadCharacterState(newDruid);
+
+      const { spellSlots } = useCharacterStore.getState().character;
+      expect(spellSlots[1].max).toBe(2);
+    });
+
+    it('preserves used spell slots when recalculating on load', () => {
+      const wizard = makeCharacter({
+        class: {
+          name: 'Wizard',
+          isCustom: false,
+          spellcaster: 'full',
+          hitDie: 6,
+        },
+        level: 3,
+        totalLevel: 3,
+        classes: undefined,
+        spellSlots: {
+          1: { max: 4, used: 2 },
+          2: { max: 2, used: 0 },
+          3: { max: 0, used: 0 },
+          4: { max: 0, used: 0 },
+          5: { max: 0, used: 0 },
+          6: { max: 0, used: 0 },
+          7: { max: 0, used: 0 },
+          8: { max: 0, used: 0 },
+          9: { max: 0, used: 0 },
+        },
+      });
+
+      useCharacterStore.getState().loadCharacterState(wizard);
+
+      const { spellSlots } = useCharacterStore.getState().character;
+      expect(spellSlots[1].used).toBe(2);
+    });
+  });
+
   // ─── addClassLevel ────────────────────────────────────────────────────────
 
   describe('addClassLevel', () => {

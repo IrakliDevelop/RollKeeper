@@ -10,6 +10,17 @@ import { detectSpellAoe } from './spellAoeDetection';
 import { formatSpellDescriptionForEditor } from './referenceParser';
 
 /**
+ * A spell counts as prepared if it is explicitly prepared OR always prepared
+ * (e.g. domain/patron spells). Always-prepared spells cannot be unprepared, so
+ * every "is this spell prepared?" check must treat them as prepared.
+ */
+export function isSpellPrepared(
+  spell: Pick<Spell, 'isPrepared' | 'isAlwaysPrepared'>
+): boolean {
+  return !!spell.isPrepared || !!spell.isAlwaysPrepared;
+}
+
+/**
  * Convert ProcessedSpell (from spellbook) to SpellFormData (for character sheet)
  */
 export type FreeCastMode = 'normal' | 'at_will' | 'innate';

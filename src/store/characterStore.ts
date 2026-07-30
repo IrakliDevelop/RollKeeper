@@ -816,9 +816,32 @@ export const useCharacterStore = create<CharacterStore>()(
       loadCharacterState: characterState => {
         const migratedCharacter = migrateCharacterData(characterState);
         const multiclassCharacter = migrateToMulticlass(migratedCharacter);
+
+        // Spell slots and pact magic are derived from class + level, but they are
+        // only computed on class/level changes. Recalculate them on load so that
+        // freshly-created casters (and any characters saved before this ran) get
+        // correct slots without having to toggle their level.
+        const recalculatedSpellSlots = updateSpellSlotsPreservingUsed(
+          calculateCharacterSpellSlots(multiclassCharacter),
+          multiclassCharacter.spellSlots
+        );
+
+        const recalculatedPactMagic =
+          calculateCharacterPactMagic(multiclassCharacter);
+        if (multiclassCharacter.pactMagic && recalculatedPactMagic) {
+          recalculatedPactMagic.slots.used = Math.min(
+            multiclassCharacter.pactMagic.slots.used,
+            recalculatedPactMagic.slots.max
+          );
+        }
+
         withExternalApply(() =>
           set({
-            character: multiclassCharacter,
+            character: {
+              ...multiclassCharacter,
+              spellSlots: recalculatedSpellSlots,
+              pactMagic: recalculatedPactMagic,
+            },
             hasUnsavedChanges: false,
             saveStatus: 'saved',
             lastSaved: new Date(),
