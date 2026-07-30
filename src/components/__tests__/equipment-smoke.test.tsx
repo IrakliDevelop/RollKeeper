@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WeaponCard } from '@/components/ui/game/equipment/WeaponCard';
 import { WeaponRow } from '@/components/ui/character/equipment/WeaponRow';
@@ -104,6 +104,10 @@ describe('WeaponCard', () => {
 });
 
 describe('WeaponRow', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   const defaultProps = {
     weapon: mockWeaponWithCharges,
     characterLevel: 5,
@@ -122,7 +126,9 @@ describe('WeaponRow', () => {
   it('shows individual charge chips when expanded', async () => {
     const user = userEvent.setup();
     render(<WeaponRow {...defaultProps} />);
-    await user.click(screen.getByRole('button', { name: /Sun Blade/i }));
+    const header = screen.getByText('Sun Blade').closest('button');
+    expect(header).toBeTruthy();
+    await user.click(header!);
     expect(screen.getByText('Flame Tongue')).toBeInTheDocument();
     expect(screen.getByText('Individual Charges')).toBeInTheDocument();
   });
