@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { HeroicInspiration } from '@/types/character';
 import { Sparkles, Plus, Minus, RotateCcw, Settings } from 'lucide-react';
 import { Button, Input } from '@/components/ui/forms';
+import { Switch } from '@/components/ui/forms/switch';
 
 interface HeroicInspirationTrackerProps {
   inspiration: HeroicInspiration;
@@ -19,6 +20,12 @@ interface HeroicInspirationTrackerProps {
   hideSettings?: boolean;
   hideHelperText?: boolean;
 
+  // House-rule mode
+  stackable?: boolean; // default true (preserves prior behavior for callers that don't pass it)
+  showStackableControl?: boolean; // show the player-owned "Allow stacking" switch
+  dmControlled?: boolean; // show a read-only "set by your DM" note instead
+  onToggleStackable?: (enabled: boolean) => void;
+
   className?: string;
 }
 
@@ -33,6 +40,10 @@ export function HeroicInspirationTracker({
   hideControls = false,
   hideSettings = false,
   hideHelperText = false,
+  stackable = true,
+  showStackableControl = false,
+  dmControlled = false,
+  onToggleStackable,
   className = '',
 }: HeroicInspirationTrackerProps) {
   const [showSettings, setShowSettings] = useState(false);
@@ -156,7 +167,7 @@ export function HeroicInspirationTracker({
       )}
 
       {/* Settings Panel */}
-      {!readonly && showSettings && !hideSettings && (
+      {!readonly && showSettings && !hideSettings && stackable && (
         <div className="border-accent-amber-border bg-surface-raised mb-4 rounded-lg border p-3">
           <div className="flex items-center gap-2">
             <label className="text-body text-sm font-medium">
@@ -192,59 +203,93 @@ export function HeroicInspirationTracker({
 
       {/* Current Count Display */}
       <div className="mb-4 text-center">
-        <div
-          className={`text-accent-amber-text font-bold ${compact ? 'text-xl' : 'text-3xl'}`}
-        >
-          {inspiration.count}
-          {inspiration.maxCount && (
-            <span
-              className={`text-accent-amber-text-muted ml-1 ${compact ? 'text-sm' : 'text-lg'}`}
+        {stackable ? (
+          <>
+            <div
+              className={`text-accent-amber-text font-bold ${compact ? 'text-xl' : 'text-3xl'}`}
             >
-              / {inspiration.maxCount}
-            </span>
-          )}
-        </div>
-        {!compact && (
-          <div className="text-accent-amber-text-muted text-sm">
-            {inspiration.count === 0
-              ? 'No inspiration available'
-              : inspiration.count === 1
-                ? '1 inspiration die'
-                : `${inspiration.count} inspiration dice`}
-          </div>
+              {inspiration.count}
+              {inspiration.maxCount && (
+                <span
+                  className={`text-accent-amber-text-muted ml-1 ${compact ? 'text-sm' : 'text-lg'}`}
+                >
+                  / {inspiration.maxCount}
+                </span>
+              )}
+            </div>
+            {!compact && (
+              <div className="text-accent-amber-text-muted text-sm">
+                {inspiration.count === 0
+                  ? 'No inspiration available'
+                  : inspiration.count === 1
+                    ? '1 inspiration die'
+                    : `${inspiration.count} inspiration dice`}
+              </div>
+            )}
+          </>
+        ) : (
+          !compact && (
+            <div className="text-accent-amber-text-muted text-sm">
+              {inspiration.count > 0
+                ? 'You have inspiration'
+                : 'No inspiration'}
+            </div>
+          )
         )}
       </div>
 
-      {/* Inspiration Dice Visual */}
-      <div className="mb-4">{renderInspirationDice()}</div>
+      {/* Inspiration Dice Visual (stacking mode only) */}
+      {stackable && <div className="mb-4">{renderInspirationDice()}</div>}
 
       {/* Action Buttons */}
       {!readonly && !hideControls && (
         <div className="flex justify-center gap-2">
-          {onAddInspiration && (
-            <Button
-              onClick={() => onAddInspiration(1)}
-              disabled={
-                inspiration.maxCount
-                  ? inspiration.count >= inspiration.maxCount
-                  : false
-              }
-              variant="success"
-              size="sm"
-              leftIcon={<Plus size={16} />}
-            >
-              Add
-            </Button>
-          )}
-          {onUseInspiration && (
+          {stackable ? (
+            <>
+              {onAddInspiration && (
+                <Button
+                  onClick={() => onAddInspiration(1)}
+                  disabled={
+                    inspiration.maxCount
+                      ? inspiration.count >= inspiration.maxCount
+                      : false
+                  }
+                  variant="success"
+                  size="sm"
+                  leftIcon={<Plus size={16} />}
+                >
+                  Add
+                </Button>
+              )}
+              {onUseInspiration && (
+                <Button
+                  onClick={onUseInspiration}
+                  disabled={inspiration.count === 0}
+                  variant="danger"
+                  size="sm"
+                  leftIcon={<Minus size={16} />}
+                >
+                  Use
+                </Button>
+              )}
+            </>
+          ) : inspiration.count > 0 ? (
             <Button
               onClick={onUseInspiration}
-              disabled={inspiration.count === 0}
               variant="danger"
               size="sm"
               leftIcon={<Minus size={16} />}
             >
-              Use
+              Use Inspiration
+            </Button>
+          ) : (
+            <Button
+              onClick={() => onAddInspiration?.(1)}
+              variant="success"
+              size="sm"
+              leftIcon={<Plus size={16} />}
+            >
+              Gain Inspiration
             </Button>
           )}
         </div>
@@ -258,9 +303,31 @@ export function HeroicInspirationTracker({
             new roll.
           </p>
           <p className="mt-1">
-            Unlike regular inspiration, you can have multiple dice and they
-            stack!
+            {stackable
+              ? 'Unlike regular inspiration, you can have multiple dice and they stack!'
+              : 'You either have inspiration or you don’t — you can hold only one at a time.'}
           </p>
+        </div>
+      )}
+
+      {!compact && (showStackableControl || dmControlled) && (
+        <div className="border-accent-amber-border mt-3 border-t pt-3">
+          {dmControlled ? (
+            <p className="text-accent-amber-text-muted text-center text-xs">
+              Stacking is set by your DM: {stackable ? 'On' : 'Off'}
+            </p>
+          ) : (
+            <label className="flex items-center justify-between gap-3">
+              <span className="text-body text-sm">
+                Allow stacking (house rule)
+              </span>
+              <Switch
+                checked={stackable}
+                onCheckedChange={enabled => onToggleStackable?.(enabled)}
+                aria-label="Allow stacking heroic inspiration"
+              />
+            </label>
+          )}
         </div>
       )}
     </div>

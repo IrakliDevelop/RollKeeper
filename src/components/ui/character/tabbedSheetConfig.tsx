@@ -217,6 +217,9 @@ export interface TabbedSheetConfigParams {
   updateHeroicInspiration: (updates: Partial<HeroicInspiration>) => void;
   useHeroicInspiration: () => void;
   resetHeroicInspiration: () => void;
+  stackableInspiration?: boolean;
+  inCampaign?: boolean;
+  setStackableInspiration?: (enabled: boolean) => void;
 
   // Bardic inspiration
   useBardicInspiration: () => void;
@@ -1204,6 +1207,10 @@ function FeaturesTabContent({
             onUpdateInspiration={params.updateHeroicInspiration}
             onUseInspiration={params.useHeroicInspiration}
             onResetInspiration={params.resetHeroicInspiration}
+            stackable={params.stackableInspiration ?? false}
+            showStackableControl={!params.inCampaign}
+            dmControlled={Boolean(params.inCampaign)}
+            onToggleStackable={params.setStackableInspiration}
           />
           {customCounter && customCounter.value > 0 && (
             <DmCustomCounterDisplay

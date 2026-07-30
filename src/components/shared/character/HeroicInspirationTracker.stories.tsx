@@ -57,3 +57,42 @@ export const AtMaxDark: Story = {
   ...AtMax,
   globals: { theme: 'dark' },
 };
+
+export const Classic: Story = {
+  args: {
+    inspiration: { count: 1 },
+    stackable: false,
+  },
+};
+
+export const ClassicDark: Story = {
+  ...Classic,
+  globals: { theme: 'dark' },
+};
+
+export const ClassicWithPlayerToggle: Story = {
+  args: {
+    inspiration: { count: 0 },
+    stackable: false,
+    showStackableControl: true,
+    onToggleStackable: fn(),
+  },
+};
+
+export const ClassicWithPlayerToggleDark: Story = {
+  ...ClassicWithPlayerToggle,
+  globals: { theme: 'dark' },
+};
+
+export const ClassicDmControlled: Story = {
+  args: {
+    inspiration: { count: 0 },
+    stackable: false,
+    dmControlled: true,
+  },
+};
+
+export const ClassicDmControlledDark: Story = {
+  ...ClassicDmControlled,
+  globals: { theme: 'dark' },
+};
