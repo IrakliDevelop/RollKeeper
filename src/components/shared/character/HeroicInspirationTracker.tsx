@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { HeroicInspiration } from '@/types/character';
 import { Sparkles, Plus, Minus, RotateCcw, Settings } from 'lucide-react';
 import { Button, Input } from '@/components/ui/forms';
@@ -50,6 +50,12 @@ export function HeroicInspirationTracker({
   const [maxCountInput, setMaxCountInput] = useState(
     inspiration.maxCount?.toString() || ''
   );
+
+  // Classic mode has no max to configure, so the panel must not survive a
+  // switch out of stacking mode.
+  useEffect(() => {
+    if (!stackable) setShowSettings(false);
+  }, [stackable]);
 
   const handleMaxCountChange = () => {
     const newMax =
@@ -141,15 +147,17 @@ export function HeroicInspirationTracker({
 
           {!readonly && !hideSettings && (
             <div className="flex items-center gap-1">
-              <Button
-                onClick={() => setShowSettings(!showSettings)}
-                variant="ghost"
-                size="xs"
-                className="text-accent-amber-text-muted hover:bg-accent-amber-bg-strong"
-                title="Settings"
-              >
-                <Settings size={16} />
-              </Button>
+              {stackable && (
+                <Button
+                  onClick={() => setShowSettings(!showSettings)}
+                  variant="ghost"
+                  size="xs"
+                  className="text-accent-amber-text-muted hover:bg-accent-amber-bg-strong"
+                  title="Settings"
+                >
+                  <Settings size={16} />
+                </Button>
+              )}
               {onResetInspiration && (
                 <Button
                   onClick={onResetInspiration}
@@ -324,7 +332,7 @@ export function HeroicInspirationTracker({
               <Switch
                 checked={stackable}
                 onCheckedChange={enabled => onToggleStackable?.(enabled)}
-                aria-label="Allow stacking heroic inspiration"
+                aria-label="Allow stacking (house rule)"
               />
             </label>
           )}

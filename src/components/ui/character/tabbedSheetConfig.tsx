@@ -1208,7 +1208,9 @@ function FeaturesTabContent({
             onUseInspiration={params.useHeroicInspiration}
             onResetInspiration={params.resetHeroicInspiration}
             stackable={params.stackableInspiration ?? false}
-            showStackableControl={!params.inCampaign}
+            showStackableControl={
+              !params.inCampaign && Boolean(params.setStackableInspiration)
+            }
             dmControlled={Boolean(params.inCampaign)}
             onToggleStackable={params.setStackableInspiration}
           />

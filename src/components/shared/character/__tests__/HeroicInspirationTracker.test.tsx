@@ -162,7 +162,7 @@ describe('HeroicInspirationTracker stackable modes', () => {
     expect(screen.queryByLabelText(/allow stacking/i)).toBeNull();
   });
 
-  it('hides the Max Inspiration settings panel in classic mode', () => {
+  it('hides the settings gear entirely in classic mode', () => {
     render(
       <HeroicInspirationTracker
         inspiration={{ count: 1 }}
@@ -172,8 +172,105 @@ describe('HeroicInspirationTracker stackable modes', () => {
         onUpdateInspiration={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByTitle('Settings'));
+    expect(screen.queryByTitle('Settings')).toBeNull();
     expect(screen.queryByText('Max Inspiration:')).not.toBeInTheDocument();
+  });
+
+  it('shows the settings gear in stacking mode', () => {
+    render(
+      <HeroicInspirationTracker
+        inspiration={{ count: 1 }}
+        stackable={true}
+        onAddInspiration={vi.fn()}
+        onUseInspiration={vi.fn()}
+        onUpdateInspiration={vi.fn()}
+      />
+    );
+    expect(screen.getByTitle('Settings')).toBeInTheDocument();
+  });
+
+  it('closes an open settings panel when stacking is turned off', () => {
+    const { rerender } = render(
+      <HeroicInspirationTracker
+        inspiration={{ count: 1 }}
+        stackable={true}
+        onAddInspiration={vi.fn()}
+        onUseInspiration={vi.fn()}
+        onUpdateInspiration={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByTitle('Settings'));
+    expect(screen.getByText('Max Inspiration:')).toBeInTheDocument();
+
+    rerender(
+      <HeroicInspirationTracker
+        inspiration={{ count: 1 }}
+        stackable={false}
+        onAddInspiration={vi.fn()}
+        onUseInspiration={vi.fn()}
+        onUpdateInspiration={vi.fn()}
+      />
+    );
+    expect(screen.queryByText('Max Inspiration:')).not.toBeInTheDocument();
+
+    rerender(
+      <HeroicInspirationTracker
+        inspiration={{ count: 1 }}
+        stackable={true}
+        onAddInspiration={vi.fn()}
+        onUseInspiration={vi.fn()}
+        onUpdateInspiration={vi.fn()}
+      />
+    );
+    expect(screen.queryByText('Max Inspiration:')).not.toBeInTheDocument();
+  });
+
+  it('reports the DM setting as On when stacking is enabled', () => {
+    render(
+      <HeroicInspirationTracker
+        inspiration={{ count: 2 }}
+        stackable={true}
+        dmControlled
+        onAddInspiration={vi.fn()}
+        onUseInspiration={vi.fn()}
+        onUpdateInspiration={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByText(/Stacking is set by your DM:\s*On/i)
+    ).toBeInTheDocument();
+  });
+
+  it('renders the player switch checked when stacking is enabled', () => {
+    render(
+      <HeroicInspirationTracker
+        inspiration={{ count: 2 }}
+        stackable={true}
+        showStackableControl
+        onToggleStackable={vi.fn()}
+        onAddInspiration={vi.fn()}
+        onUseInspiration={vi.fn()}
+        onUpdateInspiration={vi.fn()}
+      />
+    );
+    expect(screen.getByLabelText(/allow stacking/i)).toBeChecked();
+  });
+
+  it('gives the switch an accessible name matching its visible label', () => {
+    render(
+      <HeroicInspirationTracker
+        inspiration={{ count: 0 }}
+        stackable={false}
+        showStackableControl
+        onToggleStackable={vi.fn()}
+        onAddInspiration={vi.fn()}
+        onUseInspiration={vi.fn()}
+        onUpdateInspiration={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('switch', { name: 'Allow stacking (house rule)' })
+    ).toBeInTheDocument();
   });
 
   it('toggling the player switch reports the new stacking value', () => {
