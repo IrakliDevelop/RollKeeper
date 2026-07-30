@@ -27,9 +27,10 @@ export function useDmSettingsSync(campaignCode: string, dmId: string) {
     [campaignCode, dmId]
   );
 
-  const stackableInspiration = campaign?.stackableInspiration ?? false;
-
   useEffect(() => {
+    if (!campaign) return;
+
+    const stackableInspiration = campaign.stackableInspiration ?? false;
     const fingerprint = JSON.stringify({ stackableInspiration });
     if (fingerprint === lastPushedRef.current) return;
 
@@ -42,5 +43,5 @@ export function useDmSettingsSync(campaignCode: string, dmId: string) {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [stackableInspiration, pushSettings]);
+  }, [campaign, pushSettings]);
 }

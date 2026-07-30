@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useDmSettingsSync } from '@/hooks/useDmSettingsSync';
 import { useDmStore } from '@/store/dmStore';
@@ -17,6 +17,10 @@ describe('useDmSettingsSync', () => {
         },
       ],
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('pushes the stackableInspiration setting to /shared', async () => {
@@ -38,5 +42,18 @@ describe('useDmSettingsSync', () => {
         }),
       })
     );
+  });
+
+  it('does not push when the campaign is not found locally', async () => {
+    useDmStore.setState({ campaigns: [] });
+
+    const fetchMock = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValue({ ok: true } as Response);
+
+    renderHook(() => useDmSettingsSync('MISSING', 'dm-1'));
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
