@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { WeaponCard } from '@/components/ui/game/equipment/WeaponCard';
+import { WeaponRow } from '@/components/ui/character/equipment/WeaponRow';
 import { MagicItemRow } from '@/components/ui/character/equipment/MagicItemRow';
 import { ItemCard } from '@/components/ui/game/inventory/ItemCard';
 import { ChargePoolDisplay } from '@/components/ui/character/equipment/ChargePoolDisplay';
@@ -23,6 +25,22 @@ const mockWeapon: Weapon = {
   isEquipped: true,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
+};
+
+const mockWeaponWithCharges: Weapon = {
+  ...mockWeapon,
+  id: 'w-charges',
+  name: 'Sun Blade',
+  isEquipped: false,
+  charges: [
+    {
+      id: 'c1',
+      name: 'Flame Tongue',
+      maxCharges: 3,
+      usedCharges: 1,
+      restType: 'long',
+    },
+  ],
 };
 
 const mockMagicItem: MagicItem = {
@@ -82,6 +100,31 @@ describe('WeaponCard', () => {
   it('shows equipped status', () => {
     render(<WeaponCard {...defaultProps} />);
     expect(screen.getAllByText('Equipped').length).toBeGreaterThan(0);
+  });
+});
+
+describe('WeaponRow', () => {
+  const defaultProps = {
+    weapon: mockWeaponWithCharges,
+    characterLevel: 5,
+    onEdit: vi.fn(),
+    onDelete: vi.fn(),
+    onToggleEquip: vi.fn(),
+    onExpendCharge: vi.fn(),
+    onRestoreCharge: vi.fn(),
+  };
+
+  it('shows compact individual charge total when collapsed', () => {
+    render(<WeaponRow {...defaultProps} />);
+    expect(screen.getByText('2/3')).toBeInTheDocument();
+  });
+
+  it('shows individual charge chips when expanded', async () => {
+    const user = userEvent.setup();
+    render(<WeaponRow {...defaultProps} />);
+    await user.click(screen.getByRole('button', { name: /Sun Blade/i }));
+    expect(screen.getByText('Flame Tongue')).toBeInTheDocument();
+    expect(screen.getByText('Individual Charges')).toBeInTheDocument();
   });
 });
 
