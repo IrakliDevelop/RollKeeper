@@ -72,4 +72,20 @@ describe('heroic inspiration stackable toggle', () => {
       false
     );
   });
+
+  it('updateHeroicInspiration clamps count to 1 when stackable is off', () => {
+    reset({ stackableInspiration: false, heroicInspiration: { count: 0 } });
+    useCharacterStore.getState().updateHeroicInspiration({ count: 5 });
+    expect(useCharacterStore.getState().character.heroicInspiration.count).toBe(
+      1
+    );
+  });
+
+  it('updateHeroicInspiration leaves count alone when stackable is on', () => {
+    reset({ stackableInspiration: true, heroicInspiration: { count: 0 } });
+    useCharacterStore.getState().updateHeroicInspiration({ count: 5 });
+    expect(useCharacterStore.getState().character.heroicInspiration.count).toBe(
+      5
+    );
+  });
 });

@@ -1050,17 +1050,21 @@ export const useCharacterStore = create<CharacterStore>()(
 
       // Heroic inspiration management actions
       updateHeroicInspiration: updates => {
-        set(state => ({
-          character: {
-            ...state.character,
-            heroicInspiration: {
-              ...state.character.heroicInspiration,
-              ...updates,
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
+        set(state => {
+          const merged = {
+            ...state.character.heroicInspiration,
+            ...updates,
+          };
+          const stackable = state.character.stackableInspiration ?? false;
+          if (!stackable) {
+            merged.count = Math.min(merged.count, 1);
+          }
+          return {
+            character: { ...state.character, heroicInspiration: merged },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
       },
 
       addHeroicInspiration: (amount = 1) => {
