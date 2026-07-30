@@ -45,6 +45,8 @@ export function DockVitals({ addToast }: DockVitalsProps) {
 
   const { count: heroicCount, maxCount: heroicMax } =
     character.heroicInspiration;
+  const stackable = character.stackableInspiration ?? false;
+  const effectiveHeroicMax = stackable ? heroicMax : 1;
 
   const applyAmount = (
     apply: (n: number) => void,
@@ -116,7 +118,7 @@ export function DockVitals({ addToast }: DockVitalsProps) {
 
       <HeroicInspirationRow
         count={heroicCount}
-        maxCount={heroicMax}
+        maxCount={effectiveHeroicMax}
         onIncrement={() => addHeroicInspiration(1)}
         onDecrement={() =>
           updateHeroicInspiration({ count: Math.max(0, heroicCount - 1) })
