@@ -1196,7 +1196,7 @@
 							"hypnotic pattern"
 						],
 						"13": [
-							"Otiluke's resilient sphere",
+							"Otiluke's Resilient Sphere",
 							"stoneskin"
 						],
 						"17": [
@@ -4407,7 +4407,7 @@
 						],
 						[
 							"13th",
-							"{@spell Otiluke's resilient sphere}, {@spell stoneskin}"
+							"{@spell Otiluke's Resilient Sphere}, {@spell stoneskin}"
 						],
 						[
 							"17th",
@@ -5019,7 +5019,7 @@
 					"rows": [
 						[
 							"3rd",
-							"{@spell Protection from Evil And Good|XPHB}, {@spell Shield of Faith|XPHB}"
+							"{@spell Protection from Evil and Good|XPHB}, {@spell Shield of Faith|XPHB}"
 						],
 						[
 							"5th",

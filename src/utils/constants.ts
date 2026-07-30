@@ -595,6 +595,8 @@ export const SPELL_SOURCE_COLORS: Record<string, string> = {
   GHLoE: 'bg-cyan-600',
   VG: 'bg-teal-600',
   'AitFR-AVT': 'bg-green-600',
+  FRHoF: 'bg-amber-600',
+  RHW: 'bg-rose-700',
 };
 
 export const SPELL_SOURCE_BOOKS: Record<string, string> = {
@@ -629,6 +631,8 @@ export const SPELL_SOURCE_BOOKS: Record<string, string> = {
   DMG: "Dungeon Master's Guide",
   DMG2024: "Dungeon Master's Guide 2024",
   XDMG: "Dungeon Master's Guide 2024",
+  FRHoF: 'Forgotten Realms: Heroes of Faerûn',
+  RHW: 'Ravenloft: Horrors Within',
 };
 
 // Auto-save settings
