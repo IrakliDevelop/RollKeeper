@@ -31,6 +31,8 @@ export function WeaponsTab() {
     deleteWeapon,
     equipWeapon,
     reorderWeapons,
+    expendWeaponCharge,
+    restoreWeaponCharge,
     expendWeaponChargePoolAbility,
     restoreWeaponChargePool,
     setWeaponChargePoolUsed,
@@ -152,9 +154,12 @@ export function WeaponsTab() {
           renderItem={weapon => (
             <WeaponRow
               weapon={weapon}
+              characterLevel={character.level}
               onEdit={handleEdit}
               onDelete={id => deleteWeapon(id)}
               onToggleEquip={(id, eq) => equipWeapon(id, eq)}
+              onExpendCharge={expendWeaponCharge}
+              onRestoreCharge={restoreWeaponCharge}
               onExpendChargePoolAbility={expendWeaponChargePoolAbility}
               onRestoreChargePool={restoreWeaponChargePool}
               onSetChargePoolUsed={setWeaponChargePoolUsed}
