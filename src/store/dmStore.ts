@@ -30,6 +30,7 @@ interface DmStoreState {
     code: string,
     partial: Partial<{
       playersSectionOpen: boolean;
+      houseRulesSectionOpen: boolean;
       npcSectionOpen: boolean;
       npcCollapsedGroupNames: string[];
       npcInlineSpellSlots: boolean;
