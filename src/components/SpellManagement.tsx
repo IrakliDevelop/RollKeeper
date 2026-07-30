@@ -44,6 +44,7 @@ import {
   convertProcessedSpellToFormData,
   spellToFormData,
   createInitialSpellFormData,
+  isSpellPrepared,
   type SpellFormData,
 } from '@/utils/spellConversion';
 import { SpellFormFields } from '@/components/shared/spells';
@@ -120,7 +121,7 @@ const SpellCard: React.FC<{
     return (
       <div
         className={`flex items-center justify-between rounded-lg border-2 p-3 transition-all hover:shadow-md ${
-          spell.isPrepared
+          isSpellPrepared(spell)
             ? 'border-accent-green-border-strong bg-surface-raised'
             : 'border-divider bg-surface-raised hover:border-accent-purple-border'
         }`}
@@ -201,10 +202,16 @@ const SpellCard: React.FC<{
           </Button>
           <Button
             onClick={onTogglePrepared}
-            variant={spell.isPrepared ? 'success' : 'outline'}
+            variant={isSpellPrepared(spell) ? 'success' : 'outline'}
             size="xs"
+            disabled={spell.isAlwaysPrepared}
+            title={
+              spell.isAlwaysPrepared
+                ? 'Always prepared — cannot be unprepared'
+                : undefined
+            }
           >
-            {spell.isPrepared ? 'Prepared' : 'Prepare'}
+            {isSpellPrepared(spell) ? 'Prepared' : 'Prepare'}
           </Button>
           <Button
             onClick={onView}
@@ -240,7 +247,7 @@ const SpellCard: React.FC<{
   return (
     <div
       className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${
-        spell.isPrepared
+        isSpellPrepared(spell)
           ? 'border-accent-green-border-strong bg-surface-raised'
           : 'border-divider bg-surface-raised hover:border-accent-purple-border'
       }`}
@@ -376,10 +383,16 @@ const SpellCard: React.FC<{
 
           <Button
             onClick={onTogglePrepared}
-            variant={spell.isPrepared ? 'success' : 'outline'}
+            variant={isSpellPrepared(spell) ? 'success' : 'outline'}
             size="sm"
+            disabled={spell.isAlwaysPrepared}
+            title={
+              spell.isAlwaysPrepared
+                ? 'Always prepared — cannot be unprepared'
+                : undefined
+            }
           >
-            {spell.isPrepared ? 'Prepared' : 'Prepare'}
+            {isSpellPrepared(spell) ? 'Prepared' : 'Prepare'}
           </Button>
 
           <div className="flex gap-1">
