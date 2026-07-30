@@ -21,6 +21,7 @@ const baseState: SharedCampaignState = {
     encounterName: 'Goblin Ambush',
     requestedAt: 1,
   },
+  settings: null,
 };
 
 describe('useInitiativePrompt', () => {

@@ -19,6 +19,7 @@ const makeSharedState = (
   initiative: null,
   battleMap: null,
   initiativeRequest: null,
+  settings: null,
   ...overrides,
 });
 
