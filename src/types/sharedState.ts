@@ -154,6 +154,7 @@ export interface SharedCampaignState {
   initiative: SharedInitiativeState | null;
   battleMap: SharedBattleMapState | null;
   initiativeRequest: InitiativeRollRequest | null;
+  settings: { stackableInspiration: boolean } | null;
 }
 
 // POST body for DM pushing shared state

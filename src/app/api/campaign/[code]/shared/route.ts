@@ -59,6 +59,15 @@ export async function GET(
           : battleMapRaw;
     }
 
+    const settingsRaw = await redis.get<string>(
+      campaignSharedKey(code, 'settings')
+    );
+    let settings: SharedCampaignState['settings'] = null;
+    if (settingsRaw) {
+      settings =
+        typeof settingsRaw === 'string' ? JSON.parse(settingsRaw) : settingsRaw;
+    }
+
     const initiativeRequestRaw = await redis.get<string>(
       campaignSharedKey(code, 'initiativeRequest')
     );
@@ -143,6 +152,7 @@ export async function GET(
       initiative,
       battleMap,
       initiativeRequest,
+      settings,
     };
     return NextResponse.json(state);
   } catch (error) {
