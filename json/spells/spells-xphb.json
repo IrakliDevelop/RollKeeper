@@ -58,8 +58,7 @@
 				"dexterity"
 			],
 			"miscTags": [
-				"SCL",
-				"SGT"
+				"SCL"
 			],
 			"areaTags": [
 				"MT"
@@ -71,6 +70,9 @@
 			"page": 239,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 2,
 			"school": "A",
 			"time": [
@@ -125,6 +127,9 @@
 			"page": 239,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-BD"
+			],
 			"level": 1,
 			"school": "A",
 			"time": [
@@ -284,7 +289,7 @@
 				}
 			],
 			"entries": [
-				"Target a Beast that you can see within range. The target must succeed on a Wisdom saving throw or have the {@condition Charmed|XPHB} condition for the duration. If you or one of your allies deals damage to the target, the spells ends."
+				"Target a Beast that you can see within range. The target must succeed on a Wisdom saving throw or have the {@condition Charmed|XPHB} condition for the duration. If you or one of your allies deals damage to the target, the spell ends."
 			],
 			"entriesHigherLevel": [
 				{
@@ -428,6 +433,9 @@
 			"page": 240,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TWoO"
+			],
 			"level": 3,
 			"school": "N",
 			"time": [
@@ -634,7 +642,7 @@
 				}
 			],
 			"entries": [
-				"An aura of antimagic surrounds you in 10-foot {@variantrule Emanation [Area of Effect]|XPHB|Emanation}. No one can cast spells, take {@action Magic|XPHB} actions, or create other magical effects inside the aura, and those things can't target or otherwise affect anything inside it. Magical properties of magic items don't work inside the aura or on anything inside it.",
+				"An aura of antimagic surrounds you in a 10-foot {@variantrule Emanation [Area of Effect]|XPHB|Emanation}. No one can cast spells, take {@action Magic|XPHB} actions, or create other magical effects inside the aura, and those things can't target or otherwise affect anything inside it. Magical properties of magic items don't work inside the aura or on anything inside it.",
 				"Areas of effect created by spells or other magic can't extend into the aura, and no one can teleport into or out of it or use planar travel there. Portals close temporarily while in the aura.",
 				"Ongoing spells, except those cast by an Artifact or a deity, are suppressed in the area. While an effect is suppressed, it doesn't function, but the time it spends suppressed counts against its duration.",
 				"{@spell Dispel Magic|XPHB} has no effect on the aura, and the auras created by different {@spell Antimagic Field|XPHB} spells don't nullify each other."
@@ -820,6 +828,9 @@
 			"page": 242,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN"
+			],
 			"level": 2,
 			"school": "A",
 			"time": [
@@ -1066,6 +1077,9 @@
 			"page": 244,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"FRAiF"
+			],
 			"level": 2,
 			"school": "D",
 			"time": [
@@ -1565,7 +1579,7 @@
 				}
 			],
 			"entries": [
-				"Choose any number of creatures within range. For the duration, each target has {@variantrule Advantage|XPHB} on Wisdom saving throws and Death Saving Throws and regains the maximum number of {@variantrule Hit Points|XPHB} possible from any healing."
+				"Choose any number of creatures within range. For the duration, each target has {@variantrule Advantage|XPHB} on Wisdom saving throws and {@variantrule Death Saving Throw|XPHB|Death Saving Throws} and regains the maximum number of {@variantrule Hit Points|XPHB} possible from any healing."
 			],
 			"miscTags": [
 				"ADV",
@@ -1802,7 +1816,7 @@
 							"type": "item",
 							"name": "Interposing Hand",
 							"entries": [
-								"The hand grants you Half {@variantrule Cover|XPHB} against attacks and other effects that originate from its space or that pass through it. In addition, its space counts as {@variantrule Difficult Terrain|XPHB} for your enemies."
+								"The hand grants you {@variantrule Cover|XPHB|Half Cover} against attacks and other effects that originate from its space or that pass through it. In addition, its space counts as {@variantrule Difficult Terrain|XPHB} for your enemies."
 							]
 						}
 					]
@@ -1813,7 +1827,7 @@
 					"type": "entries",
 					"name": "Using a Higher-Level Spell Slot",
 					"entries": [
-						"The damage of the Clenched Fist increases by {@scaledamage 4d8|5-9|2d8} and the damage of the Grasping Hand increases by {@scaledamage 2d6|5-9|2d6} for each spell slot level above 5."
+						"The damage of the Clenched Fist increases by {@scaledamage 5d8|5-9|2d8} and the damage of the Grasping Hand increases by {@scaledamage 4d6|5-9|2d6} for each spell slot level above 5."
 					]
 				}
 			],
@@ -1877,7 +1891,7 @@
 			],
 			"entries": [
 				"You create a wall of whirling blades made of magical energy. The wall appears within range and lasts for the duration. You make a straight wall up to 100 feet long, 20 feet high, and 5 feet thick, or a ringed wall up to 60 feet in diameter, 20 feet high, and 5 feet thick. The wall provides Three-Quarters {@variantrule Cover|XPHB}, and its space is {@variantrule Difficult Terrain|XPHB}.",
-				"Any creature in the wall's space makes a Dexterity saving throw, taking {@damage 6d10} Force damage on a failed save or half as much damage on a successful one. A creature also makes that save if it enters the wall's space or ends it turn there. A creature makes that save only once per turn."
+				"Any creature in the wall's space makes a Dexterity saving throw, taking {@damage 6d10} Force damage on a failed save or half as much damage on a successful one. A creature also makes that save if it enters the wall's space or ends its turn there. A creature makes that save only once per turn."
 			],
 			"damageInflict": [
 				"force"
@@ -1934,6 +1948,10 @@
 			"page": 247,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN",
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "E",
 			"time": [
@@ -2104,6 +2122,9 @@
 			"page": 248,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 2,
 			"school": "T",
 			"time": [
@@ -2242,6 +2263,9 @@
 			"page": 248,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "V",
 			"time": [
@@ -2827,6 +2851,9 @@
 			"page": 250,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TFV"
+			],
 			"level": 3,
 			"school": "D",
 			"time": [
@@ -3033,6 +3060,9 @@
 			"page": 251,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN"
+			],
 			"level": 1,
 			"school": "I",
 			"time": [
@@ -3314,6 +3344,9 @@
 			"page": 252,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "D",
 			"time": [
@@ -3408,6 +3441,9 @@
 			"page": 253,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 5,
 			"school": "V",
 			"time": [
@@ -3784,7 +3820,7 @@
 			],
 			"entries": [
 				"You conjure a Large, intangible spirit from the Elemental Planes that appears in an unoccupied space within range. Choose the spirit's element, which determines its damage type: air (Lightning), earth (Thunder), fire (Fire), or water (Cold). The spirit lasts for the duration.",
-				"Whenever a creature you can see enters the spirit's space or starts its turn within 5 feet of the spirit, you can force that creature to make a Dexterity saving throw if the spirit has no creature {@condition Restrained|XPHB}. On failed save, the target takes {@damage 8d8} damage of the spirit's type, and the target has the {@condition Restrained|XPHB} condition until the spell ends. At the start of each of its turns, the {@condition Restrained|XPHB} target repeats the save. On a failed save, the target takes {@damage 4d8} damage of the spirit's type. On a successful save, the target isn't {@condition Restrained|XPHB} by the spirit."
+				"Whenever a creature you can see enters the spirit's space or starts its turn within 5 feet of the spirit, you can force that creature to make a Dexterity saving throw if the spirit has no creature {@condition Restrained|XPHB}. On a failed save, the target takes {@damage 8d8} damage of the spirit's type, and the target has the {@condition Restrained|XPHB} condition until the spell ends. At the start of each of its turns, the {@condition Restrained|XPHB} target repeats the save. On a failed save, the target takes {@damage 4d8} damage of the spirit's type. On a successful save, the target isn't {@condition Restrained|XPHB} by the spirit."
 			],
 			"entriesHigherLevel": [
 				{
@@ -4185,6 +4221,9 @@
 			"page": 256,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"BQGT"
+			],
 			"level": 2,
 			"school": "V",
 			"time": [
@@ -4519,6 +4558,10 @@
 			"page": 258,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN",
+				"UtHftLH"
+			],
 			"level": 3,
 			"school": "A",
 			"time": [
@@ -4593,6 +4636,10 @@
 			"page": 258,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-BD",
+				"DrDe-BtS"
+			],
 			"level": 1,
 			"school": "T",
 			"time": [
@@ -4898,6 +4945,9 @@
 			"page": 259,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "A",
 			"time": [
@@ -4946,6 +4996,9 @@
 			"page": 259,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 0,
 			"school": "I",
 			"time": [
@@ -5026,7 +5079,8 @@
 				"If any of this spell's area overlaps with an area of {@variantrule Bright Light|XPHB} or {@variantrule Dim Light|XPHB} created by a spell of level 2 or lower, that other spell is dispelled."
 			],
 			"miscTags": [
-				"OBJ"
+				"OBJ",
+				"OBS"
 			],
 			"areaTags": [
 				"S"
@@ -5038,6 +5092,9 @@
 			"page": 260,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN"
+			],
 			"level": 2,
 			"school": "T",
 			"time": [
@@ -5284,7 +5341,7 @@
 				}
 			],
 			"range": {
-				"type": "sphere",
+				"type": "emanation",
 				"distance": {
 					"type": "feet",
 					"amount": 30
@@ -5371,6 +5428,11 @@
 			"page": 262,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN",
+				"DrDe-TWoO",
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "D",
 			"time": [
@@ -5563,6 +5625,9 @@
 			"page": 262,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-BD"
+			],
 			"level": 1,
 			"school": "I",
 			"time": [
@@ -5737,6 +5802,10 @@
 			"page": 264,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-ACfaS",
+				"DrDe-SD"
+			],
 			"level": 3,
 			"school": "A",
 			"time": [
@@ -6782,6 +6851,9 @@
 			"page": 268,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 2,
 			"school": "T",
 			"time": [
@@ -6848,6 +6920,9 @@
 			"page": 268,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "C",
 			"time": [
@@ -6989,7 +7064,8 @@
 					"duration": {
 						"type": "minute",
 						"amount": 1
-					}
+					},
+					"concentration": true
 				}
 			],
 			"entries": [
@@ -7099,7 +7175,7 @@
 			],
 			"entries": [
 				"Squirming, ebony tentacles fill a 20-foot square on ground that you can see within range. For the duration, these tentacles turn the ground in that area into {@variantrule Difficult Terrain|XPHB}.",
-				"Each creature in that area makes a Strength saving throw. On a failed save, it takes {@damage 3d6} Bludgeoning damage, and it has the {@condition Restrained|XPHB} condition until the spell ends. A creature also makes that save if it enters the area or ends it turn there. A creature makes that save only once per turn.",
+				"Each creature in that area makes a Strength saving throw. On a failed save, it takes {@damage 3d6} Bludgeoning damage, and it has the {@condition Restrained|XPHB} condition until the spell ends. A creature also makes that save if it enters the area or ends its turn there. A creature makes that save only once per turn.",
 				"A {@condition Restrained|XPHB} creature can take an action to make a Strength ({@skill Athletics|XPHB}) check against your spell save DC, ending the condition on itself on a success."
 			],
 			"damageInflict": [
@@ -7284,6 +7360,9 @@
 			"page": 271,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "V",
 			"time": [
@@ -7333,6 +7412,9 @@
 			"page": 271,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN"
+			],
 			"level": 1,
 			"school": "N",
 			"time": [
@@ -7429,6 +7511,10 @@
 			"page": 271,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN",
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "T",
 			"time": [
@@ -7807,6 +7893,9 @@
 			"page": 274,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 0,
 			"school": "V",
 			"time": [
@@ -7970,6 +8059,12 @@
 			"page": 274,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-SD",
+				"FFotR",
+				"HotB",
+				"UtHftLH"
+			],
 			"level": 3,
 			"school": "V",
 			"time": [
@@ -8266,6 +8361,9 @@
 			"page": 276,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 3,
 			"school": "T",
 			"time": [
@@ -8320,6 +8418,9 @@
 			"page": 276,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "C",
 			"time": [
@@ -9061,6 +9162,9 @@
 			"page": 279,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"FRAiF"
+			],
 			"level": 3,
 			"school": "A",
 			"time": [
@@ -9153,6 +9257,9 @@
 			"page": 280,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-SD"
+			],
 			"level": 1,
 			"school": "C",
 			"time": [
@@ -9260,6 +9367,9 @@
 			"page": 280,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "C",
 			"time": [
@@ -9356,6 +9466,10 @@
 			"page": 281,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-BD",
+				"DrDe-DotSC"
+			],
 			"level": 5,
 			"school": "A",
 			"time": [
@@ -9531,7 +9645,8 @@
 			],
 			"miscTags": [
 				"OBS",
-				"PIR"
+				"PIR",
+				"PRM"
 			],
 			"areaTags": [
 				"Q"
@@ -9543,6 +9658,9 @@
 			"page": 282,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 0,
 			"school": "D",
 			"time": [
@@ -9584,6 +9702,9 @@
 			"page": 282,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "V",
 			"time": [
@@ -9643,6 +9764,11 @@
 			"page": 282,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-ACfaS",
+				"DrDe-SD",
+				"UtHftLH"
+			],
 			"level": 2,
 			"school": "V",
 			"time": [
@@ -9901,7 +10027,8 @@
 				"undead"
 			],
 			"miscTags": [
-				"LGT"
+				"LGT",
+				"OBS"
 			]
 		},
 		{
@@ -10104,6 +10231,9 @@
 			"page": 284,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "A",
 			"time": [
@@ -10508,6 +10638,9 @@
 			"page": 286,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 2,
 			"school": "E",
 			"time": [
@@ -10657,7 +10790,7 @@
 				}
 			],
 			"entries": [
-				"You open a gateway to the Far Realm, a region infested with unspeakable horrors. A 20-foot-radius {@variantrule Sphere [Area of Effect]|XPHB|Sphere} of {@variantrule Darkness|XPHB} appears, centered on a point with range and lasting for the duration. The {@variantrule Sphere [Area of Effect]|XPHB|Sphere} is {@variantrule Difficult Terrain|XPHB}, and it is filled with strange whispers and slurping noises, which can be heard up to 30 feet away. No light, magical or otherwise, can illuminate the area, and creatures fully within it have the {@condition Blinded|XPHB} condition.",
+				"You open a gateway to the Far Realm, a region infested with unspeakable horrors. A 20-foot-radius {@variantrule Sphere [Area of Effect]|XPHB|Sphere} of {@variantrule Darkness|XPHB} appears, centered on a point within range and lasting for the duration. The {@variantrule Sphere [Area of Effect]|XPHB|Sphere} is {@variantrule Difficult Terrain|XPHB}, and it is filled with strange whispers and slurping noises, which can be heard up to 30 feet away. No light, magical or otherwise, can illuminate the area, and creatures fully within it have the {@condition Blinded|XPHB} condition.",
 				"Any creature that starts its turn in the area takes {@damage 2d6} Cold damage. Any creature that ends its turn there must succeed on a Dexterity saving throw or take {@damage 2d6} Acid damage from otherworldly tentacles."
 			],
 			"entriesHigherLevel": [
@@ -10680,7 +10813,8 @@
 				"dexterity"
 			],
 			"miscTags": [
-				"DFT"
+				"DFT",
+				"OBS"
 			],
 			"areaTags": [
 				"S"
@@ -10693,6 +10827,9 @@
 			"page": 287,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "D",
 			"time": [
@@ -10918,6 +11055,11 @@
 			"page": 287,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-DotSC",
+				"DrDe-TDoN",
+				"FRAiF"
+			],
 			"level": 1,
 			"school": "D",
 			"time": [
@@ -11282,6 +11424,11 @@
 			"page": 289,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN",
+				"DrDe-TFV",
+				"UtHftLH"
+			],
 			"level": 2,
 			"school": "I",
 			"time": [
@@ -11405,6 +11552,9 @@
 			"page": 290,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "T",
 			"time": [
@@ -11458,6 +11608,11 @@
 			"page": 290,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-BD",
+				"DrDe-FWtVC",
+				"DrDe-TDoN"
+			],
 			"level": 2,
 			"school": "T",
 			"time": [
@@ -11638,6 +11793,9 @@
 			"page": 291,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 2,
 			"school": "A",
 			"time": [
@@ -11727,6 +11885,9 @@
 			"page": 292,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 0,
 			"school": "V",
 			"time": [
@@ -11820,6 +11981,10 @@
 			"page": 292,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-SD",
+				"UtHftLH"
+			],
 			"level": 3,
 			"school": "V",
 			"time": [
@@ -11958,6 +12123,9 @@
 			"page": 293,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"FRAiF"
+			],
 			"level": 2,
 			"school": "D",
 			"time": [
@@ -12002,6 +12170,9 @@
 			"page": 293,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "T",
 			"time": [
@@ -12055,6 +12226,10 @@
 			"page": 293,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN",
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "A",
 			"time": [
@@ -12100,6 +12275,10 @@
 			"page": 293,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"FRAiF",
+				"UtHftLH"
+			],
 			"level": 0,
 			"school": "C",
 			"time": [
@@ -12277,6 +12456,10 @@
 			"page": 295,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN",
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "V",
 			"time": [
@@ -12331,6 +12514,9 @@
 			"page": 295,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-BD"
+			],
 			"level": 2,
 			"school": "I",
 			"time": [
@@ -12686,6 +12872,9 @@
 			"page": 296,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"FRAiF"
+			],
 			"level": 8,
 			"school": "C",
 			"time": [
@@ -12784,6 +12973,9 @@
 			"page": 297,
 			"srd52": "Acid Arrow",
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN"
+			],
 			"level": 2,
 			"school": "V",
 			"time": [
@@ -12838,6 +13030,10 @@
 			"page": 297,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"BQGT",
+				"DrDe-ACfaS"
+			],
 			"level": 0,
 			"school": "T",
 			"time": [
@@ -13317,6 +13513,9 @@
 			"page": 299,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 2,
 			"school": "C",
 			"time": [
@@ -13708,6 +13907,9 @@
 			"page": 302,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-DotSC"
+			],
 			"level": 6,
 			"school": "T",
 			"time": [
@@ -13888,7 +14090,7 @@
 				}
 			],
 			"entries": [
-				"A frigid globe streaks from you to a point of your choice within range, where it explodes in a 60-foot-radius {@variantrule Sphere [Area of Effect]|XPHB|Sphere}. Each creature in that area makes a Constitution saving throw, taking {@damage 10d6} Cold damage on failed save or half as much damage on a successful one.",
+				"A frigid globe streaks from you to a point of your choice within range, where it explodes in a 60-foot-radius {@variantrule Sphere [Area of Effect]|XPHB|Sphere}. Each creature in that area makes a Constitution saving throw, taking {@damage 10d6} Cold damage on a failed save or half as much damage on a successful one.",
 				"If the globe strikes a body of water, it freezes the water to a depth of 6 inches over an area 30 feet square. This ice lasts for 1 minute. Creatures that were swimming on the surface of frozen water are trapped in the ice and have the {@condition Restrained|XPHB} condition. A trapped creature can take an action to make a Strength ({@skill Athletics|XPHB}) check against your spell save DC to break free.",
 				"You can refrain from firing the globe after completing the spell's casting. If you do so, a globe about the size of a sling bullet, cool to the touch, appears in your hand. At any time, you or a creature you give the globe to can throw the globe (to a range of 40 feet) or hurl it with a sling (to the sling's normal range). It shatters on impact, with the same effect as a normal casting of the spell. You can also set the globe down without shattering it. After 1 minute, if the globe hasn't already shattered, it explodes."
 			],
@@ -14125,6 +14327,10 @@
 			"page": 304,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN",
+				"UtHftLH"
+			],
 			"level": 2,
 			"school": "I",
 			"time": [
@@ -14559,6 +14765,9 @@
 			"page": 306,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 4,
 			"school": "T",
 			"time": [
@@ -14777,6 +14986,9 @@
 			"page": 307,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 2,
 			"school": "A",
 			"time": [
@@ -14825,6 +15037,9 @@
 			"page": 307,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 0,
 			"school": "T",
 			"time": [
@@ -15336,6 +15551,9 @@
 			"page": 309,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN"
+			],
 			"level": 1,
 			"school": "A",
 			"time": [
@@ -15393,6 +15611,9 @@
 			"page": 310,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 2,
 			"school": "A",
 			"time": [
@@ -15631,6 +15852,9 @@
 			"page": 311,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 0,
 			"school": "V",
 			"time": [
@@ -15695,6 +15919,9 @@
 			"page": 311,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "N",
 			"time": [
@@ -16165,6 +16392,9 @@
 			"page": 313,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 0,
 			"school": "V",
 			"time": [
@@ -16190,7 +16420,7 @@
 				}
 			],
 			"entries": [
-				"Flame-like radiance descends on a creature that you can see within range. The target must succeed on a Dexterity saving throw or take {@damage 1d8} Radiant damage. The target gains no benefit from Half {@variantrule Cover|XPHB} or Three-Quarters {@variantrule Cover|XPHB} for this save."
+				"Flame-like radiance descends on a creature that you can see within range. The target must succeed on a Dexterity saving throw or take {@damage 1d8} Radiant damage. The target gains no benefit from {@variantrule Cover|XPHB|Half Cover} or Three-Quarters {@variantrule Cover|XPHB} for this save."
 			],
 			"entriesHigherLevel": [
 				{
@@ -16276,6 +16506,9 @@
 			"page": 313,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 2,
 			"school": "V",
 			"time": [
@@ -16574,6 +16807,9 @@
 			"page": 314,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN"
+			],
 			"level": 3,
 			"school": "D",
 			"time": [
@@ -16610,6 +16846,10 @@
 			"page": 315,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-ACfaS",
+				"DrDe-TFV"
+			],
 			"level": 7,
 			"school": "T",
 			"time": [
@@ -16769,6 +17009,9 @@
 			"page": 316,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "A",
 			"time": [
@@ -16810,6 +17053,9 @@
 			"page": 316,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "A",
 			"time": [
@@ -16867,7 +17113,7 @@
 			"range": {
 				"type": "point",
 				"distance": {
-					"type": "touch"
+					"type": "self"
 				}
 			},
 			"components": {
@@ -16906,6 +17152,9 @@
 					"17": "2d6"
 				}
 			},
+			"damageInflict": [
+				"force"
+			],
 			"miscTags": [
 				"AAD",
 				"SCL"
@@ -16975,6 +17224,9 @@
 			"page": 316,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"FFotR"
+			],
 			"level": 0,
 			"school": "V",
 			"time": [
@@ -17189,6 +17441,9 @@
 			"page": 317,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "E",
 			"time": [
@@ -17467,6 +17722,10 @@
 			"page": 318,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-BD",
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "D",
 			"time": [
@@ -17512,6 +17771,12 @@
 			"page": 318,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-ACfaS",
+				"DrDe-BtS",
+				"DrDe-TDoN",
+				"DrDe-TFV"
+			],
 			"level": 3,
 			"school": "N",
 			"time": [
@@ -17614,6 +17879,9 @@
 			"page": 319,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-BD"
+			],
 			"level": 2,
 			"school": "T",
 			"time": [
@@ -17718,6 +17986,9 @@
 			"page": 319,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"FFotR"
+			],
 			"level": 3,
 			"school": "C",
 			"time": [
@@ -17778,6 +18049,9 @@
 			"page": 319,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 2,
 			"school": "V",
 			"time": [
@@ -18007,6 +18281,11 @@
 			"page": 321,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-BD",
+				"DrDe-TFV",
+				"UtHftLH"
+			],
 			"level": 3,
 			"school": "C",
 			"time": [
@@ -18040,6 +18319,9 @@
 			"entries": [
 				"You create a 20-foot-radius {@variantrule Sphere [Area of Effect]|XPHB|Sphere} of yellow, nauseating gas centered on a point within range. The cloud is {@variantrule Heavily Obscured|XPHB}. The cloud lingers in the air for the duration or until a strong wind (such as the one created by {@spell Gust of Wind|XPHB}) disperses it.",
 				"Each creature that starts its turn in the {@variantrule Sphere [Area of Effect]|XPHB|Sphere} must succeed on a Constitution saving throw or have the {@condition Poisoned|XPHB} condition until the end of the current turn. While {@condition Poisoned|XPHB} in this way, the creature can't take an action or a {@variantrule Bonus Action|XPHB}."
+			],
+			"conditionInflict": [
+				"poisoned"
 			],
 			"savingThrow": [
 				"constitution"
@@ -18235,6 +18517,9 @@
 			"page": 321,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 2,
 			"school": "E",
 			"time": [
@@ -18341,6 +18626,9 @@
 			"name": "Summon Beast",
 			"source": "XPHB",
 			"page": 322,
+			"referenceSources": [
+				"FRAiF"
+			],
 			"level": 2,
 			"school": "C",
 			"time": [
@@ -18396,6 +18684,9 @@
 			"name": "Summon Celestial",
 			"source": "XPHB",
 			"page": 323,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 5,
 			"school": "C",
 			"time": [
@@ -19348,7 +19639,7 @@
 			],
 			"entries": [
 				"This spell instantly transports you and up to eight willing creatures that you can see within range, or a single object that you can see within range, to a destination you select. If you target an object, it must be Large or smaller, and it can't be held or carried by an unwilling creature.",
-				"The destination you choose must be known to you, and it must be on the same plane of existence as you. Your familiarity with the destination determines whether you arrive there successfully. The DM rolls {@dice 1d100} and consults the {@variantrule Teleportation|XPHB} Outcome table and the explanations after it.",
+				"The destination you choose must be known to you, and it must be on the same plane of existence as you. Your familiarity with the destination determines whether you arrive there successfully. The DM rolls {@dice 1d100} and consults the Teleportation Outcome table and the explanations after it.",
 				{
 					"type": "table",
 					"caption": "Teleportation Outcome",
@@ -19477,6 +19768,9 @@
 			"page": 332,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-FWtVC"
+			],
 			"level": 5,
 			"school": "C",
 			"time": [
@@ -19575,6 +19869,9 @@
 			"page": 333,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 0,
 			"school": "T",
 			"time": [
@@ -19835,6 +20132,9 @@
 			"page": 334,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 1,
 			"school": "V",
 			"time": [
@@ -19923,6 +20223,9 @@
 			"name": "Toll the Dead",
 			"source": "XPHB",
 			"page": 334,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 0,
 			"school": "N",
 			"time": [
@@ -20062,8 +20365,8 @@
 				{
 					"type": "timed",
 					"duration": {
-						"type": "round",
-						"amount": 1
+						"type": "minute",
+						"amount": 10
 					}
 				}
 			],
@@ -20162,7 +20465,7 @@
 					"name": "Creature into Creature",
 					"entries": [
 						"If you turn a creature into another kind of creature, the new form can be any kind you choose that has a {@variantrule Challenge Rating|XPHB} equal to or less than the target's {@variantrule Challenge Rating|XPHB} or level. The target's game statistics are replaced by the stat block of the new form, but it retains its {@variantrule Hit Points|XPHB}, {@variantrule Hit Point Dice|XPHB}, alignment, and personality.",
-						"The target gains a number of {@variantrule Temporary Hit Points|XPHB} equal to the {@variantrule Hit Points|XPHB} of the new form. These {@variantrule Temporary Hit Points|XPHB} vanish if any remain when the spell ends. The spell ends early on the target if it has no {@variantrule Temporary Hit Points|XPHB} left.",
+						"The target gains a number of {@variantrule Temporary Hit Points|XPHB} equal to the {@variantrule Hit Points|XPHB} of the new form. These {@variantrule Temporary Hit Points|XPHB} vanish if any remain when the spell ends.",
 						"The target is limited in the actions it can perform by the anatomy of its new form, and it can't speak or cast spells.",
 						"The target's gear melds into the new form. The creature can't use or otherwise benefit from any of that equipment."
 					]
@@ -20409,6 +20712,10 @@
 			"page": 336,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN",
+				"FRAiF"
+			],
 			"level": 1,
 			"school": "C",
 			"time": [
@@ -20457,6 +20764,9 @@
 			"page": 337,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN"
+			],
 			"level": 3,
 			"school": "N",
 			"time": [
@@ -20582,6 +20892,9 @@
 			"page": 337,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"UtHftLH"
+			],
 			"level": 4,
 			"school": "V",
 			"time": [
@@ -21059,6 +21372,9 @@
 			"page": 340,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-DaS"
+			],
 			"level": 2,
 			"school": "C",
 			"time": [
@@ -21271,6 +21587,10 @@
 			"page": 341,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-SD",
+				"UtHftLH"
+			],
 			"level": 9,
 			"school": "C",
 			"time": [
