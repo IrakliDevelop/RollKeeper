@@ -65,8 +65,8 @@ import { useCalendarStore } from '@/store/calendarStore';
 import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
 import { useJoinedBattleMap } from '@/hooks/useJoinedBattleMap';
 import { useBattleMapPokes } from '@/hooks/useBattleMapPokes';
+import { useMaterializeCampaignStackable } from '@/hooks/useMaterializeCampaignStackable';
 import { getMsPerDay, getCampaignDays } from '@/utils/calendarCalculations';
-import { campaignStackableToMaterialize } from '@/utils/inspiration';
 import TabbedCharacterSheet from '@/components/ui/character/TabbedCharacterSheet';
 import type { TabbedCharacterSheetRef } from '@/components/ui/character/TabbedCharacterSheet';
 import {
@@ -288,26 +288,14 @@ export default function CharacterSheet() {
   } = useSharedCampaignState(playerSync.campaignCode, characterId);
   const sharedCalendar = sharedState?.calendar ?? null;
 
-  // In a campaign the DM's house rule governs stacking; solo characters keep
-  // their own preference. Once resolved it lives on the character itself, so
-  // the store clamp and the sheet UI only ever read that one flag.
   const inCampaign = Boolean(playerSync.campaignCode);
-  const stackableToMaterialize = campaignStackableToMaterialize(
+  useMaterializeCampaignStackable({
     inCampaign,
-    sharedState !== null,
-    sharedState?.settings?.stackableInspiration
-  );
-
-  useEffect(() => {
-    if (stackableToMaterialize === null) return;
-    if (character.stackableInspiration !== stackableToMaterialize) {
-      setStackableInspiration(stackableToMaterialize);
-    }
-  }, [
-    stackableToMaterialize,
-    character.stackableInspiration,
+    sharedStateLoaded: sharedState !== null,
+    campaignStackable: sharedState?.settings?.stackableInspiration,
+    currentStackable: character.stackableInspiration ?? false,
     setStackableInspiration,
-  ]);
+  });
 
   // Live battle map join-state derives from this too — derived here (rather
   // than lower in the file, where it used to live) so it's available before
