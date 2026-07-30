@@ -39,6 +39,7 @@ import {
   calculateCharacterSpellSlots,
   calculateCharacterPactMagic,
   getCharacterTotalLevel,
+  hasSpellcasting,
   updateSpellSlotsPreservingUsed,
   calculateModifier,
   calculateLevelFromXP,
@@ -839,19 +840,28 @@ export const useCharacterStore = create<CharacterStore>()(
         // Spell slots and pact magic are derived from class + level, but they are
         // only computed on class/level changes. Recalculate them on load so that
         // freshly-created casters (and any characters saved before this ran) get
-        // correct slots without having to toggle their level.
-        const recalculatedSpellSlots = updateSpellSlotsPreservingUsed(
-          calculateCharacterSpellSlots(multiclassCharacter),
-          multiclassCharacter.spellSlots
-        );
+        // correct slots without having to toggle their level. Only recalculate
+        // for actual spellcasters: for non-casters the calculation yields empty
+        // slots / undefined pact magic, which would clobber slots that were set
+        // explicitly and stored on the character (e.g. a cross-tab spell-slot
+        // spend being adopted through this same load path).
+        let recalculatedSpellSlots = multiclassCharacter.spellSlots;
+        let recalculatedPactMagic = multiclassCharacter.pactMagic;
 
-        const recalculatedPactMagic =
-          calculateCharacterPactMagic(multiclassCharacter);
-        if (multiclassCharacter.pactMagic && recalculatedPactMagic) {
-          recalculatedPactMagic.slots.used = Math.min(
-            multiclassCharacter.pactMagic.slots.used,
-            recalculatedPactMagic.slots.max
+        if (hasSpellcasting(multiclassCharacter)) {
+          recalculatedSpellSlots = updateSpellSlotsPreservingUsed(
+            calculateCharacterSpellSlots(multiclassCharacter),
+            multiclassCharacter.spellSlots
           );
+
+          recalculatedPactMagic =
+            calculateCharacterPactMagic(multiclassCharacter);
+          if (multiclassCharacter.pactMagic && recalculatedPactMagic) {
+            recalculatedPactMagic.slots.used = Math.min(
+              multiclassCharacter.pactMagic.slots.used,
+              recalculatedPactMagic.slots.max
+            );
+          }
         }
 
         withExternalApply(() =>
