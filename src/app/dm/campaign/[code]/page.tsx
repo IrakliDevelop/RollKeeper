@@ -26,7 +26,15 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import { Switch } from '@/components/ui/forms/switch';
 import { Badge } from '@/components/ui/layout/badge';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/layout/card';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { PlayerSummaryCard } from '@/components/ui/campaign/PlayerSummaryCard';
 import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
@@ -34,6 +42,7 @@ import { SendMessageDialog } from '@/components/ui/campaign/SendMessageDialog';
 import { NPCSection } from '@/components/ui/campaign/NPCSection';
 import { useCampaignSync } from '@/hooks/useCampaignSync';
 import { useDmCounterSync } from '@/hooks/useDmCounterSync';
+import { useDmSettingsSync } from '@/hooks/useDmSettingsSync';
 import { useDmStore } from '@/store/dmStore';
 import { BannerUpload } from '@/components/ui/campaign/BannerUpload';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
@@ -89,6 +98,7 @@ export default function CampaignViewPage() {
     });
 
   useDmCounterSync(code, dmId);
+  useDmSettingsSync(code, dmId);
 
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -117,6 +127,11 @@ export default function CampaignViewPage() {
     localCampaign?.dmDashboardUi?.playersSectionOpen ?? true;
 
   const customCounterLabel = localCampaign?.customCounterLabel;
+  const stackableInspiration = localCampaign?.stackableInspiration ?? false;
+
+  const handleToggleStackableInspiration = (enabled: boolean) => {
+    updateCampaign(code, { stackableInspiration: enabled });
+  };
 
   useEffect(() => {
     if (loading) return;
@@ -601,6 +616,34 @@ export default function CampaignViewPage() {
             )}
           </>
         )}
+
+        {/* House Rules — always visible */}
+        <Card>
+          <CardHeader>
+            <CardTitle>House Rules</CardTitle>
+            <CardDescription>
+              Rules that apply to every player in this campaign.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-heading font-medium">
+                  Stackable heroic inspiration
+                </p>
+                <p className="text-muted text-sm">
+                  When on, players can hold more than one Heroic Inspiration.
+                  When off, they follow classic rules (at most one).
+                </p>
+              </div>
+              <Switch
+                checked={stackableInspiration}
+                onCheckedChange={handleToggleStackableInspiration}
+                aria-label="Toggle stackable heroic inspiration"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         {/* NPC Management — always visible */}
         {!loading && !error && (
