@@ -6,6 +6,7 @@ import { useAutoSave } from '@/hooks/useAutoSave';
 import { useCharacterRosterSync } from '@/hooks/useCharacterRosterSync';
 import { useHydration } from '@/hooks/useHydration';
 import { useLiveInitiative } from '@/hooks/useLiveInitiative';
+import { useMaterializeCampaignStackable } from '@/hooks/useMaterializeCampaignStackable';
 import { usePartySync } from '@/hooks/usePartySync';
 import { usePlayerSync } from '@/hooks/usePlayerSync';
 import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
@@ -70,6 +71,9 @@ export function usePlayerVttState(campaignCode: string, characterId: string) {
   );
   const character = useCharacterStore(s => s.character);
   const loadCharacterState = useCharacterStore(s => s.loadCharacterState);
+  const setStackableInspiration = useCharacterStore(
+    s => s.setStackableInspiration
+  );
   const updateCharacterData = usePlayerStore(s => s.updateCharacterData);
   // Loads character + writes live edits back to the roster (page.tsx:387-442).
   useCharacterRosterSync({
@@ -98,6 +102,15 @@ export function usePlayerVttState(campaignCode: string, characterId: string) {
     campaignCode,
     characterId
   );
+  // The VTT is a second entry point into a character, so it needs the same
+  // house-rule materialization the character sheet does.
+  useMaterializeCampaignStackable({
+    inCampaign: Boolean(campaignCode),
+    sharedStateLoaded: sharedState !== null,
+    campaignStackable: sharedState?.settings?.stackableInspiration,
+    currentStackable: character?.stackableInspiration ?? false,
+    setStackableInspiration,
+  });
   const { partyMembers, refetchNow: refetchPartyHpNow } = usePartySync({
     campaignCode,
     currentCharacterId: characterId,

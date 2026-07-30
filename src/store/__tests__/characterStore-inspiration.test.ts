@@ -1,6 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useCharacterStore } from '@/store/characterStore';
+import { STORAGE_KEY } from '@/utils/constants';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
+
+function persistCharacter(overrides = {}) {
+  window.localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      state: { character: makeCharacter(overrides), lastSaved: null },
+      version: 0,
+    })
+  );
+}
 
 function reset(overrides = {}) {
   useCharacterStore.setState({
@@ -61,6 +72,28 @@ describe('heroic inspiration stackable toggle', () => {
     useCharacterStore.getState().loadCharacterState(char);
     expect(useCharacterStore.getState().character.heroicInspiration.count).toBe(
       1
+    );
+  });
+
+  it('rehydration clamps count to 1 when stackable is off', async () => {
+    persistCharacter({
+      stackableInspiration: false,
+      heroicInspiration: { count: 3 },
+    });
+    await useCharacterStore.persist.rehydrate();
+    expect(useCharacterStore.getState().character.heroicInspiration.count).toBe(
+      1
+    );
+  });
+
+  it('rehydration leaves the count alone when stackable is on', async () => {
+    persistCharacter({
+      stackableInspiration: true,
+      heroicInspiration: { count: 3 },
+    });
+    await useCharacterStore.persist.rehydrate();
+    expect(useCharacterStore.getState().character.heroicInspiration.count).toBe(
+      3
     );
   });
 

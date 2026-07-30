@@ -200,6 +200,14 @@ function migrateCharacterData(character: unknown): CharacterState {
     if (typeof result.stackableInspiration !== 'boolean') {
       result.stackableInspiration = false;
     }
+    // Clamping here (rather than in loadCharacterState) also covers the
+    // persist-rehydration path, which never goes through loadCharacterState.
+    if (!result.stackableInspiration && result.heroicInspiration) {
+      result.heroicInspiration.count = Math.min(
+        result.heroicInspiration.count,
+        1
+      );
+    }
     // Ensure bardic inspiration exists (initialize for existing characters)
     if (
       !result.bardicInspiration ||
@@ -840,21 +848,12 @@ export const useCharacterStore = create<CharacterStore>()(
           );
         }
 
-        const clampedInspirationCount =
-          multiclassCharacter.stackableInspiration === false
-            ? Math.min(multiclassCharacter.heroicInspiration.count, 1)
-            : multiclassCharacter.heroicInspiration.count;
-
         withExternalApply(() =>
           set({
             character: {
               ...multiclassCharacter,
               spellSlots: recalculatedSpellSlots,
               pactMagic: recalculatedPactMagic,
-              heroicInspiration: {
-                ...multiclassCharacter.heroicInspiration,
-                count: clampedInspirationCount,
-              },
             },
             hasUnsavedChanges: false,
             saveStatus: 'saved',

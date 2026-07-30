@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, cleanup } from '@testing-library/react';
 import { useDmSettingsSync } from '@/hooks/useDmSettingsSync';
 import { useDmStore } from '@/store/dmStore';
 
@@ -20,6 +20,9 @@ describe('useDmSettingsSync', () => {
   });
 
   afterEach(() => {
+    // No global auto-cleanup: a leftover mounted hook would push again when the
+    // next test seeds the store.
+    cleanup();
     vi.useRealTimers();
   });
 
@@ -42,6 +45,58 @@ describe('useDmSettingsSync', () => {
         }),
       })
     );
+  });
+
+  it('retries the push after a failed request instead of recording it as delivered', async () => {
+    const fetchMock = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValue({ ok: false, status: 500 } as Response);
+
+    const { rerender } = renderHook(() => useDmSettingsSync('ABC', 'dm-1'));
+    await vi.advanceTimersByTimeAsync(600);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // Same setting, new campaign object identity — a failed push must not have
+    // been fingerprinted, so the hook re-attempts delivery.
+    useDmStore.setState({
+      campaigns: [
+        {
+          code: 'ABC',
+          name: 'Test',
+          createdAt: new Date().toISOString(),
+          stackableInspiration: true,
+        },
+      ],
+    });
+    rerender();
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not re-push after a successful request', async () => {
+    const fetchMock = vi
+      .spyOn(global, 'fetch')
+      .mockResolvedValue({ ok: true } as Response);
+
+    const { rerender } = renderHook(() => useDmSettingsSync('ABC', 'dm-1'));
+    await vi.advanceTimersByTimeAsync(600);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    useDmStore.setState({
+      campaigns: [
+        {
+          code: 'ABC',
+          name: 'Test',
+          createdAt: new Date().toISOString(),
+          stackableInspiration: true,
+        },
+      ],
+    });
+    rerender();
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('does not push when the campaign is not found locally', async () => {
