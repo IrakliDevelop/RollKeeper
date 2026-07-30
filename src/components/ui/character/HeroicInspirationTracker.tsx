@@ -10,6 +10,10 @@ interface HeroicInspirationTrackerProps {
   onAddInspiration: (amount?: number) => void;
   onUseInspiration: () => void;
   onResetInspiration: () => void;
+  stackable: boolean;
+  showStackableControl?: boolean;
+  dmControlled?: boolean;
+  onToggleStackable?: (enabled: boolean) => void;
   className?: string;
 }
 
@@ -19,6 +23,10 @@ export default function HeroicInspirationTracker({
   onAddInspiration,
   onUseInspiration,
   onResetInspiration,
+  stackable,
+  showStackableControl,
+  dmControlled,
+  onToggleStackable,
   className = '',
 }: HeroicInspirationTrackerProps) {
   // Use the shared HeroicInspirationTracker component with full functionality
@@ -29,6 +37,10 @@ export default function HeroicInspirationTracker({
       onAddInspiration={onAddInspiration}
       onUseInspiration={onUseInspiration}
       onResetInspiration={onResetInspiration}
+      stackable={stackable}
+      showStackableControl={showStackableControl}
+      dmControlled={dmControlled}
+      onToggleStackable={onToggleStackable}
       readonly={false}
       compact={false}
       hideControls={false}

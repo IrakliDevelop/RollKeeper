@@ -66,6 +66,7 @@ import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
 import { useJoinedBattleMap } from '@/hooks/useJoinedBattleMap';
 import { useBattleMapPokes } from '@/hooks/useBattleMapPokes';
 import { getMsPerDay, getCampaignDays } from '@/utils/calendarCalculations';
+import { campaignStackableToMaterialize } from '@/utils/inspiration';
 import TabbedCharacterSheet from '@/components/ui/character/TabbedCharacterSheet';
 import type { TabbedCharacterSheetRef } from '@/components/ui/character/TabbedCharacterSheet';
 import {
@@ -181,6 +182,7 @@ export default function CharacterSheet() {
     updateHeroicInspiration,
     useHeroicInspiration: spendHeroicInspiration,
     resetHeroicInspiration,
+    setStackableInspiration,
     toggleReaction,
     resetReaction,
     // Bardic inspiration methods
@@ -285,6 +287,27 @@ export default function CharacterSheet() {
     refetchNow,
   } = useSharedCampaignState(playerSync.campaignCode, characterId);
   const sharedCalendar = sharedState?.calendar ?? null;
+
+  // In a campaign the DM's house rule governs stacking; solo characters keep
+  // their own preference. Once resolved it lives on the character itself, so
+  // the store clamp and the sheet UI only ever read that one flag.
+  const inCampaign = Boolean(playerSync.campaignCode);
+  const stackableToMaterialize = campaignStackableToMaterialize(
+    inCampaign,
+    sharedState !== null,
+    sharedState?.settings?.stackableInspiration
+  );
+
+  useEffect(() => {
+    if (stackableToMaterialize === null) return;
+    if (character.stackableInspiration !== stackableToMaterialize) {
+      setStackableInspiration(stackableToMaterialize);
+    }
+  }, [
+    stackableToMaterialize,
+    character.stackableInspiration,
+    setStackableInspiration,
+  ]);
 
   // Live battle map join-state derives from this too — derived here (rather
   // than lower in the file, where it used to live) so it's available before
@@ -1235,6 +1258,9 @@ export default function CharacterSheet() {
                 updateHeroicInspiration={updateHeroicInspiration}
                 useHeroicInspiration={spendHeroicInspiration}
                 resetHeroicInspiration={resetHeroicInspiration}
+                stackableInspiration={character.stackableInspiration ?? false}
+                inCampaign={inCampaign}
+                setStackableInspiration={setStackableInspiration}
                 useBardicInspiration={useBardicInspiration}
                 restoreBardicInspiration={restoreBardicInspiration}
                 resetBardicInspiration={resetBardicInspiration}
