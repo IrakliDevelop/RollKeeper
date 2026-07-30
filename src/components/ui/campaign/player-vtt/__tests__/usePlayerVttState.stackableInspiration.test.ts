@@ -21,10 +21,10 @@ function sharedStateBody(stackableInspiration: boolean) {
   };
 }
 
-function seedRoster() {
+function seedRoster(stackableInspiration = false) {
   const characterData = makeCharacter({
     id: CHARACTER_ID,
-    stackableInspiration: false,
+    stackableInspiration,
   });
   usePlayerStore.setState({
     characters: [
@@ -84,9 +84,15 @@ describe('usePlayerVttState — campaign stackable inspiration', () => {
   it('leaves the character alone when the campaign already matches', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response(JSON.stringify(sharedStateBody(false))))
+      vi.fn(async () => new Response(JSON.stringify(sharedStateBody(true))))
     );
-    seedRoster();
+    // Seeded on (the opposite of the default) so a hook that wrote
+    // unconditionally — or reset to the default — would be caught.
+    seedRoster(true);
+    const setSpy = vi.spyOn(
+      useCharacterStore.getState(),
+      'setStackableInspiration'
+    );
 
     const { unmount } = renderHook(() =>
       usePlayerVttState('CAMP1', CHARACTER_ID)
@@ -96,10 +102,12 @@ describe('usePlayerVttState — campaign stackable inspiration', () => {
       await vi.advanceTimersByTimeAsync(60);
     });
 
+    expect(setSpy).not.toHaveBeenCalled();
     expect(useCharacterStore.getState().character.stackableInspiration).toBe(
-      false
+      true
     );
 
     unmount();
+    setSpy.mockRestore();
   });
 });

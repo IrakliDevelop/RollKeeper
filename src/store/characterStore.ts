@@ -194,7 +194,10 @@ function migrateCharacterData(character: unknown): CharacterState {
       !result.heroicInspiration ||
       typeof result.heroicInspiration !== 'object'
     ) {
-      result.heroicInspiration = DEFAULT_CHARACTER_STATE.heroicInspiration;
+      // Copy, so the clamp below never mutates the shared default object.
+      result.heroicInspiration = {
+        ...DEFAULT_CHARACTER_STATE.heroicInspiration,
+      };
     }
     // House-rule: stackable inspiration defaults to off (classic rules).
     if (typeof result.stackableInspiration !== 'boolean') {
@@ -202,7 +205,10 @@ function migrateCharacterData(character: unknown): CharacterState {
     }
     // Clamping here (rather than in loadCharacterState) also covers the
     // persist-rehydration path, which never goes through loadCharacterState.
-    if (!result.stackableInspiration && result.heroicInspiration) {
+    if (
+      !result.stackableInspiration &&
+      typeof result.heroicInspiration?.count === 'number'
+    ) {
       result.heroicInspiration.count = Math.min(
         result.heroicInspiration.count,
         1
