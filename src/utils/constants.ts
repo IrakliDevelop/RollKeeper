@@ -466,10 +466,6 @@ export const DEFAULT_CHARACTER_STATE = {
   },
   stackableInspiration: false,
 
-  bardicInspiration: {
-    usesExpended: 0,
-  },
-
   classResources: {} as Record<string, ClassResourceUsage>,
 
   trackableTraits: [] as TrackableTrait[],
