@@ -3763,6 +3763,20 @@ export const useCharacterStore = create<CharacterStore>()(
             hasUsedReaction: false,
           };
 
+          // Reset class resources per each resource's short-rest rule
+          const resetClassResources = {
+            ...(character.classResources ?? {}),
+          };
+          for (const active of getActiveClassResources(character)) {
+            const rule = active.definition.getShortRestReset(active.classLevel);
+            if (rule === 0) continue;
+            const current =
+              resetClassResources[active.definition.id]?.usesExpended ?? 0;
+            resetClassResources[active.definition.id] = {
+              usesExpended: rule === 'all' ? 0 : Math.max(0, current - 1),
+            };
+          }
+
           return {
             character: {
               ...character,
@@ -3772,6 +3786,7 @@ export const useCharacterStore = create<CharacterStore>()(
               magicItems: resetMagicItems,
               pactMagic: resetPactMagic,
               reaction: resetReaction,
+              classResources: resetClassResources,
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
@@ -3881,6 +3896,13 @@ export const useCharacterStore = create<CharacterStore>()(
             ? { ...character.bardicInspiration, usesExpended: 0 }
             : undefined;
 
+          // Reset all class resources (long rest restores everything)
+          const resetClassResources = Object.fromEntries(
+            Object.entries(character.classResources ?? {}).map(
+              ([id, usage]) => [id, { ...usage, usesExpended: 0 }]
+            )
+          );
+
           // Deactivate all temporary buffs (preserve them for re-enabling)
           const deactivatedBuffs = (character.temporaryBuffs || []).map(buff =>
             buff.isActive
@@ -3920,6 +3942,7 @@ export const useCharacterStore = create<CharacterStore>()(
               reaction: resetReaction,
               isTempACActive: resetIsTempACActive,
               bardicInspiration: resetBardicInspiration,
+              classResources: resetClassResources,
               temporaryBuffs: deactivatedBuffs,
               summons: resetSummons,
               daysSpent: (character.daysSpent || 0) + 1,
