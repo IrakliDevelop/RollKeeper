@@ -9,6 +9,7 @@ import {
   MagicItem,
   ArmorItem,
   InventoryItem,
+  ClassResourceUsage,
 } from '@/types/character';
 
 // D&D 5e skill to ability mappings
@@ -468,6 +469,8 @@ export const DEFAULT_CHARACTER_STATE = {
   bardicInspiration: {
     usesExpended: 0,
   },
+
+  classResources: {} as Record<string, ClassResourceUsage>,
 
   trackableTraits: [] as TrackableTrait[],
 
