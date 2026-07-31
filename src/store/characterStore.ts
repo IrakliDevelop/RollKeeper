@@ -60,6 +60,7 @@ import {
   isDead,
 } from '@/utils/hpCalculations';
 import { detectSpellAoe } from '@/utils/spellAoeDetection';
+import { getActiveClassResources } from '@/utils/classResources';
 import { usePlayerStore } from '@/store/playerStore';
 import { isApplyingExternal, withExternalApply } from '@/lib/characterRevision';
 import { initCrossTabCharacterSync } from '@/lib/crossTabCharacterSync';
@@ -221,6 +222,19 @@ function migrateCharacterData(character: unknown): CharacterState {
       typeof result.bardicInspiration !== 'object'
     ) {
       result.bardicInspiration = DEFAULT_CHARACTER_STATE.bardicInspiration;
+    }
+    // Ensure classResources exists; migrate legacy bardicInspiration into it
+    if (!result.classResources || typeof result.classResources !== 'object') {
+      result.classResources = {};
+    }
+    if (
+      result.bardicInspiration &&
+      typeof result.bardicInspiration.usesExpended === 'number' &&
+      result.classResources['bardic-inspiration'] === undefined
+    ) {
+      result.classResources['bardic-inspiration'] = {
+        usesExpended: result.bardicInspiration.usesExpended,
+      };
     }
     // Ensure temporary AC field exists
     if (typeof result.tempArmorClass !== 'number') {
@@ -450,6 +464,11 @@ interface CharacterStore {
   useBardicInspiration: () => void;
   restoreBardicInspiration: () => void;
   resetBardicInspiration: () => void;
+
+  // Generic class resource management
+  useClassResource: (id: string, amount?: number) => void;
+  restoreClassResource: (id: string, amount?: number) => void;
+  resetClassResource: (id: string) => void;
 
   // Armor Class management
   updateTempArmorClass: (tempAC: number) => void;
@@ -1192,6 +1211,65 @@ export const useCharacterStore = create<CharacterStore>()(
             bardicInspiration: {
               ...state.character.bardicInspiration,
               usesExpended: 0,
+            },
+          },
+          hasUnsavedChanges: true,
+          saveStatus: 'saving',
+        }));
+      },
+
+      // Generic class resource management
+      useClassResource: (id, amount = 1) => {
+        set(state => {
+          const active = getActiveClassResources(state.character).find(
+            r => r.definition.id === id
+          );
+          if (!active) return state;
+          const current =
+            state.character.classResources?.[id]?.usesExpended ?? 0;
+          const next = Math.min(active.maxUses, current + amount);
+          if (next === current) return state;
+          return {
+            character: {
+              ...state.character,
+              classResources: {
+                ...state.character.classResources,
+                [id]: { usesExpended: next },
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      restoreClassResource: (id, amount = 1) => {
+        set(state => {
+          const current =
+            state.character.classResources?.[id]?.usesExpended ?? 0;
+          const next = Math.max(0, current - amount);
+          if (next === current) return state;
+          return {
+            character: {
+              ...state.character,
+              classResources: {
+                ...state.character.classResources,
+                [id]: { usesExpended: next },
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          };
+        });
+      },
+
+      resetClassResource: id => {
+        set(state => ({
+          character: {
+            ...state.character,
+            classResources: {
+              ...state.character.classResources,
+              [id]: { usesExpended: 0 },
             },
           },
           hasUnsavedChanges: true,

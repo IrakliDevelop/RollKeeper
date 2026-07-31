@@ -129,6 +129,13 @@ export interface BardicInspiration {
   usesExpended: number; // Number of bardic inspiration uses expended (resets on long rest)
 }
 
+// Generic class resource usage, keyed by ClassResourceDefinition.id
+// (see src/utils/classResources). Maximum is always computed from the
+// registry — never persisted.
+export interface ClassResourceUsage {
+  usesExpended: number;
+}
+
 // Rich text content for character information
 export interface RichTextContent {
   id: string;
@@ -635,6 +642,9 @@ export interface CharacterState {
 
   // Bardic Inspiration (Bard class feature)
   bardicInspiration?: BardicInspiration;
+
+  // Generic class resources (Rage, Wild Shape, Channel Divinity, ...)
+  classResources?: Record<string, ClassResourceUsage>;
 
   // Trackable Traits
   trackableTraits: TrackableTrait[];

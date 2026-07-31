@@ -34,10 +34,7 @@ export function getActiveClassResources(
   const proficiencyBonus = getProficiencyBonus(
     character.totalLevel ?? character.level ?? 1
   );
-  // Cast keeps Task 1 standalone; the field lands on CharacterState in Task 2.
-  const stored = (
-    character as { classResources?: Record<string, { usesExpended: number }> }
-  ).classResources;
+  const stored = character.classResources;
 
   const result: ActiveClassResource[] = [];
   for (const entry of classes) {
