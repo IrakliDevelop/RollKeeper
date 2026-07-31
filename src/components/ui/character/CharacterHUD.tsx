@@ -19,20 +19,23 @@ import {
   Bird,
   Mountain,
   Waves,
-  Music,
   Wand2,
 } from 'lucide-react';
 import { CharacterState } from '@/types/character';
 import { NumberField } from '@/components/ui/forms/NumberInput';
 import {
   calculateCharacterArmorClass,
-  calculateModifier,
   calculateSpellAttackBonus,
   calculateSpellSaveDC,
   formatModifier,
   getProficiencyBonus,
   getBuffSpeedBonus,
 } from '@/utils/calculations';
+import { getActiveClassResources } from '@/utils/classResources';
+import {
+  CLASS_RESOURCE_ICONS,
+  CLASS_RESOURCE_COLORS,
+} from './classResourceStyles';
 
 interface CharacterHUDProps {
   character: CharacterState;
@@ -43,8 +46,8 @@ interface CharacterHUDProps {
   onDecrementDays: () => void;
   onToggleInspiration: () => void;
   onToggleReaction: () => void;
-  onUseBardicInspiration?: () => void;
-  onRestoreBardicInspiration?: () => void;
+  onUseClassResource?: (id: string) => void;
+  onRestoreClassResource?: (id: string) => void;
   onStopConcentration: () => void;
   onNavigateToConditions?: () => void;
   onNavigateToBuffs?: () => void;
@@ -63,8 +66,8 @@ export default function CharacterHUD({
   onDecrementDays,
   onToggleInspiration,
   onToggleReaction,
-  onUseBardicInspiration,
-  onRestoreBardicInspiration,
+  onUseClassResource,
+  onRestoreClassResource,
   onStopConcentration,
   onNavigateToConditions,
   onNavigateToBuffs,
@@ -96,19 +99,8 @@ export default function CharacterHUD({
   const hasInspiration = inspirationCount > 0;
   const hasUsedReaction = character.reaction?.hasUsedReaction ?? false;
 
-  // Bardic Inspiration (bard only)
-  const isBard =
-    character.classes?.some(c => c.className.toLowerCase() === 'bard') ||
-    character.class?.name?.toLowerCase() === 'bard';
-  const bardicMaxUses = isBard
-    ? Math.max(1, calculateModifier(character.abilities.charisma))
-    : 0;
-  const bardicUsesRemaining = isBard
-    ? Math.max(
-        0,
-        bardicMaxUses - (character.bardicInspiration?.usesExpended ?? 0)
-      )
-    : 0;
+  // Class resource chips (capped to protect layout)
+  const classResourceChips = getActiveClassResources(character).slice(0, 4);
 
   const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
   const activeBuffCount = activeBuffs.length;
@@ -326,31 +318,45 @@ export default function CharacterHUD({
           )}
         </button>
 
-        {/* Bardic Inspiration (Bard only) */}
-        {isBard && onUseBardicInspiration && onRestoreBardicInspiration && (
-          <button
-            onClick={
-              bardicUsesRemaining > 0
-                ? onUseBardicInspiration
-                : onRestoreBardicInspiration
-            }
-            className={`relative rounded-lg border px-2.5 py-2 transition-colors ${
-              bardicUsesRemaining > 0
-                ? 'border-indigo-400 bg-indigo-50 text-indigo-600 dark:border-indigo-600 dark:bg-indigo-950 dark:text-indigo-400'
-                : 'border-divider text-muted hover:bg-surface-hover hover:text-indigo-600'
-            }`}
-            title={
-              bardicUsesRemaining > 0
-                ? `Expend Bardic Inspiration (${bardicUsesRemaining}/${bardicMaxUses})`
-                : `Restore Bardic Inspiration (0/${bardicMaxUses})`
-            }
-          >
-            <Music className="h-4 w-4" />
-            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-indigo-500 px-0.5 text-[10px] font-bold text-white dark:bg-indigo-400 dark:text-indigo-950">
-              {bardicUsesRemaining}
-            </span>
-          </button>
-        )}
+        {/* Class resource chips */}
+        {onUseClassResource &&
+          onRestoreClassResource &&
+          classResourceChips.map(resource => {
+            const Icon = CLASS_RESOURCE_ICONS[resource.definition.icon];
+            const colors = CLASS_RESOURCE_COLORS[resource.definition.color];
+            const isPool = resource.definition.displayStyle === 'pool';
+            const hasUses = resource.usesRemaining > 0;
+            return (
+              <button
+                key={resource.definition.id}
+                onClick={
+                  isPool
+                    ? undefined
+                    : hasUses
+                      ? () => onUseClassResource(resource.definition.id)
+                      : () => onRestoreClassResource(resource.definition.id)
+                }
+                disabled={isPool}
+                className={`relative rounded-lg border px-2.5 py-2 transition-colors ${
+                  hasUses
+                    ? colors.chipOn
+                    : 'border-divider text-muted hover:bg-surface-hover'
+                } ${isPool ? 'cursor-default' : ''}`}
+                title={
+                  isPool
+                    ? `${resource.definition.name}: ${resource.usesRemaining}/${resource.maxUses} (manage in Actions tab)`
+                    : hasUses
+                      ? `Expend ${resource.definition.name} (${resource.usesRemaining}/${resource.maxUses})`
+                      : `Restore ${resource.definition.name} (0/${resource.maxUses})`
+                }
+              >
+                <Icon className="h-4 w-4" />
+                <span className="bg-surface-elevated text-heading border-divider absolute -top-1.5 -right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full border px-0.5 text-[10px] font-bold">
+                  {resource.usesRemaining}
+                </span>
+              </button>
+            );
+          })}
 
         {/* Reaction Toggle */}
         <button

@@ -9,7 +9,8 @@ import { QuickFeatures } from '@/components/QuickFeatures';
 import { ConcentrationTracker } from '@/components/ui/character';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
-import BardicInspirationTracker from '@/components/ui/character/BardicInspirationTracker';
+import ClassResourceTracker from '@/components/ui/character/ClassResourceTracker';
+import { getActiveClassResources } from '@/utils/classResources';
 import { CharacterState } from '@/types/character';
 
 interface ActionsSectionProps {
@@ -36,10 +37,10 @@ interface ActionsSectionProps {
   animateRoll?: (notation: string) => Promise<unknown>;
   switchToTab: (tabId: string) => void;
   onStopConcentration: () => void;
-  isBard?: boolean;
-  onUseBardicInspiration?: () => void;
-  onRestoreBardicInspiration?: () => void;
-  onResetBardicInspiration?: () => void;
+  showClassResources?: boolean;
+  onUseClassResource?: (id: string, amount?: number) => void;
+  onRestoreClassResource?: (id: string, amount?: number) => void;
+  onResetClassResource?: (id: string) => void;
 }
 
 // Simple collapsible component for subsections
@@ -114,12 +115,15 @@ export default function ActionsSection({
   animateRoll,
   switchToTab,
   onStopConcentration,
-  isBard,
-  onUseBardicInspiration,
-  onRestoreBardicInspiration,
-  onResetBardicInspiration,
+  showClassResources,
+  onUseClassResource,
+  onRestoreClassResource,
+  onResetClassResource,
 }: ActionsSectionProps) {
   const equippedWeapons = character.weapons.filter(weapon => weapon.isEquipped);
+  const classResources = showClassResources
+    ? getActiveClassResources(character)
+    : [];
   const actionSpells = character.spells.filter(
     spell =>
       (spell.level === 0 && spell.isPrepared) || // Only prepared cantrips
@@ -163,23 +167,44 @@ export default function ActionsSection({
             animateRoll={animateRoll}
           />
         </ErrorBoundary>
-        {isBard &&
-          onUseBardicInspiration &&
-          onRestoreBardicInspiration &&
-          onResetBardicInspiration && (
-            <div className="border-divider mt-4 border-t pt-4">
-              <BardicInspirationTracker
-                bardicInspiration={
-                  character.bardicInspiration ?? { usesExpended: 0 }
-                }
-                character={character}
-                onUseInspiration={onUseBardicInspiration}
-                onRestoreInspiration={onRestoreBardicInspiration}
-                onResetInspiration={onResetBardicInspiration}
-              />
-            </div>
-          )}
       </CollapsibleSubsection>
+
+      {/* Class Resources - Collapsible */}
+      {classResources.length > 0 &&
+        onUseClassResource &&
+        onRestoreClassResource &&
+        onResetClassResource && (
+          <CollapsibleSubsection
+            title="Class Resources"
+            icon="🔥"
+            persistKey="class-resources"
+            defaultExpanded={true}
+            badge={
+              <span className="bg-accent-purple-bg text-accent-purple-text rounded-full px-2 py-1 text-sm font-medium">
+                {classResources.length}
+              </span>
+            }
+          >
+            <div className="space-y-4">
+              {classResources.map((resource, index) => (
+                <div
+                  key={resource.definition.id}
+                  className={
+                    index > 0 ? 'border-divider border-t pt-4' : undefined
+                  }
+                >
+                  <ClassResourceTracker
+                    resource={resource}
+                    abilities={character.abilities}
+                    onUse={onUseClassResource}
+                    onRestore={onRestoreClassResource}
+                    onReset={onResetClassResource}
+                  />
+                </div>
+              ))}
+            </div>
+          </CollapsibleSubsection>
+        )}
 
       {/* Quick Features - Collapsible */}
       {(character.favoriteFeatureIds || []).length > 0 && (

@@ -185,10 +185,10 @@ export default function CharacterSheet() {
     setStackableInspiration,
     toggleReaction,
     resetReaction,
-    // Bardic inspiration methods
-    useBardicInspiration,
-    restoreBardicInspiration,
-    resetBardicInspiration,
+    // Class resource methods
+    useClassResource: expendClassResource,
+    restoreClassResource,
+    resetClassResource,
     updateTempArmorClass,
     toggleTempAC,
     toggleJackOfAllTrades,
@@ -1064,8 +1064,8 @@ export default function CharacterSheet() {
               }
               onToggleInspiration={handleToggleInspiration}
               onToggleReaction={toggleReaction}
-              onUseBardicInspiration={useBardicInspiration}
-              onRestoreBardicInspiration={restoreBardicInspiration}
+              onUseClassResource={expendClassResource}
+              onRestoreClassResource={restoreClassResource}
               onStopConcentration={stopConcentration}
               onNavigateToConditions={() => {
                 switchToTab('conditions');
@@ -1249,9 +1249,9 @@ export default function CharacterSheet() {
                 stackableInspiration={character.stackableInspiration ?? false}
                 inCampaign={inCampaign}
                 setStackableInspiration={setStackableInspiration}
-                useBardicInspiration={useBardicInspiration}
-                restoreBardicInspiration={restoreBardicInspiration}
-                resetBardicInspiration={resetBardicInspiration}
+                useClassResource={expendClassResource}
+                restoreClassResource={restoreClassResource}
+                resetClassResource={resetClassResource}
                 addLanguage={addLanguage}
                 deleteLanguage={deleteLanguage}
                 addFeature={addFeature}
