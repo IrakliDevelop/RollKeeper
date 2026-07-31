@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Heart,
   Shield,
@@ -99,8 +99,20 @@ export default function CharacterHUD({
   const hasInspiration = inspirationCount > 0;
   const hasUsedReaction = character.reaction?.hasUsedReaction ?? false;
 
-  // Class resource chips (capped to protect layout)
-  const classResourceChips = getActiveClassResources(character).slice(0, 4);
+  // Class resource chips (capped to protect layout). Intentionally narrow
+  // deps: only recompute when fields that affect resource maxima change.
+  const classResourceChips = useMemo(
+    () => getActiveClassResources(character).slice(0, 4),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      character.classes,
+      character.class,
+      character.level,
+      character.totalLevel,
+      character.abilities,
+      character.classResources,
+    ]
+  );
 
   const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
   const activeBuffCount = activeBuffs.length;
@@ -336,7 +348,7 @@ export default function CharacterHUD({
                       ? () => onUseClassResource(resource.definition.id)
                       : () => onRestoreClassResource(resource.definition.id)
                 }
-                disabled={isPool}
+                aria-disabled={isPool || undefined}
                 className={`relative rounded-lg border px-2.5 py-2 transition-colors ${
                   hasUses
                     ? colors.chipOn

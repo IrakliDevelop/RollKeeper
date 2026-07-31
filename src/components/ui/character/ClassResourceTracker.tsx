@@ -12,12 +12,9 @@ import {
 } from './classResourceStyles';
 
 import { ActiveClassResource } from '@/utils/classResources';
-import { getProficiencyBonus } from '@/utils/calculations';
-import { CharacterAbilities } from '@/types/character';
 
 interface ClassResourceTrackerProps {
   resource: ActiveClassResource;
-  abilities: CharacterAbilities;
   onUse: (id: string, amount?: number) => void;
   onRestore: (id: string, amount?: number) => void;
   onReset: (id: string) => void;
@@ -26,23 +23,17 @@ interface ClassResourceTrackerProps {
 
 export default function ClassResourceTracker({
   resource,
-  abilities,
   onUse,
   onRestore,
   onReset,
   className = '',
 }: ClassResourceTrackerProps) {
-  const { definition, classLevel, maxUses, die, usesExpended, usesRemaining } =
+  const { definition, maxUses, die, usesExpended, usesRemaining, description } =
     resource;
   const Icon = CLASS_RESOURCE_ICONS[definition.icon];
   const colors = CLASS_RESOURCE_COLORS[definition.color];
   const isPool = definition.displayStyle === 'pool';
   const bigPool = isPool && maxUses >= 20;
-  const description = definition.getDescription?.({
-    classLevel,
-    abilities,
-    proficiencyBonus: getProficiencyBonus(classLevel),
-  });
 
   return (
     <div className={className}>

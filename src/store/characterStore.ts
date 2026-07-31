@@ -1177,7 +1177,10 @@ export const useCharacterStore = create<CharacterStore>()(
               ...state.character,
               classResources: {
                 ...state.character.classResources,
-                [id]: { usesExpended: next },
+                [id]: {
+                  ...state.character.classResources?.[id],
+                  usesExpended: next,
+                },
               },
             },
             hasUnsavedChanges: true,
@@ -1197,7 +1200,10 @@ export const useCharacterStore = create<CharacterStore>()(
               ...state.character,
               classResources: {
                 ...state.character.classResources,
-                [id]: { usesExpended: next },
+                [id]: {
+                  ...state.character.classResources?.[id],
+                  usesExpended: next,
+                },
               },
             },
             hasUnsavedChanges: true,
@@ -1212,7 +1218,10 @@ export const useCharacterStore = create<CharacterStore>()(
             ...state.character,
             classResources: {
               ...state.character.classResources,
-              [id]: { usesExpended: 0 },
+              [id]: {
+                ...state.character.classResources?.[id],
+                usesExpended: 0,
+              },
             },
           },
           hasUnsavedChanges: true,
@@ -3716,6 +3725,7 @@ export const useCharacterStore = create<CharacterStore>()(
             const current =
               resetClassResources[active.definition.id]?.usesExpended ?? 0;
             resetClassResources[active.definition.id] = {
+              ...resetClassResources[active.definition.id],
               usesExpended: rule === 'all' ? 0 : Math.max(0, current - 1),
             };
           }

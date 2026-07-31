@@ -7,7 +7,6 @@ import { ActiveClassResource } from './types';
 interface CharacterClassEntry {
   className: string;
   level: number;
-  classSource?: string;
 }
 
 function getCharacterClasses(character: CharacterState): CharacterClassEntry[] {
@@ -63,6 +62,7 @@ export function getActiveClassResources(
         die: definition.getDie?.(entry.level),
         usesExpended,
         usesRemaining: maxUses - usesExpended,
+        description: definition.getDescription?.(ctx),
       });
     }
   }

@@ -58,4 +58,5 @@ export interface ActiveClassResource {
   die?: string;
   usesExpended: number;
   usesRemaining: number;
+  description?: string;
 }
