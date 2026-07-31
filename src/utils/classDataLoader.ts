@@ -183,11 +183,13 @@ function processClassFeatures(
     let level: number = 1;
     let isSubclassFeature = false;
     let original: string;
+    let refSource: string = source;
 
     if (typeof feature === 'string') {
       const parts = feature.split('|');
       featureName = parts[0] || feature;
       original = feature;
+      refSource = parts[2] || source;
 
       // Determine if this is a subclass feature based on format
       // Subclass format: "Feature Name|Class||Subclass||Level"
@@ -210,6 +212,7 @@ function processClassFeatures(
       featureName = parts[0] || String(feature.classFeature);
       original = String(feature.classFeature);
       isSubclassFeature = Boolean(feature.gainSubclassFeature);
+      refSource = parts[2] || source;
 
       // Apply same logic for object format
       if (parts.length >= 6 && parts[2] === '' && parts[4] === '') {
@@ -222,13 +225,20 @@ function processClassFeatures(
       original = String(feature);
     }
 
-    // Find the feature description in classFeatureDescriptions
-    const featureDesc = classFeatureDescriptions?.find(
-      desc =>
-        desc.name === featureName &&
-        desc.className === className &&
-        desc.level === level
-    );
+    // Find the feature description in classFeatureDescriptions.
+    // PHB (2014) and XPHB (2024) descriptions share one classFeature[]
+    // array per file, so the lookup must match the edition too — the ref
+    // carries it in parts[2] (empty = the class object's own source) —
+    // otherwise whichever edition appears first in the file shadows the
+    // other for colliding name+level pairs (e.g. Wild Shape L2, Rage L1).
+    const matchesFeature = (desc: Record<string, unknown>) =>
+      desc.name === featureName &&
+      desc.className === className &&
+      desc.level === level;
+    const featureDesc =
+      classFeatureDescriptions?.find(
+        desc => matchesFeature(desc) && desc.classSource === refSource
+      ) ?? classFeatureDescriptions?.find(matchesFeature);
 
     let entries: string[] = [];
     let choice: FeatureChoice | undefined;
