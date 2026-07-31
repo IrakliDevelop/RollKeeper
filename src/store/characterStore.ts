@@ -216,26 +216,23 @@ function migrateCharacterData(character: unknown): CharacterState {
         1
       );
     }
-    // Ensure bardic inspiration exists (initialize for existing characters)
-    if (
-      !result.bardicInspiration ||
-      typeof result.bardicInspiration !== 'object'
-    ) {
-      result.bardicInspiration = DEFAULT_CHARACTER_STATE.bardicInspiration;
-    }
     // Ensure classResources exists; migrate legacy bardicInspiration into it
     if (!result.classResources || typeof result.classResources !== 'object') {
       result.classResources = {};
     }
+    const legacyBardic = (
+      result as { bardicInspiration?: { usesExpended?: number } }
+    ).bardicInspiration;
     if (
-      result.bardicInspiration &&
-      typeof result.bardicInspiration.usesExpended === 'number' &&
+      legacyBardic &&
+      typeof legacyBardic.usesExpended === 'number' &&
       result.classResources['bardic-inspiration'] === undefined
     ) {
       result.classResources['bardic-inspiration'] = {
-        usesExpended: result.bardicInspiration.usesExpended,
+        usesExpended: legacyBardic.usesExpended,
       };
     }
+    delete (result as { bardicInspiration?: unknown }).bardicInspiration;
     // Ensure temporary AC field exists
     if (typeof result.tempArmorClass !== 'number') {
       result.tempArmorClass = DEFAULT_CHARACTER_STATE.tempArmorClass;
@@ -459,11 +456,6 @@ interface CharacterStore {
   useHeroicInspiration: () => void;
   resetHeroicInspiration: () => void;
   setStackableInspiration: (enabled: boolean) => void;
-
-  // Bardic inspiration management
-  useBardicInspiration: () => void;
-  restoreBardicInspiration: () => void;
-  resetBardicInspiration: () => void;
 
   // Generic class resource management
   useClassResource: (id: string, amount?: number) => void;
@@ -1162,55 +1154,6 @@ export const useCharacterStore = create<CharacterStore>()(
             heroicInspiration: {
               ...state.character.heroicInspiration,
               count: 0,
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      // Bardic inspiration management actions
-      useBardicInspiration: () => {
-        set(state => {
-          const current = state.character.bardicInspiration?.usesExpended ?? 0;
-          return {
-            character: {
-              ...state.character,
-              bardicInspiration: {
-                ...state.character.bardicInspiration,
-                usesExpended: current + 1,
-              },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      restoreBardicInspiration: () => {
-        set(state => {
-          const current = state.character.bardicInspiration?.usesExpended ?? 0;
-          return {
-            character: {
-              ...state.character,
-              bardicInspiration: {
-                ...state.character.bardicInspiration,
-                usesExpended: Math.max(0, current - 1),
-              },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      resetBardicInspiration: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            bardicInspiration: {
-              ...state.character.bardicInspiration,
-              usesExpended: 0,
             },
           },
           hasUnsavedChanges: true,
@@ -3891,11 +3834,6 @@ export const useCharacterStore = create<CharacterStore>()(
           // Reset temp AC (deactivate but preserve saved value)
           const resetIsTempACActive = false;
 
-          // Reset Bardic Inspiration (if Bard)
-          const resetBardicInspiration = character.bardicInspiration
-            ? { ...character.bardicInspiration, usesExpended: 0 }
-            : undefined;
-
           // Reset all class resources (long rest restores everything)
           const resetClassResources = Object.fromEntries(
             Object.entries(character.classResources ?? {}).map(
@@ -3941,7 +3879,6 @@ export const useCharacterStore = create<CharacterStore>()(
               hitPoints: resetHitPoints,
               reaction: resetReaction,
               isTempACActive: resetIsTempACActive,
-              bardicInspiration: resetBardicInspiration,
               classResources: resetClassResources,
               temporaryBuffs: deactivatedBuffs,
               summons: resetSummons,

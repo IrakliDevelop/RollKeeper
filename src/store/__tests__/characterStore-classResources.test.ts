@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useCharacterStore } from '@/store/characterStore';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
+import type { CharacterState } from '@/types/character';
 
 function loadBard(level = 5, charisma = 16) {
   useCharacterStore.setState({
@@ -172,5 +173,48 @@ describe('rest integration', () => {
     expect(resources['lay-on-hands']?.usesExpended).toBe(0);
     expect(resources['channel-divinity-paladin']?.usesExpended).toBe(0);
     expect(resources['stale-old-key']?.usesExpended).toBe(0);
+  });
+});
+
+// `migrateCharacterData` (the normalization function in characterStore.ts
+// that contains the "Ensure classResources exists" migration block) is not
+// exported, so these tests exercise it through `loadCharacterState`, the
+// public entry point that calls it — same pattern used by
+// characterStore-persistence.test.ts and characterStore-aoeMigration.test.ts.
+describe('legacy bardicInspiration migration', () => {
+  it('copies legacy usesExpended into classResources and drops the old field', () => {
+    const legacy = {
+      ...makeCharacter({
+        classes: [{ className: 'Bard', level: 5, isCustom: false, hitDie: 8 }],
+        totalLevel: 5,
+      }),
+      bardicInspiration: { usesExpended: 2 },
+      classResources: undefined,
+    } as unknown as CharacterState;
+
+    useCharacterStore.getState().loadCharacterState(legacy);
+    const migrated = useCharacterStore.getState().character;
+
+    expect(migrated.classResources?.['bardic-inspiration']?.usesExpended).toBe(
+      2
+    );
+    expect(
+      (migrated as unknown as Record<string, unknown>).bardicInspiration
+    ).toBeUndefined();
+  });
+
+  it('does not overwrite an already-migrated value', () => {
+    const partiallyMigrated = {
+      ...makeCharacter({}),
+      bardicInspiration: { usesExpended: 2 },
+      classResources: { 'bardic-inspiration': { usesExpended: 1 } },
+    } as unknown as CharacterState;
+
+    useCharacterStore.getState().loadCharacterState(partiallyMigrated);
+    const migrated = useCharacterStore.getState().character;
+
+    expect(migrated.classResources?.['bardic-inspiration']?.usesExpended).toBe(
+      1
+    );
   });
 });

@@ -124,11 +124,6 @@ export interface HeroicInspiration {
   maxCount?: number; // Optional maximum (some DMs set limits)
 }
 
-// Bardic Inspiration tracking (Bard class feature)
-export interface BardicInspiration {
-  usesExpended: number; // Number of bardic inspiration uses expended (resets on long rest)
-}
-
 // Generic class resource usage, keyed by ClassResourceDefinition.id
 // (see src/utils/classResources). Maximum is always computed from the
 // registry — never persisted.
@@ -639,9 +634,6 @@ export interface CharacterState {
 
   // Heroic Inspiration
   heroicInspiration: HeroicInspiration;
-
-  // Bardic Inspiration (Bard class feature)
-  bardicInspiration?: BardicInspiration;
 
   // Generic class resources (Rage, Wild Shape, Channel Divinity, ...)
   classResources?: Record<string, ClassResourceUsage>;
