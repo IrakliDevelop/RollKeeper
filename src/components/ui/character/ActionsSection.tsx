@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { EquippedWeapons } from '@/components/EquippedWeapons';
@@ -121,9 +121,21 @@ export default function ActionsSection({
   onResetClassResource,
 }: ActionsSectionProps) {
   const equippedWeapons = character.weapons.filter(weapon => weapon.isEquipped);
-  const classResources = showClassResources
-    ? getActiveClassResources(character)
-    : [];
+  // Intentionally narrow deps: only recompute when fields that affect
+  // resource maxima change, not on every character mutation.
+  const classResources = useMemo(
+    () => (showClassResources ? getActiveClassResources(character) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      showClassResources,
+      character.classes,
+      character.class,
+      character.level,
+      character.totalLevel,
+      character.abilities,
+      character.classResources,
+    ]
+  );
   const actionSpells = character.spells.filter(
     spell =>
       (spell.level === 0 && spell.isPrepared) || // Only prepared cantrips
@@ -195,7 +207,6 @@ export default function ActionsSection({
                 >
                   <ClassResourceTracker
                     resource={resource}
-                    abilities={character.abilities}
                     onUse={onUseClassResource}
                     onRestore={onRestoreClassResource}
                     onReset={onResetClassResource}
