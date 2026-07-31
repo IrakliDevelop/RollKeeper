@@ -254,7 +254,7 @@ function processClassFeatures(
     return {
       name: featureName,
       level,
-      source: (featureDesc?.source as string) || source,
+      source: formatSourceForDisplay((featureDesc?.source as string) || source),
       className,
       entries,
       isSubclassFeature,
@@ -316,7 +316,7 @@ function processSubclassFeatures(
     return {
       name: String(feature.name || ''),
       level: adjustedLevel,
-      source: String(feature.source || source),
+      source: formatSourceForDisplay(String(feature.source || source)),
       className,
       entries,
       isSubclassFeature: true,

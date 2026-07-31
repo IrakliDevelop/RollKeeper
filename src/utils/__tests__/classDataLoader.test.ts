@@ -23,7 +23,8 @@ describe('class feature edition pairing', () => {
     const druid2024 = classBySource('Druid', 'PHB2024');
     const wildShape = druid2024.features.find(f => f.name === 'Wild Shape');
     expect(wildShape).toBeDefined();
-    expect(wildShape!.source).toBe('XPHB');
+    // Feature source is display-formatted: raw XPHB renders as PHB2024
+    expect(wildShape!.source).toBe('PHB2024');
     expect(wildShape!.is2024Rules).toBe(true);
   });
 
@@ -39,8 +40,27 @@ describe('class feature edition pairing', () => {
     const barbarian2024 = classBySource('Barbarian', 'PHB2024');
     const rage = barbarian2024.features.find(f => f.name === 'Rage');
     expect(rage).toBeDefined();
-    expect(rage!.source).toBe('XPHB');
+    expect(rage!.source).toBe('PHB2024');
     expect(rage!.is2024Rules).toBe(true);
+  });
+
+  it('never displays raw XPHB as a feature source', () => {
+    for (const cls of classes) {
+      for (const feature of cls.features) {
+        expect(
+          feature.source,
+          `${cls.name} (${cls.source}) L${feature.level} ${feature.name}`
+        ).not.toBe('XPHB');
+      }
+      for (const subclass of cls.subclasses ?? []) {
+        for (const feature of subclass.features) {
+          expect(
+            feature.source,
+            `${cls.name}/${subclass.name} L${feature.level} ${feature.name}`
+          ).not.toBe('XPHB');
+        }
+      }
+    }
   });
 
   it('every 2024 class feature resolves to a non-2014 description when an XPHB entry exists', () => {
