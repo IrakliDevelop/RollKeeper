@@ -221,10 +221,10 @@ export interface TabbedSheetConfigParams {
   inCampaign?: boolean;
   setStackableInspiration?: (enabled: boolean) => void;
 
-  // Bardic inspiration
-  useBardicInspiration: () => void;
-  restoreBardicInspiration: () => void;
-  resetBardicInspiration: () => void;
+  // Class resources
+  useClassResource: (id: string, amount?: number) => void;
+  restoreClassResource: (id: string, amount?: number) => void;
+  resetClassResource: (id: string) => void;
 
   // Languages
   addLanguage: (
@@ -270,10 +270,6 @@ export function createTabbedSheetConfig(
     onSendItem,
   } = params;
 
-  const isBard =
-    character.classes?.some(c => c.className.toLowerCase() === 'bard') ||
-    character.class?.name?.toLowerCase() === 'bard';
-
   const tabs: BookmarkTabItem[] = [
     // Tab 1: Actions
     {
@@ -295,10 +291,10 @@ export function createTabbedSheetConfig(
             animateRoll={params.animateRoll}
             switchToTab={params.switchToTab}
             onStopConcentration={params.stopConcentration}
-            isBard={hasHydrated && isBard}
-            onUseBardicInspiration={params.useBardicInspiration}
-            onRestoreBardicInspiration={params.restoreBardicInspiration}
-            onResetBardicInspiration={params.resetBardicInspiration}
+            showClassResources={hasHydrated}
+            onUseClassResource={params.useClassResource}
+            onRestoreClassResource={params.restoreClassResource}
+            onResetClassResource={params.resetClassResource}
           />
           {characterHasSpells && (
             <div className="border-accent-purple-border overflow-hidden rounded-lg border-2">
