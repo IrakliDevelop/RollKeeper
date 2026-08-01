@@ -1,13 +1,16 @@
 'use client';
 
+import { useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import { useCharacterStore } from '@/store/characterStore';
+import { getActiveClassResources } from '@/utils/classResources';
 import type { SpellAoe } from '@/types/spellAoe';
 
 import { DockBuffs } from './DockBuffs';
+import { DockResources } from './DockResources';
 import { DockSpells } from './DockSpells';
 import { DockVitals } from './DockVitals';
 
@@ -36,6 +39,17 @@ export function CharacterDock({
 }: CharacterDockProps) {
   const character = useCharacterStore(state => state.character);
   const toggleBuff = useCharacterStore(state => state.toggleBuff);
+  const expendClassResource = useCharacterStore(
+    state => state.useClassResource
+  );
+  const restoreClassResource = useCharacterStore(
+    state => state.restoreClassResource
+  );
+
+  const resources = useMemo(
+    () => getActiveClassResources(character),
+    [character]
+  );
 
   if (collapsed) {
     return (
@@ -59,6 +73,24 @@ export function CharacterDock({
         message: '',
       });
     }
+  };
+
+  const handleSpendResource = (id: string) => {
+    expendClassResource(id, 1);
+    const after = getActiveClassResources(
+      useCharacterStore.getState().character
+    ).find(r => r.definition.id === id);
+    if (after) {
+      addToast({
+        type: 'info',
+        title: `${after.definition.name}: ${after.usesRemaining}/${after.maxUses} left`,
+        message: '',
+      });
+    }
+  };
+
+  const handleRestoreResource = (id: string) => {
+    restoreClassResource(id, 1);
   };
 
   const level = character.totalLevel || character.level;
@@ -104,6 +136,12 @@ export function CharacterDock({
         <DockBuffs
           buffs={character.temporaryBuffs || []}
           onToggleBuff={handleToggleBuff}
+        />
+
+        <DockResources
+          resources={resources}
+          onSpend={handleSpendResource}
+          onRestore={handleRestoreResource}
         />
 
         <DockSpells
