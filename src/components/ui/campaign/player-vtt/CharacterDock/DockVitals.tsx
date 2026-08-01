@@ -11,7 +11,7 @@ import {
 
 import { AcEditDialog } from './AcEditDialog';
 import { parseHpAmount } from './DockVitals.utils';
-import { HeroicInspirationRow } from './HeroicInspirationRow';
+import { QuickCombatStrip } from './QuickCombatStrip';
 import { HpCard } from './HpCard';
 
 export interface DockVitalsProps {
@@ -27,6 +27,7 @@ export function DockVitals({ addToast }: DockVitalsProps) {
     addHeroicInspiration,
     updateHeroicInspiration,
     useHeroicInspiration: spendHeroicInspiration,
+    toggleReaction,
   } = useCharacterStore();
   const [amount, setAmount] = useState('');
   const [acOpen, setAcOpen] = useState(false);
@@ -43,10 +44,11 @@ export function DockVitals({ addToast }: DockVitalsProps) {
     ? character.initiative.value
     : Math.floor((character.abilities.dexterity - 10) / 2);
 
-  const { count: heroicCount, maxCount: heroicMax } =
-    character.heroicInspiration;
+  const { count: heroicCount, maxCount } = character.heroicInspiration;
+  const heroicMax = maxCount ?? 1;
   const stackable = character.stackableInspiration ?? false;
   const effectiveHeroicMax = stackable ? heroicMax : 1;
+  const hasUsedReaction = character.reaction?.hasUsedReaction ?? false;
 
   const applyAmount = (
     apply: (n: number) => void,
@@ -116,14 +118,17 @@ export function DockVitals({ addToast }: DockVitalsProps) {
       </div>
       <AcEditDialog open={acOpen} onOpenChange={setAcOpen} />
 
-      <HeroicInspirationRow
+      <QuickCombatStrip
+        hasUsedReaction={hasUsedReaction}
+        onToggleReaction={toggleReaction}
         count={heroicCount}
         maxCount={effectiveHeroicMax}
+        stackable={stackable}
+        onUse={handleUseHeroic}
         onIncrement={() => addHeroicInspiration(1)}
         onDecrement={() =>
           updateHeroicInspiration({ count: Math.max(0, heroicCount - 1) })
         }
-        onUse={handleUseHeroic}
       />
     </div>
   );
