@@ -461,6 +461,9 @@ interface CharacterStore {
   useClassResource: (id: string, amount?: number) => void;
   restoreClassResource: (id: string, amount?: number) => void;
   resetClassResource: (id: string) => void;
+  backfillCantripScaling: (
+    entries: Array<{ spellId: string; scaling: Record<number, string> }>
+  ) => void;
 
   // Armor Class management
   updateTempArmorClass: (tempAC: number) => void;
@@ -1227,6 +1230,29 @@ export const useCharacterStore = create<CharacterStore>()(
           hasUnsavedChanges: true,
           saveStatus: 'saving',
         }));
+      },
+
+      backfillCantripScaling: entries => {
+        set(state => {
+          const tableById = new Map(entries.map(e => [e.spellId, e.scaling]));
+          let changed = false;
+          const spells = state.character.spells.map(spell => {
+            const scaling = tableById.get(spell.id);
+            if (
+              !scaling ||
+              spell.level !== 0 ||
+              spell.damageScaling !== undefined
+            ) {
+              return spell;
+            }
+            changed = true;
+            return { ...spell, damageScaling: scaling };
+          });
+          if (!changed) return state;
+          return {
+            character: { ...state.character, spells },
+          };
+        });
       },
 
       // Armor Class management
