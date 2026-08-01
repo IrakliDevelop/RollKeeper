@@ -63,11 +63,9 @@ import {
   resetDeathSaves,
   calculateMaxHP,
   getClassHitDie,
-  isDead,
 } from '@/utils/hpCalculations';
 import { detectSpellAoe } from '@/utils/spellAoeDetection';
 import { getActiveClassResources } from '@/utils/classResources';
-import { usePlayerStore } from '@/store/playerStore';
 import { isApplyingExternal, withExternalApply } from '@/lib/characterRevision';
 import { initCrossTabCharacterSync } from '@/lib/crossTabCharacterSync';
 import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
@@ -505,6 +503,8 @@ interface CharacterStore {
   recalculateMaxHP: () => void;
   clearDeathAnimation: () => void;
   clearLevelUpAnimation: () => void;
+  triggerDeathAnimation: () => void;
+  triggerLevelUpAnimation: (level: number) => void;
 
   // Class and spell management
   updateClass: (classInfo: ClassInfo) => void;
@@ -1454,16 +1454,7 @@ export const useCharacterStore = create<CharacterStore>()(
         // HP management actions
         applyDamageToCharacter: damage => {
           const state = get();
-          const wasDeadBefore = isDead(state.character.hitPoints);
           const newHitPoints = applyDamage(state.character.hitPoints, damage);
-          const isDeadAfter = isDead(newHitPoints);
-
-          // Check if death animation is enabled in player settings
-          const playerSettings = usePlayerStore.getState().settings;
-          const shouldShowDeathAnimation =
-            playerSettings.enableDeathAnimation &&
-            !wasDeadBefore &&
-            isDeadAfter;
 
           set({
             character: {
@@ -1472,17 +1463,7 @@ export const useCharacterStore = create<CharacterStore>()(
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-            showDeathAnimation: shouldShowDeathAnimation
-              ? true
-              : state.showDeathAnimation,
           });
-
-          // Auto-clear the death animation after 8.5 seconds
-          if (shouldShowDeathAnimation) {
-            setTimeout(() => {
-              set({ showDeathAnimation: false });
-            }, 8500);
-          }
         },
 
         applyHealingToCharacter: healing => {
@@ -1509,20 +1490,11 @@ export const useCharacterStore = create<CharacterStore>()(
 
         makeDeathSavingThrow: (isSuccess, isCritical = false) => {
           const state = get();
-          const wasDeadBefore = isDead(state.character.hitPoints);
           const newHitPoints = makeDeathSave(
             state.character.hitPoints,
             isSuccess,
             isCritical
           );
-          const isDeadAfter = isDead(newHitPoints);
-
-          // Check if death animation is enabled in player settings
-          const playerSettings = usePlayerStore.getState().settings;
-          const shouldShowDeathAnimation =
-            playerSettings.enableDeathAnimation &&
-            !wasDeadBefore &&
-            isDeadAfter;
 
           set({
             character: {
@@ -1531,16 +1503,7 @@ export const useCharacterStore = create<CharacterStore>()(
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-            showDeathAnimation: shouldShowDeathAnimation
-              ? true
-              : state.showDeathAnimation,
           });
-
-          if (shouldShowDeathAnimation) {
-            setTimeout(() => {
-              set({ showDeathAnimation: false });
-            }, 8500);
-          }
         },
 
         resetDeathSavingThrows: () => {
@@ -1560,6 +1523,20 @@ export const useCharacterStore = create<CharacterStore>()(
 
         clearLevelUpAnimation: () => {
           set({ showLevelUpAnimation: false });
+        },
+
+        triggerDeathAnimation: () => {
+          set({ showDeathAnimation: true });
+          setTimeout(() => {
+            set({ showDeathAnimation: false });
+          }, 8500);
+        },
+
+        triggerLevelUpAnimation: level => {
+          set({ showLevelUpAnimation: true, levelUpAnimationLevel: level });
+          setTimeout(() => {
+            set({ showLevelUpAnimation: false });
+          }, 6000);
         },
 
         toggleHPCalculationMode: () => {
@@ -1706,13 +1683,7 @@ export const useCharacterStore = create<CharacterStore>()(
         },
 
         updateLevel: level => {
-          const currentState = get();
-          const oldLevel =
-            currentState.character.totalLevel || currentState.character.level;
           const clampedLevel = Math.max(1, Math.min(20, level));
-
-          // Check if this is a level UP (not down or same)
-          const isLevelUp = clampedLevel > oldLevel;
 
           set(state => {
             // Ensure character has multiclass structure
@@ -1787,11 +1758,6 @@ export const useCharacterStore = create<CharacterStore>()(
               );
             }
 
-            // Check if level up animation should be shown
-            const playerSettings = usePlayerStore.getState().settings;
-            const enableLevelUp = playerSettings?.enableLevelUpAnimation;
-            const shouldShowLevelUp = isLevelUp && enableLevelUp;
-
             // Update XP to minimum for the new level (only if current XP is less than required)
             const minXPForLevel = getXPForLevel(clampedLevel);
             const currentXP = state.character.experience || 0;
@@ -1806,25 +1772,8 @@ export const useCharacterStore = create<CharacterStore>()(
               },
               hasUnsavedChanges: true,
               saveStatus: 'saving',
-              showLevelUpAnimation: shouldShowLevelUp
-                ? true
-                : state.showLevelUpAnimation,
-              levelUpAnimationLevel: shouldShowLevelUp
-                ? clampedLevel
-                : state.levelUpAnimationLevel,
             };
           });
-
-          // Auto-clear the level up animation after 6 seconds
-          if (isLevelUp) {
-            const playerSettings = usePlayerStore.getState().settings;
-            const enableLevelUpAnim = playerSettings?.enableLevelUpAnimation;
-            if (enableLevelUpAnim) {
-              setTimeout(() => {
-                set({ showLevelUpAnimation: false });
-              }, 6000);
-            }
-          }
         },
 
         updateSpellSlot: (level, used) => {
@@ -2623,24 +2572,9 @@ export const useCharacterStore = create<CharacterStore>()(
         // XP management
         addExperience: xpToAdd => {
           const currentState = get();
-          const oldLevel =
-            currentState.character.totalLevel || currentState.character.level;
           const newXP = currentState.character.experience + xpToAdd;
           const newLevel = calculateLevelFromXP(newXP);
 
-          // Check if this is a level UP
-          const isLevelUp = newLevel > oldLevel;
-
-          // Debug logging
-          console.log('addExperience called:', {
-            xpToAdd,
-            oldXP: currentState.character.experience,
-            newXP,
-            oldLevel,
-            newLevel,
-            isLevelUp,
-          });
-
           set(state => {
             // Ensure character has multiclass structure
             const migratedCharacter = migrateToMulticlass(state.character);
@@ -2710,18 +2644,6 @@ export const useCharacterStore = create<CharacterStore>()(
               );
             }
 
-            // Check if level up animation should be shown
-            const playerSettings = usePlayerStore.getState().settings;
-            const enableLevelUp = playerSettings?.enableLevelUpAnimation; // Default to true
-            const shouldShowLevelUp = isLevelUp && enableLevelUp;
-
-            console.log('addExperience animation check:', {
-              isLevelUp,
-              enableLevelUpAnimation: enableLevelUp,
-              shouldShowLevelUp,
-              newLevel,
-            });
-
             return {
               character: {
                 ...updatedCharacter,
@@ -2731,34 +2653,12 @@ export const useCharacterStore = create<CharacterStore>()(
               },
               hasUnsavedChanges: true,
               saveStatus: 'saving',
-              showLevelUpAnimation: shouldShowLevelUp
-                ? true
-                : state.showLevelUpAnimation,
-              levelUpAnimationLevel: shouldShowLevelUp
-                ? newLevel
-                : state.levelUpAnimationLevel,
             };
           });
-
-          // Auto-clear the level up animation after 6 seconds
-          const playerSettings = usePlayerStore.getState().settings;
-          const enableLevelUpAnim = playerSettings?.enableLevelUpAnimation;
-          if (isLevelUp && enableLevelUpAnim) {
-            console.log('Setting up auto-clear timeout for level up animation');
-            setTimeout(() => {
-              set({ showLevelUpAnimation: false });
-            }, 6000);
-          }
         },
 
         setExperience: newXP => {
-          const currentState = get();
-          const oldLevel =
-            currentState.character.totalLevel || currentState.character.level;
           const newLevel = calculateLevelFromXP(newXP);
-
-          // Check if this is a level UP
-          const isLevelUp = newLevel > oldLevel;
 
           set(state => {
             // Ensure character has multiclass structure
@@ -2829,11 +2729,6 @@ export const useCharacterStore = create<CharacterStore>()(
               );
             }
 
-            // Check if level up animation should be shown
-            const playerSettings = usePlayerStore.getState().settings;
-            const enableLevelUp = playerSettings?.enableLevelUpAnimation;
-            const shouldShowLevelUp = isLevelUp && enableLevelUp;
-
             return {
               character: {
                 ...updatedCharacter,
@@ -2843,23 +2738,8 @@ export const useCharacterStore = create<CharacterStore>()(
               },
               hasUnsavedChanges: true,
               saveStatus: 'saving',
-              showLevelUpAnimation: shouldShowLevelUp
-                ? true
-                : state.showLevelUpAnimation,
-              levelUpAnimationLevel: shouldShowLevelUp
-                ? newLevel
-                : state.levelUpAnimationLevel,
             };
           });
-
-          // Auto-clear the level up animation after 6 seconds
-          const playerSettings = usePlayerStore.getState().settings;
-          const enableLevelUpAnim = playerSettings?.enableLevelUpAnimation;
-          if (isLevelUp && enableLevelUpAnim) {
-            setTimeout(() => {
-              set({ showLevelUpAnimation: false });
-            }, 6000);
-          }
         },
 
         // Rich text content management

@@ -172,7 +172,7 @@ describe('characterStore — class, level, multiclass, hit dice, XP', () => {
       expect(useCharacterStore.getState().hasUnsavedChanges).toBe(true);
     });
 
-    it('does not trigger level up animation when disabled', () => {
+    it('no longer sets showLevelUpAnimation (state-observer owns it)', () => {
       useCharacterStore.getState().updateLevel(6);
       expect(useCharacterStore.getState().showLevelUpAnimation).toBe(false);
     });
@@ -581,7 +581,7 @@ describe('characterStore — class, level, multiclass, hit dice, XP', () => {
       expect(useCharacterStore.getState().character.level).toBe(5);
     });
 
-    it('does not trigger level up animation when disabled', () => {
+    it('no longer sets showLevelUpAnimation (state-observer owns it)', () => {
       // Adding enough XP to cross level 6 threshold
       useCharacterStore.getState().addExperience(7500);
       expect(useCharacterStore.getState().showLevelUpAnimation).toBe(false);
@@ -634,7 +634,7 @@ describe('characterStore — class, level, multiclass, hit dice, XP', () => {
       expect(useCharacterStore.getState().character.level).toBe(1);
     });
 
-    it('does not trigger level up animation when disabled', () => {
+    it('no longer sets showLevelUpAnimation (state-observer owns it)', () => {
       // Setting to level 10 XP from level 5
       useCharacterStore.getState().setExperience(64000);
       expect(useCharacterStore.getState().showLevelUpAnimation).toBe(false);

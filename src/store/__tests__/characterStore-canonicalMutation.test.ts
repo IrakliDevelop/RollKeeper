@@ -86,4 +86,11 @@ describe('canonical mutation middleware', () => {
     );
     expect(useCharacterStore.getState().hasUnsavedChanges).toBe(false);
   });
+
+  it('applyDamageToCharacter no longer sets showDeathAnimation (state-observer owns it)', () => {
+    useCharacterStore.setState({ showDeathAnimation: false });
+    const hp = useCharacterStore.getState().character.hitPoints;
+    useCharacterStore.getState().applyDamageToCharacter(hp.current + hp.max);
+    expect(useCharacterStore.getState().showDeathAnimation).toBe(false);
+  });
 });
