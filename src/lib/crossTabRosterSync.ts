@@ -1,3 +1,4 @@
+import { isStrictlyFresher } from '@/lib/characterFreshness';
 import { PLAYER_STORAGE_KEY } from '@/utils/constants';
 import type { PlayerCharacter } from '@/store/playerStore';
 
@@ -10,11 +11,11 @@ interface PlayerStoreLike {
 /**
  * Cross-tab roster convergence. Each tab persists its WHOLE roster, so a tab
  * holding character B used to write back a stale copy of character A over
- * A's fresh entry (multi-tab clobber). Merge per entry by
- * characterData.revision — strictly newer wins; unknown ids are adopted
- * (created elsewhere); local-only entries are kept (deletion sync is out of
- * scope). setState only on change, so the echo event the other tab receives
- * finds equal revisions and terminates.
+ * A's fresh entry (multi-tab clobber). Merge per entry by (revision,
+ * lastMutatedAt, lastMutatedBy) — strictly fresher wins; unknown ids are
+ * adopted (created elsewhere); local-only entries are kept (deletion sync is
+ * out of scope). setState only on change, so the echo event the other tab
+ * receives finds equal revisions and terminates.
  */
 export function initCrossTabRosterSync(store: PlayerStoreLike): () => void {
   if (typeof window === 'undefined') return () => {};
@@ -42,9 +43,12 @@ export function initCrossTabRosterSync(store: PlayerStoreLike): () => void {
       const candidate = incomingById.get(entry.id);
       incomingById.delete(entry.id);
       if (!candidate) return entry;
-      const incomingRevision = candidate.characterData?.revision ?? 0;
-      const localRevision = entry.characterData?.revision ?? 0;
-      if (incomingRevision > localRevision) {
+      if (
+        isStrictlyFresher(
+          candidate.characterData ?? {},
+          entry.characterData ?? {}
+        )
+      ) {
         changed = true;
         return candidate;
       }
