@@ -1,4 +1,6 @@
-import { STORAGE_KEY } from '@/utils/constants';
+import { CHARACTER_ENVELOPE_KEY_PREFIX } from '@/utils/constants';
+import { isStrictlyFresher } from '@/lib/characterFreshness';
+import type { IntentWatermark } from '@/lib/characterCanonicalStorage';
 import type { CharacterState } from '@/types/character';
 
 interface CharacterStoreLike {
@@ -6,14 +8,20 @@ interface CharacterStoreLike {
     character: CharacterState;
     loadCharacterState: (characterState: CharacterState) => void;
   };
+  setState: (partial: {
+    intentWatermarks: Record<string, IntentWatermark>;
+  }) => void;
 }
 
 /**
- * Cross-tab character convergence. Zustand persist already writes every
- * mutation to localStorage; other tabs receive a `storage` event. Apply the
- * incoming character iff it is the SAME character and a NEWER revision —
- * `loadCharacterState` runs under withExternalApply, so the adopted
- * revision is kept as-is (no bump, no echo loop).
+ * Cross-tab character convergence over per-character envelope keys.
+ * Adopt iff same character AND strictly fresher by (revision,
+ * lastMutatedAt, lastMutatedBy). Under Web Locks only the leader writes,
+ * so followers see strictly increasing revisions; the stamp tiebreak is
+ * the no-locks / legacy safety net (spec §reduced guarantees).
+ * Watermarks ride along so a later promotion starts from current dedup
+ * state. loadCharacterState runs under withExternalApply — the adopted
+ * revision/stamps are kept as-is (no bump, no echo loop).
  */
 export function initCrossTabCharacterSync(
   store: CharacterStoreLike
@@ -21,23 +29,38 @@ export function initCrossTabCharacterSync(
   if (typeof window === 'undefined') return () => {};
 
   const onStorage = (event: StorageEvent) => {
-    if (event.key !== STORAGE_KEY || !event.newValue) return;
+    if (
+      !event.key ||
+      !event.key.startsWith(CHARACTER_ENVELOPE_KEY_PREFIX) ||
+      !event.newValue
+    )
+      return;
 
-    let incoming: CharacterState | undefined;
+    let incomingCharacter: CharacterState | undefined;
+    let incomingWatermarks: Record<string, IntentWatermark> = {};
     try {
       const parsed: unknown = JSON.parse(event.newValue);
-      incoming = (parsed as { state?: { character?: CharacterState } } | null)
-        ?.state?.character;
+      const state = (
+        parsed as {
+          state?: {
+            character?: CharacterState;
+            intentWatermarks?: Record<string, IntentWatermark>;
+          };
+        } | null
+      )?.state;
+      incomingCharacter = state?.character;
+      incomingWatermarks = state?.intentWatermarks ?? {};
     } catch {
       return;
     }
-    if (!incoming || typeof incoming.id !== 'string') return;
+    if (!incomingCharacter || typeof incomingCharacter.id !== 'string') return;
 
     const { character, loadCharacterState } = store.getState();
-    if (incoming.id !== character.id) return;
-    if ((incoming.revision ?? 0) <= (character.revision ?? 0)) return;
+    if (incomingCharacter.id !== character.id) return;
+    if (!isStrictlyFresher(incomingCharacter, character)) return;
 
-    loadCharacterState(incoming);
+    loadCharacterState(incomingCharacter);
+    store.setState({ intentWatermarks: incomingWatermarks });
   };
 
   window.addEventListener('storage', onStorage);
