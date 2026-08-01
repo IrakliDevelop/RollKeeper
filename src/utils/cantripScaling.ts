@@ -132,6 +132,26 @@ export function findScalingSpellMatch(
 }
 
 /**
+ * Guards `findScalingSpellMatch` results against cross-edition name
+ * collisions before a backfill is applied. Same-named spells sometimes
+ * exist in both 2014 and 2024 sourcebooks with different mechanics (e.g.
+ * 2014 True Strike has no damage; 2024 True Strike is a scaling cantrip). If
+ * the stored spell has no base damage of its own AND the match came from a
+ * different source, the match is likely that other edition's spell rather
+ * than the same one re-keyed — attaching its table would fabricate damage
+ * that the stored spell never had. Damage-bearing spells are always safe to
+ * enrich via the PHB2024 fallback, since a real dice value confirms the
+ * stored spell already deals damage.
+ */
+export function isSafeScalingBackfillMatch(
+  spell: Pick<Spell, 'damage' | 'source'>,
+  match: Pick<ProcessedSpell, 'source'>
+): boolean {
+  if (spell.damage) return true;
+  return !spell.source || match.source === spell.source;
+}
+
+/**
  * damageScaling value after a spell-editor save: a manual damage change on a
  * scaling cantrip turns scaling off (null); otherwise the prior state is kept.
  */

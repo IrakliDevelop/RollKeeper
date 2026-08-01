@@ -210,8 +210,14 @@ export default function ConfirmationStep({
                 Cantrip Damage Increases:
               </span>
               <ul className="text-body mt-1 space-y-0.5 text-sm">
-                {cantripUpgrades.map(upgrade => (
-                  <li key={upgrade.name} className="flex items-center gap-1">
+                {cantripUpgrades.map((upgrade, i) => (
+                  // Render-only, never reordered — index-suffixed key avoids
+                  // collisions when the same cantrip name appears twice
+                  // (e.g. both editions upgrading on the same level-up).
+                  <li
+                    key={`${upgrade.name}-${i}`}
+                    className="flex items-center gap-1"
+                  >
                     <Check
                       size={12}
                       className="text-accent-emerald-text flex-shrink-0"
