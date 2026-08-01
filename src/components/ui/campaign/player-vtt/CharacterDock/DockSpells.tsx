@@ -12,6 +12,7 @@ import {
   calculateSpellSaveDC,
   getCharacterSpellcastingAbility,
 } from '@/utils/calculations';
+import { getTotalLevel } from '@/utils/multiclass';
 import type { SpellSlots } from '@/types/character';
 import type { SpellAoe } from '@/types/spellAoe';
 
@@ -152,6 +153,7 @@ export function DockSpells(props: DockSpellsProps) {
           isOpen
           onClose={closeDetailsModal}
           onCast={() => handleCastClick(viewingSpell)}
+          characterLevel={getTotalLevel(character)}
         />
       )}
     </div>

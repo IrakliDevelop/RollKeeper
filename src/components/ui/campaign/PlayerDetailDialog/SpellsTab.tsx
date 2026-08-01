@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Eye, Star, Wand2 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
+import { getTotalLevel } from '@/utils/multiclass';
 import { ensureArray, formatMod } from './shared';
 import {
   calculateSpellAttackBonus,
@@ -349,6 +350,7 @@ export function SpellsTab({ char }: SpellsTabProps) {
           spell={viewingSpell}
           isOpen={!!viewingSpell}
           onClose={() => setViewingSpell(null)}
+          characterLevel={getTotalLevel(char)}
         />
       )}
     </div>

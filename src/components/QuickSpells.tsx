@@ -25,6 +25,8 @@ import {
   getCharacterSpellcastingAbility,
   rollDamage,
 } from '@/utils/calculations';
+import { getScaledSpellDamage } from '@/utils/cantripScaling';
+import { getTotalLevel } from '@/utils/multiclass';
 import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import { RollSummary } from '@/types/dice';
@@ -70,6 +72,7 @@ interface LevelSectionProps {
   onSpellAction: (spell: Spell, action: string) => void;
   favoriteSpells: string[];
   onToggleFavorite: (spellId: string) => void;
+  totalLevel: number;
   slotMax?: number;
   slotUsed?: number;
   onSlotChange?: (used: number) => void;
@@ -82,6 +85,7 @@ const SpellCard: React.FC<{
   spellSaveDC: number | null;
   onAction: (action: string) => void;
   onToggleFavorite: () => void;
+  totalLevel: number;
 }> = ({
   spell,
   compact,
@@ -89,6 +93,7 @@ const SpellCard: React.FC<{
   spellSaveDC,
   onAction,
   onToggleFavorite,
+  totalLevel,
 }) => {
   const isCantrip = spell.level === 0;
   const isAtWill = spell.freeCastMax === 0;
@@ -96,6 +101,7 @@ const SpellCard: React.FC<{
   const freeCastsRemaining = isInnate
     ? spell.freeCastMax! - (spell.freeCastsUsed || 0)
     : 0;
+  const displayDamage = getScaledSpellDamage(spell, totalLevel);
 
   if (compact) {
     return (
@@ -275,9 +281,9 @@ const SpellCard: React.FC<{
             {spell.savingThrow} Save DC {spellSaveDC || '?'}
           </Badge>
         )}
-        {spell.damage && (
+        {displayDamage && (
           <Badge variant="warning" size="sm">
-            {spell.damage} {spell.damageType && `${spell.damageType}`}
+            {displayDamage} {spell.damageType && `${spell.damageType}`}
           </Badge>
         )}
       </div>
@@ -295,6 +301,7 @@ const LevelSection: React.FC<LevelSectionProps> = ({
   onSpellAction,
   favoriteSpells,
   onToggleFavorite,
+  totalLevel,
   slotMax,
   slotUsed,
   onSlotChange,
@@ -387,6 +394,7 @@ const LevelSection: React.FC<LevelSectionProps> = ({
                 spellSaveDC={spellSaveDC}
                 onAction={action => onSpellAction(spell, action)}
                 onToggleFavorite={() => onToggleFavorite(spell.id)}
+                totalLevel={totalLevel}
               />
             ))}
           </div>
@@ -405,6 +413,7 @@ export function QuickSpells({
   const { character, updateSpellSlot, toggleSpellFavorite, toggleReaction } =
     useCharacterStore();
   const { castSpell } = useCastSpell();
+  const totalLevel = getTotalLevel(character);
 
   // Local state
   const [castModalOpen, setCastModalOpen] = useState(false);
@@ -496,7 +505,7 @@ export function QuickSpells({
             roll,
             spellAttackBonus,
             isCrit,
-            spell.damage,
+            getScaledSpellDamage(spell, totalLevel),
             spell.damageType
           );
           return;
@@ -516,7 +525,7 @@ export function QuickSpells({
       roll,
       spellAttackBonus,
       isCrit,
-      spell.damage,
+      getScaledSpellDamage(spell, totalLevel),
       spell.damageType
     );
   };
@@ -530,20 +539,21 @@ export function QuickSpells({
       spell.name,
       spellSaveDC,
       spell.savingThrow,
-      spell.damage,
+      getScaledSpellDamage(spell, totalLevel),
       spell.damageType
     );
   };
 
   const rollSpellDamage = async (spell: Spell) => {
-    if (!spell.damage) {
+    const damage = getScaledSpellDamage(spell, totalLevel);
+    if (!damage) {
       alert('This spell does not have damage dice specified');
       return;
     }
 
     if (animateRoll) {
       try {
-        const rollResult = await animateRoll(spell.damage);
+        const rollResult = await animateRoll(damage);
         if (
           rollResult &&
           typeof rollResult === 'object' &&
@@ -562,7 +572,7 @@ export function QuickSpells({
       }
     }
 
-    const damageResult = rollDamage(spell.damage);
+    const damageResult = rollDamage(damage);
     showDamageRoll(spell.name, damageResult, spell.damageType);
   };
 
@@ -722,6 +732,7 @@ export function QuickSpells({
                   spellSaveDC={spellSaveDC}
                   onAction={action => handleSpellAction(spell, action)}
                   onToggleFavorite={() => toggleSpellFavorite(spell.id)}
+                  totalLevel={totalLevel}
                 />
               ))}
             </div>
@@ -741,6 +752,7 @@ export function QuickSpells({
             onSpellAction={handleSpellAction}
             favoriteSpells={favoriteSpells}
             onToggleFavorite={toggleSpellFavorite}
+            totalLevel={totalLevel}
           />
         )}
 
@@ -764,6 +776,7 @@ export function QuickSpells({
                   onSpellAction={handleSpellAction}
                   favoriteSpells={favoriteSpells}
                   onToggleFavorite={toggleSpellFavorite}
+                  totalLevel={totalLevel}
                   slotMax={slot?.max}
                   slotUsed={slot?.used}
                   onSlotChange={used =>
@@ -819,6 +832,7 @@ export function QuickSpells({
             toggleSpellFavorite(viewingSpell.id);
           }}
           onCast={() => openCastModal(viewingSpell)}
+          characterLevel={totalLevel}
         />
       )}
     </>
