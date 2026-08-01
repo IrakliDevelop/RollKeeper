@@ -159,4 +159,29 @@ describe('promotion', () => {
     bus.reconcileOwnPending('char-1');
     expect(applied).toHaveLength(2); // idempotent — queue cleared
   });
+
+  it('does not re-apply a pending intent whose watermark already shows it applied (C1)', () => {
+    // Pins the failover window: the former leader applied this tab's seq 1,
+    // persisted it, and died before the ack arrived. Promotion must hydrate
+    // the watermark from the envelope (this test simulates that hydration
+    // directly on the dep, mirroring onPromotedToLeader's fixed merge)
+    // BEFORE reconcileOwnPending runs, so the still-pending intent is
+    // recognized as a duplicate rather than re-applied.
+    const { bus, applied, watermarks } = makeBus({ isLeader: () => true });
+    bus.send('char-1', 'a', []); // seq 1, queued — never acked
+    watermarks.set(TAB_ID, 1); // envelope-hydrated watermark says seq 1 landed
+
+    bus.reconcileOwnPending('char-1');
+
+    expect(applied).toHaveLength(0); // deduped, not re-applied
+  });
+
+  it('still applies a pending intent when the watermark has NOT caught up (no false dedup)', () => {
+    const { bus, applied } = makeBus({ isLeader: () => true });
+    bus.send('char-1', 'a', []); // seq 1, watermark starts at 0
+
+    bus.reconcileOwnPending('char-1');
+
+    expect(applied.map(i => i.actionName)).toEqual(['a']);
+  });
 });

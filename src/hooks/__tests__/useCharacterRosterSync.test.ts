@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 
 import { useCharacterRosterSync } from '../useCharacterRosterSync';
 import { characterEnvelopeKey } from '@/lib/characterCanonicalStorage';
+import { useCharacterStore } from '@/store/characterStore';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 import type { CharacterState } from '@/types/character';
 
@@ -24,11 +25,13 @@ function makeProps(overrides: Partial<Props> = {}): Props {
 describe('useCharacterRosterSync', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    useCharacterStore.setState({ intentWatermarks: {} });
   });
 
   afterEach(() => {
     vi.useRealTimers();
     window.localStorage.clear();
+    useCharacterStore.setState({ intentWatermarks: {} });
   });
 
   it('loads the roster character into the store exactly once per characterId', () => {
@@ -200,6 +203,64 @@ describe('useCharacterRosterSync', () => {
 
     expect(loadCharacterState).toHaveBeenCalledTimes(1);
     expect(loadCharacterState).toHaveBeenCalledWith(envelopeCharacter);
+  });
+
+  it('adopts envelope watermarks even when the roster entry wins arbitration (I2)', () => {
+    const envelopeCharacter = makeCharacter({ id: 'char-1', revision: 3 });
+    // Strictly fresher than the envelope — the roster entry wins arbitration.
+    const rosterData = makeCharacter({ id: 'char-1', revision: 7 });
+    window.localStorage.setItem(
+      characterEnvelopeKey('char-1'),
+      JSON.stringify({
+        state: {
+          character: envelopeCharacter,
+          intentWatermarks: { 'tab-x': { seq: 5, lastSeen: 1 } },
+        },
+        version: 0,
+      })
+    );
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+    });
+
+    renderHook(p => useCharacterRosterSync(p), { initialProps: props });
+
+    expect(useCharacterStore.getState().intentWatermarks).toEqual({
+      'tab-x': { seq: 5, lastSeen: 1 },
+    });
+  });
+
+  it('merges envelope watermarks against current in-memory state instead of clobbering', () => {
+    const envelopeCharacter = makeCharacter({ id: 'char-1', revision: 3 });
+    const rosterData = makeCharacter({ id: 'char-1', revision: 7 });
+    window.localStorage.setItem(
+      characterEnvelopeKey('char-1'),
+      JSON.stringify({
+        state: {
+          character: envelopeCharacter,
+          intentWatermarks: { 'tab-x': { seq: 2, lastSeen: 1 } },
+        },
+        version: 0,
+      })
+    );
+    // In-memory already knows about a higher seq for tab-x, and an unrelated
+    // tab-y the envelope has never heard of.
+    useCharacterStore.setState({
+      intentWatermarks: {
+        'tab-x': { seq: 9, lastSeen: 500 },
+        'tab-y': { seq: 1, lastSeen: 2 },
+      },
+    });
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+    });
+
+    renderHook(p => useCharacterRosterSync(p), { initialProps: props });
+
+    expect(useCharacterStore.getState().intentWatermarks).toEqual({
+      'tab-x': { seq: 9, lastSeen: 500 },
+      'tab-y': { seq: 1, lastSeen: 2 },
+    });
   });
 
   it('still writes fresher store state back to the roster when a stale load is skipped', () => {

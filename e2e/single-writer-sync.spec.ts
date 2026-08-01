@@ -189,6 +189,50 @@ test('4+9: leader killed around a follower intent — applied exactly once after
     .toBe(max - 3);
 });
 
+test('9b: leader applies-but-dies before acking a follower intent — exactly one application after promotion (C1)', async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  const tab1 = await context.newPage(); // leader
+  const url = await createCharacter(tab1, 'UnackedFailoverHero');
+  const characterId = characterIdFromUrl(url);
+  const tab2 = await openSecondTab(context, url, characterId);
+
+  const { max } = await storeHp(tab2);
+
+  // Seed a real, fully round-tripped watermark entry for tab2's own tabId
+  // first — applied, acked, AND adopted (visible via tab2's own storeHp).
+  // Test 4+9 races a follower's FIRST-ever intent, where tab2's in-memory
+  // watermarks have no entry for itself yet; this variant instead ensures a
+  // STALE-but-present entry exists before the race, which is what exercises
+  // the promotion-time watermark MERGE (as opposed to a plain adopt) — the
+  // exact branch C1 fixed.
+  await damageCharacter(tab2, 2);
+  await expect
+    .poll(async () => (await storeHp(tab2)).current, { timeout: 10_000 })
+    .toBe(max - 2);
+
+  // Fire a second intent and kill the leader in the same beat, racing the
+  // leader's apply+persist+ack against the close.
+  await Promise.all([damageCharacter(tab2, 3), tab1.close()]);
+
+  // tab2 promotes, hydrates watermarks from the envelope (max of envelope
+  // vs. its own stale in-memory entry), reconciles its own pending intent
+  // (deduped against the hydrated watermark, whichever way the race fell),
+  // and lands on exactly one application of each intent.
+  await expect
+    .poll(async () => (await storeHp(tab2)).current, { timeout: 15_000 })
+    .toBe(max - 5);
+
+  // Never max - 8 (double apply of the second intent via a stale watermark
+  // surviving promotion) — hold past the retry interval to prove stability.
+  await tab2.waitForTimeout(3000); // > retry interval
+  expect((await storeHp(tab2)).current).toBe(max - 5);
+  await expect
+    .poll(() => envelopeHp(tab2, characterId), { timeout: 10_000 })
+    .toBe(max - 5);
+});
+
 test('5: character switch hands leadership over', async ({ browser }) => {
   const context = await browser.newContext();
   const tab1 = await context.newPage();

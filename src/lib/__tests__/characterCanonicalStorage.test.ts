@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import {
   characterEnvelopeKey,
@@ -6,7 +6,9 @@ import {
   readCharacterEnvelope,
   pickFresherCharacter,
   createPerCharacterStorage,
+  mergeWatermarks,
 } from '@/lib/characterCanonicalStorage';
+import { characterWriterLock } from '@/lib/characterWriterLock';
 import { STORAGE_KEY } from '@/utils/constants';
 import type { CharacterState } from '@/types/character';
 
@@ -95,5 +97,78 @@ describe('createPerCharacterStorage', () => {
     storage.setItem('n', persistJson(char('b', 7)));
     expect(readCharacterEnvelope('a')?.character.revision).toBe(1);
     expect(readCharacterEnvelope('b')?.character.revision).toBe(7);
+  });
+
+  describe('leadership gate (I1)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('follower tabs never echo-write the envelope, even when armed', () => {
+      const storage = createPerCharacterStorage();
+      armCanonicalPersistence('a');
+      vi.spyOn(characterWriterLock, 'isLeader').mockReturnValue(false);
+
+      storage.setItem('n', persistJson(char('a', 1)));
+
+      expect(window.localStorage.getItem(characterEnvelopeKey('a'))).toBeNull();
+    });
+
+    it('the leader tab writes normally', () => {
+      const storage = createPerCharacterStorage();
+      armCanonicalPersistence('a');
+      vi.spyOn(characterWriterLock, 'isLeader').mockReturnValue(true);
+
+      storage.setItem('n', persistJson(char('a', 1)));
+
+      expect(window.localStorage.getItem(characterEnvelopeKey('a'))).toContain(
+        '"revision":1'
+      );
+    });
+  });
+});
+
+describe('mergeWatermarks', () => {
+  it('takes the per-tab max seq; envelope-dominant for tabs only it has', () => {
+    const envelope = { F: { seq: 5, lastSeen: 100 } };
+    const current = {
+      F: { seq: 4, lastSeen: 50 },
+      G: { seq: 2, lastSeen: 10 },
+    };
+    expect(mergeWatermarks(envelope, current)).toEqual({
+      F: { seq: 5, lastSeen: 100 },
+      G: { seq: 2, lastSeen: 10 },
+    });
+  });
+
+  it('never regresses a tab the envelope has advanced past current', () => {
+    // The promotion scenario the fix pins: current lags because this tab
+    // never received/adopted the leader's latest storage write before
+    // promoting — the envelope (read fresh at promotion) must win.
+    const envelope = { F: { seq: 10, lastSeen: 300 } };
+    const current = { F: { seq: 9, lastSeen: 100 } };
+    expect(mergeWatermarks(envelope, current)).toEqual({
+      F: { seq: 10, lastSeen: 300 },
+    });
+  });
+
+  it('keeps the fresher lastSeen even when current holds the higher seq', () => {
+    const envelope = { F: { seq: 3, lastSeen: 50 } };
+    const current = { F: { seq: 3, lastSeen: 200 } };
+    expect(mergeWatermarks(envelope, current)).toEqual({
+      F: { seq: 3, lastSeen: 200 },
+    });
+  });
+
+  it('passes tabs present only in current straight through', () => {
+    expect(mergeWatermarks({}, { G: { seq: 2, lastSeen: 10 } })).toEqual({
+      G: { seq: 2, lastSeen: 10 },
+    });
+  });
+
+  it('passes tabs present only in the envelope straight through', () => {
+    expect(mergeWatermarks({ F: { seq: 5, lastSeen: 1 } }, {})).toEqual({
+      F: { seq: 5, lastSeen: 1 },
+    });
   });
 });
