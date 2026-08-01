@@ -99,7 +99,9 @@ describe('DockVitals', () => {
   it('disables the Use button at 0 heroic inspiration', () => {
     seedCharacter({ heroicInspiration: { count: 0, maxCount: 3 } });
     render(<DockVitals addToast={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /^use$/i })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: /use heroic inspiration/i })
+    ).toBeDisabled();
   });
 
   it('spends heroic inspiration and fires an advantage toast', () => {
@@ -109,7 +111,9 @@ describe('DockVitals', () => {
     });
     const addToast = vi.fn();
     render(<DockVitals addToast={addToast} />);
-    const useButton = screen.getByRole('button', { name: /^use$/i });
+    const useButton = screen.getByRole('button', {
+      name: /use heroic inspiration/i,
+    });
     expect(useButton).not.toBeDisabled();
 
     fireEvent.click(useButton);
@@ -126,8 +130,8 @@ describe('DockVitals', () => {
     });
     render(<DockVitals addToast={vi.fn()} />);
     expect(
-      screen.getByRole('button', { name: /add heroic inspiration/i })
-    ).toBeDisabled();
+      screen.queryByRole('button', { name: /add heroic inspiration/i })
+    ).toBeNull();
   });
 
   it('increments heroic inspiration via the + stepper when under max', () => {
@@ -160,8 +164,9 @@ describe('DockVitals', () => {
       heroicInspiration: { count: 1, maxCount: 3 },
     });
     render(<DockVitals addToast={vi.fn()} />);
-    const addBtn = screen.getByLabelText('Add heroic inspiration');
-    expect(addBtn).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: /add heroic inspiration/i })
+    ).toBeNull();
   });
 
   it('opens the armor class editor from the AC card', () => {

@@ -45,9 +45,10 @@ export function DockVitals({ addToast }: DockVitalsProps) {
     : Math.floor((character.abilities.dexterity - 10) / 2);
 
   const { count: heroicCount, maxCount } = character.heroicInspiration;
-  const heroicMax = maxCount ?? 1;
   const stackable = character.stackableInspiration ?? false;
-  const effectiveHeroicMax = stackable ? heroicMax : 1;
+  const effectiveHeroicMax = stackable
+    ? (maxCount ?? Number.POSITIVE_INFINITY)
+    : 1;
   const hasUsedReaction = character.reaction?.hasUsedReaction ?? false;
 
   const applyAmount = (
