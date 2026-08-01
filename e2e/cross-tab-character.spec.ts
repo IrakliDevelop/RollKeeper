@@ -2,7 +2,9 @@ import { test, expect } from '@playwright/test';
 
 import {
   createCharacter,
+  characterIdFromUrl,
   waitForStoresReady,
+  waitForCharacterLoaded,
   storeHp,
   damageCharacter,
 } from './helpers';
@@ -19,10 +21,12 @@ test('damage applied in one tab reaches another tab of the same character', asyn
   const tab1 = await context.newPage();
 
   const characterUrl = await createCharacter(tab1, 'SoloHero');
+  const characterId = characterIdFromUrl(characterUrl);
 
   const tab2 = await context.newPage();
   await tab2.goto(characterUrl, { waitUntil: 'networkidle' });
   await waitForStoresReady(tab2);
+  await waitForCharacterLoaded(tab2, characterId);
 
   const { max: hpMax } = await storeHp(tab1);
 

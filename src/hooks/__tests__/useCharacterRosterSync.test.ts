@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
 import { useCharacterRosterSync } from '../useCharacterRosterSync';
+import { characterEnvelopeKey } from '@/lib/characterCanonicalStorage';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 import type { CharacterState } from '@/types/character';
 
@@ -27,6 +28,7 @@ describe('useCharacterRosterSync', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    window.localStorage.clear();
   });
 
   it('loads the roster character into the store exactly once per characterId', () => {
@@ -176,6 +178,28 @@ describe('useCharacterRosterSync', () => {
 
     expect(loadCharacterState).toHaveBeenCalledTimes(1);
     expect(loadCharacterState).toHaveBeenCalledWith(rosterData);
+  });
+
+  it('loads the canonical envelope over a stale roster entry for the same character', () => {
+    const envelopeCharacter = makeCharacter({ id: 'char-1', revision: 7 });
+    const rosterData = makeCharacter({ id: 'char-1', revision: 5 });
+    window.localStorage.setItem(
+      characterEnvelopeKey('char-1'),
+      JSON.stringify({
+        state: { character: envelopeCharacter, intentWatermarks: {} },
+        version: 0,
+      })
+    );
+    const loadCharacterState = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      loadCharacterState,
+    });
+
+    renderHook(p => useCharacterRosterSync(p), { initialProps: props });
+
+    expect(loadCharacterState).toHaveBeenCalledTimes(1);
+    expect(loadCharacterState).toHaveBeenCalledWith(envelopeCharacter);
   });
 
   it('still writes fresher store state back to the roster when a stale load is skipped', () => {
