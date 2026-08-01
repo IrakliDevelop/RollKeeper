@@ -425,6 +425,35 @@ describe('TokenDecorationLayer', () => {
     expect(dead.container.querySelector(badgeSelector)).not.toBeInTheDocument();
   });
 
+  it('paints the reaction badge above a full condition strip (badge after strip in DOM order)', () => {
+    // The overlay has no z-index tiers — stacking is DOM order. A 4-icon
+    // strip spans the token's top edge including the badge corner, so the
+    // badge must come after the strip or it gets painted over.
+    const { container } = render(
+      <TokenDecorationLayer
+        decorations={deco({
+          hasUsedReaction: true,
+          conditions: [
+            { name: 'Poisoned' },
+            { name: 'Prone' },
+            { name: 'Stunned' },
+            { name: 'Blinded' },
+          ],
+        })}
+        mode="full"
+      />
+    );
+    const badge = container.querySelector(
+      '[data-testid="reaction-used-glyph"]'
+    );
+    const strip = container.querySelector('svg')?.closest('span[style]');
+    expect(badge).toBeInTheDocument();
+    expect(strip).toBeInTheDocument();
+    expect(
+      strip!.compareDocumentPosition(badge!) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
   it('renders no reaction badge when hasUsedReaction is absent', () => {
     const { container } = render(
       <TokenDecorationLayer decorations={deco({})} mode="full" />
