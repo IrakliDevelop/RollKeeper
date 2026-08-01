@@ -1,6 +1,12 @@
 import { create, StateCreator } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { createSafeStorage } from '@/lib/safeStorage';
+import { TAB_ID } from '@/lib/tabIdentity';
+import {
+  armCanonicalPersistence,
+  createPerCharacterStorage,
+  type IntentWatermark,
+} from '@/lib/characterCanonicalStorage';
+import { getApplyingIntent } from '@/store/characterIntentContext';
 import {
   CharacterState,
   SaveStatus,
@@ -412,6 +418,11 @@ interface CharacterStore {
   lastSaved: Date | string | null; // Can be string when rehydrated from localStorage
   hasUnsavedChanges: boolean;
   hasHydrated: boolean;
+  /** Highest contiguously applied intent seq per sender tab — persisted
+   * atomically with the character so failover dedup survives leader death. */
+  intentWatermarks: Record<string, IntentWatermark>;
+  /** Watermark advance for intents whose action never called set. */
+  noteIntentApplied: (tabId: string, seq: number) => void;
   showDeathAnimation: boolean;
   showLevelUpAnimation: boolean;
   levelUpAnimationLevel: number;
@@ -794,29 +805,84 @@ type CharacterStoreCreator = StateCreator<
   CharacterStore
 >;
 
-// Wraps the store creator's `set` so every local mutation that changes
-// `state.character` bumps `character.revision` by exactly 1. External
-// applies (loadCharacterState, cross-tab) run under withExternalApply and
-// adopt the incoming revision instead of bumping it. Implemented as a
-// middleware (rather than inline in the creator) so the creator's object
-// literal keeps its original shape/indentation.
-function withRevisionBump(
+const WATERMARK_MAX_TABS = 10;
+const WATERMARK_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function advanceWatermark(
+  current: Record<string, IntentWatermark>,
+  mark: { tabId: string; seq: number }
+): Record<string, IntentWatermark> {
+  const now = Date.now();
+  const next: Record<string, IntentWatermark> = {
+    ...current,
+    [mark.tabId]: { seq: mark.seq, lastSeen: now },
+  };
+  const entries = Object.entries(next).filter(
+    ([, wm]) => now - wm.lastSeen <= WATERMARK_MAX_AGE_MS
+  );
+  // The just-advanced mark must always survive GC — equal lastSeen values
+  // (same-ms inserts) would otherwise let the slice evict it.
+  entries.sort((a, b) =>
+    a[0] === mark.tabId
+      ? -1
+      : b[0] === mark.tabId
+        ? 1
+        : b[1].lastSeen - a[1].lastSeen
+  );
+  return Object.fromEntries(entries.slice(0, WATERMARK_MAX_TABS));
+}
+
+// Wraps the creator's `set` so every local mutation that changes
+// `state.character` gets, in ONE rawSet (and therefore one persist write):
+// revision bump by exactly 1, lastMutatedAt/lastMutatedBy stamps, and —
+// when executing a forwarded intent — the sender's watermark advance.
+// External applies (loadCharacterState, cross-tab) run under
+// withExternalApply and adopt the incoming values instead.
+function withCanonicalMutation(
   creator: CharacterStoreCreator
 ): CharacterStoreCreator {
   return (rawSet, get, store) => {
-    const set = ((...args: Parameters<typeof rawSet>) => {
-      const prev = get()?.character;
-      rawSet(...args);
-      if (isApplyingExternal()) return;
-      const next = get().character;
-      if (prev && next && next !== prev && next.revision === prev.revision) {
-        rawSet(state => ({
-          character: {
-            ...state.character,
-            revision: (state.character.revision ?? 0) + 1,
-          },
-        }));
+    const set = ((partial: unknown, replace?: boolean) => {
+      if (isApplyingExternal()) {
+        rawSet(
+          partial as Parameters<typeof rawSet>[0],
+          replace as Parameters<typeof rawSet>[1]
+        );
+        return;
       }
+      rawSet(state => {
+        const patch =
+          typeof partial === 'function'
+            ? (partial as (s: CharacterStore) => Partial<CharacterStore>)(state)
+            : (partial as Partial<CharacterStore>);
+        const intentMark = getApplyingIntent();
+        const watermarkPatch = intentMark
+          ? {
+              intentWatermarks: advanceWatermark(
+                state.intentWatermarks,
+                intentMark
+              ),
+            }
+          : null;
+        const nextCharacter = patch.character;
+        const characterChanged =
+          !!nextCharacter &&
+          nextCharacter !== state.character &&
+          nextCharacter.revision === state.character.revision;
+        if (!characterChanged) {
+          return watermarkPatch ? { ...patch, ...watermarkPatch } : patch;
+        }
+        return {
+          ...patch,
+          ...(watermarkPatch ?? {}),
+          character: {
+            ...nextCharacter,
+            revision: (state.character.revision ?? 0) + 1,
+            lastMutatedAt: Date.now(),
+            lastMutatedBy: TAB_ID,
+          },
+        };
+      });
     }) as typeof rawSet;
     return creator(set, get, store);
   };
@@ -824,7 +890,7 @@ function withRevisionBump(
 
 export const useCharacterStore = create<CharacterStore>()(
   persist(
-    withRevisionBump((set, get) => ({
+    withCanonicalMutation((set, get) => ({
       // Initial state
       character: {
         ...DEFAULT_CHARACTER_STATE,
@@ -834,6 +900,7 @@ export const useCharacterStore = create<CharacterStore>()(
       lastSaved: null,
       hasUnsavedChanges: false,
       hasHydrated: false,
+      intentWatermarks: {},
       showDeathAnimation: false,
       showLevelUpAnimation: false,
       levelUpAnimationLevel: 1,
@@ -849,6 +916,7 @@ export const useCharacterStore = create<CharacterStore>()(
 
       loadCharacterState: characterState => {
         const migratedCharacter = migrateCharacterData(characterState);
+        armCanonicalPersistence(migratedCharacter.id);
         const multiclassCharacter = migrateToMulticlass(migratedCharacter);
 
         // Spell slots and pact magic are derived from class + level, but they are
@@ -1479,7 +1547,7 @@ export const useCharacterStore = create<CharacterStore>()(
 
           // No-op guard: recalculation runs unconditionally on every
           // sheet mount, so when the recalculated max matches the current
-          // max, return the untouched state. Otherwise `withRevisionBump`
+          // max, return the untouched state. Otherwise `withCanonicalMutation`
           // sees a fresh (but content-identical) character object on every
           // mount and mints a revision bump with zero real change, which
           // degrades every revision-comparison site (roster merge,
@@ -5268,6 +5336,7 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       loadCharacter: character => {
+        armCanonicalPersistence(character.id);
         withExternalApply(() =>
           set({
             character,
@@ -5279,10 +5348,12 @@ export const useCharacterStore = create<CharacterStore>()(
       },
 
       resetCharacter: () => {
+        const newId = generateId();
+        armCanonicalPersistence(newId);
         set({
           character: {
             ...DEFAULT_CHARACTER_STATE,
-            id: generateId(),
+            id: newId,
           },
           saveStatus: 'saved',
           lastSaved: new Date(),
@@ -5316,6 +5387,7 @@ export const useCharacterStore = create<CharacterStore>()(
             );
           }
 
+          armCanonicalPersistence(exportData.character.id);
           set({
             character: exportData.character,
             saveStatus: 'saved',
@@ -5350,25 +5422,26 @@ export const useCharacterStore = create<CharacterStore>()(
           saveStatus: 'saving',
         });
       },
+
+      noteIntentApplied: (tabId, seq) =>
+        set(state => ({
+          intentWatermarks: advanceWatermark(state.intentWatermarks, {
+            tabId,
+            seq,
+          }),
+        })),
     })),
     {
       name: STORAGE_KEY,
-      storage: createJSONStorage(() => createSafeStorage()),
-      // Only persist the character data and save metadata
+      storage: createJSONStorage(() => createPerCharacterStorage()),
       partialize: state => ({
         character: state.character,
         lastSaved: state.lastSaved,
+        intentWatermarks: state.intentWatermarks,
       }),
-      // Handle rehydration and migration
-      onRehydrateStorage: () => state => {
-        if (state) {
-          // Migrate character data if needed
-          state.character = migrateCharacterData(state.character);
-          state.saveStatus = 'saved';
-          state.hasUnsavedChanges = false;
-          state.hasHydrated = true;
-        }
-      },
+      // No onRehydrateStorage: the adapter's getItem returns null, the
+      // store boots empty, and hydration happens through the explicit
+      // load-by-id flow (useCharacterRosterSync → loadCharacterState).
     }
   )
 );
