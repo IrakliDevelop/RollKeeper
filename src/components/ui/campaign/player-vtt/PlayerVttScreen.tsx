@@ -12,6 +12,7 @@ import { useTokenInfoMode } from '@/components/ui/campaign/token-overlay/useToke
 import { InitiativeRollPrompt } from '@/components/ui/campaign/InitiativeRollPrompt';
 import { useInitiativePrompt } from '@/components/ui/campaign/useInitiativePrompt';
 import { ToastContainer } from '@/components/ui/feedback/Toast';
+import { useReactionTurnReset } from '@/hooks/useReactionTurnReset';
 
 import { CastingBanner } from './CastingBanner';
 import { CharacterDock } from './CharacterDock';
@@ -58,6 +59,15 @@ export function PlayerVttScreen({
     addToast,
     dismissToast,
   } = usePlayerVttState(campaignCode, characterId);
+
+  const handleReactionAutoReset = useCallback(() => {
+    addToast({
+      type: 'info',
+      title: 'Reaction refreshed',
+      message: 'Your turn started',
+    });
+  }, [addToast]);
+  useReactionTurnReset(liveInitiative, characterId, handleReactionAutoReset);
 
   const [combatCollapsed, setCombatCollapsed] = useState(defaultCollapsed);
   const [dockCollapsed, setDockCollapsed] = useState(defaultCollapsed);
