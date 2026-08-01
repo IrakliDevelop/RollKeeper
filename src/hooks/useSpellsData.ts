@@ -22,9 +22,10 @@ let cachedSpells: ProcessedSpell[] | null = null;
 let cachePromise: Promise<ProcessedSpell[]> | null = null;
 
 /**
- * Fetch spells from the API
+ * Fetch spells from the API. Module-level cached and shared across callers
+ * (including non-hook consumers like `useCantripScalingBackfill`).
  */
-async function fetchSpells(): Promise<ProcessedSpell[]> {
+export async function fetchSpells(): Promise<ProcessedSpell[]> {
   // Return cached spells if available
   if (cachedSpells) {
     return cachedSpells;

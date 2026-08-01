@@ -8,7 +8,7 @@
  */
 
 import type { Spell } from '@/types/character';
-import type { SpellScalingLevelDice } from '@/types/spells';
+import type { ProcessedSpell, SpellScalingLevelDice } from '@/types/spells';
 
 export type CantripDamageScaling = Record<number, string>;
 
@@ -108,6 +108,27 @@ export function getCantripUpgrades(
     }
   }
   return upgrades;
+}
+
+/**
+ * Best spell-data candidate for backfilling a stored cantrip: same source
+ * first, then 2024 rules (PHB2024), then any entry carrying scaling data.
+ */
+export function findScalingSpellMatch(
+  processed: ProcessedSpell[],
+  name: string,
+  source?: string
+): ProcessedSpell | undefined {
+  const nameLower = name.toLowerCase();
+  const candidates = processed.filter(
+    p => p.isCantrip && p.scalingLevelDice && p.name.toLowerCase() === nameLower
+  );
+  if (candidates.length === 0) return undefined;
+  return (
+    (source && candidates.find(c => c.source === source)) ||
+    candidates.find(c => c.source === 'PHB2024') ||
+    candidates[0]
+  );
 }
 
 /**
