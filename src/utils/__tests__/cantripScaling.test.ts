@@ -6,6 +6,7 @@ import {
   getCantripUpgrades,
   resolveDamageScalingOnEdit,
   findScalingSpellMatch,
+  isSafeScalingBackfillMatch,
 } from '@/utils/cantripScaling';
 import type { SpellScalingLevelDice, ProcessedSpell } from '@/types/spells';
 import type { Spell } from '@/types/character';
@@ -269,7 +270,100 @@ describe('findScalingSpellMatch', () => {
     ).toBeUndefined();
   });
 
+  it('never matches a same-name same-source entry that is not a cantrip', () => {
+    expect(
+      findScalingSpellMatch(
+        [processed({ source: 'PHB', isCantrip: false })],
+        'Shocking Grasp',
+        'PHB'
+      )
+    ).toBeUndefined();
+  });
+
   it('returns undefined for unknown names', () => {
     expect(findScalingSpellMatch(pool, 'Fire Bolt')).toBeUndefined();
+  });
+});
+
+describe('isSafeScalingBackfillMatch', () => {
+  it('rejects a no-damage cantrip matched to a different-source entry (cross-edition True Strike)', () => {
+    const trueStrike2014 = { damage: undefined, source: 'PHB' };
+    const trueStrike2024Match = { source: 'PHB2024' };
+    expect(
+      isSafeScalingBackfillMatch(trueStrike2014, trueStrike2024Match)
+    ).toBe(false);
+  });
+
+  it('allows a damage-bearing cantrip to enrich via a different-source match', () => {
+    const shockingGrasp2014 = { damage: '1d8', source: 'PHB' };
+    const shockingGrasp2024Match = { source: 'PHB2024' };
+    expect(
+      isSafeScalingBackfillMatch(shockingGrasp2014, shockingGrasp2024Match)
+    ).toBe(true);
+  });
+
+  it('allows a no-damage cantrip when the match source agrees with the stored source', () => {
+    expect(
+      isSafeScalingBackfillMatch(
+        { damage: undefined, source: 'PHB2024' },
+        { source: 'PHB2024' }
+      )
+    ).toBe(true);
+  });
+
+  it('allows a no-damage, no-source stored spell (nothing to contradict)', () => {
+    expect(
+      isSafeScalingBackfillMatch(
+        { damage: undefined, source: undefined },
+        { source: 'PHB2024' }
+      )
+    ).toBe(true);
+  });
+});
+
+describe('backfill decision: findScalingSpellMatch + isSafeScalingBackfillMatch', () => {
+  it('produces no backfill entry for 2014 True Strike when only PHB2024 has scaling', () => {
+    const storedSpell = {
+      name: 'True Strike',
+      source: 'PHB',
+      damage: undefined,
+      damageScaling: undefined,
+    };
+    const pool = [
+      processed({
+        id: 'true-strike-xphb',
+        name: 'True Strike',
+        source: 'PHB2024',
+        scalingLevelDice: {
+          label: 'x',
+          scaling: { '5': '1d6', '11': '2d6', '17': '3d6' },
+        },
+      }),
+    ];
+
+    const match = findScalingSpellMatch(
+      pool,
+      storedSpell.name,
+      storedSpell.source
+    );
+    expect(match).toBeDefined();
+    expect(isSafeScalingBackfillMatch(storedSpell, match!)).toBe(false);
+  });
+
+  it('still produces a backfill entry for damage-bearing Shocking Grasp when only PHB2024 candidate exists', () => {
+    const storedSpell = {
+      name: 'Shocking Grasp',
+      source: 'PHB',
+      damage: '1d8',
+    };
+    const pool = [processed({ id: 'sg-xphb', source: 'PHB2024' })];
+
+    const match = findScalingSpellMatch(
+      pool,
+      storedSpell.name,
+      storedSpell.source
+    );
+    expect(match).toBeDefined();
+    expect(isSafeScalingBackfillMatch(storedSpell, match!)).toBe(true);
   });
 });

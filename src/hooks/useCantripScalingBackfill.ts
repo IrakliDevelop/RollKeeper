@@ -7,6 +7,7 @@ import { fetchSpells } from '@/hooks/useSpellsData';
 import {
   extractCantripScaling,
   findScalingSpellMatch,
+  isSafeScalingBackfillMatch,
 } from '@/utils/cantripScaling';
 
 /**
@@ -45,7 +46,7 @@ export function useCantripScalingBackfill(): void {
             spell.name,
             spell.source
           );
-          if (!match) continue;
+          if (!match || !isSafeScalingBackfillMatch(spell, match)) continue;
           const scaling = extractCantripScaling(
             match.scalingLevelDice,
             spell.damage
