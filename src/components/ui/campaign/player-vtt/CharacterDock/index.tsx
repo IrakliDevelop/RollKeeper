@@ -7,6 +7,7 @@ import type { ToastData } from '@/components/ui/feedback/Toast';
 import { useCharacterStore } from '@/store/characterStore';
 import type { SpellAoe } from '@/types/spellAoe';
 
+import { DockBuffs } from './DockBuffs';
 import { DockSpells } from './DockSpells';
 import { DockVitals } from './DockVitals';
 
@@ -34,6 +35,7 @@ export function CharacterDock({
   onCancelPlacement,
 }: CharacterDockProps) {
   const character = useCharacterStore(state => state.character);
+  const toggleBuff = useCharacterStore(state => state.toggleBuff);
 
   if (collapsed) {
     return (
@@ -46,6 +48,18 @@ export function CharacterDock({
       </button>
     );
   }
+
+  const handleToggleBuff = (id: string) => {
+    const buff = (character.temporaryBuffs || []).find(b => b.id === id);
+    toggleBuff(id);
+    if (buff) {
+      addToast({
+        type: 'info',
+        title: `${buff.name} ${buff.isActive ? 'off' : 'on'}`,
+        message: '',
+      });
+    }
+  };
 
   const level = character.totalLevel || character.level;
   const className = character.class?.name || 'Unknown Class';
@@ -86,6 +100,11 @@ export function CharacterDock({
 
       <div className="flex-1 space-y-3 overflow-x-hidden overflow-y-auto px-3 py-3">
         <DockVitals addToast={addToast} />
+
+        <DockBuffs
+          buffs={character.temporaryBuffs || []}
+          onToggleBuff={handleToggleBuff}
+        />
 
         <DockSpells
           addToast={addToast}
