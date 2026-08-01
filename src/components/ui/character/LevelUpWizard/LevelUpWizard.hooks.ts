@@ -23,6 +23,7 @@ import {
 } from '@/utils/calculations';
 import { calculateHitDicePools, migrateToMulticlass } from '@/utils/multiclass';
 import { detectSpellAoe } from '@/utils/spellAoeDetection';
+import { getCantripUpgrades } from '@/utils/cantripScaling';
 import {
   matchClassByName,
   getEditionOptions,
@@ -424,6 +425,11 @@ export function useLevelUpWizard(character: CharacterState) {
     ? getCantripsKnownDelta(matchedClass, newClassLevel - 1, newClassLevel)
     : 0;
 
+  const cantripUpgrades = useMemo(
+    () => getCantripUpgrades(migrated.spells || [], totalLevel, newTotalLevel),
+    [migrated.spells, totalLevel, newTotalLevel]
+  );
+
   const applyLevelUp = useCallback(() => {
     if (!targetClass) return;
     const classIdx = targetClassIndex;
@@ -627,6 +633,7 @@ export function useLevelUpWizard(character: CharacterState) {
     allSpells,
     spellsKnownDelta,
     cantripsKnownDelta,
+    cantripUpgrades,
     currentStep,
     canGoNext: canGoNext(),
     goNext,

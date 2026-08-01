@@ -3,6 +3,7 @@
 import { Check, ArrowUp, Sparkles, BookOpen, Heart, Sword } from 'lucide-react';
 import type { ClassFeature } from '@/types/classes';
 import type { CharacterAbilities } from '@/types/character';
+import type { CantripUpgrade } from '@/utils/cantripScaling';
 import type { ASIChoice, SubclassSpellGrant } from '../LevelUpWizard.types';
 
 interface ConfirmationStepProps {
@@ -23,6 +24,7 @@ interface ConfirmationStepProps {
   isCustomClass: boolean;
   spellsKnownDelta: number;
   cantripsKnownDelta: number;
+  cantripUpgrades: CantripUpgrade[];
 }
 
 export default function ConfirmationStep({
@@ -43,6 +45,7 @@ export default function ConfirmationStep({
   isCustomClass,
   spellsKnownDelta,
   cantripsKnownDelta,
+  cantripUpgrades,
 }: ConfirmationStepProps) {
   const displayFeatures = [...features, ...subclassFeatures].filter(
     f => f.name !== 'Ability Score Improvement' && f.name !== 'Epic Boon'
@@ -196,6 +199,29 @@ export default function ConfirmationStep({
           <p className="text-muted text-xs italic">
             Custom class — update features and abilities manually.
           </p>
+        )}
+
+        {/* Cantrip damage increases */}
+        {cantripUpgrades.length > 0 && (
+          <div className="flex items-start gap-2">
+            <Sparkles size={14} className="text-accent-purple-text mt-0.5" />
+            <div>
+              <span className="text-heading text-sm font-medium">
+                Cantrip Damage Increases:
+              </span>
+              <ul className="text-body mt-1 space-y-0.5 text-sm">
+                {cantripUpgrades.map(upgrade => (
+                  <li key={upgrade.name} className="flex items-center gap-1">
+                    <Check
+                      size={12}
+                      className="text-accent-emerald-text flex-shrink-0"
+                    />
+                    {upgrade.name}: {upgrade.from} → {upgrade.to}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         )}
 
         {/* Spell notes */}

@@ -215,6 +215,7 @@ export default function LevelUpWizard({ isOpen, onClose }: LevelUpWizardProps) {
               isCustomClass={state.isCustomClass}
               spellsKnownDelta={wizard.spellsKnownDelta}
               cantripsKnownDelta={wizard.cantripsKnownDelta}
+              cantripUpgrades={wizard.cantripUpgrades}
             />
           )}
         </DialogBody>
