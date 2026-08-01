@@ -39,6 +39,8 @@ interface SpellCastModalProps {
     usePact?: boolean
   ) => void;
   onResetReaction?: () => void;
+  /** Fired on confirmed cast of a reaction-speed spell while the reaction was still available. */
+  onReactionSpellCast?: () => void;
   pactMagic?: PactMagic | null;
 }
 
@@ -51,6 +53,7 @@ export function SpellCastModal({
   hasUsedReaction,
   onCastSpell,
   onResetReaction,
+  onReactionSpellCast,
   pactMagic,
 }: SpellCastModalProps) {
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
@@ -116,6 +119,9 @@ export function SpellCastModal({
   const handleCast = () => {
     if (selectedLevel !== null) {
       onCastSpell(selectedLevel, useFreecast, useRitual, usePact);
+      if (isReactionSpell && !hasUsedReaction && onReactionSpellCast) {
+        onReactionSpellCast();
+      }
       onClose();
       setSelectedLevel(null);
       setUseFreecast(false);
