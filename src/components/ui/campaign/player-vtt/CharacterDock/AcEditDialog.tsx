@@ -21,8 +21,8 @@ export function AcEditDialog({ open, onOpenChange }: AcEditDialogProps) {
   const character = useCharacterStore(s => s.character);
   const updateCharacter = useCharacterStore(s => s.updateCharacter);
   const updateTempArmorClass = useCharacterStore(s => s.updateTempArmorClass);
-  const toggleTempAC = useCharacterStore(s => s.toggleTempAC);
-  const toggleShield = useCharacterStore(s => s.toggleShield);
+  const setTempACActive = useCharacterStore(s => s.setTempACActive);
+  const setShieldEquipped = useCharacterStore(s => s.setShieldEquipped);
   const updateShieldBonus = useCharacterStore(s => s.updateShieldBonus);
 
   return (
@@ -36,8 +36,8 @@ export function AcEditDialog({ open, onOpenChange }: AcEditDialogProps) {
             character={character}
             onUpdateArmorClass={ac => updateCharacter({ armorClass: ac })}
             onUpdateTempArmorClass={updateTempArmorClass}
-            onToggleTempAC={toggleTempAC}
-            onToggleShield={toggleShield}
+            onSetTempACActive={setTempACActive}
+            onSetShieldEquipped={setShieldEquipped}
             onUpdateShieldBonus={updateShieldBonus}
           />
         </DialogBody>

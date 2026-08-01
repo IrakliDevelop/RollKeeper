@@ -21,7 +21,8 @@ export interface CastSpellOptions {
 export function useCastSpell() {
   const character = useCharacterStore(s => s.character);
   const updateCharacter = useCharacterStore(s => s.updateCharacter);
-  const updateSpellSlot = useCharacterStore(s => s.updateSpellSlot);
+  const spendSpellSlot = useCharacterStore(s => s.spendSpellSlot);
+  const spendPactMagicSlot = useCharacterStore(s => s.spendPactMagicSlot);
   const startConcentration = useCharacterStore(s => s.startConcentration);
   const stopConcentration = useCharacterStore(s => s.stopConcentration);
   const toggleReaction = useCharacterStore(s => s.toggleReaction);
@@ -54,22 +55,11 @@ export function useCastSpell() {
             '[useCastSpell] usePact without pactMagic — spending nothing'
           );
         } else {
-          updateCharacter({
-            pactMagic: {
-              ...character.pactMagic,
-              slots: {
-                ...character.pactMagic.slots,
-                used: Math.min(
-                  character.pactMagic.slots.used + 1,
-                  character.pactMagic.slots.max
-                ),
-              },
-            },
-          });
+          spendPactMagicSlot();
         }
       } else if (spell.level > 0) {
         const level = options.level as keyof SpellSlots;
-        updateSpellSlot(level, character.spellSlots[level].used + 1);
+        spendSpellSlot(level);
       }
 
       if (
@@ -82,7 +72,8 @@ export function useCastSpell() {
     [
       character,
       updateCharacter,
-      updateSpellSlot,
+      spendSpellSlot,
+      spendPactMagicSlot,
       startConcentration,
       stopConcentration,
       toggleReaction,

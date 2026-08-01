@@ -126,9 +126,9 @@ export interface TabbedSheetConfigParams {
   addExperience: (xp: number) => void;
   setExperience: (xp: number) => void;
 
-  // Spell slots
-  updateSpellSlot: (level: keyof SpellSlots, used: number) => void;
-  updatePactMagicSlot: (used: number) => void;
+  // Spell slots — delta forms (forwarded-intent safe)
+  changeSpellSlotBy: (level: keyof SpellSlots, delta: number) => void;
+  changePactMagicBy: (delta: number) => void;
   resetSpellSlots: () => void;
   resetPactMagicSlots: () => void;
 
@@ -140,8 +140,8 @@ export interface TabbedSheetConfigParams {
   resetReaction: () => void;
   rollInitiative: () => void;
   updateTempArmorClass: (tempAC: number) => void;
-  toggleTempAC: () => void;
-  toggleShield: () => void;
+  setTempACActive: (active: boolean) => void;
+  setShieldEquipped: (equipped: boolean) => void;
   updateShieldBonus: (bonus: number) => void;
 
   // HP handlers
@@ -322,11 +322,9 @@ export function createTabbedSheetConfig(
                   <SpellSlotTracker
                     spellSlots={character.spellSlots}
                     pactMagic={character.pactMagic}
-                    onSpellSlotChange={params.updateSpellSlot}
+                    onSpellSlotChange={params.changeSpellSlotBy}
                     onPactMagicChange={
-                      character.pactMagic
-                        ? params.updatePactMagicSlot
-                        : undefined
+                      character.pactMagic ? params.changePactMagicBy : undefined
                     }
                     onResetSpellSlots={params.resetSpellSlots}
                     onResetPactMagic={
@@ -520,9 +518,9 @@ export function createTabbedSheetConfig(
                 <SpellSlotTracker
                   spellSlots={character.spellSlots}
                   pactMagic={character.pactMagic}
-                  onSpellSlotChange={params.updateSpellSlot}
+                  onSpellSlotChange={params.changeSpellSlotBy}
                   onPactMagicChange={
-                    character.pactMagic ? params.updatePactMagicSlot : undefined
+                    character.pactMagic ? params.changePactMagicBy : undefined
                   }
                   onResetSpellSlots={params.resetSpellSlots}
                   onResetPactMagic={
@@ -938,8 +936,8 @@ function CombatTabContent({
                   params.updateCharacter({ armorClass: ac })
                 }
                 onUpdateTempArmorClass={params.updateTempArmorClass}
-                onToggleTempAC={params.toggleTempAC}
-                onToggleShield={params.toggleShield}
+                onSetTempACActive={params.setTempACActive}
+                onSetShieldEquipped={params.setShieldEquipped}
                 onUpdateShieldBonus={params.updateShieldBonus}
               />
               <CombatStats

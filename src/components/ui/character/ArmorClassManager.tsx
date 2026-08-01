@@ -11,8 +11,8 @@ interface ArmorClassManagerProps {
   character: CharacterState;
   onUpdateArmorClass: (ac: number) => void;
   onUpdateTempArmorClass: (tempAC: number) => void;
-  onToggleTempAC: () => void;
-  onToggleShield: () => void;
+  onSetTempACActive: (active: boolean) => void;
+  onSetShieldEquipped: (equipped: boolean) => void;
   onUpdateShieldBonus: (bonus: number) => void;
 }
 
@@ -20,8 +20,8 @@ export default function ArmorClassManager({
   character,
   onUpdateArmorClass,
   onUpdateTempArmorClass,
-  onToggleTempAC,
-  onToggleShield,
+  onSetTempACActive,
+  onSetShieldEquipped,
   onUpdateShieldBonus,
 }: ArmorClassManagerProps) {
   const [baseACInput, setBaseACInput] = useState(
@@ -161,7 +161,9 @@ export default function ArmorClassManager({
                   >
                     <button
                       type="button"
-                      onClick={onToggleTempAC}
+                      onClick={() =>
+                        onSetTempACActive(!character.isTempACActive)
+                      }
                       className={`flex items-center gap-2 text-lg font-bold transition-opacity hover:opacity-80 ${
                         character.isTempACActive
                           ? 'text-orange-700'
@@ -210,7 +212,9 @@ export default function ArmorClassManager({
                   >
                     <button
                       type="button"
-                      onClick={onToggleShield}
+                      onClick={() =>
+                        onSetShieldEquipped(!character.isWearingShield)
+                      }
                       className={`flex items-center gap-2 text-lg font-bold transition-opacity hover:opacity-80 ${
                         character.isWearingShield
                           ? 'text-blue-700'

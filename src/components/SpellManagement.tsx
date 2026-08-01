@@ -454,7 +454,7 @@ const LevelSection: React.FC<{
   onReorder: (sourceIndex: number, destinationIndex: number) => void;
   slotMax?: number;
   slotUsed?: number;
-  onSlotChange?: (used: number) => void;
+  onSlotChange?: (delta: number) => void;
 }> = ({
   level,
   spells,
@@ -549,7 +549,9 @@ const LevelSection: React.FC<{
                     type="button"
                     onClick={() => {
                       const newUsed = isUsed ? (slotUsed ?? 0) - 1 : index + 1;
-                      onSlotChange(Math.max(0, Math.min(newUsed, slotMax!)));
+                      const clamped = Math.max(0, Math.min(newUsed, slotMax!));
+                      const delta = clamped - (slotUsed ?? 0);
+                      if (delta !== 0) onSlotChange(delta);
                     }}
                     className={`h-4 w-4 cursor-pointer rounded-full border-2 transition-all ${
                       isUsed
@@ -609,7 +611,8 @@ export const SpellManagement: React.FC = () => {
     updateCharacter,
     reorderSpells,
     toggleSpellFavorite,
-    updateSpellSlot,
+    spendSpellSlot,
+    restoreSpellSlot,
     startConcentration,
     stopConcentration,
     toggleReaction,
@@ -920,11 +923,7 @@ export const SpellManagement: React.FC = () => {
         });
       }
     } else if (selectedSpell.level > 0) {
-      updateSpellSlot(
-        spellLevel as keyof typeof character.spellSlots,
-        character.spellSlots[spellLevel as keyof typeof character.spellSlots]
-          .used + 1
-      );
+      spendSpellSlot(spellLevel as keyof typeof character.spellSlots);
     }
 
     // Auto-trigger reaction usage when casting a reaction spell
@@ -1358,11 +1357,12 @@ export const SpellManagement: React.FC = () => {
               }
               onSlotChange={
                 level > 0
-                  ? used =>
-                      updateSpellSlot(
-                        level as keyof typeof character.spellSlots,
-                        used
-                      )
+                  ? delta => {
+                      const slotLevel =
+                        level as keyof typeof character.spellSlots;
+                      if (delta > 0) spendSpellSlot(slotLevel, delta);
+                      else if (delta < 0) restoreSpellSlot(slotLevel, -delta);
+                    }
                   : undefined
               }
             />

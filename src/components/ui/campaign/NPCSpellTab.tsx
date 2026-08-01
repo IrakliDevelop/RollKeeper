@@ -390,12 +390,14 @@ export function NPCSpellTab({
   );
 
   const handleSpellSlotChange = useCallback(
-    (level: keyof SpellSlots, used: number) => {
+    (level: keyof SpellSlots, delta: number) => {
+      const slot = spellSlots[level];
+      const newUsed = Math.max(0, Math.min(slot.used + delta, slot.max));
       useNPCStore
         .getState()
-        .setNPCSpellSlotUsed(campaignCode, npc.id, level as number, used);
+        .setNPCSpellSlotUsed(campaignCode, npc.id, level as number, newUsed);
     },
-    [campaignCode, npc.id]
+    [campaignCode, npc.id, spellSlots]
   );
 
   const handleResetSlots = useCallback(() => {

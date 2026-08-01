@@ -7,8 +7,8 @@ import { SpellSlotTracker as SharedSpellSlotTracker } from '@/components/shared/
 interface SpellSlotTrackerProps {
   spellSlots: SpellSlots;
   pactMagic?: PactMagic;
-  onSpellSlotChange: (level: keyof SpellSlots, used: number) => void;
-  onPactMagicChange?: (used: number) => void;
+  onSpellSlotChange: (level: keyof SpellSlots, delta: number) => void;
+  onPactMagicChange?: (delta: number) => void;
   onResetSpellSlots: () => void;
   onResetPactMagic?: () => void;
   compact?: boolean;

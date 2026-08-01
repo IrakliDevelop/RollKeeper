@@ -46,6 +46,7 @@ import {
   SkillName,
   CharacterState,
   Spell,
+  SpellSlots,
   InventoryItem,
 } from '@/types/character';
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
@@ -152,8 +153,10 @@ export default function CharacterSheet() {
     recalculateMaxHP,
     updateClass,
     updateLevel,
-    updateSpellSlot,
-    updatePactMagicSlot,
+    spendSpellSlot,
+    restoreSpellSlot,
+    spendPactMagicSlot,
+    restorePactMagicSlot,
     resetSpellSlots,
     resetPactMagicSlots,
     addExperience,
@@ -191,9 +194,9 @@ export default function CharacterSheet() {
     restoreClassResource,
     resetClassResource,
     updateTempArmorClass,
-    toggleTempAC,
+    setTempACActive,
     toggleJackOfAllTrades,
-    toggleShield,
+    setShieldEquipped,
     updateShieldBonus,
     stopConcentration,
     loadCharacterState,
@@ -234,6 +237,24 @@ export default function CharacterSheet() {
   // Derive campaign days from local calendar (may be overridden by shared state below)
   const playerCalendar = useCalendarStore(state =>
     state.calendars.find(c => c.campaignCode === characterId)
+  );
+
+  // Delta dispatchers for pip trackers — forwarded intents must carry
+  // deltas, never absolute values computed from possibly-stale renders.
+  const changeSpellSlotBy = useCallback(
+    (level: keyof SpellSlots, delta: number) => {
+      if (delta > 0) spendSpellSlot(level, delta);
+      else if (delta < 0) restoreSpellSlot(level, -delta);
+    },
+    [spendSpellSlot, restoreSpellSlot]
+  );
+
+  const changePactMagicBy = useCallback(
+    (delta: number) => {
+      if (delta > 0) spendPactMagicSlot(delta);
+      else if (delta < 0) restorePactMagicSlot(-delta);
+    },
+    [spendPactMagicSlot, restorePactMagicSlot]
   );
 
   const handleAddSpellsFromFeat = useCallback(
@@ -1203,8 +1224,8 @@ export default function CharacterSheet() {
                 getClassDisplayString={getClassDisplayString}
                 addExperience={addExperience}
                 setExperience={setExperience}
-                updateSpellSlot={updateSpellSlot}
-                updatePactMagicSlot={updatePactMagicSlot}
+                changeSpellSlotBy={changeSpellSlotBy}
+                changePactMagicBy={changePactMagicBy}
                 resetSpellSlots={resetSpellSlots}
                 resetPactMagicSlots={resetPactMagicSlots}
                 getInitiativeModifier={getInitiativeModifier}
@@ -1214,8 +1235,8 @@ export default function CharacterSheet() {
                 resetReaction={resetReaction}
                 rollInitiative={rollInitiative}
                 updateTempArmorClass={updateTempArmorClass}
-                toggleTempAC={toggleTempAC}
-                toggleShield={toggleShield}
+                setTempACActive={setTempACActive}
+                setShieldEquipped={setShieldEquipped}
                 updateShieldBonus={updateShieldBonus}
                 applyDamageToCharacter={applyDamageToCharacter}
                 applyHealingToCharacter={applyHealingToCharacter}
