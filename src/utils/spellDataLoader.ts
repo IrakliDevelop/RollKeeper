@@ -1566,6 +1566,7 @@ function processSpell(rawSpell: RawSpellData): ProcessedSpell {
     ],
     damage: rawSpell.damageInflict,
     saves: rawSpell.savingThrow,
+    scalingLevelDice: rawSpell.scalingLevelDice,
     isCantrip: rawSpell.level === 0,
     isSrd: rawSpell.srd || false,
   };
