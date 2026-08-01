@@ -5,7 +5,7 @@ import { getHpTierBarColor } from '@/utils/hpColor';
 import { ChipRow } from './ChipRow';
 import { ConcentrationRing } from './ConcentrationRing';
 import { ConditionStrip } from './ConditionStrip';
-import { DeadGlyph, PieceGlyph } from './TokenGlyphs';
+import { DeadGlyph, PieceGlyph, ReactionUsedGlyph } from './TokenGlyphs';
 
 import type { DecoratedTokenRect } from './TokenDecorationLayer.hooks';
 import type {
@@ -67,8 +67,9 @@ function InTokenBar({
  * row and condition strip are always shown; in compact mode they only appear
  * when `showChipRow` is set (the token is hovered or tap-revealed — see
  * `useCompactReveal`), where the chip row instead lists condition names. The
- * concentration ring shows in both full and compact modes. Dead entities keep
- * skull precedence: no strip, no ring, no piece glyph.
+ * concentration ring and the reaction-used corner badge show in both full and
+ * compact modes. Dead entities keep skull precedence: no strip, no ring, no
+ * piece glyph, no reaction badge.
  */
 export function DecorationItem({
   rect,
@@ -88,6 +89,9 @@ export function DecorationItem({
     <div style={{ opacity: deco.isDead ? 0.75 : 1 }}>
       {!deco.isDead && deco.isConcentrating && (
         <ConcentrationRing rect={rect} />
+      )}
+      {!deco.isDead && deco.hasUsedReaction && (
+        <ReactionUsedGlyph rect={rect} cell={cell} />
       )}
       {deco.isDead && <DeadGlyph rect={rect} cell={cell} />}
       {showBar && (

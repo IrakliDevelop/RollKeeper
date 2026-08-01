@@ -395,6 +395,44 @@ describe('TokenDecorationLayer', () => {
     );
     expect(dead.container.querySelector(ringSelector)).not.toBeInTheDocument();
   });
+
+  it('renders a reaction-used badge in full and compact modes, but not when dead', () => {
+    const badgeSelector = '[data-testid="reaction-used-glyph"]';
+    const full = render(
+      <TokenDecorationLayer
+        decorations={deco({ hasUsedReaction: true })}
+        mode="full"
+      />
+    );
+    expect(full.container.querySelector(badgeSelector)).toBeInTheDocument();
+    cleanup();
+
+    const compact = render(
+      <TokenDecorationLayer
+        decorations={deco({ hasUsedReaction: true })}
+        mode="compact"
+      />
+    );
+    expect(compact.container.querySelector(badgeSelector)).toBeInTheDocument();
+    cleanup();
+
+    const dead = render(
+      <TokenDecorationLayer
+        decorations={deco({ hasUsedReaction: true, isDead: true })}
+        mode="full"
+      />
+    );
+    expect(dead.container.querySelector(badgeSelector)).not.toBeInTheDocument();
+  });
+
+  it('renders no reaction badge when hasUsedReaction is absent', () => {
+    const { container } = render(
+      <TokenDecorationLayer decorations={deco({})} mode="full" />
+    );
+    expect(
+      container.querySelector('[data-testid="reaction-used-glyph"]')
+    ).not.toBeInTheDocument();
+  });
 });
 
 function firePointer(type: string, clientX: number, clientY: number) {
