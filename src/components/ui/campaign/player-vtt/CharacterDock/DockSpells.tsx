@@ -32,7 +32,7 @@ export interface DockSpellsProps {
 
 /** Dock's Spells section: search, per-level groups with slot pips, and the cast flow. */
 export function DockSpells(props: DockSpellsProps) {
-  const { character } = useCharacterStore();
+  const { character, toggleReaction } = useCharacterStore();
   const {
     castingSpell,
     viewingSpell,
@@ -144,6 +144,17 @@ export function DockSpells(props: DockSpellsProps) {
           pactMagic={character.pactMagic}
           hasUsedReaction={character.reaction?.hasUsedReaction}
           onCastSpell={handleModalCast}
+          onReactionSpellCast={() => {
+            // toggleReaction acts as "mark used" here only because SpellCastModal
+            // fires this callback solely when hasUsedReaction is false — if that
+            // guard ever moves, this must become an idempotent setter.
+            toggleReaction();
+            props.addToast({
+              type: 'info',
+              title: `Reaction used — ${castingSpell.name}`,
+              message: '',
+            });
+          }}
         />
       )}
 
