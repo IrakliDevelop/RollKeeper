@@ -8,6 +8,7 @@ import { Spell, SpellActionType } from '@/types/character';
 import type { SpellAoe } from '@/types/spellAoe';
 import { detectSpellAoe } from './spellAoeDetection';
 import { formatSpellDescriptionForEditor } from './referenceParser';
+import { extractCantripScaling, CantripDamageScaling } from './cantripScaling';
 
 /**
  * A spell counts as prepared if it is explicitly prepared OR always prepared
@@ -54,6 +55,8 @@ export interface SpellFormData {
   freeCastMax: number;
   /** AoE template geometry. Always a value or explicit null in the form — never undefined. */
   aoe: SpellAoe | null;
+  /** Cantrip scaling table. undefined = none/never enriched; null = user-custom (scaling off). */
+  damageScaling?: CantripDamageScaling | null;
 }
 
 /**
@@ -181,6 +184,11 @@ export function convertProcessedSpellToFormData(
     ? formatSpellDescriptionForEditor(spell.higherLevelDescription)
     : '';
 
+  const damageScaling =
+    spell.level === 0
+      ? extractCantripScaling(spell.scalingLevelDice, extractedDamage)
+      : undefined;
+
   return {
     name: spell.name,
     level: spell.level,
@@ -209,6 +217,7 @@ export function convertProcessedSpellToFormData(
     freeCastMode: 'normal',
     freeCastMax: 1,
     aoe: detectSpellAoe(spell.description, spell.range),
+    damageScaling,
   };
 }
 
@@ -257,6 +266,7 @@ export function convertFormDataToSpell(
           : undefined,
     freeCastsUsed: formData.freeCastMode !== 'normal' ? 0 : undefined,
     aoe: formData.aoe,
+    damageScaling: formData.damageScaling,
     createdAt: now,
     updatedAt: now,
   };
@@ -388,5 +398,6 @@ export function spellToFormData(spell: Spell): SpellFormData {
     freeCastMode,
     freeCastMax,
     aoe: spell.aoe ?? null,
+    damageScaling: spell.damageScaling,
   };
 }
