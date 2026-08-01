@@ -4,6 +4,7 @@ import {
   CharacterIntentBus,
   type CharacterIntent,
   type IntentBusDeps,
+  type BroadcastChannelLike,
 } from '@/lib/characterIntentBus';
 import { TAB_ID } from '@/lib/tabIdentity';
 
@@ -12,11 +13,11 @@ type Message = Record<string, unknown>;
 /** In-memory stand-in for BroadcastChannel: posted messages are captured;
  * incoming messages are injected via receive(). Mirrors the real API's
  * no-self-delivery semantics (postMessage does NOT loop back). */
-class FakeChannel {
+class FakeChannel implements BroadcastChannelLike {
   posted: Message[] = [];
-  onmessage: ((e: { data: Message }) => void) | null = null;
-  postMessage(data: Message) {
-    this.posted.push(data);
+  onmessage: ((e: { data: unknown }) => void) | null = null;
+  postMessage(data: unknown) {
+    this.posted.push(data as Message);
   }
   close() {}
   receive(data: Message) {
