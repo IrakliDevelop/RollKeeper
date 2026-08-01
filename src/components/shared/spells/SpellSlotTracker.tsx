@@ -9,8 +9,8 @@ import { RotateCcw, Zap } from 'lucide-react';
 interface SpellSlotTrackerProps {
   spellSlots: SpellSlots;
   pactMagic?: PactMagic;
-  onSpellSlotChange?: (level: keyof SpellSlots, used: number) => void;
-  onPactMagicChange?: (used: number) => void;
+  onSpellSlotChange?: (level: keyof SpellSlots, delta: number) => void;
+  onPactMagicChange?: (delta: number) => void;
   onResetSpellSlots?: () => void;
   onResetPactMagic?: () => void;
 
@@ -53,7 +53,7 @@ export function SpellSlotTracker({
   const renderSlotCheckboxes = (
     max: number,
     used: number,
-    onChange?: (used: number) => void
+    onChange?: (delta: number) => void
   ) => {
     const size = compact ? 'w-3 h-3' : 'w-4 h-4';
     const gap = compact ? 'gap-0.5' : 'gap-1';
@@ -66,7 +66,9 @@ export function SpellSlotTracker({
             onClick={() => {
               if (readonly || !onChange) return;
               const newUsed = index < used ? used - 1 : index + 1;
-              onChange(Math.max(0, Math.min(newUsed, max)));
+              const clamped = Math.max(0, Math.min(newUsed, max));
+              const delta = clamped - used;
+              if (delta !== 0) onChange(delta);
             }}
             disabled={readonly || !onChange}
             className={`${size} rounded border-2 transition-colors ${
@@ -197,7 +199,7 @@ export function SpellSlotTracker({
                   slot.max,
                   slot.used,
                   onSpellSlotChange
-                    ? used => onSpellSlotChange(level, used)
+                    ? delta => onSpellSlotChange(level, delta)
                     : undefined
                 )}
               </div>

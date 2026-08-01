@@ -251,8 +251,8 @@ describe('ArmorClassManager', () => {
         character={character}
         onUpdateArmorClass={vi.fn()}
         onUpdateTempArmorClass={vi.fn()}
-        onToggleTempAC={vi.fn()}
-        onToggleShield={vi.fn()}
+        onSetTempACActive={vi.fn()}
+        onSetShieldEquipped={vi.fn()}
         onUpdateShieldBonus={vi.fn()}
       />
     );
@@ -271,8 +271,8 @@ describe('ArmorClassManager', () => {
         character={character}
         onUpdateArmorClass={vi.fn()}
         onUpdateTempArmorClass={vi.fn()}
-        onToggleTempAC={vi.fn()}
-        onToggleShield={vi.fn()}
+        onSetTempACActive={vi.fn()}
+        onSetShieldEquipped={vi.fn()}
         onUpdateShieldBonus={vi.fn()}
       />
     );

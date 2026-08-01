@@ -81,8 +81,8 @@ describe('SpellSlotTracker', () => {
     );
     expect(slot).not.toBeNull();
     fireEvent.click(slot!);
-    // Clicking index 3 (>= used=1): newUsed = index + 1 = 4
-    expect(onChange).toHaveBeenCalledWith(1, 4);
+    // Clicking index 3 (>= used=1): newUsed = index + 1 = 4, delta = 4 - 1 = 3
+    expect(onChange).toHaveBeenCalledWith(1, 3);
   });
 
   it('Reset Slots button calls onResetSpellSlots', () => {

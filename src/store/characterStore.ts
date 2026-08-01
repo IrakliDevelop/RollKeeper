@@ -489,6 +489,9 @@ interface CharacterStore {
   updateTempArmorClass: (tempAC: number) => void;
   toggleTempAC: () => void;
   toggleShield: () => void;
+  /** Idempotent target-state forms — forwarded-intent safe. */
+  setShieldEquipped: (equipped: boolean) => void;
+  setTempACActive: (active: boolean) => void;
   resetTempArmorClass: () => void;
   updateShieldBonus: (bonus: number) => void;
 
@@ -508,6 +511,12 @@ interface CharacterStore {
   updateLevel: (level: number) => void;
   updateSpellSlot: (level: keyof SpellSlots, used: number) => void;
   updatePactMagicSlot: (used: number) => void;
+  /** Delta forms — REQUIRED for forwarded intents (spec delta rule):
+   * concurrent casts from two tabs must both land. */
+  spendSpellSlot: (level: keyof SpellSlots, amount?: number) => void;
+  restoreSpellSlot: (level: keyof SpellSlots, amount?: number) => void;
+  spendPactMagicSlot: (amount?: number) => void;
+  restorePactMagicSlot: (amount?: number) => void;
   resetSpellSlots: () => void;
   resetPactMagicSlots: () => void;
 
@@ -1399,6 +1408,26 @@ export const useCharacterStore = create<CharacterStore>()(
           }));
         },
 
+        setShieldEquipped: equipped =>
+          set(state => {
+            if (state.character.isWearingShield === equipped) return state;
+            return {
+              character: { ...state.character, isWearingShield: equipped },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          }),
+
+        setTempACActive: active =>
+          set(state => {
+            if (state.character.isTempACActive === active) return state;
+            return {
+              character: { ...state.character, isTempACActive: active },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          }),
+
         resetTempArmorClass: () => {
           set(state => ({
             character: {
@@ -1841,6 +1870,82 @@ export const useCharacterStore = create<CharacterStore>()(
             };
           });
         },
+
+        spendSpellSlot: (level, amount = 1) =>
+          set(state => {
+            const slot = state.character.spellSlots[level];
+            if (!slot) return state;
+            const used = Math.max(0, Math.min(slot.used + amount, slot.max));
+            if (used === slot.used) return state;
+            return {
+              character: {
+                ...state.character,
+                spellSlots: {
+                  ...state.character.spellSlots,
+                  [level]: { ...slot, used },
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          }),
+
+        restoreSpellSlot: (level, amount = 1) =>
+          set(state => {
+            const slot = state.character.spellSlots[level];
+            if (!slot) return state;
+            const used = Math.max(0, Math.min(slot.used - amount, slot.max));
+            if (used === slot.used) return state;
+            return {
+              character: {
+                ...state.character,
+                spellSlots: {
+                  ...state.character.spellSlots,
+                  [level]: { ...slot, used },
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          }),
+
+        spendPactMagicSlot: (amount = 1) =>
+          set(state => {
+            const pact = state.character.pactMagic;
+            if (!pact) return state;
+            const used = Math.max(
+              0,
+              Math.min(pact.slots.used + amount, pact.slots.max)
+            );
+            if (used === pact.slots.used) return state;
+            return {
+              character: {
+                ...state.character,
+                pactMagic: { ...pact, slots: { ...pact.slots, used } },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          }),
+
+        restorePactMagicSlot: (amount = 1) =>
+          set(state => {
+            const pact = state.character.pactMagic;
+            if (!pact) return state;
+            const used = Math.max(
+              0,
+              Math.min(pact.slots.used - amount, pact.slots.max)
+            );
+            if (used === pact.slots.used) return state;
+            return {
+              character: {
+                ...state.character,
+                pactMagic: { ...pact, slots: { ...pact.slots, used } },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          }),
 
         resetSpellSlots: () => {
           set(state => {

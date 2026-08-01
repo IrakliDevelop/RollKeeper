@@ -75,7 +75,7 @@ interface LevelSectionProps {
   totalLevel: number;
   slotMax?: number;
   slotUsed?: number;
-  onSlotChange?: (used: number) => void;
+  onSlotChange?: (delta: number) => void;
 }
 
 const SpellCard: React.FC<{
@@ -359,7 +359,9 @@ const LevelSection: React.FC<LevelSectionProps> = ({
                     type="button"
                     onClick={() => {
                       const newUsed = isUsed ? (slotUsed ?? 0) - 1 : index + 1;
-                      onSlotChange(Math.max(0, Math.min(newUsed, slotMax!)));
+                      const clamped = Math.max(0, Math.min(newUsed, slotMax!));
+                      const delta = clamped - (slotUsed ?? 0);
+                      if (delta !== 0) onSlotChange(delta);
                     }}
                     className={`h-4 w-4 cursor-pointer rounded-full border-2 transition-all ${
                       isUsed
@@ -410,8 +412,13 @@ export function QuickSpells({
   showDamageRoll,
   animateRoll,
 }: QuickSpellsProps) {
-  const { character, updateSpellSlot, toggleSpellFavorite, toggleReaction } =
-    useCharacterStore();
+  const {
+    character,
+    spendSpellSlot,
+    restoreSpellSlot,
+    toggleSpellFavorite,
+    toggleReaction,
+  } = useCharacterStore();
   const { castSpell } = useCastSpell();
   const totalLevel = getTotalLevel(character);
 
@@ -779,12 +786,12 @@ export function QuickSpells({
                   totalLevel={totalLevel}
                   slotMax={slot?.max}
                   slotUsed={slot?.used}
-                  onSlotChange={used =>
-                    updateSpellSlot(
-                      level as keyof typeof character.spellSlots,
-                      used
-                    )
-                  }
+                  onSlotChange={delta => {
+                    const slotLevel =
+                      level as keyof typeof character.spellSlots;
+                    if (delta > 0) spendSpellSlot(slotLevel, delta);
+                    else if (delta < 0) restoreSpellSlot(slotLevel, -delta);
+                  }}
                 />
               );
             })}
