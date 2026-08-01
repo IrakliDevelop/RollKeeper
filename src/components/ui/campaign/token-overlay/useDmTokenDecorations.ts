@@ -33,6 +33,7 @@ export function useDmTokenDecorations(
       if (e.conditions.length > 0)
         deco.conditions = toSharedConditions(e.conditions);
       if (e.concentrationSpell) deco.isConcentrating = true;
+      if (e.hasUsedReaction) deco.hasUsedReaction = true;
       map.set(e.id, deco);
       if (e.playerCharacterId) map.set(e.playerCharacterId, deco);
     }

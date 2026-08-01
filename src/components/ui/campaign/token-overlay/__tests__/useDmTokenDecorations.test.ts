@@ -99,4 +99,21 @@ describe('useDmTokenDecorations', () => {
     expect(d?.conditions).toBeUndefined();
     expect(d?.isConcentrating).toBeUndefined();
   });
+
+  it('carries hasUsedReaction from a player entity and omits it otherwise', () => {
+    const { result } = renderHook(() =>
+      useDmTokenDecorations([
+        entity({
+          id: 'p1',
+          type: 'player',
+          playerCharacterId: 'char-1',
+          hasUsedReaction: true,
+        }),
+        entity({ id: 'e1' }),
+      ])
+    );
+    expect(result.current.get('p1')?.hasUsedReaction).toBe(true);
+    expect(result.current.get('char-1')?.hasUsedReaction).toBe(true);
+    expect(result.current.get('e1')?.hasUsedReaction).toBeUndefined();
+  });
 });
