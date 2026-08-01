@@ -4,10 +4,11 @@ import {
   createCharacter,
   characterIdFromUrl,
   waitForStoresReady,
+  waitForCharacterLoaded,
   readRosterEntry,
   storeHp,
   storeRevision,
-  characterSlotId,
+  envelopeHp,
   damageCharacter,
 } from './helpers';
 
@@ -40,6 +41,7 @@ test("a tab holding another character must not revert this character's roster en
   // snapshot at this point: [A, B]).
   await tab1.goto(urlA, { waitUntil: 'networkidle' });
   await waitForStoresReady(tab1);
+  await waitForCharacterLoaded(tab1, idA);
 
   // tab2: fresh page, first-ever load of B's sheet (captures tab2's
   // in-memory roster snapshot: [A, B] too, both read from the same
@@ -47,6 +49,7 @@ test("a tab holding another character must not revert this character's roster en
   const tab2 = await context.newPage();
   await tab2.goto(urlB, { waitUntil: 'networkidle' });
   await waitForStoresReady(tab2);
+  await waitForCharacterLoaded(tab2, idB);
 
   const { max: hpMaxA } = await storeHp(tab1);
   const { max: hpMaxB } = await storeHp(tab2);
@@ -110,25 +113,27 @@ test("a tab holding another character must not revert this character's roster en
   // the single `rollkeeper-character` slot by the time tab2 reloads next.
   await tab1.reload({ waitUntil: 'networkidle' });
   await waitForStoresReady(tab1);
+  await waitForCharacterLoaded(tab1, idA);
   await tab1.goto('/player', { waitUntil: 'networkidle' });
   await tab1.goto(urlA, { waitUntil: 'networkidle' });
   await waitForStoresReady(tab1);
+  await waitForCharacterLoaded(tab1, idA);
 
   // Force the ordering explicitly rather than relying on navigation overhead
   // outlasting useCharacterRosterSync's 50ms initial-load timer: confirm
-  // tab1's final write-back (the single `rollkeeper-character` slot holding
-  // A, and A's roster entry reflecting tab1's last write) has actually landed
-  // before tab2 reloads next. (Revision is not asserted here: remounting the
-  // sheet after `reload`/navigation legitimately re-runs mount-time effects
-  // that can bump revision again with no change in hp — that's unrelated to
-  // the clobber bug this spec targets, so only hp/id are checked.)
+  // tab1's final write-back (A's per-character canonical envelope, and A's
+  // roster entry reflecting tab1's last write) has actually landed before
+  // tab2 reloads next. (Revision is not asserted here: remounting the sheet
+  // after `reload`/navigation legitimately re-runs mount-time effects that
+  // can bump revision again with no change in hp — that's unrelated to the
+  // clobber bug this spec targets, so only hp/id are checked.)
   await expect
-    .poll(async () => characterSlotId(tab1), {
+    .poll(async () => envelopeHp(tab1, idA), {
       message:
-        "tab1's reload round-trip must finish writing A into the rollkeeper-character slot before tab2 reloads",
+        "tab1's reload round-trip must finish writing A's envelope before tab2 reloads",
       timeout: 10_000,
     })
-    .toBe(idA);
+    .toBe(hpMaxA - 5);
   await expect
     .poll(async () => (await readRosterEntry(tab1, idA))?.hpCurrent, {
       message:
@@ -138,13 +143,16 @@ test("a tab holding another character must not revert this character's roster en
     .toBe(hpMaxA - 5);
 
   // --- Assert 2 (user-visible data loss): reloading tab2 (B's sheet) must
-  // NOT undo B's damage. Pre-fix: characterStore rehydrates from the single
-  // `rollkeeper-character` slot (now holding A, since tab1 wrote it last);
-  // the id mismatch bypasses useCharacterRosterSync's staleness guard, so it
-  // unconditionally loads B from the (already-clobbered) roster blob —
-  // reverting B's live hp back to full.
+  // NOT undo B's damage. Pre-fix: characterStore rehydrated from the single
+  // `rollkeeper-character` slot (which tab1's writes could clobber with A);
+  // an id mismatch bypassed useCharacterRosterSync's staleness guard, so it
+  // unconditionally loaded B from the (already-clobbered) roster blob —
+  // reverting B's live hp back to full. Under the per-character envelope
+  // model B has its own storage key, but this assertion still pins that a
+  // reload of B must rehydrate B's own latest damage, not a stale value.
   await tab2.reload({ waitUntil: 'networkidle' });
   await waitForStoresReady(tab2);
+  await waitForCharacterLoaded(tab2, idB);
   const hpAfterReload = await storeHp(tab2);
   expect
     .soft(

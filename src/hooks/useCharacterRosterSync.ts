@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 
+import {
+  pickFresherCharacter,
+  readCharacterEnvelope,
+} from '@/lib/characterCanonicalStorage';
+import { isStrictlyFresher } from '@/lib/characterFreshness';
+import { useCharacterStore } from '@/store/characterStore';
 import type { CharacterState } from '@/types/character';
 
 /** Minimal roster-entry shape both callers need — avoids importing the full
@@ -63,24 +69,32 @@ export function useCharacterRosterSync({
 
       // Only load if we haven't loaded this character yet or if it's a different character
       if (lastLoadedCharacterRef.current !== currentCharacterId) {
-        // The roster blob (playerStore) has no cross-tab convergence, unlike
-        // the live characterStore state, which the storage listener keeps
-        // fresh. If the roster blob is the same character but at a stale
-        // (lower or equal) revision, adopting it here would clobber newer
-        // local state. Skip the load but still arm the write-back effect so
-        // the fresher characterStore state gets written back to the roster.
-        const isStaleRosterBlob =
-          playerCharacter.characterData.id === liveCharacter.id &&
-          (playerCharacter.characterData.revision ?? 0) <=
-            (liveCharacter.revision ?? 0);
+        // Canonical envelope (per-character key, legacy-slot fallback)
+        // vs roster entry: strictly fresher wins, envelope wins ties
+        // (spec §migration seed arbitration). The live characterStore
+        // state may be fresher still (storage-event adoption) — never
+        // clobber it with a stale candidate.
+        const envelope = readCharacterEnvelope(currentCharacterId);
+        const candidate =
+          pickFresherCharacter(envelope, playerCharacter.characterData) ??
+          playerCharacter.characterData;
+
+        const isStaleCandidate =
+          candidate.id === liveCharacter.id &&
+          !isStrictlyFresher(candidate, liveCharacter);
 
         setIsInitialLoad(true);
-        if (!isStaleRosterBlob) {
-          loadCharacterState(playerCharacter.characterData);
-          onLoad?.(playerCharacter.characterData);
+        if (!isStaleCandidate) {
+          loadCharacterState(candidate);
+          if (envelope && candidate === envelope.character) {
+            useCharacterStore.setState({
+              intentWatermarks: envelope.intentWatermarks,
+            });
+          }
+          onLoad?.(candidate);
         }
         lastLoadedCharacterRef.current = currentCharacterId;
-        lastSyncedCharacterRef.current = playerCharacter.characterData;
+        lastSyncedCharacterRef.current = candidate;
 
         // Mark initial load as complete after state has been set
         const timer = setTimeout(() => {

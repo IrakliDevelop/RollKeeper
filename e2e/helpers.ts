@@ -32,7 +32,9 @@ export async function createCharacter(
     { timeout: 15_000 }
   );
   await waitForStoresReady(page);
-  return page.url();
+  const url = page.url();
+  await waitForCharacterLoaded(page, characterIdFromUrl(url));
+  return url;
 }
 
 /** Extracts the character id from a sheet URL produced by createCharacter(). */
@@ -105,20 +107,32 @@ export async function storeRevision(page: Page): Promise<number | undefined> {
   );
 }
 
-/** Id of the character currently occupying the single-character
- * `rollkeeper-character` localStorage slot (the live characterStore's
- * persisted blob) — distinct from the whole-roster `rollkeeper-player-data`
- * blob read by `readRosterEntry`. Used to confirm a tab's write-back has
- * actually landed before another tab reloads. */
-export async function characterSlotId(page: Page): Promise<string | null> {
-  return page.evaluate(() => {
-    const raw = window.localStorage.getItem('rollkeeper-character');
+/** HP stored in the per-character canonical envelope — the value a
+ * reloading tab will rehydrate. */
+export async function envelopeHp(
+  page: Page,
+  characterId: string
+): Promise<number | null> {
+  return page.evaluate(id => {
+    const raw = window.localStorage.getItem(`rollkeeper-character:${id}`);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as {
-      state?: { character?: { id?: string } };
+      state?: { character?: { hitPoints?: { current?: number } } };
     };
-    return parsed.state?.character?.id ?? null;
-  });
+    return parsed.state?.character?.hitPoints?.current ?? null;
+  }, characterId);
+}
+
+/** Waits until the characterStore holds the requested character. */
+export async function waitForCharacterLoaded(
+  page: Page,
+  characterId: string
+): Promise<void> {
+  await page.waitForFunction(
+    id => window.__rkStores?.character?.getState().character.id === id,
+    characterId,
+    { timeout: 15_000 }
+  );
 }
 
 /** Applies damage via the live characterStore handle (same mechanism as the
