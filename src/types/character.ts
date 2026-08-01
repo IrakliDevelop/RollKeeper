@@ -559,6 +559,11 @@ export interface CharacterState {
    * Redis, DM view) accepts a snapshot only if its revision is newer.
    * Optional for backwards compat — readers must treat missing as 0. */
   revision?: number;
+  /** Wall-clock stamp of the last local mutation (same set as the revision
+   * bump). Tiebreak component for equal-revision cross-tab conflicts. */
+  lastMutatedAt?: number;
+  /** TAB_ID of the tab that made the last local mutation. Final tiebreak. */
+  lastMutatedBy?: string;
   // Basic Information
   name: string;
   race: string;
