@@ -40,6 +40,8 @@ import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { SpellAutocomplete } from '@/components/ui/forms/SpellAutocomplete';
 import { useSpellsData } from '@/hooks/useSpellsData';
+import { getScaledSpellDamage } from '@/utils/cantripScaling';
+import { getTotalLevel } from '@/utils/multiclass';
 import {
   convertProcessedSpellToFormData,
   spellToFormData,
@@ -93,6 +95,7 @@ const SpellCard: React.FC<{
   spell: Spell;
   compact: boolean;
   isFavorite: boolean;
+  totalLevel: number;
   onEdit: () => void;
   onDelete: () => void;
   onView: () => void;
@@ -103,6 +106,7 @@ const SpellCard: React.FC<{
   spell,
   compact,
   isFavorite,
+  totalLevel,
   onEdit,
   onDelete,
   onView,
@@ -116,6 +120,7 @@ const SpellCard: React.FC<{
   const freeCastsRemaining = isInnate
     ? spell.freeCastMax! - (spell.freeCastsUsed || 0)
     : 0;
+  const displayDamage = getScaledSpellDamage(spell, totalLevel);
 
   if (compact) {
     return (
@@ -356,10 +361,10 @@ const SpellCard: React.FC<{
               )}
           </div>
 
-          {spell.damage && (
+          {displayDamage && (
             <div className="mb-2">
               <Badge variant="danger" size="sm">
-                {spell.damage} {spell.damageType}
+                {displayDamage} {spell.damageType}
               </Badge>
             </div>
           )}
@@ -436,6 +441,7 @@ const LevelSection: React.FC<{
   onToggle: () => void;
   compact: boolean;
   favoriteSpells: string[];
+  totalLevel: number;
   onSpellEdit: (spell: Spell) => void;
   onSpellDelete: (id: string) => void;
   onSpellView: (spell: Spell) => void;
@@ -453,6 +459,7 @@ const LevelSection: React.FC<{
   onToggle,
   compact,
   favoriteSpells,
+  totalLevel,
   onSpellEdit,
   onSpellDelete,
   onSpellView,
@@ -577,6 +584,7 @@ const LevelSection: React.FC<{
                 spell={spell}
                 compact={compact}
                 isFavorite={favoriteSpells.includes(spell.id)}
+                totalLevel={totalLevel}
                 onEdit={() => onSpellEdit(spell)}
                 onDelete={() => onSpellDelete(spell.id)}
                 onView={() => onSpellView(spell)}
@@ -604,6 +612,7 @@ export const SpellManagement: React.FC = () => {
     toggleReaction,
     addSummon,
   } = useCharacterStore();
+  const totalLevel = getTotalLevel(character);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<SpellFormData>(
@@ -1321,6 +1330,7 @@ export const SpellManagement: React.FC = () => {
               onToggle={() => toggleLevelExpanded(level)}
               compact={compactView}
               favoriteSpells={favoriteSpells}
+              totalLevel={totalLevel}
               onSpellEdit={handleEdit}
               onSpellDelete={handleDelete}
               onSpellView={setViewingSpell}
@@ -1434,6 +1444,7 @@ export const SpellManagement: React.FC = () => {
           isFavorite={favoriteSpells.includes(viewingSpell.id)}
           onToggleFavorite={() => toggleSpellFavorite(viewingSpell.id)}
           onCast={() => handleCastSpell(viewingSpell)}
+          characterLevel={totalLevel}
         />
       )}
 

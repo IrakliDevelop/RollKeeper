@@ -13,6 +13,7 @@ import {
   DialogBody,
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
+import { getScaledSpellDamage } from '@/utils/cantripScaling';
 
 interface SpellDetailsModalProps {
   spell: Spell;
@@ -21,6 +22,7 @@ interface SpellDetailsModalProps {
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
   onCast?: () => void;
+  characterLevel?: number; // total character level; enables cantrip damage scaling on the damage line
 }
 
 export default function SpellDetailsModal({
@@ -30,8 +32,13 @@ export default function SpellDetailsModal({
   isFavorite = false,
   onToggleFavorite,
   onCast,
+  characterLevel,
 }: SpellDetailsModalProps) {
   const isCantrip = spell.level === 0;
+  const displayDamage =
+    characterLevel !== undefined
+      ? getScaledSpellDamage(spell, characterLevel)
+      : spell.damage;
 
   return (
     <Dialog
@@ -177,7 +184,7 @@ export default function SpellDetailsModal({
             </div>
 
             {/* Combat Info */}
-            {(spell.actionType || spell.damage) && (
+            {(spell.actionType || displayDamage) && (
               <div className="border-divider bg-surface-raised rounded-lg border-2 p-4">
                 <h3 className="text-heading mb-3 text-lg font-bold">
                   Combat Details
@@ -193,9 +200,9 @@ export default function SpellDetailsModal({
                       {spell.savingThrow} Save
                     </Badge>
                   )}
-                  {spell.damage && (
+                  {displayDamage && (
                     <Badge variant="danger" size="sm">
-                      {spell.damage} {spell.damageType || 'damage'}
+                      {displayDamage} {spell.damageType || 'damage'}
                     </Badge>
                   )}
                 </div>
