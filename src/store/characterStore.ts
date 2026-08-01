@@ -4,6 +4,7 @@ import { TAB_ID } from '@/lib/tabIdentity';
 import {
   armCanonicalPersistence,
   createPerCharacterStorage,
+  mergeWatermarks,
   type IntentWatermark,
 } from '@/lib/characterCanonicalStorage';
 import { getApplyingIntent } from '@/store/characterIntentContext';
@@ -5578,10 +5579,10 @@ function onPromotedToLeader(characterId: string): void {
       state.loadCharacterState(envelope.character);
     }
     useCharacterStore.setState(current => ({
-      intentWatermarks: {
-        ...envelope.intentWatermarks,
-        ...current.intentWatermarks,
-      },
+      intentWatermarks: mergeWatermarks(
+        envelope.intentWatermarks,
+        current.intentWatermarks
+      ),
     }));
   }
   characterIntentBus.reconcileOwnPending(characterId);

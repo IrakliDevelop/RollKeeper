@@ -1,5 +1,6 @@
 import type { StateStorage } from 'zustand/middleware';
 
+import { characterWriterLock } from '@/lib/characterWriterLock';
 import { isStrictlyFresher } from '@/lib/characterFreshness';
 import { CHARACTER_ENVELOPE_KEY_PREFIX, STORAGE_KEY } from '@/utils/constants';
 import type { CharacterState } from '@/types/character';
@@ -64,6 +65,33 @@ export function readCharacterEnvelope(
   return legacy && legacy.character.id === characterId ? legacy : null;
 }
 
+/** Merges two per-tab watermark maps, envelope-dominant: the envelope was
+ * just read synchronously (e.g. at leader promotion) and can only be as
+ * fresh or fresher than in-memory state for any tab whose watermark it
+ * carries, since followers only ever adopt watermarks via storage-event
+ * adoption gated on the character being strictly fresher. For a tabId
+ * present in both maps the merged seq is the max of the two (never regress
+ * dedup state) and the merged lastSeen is the max of the two timestamps.
+ * A tabId present in only one map passes through unchanged. Pure — safe to
+ * unit-test directly and to reuse from both onPromotedToLeader and the
+ * roster-sync load path. */
+export function mergeWatermarks(
+  envelopeWatermarks: Record<string, IntentWatermark>,
+  currentWatermarks: Record<string, IntentWatermark>
+): Record<string, IntentWatermark> {
+  const merged: Record<string, IntentWatermark> = { ...currentWatermarks };
+  for (const [tabId, envMark] of Object.entries(envelopeWatermarks)) {
+    const curMark = currentWatermarks[tabId];
+    merged[tabId] = curMark
+      ? {
+          seq: Math.max(envMark.seq, curMark.seq),
+          lastSeen: Math.max(envMark.lastSeen, curMark.lastSeen),
+        }
+      : envMark;
+  }
+  return merged;
+}
+
 /** Load-time arbitration between the canonical envelope and the roster
  * entry: strictly fresher wins; ties go to the envelope (canonical). */
 export function pickFresherCharacter(
@@ -80,7 +108,13 @@ export function pickFresherCharacter(
 /** zustand persist storage adapter. getItem returns null — the store boots
  * empty and hydrates through the explicit load-by-id flow. setItem derives
  * the per-character key from the serialized state and writes only while
- * that character id is armed. */
+ * that character id is armed AND this tab holds the writer lock for it —
+ * zustand persist's setItem fires on every set/setState (cross-tab
+ * adoption, UI-flag toggles, hydration flips), and a follower echoing the
+ * envelope it just read/adopted would violate single-writer at the storage
+ * layer (stale-state resurrection window, watermark regression). With no
+ * Web Locks support, isLeader() reports every tab as leader — the reduced
+ * no-locks guarantee is unchanged. */
 export function createPerCharacterStorage(): StateStorage {
   return {
     getItem: () => null,
@@ -93,6 +127,7 @@ export function createPerCharacterStorage(): StateStorage {
         return;
       }
       if (!id || id !== armedCharacterId) return;
+      if (!characterWriterLock.isLeader(id)) return;
       window.localStorage.setItem(characterEnvelopeKey(id), value);
     },
     removeItem: () => {},

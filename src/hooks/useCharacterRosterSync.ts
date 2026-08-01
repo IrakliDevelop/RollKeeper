@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import {
+  mergeWatermarks,
   pickFresherCharacter,
   readCharacterEnvelope,
 } from '@/lib/characterCanonicalStorage';
@@ -86,10 +87,18 @@ export function useCharacterRosterSync({
         setIsInitialLoad(true);
         if (!isStaleCandidate) {
           loadCharacterState(candidate);
-          if (envelope && candidate === envelope.character) {
-            useCharacterStore.setState({
-              intentWatermarks: envelope.intentWatermarks,
-            });
+          // Adopt the envelope's watermarks whenever one was read, even if
+          // the roster entry won arbitration (fresher store state) — the
+          // envelope's dedup state must not be dropped just because its
+          // character lost the freshness check, or a later promotion in
+          // this tab would re-apply already-applied intents.
+          if (envelope) {
+            useCharacterStore.setState(current => ({
+              intentWatermarks: mergeWatermarks(
+                envelope.intentWatermarks,
+                current.intentWatermarks
+              ),
+            }));
           }
           onLoad?.(candidate);
         }
