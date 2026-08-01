@@ -90,9 +90,6 @@ export function DecorationItem({
       {!deco.isDead && deco.isConcentrating && (
         <ConcentrationRing rect={rect} />
       )}
-      {!deco.isDead && deco.hasUsedReaction && (
-        <ReactionUsedGlyph rect={rect} cell={cell} />
-      )}
       {deco.isDead && <DeadGlyph rect={rect} cell={cell} />}
       {showBar && (
         <InTokenBar rect={rect} cell={cell} hp={deco.hp as BarLikeHp} />
@@ -102,6 +99,11 @@ export function DecorationItem({
       )}
       {hasConditions && shouldShowChipRow && (
         <ConditionStrip rect={rect} cell={cell} conditions={conditions} />
+      )}
+      {/* After ConditionStrip: this layer stacks by DOM order (no z-index),
+          and a full-width strip would otherwise paint over the corner badge. */}
+      {!deco.isDead && deco.hasUsedReaction && (
+        <ReactionUsedGlyph rect={rect} cell={cell} />
       )}
       {shouldShowChipRow && (
         <ChipRow
