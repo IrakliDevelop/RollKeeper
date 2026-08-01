@@ -40,7 +40,10 @@ import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { SpellAutocomplete } from '@/components/ui/forms/SpellAutocomplete';
 import { useSpellsData } from '@/hooks/useSpellsData';
-import { getScaledSpellDamage } from '@/utils/cantripScaling';
+import {
+  getScaledSpellDamage,
+  resolveDamageScalingOnEdit,
+} from '@/utils/cantripScaling';
 import { getTotalLevel } from '@/utils/multiclass';
 import {
   convertProcessedSpellToFormData,
@@ -811,6 +814,7 @@ export const SpellManagement: React.FC = () => {
         const updated = {
           ...spell,
           ...spellData,
+          damageScaling: resolveDamageScalingOnEdit(spell, spellData.damage),
           updatedAt: new Date().toISOString(),
         };
         if (spellData.freeCastMax === undefined) {
