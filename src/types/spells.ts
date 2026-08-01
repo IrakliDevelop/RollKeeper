@@ -93,7 +93,7 @@ export interface RawSpellData {
   meta?: SpellMeta;
   entries: (string | SpellEntry)[];
   entriesHigherLevel?: SpellEntryHigherLevel[];
-  scalingLevelDice?: SpellScalingLevelDice;
+  scalingLevelDice?: SpellScalingLevelDice | SpellScalingLevelDice[];
   damageInflict?: string[];
   conditionInflict?: string[];
   savingThrow?: string[];
@@ -149,6 +149,7 @@ export interface ProcessedSpell {
   tags: string[]; // Searchable tags
   damage?: string[]; // Damage types
   saves?: string[]; // Saving throws
+  scalingLevelDice?: SpellScalingLevelDice | SpellScalingLevelDice[]; // Raw cantrip scaling data, passed through for damageScaling extraction
   isCantrip: boolean;
   isSrd: boolean;
 }
