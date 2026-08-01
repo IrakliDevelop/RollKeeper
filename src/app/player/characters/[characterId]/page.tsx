@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { useCantripScalingBackfill } from '@/hooks/useCantripScalingBackfill';
 import { usePlayerSync } from '@/hooks/usePlayerSync';
 import { SyncIndicator } from '@/components/ui/campaign/SyncIndicator';
 import { PartyHPSidebar } from '@/components/ui/campaign/PartyHPSidebar';
@@ -441,6 +442,8 @@ export default function CharacterSheet() {
   ]);
 
   const { manualSave } = useAutoSave({ onAfterSave: handleAfterSave });
+
+  useCantripScalingBackfill();
 
   // Auto-migrate existing traits to extended features once a character loads
   // (mirrors the same load event the roster-sync hook fires on).

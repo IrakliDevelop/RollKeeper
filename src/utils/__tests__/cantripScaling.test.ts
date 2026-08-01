@@ -5,8 +5,9 @@ import {
   getScaledSpellDamage,
   getCantripUpgrades,
   resolveDamageScalingOnEdit,
+  findScalingSpellMatch,
 } from '@/utils/cantripScaling';
-import type { SpellScalingLevelDice } from '@/types/spells';
+import type { SpellScalingLevelDice, ProcessedSpell } from '@/types/spells';
 import type { Spell } from '@/types/character';
 
 const SHOCKING_GRASP: SpellScalingLevelDice = {
@@ -212,5 +213,63 @@ describe('resolveDamageScalingOnEdit', () => {
         '2d6'
       )
     ).toBeUndefined();
+  });
+});
+
+function processed(overrides: Partial<ProcessedSpell>): ProcessedSpell {
+  return {
+    id: 'x',
+    name: 'Shocking Grasp',
+    level: 0,
+    school: 'V',
+    schoolName: 'Evocation',
+    source: 'PHB2024',
+    isRitual: false,
+    concentration: false,
+    castingTime: '1 action',
+    range: 'Touch',
+    components: { verbal: true, somatic: true, material: false },
+    duration: 'Instantaneous',
+    description: '',
+    classes: [],
+    tags: [],
+    isCantrip: true,
+    isSrd: false,
+    scalingLevelDice: { label: 'x', scaling: { '1': '1d8', '5': '2d8' } },
+    ...overrides,
+  };
+}
+
+describe('findScalingSpellMatch', () => {
+  const pool = [
+    processed({ id: 'phb', source: 'PHB' }),
+    processed({ id: 'xphb', source: 'PHB2024' }),
+    processed({ id: 'no-scaling', source: 'TCE', scalingLevelDice: undefined }),
+  ];
+
+  it('prefers the entry matching the stored source', () => {
+    expect(findScalingSpellMatch(pool, 'Shocking Grasp', 'PHB')?.id).toBe(
+      'phb'
+    );
+  });
+
+  it('falls back to PHB2024 when source does not match', () => {
+    expect(findScalingSpellMatch(pool, 'shocking grasp', 'XGE')?.id).toBe(
+      'xphb'
+    );
+    expect(findScalingSpellMatch(pool, 'Shocking Grasp')?.id).toBe('xphb');
+  });
+
+  it('only considers cantrips that carry scaling data', () => {
+    expect(
+      findScalingSpellMatch(
+        [processed({ scalingLevelDice: undefined })],
+        'Shocking Grasp'
+      )
+    ).toBeUndefined();
+  });
+
+  it('returns undefined for unknown names', () => {
+    expect(findScalingSpellMatch(pool, 'Fire Bolt')).toBeUndefined();
   });
 });
