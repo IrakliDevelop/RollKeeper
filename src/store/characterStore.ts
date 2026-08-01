@@ -1251,6 +1251,8 @@ export const useCharacterStore = create<CharacterStore>()(
           if (!changed) return state;
           return {
             character: { ...state.character, spells },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
           };
         });
       },

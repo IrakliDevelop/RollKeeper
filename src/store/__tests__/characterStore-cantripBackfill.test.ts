@@ -36,6 +36,8 @@ describe('backfillCantripScaling', () => {
           makeSpell({ id: 's-leveled', level: 3 }),
         ],
       }),
+      hasUnsavedChanges: false,
+      saveStatus: 'saved',
     });
   });
 
@@ -77,6 +79,22 @@ describe('backfillCantripScaling', () => {
       .getState()
       .backfillCantripScaling([{ spellId: 's-custom', scaling: TABLE }]);
     expect(useCharacterStore.getState().character).toBe(before);
+  });
+
+  it('flags a real backfill for auto-save (hasUnsavedChanges/saveStatus)', () => {
+    useCharacterStore
+      .getState()
+      .backfillCantripScaling([{ spellId: 's-fresh', scaling: TABLE }]);
+    expect(useCharacterStore.getState().hasUnsavedChanges).toBe(true);
+    expect(useCharacterStore.getState().saveStatus).toBe('saving');
+  });
+
+  it('leaves hasUnsavedChanges untouched when nothing applies', () => {
+    useCharacterStore
+      .getState()
+      .backfillCantripScaling([{ spellId: 's-custom', scaling: TABLE }]);
+    expect(useCharacterStore.getState().hasUnsavedChanges).toBe(false);
+    expect(useCharacterStore.getState().saveStatus).toBe('saved');
   });
 
   it('does not touch base damage', () => {
