@@ -204,6 +204,35 @@ describe('DockSpells', () => {
     );
   });
 
+  it('casting a reaction spell marks the reaction used exactly once (no double-toggle) and fires the reaction toast', () => {
+    const { addToast } = renderDock();
+
+    fireEvent.click(castButtonFor('Shield'));
+    fireEvent.click(screen.getByRole('button', { name: /^cast shield/i }));
+
+    // Regression (PR #194 P1): useCastSpell marks the reaction used; the
+    // dock's onReactionSpellCast must NOT toggle again or the two calls
+    // cancel out and Shield leaves the reaction still available.
+    expect(getChar().reaction?.hasUsedReaction).toBe(true);
+    const reactionToasts = addToast.mock.calls.filter(
+      ([toast]) => toast.title === 'Reaction used — Shield'
+    );
+    expect(reactionToasts).toHaveLength(1);
+  });
+
+  it('casting a reaction spell with the reaction already used does not fire the reaction toast', () => {
+    seedCharacter({ reaction: { hasUsedReaction: true } });
+    const { addToast } = renderDock();
+
+    fireEvent.click(castButtonFor('Shield'));
+    fireEvent.click(screen.getByRole('button', { name: /^cast shield/i }));
+
+    expect(getChar().reaction?.hasUsedReaction).toBe(true);
+    expect(addToast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Reaction used — Shield' })
+    );
+  });
+
   it('casting a concentration spell with no aoe cancels a stale pending placement', () => {
     const { onCancelPlacement } = renderDock({ hasPendingPlacement: true });
 
