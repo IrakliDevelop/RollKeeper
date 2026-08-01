@@ -93,4 +93,55 @@ describe('CharacterWriterLock', () => {
     await vi.waitFor(() => expect(lockA.isLeader('b')).toBe(true));
     expect(lockA.isLeader('a')).toBe(false);
   });
+
+  it('onPromoted throwing releases the lock instead of leaving a stuck leader (no split-brain)', async () => {
+    installFakeLocks();
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const lockA = new CharacterWriterLock();
+    const lockB = new CharacterWriterLock();
+    const throwingOnPromoted = vi.fn(() => {
+      throw new Error('boom');
+    });
+
+    lockA.switchTo('a', { onPromoted: throwingOnPromoted });
+    await vi.waitFor(() => expect(throwingOnPromoted).toHaveBeenCalledTimes(1));
+
+    // The throw must not leave lockA stuck reporting leadership forever.
+    await vi.waitFor(() => expect(lockA.isLeader('a')).toBe(false));
+
+    // The real lock must have been released cleanly so another instance
+    // can acquire and lead the same character.
+    const onPromotedB = vi.fn();
+    lockB.switchTo('a', { onPromoted: onPromotedB });
+    await vi.waitFor(() => expect(lockB.isLeader('a')).toBe(true));
+    expect(onPromotedB).toHaveBeenCalledTimes(1);
+
+    // onPromoted must still fire at most once per acquisition.
+    expect(throwingOnPromoted).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('logs non-abort lock request errors instead of silently swallowing them', async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const requestError = new Error('lock manager unavailable');
+    const request = vi.fn(() => Promise.reject(requestError));
+    vi.stubGlobal('navigator', { locks: { request } });
+
+    const lock = new CharacterWriterLock();
+    lock.switchTo('a', { onPromoted: vi.fn() });
+
+    await vi.waitFor(() => expect(consoleErrorSpy).toHaveBeenCalled());
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('lock request failed'),
+      requestError
+    );
+
+    consoleErrorSpy.mockRestore();
+  });
 });

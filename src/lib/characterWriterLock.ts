@@ -9,6 +9,14 @@ const locksSupported = (): boolean =>
   'locks' in navigator &&
   typeof navigator.locks?.request === 'function';
 
+const isAbortError = (error: unknown): boolean =>
+  error instanceof DOMException
+    ? error.name === 'AbortError'
+    : typeof error === 'object' &&
+      error !== null &&
+      'name' in error &&
+      (error as { name: unknown }).name === 'AbortError';
+
 /** Single-writer election. One instance per JS context (singleton export).
  * Holds at most one character's writer lock at a time; switching characters
  * releases the old lock BEFORE requesting the new one. Without Web Locks
@@ -55,11 +63,24 @@ export class CharacterWriterLock {
               if (this.heldFor === characterId) this.heldFor = null;
               resolve();
             };
-            callbacks.onPromoted(characterId);
+            try {
+              callbacks.onPromoted(characterId);
+            } catch (error) {
+              // A throwing onPromoted must not leave this instance stuck
+              // "leading" after the browser has already released the real
+              // lock to the next queued tab — that's split-brain. Clear our
+              // state, log, and resolve (release cleanly) instead of letting
+              // the executor's promise auto-reject.
+              console.error('CharacterWriterLock: onPromoted threw', error);
+              if (this.heldFor === characterId) this.heldFor = null;
+              this.releaseHeld = null;
+              resolve();
+            }
           })
       )
-      .catch(() => {
-        /* AbortError on switch — expected */
+      .catch((error: unknown) => {
+        if (isAbortError(error)) return; // expected on switch/cancel
+        console.error('CharacterWriterLock: lock request failed', error);
       });
   }
 }
