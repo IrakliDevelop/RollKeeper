@@ -40,7 +40,7 @@ export function DockResources({
                     <span className="text-muted ml-1 text-xs">{die}</span>
                   )}
                 </span>
-                <span className="text-faint text-[10px]">
+                <span className="text-heading text-xs font-semibold">
                   {usesRemaining}/{maxUses}
                 </span>
               </div>
