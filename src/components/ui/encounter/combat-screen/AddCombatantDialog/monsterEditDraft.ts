@@ -32,6 +32,46 @@ export function createMonsterEditDraft(
   };
 }
 
+/** Create a complete, neutral stat block for a combatant built from scratch. */
+export function createCustomEditDraft(
+  initiativeModifier = 0
+): MonsterEditDraft {
+  return {
+    statBlock: {
+      str: 10,
+      dex: 10,
+      con: 10,
+      int: 10,
+      wis: 10,
+      cha: 10,
+      saves: '',
+      skills: '',
+      speed: '30 ft.',
+      resistances: '',
+      immunities: '',
+      vulnerabilities: '',
+      conditionImmunities: [],
+      senses: '',
+      passivePerception: 10,
+      traits: [],
+      actions: [],
+      reactions: [],
+      bonusActions: [],
+      lairActions: [],
+      cr: '0',
+      type: 'custom creature',
+      size: 'Medium',
+      languages: '',
+      alignment: 'unaligned',
+      hpFormula: '',
+    },
+    initiativeModifier,
+    initiativeDirty: initiativeModifier !== 0,
+    proficiencyBonus: 2,
+    proficiencyDirty: false,
+  };
+}
+
 export function updateDraftStatBlock(
   draft: MonsterEditDraft,
   patch: Partial<MonsterStatBlock>

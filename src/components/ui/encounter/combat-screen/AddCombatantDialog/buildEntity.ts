@@ -155,6 +155,8 @@ export interface CustomBuildOpts {
   isHidden: boolean;
   playerAlias?: string;
   playerDisposition: PlayerDisposition;
+  statBlock?: MonsterStatBlock;
+  proficiencyBonus?: number;
 }
 
 export function buildCustomEntity(
@@ -165,6 +167,7 @@ export function buildCustomEntity(
     name: opts.name.trim(),
     initiative: null,
     initiativeModifier: opts.initMod,
+    proficiencyBonus: opts.proficiencyBonus,
     currentHp: opts.hp || 1,
     maxHp: opts.hp || 1,
     tempHp: 0,
@@ -173,5 +176,9 @@ export function buildCustomEntity(
     isHidden: opts.isHidden,
     playerAlias: opts.playerAlias?.trim() || undefined,
     playerDisposition: opts.playerDisposition,
+    monsterStatBlock: opts.statBlock,
+    abilities: opts.statBlock
+      ? buildAbilitiesFromStatBlock(opts.statBlock)
+      : undefined,
   };
 }

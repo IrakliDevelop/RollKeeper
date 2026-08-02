@@ -194,6 +194,45 @@ describe('AddCombatantDialog', () => {
     expect(entity.playerDisposition).toBe('enemy');
   });
 
+  it('custom combatant can save a fully editable stat block', () => {
+    const onAddEntity = vi.fn();
+    render(<AddCombatantDialog {...defaultProps} onAddEntity={onAddEntity} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /custom/i }));
+    fireEvent.change(screen.getByPlaceholderText(/cursed statue/i), {
+      target: { value: 'Clockwork Sentry' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^edit stat block$/i }));
+
+    fireEvent.change(screen.getByRole('textbox', { name: /str score/i }), {
+      target: { value: '18' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: /^type$/i }), {
+      target: { value: 'construct' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /actions & traits/i }));
+    fireEvent.click(screen.getByRole('button', { name: /add actions entry/i }));
+    fireEvent.change(
+      screen.getByRole('textbox', { name: /actions entry name/i }),
+      { target: { value: 'Slam' } }
+    );
+    fireEvent.change(
+      screen.getByRole('textbox', { name: /actions entry text/i }),
+      { target: { value: 'Melee Weapon Attack: +6 to hit.' } }
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /add npc/i }));
+
+    const entity = onAddEntity.mock.calls[0][0];
+    expect(entity.monsterStatBlock).toMatchObject({
+      str: 18,
+      type: 'construct',
+      actions: [{ name: 'Slam', text: 'Melee Weapon Attack: +6 to hit.' }],
+    });
+    expect(entity.proficiencyBonus).toBe(2);
+    expect(entity.abilities).toEqual([]);
+  });
+
   it('NPC delete button triggers confirmation dialog', () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<AddCombatantDialog {...defaultProps} />);
