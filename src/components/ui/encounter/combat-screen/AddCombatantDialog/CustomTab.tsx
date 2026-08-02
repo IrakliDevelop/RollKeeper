@@ -1,7 +1,9 @@
 'use client';
 
 import React from 'react';
+import { FilePen } from 'lucide-react';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { Button } from '@/components/ui/forms/button';
 import type { PlayerDisposition } from '@/types/encounter';
 import { SharedOptions } from './SharedOptions';
 
@@ -22,6 +24,8 @@ interface CustomTabProps {
   onPlayerAliasChange: (v: string) => void;
   disposition: PlayerDisposition;
   onDispositionChange: (v: PlayerDisposition) => void;
+  onEditStatBlock: () => void;
+  hasStatBlockEdits: boolean;
 }
 
 export function CustomTab({
@@ -41,6 +45,8 @@ export function CustomTab({
   onPlayerAliasChange,
   disposition,
   onDispositionChange,
+  onEditStatBlock,
+  hasStatBlockEdits,
 }: CustomTabProps) {
   return (
     <div className="space-y-3 pb-4">
@@ -111,6 +117,15 @@ export function CustomTab({
           label="Init Mod"
         />
       </div>
+
+      <Button
+        variant="outline"
+        fullWidth
+        onClick={onEditStatBlock}
+        leftIcon={<FilePen size={14} />}
+      >
+        Edit stat block{hasStatBlockEdits ? ' (edited)' : ''}
+      </Button>
 
       <SharedOptions
         hideName={hideName}

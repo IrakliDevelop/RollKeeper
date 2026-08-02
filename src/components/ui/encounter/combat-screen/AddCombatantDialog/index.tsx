@@ -19,8 +19,13 @@ import { NpcTab } from './NpcTab';
 import { MonsterTab } from './MonsterTab';
 import { CustomTab } from './CustomTab';
 import { buildMonsterEntities, buildCustomEntity } from './buildEntity';
-import { createMonsterEditDraft } from './monsterEditDraft';
+import {
+  createCustomEditDraft,
+  createMonsterEditDraft,
+  setDraftInitiative,
+} from './monsterEditDraft';
 import type { MonsterEditDraft } from './monsterEditDraft';
+import { StatBlockEditor } from './StatBlockEditor';
 
 export interface AddCombatantDialogProps {
   open: boolean;
@@ -88,6 +93,8 @@ export function AddCombatantDialog({
   const [cHideName, setCHideName] = useState(false);
   const [cAlias, setCAlias] = useState('');
   const [cDisposition, setCDisposition] = useState<PlayerDisposition>('enemy');
+  const [cDraft, setCDraft] = useState<MonsterEditDraft | null>(null);
+  const [cEditing, setCEditing] = useState(false);
 
   const resetMonsterState = () => {
     setSelMonster(null);
@@ -110,6 +117,8 @@ export function AddCombatantDialog({
     setCHideName(false);
     setCAlias('');
     setCDisposition('enemy');
+    setCDraft(null);
+    setCEditing(false);
   };
 
   // Selecting a (different) monster always discards any stat block draft.
@@ -181,12 +190,31 @@ export function AddCombatantDialog({
         type: cType,
         hp: parseInt(cHp) || 10,
         ac: parseInt(cAc) || 10,
-        initMod: parseInt(cInit) || 0,
+        initMod: cDraft?.initiativeModifier ?? (parseInt(cInit) || 0),
         isHidden: cHideName,
         playerAlias: cAlias || undefined,
         playerDisposition: cDisposition,
+        statBlock: cDraft?.statBlock,
+        proficiencyBonus: cDraft?.proficiencyBonus,
       })
     );
+  };
+
+  const handleCustomInitChange = (value: string) => {
+    setCInit(value);
+    if (cDraft) {
+      setCDraft(setDraftInitiative(cDraft, parseInt(value) || 0));
+    }
+  };
+
+  const handleCustomEditStatBlock = () => {
+    setCDraft(d => d ?? createCustomEditDraft(parseInt(cInit) || 0));
+    setCEditing(true);
+  };
+
+  const handleCustomDraftChange = (draft: MonsterEditDraft) => {
+    setCDraft(draft);
+    setCInit(String(draft.initiativeModifier));
   };
 
   const showFooter =
@@ -282,26 +310,41 @@ export function AddCombatantDialog({
               onEditorReset={handleResetDraft}
             />
           )}
-          {tab === 'custom' && (
-            <CustomTab
-              name={cName}
-              onNameChange={setCName}
-              type={cType}
-              onTypeChange={setCType}
-              hp={cHp}
-              onHpChange={setCHp}
-              ac={cAc}
-              onAcChange={setCAc}
-              initMod={cInit}
-              onInitModChange={setCInit}
-              hideName={cHideName}
-              onHideNameChange={setCHideName}
-              playerAlias={cAlias}
-              onPlayerAliasChange={setCAlias}
-              disposition={cDisposition}
-              onDispositionChange={setCDisposition}
-            />
-          )}
+          {tab === 'custom' &&
+            (cEditing && cDraft ? (
+              <StatBlockEditor
+                monsterName={cName.trim() || 'custom combatant'}
+                draft={cDraft}
+                onDraftChange={handleCustomDraftChange}
+                onReset={() => {
+                  const draft = createCustomEditDraft(parseInt(cInit) || 0);
+                  setCDraft(draft);
+                }}
+                onBack={() => setCEditing(false)}
+                resetLabel="Reset stat block"
+              />
+            ) : (
+              <CustomTab
+                name={cName}
+                onNameChange={setCName}
+                type={cType}
+                onTypeChange={setCType}
+                hp={cHp}
+                onHpChange={setCHp}
+                ac={cAc}
+                onAcChange={setCAc}
+                initMod={cInit}
+                onInitModChange={handleCustomInitChange}
+                hideName={cHideName}
+                onHideNameChange={setCHideName}
+                playerAlias={cAlias}
+                onPlayerAliasChange={setCAlias}
+                disposition={cDisposition}
+                onDispositionChange={setCDisposition}
+                onEditStatBlock={handleCustomEditStatBlock}
+                hasStatBlockEdits={cDraft !== null}
+              />
+            ))}
         </div>
 
         {/* Anchored footer — shown only for monster (with selection) and custom */}

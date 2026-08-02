@@ -14,6 +14,7 @@ interface StatBlockEditorProps {
   onDraftChange: (draft: MonsterEditDraft) => void;
   onReset: () => void;
   onBack: () => void;
+  resetLabel?: string;
 }
 
 type EditorTab = 'stats' | 'actions';
@@ -34,6 +35,7 @@ export function StatBlockEditor({
   onDraftChange,
   onReset,
   onBack,
+  resetLabel = 'Reset to original',
 }: StatBlockEditorProps) {
   const [tab, setTab] = useState<EditorTab>('stats');
 
@@ -53,7 +55,7 @@ export function StatBlockEditor({
           onClick={onReset}
           className="text-muted hover:text-heading flex items-center gap-1 text-[12px] font-bold transition-colors"
         >
-          <RotateCcw size={12} /> Reset to original
+          <RotateCcw size={12} /> {resetLabel}
         </button>
       </div>
 
