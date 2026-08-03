@@ -100,10 +100,7 @@ export function NpcResourcesEditor({
           Class Resources
         </label>
         <div className="w-56">
-          <SelectField
-            value={undefined as unknown as string}
-            onValueChange={handleAdd}
-          >
+          <SelectField value="__placeholder__" onValueChange={handleAdd}>
             <SelectItem value="__placeholder__" disabled>
               Add resource…
             </SelectItem>
