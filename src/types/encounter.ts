@@ -71,6 +71,8 @@ export interface MonsterStatBlock {
   wis: number;
   cha: number;
   saves: string;
+  /** Explicit save proficiencies; absent on legacy blocks, where `saves` implies them. */
+  saveProficiencies?: Array<'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'>;
   skills: string;
   speed: string;
   resistances: string;

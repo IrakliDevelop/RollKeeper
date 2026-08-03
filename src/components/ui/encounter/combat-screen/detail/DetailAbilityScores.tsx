@@ -2,7 +2,11 @@
 
 import React from 'react';
 import { NumberField } from '@/components/ui/forms/NumberInput';
-import { parseSavesString, type AbilityKey } from './DetailAbilityScores.utils';
+import {
+  parseSavesString,
+  removeSaveOverride,
+  type AbilityKey,
+} from './DetailAbilityScores.utils';
 import type { DetailSectionProps } from './DetailHeader';
 
 const ABILITY_LABELS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const;
@@ -13,12 +17,18 @@ function signedMod(score: number): string {
   return mod >= 0 ? `+${mod}` : `${mod}`;
 }
 
+function signed(value: number): string {
+  return value >= 0 ? `+${value}` : `${value}`;
+}
+
 export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
   const sb = entity.monsterStatBlock;
   if (!sb) return null;
 
   const saveByAbility = parseSavesString(sb.saves);
   const isPlayer = entity.type === 'player';
+  const inferredProficiencies = ABILITY_KEYS.filter(key => saveByAbility[key]);
+  const proficiencies = sb.saveProficiencies ?? inferredProficiencies;
 
   const handleChange = (key: AbilityKey, val: number | undefined) => {
     if (val !== undefined && sb) {
@@ -26,6 +36,29 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
         monsterStatBlock: { ...sb, [key]: val },
       });
     }
+  };
+
+  const setProficient = (key: AbilityKey, proficient: boolean) => {
+    const next = proficient
+      ? [...new Set([...proficiencies, key])]
+      : proficiencies.filter(candidate => candidate !== key);
+    actions.onUpdate(entity.id, {
+      monsterStatBlock: {
+        ...sb,
+        saveProficiencies: next,
+        saves: proficient ? sb.saves : removeSaveOverride(sb.saves, key),
+      },
+    });
+  };
+
+  const resetSave = (key: AbilityKey) => {
+    actions.onUpdate(entity.id, {
+      monsterStatBlock: {
+        ...sb,
+        saveProficiencies: proficiencies,
+        saves: removeSaveOverride(sb.saves, key),
+      },
+    });
   };
 
   return (
@@ -36,7 +69,12 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
       <div className="grid grid-cols-6 gap-1">
         {ABILITY_KEYS.map((key, i) => {
           const score = sb[key];
-          const save = saveByAbility[key];
+          const override = saveByAbility[key];
+          const proficient = proficiencies.includes(key);
+          const calculated =
+            Math.floor((score - 10) / 2) +
+            (proficient ? (entity.proficiencyBonus ?? 0) : 0);
+          const save = override ?? signed(calculated);
           return (
             <div
               key={key}
@@ -60,14 +98,36 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
               <span className="text-accent-emerald-text-muted text-[10px]">
                 {signedMod(score)}
               </span>
-              {save != null ? (
+              {!isPlayer && (
+                <label className="text-muted flex items-center gap-0.5 text-[9px] font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={proficient}
+                    onChange={event => setProficient(key, event.target.checked)}
+                    aria-label={`${ABILITY_LABELS[i]} saving throw proficiency`}
+                    className="text-accent-amber-text h-3 w-3 accent-current"
+                  />
+                  PROF
+                </label>
+              )}
+              {proficient ? (
                 <span className="text-accent-amber-text text-[10px] font-bold">
                   SAVE {save}
                 </span>
               ) : (
                 <span className="text-muted text-[10px] font-semibold">
-                  SAVE {signedMod(score)}
+                  SAVE {save}
                 </span>
+              )}
+              {!isPlayer && override != null && (
+                <button
+                  type="button"
+                  onClick={() => resetSave(key)}
+                  className="text-faint hover:text-body text-[9px] underline"
+                  aria-label={`Reset ${ABILITY_LABELS[i]} saving throw`}
+                >
+                  Reset
+                </button>
               )}
             </div>
           );

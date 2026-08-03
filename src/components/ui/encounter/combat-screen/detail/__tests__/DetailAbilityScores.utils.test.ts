@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { parseSavesString } from '@/components/ui/encounter/combat-screen/detail/DetailAbilityScores.utils';
+import {
+  parseSavesString,
+  removeSaveOverride,
+} from '@/components/ui/encounter/combat-screen/detail/DetailAbilityScores.utils';
 
 describe('parseSavesString', () => {
   it('parses a typical loader-formatted string', () => {
@@ -42,5 +45,13 @@ describe('parseSavesString', () => {
       dex: '+5',
       wis: '+2',
     });
+  });
+});
+
+describe('removeSaveOverride', () => {
+  it('removes only the selected ability and preserves other tokens', () => {
+    expect(removeSaveOverride('STR +8, DEX +4, odd note', 'str')).toBe(
+      'DEX +4, odd note'
+    );
   });
 });

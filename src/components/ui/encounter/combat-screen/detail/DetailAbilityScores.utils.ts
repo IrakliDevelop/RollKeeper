@@ -31,3 +31,19 @@ export function parseSavesString(
   }
   return result;
 }
+
+export function removeSaveOverride(
+  saves: string | undefined,
+  ability: AbilityKey
+): string {
+  if (!saves) return '';
+  return saves
+    .split(',')
+    .filter(token => {
+      const match = token.trim().match(/^([a-zA-Z]{3})\s+/);
+      return !match || match[1].toLowerCase() !== ability;
+    })
+    .map(token => token.trim())
+    .filter(Boolean)
+    .join(', ');
+}
