@@ -8,6 +8,11 @@ import {
   resetNPCSpellcasting,
 } from '@/utils/npcSpellcasting';
 import { detectSpellAoe } from '@/utils/spellAoeDetection';
+import {
+  applyShortRest,
+  applyLongRest,
+  isValidResourceAmount,
+} from '@/utils/npcResources';
 
 const NPC_STORAGE_KEY = 'rollkeeper-npc-data';
 
@@ -75,6 +80,21 @@ interface NPCStoreState {
     spellId: string
   ) => void;
   longRestNPC: (campaignCode: string, npcId: string) => void;
+  /** Atomic all-or-nothing spend; false = insufficient uses or unknown id (no mutation). */
+  spendNpcResource: (
+    campaignCode: string,
+    npcId: string,
+    resourceId: string,
+    amount: number
+  ) => boolean;
+  restoreNpcResource: (
+    campaignCode: string,
+    npcId: string,
+    resourceId: string,
+    amount: number
+  ) => void;
+  /** Restores class resources per their shortRestReset rule. Touches nothing else. */
+  shortRestNPC: (campaignCode: string, npcId: string) => void;
 }
 
 export function migrateNpcPersistedState(
@@ -398,9 +418,93 @@ export const useNPCStore = create<NPCStoreState>()(
                         spellcasting: resetNPCSpellcasting(npc.spellcasting),
                       }
                     : {}),
+                  ...(npc.resources
+                    ? { resources: applyLongRest(npc.resources) }
+                    : {}),
                   updatedAt: new Date().toISOString(),
                 };
               }),
+            },
+          };
+        });
+      },
+
+      spendNpcResource: (campaignCode, npcId, resourceId, amount) => {
+        if (!isValidResourceAmount(amount)) return false;
+        const npc = get().getNPC(campaignCode, npcId);
+        const resource = npc?.resources?.find(r => r.id === resourceId);
+        if (!resource) return false;
+        if (resource.maxUses - resource.usesExpended < amount) return false; // no expenditure mutation
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(n =>
+                n.id === npcId
+                  ? {
+                      ...n,
+                      resources: n.resources?.map(r =>
+                        r.id === resourceId
+                          ? { ...r, usesExpended: r.usesExpended + amount }
+                          : r
+                      ),
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : n
+              ),
+            },
+          };
+        });
+        return true;
+      },
+
+      restoreNpcResource: (campaignCode, npcId, resourceId, amount) => {
+        if (!isValidResourceAmount(amount)) return; // negative restore must not raise expenditure
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(n =>
+                n.id === npcId
+                  ? {
+                      ...n,
+                      resources: n.resources?.map(r =>
+                        r.id === resourceId
+                          ? {
+                              ...r,
+                              usesExpended: Math.max(
+                                0,
+                                r.usesExpended - amount
+                              ),
+                            }
+                          : r
+                      ),
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : n
+              ),
+            },
+          };
+        });
+      },
+
+      shortRestNPC: (campaignCode, npcId) => {
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(n =>
+                n.id === npcId && n.resources
+                  ? {
+                      ...n,
+                      resources: applyShortRest(n.resources),
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : n
+              ),
             },
           };
         });
