@@ -51,6 +51,7 @@ export function NpcResourcesEditor({
   onDeleteResource,
 }: NpcResourcesEditorProps) {
   const handleAdd = (value: string) => {
+    if (value === '__placeholder__' || !value) return;
     if (value === ADD_CUSTOM) {
       onChange([
         ...resources,
@@ -99,8 +100,11 @@ export function NpcResourcesEditor({
           Class Resources
         </label>
         <div className="w-56">
-          <SelectField value="" onValueChange={handleAdd}>
-            <SelectItem value="" disabled>
+          <SelectField
+            value={undefined as unknown as string}
+            onValueChange={handleAdd}
+          >
+            <SelectItem value="__placeholder__" disabled>
               Add resource…
             </SelectItem>
             {CLASS_RESOURCE_DEFINITIONS.map(def => (
