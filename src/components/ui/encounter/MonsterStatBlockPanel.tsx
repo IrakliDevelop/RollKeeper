@@ -2,12 +2,19 @@
 
 import React from 'react';
 import { NumberField } from '@/components/ui/forms/NumberInput';
-import { MonsterStatBlock } from '@/types/encounter';
+import type {
+  MonsterStatBlock,
+  NpcResource,
+  StatBlockEntry,
+} from '@/types/encounter';
 import { formatUsesLabel } from '@/utils/encounterConverter';
 
 interface MonsterStatBlockPanelProps {
   statBlock: MonsterStatBlock;
   onUpdate?: (updates: Partial<MonsterStatBlock>) => void;
+  /** When provided, entries with resourceCost render a cost badge + Use button. */
+  resources?: NpcResource[];
+  onUseEntry?: (entry: StatBlockEntry) => void;
 }
 
 const ABILITIES = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
@@ -36,9 +43,13 @@ function StatRow({
 function TraitBlock({
   title,
   entries,
+  resources,
+  onUseEntry,
 }: {
   title: string;
-  entries: Array<{ name: string; text: string; uses?: number }>;
+  entries: StatBlockEntry[];
+  resources?: NpcResource[];
+  onUseEntry?: (entry: StatBlockEntry) => void;
 }) {
   if (!entries || entries.length === 0) return null;
   return (
@@ -48,6 +59,13 @@ function TraitBlock({
       </h5>
       {entries.map((entry, i) => {
         const usesLabel = formatUsesLabel(entry.name, entry.uses);
+        const cost = entry.resourceCost;
+        const resource = cost && resources?.find(r => r.id === cost.resourceId);
+        const remaining = resource
+          ? Math.max(0, resource.maxUses - resource.usesExpended)
+          : 0;
+        const insufficient =
+          !resource || (cost != null && remaining < cost.amount);
         return (
           <div key={i} className="text-sm">
             <span className="text-heading font-semibold italic">
@@ -57,6 +75,33 @@ function TraitBlock({
               <span className="text-heading font-semibold italic">
                 {' '}
                 ({usesLabel})
+              </span>
+            )}
+            {cost && onUseEntry && (
+              <span className="ml-2 inline-flex items-center gap-1.5 align-middle">
+                <span className="bg-accent-purple-bg text-accent-purple-text rounded px-1.5 py-0.5 text-[10px] font-semibold">
+                  {resource
+                    ? `${cost.amount > 1 ? `${cost.amount}× ` : ''}${resource.name}`
+                    : 'Unknown resource'}
+                </span>
+                <button
+                  onClick={() => onUseEntry(entry)}
+                  disabled={insufficient}
+                  title={
+                    !resource
+                      ? 'Resource removed'
+                      : insufficient
+                        ? `Not enough ${resource.name} uses`
+                        : `Spend ${cost.amount} ${resource.name}`
+                  }
+                  className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+                    insufficient
+                      ? 'bg-surface-raised text-faint cursor-not-allowed'
+                      : 'bg-accent-amber-bg text-accent-amber-text hover:opacity-80'
+                  }`}
+                >
+                  Use
+                </button>
               </span>
             )}{' '}
             <span
@@ -73,6 +118,8 @@ function TraitBlock({
 export function MonsterStatBlockPanel({
   statBlock,
   onUpdate,
+  resources,
+  onUseEntry,
 }: MonsterStatBlockPanelProps) {
   return (
     <div className="border-accent-red-border bg-surface space-y-3 rounded-lg border p-3">
@@ -154,19 +201,44 @@ export function MonsterStatBlockPanel({
       </div>
 
       {/* Traits */}
-      <TraitBlock title="Traits" entries={statBlock.traits} />
+      <TraitBlock
+        title="Traits"
+        entries={statBlock.traits}
+        resources={resources}
+        onUseEntry={onUseEntry}
+      />
 
       {/* Actions */}
-      <TraitBlock title="Actions" entries={statBlock.actions} />
+      <TraitBlock
+        title="Actions"
+        entries={statBlock.actions}
+        resources={resources}
+        onUseEntry={onUseEntry}
+      />
 
       {/* Bonus Actions */}
-      <TraitBlock title="Bonus Actions" entries={statBlock.bonusActions} />
+      <TraitBlock
+        title="Bonus Actions"
+        entries={statBlock.bonusActions}
+        resources={resources}
+        onUseEntry={onUseEntry}
+      />
 
       {/* Reactions */}
-      <TraitBlock title="Reactions" entries={statBlock.reactions} />
+      <TraitBlock
+        title="Reactions"
+        entries={statBlock.reactions}
+        resources={resources}
+        onUseEntry={onUseEntry}
+      />
 
       {/* Lair Actions */}
-      <TraitBlock title="Lair Actions" entries={statBlock.lairActions} />
+      <TraitBlock
+        title="Lair Actions"
+        entries={statBlock.lairActions}
+        resources={resources}
+        onUseEntry={onUseEntry}
+      />
     </div>
   );
 }
