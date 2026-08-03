@@ -147,4 +147,32 @@ describe('AwardXpDialog', () => {
     expect(retried.data.playerId).toBe('p-2');
     expect(retried.data.award).toEqual(failedBody.data.award); // verbatim, same id
   });
+
+  it('after fully successful send, amount is cleared and award button is disabled', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({}) });
+    render(
+      <AwardXpDialog
+        open
+        onClose={() => {}}
+        players={players}
+        campaignCode="ABC"
+        dmId="dm-1"
+      />
+    );
+
+    const amountInput = screen.getByLabelText(/xp to add/i) as HTMLInputElement;
+    const awardButton = screen.getByRole('button', { name: /award to 2/i });
+
+    await user.type(amountInput, '250');
+    expect(awardButton).not.toBeDisabled();
+
+    await user.click(awardButton);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    // After success, amount should be cleared
+    expect(amountInput.value).toBe('');
+    // Button should be disabled since amount is now required and empty
+    expect(awardButton).toBeDisabled();
+  });
 });

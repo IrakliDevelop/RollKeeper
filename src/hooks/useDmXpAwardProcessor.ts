@@ -35,10 +35,10 @@ export function useDmXpAwardProcessor({
       for (const { award, receipt } of xpAwards) {
         try {
           const result = applyDmXpAward(award);
-          await acknowledgeXpAward(receipt);
           if (result.status === 'applied') {
             onApplied(award, result.becamePending);
           }
+          await acknowledgeXpAward(receipt);
         } catch (err) {
           console.error(
             'Failed to process DM XP award; will retry next poll',

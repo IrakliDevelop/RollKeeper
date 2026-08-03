@@ -137,4 +137,37 @@ describe('useDmXpAwardProcessor', () => {
     await waitFor(() => expect(acknowledgeXpAward).toHaveBeenCalledTimes(1));
     expect(applyDmXpAward).toHaveBeenCalledTimes(1);
   });
+
+  it('onApplied fires before ack, so ack failure does not prevent notification', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const applyDmXpAward = vi.fn(() => ({
+      status: 'applied' as const,
+      becamePending: false,
+    }));
+    const acknowledgeXpAward = vi.fn(async () => {
+      throw new Error('network error');
+    });
+    const onApplied = vi.fn();
+
+    renderHook(() =>
+      useDmXpAwardProcessor({
+        xpAwards: [makeEnvelope('a')],
+        applyDmXpAward,
+        acknowledgeXpAward,
+        onApplied,
+      })
+    );
+
+    await waitFor(() => expect(onApplied).toHaveBeenCalledTimes(1));
+    // onApplied fires for the applied award even though ack failed
+    expect(onApplied).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ id: 'a' }),
+      false
+    );
+    // ack was attempted and failed
+    expect(acknowledgeXpAward).toHaveBeenCalledTimes(1);
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
 });
