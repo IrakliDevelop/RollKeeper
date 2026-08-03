@@ -22,6 +22,7 @@ const baseState: SharedCampaignState = {
     requestedAt: 1,
   },
   settings: null,
+  xpAwards: [],
 };
 
 describe('useInitiativePrompt', () => {

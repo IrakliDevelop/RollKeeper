@@ -24,6 +24,28 @@ export function getRedis(): Redis {
   return redis;
 }
 
+let rawRedis: Redis | null = null;
+
+/**
+ * Client with automaticDeserialization disabled. The XP award queue needs the
+ * EXACT stored list strings back (they double as ack receipts); the default
+ * client would JSON.parse LRANGE results and the receipt would no longer be
+ * the stored string.
+ */
+export function getRawRedis(): Redis {
+  if (!rawRedis) {
+    const url = process.env.UPSTASH_REDIS_REST_URL;
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+    if (!url || !token) {
+      throw new Error(
+        'Missing UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN environment variables'
+      );
+    }
+    rawRedis = new Redis({ url, token, automaticDeserialization: false });
+  }
+  return rawRedis;
+}
+
 export function campaignKey(code: string): string {
   return `campaign:${code}`;
 }
@@ -50,6 +72,10 @@ export function campaignEffectsKey(code: string, playerId: string): string {
 
 export function campaignTransfersKey(code: string, playerId: string): string {
   return `campaign:${code}:transfers:${playerId}`;
+}
+
+export function campaignXpKey(code: string, playerId: string): string {
+  return `campaign:${code}:xp:${playerId}`;
 }
 
 export function campaignRemovedKey(code: string, playerId: string): string {
