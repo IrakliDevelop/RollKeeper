@@ -28,6 +28,9 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     handleToggleHiddenPlacement,
     hiddenElementCount,
     handleRevealAll,
+    selectedElementId,
+    selectedElementIsDmOnly,
+    handleToggleSelectedDmOnly,
   } = useDmBattleMapCanvas(props);
 
   return (
@@ -48,10 +51,13 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
             onToggleHiddenPlacement={handleToggleHiddenPlacement}
             hiddenElementCount={hiddenElementCount}
             onRevealAll={handleRevealAll}
+            selectedElementId={selectedElementId}
+            selectedElementIsDmOnly={selectedElementIsDmOnly}
+            onToggleSelectedDmOnly={handleToggleSelectedDmOnly}
           />
         )}
         {viewport && (
-          <div className="border-divider absolute top-[7.25rem] left-1/2 z-10 max-w-[92vw] -translate-x-1/2 overflow-hidden rounded-xl border shadow-lg">
+          <div className="border-divider absolute top-[8.25rem] left-1/2 z-10 max-w-[92vw] -translate-x-1/2 overflow-hidden rounded-xl border shadow-lg">
             <DmLocationToolOptions mode="battlemap" />
           </div>
         )}

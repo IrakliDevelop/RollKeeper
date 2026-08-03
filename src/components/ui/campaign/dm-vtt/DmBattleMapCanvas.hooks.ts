@@ -5,6 +5,9 @@ import {
   ArrowTool,
   MeasureTool,
   TemplateTool,
+  NoteTool,
+  TextTool,
+  ShapeTool,
   AutoSave,
   type Tool,
   type Viewport,
@@ -62,6 +65,9 @@ export interface DmBattleMapCanvasState {
   handleToggleHiddenPlacement: () => void;
   hiddenElementCount: number;
   handleRevealAll: () => void;
+  selectedElementId: string | null;
+  selectedElementIsDmOnly: boolean;
+  handleToggleSelectedDmOnly: () => void;
 }
 
 /**
@@ -89,11 +95,21 @@ export function useDmBattleMapCanvas({
   const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
   const [hiddenPlacementActive, setHiddenPlacementActive] = useState(false);
   const hiddenPlacementActiveRef = useRef(false);
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(
+    null
+  );
   const hiddenElementCount = useBattleMapStore(
     state =>
       Object.keys(
         state.battleMaps[campaignCode]?.[battleMapId]?.dmOnlyElements ?? {}
       ).length
+  );
+  const selectedElementIsDmOnly = useBattleMapStore(state =>
+    selectedElementId
+      ? (state.battleMaps[campaignCode]?.[battleMapId]?.dmOnlyElements[
+          selectedElementId
+        ] ?? false)
+      : false
   );
   // The connection is created once inside the fire-once `handleReady`
   // callback; a plain closure over `onPoke` would go stale if the prop's
@@ -109,6 +125,14 @@ export function useDmBattleMapCanvas({
       selectTool,
       new PencilTool({ color: '#F4C430', width: 2.6 }),
       new ArrowTool({ color: '#F4C430', width: 2 }),
+      new ShapeTool({
+        shape: 'rectangle',
+        strokeColor: '#F4C430',
+        strokeWidth: 2,
+        fillColor: 'transparent',
+      }),
+      new TextTool(),
+      new NoteTool(),
       new MeasureTool({ feetPerCell: 5 }),
       new TemplateTool({
         templateShape: 'circle',
@@ -192,7 +216,6 @@ export function useDmBattleMapCanvas({
       // re-applying remote elements as full updates (including layerId).
       attachUnknownLayerMirror(vp, 'dm', () => vp.requestRender());
       pinUnsubRef.current?.();
-      hiddenPlacementUnsubRef.current?.();
       // Play canvas never arranges maps — the annotations layer (DM tokens,
       // notes, text) must stay unlocked, repairing any state persisted locked
       // by the setup editor's arrange-maps mode.
@@ -202,6 +225,9 @@ export function useDmBattleMapCanvas({
 
       const selectTool = vp.toolManager.getTool<SelectTool>('select');
       selectTool?.onSelectionChange(() => {
+        setSelectedElementId(
+          selectTool.selectedIds.length === 1 ? selectTool.selectedIds[0] : null
+        );
         onSelectionChange?.(selectTool.selectedIds);
       });
 
@@ -293,6 +319,16 @@ export function useDmBattleMapCanvas({
     }
   }, [viewport, campaignCode, battleMapId]);
 
+  const handleToggleSelectedDmOnly = useCallback(() => {
+    if (!viewport || !selectedElementId) return;
+    useBattleMapStore
+      .getState()
+      .toggleDmOnly(campaignCode, battleMapId, selectedElementId);
+    if (viewport.store.getById(selectedElementId)) {
+      viewport.store.update(selectedElementId, {});
+    }
+  }, [viewport, selectedElementId, campaignCode, battleMapId]);
+
   return {
     viewport,
     status,
@@ -303,5 +339,8 @@ export function useDmBattleMapCanvas({
     handleToggleHiddenPlacement,
     hiddenElementCount,
     handleRevealAll,
+    selectedElementId,
+    selectedElementIsDmOnly,
+    handleToggleSelectedDmOnly,
   };
 }
