@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -81,6 +81,10 @@ export function CombatConfigDialog({
       combatConfig.enemyConditionsDisplay ?? 'off'
     );
   const [bands, setBands] = useState<HpStateBand[]>(combatConfig.hpStateBands);
+  const [customStatuses, setCustomStatuses] = useState<string[]>(
+    combatConfig.customStatuses ?? []
+  );
+  const [newStatus, setNewStatus] = useState('');
 
   // Re-sync local state when dialog opens or store changes
   useEffect(() => {
@@ -88,6 +92,8 @@ export function CombatConfigDialog({
       setHpDisplay(combatConfig.enemyHpDisplay);
       setConditionsDisplay(combatConfig.enemyConditionsDisplay ?? 'off');
       setBands(combatConfig.hpStateBands);
+      setCustomStatuses(combatConfig.customStatuses ?? []);
+      setNewStatus('');
     }
   }, [open, combatConfig]);
 
@@ -123,6 +129,17 @@ export function CombatConfigDialog({
     setBands([...DEFAULT_HP_STATE_BANDS]);
   };
 
+  const handleAddStatus = () => {
+    const name = newStatus.trim();
+    if (!name) return;
+    if (
+      customStatuses.some(status => status.toLowerCase() === name.toLowerCase())
+    )
+      return;
+    setCustomStatuses(prev => [...prev, name]);
+    setNewStatus('');
+  };
+
   const handleSave = () => {
     const cleaned = bands
       .filter(b => b.label.trim() !== '')
@@ -132,6 +149,7 @@ export function CombatConfigDialog({
       enemyHpDisplay: hpDisplay,
       hpStateBands: cleaned,
       enemyConditionsDisplay: conditionsDisplay,
+      customStatuses,
     });
     onOpenChange(false);
   };
@@ -256,6 +274,70 @@ export function CombatConfigDialog({
               description="Players see condition icons and concentration on enemy tokens. Your own party's conditions are always visible to them."
               wrapperClassName="gap-4"
             />
+          </div>
+
+          <div className="border-divider space-y-3 border-t pt-4">
+            <div>
+              <h3 className="text-heading text-sm font-medium">
+                Custom statuses
+              </h3>
+              <p className="text-muted mt-1 text-xs">
+                Save reusable condition presets that appear in every combat.
+              </p>
+            </div>
+
+            {customStatuses.length > 0 && (
+              <div className="space-y-2">
+                {customStatuses.map(status => (
+                  <div
+                    key={status.toLowerCase()}
+                    className="bg-surface-secondary flex items-center justify-between rounded-md px-3 py-2"
+                  >
+                    <span className="text-body text-sm">{status}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setCustomStatuses(prev =>
+                          prev.filter(item => item !== status)
+                        )
+                      }
+                      type="button"
+                      aria-label={`Remove ${status}`}
+                    >
+                      <Trash2 size={14} className="text-muted" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-end gap-2">
+              <Input
+                value={newStatus}
+                onChange={e => setNewStatus(e.target.value)}
+                aria-label="Status name"
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddStatus();
+                  }
+                }}
+                label="Status name"
+                placeholder="e.g. Marked"
+                wrapperClassName="flex-1"
+              />
+              <Button
+                variant="outline"
+                size="md"
+                onClick={handleAddStatus}
+                disabled={!newStatus.trim()}
+                type="button"
+              >
+                <Plus size={14} />
+                Add
+              </Button>
+            </div>
           </div>
         </DialogBody>
 
