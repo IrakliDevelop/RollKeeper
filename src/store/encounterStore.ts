@@ -7,6 +7,8 @@ import {
   EncounterCondition,
   CombatConfig,
   DEFAULT_COMBAT_CONFIG,
+  MonsterStatBlock,
+  MonsterAbility,
 } from '@/types/encounter';
 import { useNPCStore } from './npcStore';
 import { initCrossTabEncounterSync } from '@/lib/crossTabEncounterSync';
@@ -17,6 +19,14 @@ import {
   applyLongRest,
   isValidResourceAmount,
 } from '@/utils/npcResources';
+import {
+  ensureStatBlockEntryIds,
+  buildAbilitiesFromNormalizedBlock,
+  reconcileEntityAbilities,
+  findEntryById,
+  getEntryAbilityConfig,
+} from '@/utils/statBlockAbilities';
+import { parseRechargeFromName } from '@/utils/encounterConverter';
 import type { NpcResource } from '@/types/encounter';
 
 function generateId(): string {
@@ -310,6 +320,56 @@ function resolveLinkedNpc(
   return { npc };
 }
 
+interface PersistedEncounterState {
+  encounters: Encounter[];
+  activeEncounterId: string | null;
+}
+
+export function migrateEncounterPersistedState(
+  persisted: unknown,
+  version: number
+): PersistedEncounterState {
+  const state = (persisted ?? {
+    encounters: [],
+    activeEncounterId: null,
+  }) as PersistedEncounterState;
+
+  if (version < 2) {
+    for (const enc of state.encounters ?? []) {
+      enc.entities = enc.entities.map(entity => {
+        if (!entity.monsterStatBlock) return entity;
+        const statBlock = ensureStatBlockEntryIds(entity.monsterStatBlock);
+        const rebuilt = buildAbilitiesFromNormalizedBlock(statBlock); // source 'entity'
+        const old = entity.abilities ?? [];
+        // Preserve usedUses on an unambiguous clean-name match (exactly one
+        // old and one new ability with that name); otherwise reset to 0.
+        const oldByName = new Map<string, MonsterAbility[]>();
+        for (const a of old) {
+          const key = parseRechargeFromName(a.name).cleanName;
+          oldByName.set(key, [...(oldByName.get(key) ?? []), a]);
+        }
+        const newNameCounts = new Map<string, number>();
+        for (const a of rebuilt) {
+          newNameCounts.set(a.name, (newNameCounts.get(a.name) ?? 0) + 1);
+        }
+        const abilities = rebuilt.map(a => {
+          const candidates = oldByName.get(a.name) ?? [];
+          if (candidates.length === 1 && newNameCounts.get(a.name) === 1) {
+            return {
+              ...a,
+              usedUses: Math.min(candidates[0].usedUses, a.maxUses ?? 1),
+            };
+          }
+          return a;
+        });
+        return { ...entity, monsterStatBlock: statBlock, abilities };
+      });
+    }
+  }
+
+  return state;
+}
+
 export const useEncounterStore = create<EncounterStoreState>()(
   persist(
     (set, get) => ({
@@ -409,7 +469,31 @@ export const useEncounterStore = create<EncounterStoreState>()(
             state.encounters,
             encounterId,
             entityId,
-            e => ({ ...e, ...updates })
+            e => {
+              if (!updates.monsterStatBlock) return { ...e, ...updates };
+              // Stat-block edits: normalize ids, then rebuild abilities
+              // preserving usedUses (NPC config wins for linked entries).
+              const normalized = ensureStatBlockEntryIds(
+                updates.monsterStatBlock
+              );
+              const linkedNpc =
+                e.type === 'npc' && e.npcSourceId && e.campaignCode
+                  ? useNPCStore.getState().getNPC(e.campaignCode, e.npcSourceId)
+                  : undefined;
+              const abilities = reconcileEntityAbilities(
+                normalized,
+                e.abilities ?? [],
+                linkedNpc
+                  ? id => findEntryById(linkedNpc.monsterStatBlock, id)
+                  : undefined
+              );
+              return {
+                ...e,
+                ...updates,
+                monsterStatBlock: normalized,
+                abilities,
+              };
+            }
           ),
         }));
       },
@@ -830,6 +914,87 @@ export const useEncounterStore = create<EncounterStoreState>()(
       // Abilities/Charges
 
       useAbility: (encounterId, entityId, abilityId) => {
+        const enc = get().encounters.find(e => e.id === encounterId);
+        const entity = enc?.entities.find(e => e.id === entityId);
+        const target = entity?.abilities?.find(a => a.id === abilityId);
+        if (!entity || !target) return;
+
+        // Routing by provenance: only 'npc'-sourced abilities take the
+        // authoritative path; 'entity'-sourced (combat-added, monsters,
+        // legacy without source) always mutate entity-locally.
+        const linked =
+          target.source === 'npc' ? resolveLinkedNpc(entity) : null;
+        if (linked?.npc) {
+          const npc = linked.npc;
+          const npcEntry = findEntryById(npc.monsterStatBlock, abilityId);
+          if (!npcEntry || !getEntryAbilityConfig(npcEntry)) {
+            // Deletion is authoritative: drop the ability from the entity.
+            set(state => ({
+              encounters: updateEntityInEncounter(
+                state.encounters,
+                encounterId,
+                entityId,
+                e => ({
+                  ...e,
+                  abilities: e.abilities?.filter(a => a.id !== abilityId),
+                })
+              ),
+            }));
+            return;
+          }
+          // Single atomic mutation (ability + optional resource cost) in npcStore.
+          useNPCStore
+            .getState()
+            .useNpcAbility(npc.campaignCode, npc.id, abilityId);
+          // Success or rejection: resync counter (and resource snapshot) from the NPC.
+          const fresh = useNPCStore.getState().getNPC(npc.campaignCode, npc.id);
+          const freshUsed = fresh?.abilityUsage?.[abilityId] ?? 0;
+          const freshResources = fresh?.resources;
+          set(state => ({
+            encounters: updateEntityInEncounter(
+              state.encounters,
+              encounterId,
+              entityId,
+              e => ({
+                ...e,
+                abilities: e.abilities?.map(a =>
+                  a.id === abilityId ? { ...a, usedUses: freshUsed } : a
+                ),
+                ...(npcEntry.resourceCost && freshResources && e.resources
+                  ? {
+                      resources: e.resources.map(r => {
+                        const nr = freshResources.find(n => n.id === r.id);
+                        return nr ? { ...r, usesExpended: nr.usesExpended } : r;
+                      }),
+                    }
+                  : {}),
+              })
+            ),
+          }));
+          return;
+        }
+
+        // Entity-local path (entity-sourced ability, unlinked entity, or NPC
+        // deleted). Combined cost stays atomic against the entity's own
+        // resource snapshot; malformed amounts are atomic rejections.
+        const max = target.maxUses ?? Infinity;
+        if (target.usedUses >= max) return;
+        const entry = findEntryById(entity.monsterStatBlock, abilityId);
+        const cost = entry?.resourceCost;
+        let nextResources = entity.resources;
+        if (cost) {
+          if (!isValidResourceAmount(cost.amount)) return; // atomic rejection
+          const resource = entity.resources?.find(
+            r => r.id === cost.resourceId
+          );
+          if (!resource) return;
+          if (resource.maxUses - resource.usesExpended < cost.amount) return;
+          nextResources = entity.resources!.map(r =>
+            r.id === cost.resourceId
+              ? { ...r, usesExpended: r.usesExpended + cost.amount }
+              : r
+          );
+        }
         set(state => ({
           encounters: updateEntityInEncounter(
             state.encounters,
@@ -838,19 +1003,60 @@ export const useEncounterStore = create<EncounterStoreState>()(
             e => ({
               ...e,
               abilities: e.abilities?.map(a =>
-                a.id === abilityId
-                  ? {
-                      ...a,
-                      usedUses: Math.min(a.usedUses + 1, a.maxUses ?? Infinity),
-                    }
-                  : a
+                a.id === abilityId ? { ...a, usedUses: a.usedUses + 1 } : a
               ),
+              resources: nextResources,
             })
           ),
         }));
       },
 
       restoreAbility: (encounterId, entityId, abilityId) => {
+        const enc = get().encounters.find(e => e.id === encounterId);
+        const entity = enc?.entities.find(e => e.id === entityId);
+        const target = entity?.abilities?.find(a => a.id === abilityId);
+        if (!entity || !target) return;
+
+        const linked =
+          target.source === 'npc' ? resolveLinkedNpc(entity) : null;
+        if (linked?.npc) {
+          const npc = linked.npc;
+          if (!findEntryById(npc.monsterStatBlock, abilityId)) {
+            set(state => ({
+              encounters: updateEntityInEncounter(
+                state.encounters,
+                encounterId,
+                entityId,
+                e => ({
+                  ...e,
+                  abilities: e.abilities?.filter(a => a.id !== abilityId),
+                })
+              ),
+            }));
+            return;
+          }
+          useNPCStore
+            .getState()
+            .restoreNpcAbility(npc.campaignCode, npc.id, abilityId);
+          const freshUsed =
+            useNPCStore.getState().getNPC(npc.campaignCode, npc.id)
+              ?.abilityUsage?.[abilityId] ?? 0;
+          set(state => ({
+            encounters: updateEntityInEncounter(
+              state.encounters,
+              encounterId,
+              entityId,
+              e => ({
+                ...e,
+                abilities: e.abilities?.map(a =>
+                  a.id === abilityId ? { ...a, usedUses: freshUsed } : a
+                ),
+              })
+            ),
+          }));
+          return;
+        }
+
         set(state => ({
           encounters: updateEntityInEncounter(
             state.encounters,
@@ -1112,13 +1318,16 @@ export const useEncounterStore = create<EncounterStoreState>()(
         // Single-calculation rule: when linked, npcStore.shortRestNPC is the
         // one place the resource math runs; the entity copies the results.
         let npcResources: NpcResource[] | null = null;
+        let npcUsage: Record<string, number> | null = null;
+        let npcBlock: MonsterStatBlock | undefined;
         const linked = resolveLinkedNpc(entity);
         if (linked?.npc) {
           const npc = linked.npc;
           useNPCStore.getState().shortRestNPC(npc.campaignCode, npc.id);
-          npcResources =
-            useNPCStore.getState().getNPC(npc.campaignCode, npc.id)
-              ?.resources ?? [];
+          const fresh = useNPCStore.getState().getNPC(npc.campaignCode, npc.id);
+          npcResources = fresh?.resources ?? [];
+          npcUsage = fresh?.abilityUsage ?? {};
+          npcBlock = fresh?.monsterStatBlock;
         }
 
         set(state => ({
@@ -1149,9 +1358,31 @@ export const useEncounterStore = create<EncounterStoreState>()(
                 : {}),
               ...(e.abilities
                 ? {
-                    abilities: e.abilities.map(a =>
-                      a.restType === 'short' ? { ...a, usedUses: 0 } : a
-                    ),
+                    abilities:
+                      npcUsage !== null
+                        ? e.abilities
+                            // Provenance decides: an 'npc'-sourced ability whose
+                            // entry vanished from the NPC was deleted → dropped.
+                            // 'entity'-sourced (combat-added) abilities survive.
+                            .filter(
+                              a =>
+                                a.source !== 'npc' ||
+                                findEntryById(npcBlock, a.id) != null
+                            )
+                            .map(a => {
+                              if (
+                                a.source === 'npc' &&
+                                findEntryById(npcBlock, a.id)
+                              ) {
+                                return { ...a, usedUses: npcUsage![a.id] ?? 0 };
+                              }
+                              return a.restType === 'short'
+                                ? { ...a, usedUses: 0 }
+                                : a;
+                            })
+                        : e.abilities.map(a =>
+                            a.restType === 'short' ? { ...a, usedUses: 0 } : a
+                          ),
                   }
                 : {}),
             })
@@ -1166,13 +1397,14 @@ export const useEncounterStore = create<EncounterStoreState>()(
 
         // Mirror first — longRestNPC is where NPC-side math (incl. resources) runs.
         let npcResources: NpcResource[] | null = null;
+        let npcBlockForLongRest: MonsterStatBlock | undefined;
         const linked = resolveLinkedNpc(entityBefore);
         if (linked?.npc) {
           const npc = linked.npc;
           useNPCStore.getState().longRestNPC(npc.campaignCode, npc.id);
-          npcResources =
-            useNPCStore.getState().getNPC(npc.campaignCode, npc.id)
-              ?.resources ?? [];
+          const fresh = useNPCStore.getState().getNPC(npc.campaignCode, npc.id);
+          npcResources = fresh?.resources ?? [];
+          npcBlockForLongRest = fresh?.monsterStatBlock;
         }
 
         set(state => ({
@@ -1207,7 +1439,14 @@ export const useEncounterStore = create<EncounterStoreState>()(
                 : {}),
               ...(e.abilities
                 ? {
-                    abilities: e.abilities.map(a => ({ ...a, usedUses: 0 })),
+                    abilities: (npcBlockForLongRest !== undefined
+                      ? e.abilities.filter(
+                          a =>
+                            a.source !== 'npc' ||
+                            findEntryById(npcBlockForLongRest, a.id) != null
+                        )
+                      : e.abilities
+                    ).map(a => ({ ...a, usedUses: 0 })),
                   }
                 : {}),
               ...(e.legendaryActions
@@ -1249,7 +1488,8 @@ export const useEncounterStore = create<EncounterStoreState>()(
     {
       name: ENCOUNTER_STORAGE_KEY,
       storage: createJSONStorage(() => createSafeStorage()),
-      version: 1,
+      version: 2,
+      migrate: migrateEncounterPersistedState,
     }
   )
 );

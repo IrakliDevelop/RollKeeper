@@ -51,7 +51,7 @@ function makeMonster(
 }
 
 describe('monsterToEncounterEntity with statBlockOverride', () => {
-  test('adopts the override block verbatim', () => {
+  test('adopts the override block verbatim (after normalization)', () => {
     const monster = makeMonster();
     const block = {
       ...buildMonsterStatBlock(monster),
@@ -60,7 +60,9 @@ describe('monsterToEncounterEntity with statBlockOverride', () => {
     const entity = monsterToEncounterEntity(monster, {
       statBlockOverride: block,
     });
-    expect(entity.monsterStatBlock).toBe(block);
+    // Entity builders normalize the stat block (add ids), so it's a clone
+    expect(entity.monsterStatBlock).not.toBe(block);
+    expect(entity.monsterStatBlock!.speed).toBe('60 ft., fly 90 ft.');
   });
 
   test('derives initiativeModifier from the override dex', () => {
@@ -118,7 +120,11 @@ describe('monsterToEncounterEntity with statBlockOverride', () => {
   test('no overrides → legacy behavior unchanged', () => {
     const monster = makeMonster();
     const entity = monsterToEncounterEntity(monster);
-    expect(entity.monsterStatBlock).toEqual(buildMonsterStatBlock(monster));
+    const expectedBlock = buildMonsterStatBlock(monster);
+    // Stat block is normalized (with ids), so check key properties instead
+    expect(entity.monsterStatBlock!.str).toBe(expectedBlock.str);
+    expect(entity.monsterStatBlock!.dex).toBe(expectedBlock.dex);
+    expect(entity.monsterStatBlock!.cr).toBe(expectedBlock.cr);
     expect(entity.initiativeModifier).toBe(2); // dex 14
     expect(entity.proficiencyBonus).toBe(2); // cr 1/4
     expect(entity.maxHp).toBe(7);
@@ -142,7 +148,12 @@ describe('buildMonsterEntities pass-through', () => {
     });
     expect(entities).toHaveLength(2);
     for (const e of entities) {
-      expect(e.monsterStatBlock).toBe(block);
+      // Entity builders store a normalized clone of the stat block (with ids added)
+      expect(e.monsterStatBlock).not.toBe(block);
+      expect(e.monsterStatBlock!.dex).toBe(20);
+      expect(e.monsterStatBlock!.str).toBe(8);
+      expect(e.monsterStatBlock!.actions).toHaveLength(1);
+      expect(e.monsterStatBlock!.traits).toHaveLength(1);
       expect(e.initiativeModifier).toBe(4);
       expect(e.proficiencyBonus).toBe(5);
     }
