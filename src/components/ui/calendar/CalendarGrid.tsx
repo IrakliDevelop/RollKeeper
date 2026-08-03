@@ -137,7 +137,11 @@ function DayPopover({
                 key={event.id}
                 className="hover:bg-surface-secondary group flex items-center gap-1.5 rounded px-2 py-1.5 transition-colors duration-150"
               >
-                <span className="bg-accent-blue-text inline-block h-2 w-2 shrink-0 rounded-full transition-transform duration-150 group-hover:scale-125" />
+                <EventMarker
+                  event={event}
+                  size="row"
+                  className="transition-transform duration-150 group-hover:scale-125"
+                />
                 <button
                   type="button"
                   onClick={() => onEditEvent(event)}
