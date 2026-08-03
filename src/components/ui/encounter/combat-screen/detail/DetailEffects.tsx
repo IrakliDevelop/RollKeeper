@@ -9,11 +9,16 @@ import { useEncounterStore } from '@/store/encounterStore';
 
 type PaletteTab = 'conditions' | 'buffs';
 
+// Stable fallback: pre-custom-statuses persisted combatConfig lacks the field,
+// and a per-call `?? []` makes the selector snapshot a fresh reference every
+// render — useSyncExternalStore then loops ("getSnapshot should be cached").
+const EMPTY_CUSTOM_STATUSES: string[] = [];
+
 export function DetailEffects({ entity, actions }: DetailSectionProps) {
   const [tab, setTab] = useState<PaletteTab>('conditions');
   const [customInput, setCustomInput] = useState('');
   const customStatuses = useEncounterStore(
-    state => state.combatConfig.customStatuses ?? []
+    state => state.combatConfig.customStatuses ?? EMPTY_CUSTOM_STATUSES
   );
 
   const activeNames = new Set(entity.conditions.map(c => c.name));
