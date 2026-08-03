@@ -23,6 +23,7 @@ import {
   Languages,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
+import { XpAwardControl } from '@/components/ui/campaign/XpAwardControl';
 import { SectionTitle, ensureArray, formatMod } from './shared';
 import { calculateEncumbrance, EncumbranceInfo } from '@/utils/encumbrance';
 import {
@@ -91,6 +92,9 @@ interface OverviewTabProps {
   customCounterLabel?: string;
   counterValue: number;
   onAdjustCounter?: (delta: number) => void;
+  campaignCode?: string;
+  dmId?: string;
+  playerId?: string;
 }
 
 export function OverviewTab({
@@ -98,6 +102,9 @@ export function OverviewTab({
   customCounterLabel,
   counterValue,
   onAdjustCounter,
+  campaignCode,
+  dmId,
+  playerId,
 }: OverviewTabProps) {
   const currentHp = char.hitPoints?.current ?? 0;
   const maxHp = char.hitPoints?.max ?? 0;
@@ -155,6 +162,17 @@ export function OverviewTab({
           }
         />
       </div>
+
+      {campaignCode && dmId && playerId && (
+        <div className="bg-surface-secondary rounded-lg p-3">
+          <XpAwardControl
+            campaignCode={campaignCode}
+            dmId={dmId}
+            playerId={playerId}
+            lastSyncedXp={char.experience ?? 0}
+          />
+        </div>
+      )}
 
       {/* ── Inspiration & Custom Counter ── */}
       <div className="flex flex-wrap gap-3">

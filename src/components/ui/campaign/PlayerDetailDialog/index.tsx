@@ -27,6 +27,8 @@ interface PlayerDetailDialogProps {
   counterValue?: number;
   onAdjustCounter?: (delta: number) => void;
   onSendMessage?: () => void;
+  campaignCode?: string;
+  dmId?: string;
 }
 
 export function PlayerDetailDialog({
@@ -37,6 +39,8 @@ export function PlayerDetailDialog({
   counterValue = 0,
   onAdjustCounter,
   onSendMessage,
+  campaignCode,
+  dmId,
 }: PlayerDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>('overview');
 
@@ -136,6 +140,9 @@ export function PlayerDetailDialog({
               customCounterLabel={customCounterLabel}
               counterValue={counterValue}
               onAdjustCounter={onAdjustCounter}
+              campaignCode={campaignCode}
+              dmId={dmId}
+              playerId={player.playerId}
             />
           )}
           {activeTab === 'spells' && showSpellsTab && <SpellsTab char={char} />}
