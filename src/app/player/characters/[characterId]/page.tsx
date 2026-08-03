@@ -20,7 +20,7 @@ import {
 import { DmEffectsNotification } from '@/components/ui/campaign/DmEffectsNotification';
 import { DmCounterNotification } from '@/components/ui/campaign/DmCounterNotification';
 import { useDmConditionOverrides } from '@/hooks/useDmConditionOverrides';
-import type { DmEffect, ItemTransfer } from '@/types/sharedState';
+import type { DmEffect, ItemTransfer, DmXpAward } from '@/types/sharedState';
 import ExperimentalFeaturesSection from '@/components/ui/layout/ExperimentalFeaturesSection';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
@@ -66,6 +66,7 @@ import { useInitiativePrompt } from '@/components/ui/campaign/useInitiativePromp
 import RestDialog from '@/components/ui/character/RestDialog';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
+import { useDmXpAwardProcessor } from '@/hooks/useDmXpAwardProcessor';
 import { useJoinedBattleMap } from '@/hooks/useJoinedBattleMap';
 import { useBattleMapPokes } from '@/hooks/useBattleMapPokes';
 import { useMaterializeCampaignStackable } from '@/hooks/useMaterializeCampaignStackable';
@@ -162,6 +163,7 @@ export default function CharacterSheet() {
     resetPactMagicSlots,
     addExperience,
     setExperience,
+    applyDmXpAward,
     addFeature,
     updateFeature,
     deleteFeature,
@@ -305,6 +307,7 @@ export default function CharacterSheet() {
     acknowledgeMessage,
     acknowledgeDmEffects,
     acknowledgeTransfers,
+    acknowledgeXpAward,
     pendingTransfers,
     clearPendingTransfer,
     refetchNow,
@@ -436,6 +439,31 @@ export default function CharacterSheet() {
       });
     }
   }, [sharedState?.customCounter]);
+
+  // Apply queued DM XP awards (idempotent), ack each, and toast new ones.
+  const handleXpAwardApplied = useCallback(
+    (award: DmXpAward, becamePending: boolean) => {
+      const headline =
+        award.mode === 'add'
+          ? `DM granted ${award.amount.toLocaleString()} XP`
+          : `DM set your XP to ${award.amount.toLocaleString()}`;
+      addToast({
+        type: 'success',
+        title: headline,
+        message: becamePending
+          ? 'Level up available! Use the Level Up button on the Stats tab.'
+          : '',
+      });
+    },
+    [addToast]
+  );
+
+  useDmXpAwardProcessor({
+    xpAwards: sharedState?.xpAwards,
+    applyDmXpAward,
+    acknowledgeXpAward,
+    onApplied: handleXpAwardApplied,
+  });
 
   const calendarDays = sharedCalendar
     ? getCampaignDays(

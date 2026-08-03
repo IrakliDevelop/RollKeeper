@@ -20,6 +20,11 @@ interface UseSharedCampaignStateResult {
   acknowledgeMessage: (messageId: string) => Promise<void>;
   acknowledgeDmEffects: () => Promise<void>;
   acknowledgeTransfers: () => Promise<void>;
+  /**
+   * Acknowledge one XP award by receipt. THROWS on failure (unlike the other
+   * acknowledge helpers) — the award processor must stop, not continue.
+   */
+  acknowledgeXpAward: (receipt: string) => Promise<void>;
   pendingTransfers: ItemTransfer[];
   clearPendingTransfer: (transferId: string) => void;
   /** Immediate refetch (e.g. on a relay poke). Debounced: at most one per second. */
@@ -247,6 +252,30 @@ export function useSharedCampaignState(
     }
   }, [campaignCode, playerId]);
 
+  const acknowledgeXpAward = useCallback(
+    async (receipt: string) => {
+      if (!campaignCode || !playerId) {
+        throw new Error('Cannot acknowledge XP award outside a campaign');
+      }
+      const res = await fetch(`/api/campaign/${campaignCode}/shared`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId, type: 'xp', receipt }),
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to acknowledge XP award (${res.status})`);
+      }
+      setSharedState(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          xpAwards: (prev.xpAwards ?? []).filter(e => e.receipt !== receipt),
+        };
+      });
+    },
+    [campaignCode, playerId]
+  );
+
   const clearPendingTransfer = useCallback((transferId: string) => {
     setPendingTransfers(prev => prev.filter(t => t.id !== transferId));
   }, []);
@@ -259,6 +288,7 @@ export function useSharedCampaignState(
     acknowledgeMessage,
     acknowledgeDmEffects,
     acknowledgeTransfers,
+    acknowledgeXpAward,
     pendingTransfers,
     clearPendingTransfer,
     refetchNow,
