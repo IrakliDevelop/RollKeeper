@@ -4,11 +4,7 @@ import { useNPCStore } from '@/store/npcStore';
 import { createMockEncounterEntity } from '@/test/helpers';
 import { ensureStatBlockEntryIds } from '@/utils/statBlockAbilities';
 import { buildNpcEntity } from '@/components/ui/encounter/combat-screen/AddCombatantDialog/buildEntity';
-import type {
-  NpcResource,
-  MonsterStatBlock,
-  MonsterAbility,
-} from '@/types/encounter';
+import type { NpcResource, MonsterStatBlock } from '@/types/encounter';
 
 function resetStore() {
   useEncounterStore.setState({
@@ -1985,6 +1981,24 @@ describe('encounterStore', () => {
       const npc = useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!;
       expect(npc.abilityUsage!['entry-elemental']).toBe(0);
       expect(npc.resources![0].usesExpended).toBe(2); // not refunded
+    });
+
+    it('untrackable entry on NPC: restoreAbility drops the entity ability (mirroring useAbility)', () => {
+      const { npcId, encId, entityId } = setupLinkedAbilityEntity();
+      const npc = useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!;
+      const sb = structuredClone(npc.monsterStatBlock!);
+      // Remove 'uses' and usage markers from entry, making it untrackable
+      sb.actions = sb.actions.map(a =>
+        a.id === 'entry-smite' ? { ...a, name: 'Smite', uses: undefined } : a
+      );
+      useNPCStore
+        .getState()
+        .updateNPC(RES_CAMPAIGN, npcId, { monsterStatBlock: sb });
+      useEncounterStore
+        .getState()
+        .restoreAbility(encId, entityId, 'entry-smite');
+      // Entity ability should be dropped (not just resynced)
+      expect(getEntityAbility(encId, entityId, 'entry-smite')).toBeUndefined();
     });
   });
 
