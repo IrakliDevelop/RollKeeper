@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-// @radix-ui/react-popover is pinned exactly to 1.1.15 in package.json: it must
-// share react-dismissable-layer/react-focus-scope module instances with
-// @radix-ui/react-dialog@1.1.15, or the picker popover self-closes inside the
-// modal dialog.
+// @radix-ui/react-popover and @radix-ui/react-dialog are both pinned exactly
+// to 1.1.15 in package.json and must be bumped together: they must share
+// react-dismissable-layer/react-focus-scope module instances, or the picker
+// popover self-closes inside the modal dialog.
 import * as Popover from '@radix-ui/react-popover';
 import { EmojiPicker } from 'frimousse';
 import { Button } from '@/components/ui/forms/button';
