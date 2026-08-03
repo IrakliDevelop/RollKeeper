@@ -30,7 +30,7 @@ function makeActions(): EntityActions {
 }
 
 // Mods: STR +5, DEX +4, CON +3, INT +2, WIS +1, CHA -1 — all distinct so
-// every fallback "SV <mod>" string is unique in the grid.
+// every fallback "SAVE <mod>" string is unique in the grid.
 const statBlock: MonsterStatBlock = {
   str: 20,
   dex: 18,
@@ -80,16 +80,16 @@ describe('DetailAbilityScores — saves column', () => {
       <DetailAbilityScores entity={monsterEntity} actions={makeActions()} />
     );
 
-    const dexSave = screen.getByText('SV +9');
+    const dexSave = screen.getByText('SAVE +9');
     expect(dexSave).toHaveClass('text-accent-amber-text');
-    const conSave = screen.getByText('SV +8');
+    const conSave = screen.getByText('SAVE +8');
     expect(conSave).toHaveClass('text-accent-amber-text');
 
-    const strSave = screen.getByText('SV +5');
-    expect(strSave).toHaveClass('text-faint');
-    expect(screen.getByText('SV +2')).toHaveClass('text-faint'); // INT
-    expect(screen.getByText('SV +1')).toHaveClass('text-faint'); // WIS
-    expect(screen.getByText('SV -1')).toHaveClass('text-faint'); // CHA
+    const strSave = screen.getByText('SAVE +5');
+    expect(strSave).toHaveClass('text-muted', 'font-semibold');
+    expect(screen.getByText('SAVE +2')).toHaveClass('text-muted'); // INT
+    expect(screen.getByText('SAVE +1')).toHaveClass('text-muted'); // WIS
+    expect(screen.getByText('SAVE -1')).toHaveClass('text-muted'); // CHA
   });
 
   it('re-renders save values when the entity saves string changes (grid derives from the prop)', () => {
@@ -97,7 +97,7 @@ describe('DetailAbilityScores — saves column', () => {
     const { rerender } = render(
       <DetailAbilityScores entity={monsterEntity} actions={actions} />
     );
-    expect(screen.getByText('SV +9')).toBeInTheDocument();
+    expect(screen.getByText('SAVE +9')).toBeInTheDocument();
 
     rerender(
       <DetailAbilityScores
@@ -109,9 +109,9 @@ describe('DetailAbilityScores — saves column', () => {
       />
     );
 
-    expect(screen.getByText('SV +12')).toBeInTheDocument();
+    expect(screen.getByText('SAVE +12')).toBeInTheDocument();
     // CON is no longer proficient — falls back to its +3 modifier.
-    expect(screen.getByText('SV +3')).toHaveClass('text-faint');
-    expect(screen.queryByText('SV +8')).not.toBeInTheDocument();
+    expect(screen.getByText('SAVE +3')).toHaveClass('text-muted');
+    expect(screen.queryByText('SAVE +8')).not.toBeInTheDocument();
   });
 });

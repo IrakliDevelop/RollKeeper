@@ -38,24 +38,29 @@ export function HeaderStatLine({ entity, actions }: HeaderStatLineProps) {
   };
 
   return (
-    <div className="mt-1 space-y-0.5">
+    <div className="mt-1 flex min-w-0 items-center gap-1.5">
       {showSpeedLine && (
-        <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
           <span className="text-muted text-xs font-semibold">Speed</span>
           {isPlayer ? (
-            <span className="text-body text-xs">{sb.speed}</span>
+            <span
+              className="text-body min-w-0 truncate text-xs"
+              title={sb.speed}
+            >
+              {sb.speed}
+            </span>
           ) : (
             <input
               type="text"
               defaultValue={sb.speed ?? ''}
               onBlur={e => updateSpeed(e.target.value)}
-              className="bg-surface-raised border-divider text-body min-w-0 flex-1 rounded border px-2 py-0.5 text-xs"
+              className="bg-surface-raised border-divider text-body max-w-64 min-w-0 flex-1 rounded border px-2 py-0.5 text-xs"
               aria-label="Speed"
             />
           )}
         </div>
       )}
-      <div className="flex items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1.5">
         <span className="text-muted text-xs font-semibold">Init</span>
         {isPlayer ? (
           <span className="text-body text-xs">
