@@ -5,6 +5,7 @@ import { Eye, Pencil, X } from 'lucide-react';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '../types';
 import { HeaderControls } from './HeaderControls';
+import { HeaderStatLine } from './HeaderStatLine';
 
 export interface DetailSectionProps {
   entity: EncounterEntity;
@@ -134,6 +135,7 @@ export function DetailHeader({
             )}
           </div>
           {meta && <p className="text-muted mt-0.5 text-xs">{meta}</p>}
+          <HeaderStatLine entity={entity} actions={actions} />
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">

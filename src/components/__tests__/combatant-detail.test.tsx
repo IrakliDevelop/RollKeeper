@@ -138,6 +138,9 @@ describe('CombatantDetail — monster with full stat block', () => {
     expect(screen.getByText('Combat Details')).toBeInTheDocument();
     expect(screen.getByText(/legendary actions/i)).toBeInTheDocument();
     expect(screen.getByText(/active effects/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('textbox', { name: 'Initiative Mod' })
+    ).toBeInTheDocument();
   });
 
   it('ability score edit patches monsterStatBlock via onUpdate', () => {
