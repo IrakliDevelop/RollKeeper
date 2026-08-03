@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { NpcResource } from '@/types/encounter';
+import type { NpcResource, MonsterStatBlock } from '@/types/encounter';
 import { useNPCStore, migrateNpcPersistedState } from '@/store/npcStore';
+import {
+  findEntryById,
+  getEntryAbilityConfig,
+} from '@/utils/statBlockAbilities';
 
 const CAMPAIGN = 'test-campaign';
 
@@ -804,5 +808,300 @@ describe('npcStore — class resources', () => {
       useNPCStore.getState().longRestNPC(CAMPAIGN, id);
       expect(useNPCStore.getState().getNPC(CAMPAIGN, id)!.currentHp).toBe(8);
     });
+  });
+});
+
+function statBlockFixture(): MonsterStatBlock {
+  return {
+    str: 10,
+    dex: 10,
+    con: 10,
+    int: 10,
+    wis: 10,
+    cha: 10,
+    saves: '',
+    skills: '',
+    speed: '30 ft.',
+    resistances: '',
+    immunities: '',
+    vulnerabilities: '',
+    conditionImmunities: [],
+    senses: '',
+    passivePerception: 10,
+    traits: [],
+    actions: [
+      { id: 'entry-smite', name: 'Smite', text: 'holy', uses: 3 },
+      { id: 'entry-bite', name: 'Bite', text: 'chomp' },
+      {
+        id: 'entry-elemental',
+        name: 'Elemental Form',
+        text: 'transforms',
+        uses: 2,
+        resourceCost: { resourceId: 'res-ws', amount: 2 },
+      },
+    ],
+    reactions: [],
+    bonusActions: [],
+    lairActions: [],
+    cr: '1',
+    type: 'Humanoid',
+    size: 'Medium',
+    languages: '',
+    alignment: '',
+    hpFormula: '',
+  };
+}
+
+function createAbilityNpc(): string {
+  return useNPCStore.getState().createNPC(CAMPAIGN, {
+    name: 'Druid Elder',
+    armorClass: '13',
+    maxHp: 45,
+    speed: '30 ft.',
+    monsterStatBlock: statBlockFixture(),
+    resources: [
+      {
+        id: 'res-ws',
+        name: 'Wild Shape',
+        icon: 'paw-print',
+        color: 'emerald',
+        displayStyle: 'pips',
+        maxUses: 4,
+        usesExpended: 0,
+        shortRestReset: 1,
+      },
+    ],
+  });
+}
+
+describe('npcStore — entry id enforcement', () => {
+  beforeEach(() => {
+    useNPCStore.setState({ npcsByCampaign: {} });
+  });
+
+  it('migration v4 backfills missing ids and is idempotent', () => {
+    const legacy = {
+      npcsByCampaign: {
+        [CAMPAIGN]: [
+          {
+            id: 'npc-old',
+            campaignCode: CAMPAIGN,
+            name: 'Old NPC',
+            armorClass: '10',
+            maxHp: 8,
+            speed: '30 ft.',
+            monsterStatBlock: {
+              ...statBlockFixture(),
+              actions: [{ name: 'Slam', text: 'thud' }], // no id
+            },
+            createdAt: 'x',
+            updatedAt: 'x',
+          },
+        ],
+      },
+    };
+    const once = migrateNpcPersistedState(structuredClone(legacy), 3);
+    const npc = once.npcsByCampaign[CAMPAIGN][0];
+    expect(npc.monsterStatBlock!.actions[0].id).toMatch(/^entry-/);
+    const twice = migrateNpcPersistedState(structuredClone(once), 4);
+    expect(
+      twice.npcsByCampaign[CAMPAIGN][0].monsterStatBlock!.actions[0].id
+    ).toBe(npc.monsterStatBlock!.actions[0].id);
+  });
+
+  it('createNPC normalizes missing ids; updateNPC preserves existing ids and prunes orphan usage', () => {
+    const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'N',
+      armorClass: '10',
+      maxHp: 5,
+      speed: '30 ft.',
+      monsterStatBlock: {
+        ...statBlockFixture(),
+        actions: [{ name: 'Slam', text: 'thud', uses: 1 }],
+      },
+    });
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id)!;
+    const entryId = npc.monsterStatBlock!.actions[0].id!;
+    expect(entryId).toMatch(/^entry-/);
+
+    useNPCStore.getState().updateNPC(CAMPAIGN, id, {
+      abilityUsage: { [entryId]: 1, 'entry-ghost': 2 },
+    });
+    // Update the stat block: entry survives with same id; ghost usage pruned.
+    useNPCStore.getState().updateNPC(CAMPAIGN, id, {
+      monsterStatBlock: npc.monsterStatBlock,
+    });
+    const after = useNPCStore.getState().getNPC(CAMPAIGN, id)!;
+    expect(after.monsterStatBlock!.actions[0].id).toBe(entryId);
+    expect(after.abilityUsage).toEqual({ [entryId]: 1 });
+  });
+
+  it('updateNPC clamps usage when an entry maximum decreased', () => {
+    const id = createAbilityNpc();
+    useNPCStore
+      .getState()
+      .updateNPC(CAMPAIGN, id, { abilityUsage: { 'entry-smite': 3 } });
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id)!;
+    const sb = structuredClone(npc.monsterStatBlock!);
+    sb.actions[0].uses = 1; // Smite 3 → 1
+    useNPCStore.getState().updateNPC(CAMPAIGN, id, { monsterStatBlock: sb });
+    expect(
+      useNPCStore.getState().getNPC(CAMPAIGN, id)!.abilityUsage!['entry-smite']
+    ).toBe(1);
+  });
+});
+
+describe('npcStore — useNpcAbility / restoreNpcAbility', () => {
+  beforeEach(() => {
+    useNPCStore.setState({ npcsByCampaign: {} });
+  });
+
+  it('increments abilityUsage and returns true; at max returns false without mutation', () => {
+    const id = createAbilityNpc();
+    expect(
+      useNPCStore.getState().useNpcAbility(CAMPAIGN, id, 'entry-smite')
+    ).toBe(true);
+    expect(
+      useNPCStore.getState().useNpcAbility(CAMPAIGN, id, 'entry-smite')
+    ).toBe(true);
+    expect(
+      useNPCStore.getState().useNpcAbility(CAMPAIGN, id, 'entry-smite')
+    ).toBe(true);
+    expect(
+      useNPCStore.getState().useNpcAbility(CAMPAIGN, id, 'entry-smite')
+    ).toBe(false);
+    expect(
+      useNPCStore.getState().getNPC(CAMPAIGN, id)!.abilityUsage!['entry-smite']
+    ).toBe(3);
+  });
+
+  it('combined cost is atomic: both counters move on success', () => {
+    const id = createAbilityNpc();
+    expect(
+      useNPCStore.getState().useNpcAbility(CAMPAIGN, id, 'entry-elemental')
+    ).toBe(true);
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id)!;
+    expect(npc.abilityUsage!['entry-elemental']).toBe(1);
+    expect(npc.resources![0].usesExpended).toBe(2);
+  });
+
+  it('combined cost with insufficient resource: NEITHER counter moves, returns false', () => {
+    const id = createAbilityNpc();
+    useNPCStore.getState().spendNpcResource(CAMPAIGN, id, 'res-ws', 3); // 1 remaining < cost 2
+    expect(
+      useNPCStore.getState().useNpcAbility(CAMPAIGN, id, 'entry-elemental')
+    ).toBe(false);
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id)!;
+    expect(npc.abilityUsage?.['entry-elemental'] ?? 0).toBe(0);
+    expect(npc.resources![0].usesExpended).toBe(3);
+  });
+
+  it('combined cost with deleted resource: rejected, ability counter unchanged', () => {
+    const id = createAbilityNpc();
+    useNPCStore.getState().updateNPC(CAMPAIGN, id, { resources: [] });
+    expect(
+      useNPCStore.getState().useNpcAbility(CAMPAIGN, id, 'entry-elemental')
+    ).toBe(false);
+  });
+
+  it('restore floors at 0 and never refunds the resource', () => {
+    const id = createAbilityNpc();
+    useNPCStore.getState().useNpcAbility(CAMPAIGN, id, 'entry-elemental');
+    useNPCStore.getState().restoreNpcAbility(CAMPAIGN, id, 'entry-elemental');
+    useNPCStore.getState().restoreNpcAbility(CAMPAIGN, id, 'entry-elemental');
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id)!;
+    expect(npc.abilityUsage!['entry-elemental']).toBe(0);
+    expect(npc.resources![0].usesExpended).toBe(2); // NOT refunded
+  });
+
+  it('unknown entry id and untrackable entries are no-ops returning false', () => {
+    const id = createAbilityNpc();
+    expect(useNPCStore.getState().useNpcAbility(CAMPAIGN, id, 'nope')).toBe(
+      false
+    );
+    expect(
+      useNPCStore.getState().useNpcAbility(CAMPAIGN, id, 'entry-bite')
+    ).toBe(false);
+  });
+
+  it('malformed cost amounts (zero/negative/fractional/non-finite) are atomic rejections', () => {
+    for (const bad of [0, -2, 1.5, NaN, Infinity]) {
+      useNPCStore.setState({ npcsByCampaign: {} });
+      const id = createAbilityNpc();
+      const npc0 = useNPCStore.getState().getNPC(CAMPAIGN, id)!;
+      const sb = structuredClone(npc0.monsterStatBlock!);
+      sb.actions = sb.actions.map(a =>
+        a.id === 'entry-elemental'
+          ? { ...a, resourceCost: { resourceId: 'res-ws', amount: bad } }
+          : a
+      );
+      useNPCStore.getState().updateNPC(CAMPAIGN, id, { monsterStatBlock: sb });
+      expect(
+        useNPCStore.getState().useNpcAbility(CAMPAIGN, id, 'entry-elemental')
+      ).toBe(false);
+      const npc = useNPCStore.getState().getNPC(CAMPAIGN, id)!;
+      expect(npc.abilityUsage?.['entry-elemental'] ?? 0).toBe(0);
+      expect(npc.resources![0].usesExpended).toBe(0);
+    }
+  });
+
+  it('restoreNpcAbility is a no-op for orphaned usage keys (entry deleted or untrackable)', () => {
+    const id = createAbilityNpc();
+    useNPCStore.getState().useNpcAbility(CAMPAIGN, id, 'entry-smite');
+    const npc0 = useNPCStore.getState().getNPC(CAMPAIGN, id)!;
+    // Simulate a stale orphan key surviving alongside a block that lost the entry
+    // (bypass updateNPC's prune by writing state directly).
+    const sb = structuredClone(npc0.monsterStatBlock!);
+    sb.actions = sb.actions.filter(a => a.id !== 'entry-smite');
+    useNPCStore.setState(state => ({
+      npcsByCampaign: {
+        ...state.npcsByCampaign,
+        [CAMPAIGN]: state.npcsByCampaign[CAMPAIGN].map(n =>
+          n.id === id
+            ? { ...n, monsterStatBlock: sb, abilityUsage: { 'entry-smite': 1 } }
+            : n
+        ),
+      },
+    }));
+    useNPCStore.getState().restoreNpcAbility(CAMPAIGN, id, 'entry-smite');
+    expect(
+      useNPCStore.getState().getNPC(CAMPAIGN, id)!.abilityUsage!['entry-smite']
+    ).toBe(1); // untouched — entry no longer exists
+  });
+});
+
+describe('npcStore — rests reset ability usage', () => {
+  beforeEach(() => {
+    useNPCStore.setState({ npcsByCampaign: {} });
+  });
+
+  it('long rest clears all usage; short rest clears only short-rest entries', () => {
+    const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'N',
+      armorClass: '10',
+      maxHp: 5,
+      speed: '30 ft.',
+      monsterStatBlock: {
+        ...statBlockFixture(),
+        actions: [
+          {
+            id: 'entry-short',
+            name: 'Chains (Recharges after a Short or Long Rest)',
+            text: '',
+          },
+          { id: 'entry-day', name: 'Teleport (3/Day)', text: '' },
+        ],
+      },
+      abilityUsage: { 'entry-short': 1, 'entry-day': 2 },
+    });
+    useNPCStore.getState().shortRestNPC(CAMPAIGN, id);
+    let npc = useNPCStore.getState().getNPC(CAMPAIGN, id)!;
+    expect(npc.abilityUsage!['entry-short'] ?? 0).toBe(0);
+    expect(npc.abilityUsage!['entry-day']).toBe(2);
+    useNPCStore.getState().longRestNPC(CAMPAIGN, id);
+    npc = useNPCStore.getState().getNPC(CAMPAIGN, id)!;
+    expect(Object.values(npc.abilityUsage ?? {}).every(v => v === 0)).toBe(
+      true
+    );
   });
 });
