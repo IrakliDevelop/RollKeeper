@@ -247,17 +247,20 @@ export default function DmLocationToolbar({
               <EyeOff size={14} />
               {hiddenPlacementActive ? 'Placing hidden' : 'Place hidden'}
             </Button>
-            {hiddenElementCount > 0 && (
-              <Button
-                variant="ghost"
-                onClick={onRevealAll}
-                title={`Reveal all ${hiddenElementCount} hidden element${hiddenElementCount === 1 ? '' : 's'} to players`}
-                className="flex items-center gap-1.5 px-2 py-1 text-xs"
-              >
-                <Eye size={14} />
-                Reveal all ({hiddenElementCount})
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              onClick={onRevealAll}
+              disabled={hiddenElementCount === 0}
+              title={
+                hiddenElementCount === 0
+                  ? 'No hidden elements to reveal'
+                  : `Reveal all ${hiddenElementCount} hidden element${hiddenElementCount === 1 ? '' : 's'} to players`
+              }
+              className="flex items-center gap-1.5 px-2 py-1 text-xs"
+            >
+              <Eye size={14} />
+              Reveal all ({hiddenElementCount})
+            </Button>
           </>
         )}
 

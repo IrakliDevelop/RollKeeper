@@ -7,6 +7,9 @@ import {
   MoveUpRight,
   Ruler,
   Circle,
+  Type,
+  StickyNote,
+  Shapes,
   Eraser,
   Eye,
   Minus,
@@ -23,6 +26,9 @@ const DM_TOOLS: { name: string; label: string; Icon: typeof Hand }[] = [
   { name: 'select', label: 'Select', Icon: MousePointer2 },
   { name: 'pencil', label: 'Draw', Icon: Pencil },
   { name: 'arrow', label: 'Arrow', Icon: MoveUpRight },
+  { name: 'shape', label: 'Shape', Icon: Shapes },
+  { name: 'text', label: 'Text', Icon: Type },
+  { name: 'note', label: 'Sticky Note', Icon: StickyNote },
   { name: 'measure', label: 'Measure', Icon: Ruler },
   { name: 'template', label: 'Template', Icon: Circle },
 ];
@@ -34,6 +40,9 @@ export interface DmVttToolbarProps {
   onToggleHiddenPlacement: () => void;
   hiddenElementCount: number;
   onRevealAll: () => void;
+  selectedElementId: string | null;
+  selectedElementIsDmOnly: boolean;
+  onToggleSelectedDmOnly: () => void;
 }
 
 const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
@@ -60,11 +69,14 @@ export function DmVttToolbar({
   onToggleHiddenPlacement,
   hiddenElementCount,
   onRevealAll,
+  selectedElementId,
+  selectedElementIsDmOnly,
+  onToggleSelectedDmOnly,
 }: DmVttToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const TokenInfoIcon = TOKEN_INFO_ICON[tokenInfoToggle.mode ?? 'compact'];
   return (
-    <div className="bg-surface-raised border-divider absolute top-16 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-xl border p-1 shadow-lg">
+    <div className="bg-surface-raised border-divider absolute top-20 left-1/2 z-10 flex max-w-[94vw] -translate-x-1/2 items-center gap-3 overflow-x-auto rounded-xl border p-1 shadow-lg">
       <div className="flex items-center gap-1">
         {DM_TOOLS.map(({ name, label, Icon }) => (
           <Button
@@ -97,18 +109,40 @@ export function DmVttToolbar({
             {hiddenPlacementActive ? 'Placing hidden' : 'Place hidden'}
           </span>
         </Button>
-        {hiddenElementCount > 0 && (
+        <Button
+          variant="ghost"
+          onClick={onRevealAll}
+          disabled={hiddenElementCount === 0}
+          className="min-h-[44px] px-2"
+          title={
+            hiddenElementCount === 0
+              ? 'No hidden elements to reveal'
+              : `Reveal all ${hiddenElementCount} hidden element${hiddenElementCount === 1 ? '' : 's'}`
+          }
+          aria-label={`Reveal all hidden elements (${hiddenElementCount})`}
+        >
+          <Eye size={16} />
+          <span className="ml-1.5 hidden text-xs xl:inline">
+            Reveal all ({hiddenElementCount})
+          </span>
+        </Button>
+        {selectedElementId && (
           <Button
-            variant="ghost"
-            onClick={onRevealAll}
+            variant={selectedElementIsDmOnly ? 'warning' : 'ghost'}
+            onClick={onToggleSelectedDmOnly}
             className="min-h-[44px] px-2"
-            title={`Reveal all ${hiddenElementCount} hidden element${hiddenElementCount === 1 ? '' : 's'}`}
-            aria-label={`Reveal all hidden elements (${hiddenElementCount})`}
+            title={
+              selectedElementIsDmOnly
+                ? 'Reveal selected element to players'
+                : 'Hide selected element from players'
+            }
+            aria-label={
+              selectedElementIsDmOnly
+                ? 'Reveal selected element'
+                : 'Hide selected element'
+            }
           >
-            <Eye size={16} />
-            <span className="ml-1.5 hidden text-xs xl:inline">
-              Reveal all ({hiddenElementCount})
-            </span>
+            {selectedElementIsDmOnly ? <Eye size={16} /> : <EyeOff size={16} />}
           </Button>
         )}
         <Button

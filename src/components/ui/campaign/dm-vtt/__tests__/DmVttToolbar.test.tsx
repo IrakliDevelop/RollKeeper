@@ -23,11 +23,14 @@ describe('DmVttToolbar', () => {
         onToggleHiddenPlacement={vi.fn()}
         hiddenElementCount={0}
         onRevealAll={vi.fn()}
+        selectedElementId={null}
+        selectedElementIsDmOnly={false}
+        onToggleSelectedDmOnly={vi.fn()}
       />
     );
     const toolbar = container.firstChild as HTMLElement;
     const classes = toolbar.className.split(/\s+/);
-    expect(classes).toContain('top-16');
+    expect(classes).toContain('top-20');
     expect(classes).not.toEqual(
       expect.arrayContaining([expect.stringMatching(/^min-\[1350px\]:top-3$/)])
     );
@@ -44,6 +47,9 @@ describe('DmVttToolbar', () => {
         onToggleHiddenPlacement={onToggle}
         hiddenElementCount={2}
         onRevealAll={onRevealAll}
+        selectedElementId="trap-1"
+        selectedElementIsDmOnly
+        onToggleSelectedDmOnly={vi.fn()}
       />
     );
 
@@ -57,5 +63,8 @@ describe('DmVttToolbar', () => {
     );
     expect(onToggle).toHaveBeenCalledOnce();
     expect(onRevealAll).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole('button', { name: 'Reveal selected element' })
+    ).toBeInTheDocument();
   });
 });
