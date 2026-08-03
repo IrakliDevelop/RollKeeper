@@ -83,6 +83,7 @@ export const CHARACTER_ACTION_CLASSIFICATION: Record<string, ActionClass> = {
   // — XP —
   addExperience: 'CANONICAL',
   setExperience: 'CANONICAL',
+  applyDmXpAward: 'CANONICAL',
   // — rich text —
   addFeature: 'CANONICAL',
   updateFeature: 'CANONICAL',
