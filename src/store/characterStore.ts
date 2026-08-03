@@ -33,6 +33,7 @@ import {
   AbilityName,
   TemporaryBuff,
 } from '@/types/character';
+import type { DmXpAward } from '@/types/sharedState';
 import { ProcessedSpell } from '@/types/spells';
 import {
   DEFAULT_CHARACTER_STATE,
@@ -49,11 +50,11 @@ import {
   hasSpellcasting,
   updateSpellSlotsPreservingUsed,
   calculateModifier,
-  calculateLevelFromXP,
   getXPForLevel,
   calculateTraitMaxUses,
   calculateWeaponChargeMax,
   calculateMagicItemChargeMax,
+  shouldLevelUp,
 } from '@/utils/calculations';
 import { migrateToMulticlass, calculateHitDicePools } from '@/utils/multiclass';
 import {
@@ -580,6 +581,10 @@ interface CharacterStore {
   // XP management
   addExperience: (xpToAdd: number) => void;
   setExperience: (newXP: number) => void;
+  applyDmXpAward: (award: DmXpAward) => {
+    status: 'applied' | 'duplicate';
+    becamePending: boolean;
+  };
 
   // Rich text content management
   addFeature: (
@@ -2572,175 +2577,56 @@ export const useCharacterStore = create<CharacterStore>()(
 
         // XP management
         addExperience: xpToAdd => {
-          const currentState = get();
-          const newXP = currentState.character.experience + xpToAdd;
-          const newLevel = calculateLevelFromXP(newXP);
-
-          set(state => {
-            // Ensure character has multiclass structure
-            const migratedCharacter = migrateToMulticlass(state.character);
-
-            // Update class levels based on new total level
-            const updatedClasses = [...(migratedCharacter.classes || [])];
-            if (updatedClasses.length === 1) {
-              updatedClasses[0] = {
-                ...updatedClasses[0],
-                level: newLevel,
-              };
-            } else if (updatedClasses.length > 1) {
-              // Adjust the primary class to reach the target total level
-              const currentTotal = updatedClasses.reduce(
-                (sum, cls) => sum + cls.level,
-                0
-              );
-              const levelDifference = newLevel - currentTotal;
-
-              if (levelDifference !== 0) {
-                const primaryIndex = updatedClasses.reduce(
-                  (maxIndex, cls, index) =>
-                    cls.level > updatedClasses[maxIndex].level
-                      ? index
-                      : maxIndex,
-                  0
-                );
-
-                updatedClasses[primaryIndex] = {
-                  ...updatedClasses[primaryIndex],
-                  level: Math.max(
-                    1,
-                    updatedClasses[primaryIndex].level + levelDifference
-                  ),
-                };
-              }
-            }
-
-            // Recalculate hit dice pools
-            const hitDicePools = calculateHitDicePools(
-              updatedClasses,
-              migratedCharacter.hitDicePools
-            );
-
-            const updatedCharacter = {
-              ...migratedCharacter,
-              classes: updatedClasses,
-              totalLevel: newLevel,
-              level: newLevel,
-              hitDicePools,
-            };
-
-            // Recalculate spell slots using multiclass-aware functions
-            const newSpellSlots =
-              calculateCharacterSpellSlots(updatedCharacter);
-            const preservedSpellSlots = updateSpellSlotsPreservingUsed(
-              newSpellSlots,
-              state.character.spellSlots
-            );
-
-            const pactMagic = calculateCharacterPactMagic(updatedCharacter);
-            // Preserve existing pact magic used slots if possible
-            if (state.character.pactMagic && pactMagic) {
-              pactMagic.slots.used = Math.min(
-                state.character.pactMagic.slots.used,
-                pactMagic.slots.max
-              );
-            }
-
-            return {
-              character: {
-                ...updatedCharacter,
-                experience: newXP,
-                spellSlots: preservedSpellSlots,
-                pactMagic,
-              },
-              hasUnsavedChanges: true,
-              saveStatus: 'saving',
-            };
-          });
+          set(state => ({
+            character: {
+              ...state.character,
+              experience: Math.max(0, state.character.experience + xpToAdd),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
         },
 
         setExperience: newXP => {
-          const newLevel = calculateLevelFromXP(newXP);
+          set(state => ({
+            character: {
+              ...state.character,
+              experience: Math.max(0, newXP),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
 
-          set(state => {
-            // Ensure character has multiclass structure
-            const migratedCharacter = migrateToMulticlass(state.character);
-
-            // Update class levels based on new total level
-            const updatedClasses = [...(migratedCharacter.classes || [])];
-            if (updatedClasses.length === 1) {
-              updatedClasses[0] = {
-                ...updatedClasses[0],
-                level: newLevel,
-              };
-            } else if (updatedClasses.length > 1) {
-              // Adjust the primary class to reach the target total level
-              const currentTotal = updatedClasses.reduce(
-                (sum, cls) => sum + cls.level,
-                0
-              );
-              const levelDifference = newLevel - currentTotal;
-
-              if (levelDifference !== 0) {
-                const primaryIndex = updatedClasses.reduce(
-                  (maxIndex, cls, index) =>
-                    cls.level > updatedClasses[maxIndex].level
-                      ? index
-                      : maxIndex,
-                  0
-                );
-
-                updatedClasses[primaryIndex] = {
-                  ...updatedClasses[primaryIndex],
-                  level: Math.max(
-                    1,
-                    updatedClasses[primaryIndex].level + levelDifference
-                  ),
-                };
-              }
-            }
-
-            // Recalculate hit dice pools
-            const hitDicePools = calculateHitDicePools(
-              updatedClasses,
-              migratedCharacter.hitDicePools
-            );
-
-            const updatedCharacter = {
-              ...migratedCharacter,
-              classes: updatedClasses,
-              totalLevel: newLevel,
-              level: newLevel,
-              hitDicePools,
-            };
-
-            // Recalculate spell slots using multiclass-aware functions
-            const newSpellSlots =
-              calculateCharacterSpellSlots(updatedCharacter);
-            const preservedSpellSlots = updateSpellSlotsPreservingUsed(
-              newSpellSlots,
-              state.character.spellSlots
-            );
-
-            const pactMagic = calculateCharacterPactMagic(updatedCharacter);
-            // Preserve existing pact magic used slots if possible
-            if (state.character.pactMagic && pactMagic) {
-              pactMagic.slots.used = Math.min(
-                state.character.pactMagic.slots.used,
-                pactMagic.slots.max
-              );
-            }
-
-            return {
-              character: {
-                ...updatedCharacter,
-                experience: newXP,
-                spellSlots: preservedSpellSlots,
-                pactMagic,
-              },
-              hasUnsavedChanges: true,
-              saveStatus: 'saving',
-            };
-          });
+        applyDmXpAward: award => {
+          const { character } = get();
+          const applied = character.appliedDmXpAwardIds ?? [];
+          if (applied.includes(award.id)) {
+            return { status: 'duplicate' as const, becamePending: false };
+          }
+          const currentLevel = character.totalLevel || character.level || 1;
+          const pendingBefore = shouldLevelUp(
+            character.experience,
+            currentLevel
+          );
+          const newXP =
+            award.mode === 'add'
+              ? Math.max(0, character.experience + award.amount)
+              : Math.max(0, award.amount);
+          const pendingAfter = shouldLevelUp(newXP, currentLevel);
+          set(state => ({
+            character: {
+              ...state.character,
+              experience: newXP,
+              appliedDmXpAwardIds: [...applied, award.id].slice(-150),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+          return {
+            status: 'applied' as const,
+            becamePending: !pendingBefore && pendingAfter,
+          };
         },
 
         // Rich text content management
