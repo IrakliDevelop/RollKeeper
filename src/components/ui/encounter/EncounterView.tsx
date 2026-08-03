@@ -205,6 +205,7 @@ export function EncounterView({
     currentHp: p.characterData?.hitPoints?.current ?? 0,
     maxHp: p.characterData?.hitPoints?.max ?? 0,
     dexterity: p.characterData?.abilities?.dexterity ?? 10,
+    avatarUrl: p.characterData?.avatar,
   }));
 
   // Build player sync timestamp map for freshness indicators
