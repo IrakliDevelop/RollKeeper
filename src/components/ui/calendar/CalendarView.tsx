@@ -19,7 +19,7 @@ import { useCalendar } from '@/hooks/useCalendar';
 import { useCalendarStore } from '@/store/calendarStore';
 import { dateToTime, getCampaignDays } from '@/utils/calendarCalculations';
 import type { SelectedDay } from './CalendarGrid';
-import type { CalendarEvent } from '@/types/calendar';
+import type { CalendarEvent, CalendarEventInput } from '@/types/calendar';
 
 type CalendarTab = 'calendar' | 'events';
 
@@ -127,13 +127,7 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
     setEventDialogOpen(true);
   };
 
-  const handleSaveEvent = (data: {
-    title: string;
-    description: string;
-    year: number;
-    month: number;
-    day: number;
-  }) => {
+  const handleSaveEvent = (data: CalendarEventInput) => {
     if (editingEvent) {
       updateEvent(campaignCode, editingEvent.id, data);
     } else {

@@ -15,19 +15,17 @@ import { Input } from '@/components/ui/forms/input';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
-import type { CalendarConfig, CalendarEvent } from '@/types/calendar';
+import type {
+  CalendarConfig,
+  CalendarEvent,
+  CalendarEventInput,
+} from '@/types/calendar';
 import type { SelectedDay } from './CalendarGrid';
 
 interface EventDialogProps {
   open: boolean;
   onClose: () => void;
-  onSave: (data: {
-    title: string;
-    description: string;
-    year: number;
-    month: number;
-    day: number;
-  }) => void;
+  onSave: (data: CalendarEventInput) => void;
   onDelete?: () => void;
   event?: CalendarEvent;
   config: CalendarConfig;
