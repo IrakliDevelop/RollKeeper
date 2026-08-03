@@ -21,6 +21,8 @@ import type {
   CalendarEventInput,
 } from '@/types/calendar';
 import type { SelectedDay } from './CalendarGrid';
+import { MarkerField, type MarkerMode } from './MarkerField';
+import { DEFAULT_EVENT_COLOR, isValidHexColor } from './EventMarker';
 
 interface EventDialogProps {
   open: boolean;
@@ -47,6 +49,9 @@ export function EventDialog({
   const [month, setMonth] = useState(0);
   const [day, setDay] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [markerMode, setMarkerMode] = useState<MarkerMode>('dot');
+  const [markerColor, setMarkerColor] = useState(DEFAULT_EVENT_COLOR);
+  const [markerEmoji, setMarkerEmoji] = useState<string | null>(null);
 
   const isEdit = !!event;
 
@@ -66,6 +71,19 @@ export function EventDialog({
         setDay(defaultDate.day);
       }
       setConfirmDelete(false);
+
+      if (event?.emoji) {
+        setMarkerMode('emoji');
+        setMarkerEmoji(event.emoji);
+        setMarkerColor(DEFAULT_EVENT_COLOR);
+      } else {
+        const eventColor = event?.color;
+        setMarkerMode('dot');
+        setMarkerEmoji(null);
+        setMarkerColor(
+          isValidHexColor(eventColor) ? eventColor : DEFAULT_EVENT_COLOR
+        );
+      }
     }
   }, [open, event, defaultDate]);
 
@@ -77,9 +95,21 @@ export function EventDialog({
     }
   }, [month, daysInSelectedMonth, day]);
 
+  const saveDisabled =
+    !title.trim() || (markerMode === 'emoji' && !markerEmoji);
+
   const handleSave = () => {
-    if (!title.trim()) return;
-    onSave({ title: title.trim(), description, year, month, day });
+    if (saveDisabled) return;
+    onSave({
+      title: title.trim(),
+      description,
+      year,
+      month,
+      day,
+      ...(markerMode === 'emoji'
+        ? { emoji: markerEmoji ?? undefined, color: undefined }
+        : { color: markerColor, emoji: undefined }),
+    });
     onClose();
   };
 
@@ -139,6 +169,15 @@ export function EventDialog({
             </SelectField>
           </div>
 
+          <MarkerField
+            mode={markerMode}
+            color={markerColor}
+            emoji={markerEmoji}
+            onModeChange={setMarkerMode}
+            onColorChange={setMarkerColor}
+            onEmojiChange={setMarkerEmoji}
+          />
+
           <div>
             <label className="text-body mb-1 block text-sm font-medium">
               Description
@@ -171,7 +210,7 @@ export function EventDialog({
             variant="primary"
             size="sm"
             onClick={handleSave}
-            disabled={!title.trim()}
+            disabled={saveDisabled}
           >
             {isEdit ? 'Save Changes' : 'Create Event'}
           </Button>
