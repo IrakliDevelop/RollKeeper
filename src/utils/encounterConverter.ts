@@ -7,6 +7,10 @@ import {
   MonsterSpellcasting,
   TokenCellSize,
 } from '@/types/encounter';
+import {
+  ensureStatBlockEntryIds,
+  buildAbilitiesFromNormalizedBlock,
+} from '@/utils/statBlockAbilities';
 import { bestiaryTokenUrl } from '@/utils/bestiaryTokenUrl';
 
 function generateId(): string {
@@ -92,83 +96,6 @@ export function formatUsesLabel(name: string, uses?: number): string | null {
   // Name already carries a usage marker — the DM's uses count is redundant.
   if (parseRechargeFromName(name).usageType !== 'unlimited') return null;
   return `${uses}/Day`;
-}
-
-function buildMonsterAbilities(monster: ProcessedMonster): MonsterAbility[] {
-  const abilities: MonsterAbility[] = [];
-
-  const sources = [
-    ...(monster.traits ?? []),
-    ...(monster.actions ?? []),
-    ...(monster.bonusActions ?? []),
-  ];
-
-  for (const entry of sources) {
-    const parsed = parseRechargeFromName(entry.name);
-    if (parsed.usageType !== 'unlimited') {
-      abilities.push({
-        id: generateId(),
-        name: parsed.cleanName,
-        description: entry.text,
-        usageType: parsed.usageType,
-        rechargeOn: parsed.rechargeOn,
-        maxUses: parsed.maxUses,
-        usedUses: 0,
-        restType: parsed.restType,
-      });
-    }
-  }
-
-  return abilities;
-}
-
-/**
- * Build trackable abilities from a MonsterStatBlock (for NPCs added to combat).
- * Uses the optional `uses` field on entries as manual override, falls back to name parsing.
- */
-export function buildAbilitiesFromStatBlock(
-  statBlock: MonsterStatBlock
-): MonsterAbility[] {
-  const abilities: MonsterAbility[] = [];
-
-  const sources = [
-    ...(statBlock.traits ?? []),
-    ...(statBlock.actions ?? []),
-    ...(statBlock.bonusActions ?? []),
-  ];
-
-  for (const entry of sources) {
-    if (entry.uses !== undefined && entry.uses > 0) {
-      const parsed = parseRechargeFromName(entry.name);
-      abilities.push({
-        id: generateId(),
-        name: parsed.cleanName,
-        description: entry.text,
-        usageType:
-          parsed.usageType !== 'unlimited' ? parsed.usageType : 'per-day',
-        rechargeOn: parsed.rechargeOn,
-        maxUses: entry.uses,
-        usedUses: 0,
-        restType: parsed.restType,
-      });
-    } else {
-      const parsed = parseRechargeFromName(entry.name);
-      if (parsed.usageType !== 'unlimited') {
-        abilities.push({
-          id: generateId(),
-          name: parsed.cleanName,
-          description: entry.text,
-          usageType: parsed.usageType,
-          rechargeOn: parsed.rechargeOn,
-          maxUses: parsed.maxUses,
-          usedUses: 0,
-          restType: parsed.restType,
-        });
-      }
-    }
-  }
-
-  return abilities;
 }
 
 function buildLegendaryActionPool(
@@ -339,8 +266,9 @@ export function monsterToEncounterEntity(
 ): Omit<EncounterEntity, 'id'> {
   const hp = options?.hpOverride ?? monster.hpAverage;
   const ac = options?.acOverride ?? monster.acValue;
-  const statBlock =
-    options?.statBlockOverride ?? buildMonsterStatBlock(monster, options);
+  const statBlock = ensureStatBlockEntryIds(
+    options?.statBlockOverride ?? buildMonsterStatBlock(monster, options)
+  );
   const dex =
     options?.statBlockOverride?.dex ??
     options?.abilityScoreOverrides?.dex ??
@@ -362,9 +290,7 @@ export function monsterToEncounterEntity(
     conditions: [],
     monsterSourceId: monster.id,
     monsterStatBlock: statBlock,
-    abilities: options?.statBlockOverride
-      ? buildAbilitiesFromStatBlock(options.statBlockOverride)
-      : buildMonsterAbilities(monster),
+    abilities: buildAbilitiesFromNormalizedBlock(statBlock),
     legendaryActions: buildLegendaryActionPool(monster),
     spellcasting: buildMonsterSpellcasting(monster),
     color: options?.color,

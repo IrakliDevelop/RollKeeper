@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useEncounterStore } from '@/store/encounterStore';
 import { useNPCStore } from '@/store/npcStore';
 import { createMockEncounterEntity } from '@/test/helpers';
-import type { NpcResource } from '@/types/encounter';
+import { ensureStatBlockEntryIds } from '@/utils/statBlockAbilities';
+import { buildNpcEntity } from '@/components/ui/encounter/combat-screen/AddCombatantDialog/buildEntity';
+import type {
+  NpcResource,
+  MonsterStatBlock,
+  MonsterAbility,
+} from '@/types/encounter';
 
 function resetStore() {
   useEncounterStore.setState({
@@ -1792,6 +1798,534 @@ describe('encounterStore', () => {
       expect(entity.resources![0].usesExpended).toBe(2);
       // Snapshot is a copy, not a reference.
       expect(entity.resources![0]).not.toBe(npc.resources![0]);
+    });
+  });
+
+  // ── Ability usage (persistent, NPC-authoritative) ──
+
+  function abilityStatBlock(): MonsterStatBlock {
+    return ensureStatBlockEntryIds({
+      str: 10,
+      dex: 10,
+      con: 10,
+      int: 10,
+      wis: 10,
+      cha: 10,
+      saves: '',
+      skills: '',
+      speed: '30 ft.',
+      resistances: '',
+      immunities: '',
+      vulnerabilities: '',
+      conditionImmunities: [],
+      senses: '',
+      passivePerception: 10,
+      traits: [],
+      actions: [
+        { id: 'entry-smite', name: 'Smite', text: 'holy', uses: 3 },
+        {
+          id: 'entry-elemental',
+          name: 'Elemental Form',
+          text: 'transforms',
+          uses: 2,
+          resourceCost: { resourceId: 'res-ws', amount: 2 },
+        },
+      ],
+      reactions: [],
+      bonusActions: [],
+      lairActions: [],
+      cr: '1',
+      type: 'Humanoid',
+      size: 'Medium',
+      languages: '',
+      alignment: '',
+      hpFormula: '',
+    });
+  }
+
+  function setupLinkedAbilityEntity() {
+    useNPCStore.setState({ npcsByCampaign: {} });
+    const npcId = useNPCStore.getState().createNPC(RES_CAMPAIGN, {
+      name: 'Druid Elder',
+      armorClass: '13',
+      maxHp: 45,
+      speed: '30 ft.',
+      monsterStatBlock: abilityStatBlock(),
+      resources: [
+        {
+          id: 'res-ws',
+          name: 'Wild Shape',
+          icon: 'paw-print',
+          color: 'emerald',
+          displayStyle: 'pips',
+          maxUses: 4,
+          usesExpended: 0,
+          shortRestReset: 1,
+        },
+      ],
+    });
+    const npc = useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!;
+    const built = buildNpcEntity(npc, {
+      isHidden: false,
+      playerDisposition: 'enemy',
+      campaignCode: RES_CAMPAIGN,
+    });
+    const encId = setupEncounterWithEntities([]);
+    const store = useEncounterStore.getState();
+    store.addEntity(encId, built);
+    const entityId = useEncounterStore
+      .getState()
+      .encounters.find(e => e.id === encId)!.entities[0].id;
+    return { npcId, encId, entityId };
+  }
+
+  function getEntityAbility(
+    encId: string,
+    entityId: string,
+    abilityId: string
+  ) {
+    return useEncounterStore
+      .getState()
+      .encounters.find(e => e.id === encId)!
+      .entities.find(e => e.id === entityId)!
+      .abilities!.find(a => a.id === abilityId);
+  }
+
+  describe('encounterStore — useAbility (NPC-authoritative)', () => {
+    beforeEach(resetStore);
+
+    it('linked use writes NPC abilityUsage and the acting entity', () => {
+      const { npcId, encId, entityId } = setupLinkedAbilityEntity();
+      useEncounterStore.getState().useAbility(encId, entityId, 'entry-smite');
+      expect(
+        useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!.abilityUsage![
+          'entry-smite'
+        ]
+      ).toBe(1);
+      expect(getEntityAbility(encId, entityId, 'entry-smite')!.usedUses).toBe(
+        1
+      );
+    });
+
+    it('stale entity snapshot cannot resurrect spent uses', () => {
+      const { npcId, encId, entityId } = setupLinkedAbilityEntity();
+      // NPC already at max from elsewhere; entity snapshot shows 0.
+      useNPCStore
+        .getState()
+        .updateNPC(RES_CAMPAIGN, npcId, { abilityUsage: { 'entry-smite': 3 } });
+      useEncounterStore.getState().useAbility(encId, entityId, 'entry-smite');
+      expect(
+        useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!.abilityUsage![
+          'entry-smite'
+        ]
+      ).toBe(3); // unchanged
+      // Rejected call resynced the acting entity's counter.
+      expect(getEntityAbility(encId, entityId, 'entry-smite')!.usedUses).toBe(
+        3
+      );
+    });
+
+    it('combined cost through the entity path is atomic (insufficient resource → neither moves)', () => {
+      const { npcId, encId, entityId } = setupLinkedAbilityEntity();
+      useNPCStore.getState().spendNpcResource(RES_CAMPAIGN, npcId, 'res-ws', 3);
+      useEncounterStore
+        .getState()
+        .useAbility(encId, entityId, 'entry-elemental');
+      const npc = useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!;
+      expect(npc.abilityUsage?.['entry-elemental'] ?? 0).toBe(0);
+      expect(npc.resources![0].usesExpended).toBe(3);
+    });
+
+    it('combined cost success moves both counters and resyncs the entity resource snapshot', () => {
+      const { npcId, encId, entityId } = setupLinkedAbilityEntity();
+      useEncounterStore
+        .getState()
+        .useAbility(encId, entityId, 'entry-elemental');
+      const npc = useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!;
+      expect(npc.abilityUsage!['entry-elemental']).toBe(1);
+      expect(npc.resources![0].usesExpended).toBe(2);
+      const entity = useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!
+        .entities.find(e => e.id === entityId)!;
+      expect(entity.resources![0].usesExpended).toBe(2);
+    });
+
+    it('entry deleted on the NPC: use rejected, entity ability removed', () => {
+      const { npcId, encId, entityId } = setupLinkedAbilityEntity();
+      const npc = useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!;
+      const sb = structuredClone(npc.monsterStatBlock!);
+      sb.actions = sb.actions.filter(a => a.id !== 'entry-smite');
+      useNPCStore
+        .getState()
+        .updateNPC(RES_CAMPAIGN, npcId, { monsterStatBlock: sb });
+      useEncounterStore.getState().useAbility(encId, entityId, 'entry-smite');
+      expect(getEntityAbility(encId, entityId, 'entry-smite')).toBeUndefined();
+    });
+
+    it('NPC deleted entirely: entity-local fallback still works and clamps', () => {
+      const { npcId, encId, entityId } = setupLinkedAbilityEntity();
+      useNPCStore.getState().deleteNPC(RES_CAMPAIGN, npcId);
+      for (let i = 0; i < 5; i++) {
+        useEncounterStore.getState().useAbility(encId, entityId, 'entry-smite');
+      }
+      expect(getEntityAbility(encId, entityId, 'entry-smite')!.usedUses).toBe(
+        3
+      );
+    });
+
+    it('restoreAbility restores NPC + entity, never the resource', () => {
+      const { npcId, encId, entityId } = setupLinkedAbilityEntity();
+      useEncounterStore
+        .getState()
+        .useAbility(encId, entityId, 'entry-elemental');
+      useEncounterStore
+        .getState()
+        .restoreAbility(encId, entityId, 'entry-elemental');
+      const npc = useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!;
+      expect(npc.abilityUsage!['entry-elemental']).toBe(0);
+      expect(npc.resources![0].usesExpended).toBe(2); // not refunded
+    });
+  });
+
+  describe('encounterStore — reconcile on stat-block edit', () => {
+    beforeEach(resetStore);
+
+    it('text edit preserves usedUses; uses-edit on a linked entry is ignored (NPC config wins)', () => {
+      const { encId, entityId } = setupLinkedAbilityEntity();
+      useEncounterStore.getState().useAbility(encId, entityId, 'entry-smite');
+      const entity = useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!
+        .entities.find(e => e.id === entityId)!;
+      const sb = structuredClone(entity.monsterStatBlock!);
+      sb.actions = sb.actions.map(a =>
+        a.id === 'entry-smite' ? { ...a, text: 'edited', uses: 9 } : a
+      );
+      useEncounterStore
+        .getState()
+        .updateEntity(encId, entityId, { monsterStatBlock: sb });
+      const ability = getEntityAbility(encId, entityId, 'entry-smite')!;
+      expect(ability.usedUses).toBe(1); // preserved
+      expect(ability.maxUses).toBe(3); // NPC's 3, not the entity-edited 9
+    });
+
+    it('combat-added entry gets an id, source entity, and tracks entity-locally without touching the NPC', () => {
+      const { npcId, encId, entityId } = setupLinkedAbilityEntity();
+      const entity = useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!
+        .entities.find(e => e.id === entityId)!;
+      const sb = structuredClone(entity.monsterStatBlock!);
+      sb.actions = [...sb.actions, { name: 'Roar (1/Day)', text: 'loud' }];
+      useEncounterStore
+        .getState()
+        .updateEntity(encId, entityId, { monsterStatBlock: sb });
+      const after = useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!
+        .entities.find(e => e.id === entityId)!;
+      const roarEntry = after.monsterStatBlock!.actions.find(a =>
+        a.name.startsWith('Roar')
+      )!;
+      expect(roarEntry.id).toMatch(/^entry-/);
+      const roarAbility = after.abilities!.find(a => a.id === roarEntry.id)!;
+      expect(roarAbility.source).toBe('entity');
+      // Using it mutates the entity only — the NPC never learns about it.
+      useEncounterStore.getState().useAbility(encId, entityId, roarEntry.id!);
+      expect(getEntityAbility(encId, entityId, roarEntry.id!)!.usedUses).toBe(
+        1
+      );
+      expect(
+        useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!.abilityUsage?.[
+          roarEntry.id!
+        ]
+      ).toBeUndefined();
+    });
+
+    it('entity-local path rejects malformed cost amounts atomically', () => {
+      const encId = setupEncounterWithEntities([
+        {
+          id: 'ignored',
+          type: 'monster',
+          monsterStatBlock: (() => {
+            const sb = abilityStatBlock();
+            sb.actions = sb.actions.map(a =>
+              a.id === 'entry-elemental'
+                ? { ...a, resourceCost: { resourceId: 'res-ws', amount: -2 } }
+                : a
+            );
+            return sb;
+          })(),
+          abilities: [
+            {
+              id: 'entry-elemental',
+              name: 'Elemental Form',
+              description: '',
+              usageType: 'per-day',
+              maxUses: 2,
+              usedUses: 0,
+              source: 'entity',
+            },
+          ],
+          resources: [
+            {
+              id: 'res-ws',
+              name: 'Wild Shape',
+              icon: 'paw-print',
+              color: 'emerald',
+              displayStyle: 'pips',
+              maxUses: 4,
+              usesExpended: 0,
+              shortRestReset: 1,
+            },
+          ],
+        },
+      ]);
+      const entityId = useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!.entities[0].id;
+      useEncounterStore
+        .getState()
+        .useAbility(encId, entityId, 'entry-elemental');
+      const entity = useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!
+        .entities.find(e => e.id === entityId)!;
+      expect(entity.abilities![0].usedUses).toBe(0);
+      expect(entity.resources![0].usesExpended).toBe(0);
+    });
+
+    it('monster entity reconcile is fully entity-local (edited uses wins)', () => {
+      const encId = setupEncounterWithEntities([
+        {
+          id: 'ignored',
+          type: 'monster',
+          monsterStatBlock: abilityStatBlock(),
+          abilities: [],
+        },
+      ]);
+      const entityId = useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!.entities[0].id;
+      const entity = useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!
+        .entities.find(e => e.id === entityId)!;
+      const sb = structuredClone(entity.monsterStatBlock!);
+      sb.actions = sb.actions.map(a =>
+        a.id === 'entry-smite' ? { ...a, uses: 9 } : a
+      );
+      useEncounterStore
+        .getState()
+        .updateEntity(encId, entityId, { monsterStatBlock: sb });
+      expect(getEntityAbility(encId, entityId, 'entry-smite')!.maxUses).toBe(9);
+    });
+  });
+
+  describe('encounterStore — rests copy authoritative ability usage', () => {
+    beforeEach(resetStore);
+
+    it('shortRestEntity resets short-rest entries once, copies to entity, leaves others', () => {
+      useNPCStore.setState({ npcsByCampaign: {} });
+      const npcId = useNPCStore.getState().createNPC(RES_CAMPAIGN, {
+        name: 'N',
+        armorClass: '10',
+        maxHp: 5,
+        speed: '30 ft.',
+        monsterStatBlock: ensureStatBlockEntryIds({
+          ...abilityStatBlock(),
+          actions: [
+            {
+              id: 'entry-short',
+              name: 'Chains (Recharges after a Short or Long Rest)',
+              text: '',
+            },
+            { id: 'entry-day', name: 'Teleport (3/Day)', text: '' },
+          ],
+        }),
+        abilityUsage: { 'entry-short': 1, 'entry-day': 2 },
+      });
+      const npc = useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!;
+      const encId = setupEncounterWithEntities([]);
+      useEncounterStore.getState().addEntity(
+        encId,
+        buildNpcEntity(npc, {
+          isHidden: false,
+          playerDisposition: 'enemy',
+          campaignCode: RES_CAMPAIGN,
+        })
+      );
+      const entityId = useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!.entities[0].id;
+      useEncounterStore.getState().shortRestEntity(encId, entityId);
+      expect(getEntityAbility(encId, entityId, 'entry-short')!.usedUses).toBe(
+        0
+      );
+      expect(getEntityAbility(encId, entityId, 'entry-day')!.usedUses).toBe(2);
+      expect(
+        useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!.abilityUsage![
+          'entry-day'
+        ]
+      ).toBe(2);
+    });
+
+    it("rest drops 'npc'-sourced abilities deleted on the NPC but keeps combat-added 'entity' abilities", () => {
+      const { npcId, encId, entityId } = setupLinkedAbilityEntity();
+      // Add a combat-only entry.
+      const entity = useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!
+        .entities.find(e => e.id === entityId)!;
+      const sb = structuredClone(entity.monsterStatBlock!);
+      sb.actions = [...sb.actions, { name: 'Roar (1/Day)', text: 'loud' }];
+      useEncounterStore
+        .getState()
+        .updateEntity(encId, entityId, { monsterStatBlock: sb });
+      // Delete Smite on the NPC.
+      const npc = useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!;
+      const npcSb = structuredClone(npc.monsterStatBlock!);
+      npcSb.actions = npcSb.actions.filter(a => a.id !== 'entry-smite');
+      useNPCStore
+        .getState()
+        .updateNPC(RES_CAMPAIGN, npcId, { monsterStatBlock: npcSb });
+
+      useEncounterStore.getState().shortRestEntity(encId, entityId);
+      const after = useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!
+        .entities.find(e => e.id === entityId)!;
+      expect(after.abilities!.some(a => a.id === 'entry-smite')).toBe(false); // dropped
+      expect(after.abilities!.some(a => a.name.startsWith('Roar'))).toBe(true); // kept
+    });
+
+    it('longRestEntity zeroes NPC usage and entity counters through the mirror', () => {
+      const { npcId, encId, entityId } = setupLinkedAbilityEntity();
+      useEncounterStore.getState().useAbility(encId, entityId, 'entry-smite');
+      useEncounterStore.getState().longRestEntity(encId, entityId);
+      expect(
+        useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!.abilityUsage![
+          'entry-smite'
+        ]
+      ).toBe(0);
+      expect(getEntityAbility(encId, entityId, 'entry-smite')!.usedUses).toBe(
+        0
+      );
+    });
+  });
+
+  describe('encounterStore — persisted legacy migration (v1→v2)', () => {
+    it('re-keys legacy abilities to entry ids, preserves unambiguous usedUses, stamps entity source', async () => {
+      const { migrateEncounterPersistedState } = await import(
+        '@/store/encounterStore'
+      );
+      const legacyBlock = {
+        ...abilityStatBlock(),
+        actions: [
+          { name: 'Smite', text: 'holy', uses: 3 }, // no id (pre-feature)
+          { name: 'Teleport (2/Day)', text: 'blink' },
+          { name: 'Twin', text: '', uses: 1 },
+          { name: 'Twin', text: '', uses: 1 }, // ambiguous name — must reset
+        ], // note: these action objects deliberately carry NO ids (pre-feature shape)
+      };
+      const persisted = {
+        activeEncounterId: null,
+        encounters: [
+          {
+            id: 'enc-1',
+            name: 'Old Fight',
+            entities: [
+              {
+                id: 'e1',
+                type: 'npc',
+                name: 'Druid',
+                initiative: null,
+                initiativeModifier: 0,
+                currentHp: 10,
+                maxHp: 10,
+                tempHp: 0,
+                armorClass: 12,
+                conditions: [],
+                npcSourceId: 'npc-x',
+                campaignCode: RES_CAMPAIGN,
+                monsterStatBlock: legacyBlock,
+                abilities: [
+                  {
+                    id: 'legacy-1',
+                    name: 'Smite',
+                    description: '',
+                    usageType: 'per-day',
+                    maxUses: 3,
+                    usedUses: 2,
+                  },
+                  {
+                    id: 'legacy-2',
+                    name: 'Teleport',
+                    description: '',
+                    usageType: 'per-day',
+                    maxUses: 2,
+                    usedUses: 1,
+                  },
+                  {
+                    id: 'legacy-3',
+                    name: 'Twin',
+                    description: '',
+                    usageType: 'per-day',
+                    maxUses: 1,
+                    usedUses: 1,
+                  },
+                ],
+              },
+            ],
+            currentTurn: 0,
+            round: 0,
+            isActive: false,
+            sortOrder: 'initiative',
+            createdAt: 'x',
+            updatedAt: 'x',
+          },
+        ],
+      };
+      const out = migrateEncounterPersistedState(persisted, 1);
+      const entity = out.encounters[0].entities[0];
+      const sb = entity.monsterStatBlock!;
+      for (const e of sb.actions) expect(e.id).toMatch(/^entry-/);
+      const smite = entity.abilities!.find(a => a.name === 'Smite')!;
+      expect(smite.id).toBe(sb.actions[0].id); // re-keyed to the entry id
+      expect(smite.usedUses).toBe(2); // unambiguous name match preserved
+      expect(smite.source).toBe('entity'); // NPC-linked legacy stays entity-local (documented)
+      expect(entity.abilities!.find(a => a.name === 'Teleport')!.usedUses).toBe(
+        1
+      );
+      const twins = entity.abilities!.filter(a => a.name === 'Twin');
+      expect(twins.every(a => a.usedUses === 0)).toBe(true); // ambiguous → reset
+    });
+  });
+
+  describe('entity builders — normalization', () => {
+    beforeEach(resetStore);
+
+    it('buildNpcEntity stores a normalized CLONE (not the NPC reference) and seeds usage', () => {
+      useNPCStore.setState({ npcsByCampaign: {} });
+      const npcId = useNPCStore.getState().createNPC(RES_CAMPAIGN, {
+        name: 'N',
+        armorClass: '10',
+        maxHp: 5,
+        speed: '30 ft.',
+        monsterStatBlock: abilityStatBlock(),
+        abilityUsage: { 'entry-smite': 2 },
+      });
+      const npc = useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!;
+      const built = buildNpcEntity(npc, {
+        isHidden: false,
+        playerDisposition: 'enemy',
+        campaignCode: RES_CAMPAIGN,
+      });
+      expect(built.monsterStatBlock).not.toBe(npc.monsterStatBlock);
+      expect(built.abilities!.find(a => a.id === 'entry-smite')!.usedUses).toBe(
+        2
+      );
     });
   });
 });
