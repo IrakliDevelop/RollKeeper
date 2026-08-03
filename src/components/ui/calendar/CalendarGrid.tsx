@@ -346,7 +346,10 @@ export function CalendarGrid({
                               <EventMarker key={e.id} event={e} size="grid" />
                             ))}
                             {dayEvents.length > 5 && (
-                              <span className="text-faint text-[9px] leading-none">
+                              <span
+                                className="text-faint text-[9px] leading-none"
+                                aria-hidden="true"
+                              >
                                 +{dayEvents.length - 5}
                               </span>
                             )}
