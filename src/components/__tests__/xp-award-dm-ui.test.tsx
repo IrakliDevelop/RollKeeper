@@ -81,6 +81,35 @@ describe('XpAwardControl', () => {
     const retriedAward = lastPostedAward().data.award;
     expect(retriedAward).toEqual(firstAward); // same id — no fresh UUID
   });
+
+  it('locks and describes the original payload while a retry is pending', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: 'boom' }),
+    });
+    render(
+      <XpAwardControl
+        campaignCode="ABC"
+        dmId="dm-1"
+        playerId="p-1"
+        lastSyncedXp={0}
+      />
+    );
+
+    const amountInput = screen.getByLabelText('XP to add');
+    const modeSwitch = screen.getByLabelText(/toggle between add and set xp/i);
+    await user.type(amountInput, '100');
+    await user.click(screen.getByRole('button', { name: /send/i }));
+    await screen.findByText('boom');
+
+    expect(amountInput).toBeDisabled();
+    expect(modeSwitch).toBeDisabled();
+    expect(
+      screen.getByText(/retry will resend the original add award of 100 xp/i)
+    ).toBeTruthy();
+  });
 });
 
 describe('AwardXpDialog', () => {

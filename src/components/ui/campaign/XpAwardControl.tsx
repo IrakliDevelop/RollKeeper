@@ -99,6 +99,7 @@ export function XpAwardControl({
           onCheckedChange={checked => setMode(checked ? 'set' : 'add')}
           size="sm"
           aria-label="Toggle between add and set XP"
+          disabled={sending || failedAward !== null}
         />
         <span
           className={`text-xs font-medium ${mode === 'set' ? 'text-heading' : 'text-muted'}`}
@@ -113,6 +114,7 @@ export function XpAwardControl({
           placeholder={mode === 'add' ? 'XP to add...' : 'Total XP...'}
           aria-label={mode === 'add' ? 'XP to add' : 'Total XP'}
           className="flex-1"
+          disabled={sending || failedAward !== null}
         />
         {failedAward ? (
           <Button
@@ -134,6 +136,13 @@ export function XpAwardControl({
           </Button>
         )}
       </div>
+      {failedAward && (
+        <p className="text-accent-amber-text text-xs">
+          Retry will resend the original{' '}
+          {failedAward.mode === 'add' ? 'add' : 'set'} award of{' '}
+          {failedAward.amount.toLocaleString()} XP with the same delivery ID.
+        </p>
+      )}
       {mode === 'set' && (
         <p className="text-faint text-xs">
           Sets the player&apos;s total XP — overwrites changes they made since

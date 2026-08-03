@@ -158,6 +158,29 @@ describe('GET xpAwards', () => {
     consoleErrorSpy.mockRestore();
   });
 
+  it('removes parseable JSON entries that fail full award validation', async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    seedRedisList(xpKey, [
+      JSON.stringify(makeAward({ id: 'bad', amount: 'oops' as never })),
+      JSON.stringify(makeAward({ id: 'good' })),
+    ]);
+
+    const res = await getShared();
+    const body = await res.json();
+
+    expect(body.xpAwards.map((e: DmXpAwardEnvelope) => e.award.id)).toEqual([
+      'good',
+    ]);
+    expect(getRedisLists().get(xpKey)).toHaveLength(1);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Removed malformed XP award entry',
+      expect.any(Object)
+    );
+    consoleErrorSpy.mockRestore();
+  });
+
   it('returns an empty array when no queue exists', async () => {
     const res = await getShared();
     const body = await res.json();

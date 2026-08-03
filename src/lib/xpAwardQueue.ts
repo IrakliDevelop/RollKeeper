@@ -51,8 +51,10 @@ export async function readXpAwards(
   for (const receipt of entries) {
     let award: DmXpAward | null = null;
     try {
-      const parsed = JSON.parse(receipt) as DmXpAward;
-      if (parsed && typeof parsed.id === 'string') award = parsed;
+      const parsed: unknown = JSON.parse(receipt);
+      if (validateDmXpAward(parsed) === null) {
+        award = parsed as DmXpAward;
+      }
     } catch {
       // fall through to removal
     }
