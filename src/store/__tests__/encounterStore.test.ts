@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useEncounterStore } from '@/store/encounterStore';
+import { useNPCStore } from '@/store/npcStore';
 import { createMockEncounterEntity } from '@/test/helpers';
+import type { NpcResource } from '@/types/encounter';
 
 function resetStore() {
   useEncounterStore.setState({
@@ -1239,14 +1241,12 @@ describe('encounterStore', () => {
         })
       );
 
-      useEncounterStore
-        .getState()
-        .addCondition(encId, entityIdB, {
-          name: 'Bless',
-          kind: 'buff',
-          rounds: 2,
-          source: 'dm',
-        });
+      useEncounterStore.getState().addCondition(encId, entityIdB, {
+        name: 'Bless',
+        kind: 'buff',
+        rounds: 2,
+        source: 'dm',
+      });
       useEncounterStore
         .getState()
         .addCondition(encId, entityIdB, { name: 'Prone', source: 'dm' });
@@ -1331,14 +1331,12 @@ describe('encounterStore', () => {
           initiativeModifier: 0,
         })
       );
-      useEncounterStore
-        .getState()
-        .addCondition(encId, entityIdB, {
-          name: 'Bless',
-          kind: 'buff',
-          rounds: 2,
-          source: 'dm',
-        });
+      useEncounterStore.getState().addCondition(encId, entityIdB, {
+        name: 'Bless',
+        kind: 'buff',
+        rounds: 2,
+        source: 'dm',
+      });
 
       useEncounterStore.getState().startCombat(encId); // currentTurn = 0 (A)
 
@@ -1403,6 +1401,397 @@ describe('encounterStore', () => {
         .getEncounter(encId)!
         .entities.find(e => e.name === 'Dragon')!;
       expect(entity.legendaryActions!.usedActions).toBe(0);
+    });
+  });
+
+  // ── Class resources ──
+
+  const RES_CAMPAIGN = 'CAMP01'; // matches setupEncounterWithEntities campaign
+
+  function resourceFixture(overrides: Partial<NpcResource> = {}): NpcResource {
+    return {
+      id: 'res-ws',
+      name: 'Wild Shape',
+      icon: 'paw-print',
+      color: 'emerald',
+      displayStyle: 'pips',
+      maxUses: 4,
+      usesExpended: 0,
+      shortRestReset: 1,
+      ...overrides,
+    };
+  }
+
+  /** Creates a persistent NPC with resources plus a linked encounter entity. */
+  function setupLinkedNpcEntity(
+    resources: NpcResource[],
+    entityOverrides: Record<string, unknown> = {}
+  ) {
+    useNPCStore.setState({ npcsByCampaign: {} });
+    const npcId = useNPCStore.getState().createNPC(RES_CAMPAIGN, {
+      name: 'Druid Elder',
+      armorClass: '13',
+      maxHp: 45,
+      speed: '30 ft.',
+      resources,
+    });
+    const store = useEncounterStore.getState();
+    const encId = store.createEncounter('Test Battle', RES_CAMPAIGN);
+    const entityId = store.addEntity(
+      encId,
+      createMockEncounterEntity({
+        type: 'npc',
+        npcSourceId: npcId,
+        campaignCode: RES_CAMPAIGN,
+        resources: resources.map(r => ({ ...r })),
+        ...entityOverrides,
+      })
+    );
+    return { npcId, encId, entityId };
+  }
+
+  function getEntityResources(encId: string, entityId: string) {
+    return useEncounterStore
+      .getState()
+      .encounters.find(e => e.id === encId)!
+      .entities.find(e => e.id === entityId)!.resources;
+  }
+
+  describe('encounterStore — spendEntityResource', () => {
+    beforeEach(resetStore);
+
+    it('linked: computes from NPC, writes both NPC and acting entity', () => {
+      const { npcId, encId, entityId } = setupLinkedNpcEntity([
+        resourceFixture(),
+      ]);
+      const ok = useEncounterStore
+        .getState()
+        .spendEntityResource(encId, entityId, 'res-ws', 2);
+      expect(ok).toBe(true);
+      expect(
+        useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!.resources![0]
+          .usesExpended
+      ).toBe(2);
+      expect(getEntityResources(encId, entityId)![0].usesExpended).toBe(2);
+    });
+
+    it('linked stale snapshot: rejects using NPC values, spends nothing, resyncs snapshot', () => {
+      // NPC already fully spent; entity snapshot stale at 0 expended.
+      const { npcId, encId, entityId } = setupLinkedNpcEntity([
+        resourceFixture({ usesExpended: 0 }),
+      ]);
+      useNPCStore.getState().updateNPC(RES_CAMPAIGN, npcId, {
+        resources: [resourceFixture({ usesExpended: 4 })],
+      });
+      const ok = useEncounterStore
+        .getState()
+        .spendEntityResource(encId, entityId, 'res-ws', 1);
+      expect(ok).toBe(false);
+      // NPC unchanged, entity snapshot resynced to authoritative 4.
+      expect(
+        useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!.resources![0]
+          .usesExpended
+      ).toBe(4);
+      expect(getEntityResources(encId, entityId)![0].usesExpended).toBe(4);
+    });
+
+    it('two entity copies cannot overwrite newer expenditure (no lost update)', () => {
+      const {
+        npcId,
+        encId,
+        entityId: e1Id,
+      } = setupLinkedNpcEntity([resourceFixture({ maxUses: 3 })]);
+      const e2Id = useEncounterStore.getState().addEntity(
+        encId,
+        createMockEncounterEntity({
+          type: 'npc',
+          npcSourceId: npcId,
+          campaignCode: RES_CAMPAIGN,
+          resources: [resourceFixture({ maxUses: 3 })],
+        })
+      );
+      useEncounterStore
+        .getState()
+        .spendEntityResource(encId, e1Id, 'res-ws', 2);
+      // e2's snapshot is stale (0 expended) but the spend computes from the NPC (2 expended).
+      const ok = useEncounterStore
+        .getState()
+        .spendEntityResource(encId, e2Id, 'res-ws', 1);
+      expect(ok).toBe(true);
+      expect(
+        useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!.resources![0]
+          .usesExpended
+      ).toBe(3); // 2 + 1, never resurrected to 1
+    });
+
+    it('atomic: cost 2 with 1 remaining spends nothing', () => {
+      const { npcId, encId, entityId } = setupLinkedNpcEntity([
+        resourceFixture({ usesExpended: 3 }),
+      ]);
+      const ok = useEncounterStore
+        .getState()
+        .spendEntityResource(encId, entityId, 'res-ws', 2);
+      expect(ok).toBe(false);
+      expect(
+        useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!.resources![0]
+          .usesExpended
+      ).toBe(3);
+    });
+
+    it('NPC deleted entirely: entity-only fallback with atomic check', () => {
+      const { npcId, encId, entityId } = setupLinkedNpcEntity([
+        resourceFixture({ usesExpended: 3 }),
+      ]);
+      useNPCStore.getState().deleteNPC(RES_CAMPAIGN, npcId);
+      expect(
+        useEncounterStore
+          .getState()
+          .spendEntityResource(encId, entityId, 'res-ws', 2)
+      ).toBe(false);
+      expect(getEntityResources(encId, entityId)![0].usesExpended).toBe(3);
+      expect(
+        useEncounterStore
+          .getState()
+          .spendEntityResource(encId, entityId, 'res-ws', 1)
+      ).toBe(true);
+      expect(getEntityResources(encId, entityId)![0].usesExpended).toBe(4);
+    });
+
+    it('resource deleted from existing NPC: rejects and removes from entity snapshot', () => {
+      const { npcId, encId, entityId } = setupLinkedNpcEntity([
+        resourceFixture(),
+      ]);
+      useNPCStore.getState().updateNPC(RES_CAMPAIGN, npcId, { resources: [] });
+      const ok = useEncounterStore
+        .getState()
+        .spendEntityResource(encId, entityId, 'res-ws', 1);
+      expect(ok).toBe(false);
+      expect(getEntityResources(encId, entityId)).toEqual([]);
+    });
+
+    it('unknown resourceId on the entity is a no-op returning false', () => {
+      const { encId, entityId } = setupLinkedNpcEntity([resourceFixture()]);
+      expect(
+        useEncounterStore
+          .getState()
+          .spendEntityResource(encId, entityId, 'nope', 1)
+      ).toBe(false);
+    });
+
+    it('rejects zero, negative, and fractional amounts without mutation', () => {
+      const { npcId, encId, entityId } = setupLinkedNpcEntity([
+        resourceFixture({ usesExpended: 1 }),
+      ]);
+      for (const bad of [0, -2, 1.5]) {
+        expect(
+          useEncounterStore
+            .getState()
+            .spendEntityResource(encId, entityId, 'res-ws', bad)
+        ).toBe(false);
+      }
+      expect(
+        useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!.resources![0]
+          .usesExpended
+      ).toBe(1);
+      expect(getEntityResources(encId, entityId)![0].usesExpended).toBe(1);
+    });
+
+    it('unlinked entity (no npcSourceId) spends against its own snapshot', () => {
+      const store = useEncounterStore.getState();
+      const encId = store.createEncounter('Test Battle', 'CAMP01');
+      const entityId = store.addEntity(
+        encId,
+        createMockEncounterEntity({
+          type: 'monster',
+          resources: [resourceFixture()],
+        })
+      );
+      expect(
+        useEncounterStore
+          .getState()
+          .spendEntityResource(encId, entityId, 'res-ws', 4)
+      ).toBe(true);
+      expect(
+        useEncounterStore
+          .getState()
+          .spendEntityResource(encId, entityId, 'res-ws', 1)
+      ).toBe(false);
+    });
+  });
+
+  describe('encounterStore — restoreEntityResource', () => {
+    beforeEach(resetStore);
+
+    it('linked: restores against NPC values, floors at 0, writes both', () => {
+      const { npcId, encId, entityId } = setupLinkedNpcEntity([
+        resourceFixture({ usesExpended: 2 }),
+      ]);
+      useEncounterStore
+        .getState()
+        .restoreEntityResource(encId, entityId, 'res-ws', 5);
+      expect(
+        useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!.resources![0]
+          .usesExpended
+      ).toBe(0);
+      expect(getEntityResources(encId, entityId)![0].usesExpended).toBe(0);
+    });
+
+    it('ignores zero, negative, and fractional amounts without mutation', () => {
+      const { npcId, encId, entityId } = setupLinkedNpcEntity([
+        resourceFixture({ usesExpended: 2 }),
+      ]);
+      for (const bad of [0, -4, 0.5]) {
+        useEncounterStore
+          .getState()
+          .restoreEntityResource(encId, entityId, 'res-ws', bad);
+      }
+      expect(
+        useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!.resources![0]
+          .usesExpended
+      ).toBe(2);
+      expect(getEntityResources(encId, entityId)![0].usesExpended).toBe(2);
+    });
+  });
+
+  describe('encounterStore — shortRestEntity', () => {
+    beforeEach(resetStore);
+
+    it('linked: subtracts numeric n exactly once (no double subtraction through the mirror)', () => {
+      const { npcId, encId, entityId } = setupLinkedNpcEntity([
+        resourceFixture({ usesExpended: 3, shortRestReset: 1 }),
+      ]);
+      useEncounterStore.getState().shortRestEntity(encId, entityId);
+      const npcVal = useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!
+        .resources![0].usesExpended;
+      const entityVal = getEntityResources(encId, entityId)![0].usesExpended;
+      expect(npcVal).toBe(2); // 3 - 1, once
+      expect(entityVal).toBe(2); // identical — copied, not re-applied
+    });
+
+    it("resets abilities with restType 'short' and leaves others untouched", () => {
+      const store = useEncounterStore.getState();
+      const encId = store.createEncounter('Test Battle', 'CAMP01');
+      const entityId = store.addEntity(
+        encId,
+        createMockEncounterEntity({
+          type: 'npc',
+          abilities: [
+            {
+              id: 'ab-short',
+              name: 'Breath',
+              description: '',
+              usageType: 'per-rest',
+              usedUses: 1,
+              restType: 'short',
+            },
+            {
+              id: 'ab-long',
+              name: 'Frenzy',
+              description: '',
+              usageType: 'per-rest',
+              usedUses: 1,
+              restType: 'long',
+            },
+          ],
+        })
+      );
+      useEncounterStore.getState().shortRestEntity(encId, entityId);
+      const entity = useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!
+        .entities.find(e => e.id === entityId)!;
+      expect(entity.abilities!.find(a => a.id === 'ab-short')!.usedUses).toBe(
+        0
+      );
+      expect(entity.abilities!.find(a => a.id === 'ab-long')!.usedUses).toBe(1);
+    });
+
+    it('does not change HP or hit dice', () => {
+      const store = useEncounterStore.getState();
+      const encId = store.createEncounter('Test Battle', 'CAMP01');
+      const entityId = store.addEntity(
+        encId,
+        createMockEncounterEntity({
+          type: 'npc',
+          currentHp: 5,
+          maxHp: 20,
+          hitDice: { current: 1, max: 4, dieType: 'd8' },
+        })
+      );
+      useEncounterStore.getState().shortRestEntity(encId, entityId);
+      const entity = useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!
+        .entities.find(e => e.id === entityId)!;
+      expect(entity.currentHp).toBe(5);
+      expect(entity.hitDice!.current).toBe(1);
+    });
+
+    it('linked with resource deleted from NPC: drops it from the snapshot instead of resting it', () => {
+      const { npcId, encId, entityId } = setupLinkedNpcEntity([
+        resourceFixture({ usesExpended: 2 }),
+      ]);
+      useNPCStore.getState().updateNPC(RES_CAMPAIGN, npcId, { resources: [] });
+      useEncounterStore.getState().shortRestEntity(encId, entityId);
+      expect(getEntityResources(encId, entityId)).toEqual([]);
+    });
+  });
+
+  describe('encounterStore — longRestEntity resources', () => {
+    beforeEach(resetStore);
+
+    it('zeroes entity resources and NPC resources through the mirror', () => {
+      const { npcId, encId, entityId } = setupLinkedNpcEntity([
+        resourceFixture({ usesExpended: 3, shortRestReset: 0 }),
+      ]);
+      useEncounterStore.getState().longRestEntity(encId, entityId);
+      expect(
+        useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!.resources![0]
+          .usesExpended
+      ).toBe(0);
+      expect(getEntityResources(encId, entityId)![0].usesExpended).toBe(0);
+    });
+
+    it('unlinked entity resources reset locally', () => {
+      const store = useEncounterStore.getState();
+      const encId = store.createEncounter('Test Battle', 'CAMP01');
+      const entityId = store.addEntity(
+        encId,
+        createMockEncounterEntity({
+          type: 'monster',
+          resources: [resourceFixture({ usesExpended: 2 })],
+        })
+      );
+      useEncounterStore.getState().longRestEntity(encId, entityId);
+      expect(getEntityResources(encId, entityId)![0].usesExpended).toBe(0);
+    });
+  });
+
+  describe('buildNpcEntity — resource snapshot', () => {
+    beforeEach(resetStore);
+
+    it('snapshots current NPC usage (out-of-combat spending reflected on add)', async () => {
+      useNPCStore.setState({ npcsByCampaign: {} });
+      const npcId = useNPCStore.getState().createNPC(RES_CAMPAIGN, {
+        name: 'Druid Elder',
+        armorClass: '13',
+        maxHp: 45,
+        speed: '30 ft.',
+        resources: [resourceFixture()],
+      });
+      useNPCStore.getState().spendNpcResource(RES_CAMPAIGN, npcId, 'res-ws', 2);
+      const { buildNpcEntity } = await import(
+        '@/components/ui/encounter/combat-screen/AddCombatantDialog/buildEntity'
+      );
+      const npc = useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!;
+      const entity = buildNpcEntity(npc, {
+        isHidden: false,
+        playerDisposition: 'enemy',
+        campaignCode: RES_CAMPAIGN,
+      });
+      expect(entity.resources![0].usesExpended).toBe(2);
+      // Snapshot is a copy, not a reference.
+      expect(entity.resources![0]).not.toBe(npc.resources![0]);
     });
   });
 });

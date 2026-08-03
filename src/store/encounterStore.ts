@@ -12,6 +12,12 @@ import { useNPCStore } from './npcStore';
 import { initCrossTabEncounterSync } from '@/lib/crossTabEncounterSync';
 import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
 import { ENCOUNTER_STORAGE_KEY } from '@/utils/constants';
+import {
+  applyShortRest,
+  applyLongRest,
+  isValidResourceAmount,
+} from '@/utils/npcResources';
+import type { NpcResource } from '@/types/encounter';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -136,6 +142,21 @@ interface EncounterStoreState {
     entityId: string,
     abilityId: string
   ) => void;
+
+  // Class resources
+  /** Atomic all-or-nothing resource spend (NPC-authoritative when linked). */
+  spendEntityResource: (
+    encounterId: string,
+    entityId: string,
+    resourceId: string,
+    amount: number
+  ) => boolean;
+  restoreEntityResource: (
+    encounterId: string,
+    entityId: string,
+    resourceId: string,
+    amount: number
+  ) => void;
   useLegendaryAction: (
     encounterId: string,
     entityId: string,
@@ -160,6 +181,10 @@ interface EncounterStoreState {
 
   // Long rest
   longRestEntity: (encounterId: string, entityId: string) => void;
+
+  // Short rest
+  /** Restores resources per shortRestReset + resets restType==='short' abilities. */
+  shortRestEntity: (encounterId: string, entityId: string) => void;
 
   // Queries
   getEncountersByCampaign: (campaignCode: string) => Encounter[];
@@ -265,6 +290,24 @@ function applyTurnStart(
     }
     return next;
   });
+}
+
+/**
+ * Resolves the authoritative NPC for a linked entity. Returns:
+ * - { npc } when the entity is NPC-linked and the NPC exists
+ * - { npc: null } when the entity is linked but the NPC is gone (entity-only fallback)
+ * - null when the entity is not linked at all
+ */
+function resolveLinkedNpc(
+  entity: EncounterEntity
+): { npc: import('@/types/encounter').CampaignNPC | null } | null {
+  if (entity.type !== 'npc' || !entity.npcSourceId || !entity.campaignCode) {
+    return null;
+  }
+  const npc =
+    useNPCStore.getState().getNPC(entity.campaignCode, entity.npcSourceId) ??
+    null;
+  return { npc };
 }
 
 export const useEncounterStore = create<EncounterStoreState>()(
@@ -825,6 +868,147 @@ export const useEncounterStore = create<EncounterStoreState>()(
         }));
       },
 
+      spendEntityResource: (encounterId, entityId, resourceId, amount) => {
+        if (!isValidResourceAmount(amount)) return false;
+        const enc = get().encounters.find(e => e.id === encounterId);
+        const entity = enc?.entities.find(e => e.id === entityId);
+        const snapshot = entity?.resources?.find(r => r.id === resourceId);
+        if (!entity || !snapshot) return false;
+
+        const linked = resolveLinkedNpc(entity);
+        if (linked?.npc) {
+          const npc = linked.npc;
+          const npcRes = npc.resources?.find(r => r.id === resourceId);
+          if (!npcRes) {
+            // Deletion is authoritative: drop from the acting entity snapshot.
+            set(state => ({
+              encounters: updateEntityInEncounter(
+                state.encounters,
+                encounterId,
+                entityId,
+                e => ({
+                  ...e,
+                  resources: e.resources?.filter(r => r.id !== resourceId),
+                })
+              ),
+            }));
+            return false;
+          }
+          const ok = npcRes.maxUses - npcRes.usesExpended >= amount;
+          const newExpended = ok
+            ? npcRes.usesExpended + amount
+            : npcRes.usesExpended;
+          if (ok) {
+            useNPCStore.getState().updateNPC(npc.campaignCode, npc.id, {
+              resources: npc.resources!.map(r =>
+                r.id === resourceId ? { ...r, usesExpended: newExpended } : r
+              ),
+            });
+          }
+          // Success or rejection: resync the acting entity snapshot from the NPC.
+          set(state => ({
+            encounters: updateEntityInEncounter(
+              state.encounters,
+              encounterId,
+              entityId,
+              e => ({
+                ...e,
+                resources: e.resources?.map(r =>
+                  r.id === resourceId
+                    ? { ...npcRes, usesExpended: newExpended }
+                    : r
+                ),
+              })
+            ),
+          }));
+          return ok;
+        }
+
+        // Unlinked, or NPC deleted entirely: entity-only with the same atomic check.
+        if (snapshot.maxUses - snapshot.usesExpended < amount) return false; // no expenditure mutation
+        set(state => ({
+          encounters: updateEntityInEncounter(
+            state.encounters,
+            encounterId,
+            entityId,
+            e => ({
+              ...e,
+              resources: e.resources?.map(r =>
+                r.id === resourceId
+                  ? { ...r, usesExpended: r.usesExpended + amount }
+                  : r
+              ),
+            })
+          ),
+        }));
+        return true;
+      },
+
+      restoreEntityResource: (encounterId, entityId, resourceId, amount) => {
+        if (!isValidResourceAmount(amount)) return; // negative restore must not raise expenditure
+        const enc = get().encounters.find(e => e.id === encounterId);
+        const entity = enc?.entities.find(e => e.id === entityId);
+        if (!entity?.resources?.some(r => r.id === resourceId)) return;
+
+        const linked = resolveLinkedNpc(entity);
+        if (linked?.npc) {
+          const npc = linked.npc;
+          const npcRes = npc.resources?.find(r => r.id === resourceId);
+          if (!npcRes) {
+            set(state => ({
+              encounters: updateEntityInEncounter(
+                state.encounters,
+                encounterId,
+                entityId,
+                e => ({
+                  ...e,
+                  resources: e.resources?.filter(r => r.id !== resourceId),
+                })
+              ),
+            }));
+            return;
+          }
+          const newExpended = Math.max(0, npcRes.usesExpended - amount);
+          useNPCStore.getState().updateNPC(npc.campaignCode, npc.id, {
+            resources: npc.resources!.map(r =>
+              r.id === resourceId ? { ...r, usesExpended: newExpended } : r
+            ),
+          });
+          set(state => ({
+            encounters: updateEntityInEncounter(
+              state.encounters,
+              encounterId,
+              entityId,
+              e => ({
+                ...e,
+                resources: e.resources?.map(r =>
+                  r.id === resourceId
+                    ? { ...npcRes, usesExpended: newExpended }
+                    : r
+                ),
+              })
+            ),
+          }));
+          return;
+        }
+
+        set(state => ({
+          encounters: updateEntityInEncounter(
+            state.encounters,
+            encounterId,
+            entityId,
+            e => ({
+              ...e,
+              resources: e.resources?.map(r =>
+                r.id === resourceId
+                  ? { ...r, usesExpended: Math.max(0, r.usesExpended - amount) }
+                  : r
+              ),
+            })
+          ),
+        }));
+      },
+
       useLegendaryAction: (encounterId, entityId, actionId) => {
         set(state => ({
           encounters: updateEntityInEncounter(
@@ -920,7 +1104,77 @@ export const useEncounterStore = create<EncounterStoreState>()(
 
       // Long rest
 
+      shortRestEntity: (encounterId, entityId) => {
+        const enc = get().encounters.find(e => e.id === encounterId);
+        const entity = enc?.entities.find(e => e.id === entityId);
+        if (!entity) return;
+
+        // Single-calculation rule: when linked, npcStore.shortRestNPC is the
+        // one place the resource math runs; the entity copies the results.
+        let npcResources: NpcResource[] | null = null;
+        const linked = resolveLinkedNpc(entity);
+        if (linked?.npc) {
+          const npc = linked.npc;
+          useNPCStore.getState().shortRestNPC(npc.campaignCode, npc.id);
+          npcResources =
+            useNPCStore.getState().getNPC(npc.campaignCode, npc.id)
+              ?.resources ?? [];
+        }
+
+        set(state => ({
+          encounters: updateEntityInEncounter(
+            state.encounters,
+            encounterId,
+            entityId,
+            e => ({
+              ...e,
+              ...(e.resources
+                ? {
+                    resources:
+                      npcResources !== null
+                        ? // Copy authoritative results; deletion is authoritative,
+                          // so ids missing on the NPC are dropped, not rested.
+                          e.resources
+                            .filter(r =>
+                              npcResources!.some(nr => nr.id === r.id)
+                            )
+                            .map(r => {
+                              const nr = npcResources!.find(
+                                n => n.id === r.id
+                              )!;
+                              return { ...r, usesExpended: nr.usesExpended };
+                            })
+                        : applyShortRest(e.resources),
+                  }
+                : {}),
+              ...(e.abilities
+                ? {
+                    abilities: e.abilities.map(a =>
+                      a.restType === 'short' ? { ...a, usedUses: 0 } : a
+                    ),
+                  }
+                : {}),
+            })
+          ),
+        }));
+      },
+
       longRestEntity: (encounterId, entityId) => {
+        const encBefore = get().encounters.find(e => e.id === encounterId);
+        const entityBefore = encBefore?.entities.find(e => e.id === entityId);
+        if (!entityBefore) return;
+
+        // Mirror first — longRestNPC is where NPC-side math (incl. resources) runs.
+        let npcResources: NpcResource[] | null = null;
+        const linked = resolveLinkedNpc(entityBefore);
+        if (linked?.npc) {
+          const npc = linked.npc;
+          useNPCStore.getState().longRestNPC(npc.campaignCode, npc.id);
+          npcResources =
+            useNPCStore.getState().getNPC(npc.campaignCode, npc.id)
+              ?.resources ?? [];
+        }
+
         set(state => ({
           encounters: updateEntityInEncounter(
             state.encounters,
@@ -964,21 +1218,26 @@ export const useEncounterStore = create<EncounterStoreState>()(
                     },
                   }
                 : {}),
+              ...(e.resources
+                ? {
+                    resources:
+                      npcResources !== null
+                        ? e.resources
+                            .filter(r =>
+                              npcResources!.some(nr => nr.id === r.id)
+                            )
+                            .map(r => {
+                              const nr = npcResources!.find(
+                                n => n.id === r.id
+                              )!;
+                              return { ...r, usesExpended: nr.usesExpended };
+                            })
+                        : applyLongRest(e.resources),
+                  }
+                : {}),
             })
           ),
         }));
-        // Sync long rest back to persistent NPC store
-        const enc = get().encounters.find(e => e.id === encounterId);
-        const entity = enc?.entities.find(e => e.id === entityId);
-        if (
-          entity?.type === 'npc' &&
-          entity.npcSourceId &&
-          entity.campaignCode
-        ) {
-          useNPCStore
-            .getState()
-            .longRestNPC(entity.campaignCode, entity.npcSourceId);
-        }
       },
 
       // Queries

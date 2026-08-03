@@ -101,6 +101,7 @@ export function buildNpcEntity(
     npcSourceId: npc.id,
     campaignCode: opts.campaignCode,
     spellcasting: buildNpcSpellcasting(npc),
+    resources: npc.resources?.map(r => ({ ...r })),
     avatarUrl: npc.avatarUrl,
   };
 }
