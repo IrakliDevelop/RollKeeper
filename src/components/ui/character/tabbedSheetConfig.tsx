@@ -43,6 +43,7 @@ import {
   calculateSpellAttackBonus,
   calculateCarryingCapacity,
   calculateSpellSaveDC,
+  shouldLevelUp,
 } from '@/utils/calculations';
 import { calculateTotalWeight } from '@/utils/encumbrance';
 import {
@@ -69,11 +70,24 @@ function WizardHatIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-function LevelUpButton() {
+function LevelUpButton({
+  pendingLevelUp = false,
+}: {
+  pendingLevelUp?: boolean;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <>
-      <Button variant="primary" size="sm" onClick={() => setIsOpen(true)}>
+      <Button
+        variant="primary"
+        size="sm"
+        onClick={() => setIsOpen(true)}
+        className={
+          pendingLevelUp
+            ? 'ring-accent-emerald-border animate-pulse ring-2'
+            : undefined
+        }
+      >
         <WizardHatIcon size={14} />
         Level Up
       </Button>
@@ -413,20 +427,31 @@ export function createTabbedSheetConfig(
                 }
                 onRollSavingThrow={params.rollSavingThrow}
               />
-              <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <div className="border-divider mb-4 flex items-center justify-between border-b pb-2">
-                  <h2 className="text-heading text-lg font-bold">
-                    Experience Points
-                  </h2>
-                  {totalLevel < 20 && <LevelUpButton />}
-                </div>
-                <XPTracker
-                  currentXP={character.experience}
-                  currentLevel={totalLevel}
-                  onAddXP={params.addExperience}
-                  onSetXP={params.setExperience}
-                />
-              </div>
+              {(() => {
+                const pendingLevelUp = shouldLevelUp(
+                  character.experience,
+                  totalLevel
+                );
+                return (
+                  <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                    <div className="border-divider mb-4 flex items-center justify-between border-b pb-2">
+                      <h2 className="text-heading text-lg font-bold">
+                        Experience Points
+                      </h2>
+                      {totalLevel < 20 && (
+                        <LevelUpButton pendingLevelUp={pendingLevelUp} />
+                      )}
+                    </div>
+                    <XPTracker
+                      currentXP={character.experience}
+                      currentLevel={totalLevel}
+                      onAddXP={params.addExperience}
+                      onSetXP={params.setExperience}
+                      pendingLevelUp={pendingLevelUp}
+                    />
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="lg:sticky lg:top-4">

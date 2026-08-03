@@ -7,7 +7,6 @@ import {
   getXPForLevel,
   getXPToNextLevel,
   getXPProgress,
-  shouldLevelUp,
 } from '@/utils/calculations';
 
 interface XPTrackerProps {
@@ -23,6 +22,7 @@ interface XPTrackerProps {
   hideProgressBar?: boolean;
   hideLevelUpAlert?: boolean;
   hideThresholds?: boolean;
+  pendingLevelUp?: boolean;
 
   className?: string;
 }
@@ -38,11 +38,11 @@ export function XPTracker({
   hideProgressBar = false,
   hideLevelUpAlert = false,
   hideThresholds = false,
+  pendingLevelUp = false,
   className = '',
 }: XPTrackerProps) {
   const [mode, setMode] = useState<'add' | 'set'>('add');
   const [inputValue, setInputValue] = useState('');
-  const [showLevelUp, setShowLevelUp] = useState(false);
 
   const xpToNext = getXPToNextLevel(currentXP, currentLevel);
   const progress = getXPProgress(currentXP, currentLevel);
@@ -56,16 +56,8 @@ export function XPTracker({
 
     if (mode === 'add' && onAddXP) {
       onAddXP(value);
-      if (!hideLevelUpAlert && shouldLevelUp(currentXP + value, currentLevel)) {
-        setShowLevelUp(true);
-        setTimeout(() => setShowLevelUp(false), 3000);
-      }
     } else if (mode === 'set' && onSetXP) {
       onSetXP(value);
-      if (!hideLevelUpAlert && shouldLevelUp(value, currentLevel)) {
-        setShowLevelUp(true);
-        setTimeout(() => setShowLevelUp(false), 3000);
-      }
     }
 
     setInputValue('');
@@ -84,10 +76,10 @@ export function XPTracker({
           <TrendingUp size={compact ? 16 : 20} />
           {compact ? 'XP' : 'Experience Points'}
         </h3>
-        {!hideLevelUpAlert && showLevelUp && (
-          <div className="flex animate-pulse items-center space-x-1 font-bold text-green-600">
+        {!hideLevelUpAlert && pendingLevelUp && (
+          <div className="border-accent-emerald-border bg-accent-emerald-bg text-accent-emerald-text flex animate-pulse items-center gap-1 rounded-md border px-2 py-0.5 font-bold">
             <TrendingUp size={16} />
-            <span className="text-sm">LEVEL UP!</span>
+            <span className="text-sm">Level up available!</span>
           </div>
         )}
       </div>
@@ -127,9 +119,15 @@ export function XPTracker({
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted">To Next Level:</span>
-            <span className="text-heading font-semibold">
-              {xpToNext.toLocaleString()} XP
-            </span>
+            {pendingLevelUp ? (
+              <span className="text-accent-emerald-text font-semibold">
+                Level-up pending
+              </span>
+            ) : (
+              <span className="text-heading font-semibold">
+                {xpToNext.toLocaleString()} XP
+              </span>
+            )}
           </div>
           <div
             className={`bg-bg-tertiary w-full rounded-full ${compact ? 'h-2' : 'h-3'}`}
@@ -140,7 +138,9 @@ export function XPTracker({
             />
           </div>
           <div className="text-muted text-center text-xs">
-            {progress.toFixed(1)}% to Level {currentLevel + 1}
+            {pendingLevelUp
+              ? 'Level-up pending — use the Level Up button'
+              : `${progress.toFixed(1)}% to Level ${currentLevel + 1}`}
           </div>
         </div>
       )}
