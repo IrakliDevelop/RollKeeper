@@ -5,7 +5,11 @@ import { Search, Pencil, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { EventDialog } from './EventDialog';
-import type { CalendarConfig, CalendarEvent } from '@/types/calendar';
+import type {
+  CalendarConfig,
+  CalendarEvent,
+  CalendarEventInput,
+} from '@/types/calendar';
 
 type SortOrder = 'date-asc' | 'date-desc' | 'recent';
 
@@ -120,13 +124,7 @@ export function EventListView({
     setDialogOpen(true);
   };
 
-  const handleSave = (data: {
-    title: string;
-    description: string;
-    year: number;
-    month: number;
-    day: number;
-  }) => {
+  const handleSave = (data: CalendarEventInput) => {
     if (editingEvent) {
       onUpdateEvent(editingEvent.id, data);
     }

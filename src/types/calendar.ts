@@ -69,7 +69,12 @@ export interface CalendarEvent {
   month: number; // 0-based month index
   day: number; // 0-based day of month
   createdAt: number; // timestamp for ordering
+  color?: string; // hex '#rrggbb' dot marker color
+  emoji?: string; // emoji marker; takes precedence over color
 }
+
+// Shared save payload for event create/update dialogs
+export type CalendarEventInput = Omit<CalendarEvent, 'id' | 'createdAt'>;
 
 export type WeatherType =
   | 'clear'

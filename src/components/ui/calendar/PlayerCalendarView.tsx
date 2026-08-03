@@ -38,7 +38,7 @@ import {
 import { WEATHER_OPTIONS, type WeatherType } from '@/types/calendar';
 import type { SelectedDay } from './CalendarGrid';
 import type { ToastData } from '@/components/ui/feedback/Toast';
-import type { CalendarEvent } from '@/types/calendar';
+import type { CalendarEvent, CalendarEventInput } from '@/types/calendar';
 
 type PlayerTab = 'calendar' | 'events';
 
@@ -323,13 +323,7 @@ export function PlayerCalendarView({
     setEventDialogOpen(true);
   };
 
-  const handleSaveEvent = (data: {
-    title: string;
-    description: string;
-    year: number;
-    month: number;
-    day: number;
-  }) => {
+  const handleSaveEvent = (data: CalendarEventInput) => {
     if (editingEvent) {
       updateEvent(characterId, editingEvent.id, data);
     } else {
