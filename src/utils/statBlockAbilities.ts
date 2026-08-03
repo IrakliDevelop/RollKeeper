@@ -43,14 +43,14 @@ export function ensureStatBlockEntryIds(
   // unnecessary re-key of that later, legitimately unique entry).
   const reserved = new Set<string>();
   for (const section of ALL_ENTRY_SECTIONS) {
-    for (const entry of statBlock[section]) {
+    for (const entry of statBlock[section] ?? []) {
       if (entry.id) reserved.add(entry.id);
     }
   }
   const seen = new Set<string>();
   const out: MonsterStatBlock = { ...statBlock };
   for (const section of ALL_ENTRY_SECTIONS) {
-    out[section] = statBlock[section].map(entry => {
+    out[section] = (statBlock[section] ?? []).map(entry => {
       let id = entry.id;
       if (!id || seen.has(id)) {
         do {
@@ -120,7 +120,7 @@ export function buildAbilitiesFromNormalizedBlock(
 ): MonsterAbility[] {
   const abilities: MonsterAbility[] = [];
   for (const section of ALL_ENTRY_SECTIONS) {
-    for (const entry of statBlock[section]) {
+    for (const entry of statBlock[section] ?? []) {
       if (!entry.id) continue; // malformed input renders untrackable, never tracked
       const config = getEntryAbilityConfig(entry);
       if (!config) continue;
@@ -163,7 +163,7 @@ export function reconcileEntityAbilities(
   const prevById = new Map(prevAbilities.map(a => [a.id, a]));
   const abilities: MonsterAbility[] = [];
   for (const section of ALL_ENTRY_SECTIONS) {
-    for (const entry of normalizedBlock[section]) {
+    for (const entry of normalizedBlock[section] ?? []) {
       if (!entry.id) continue;
       const prev = prevById.get(entry.id);
       const authoritative = resolveAuthoritativeEntry?.(entry.id);
@@ -199,7 +199,7 @@ export function findEntryById(
 ): StatBlockEntry | undefined {
   if (!statBlock) return undefined;
   for (const section of ALL_ENTRY_SECTIONS) {
-    const hit = statBlock[section].find(e => e.id === entryId);
+    const hit = (statBlock[section] ?? []).find(e => e.id === entryId);
     if (hit) return hit;
   }
   return undefined;

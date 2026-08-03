@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { NpcResource, MonsterStatBlock } from '@/types/encounter';
 import { useNPCStore, migrateNpcPersistedState } from '@/store/npcStore';
-import {
-  findEntryById,
-  getEntryAbilityConfig,
-} from '@/utils/statBlockAbilities';
 
 const CAMPAIGN = 'test-campaign';
 
@@ -907,6 +903,37 @@ describe('npcStore — entry id enforcement', () => {
     expect(
       twice.npcsByCampaign[CAMPAIGN][0].monsterStatBlock!.actions[0].id
     ).toBe(npc.monsterStatBlock!.actions[0].id);
+  });
+
+  it('migration v4 does not throw on a legacy monsterStatBlock missing bonusActions/lairActions entirely', () => {
+    const fixture = statBlockFixture() as Partial<MonsterStatBlock>;
+    delete fixture.bonusActions;
+    delete fixture.lairActions;
+    const legacy = {
+      npcsByCampaign: {
+        [CAMPAIGN]: [
+          {
+            id: 'npc-old',
+            campaignCode: CAMPAIGN,
+            name: 'Old NPC',
+            armorClass: '10',
+            maxHp: 8,
+            speed: '30 ft.',
+            monsterStatBlock: fixture,
+            createdAt: 'x',
+            updatedAt: 'x',
+          },
+        ],
+      },
+    };
+    let migrated!: ReturnType<typeof migrateNpcPersistedState>;
+    expect(() => {
+      migrated = migrateNpcPersistedState(structuredClone(legacy), 3);
+    }).not.toThrow();
+    const npc = migrated.npcsByCampaign[CAMPAIGN][0];
+    expect(npc.monsterStatBlock!.bonusActions).toEqual([]);
+    expect(npc.monsterStatBlock!.lairActions).toEqual([]);
+    expect(npc.monsterStatBlock!.actions[0].id).toBe('entry-smite');
   });
 
   it('createNPC normalizes missing ids; updateNPC preserves existing ids and prunes orphan usage', () => {

@@ -4,6 +4,7 @@ import {
   getEntryAbilityConfig,
   buildAbilitiesFromNormalizedBlock,
   reconcileEntityAbilities,
+  findEntryById,
   formatAbilityUsageLabel,
 } from '@/utils/statBlockAbilities';
 import type {
@@ -43,6 +44,70 @@ function block(overrides: Partial<MonsterStatBlock> = {}): MonsterStatBlock {
     ...overrides,
   };
 }
+
+/**
+ * Simulates a pre-2026-03-24 persisted stat block that predates the
+ * bonusActions/lairActions fields entirely (not just empty arrays — the
+ * keys are absent). Cast through `unknown` since the real MonsterStatBlock
+ * type requires them.
+ */
+function legacyBlockMissingSections(
+  overrides: Partial<MonsterStatBlock> = {}
+): MonsterStatBlock {
+  const full = block(overrides);
+  const legacy = { ...full } as Partial<MonsterStatBlock>;
+  delete legacy.bonusActions;
+  delete legacy.lairActions;
+  return legacy as unknown as MonsterStatBlock;
+}
+
+describe('legacy stat blocks missing bonusActions/lairActions', () => {
+  it('ensureStatBlockEntryIds does not throw and backfills both arrays with ids assigned', () => {
+    const legacy = legacyBlockMissingSections({
+      traits: [{ name: 'T', text: '' }],
+      actions: [{ name: 'A', text: '' }],
+      reactions: [{ name: 'R', text: '' }],
+    });
+    let out!: MonsterStatBlock;
+    expect(() => {
+      out = ensureStatBlockEntryIds(legacy);
+    }).not.toThrow();
+    expect(out.bonusActions).toEqual([]);
+    expect(out.lairActions).toEqual([]);
+    expect(out.traits[0].id).toMatch(/^entry-/);
+    expect(out.actions[0].id).toMatch(/^entry-/);
+    expect(out.reactions[0].id).toMatch(/^entry-/);
+  });
+
+  it('findEntryById does not throw on a block missing sections', () => {
+    const legacy = legacyBlockMissingSections({
+      actions: [{ id: 'entry-a', name: 'A', text: '' }],
+    });
+    expect(() => findEntryById(legacy, 'entry-a')).not.toThrow();
+    expect(findEntryById(legacy, 'entry-a')?.id).toBe('entry-a');
+    expect(findEntryById(legacy, 'no-such-id')).toBeUndefined();
+  });
+
+  it('buildAbilitiesFromNormalizedBlock does not throw on a block missing sections', () => {
+    const normalized = ensureStatBlockEntryIds(
+      legacyBlockMissingSections({
+        actions: [{ name: 'Smite', text: '', uses: 3 }],
+      })
+    );
+    expect(() => buildAbilitiesFromNormalizedBlock(normalized)).not.toThrow();
+    expect(buildAbilitiesFromNormalizedBlock(normalized)).toHaveLength(1);
+  });
+
+  it('reconcileEntityAbilities does not throw on a block missing sections', () => {
+    const normalized = ensureStatBlockEntryIds(
+      legacyBlockMissingSections({
+        actions: [{ name: 'Smite', text: '', uses: 3 }],
+      })
+    );
+    expect(() => reconcileEntityAbilities(normalized, [])).not.toThrow();
+    expect(reconcileEntityAbilities(normalized, [])).toHaveLength(1);
+  });
+});
 
 describe('ensureStatBlockEntryIds', () => {
   it('assigns ids to entries missing them across all five sections', () => {
