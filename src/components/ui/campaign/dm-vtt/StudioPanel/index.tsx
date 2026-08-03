@@ -123,7 +123,11 @@ export function StudioPanel({
           />
         ) : selectedEntity ? (
           <>
-            <CombatantDetail entity={selectedEntity} actions={actions} />
+            <CombatantDetail
+              entity={selectedEntity}
+              actions={actions}
+              key={selectedEntity.id}
+            />
             {onTokenIdentityChange && (
               <TokenSettings
                 key={selectedEntity.id}
