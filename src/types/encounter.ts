@@ -28,10 +28,18 @@ export interface MonsterAbility {
   maxUses?: number;
   usedUses: number;
   restType?: 'short' | 'long' | 'dawn';
+  /**
+   * Provenance: 'npc' = backed by a CampaignNPC entry (authoritative sync);
+   * 'entity' = per-encounter only (monsters, custom, combat-added entries).
+   * Absent on legacy data = treated as 'entity'.
+   */
+  source?: 'npc' | 'entity';
 }
 
 /** Shared shape for the five stat-block entry sections. */
 export interface StatBlockEntry {
+  /** Stable instance id, unique within a stat block. Store-enforced (npcStore migration + create/update normalization); encounter MonsterAbility.id matches it. */
+  id?: string;
   name: string;
   text: string;
   /** Static per-day/authoring uses hint (feeds the abilities pipeline). */
@@ -352,6 +360,9 @@ export interface CampaignNPC {
 
   // Class-resource pools (authoritative usage state; see NpcResource)
   resources?: NpcResource[];
+
+  // Per-ability usage (entryId → usedUses). Authoritative, like resources.
+  abilityUsage?: Record<string, number>;
 
   // UI state: which spell tab sections are collapsed
   collapsedSpellSections?: string[]; // e.g. ['stats', 'slotTracker', 'spells']
