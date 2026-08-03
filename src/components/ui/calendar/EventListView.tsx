@@ -5,6 +5,7 @@ import { Search, Pencil, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { EventDialog } from './EventDialog';
+import { EventMarker } from './EventMarker';
 import type {
   CalendarConfig,
   CalendarEvent,
@@ -200,7 +201,11 @@ export function EventListView({
                     key={event.id}
                     className="hover:bg-surface-elevated border-divider group flex w-full items-center gap-2 border-b px-3 py-2.5 transition-colors duration-150 last:border-b-0"
                   >
-                    <span className="bg-accent-blue-text inline-block h-2 w-2 shrink-0 rounded-full transition-transform duration-150 group-hover:scale-125" />
+                    <EventMarker
+                      event={event}
+                      size="row"
+                      className="transition-transform duration-150 group-hover:scale-125"
+                    />
                     <button
                       type="button"
                       onClick={() => handleEditEvent(event)}
