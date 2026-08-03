@@ -61,12 +61,12 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
                 {signedMod(score)}
               </span>
               {save != null ? (
-                <span className="text-accent-amber-text text-[10px] font-semibold">
-                  SV {save}
+                <span className="text-accent-amber-text text-[10px] font-bold">
+                  SAVE {save}
                 </span>
               ) : (
-                <span className="text-faint text-[10px]">
-                  SV {signedMod(score)}
+                <span className="text-muted text-[10px] font-semibold">
+                  SAVE {signedMod(score)}
                 </span>
               )}
             </div>
