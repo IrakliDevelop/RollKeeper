@@ -54,7 +54,7 @@ export function useDmVttPlacementAndSelection({
   }, []);
 
   const armPlacement = useCallback(
-    async (entity: EncounterEntity) => {
+    (entity: EncounterEntity) => {
       if (status !== 'live') {
         addToast({
           type: 'info',
@@ -63,18 +63,22 @@ export function useDmVttPlacementAndSelection({
         });
         return;
       }
-      const config: DmTokenConfig = {
-        entityId: entity.id,
-        name: entity.name,
-        avatarUrl: await prepareCombatantTokenAvatar(entity),
-        color: entity.color ?? dispositionColor(entity),
-        tokenSize: entity.tokenSize,
-        onPlaced: () => {
-          setPendingPlacement(null); // SYNCHRONOUS — see comment above.
-          selectEntity(entity.id);
-        },
+      const arm = (avatarUrl?: string) => {
+        const config: DmTokenConfig = {
+          entityId: entity.id,
+          name: entity.name,
+          avatarUrl,
+          color: entity.color ?? dispositionColor(entity),
+          tokenSize: entity.tokenSize,
+          onPlaced: () => {
+            setPendingPlacement(null); // SYNCHRONOUS — see comment above.
+            selectEntity(entity.id);
+          },
+        };
+        setPendingPlacement({ entityName: entity.name, config });
       };
-      setPendingPlacement({ entityName: entity.name, config });
+      if (entity.avatarUrl) void prepareCombatantTokenAvatar(entity).then(arm);
+      else arm();
     },
     [status, addToast, selectEntity]
   );
