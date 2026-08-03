@@ -303,6 +303,20 @@ function applyTurnStart(
 }
 
 /**
+ * True when `id` still resolves to a trackable entry on the linked NPC's
+ * stat block — used to decide whether an 'npc'-sourced ability survives a
+ * rest. An entry that was deleted, or whose config became untrackable
+ * (e.g. its uses/recharge markup was edited away), is not "live".
+ */
+function isLiveNpcEntry(
+  npcBlock: MonsterStatBlock | undefined,
+  id: string
+): boolean {
+  const entry = findEntryById(npcBlock, id);
+  return entry != null && getEntryAbilityConfig(entry) != null;
+}
+
+/**
  * Resolves the authoritative NPC for a linked entity. Returns:
  * - { npc } when the entity is NPC-linked and the NPC exists
  * - { npc: null } when the entity is linked but the NPC is gone (entity-only fallback)
@@ -1369,12 +1383,12 @@ export const useEncounterStore = create<EncounterStoreState>()(
                             .filter(
                               a =>
                                 a.source !== 'npc' ||
-                                findEntryById(npcBlock, a.id) != null
+                                isLiveNpcEntry(npcBlock, a.id)
                             )
                             .map(a => {
                               if (
                                 a.source === 'npc' &&
-                                findEntryById(npcBlock, a.id)
+                                isLiveNpcEntry(npcBlock, a.id)
                               ) {
                                 return { ...a, usedUses: npcUsage![a.id] ?? 0 };
                               }
@@ -1445,7 +1459,7 @@ export const useEncounterStore = create<EncounterStoreState>()(
                       ? e.abilities.filter(
                           a =>
                             a.source !== 'npc' ||
-                            findEntryById(npcBlockForLongRest, a.id) != null
+                            isLiveNpcEntry(npcBlockForLongRest, a.id)
                         )
                       : e.abilities
                     ).map(a => ({ ...a, usedUses: 0 })),

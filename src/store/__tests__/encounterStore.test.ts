@@ -2214,6 +2214,27 @@ describe('encounterStore', () => {
       expect(after.abilities!.some(a => a.name.startsWith('Roar'))).toBe(true); // kept
     });
 
+    it("shortRestEntity drops an 'npc'-sourced ability whose NPC entry survives but became untrackable (uses removed, name unmarked)", () => {
+      const { npcId, encId, entityId } = setupLinkedAbilityEntity();
+      const npc = useNPCStore.getState().getNPC(RES_CAMPAIGN, npcId)!;
+      const npcSb = structuredClone(npc.monsterStatBlock!);
+      // "Smite" carries no recharge/per-day markup — stripping `uses` makes
+      // getEntryAbilityConfig return null (untrackable) without deleting the entry.
+      npcSb.actions = npcSb.actions.map(a =>
+        a.id === 'entry-smite' ? { ...a, uses: undefined } : a
+      );
+      useNPCStore
+        .getState()
+        .updateNPC(RES_CAMPAIGN, npcId, { monsterStatBlock: npcSb });
+
+      useEncounterStore.getState().shortRestEntity(encId, entityId);
+      const after = useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!
+        .entities.find(e => e.id === entityId)!;
+      expect(after.abilities!.some(a => a.id === 'entry-smite')).toBe(false);
+    });
+
     it('longRestEntity zeroes NPC usage and entity counters through the mirror', () => {
       const { npcId, encId, entityId } = setupLinkedAbilityEntity();
       useEncounterStore.getState().useAbility(encId, entityId, 'entry-smite');
@@ -2314,6 +2335,60 @@ describe('encounterStore', () => {
       );
       const twins = entity.abilities!.filter(a => a.name === 'Twin');
       expect(twins.every(a => a.usedUses === 0)).toBe(true); // ambiguous → reset
+    });
+
+    it('does not throw when an entity monsterStatBlock is missing bonusActions/lairActions entirely, and rebuilds abilities', async () => {
+      const { migrateEncounterPersistedState } = await import(
+        '@/store/encounterStore'
+      );
+      const legacyBlock = abilityStatBlock() as Partial<MonsterStatBlock>;
+      delete legacyBlock.bonusActions;
+      delete legacyBlock.lairActions;
+      const persisted = {
+        activeEncounterId: null,
+        encounters: [
+          {
+            id: 'enc-1',
+            name: 'Old Fight',
+            entities: [
+              {
+                id: 'e1',
+                type: 'npc',
+                name: 'Druid',
+                initiative: null,
+                initiativeModifier: 0,
+                currentHp: 10,
+                maxHp: 10,
+                tempHp: 0,
+                armorClass: 12,
+                conditions: [],
+                npcSourceId: 'npc-x',
+                campaignCode: RES_CAMPAIGN,
+                monsterStatBlock: legacyBlock,
+                abilities: [],
+              },
+            ],
+            currentTurn: 0,
+            round: 0,
+            isActive: false,
+            sortOrder: 'initiative',
+            createdAt: 'x',
+            updatedAt: 'x',
+          },
+        ],
+      };
+      let out!: ReturnType<typeof migrateEncounterPersistedState>;
+      expect(() => {
+        out = migrateEncounterPersistedState(structuredClone(persisted), 1);
+      }).not.toThrow();
+      const entity = out.encounters[0].entities[0];
+      expect(entity.monsterStatBlock!.bonusActions).toEqual([]);
+      expect(entity.monsterStatBlock!.lairActions).toEqual([]);
+      // Abilities rebuilt from the (backfilled) normalized block.
+      expect(entity.abilities!.some(a => a.id === 'entry-smite')).toBe(true);
+      expect(entity.abilities!.some(a => a.id === 'entry-elemental')).toBe(
+        true
+      );
     });
   });
 
