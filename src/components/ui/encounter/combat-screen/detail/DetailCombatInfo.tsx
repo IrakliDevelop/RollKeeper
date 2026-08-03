@@ -66,7 +66,6 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
   const sb = entity.monsterStatBlock;
   const isPlayer = entity.type === 'player';
   const canEdit = !isPlayer && sb != null;
-  const canEditBasics = !isPlayer;
 
   const resistances =
     (sb != null ? sbField(sb, 'resistances') : undefined) ??
@@ -81,24 +80,11 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
     (sb != null ? sbField(sb, 'senses') : undefined) ??
     entity.senses?.map(s => `${s.name} ${s.range} ft.`).join(', ');
 
-  // Editable input is type="number" — a "+" prefix is invalid number syntax
-  // and the browser blanks the field, so only the static display gets the sign.
-  const initiativeModValue = String(entity.initiativeModifier);
-  const initiativeModDisplay =
-    entity.initiativeModifier >= 0
-      ? `+${entity.initiativeModifier}`
-      : String(entity.initiativeModifier);
-  const proficiencyBonusValue =
-    entity.proficiencyBonus != null
-      ? String(entity.proficiencyBonus)
-      : undefined;
   const passivePerceptionValue =
     sb?.passivePerception != null ? String(sb.passivePerception) : undefined;
 
   const hasAnyData =
     sb != null ||
-    entity.initiativeModifier !== 0 ||
-    entity.proficiencyBonus != null ||
     (entity.damageResistances?.length ?? 0) > 0 ||
     (entity.damageImmunities?.length ?? 0) > 0 ||
     (entity.conditionImmunities?.length ?? 0) > 0 ||
@@ -133,58 +119,13 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
     });
   };
 
-  const updateInitiativeModifier = (value: string) => {
-    const trimmed = value.trim();
-    if (trimmed === '') return;
-    const num = parseInt(trimmed, 10);
-    if (!Number.isNaN(num))
-      actions.onUpdate(entity.id, { initiativeModifier: num });
-  };
-
-  const updateProficiencyBonus = (value: string) => {
-    const trimmed = value.trim();
-    if (trimmed === '') return;
-    const num = parseInt(trimmed, 10);
-    if (!Number.isNaN(num))
-      actions.onUpdate(entity.id, { proficiencyBonus: num });
-  };
-
   return (
     <div className="border-divider space-y-0 border-t p-4">
       <h3 className="text-heading mb-1 text-xs font-semibold tracking-wider uppercase">
         Combat Details
       </h3>
-      {canEditBasics ? (
-        <>
-          <InfoRow
-            label="Initiative Mod"
-            value={initiativeModValue}
-            editable
-            type="number"
-            onChange={updateInitiativeModifier}
-          />
-          <InfoRow
-            label="Proficiency Bonus"
-            value={proficiencyBonusValue}
-            editable
-            type="number"
-            onChange={updateProficiencyBonus}
-          />
-        </>
-      ) : (
-        <>
-          <StaticRow label="Initiative Mod" value={initiativeModDisplay} />
-          <StaticRow label="Proficiency Bonus" value={proficiencyBonusValue} />
-        </>
-      )}
       {canEdit ? (
         <>
-          <InfoRow
-            label="Speed"
-            value={sb?.speed}
-            editable
-            onChange={v => updateSb('speed', v)}
-          />
           <InfoRow
             label="Saving Throws"
             value={sb?.saves}
@@ -243,7 +184,6 @@ export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
         </>
       ) : (
         <>
-          <StaticRow label="Speed" value={sb?.speed} />
           <StaticRow label="Saving Throws" value={sb?.saves} />
           <StaticRow label="Skills" value={sb?.skills} />
           <StaticRow label="Resistances" value={resistances} />
