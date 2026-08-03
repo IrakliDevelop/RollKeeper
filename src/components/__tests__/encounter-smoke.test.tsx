@@ -424,7 +424,7 @@ describe('MonsterStatBlockPanel', () => {
   it('displays actions', () => {
     render(<MonsterStatBlockPanel statBlock={mockStatBlock} />);
     expect(screen.getAllByText('Actions').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/Scimitar\./).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Scimitar/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('displays senses with passive perception', () => {
