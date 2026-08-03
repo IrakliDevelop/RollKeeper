@@ -30,7 +30,11 @@ export async function enqueueXpAward(
     [key],
     [serialized, String(XP_QUEUE_CAP), String(SLIDING_TTL_SECONDS)]
   );
-  return result === 'full' ? 'full' : 'ok';
+  // Fail loud on anything unexpected — silently treating an unrecognized
+  // reply as 'ok' would let the route return 200 while the award was never
+  // stored (the caller's try/catch turns this throw into a 500).
+  if (result === 'ok' || result === 'full') return result;
+  throw new Error(`enqueueXpAward: unexpected EVAL reply: ${String(result)}`);
 }
 
 /**
@@ -62,7 +66,15 @@ export async function readXpAwards(
   return envelopes;
 }
 
-/** Remove exactly one matching entry, then refresh or delete the key. */
+/**
+ * Remove exactly one matching entry, then refresh expiry if entries remain.
+ *
+ * No explicit DEL when the queue empties: LREM → LLEN is not atomic, so a
+ * concurrent enqueue landing between them could see remaining === 0 from a
+ * list a fresh RPUSH just repopulated, and DEL would destroy that award.
+ * Redis already deletes a list key on its own once the last element is
+ * removed, so skipping DEL here is both safe and sufficient.
+ */
 export async function ackXpAward(
   redis: Redis,
   key: string,
@@ -72,8 +84,6 @@ export async function ackXpAward(
   const remaining = await redis.llen(key);
   if (remaining > 0) {
     await redis.expire(key, SLIDING_TTL_SECONDS);
-  } else {
-    await redis.del(key);
   }
 }
 

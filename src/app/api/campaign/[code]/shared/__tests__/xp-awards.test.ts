@@ -112,6 +112,17 @@ describe('POST feature=xp', () => {
     expect(statuses).toEqual([200, 409]); // exactly one landed
     expect(getRedisLists().get(xpKey)).toHaveLength(100);
   });
+
+  it('responds 500 when the EVAL reply is neither "ok" nor "full"', async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    mockRedis.eval.mockResolvedValueOnce('unexpected-reply' as never);
+    const res = await postXp(makeAward());
+    expect(res.status).toBe(500);
+    expect(getRedisLists().get(xpKey)).toBeUndefined();
+    consoleErrorSpy.mockRestore();
+  });
 });
 
 describe('GET xpAwards', () => {
@@ -175,16 +186,20 @@ describe('DELETE type=xp', () => {
     expect(res.status).toBe(200);
   });
 
-  it('deletes the key when the queue empties and refreshes expiry otherwise', async () => {
+  it('leaves the list empty when the queue empties, and refreshes expiry otherwise', async () => {
     await postXp(makeAward({ id: 'a' }));
     await postXp(makeAward({ id: 'b' }));
     const stored = [...getRedisLists().get(xpKey)!];
     mockRedis.expire.mockClear();
     await deleteXp(stored[0]);
-    expect(getRedisLists().has(xpKey)).toBe(true);
+    expect(getRedisLists().get(xpKey)).toHaveLength(1);
     expect(mockRedis.expire).toHaveBeenCalledWith(xpKey, expect.any(Number));
+    mockRedis.expire.mockClear();
     await deleteXp(stored[1]);
-    expect(getRedisLists().has(xpKey)).toBe(false);
+    expect(getRedisLists().get(xpKey)).toHaveLength(0);
+    // No explicit DEL on empty (would race a concurrent enqueue) — expiry is
+    // simply not refreshed once nothing remains.
+    expect(mockRedis.expire).not.toHaveBeenCalled();
   });
 
   it('rejects a missing receipt with 400', async () => {
