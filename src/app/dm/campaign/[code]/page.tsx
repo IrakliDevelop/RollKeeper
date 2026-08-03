@@ -25,6 +25,7 @@ import {
   ChevronDown,
   ChevronRight,
   ScrollText,
+  TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Switch } from '@/components/ui/forms/switch';
@@ -39,6 +40,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { PlayerSummaryCard } from '@/components/ui/campaign/PlayerSummaryCard';
 import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
 import { SendMessageDialog } from '@/components/ui/campaign/SendMessageDialog';
+import { AwardXpDialog } from '@/components/ui/campaign/AwardXpDialog';
 import { NPCSection } from '@/components/ui/campaign/NPCSection';
 import { useCampaignSync } from '@/hooks/useCampaignSync';
 import { useDmCounterSync } from '@/hooks/useDmCounterSync';
@@ -122,6 +124,7 @@ export default function CampaignViewPage() {
   );
   const [npcSendDialogOpen, setNpcSendDialogOpen] = useState(false);
   const [isNpcSendingItem, setIsNpcSendingItem] = useState(false);
+  const [awardXpOpen, setAwardXpOpen] = useState(false);
 
   const playersSectionOpen =
     localCampaign?.dmDashboardUi?.playersSectionOpen ?? true;
@@ -607,6 +610,14 @@ export default function CampaignViewPage() {
                   >
                     Message All
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<TrendingUp size={14} />}
+                    onClick={() => setAwardXpOpen(true)}
+                  >
+                    Award XP
+                  </Button>
                 </div>
               </div>
 
@@ -725,6 +736,8 @@ export default function CampaignViewPage() {
             setMessageTarget(selectedPlayer);
             setSelectedPlayer(null);
           }}
+          campaignCode={code}
+          dmId={dmId}
         />
       )}
 
@@ -746,6 +759,14 @@ export default function CampaignViewPage() {
         onClose={() => setMessageTarget(null)}
         players={players}
         targetPlayer={messageTarget === 'all' ? null : messageTarget}
+        campaignCode={code}
+        dmId={dmId}
+      />
+
+      <AwardXpDialog
+        open={awardXpOpen}
+        onClose={() => setAwardXpOpen(false)}
+        players={players}
         campaignCode={code}
         dmId={dmId}
       />

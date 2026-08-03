@@ -1,0 +1,149 @@
+'use client';
+
+import { useState } from 'react';
+import { TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { Switch } from '@/components/ui/forms/switch';
+import type { DmXpAward } from '@/types/sharedState';
+
+interface XpAwardControlProps {
+  campaignCode: string;
+  dmId: string;
+  playerId: string;
+  /** XP from the player's last synced snapshot — may be stale. */
+  lastSyncedXp: number;
+}
+
+export async function postXpAward(
+  campaignCode: string,
+  dmId: string,
+  playerId: string,
+  award: DmXpAward
+): Promise<void> {
+  const res = await fetch(`/api/campaign/${campaignCode}/shared`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ feature: 'xp', data: { playerId, award }, dmId }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Failed (${res.status})`);
+  }
+}
+
+export function XpAwardControl({
+  campaignCode,
+  dmId,
+  playerId,
+  lastSyncedXp,
+}: XpAwardControlProps) {
+  const [mode, setMode] = useState<'add' | 'set'>('add');
+  const [amount, setAmount] = useState<number | undefined>(undefined);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+  // Retained on failure so Retry re-sends the ORIGINAL award (same id) — a
+  // lost response may still have enqueued it; the player dedupes by id.
+  const [failedAward, setFailedAward] = useState<DmXpAward | null>(null);
+
+  const minAmount = mode === 'add' ? 1 : 0;
+  const valid = amount !== undefined && amount >= minAmount;
+
+  const send = async (award: DmXpAward) => {
+    setSending(true);
+    setError(null);
+    setSent(false);
+    try {
+      await postXpAward(campaignCode, dmId, playerId, award);
+      setFailedAward(null);
+      setAmount(undefined);
+      setSent(true);
+    } catch (err) {
+      setFailedAward(award);
+      setError(err instanceof Error ? err.message : 'Failed to send XP award');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleSend = () => {
+    if (!valid) return;
+    send({
+      id: crypto.randomUUID(),
+      mode,
+      amount: amount!,
+      awardedAt: new Date().toISOString(),
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-heading flex items-center gap-1.5 text-sm font-medium">
+          <TrendingUp size={14} />
+          Award XP
+        </span>
+        <span className="text-faint text-xs">
+          Last synced: {lastSyncedXp.toLocaleString()} XP
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span
+          className={`text-xs font-medium ${mode === 'add' ? 'text-heading' : 'text-muted'}`}
+        >
+          Add
+        </span>
+        <Switch
+          checked={mode === 'set'}
+          onCheckedChange={checked => setMode(checked ? 'set' : 'add')}
+          size="sm"
+          aria-label="Toggle between add and set XP"
+        />
+        <span
+          className={`text-xs font-medium ${mode === 'set' ? 'text-heading' : 'text-muted'}`}
+        >
+          Set
+        </span>
+        <NumberInput
+          value={amount}
+          onChange={setAmount}
+          min={minAmount}
+          allowEmpty
+          placeholder={mode === 'add' ? 'XP to add...' : 'Total XP...'}
+          aria-label={mode === 'add' ? 'XP to add' : 'Total XP'}
+          className="flex-1"
+        />
+        {failedAward ? (
+          <Button
+            variant="warning"
+            size="sm"
+            onClick={() => send(failedAward)}
+            disabled={sending}
+          >
+            {sending ? 'Sending...' : 'Retry'}
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSend}
+            disabled={!valid || sending}
+          >
+            {sending ? 'Sending...' : 'Send'}
+          </Button>
+        )}
+      </div>
+      {mode === 'set' && (
+        <p className="text-faint text-xs">
+          Sets the player&apos;s total XP — overwrites changes they made since
+          the last sync.
+        </p>
+      )}
+      {error && <p className="text-accent-red-text text-xs">{error}</p>}
+      {sent && !error && (
+        <p className="text-accent-emerald-text text-xs">XP award sent.</p>
+      )}
+    </div>
+  );
+}
