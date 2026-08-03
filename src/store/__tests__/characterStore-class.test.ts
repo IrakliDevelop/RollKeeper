@@ -568,17 +568,15 @@ describe('characterStore — class, level, multiclass, hit dice, XP', () => {
       expect(useCharacterStore.getState().hasUnsavedChanges).toBe(true);
     });
 
-    it('updates character level when XP crosses a threshold', () => {
+    it('adds XP without auto-leveling', () => {
       // Level 5 requires 6500, level 6 requires 14000. Start at 6500.
-      // Adding 7500 puts us at 14000 — level 6.
+      // Adding 7500 puts us at 14000 XP, but level does not auto-update.
+      const levelBefore = useCharacterStore.getState().character.level;
       useCharacterStore.getState().addExperience(7500);
-      expect(useCharacterStore.getState().character.level).toBe(6);
-    });
-
-    it('does not reduce level when XP stays within current level range', () => {
-      // Adding 500 XP stays at level 5 (still below 14000)
-      useCharacterStore.getState().addExperience(500);
-      expect(useCharacterStore.getState().character.level).toBe(5);
+      expect(useCharacterStore.getState().character.experience).toBe(
+        6500 + 7500
+      );
+      expect(useCharacterStore.getState().character.level).toBe(levelBefore);
     });
 
     it('no longer sets showLevelUpAnimation (state-observer owns it)', () => {
@@ -622,16 +620,20 @@ describe('characterStore — class, level, multiclass, hit dice, XP', () => {
       expect(useCharacterStore.getState().hasUnsavedChanges).toBe(true);
     });
 
-    it('updates character level based on new XP', () => {
-      // 14000 XP = level 6
+    it('sets XP without auto-leveling', () => {
+      // Character starts at level 5; setting XP does not auto-update level
+      const levelBefore = useCharacterStore.getState().character.level;
       useCharacterStore.getState().setExperience(14000);
-      expect(useCharacterStore.getState().character.level).toBe(6);
+      expect(useCharacterStore.getState().character.experience).toBe(14000);
+      expect(useCharacterStore.getState().character.level).toBe(levelBefore);
     });
 
-    it('can set experience to 0 and keep level at 1', () => {
+    it('can set experience to 0 without changing level', () => {
+      // Character starts at level 5; setting XP to 0 does not auto-level
+      const levelBefore = useCharacterStore.getState().character.level;
       useCharacterStore.getState().setExperience(0);
       expect(useCharacterStore.getState().character.experience).toBe(0);
-      expect(useCharacterStore.getState().character.level).toBe(1);
+      expect(useCharacterStore.getState().character.level).toBe(levelBefore);
     });
 
     it('no longer sets showLevelUpAnimation (state-observer owns it)', () => {
