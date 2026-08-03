@@ -182,6 +182,24 @@ describe('DetailCombatInfo — field inventory', () => {
     );
   });
 
+  it('editing Saving Throws patches monsterStatBlock.saves via onUpdate', async () => {
+    const actions = makeActions();
+    const user = userEvent.setup();
+    render(<DetailCombatInfo entity={monsterEntity} actions={actions} />);
+
+    const input = screen.getByLabelText('Saving Throws');
+    await user.clear(input);
+    await user.type(input, 'Dex +9');
+    await user.tab();
+
+    expect(actions.onUpdate).toHaveBeenCalledWith(
+      'monster-1',
+      expect.objectContaining({
+        monsterStatBlock: expect.objectContaining({ saves: 'Dex +9' }),
+      })
+    );
+  });
+
   it('editing Condition Immunities splits the comma-separated input into an array', async () => {
     const actions = makeActions();
     const user = userEvent.setup();

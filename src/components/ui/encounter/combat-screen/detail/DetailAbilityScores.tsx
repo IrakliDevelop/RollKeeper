@@ -2,10 +2,10 @@
 
 import React from 'react';
 import { NumberField } from '@/components/ui/forms/NumberInput';
+import { parseSavesString, type AbilityKey } from './DetailAbilityScores.utils';
 import type { DetailSectionProps } from './DetailHeader';
 
 const ABILITY_LABELS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const;
-type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha';
 const ABILITY_KEYS: AbilityKey[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 
 function signedMod(score: number): string {
@@ -17,6 +17,7 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
   const sb = entity.monsterStatBlock;
   if (!sb) return null;
 
+  const saveByAbility = parseSavesString(sb.saves);
   const isPlayer = entity.type === 'player';
 
   const handleChange = (key: AbilityKey, val: number | undefined) => {
@@ -35,6 +36,7 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
       <div className="grid grid-cols-6 gap-1">
         {ABILITY_KEYS.map((key, i) => {
           const score = sb[key];
+          const save = saveByAbility[key];
           return (
             <div
               key={key}
@@ -58,6 +60,15 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
               <span className="text-accent-emerald-text-muted text-[10px]">
                 {signedMod(score)}
               </span>
+              {save != null ? (
+                <span className="text-accent-amber-text text-[10px] font-semibold">
+                  SV {save}
+                </span>
+              ) : (
+                <span className="text-faint text-[10px]">
+                  SV {signedMod(score)}
+                </span>
+              )}
             </div>
           );
         })}
