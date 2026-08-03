@@ -846,6 +846,8 @@ export function NPCDetailDialog({
                 <MonsterStatBlockPanel
                   statBlock={statBlock}
                   resources={npc.resources}
+                  abilityUsage={npc.abilityUsage}
+                  readOnly={readOnly}
                   onUseEntry={
                     readOnly
                       ? undefined
@@ -858,6 +860,36 @@ export function NPCDetailDialog({
                                 npc.id,
                                 entry.resourceCost.resourceId,
                                 entry.resourceCost.amount
+                              );
+                          }
+                        }
+                  }
+                  onUseAbilityEntry={
+                    readOnly
+                      ? undefined
+                      : entry => {
+                          if (entry.id) {
+                            useNPCStore
+                              .getState()
+                              .useNpcAbility(
+                                npc.campaignCode,
+                                npc.id,
+                                entry.id
+                              );
+                          }
+                        }
+                  }
+                  onRestoreAbilityEntry={
+                    readOnly
+                      ? undefined
+                      : entry => {
+                          if (entry.id) {
+                            useNPCStore
+                              .getState()
+                              .restoreNpcAbility(
+                                npc.campaignCode,
+                                npc.id,
+                                entry.id
                               );
                           }
                         }
