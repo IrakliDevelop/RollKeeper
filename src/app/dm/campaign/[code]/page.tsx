@@ -451,6 +451,74 @@ export default function CampaignViewPage() {
       </div>
 
       <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+        {/* House Rules */}
+        {!loading && !error && (
+          <div>
+            <div className="mb-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setDmDashboardUi(code, {
+                    houseRulesSectionOpen: !houseRulesSectionOpen,
+                  })
+                }
+                className="text-muted hover:text-body hover:bg-surface-secondary shrink-0 rounded-md p-1 transition-colors"
+                aria-expanded={houseRulesSectionOpen}
+                aria-controls="dm-campaign-house-rules-section"
+                title={
+                  houseRulesSectionOpen
+                    ? 'Collapse house rules'
+                    : 'Expand house rules'
+                }
+              >
+                {houseRulesSectionOpen ? (
+                  <ChevronDown size={20} />
+                ) : (
+                  <ChevronRight size={20} />
+                )}
+              </button>
+              <div className="flex min-w-0 items-center gap-2">
+                <ScrollText size={20} className="text-muted shrink-0" />
+                <h2 className="text-heading text-lg font-semibold">
+                  House Rules
+                </h2>
+              </div>
+            </div>
+
+            {houseRulesSectionOpen && (
+              <Card id="dm-campaign-house-rules-section">
+                <CardHeader>
+                  <CardDescription>
+                    Rules that apply to every player in this campaign.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p
+                        id="stackable-inspiration-label"
+                        className="text-heading font-medium"
+                      >
+                        Stackable heroic inspiration
+                      </p>
+                      <p className="text-muted text-sm">
+                        When on, players can hold more than one Heroic
+                        Inspiration. When off, they follow classic rules (at
+                        most one).
+                      </p>
+                    </div>
+                    <Switch
+                      checked={stackableInspiration}
+                      onCheckedChange={handleToggleStackableInspiration}
+                      aria-labelledby="stackable-inspiration-label"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-muted animate-pulse text-lg">
@@ -620,74 +688,6 @@ export default function CampaignViewPage() {
               </div>
             )}
           </>
-        )}
-
-        {/* House Rules */}
-        {!loading && !error && (
-          <div>
-            <div className="mb-4 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setDmDashboardUi(code, {
-                    houseRulesSectionOpen: !houseRulesSectionOpen,
-                  })
-                }
-                className="text-muted hover:text-body hover:bg-surface-secondary shrink-0 rounded-md p-1 transition-colors"
-                aria-expanded={houseRulesSectionOpen}
-                aria-controls="dm-campaign-house-rules-section"
-                title={
-                  houseRulesSectionOpen
-                    ? 'Collapse house rules'
-                    : 'Expand house rules'
-                }
-              >
-                {houseRulesSectionOpen ? (
-                  <ChevronDown size={20} />
-                ) : (
-                  <ChevronRight size={20} />
-                )}
-              </button>
-              <div className="flex min-w-0 items-center gap-2">
-                <ScrollText size={20} className="text-muted shrink-0" />
-                <h2 className="text-heading text-lg font-semibold">
-                  House Rules
-                </h2>
-              </div>
-            </div>
-
-            {houseRulesSectionOpen && (
-              <Card id="dm-campaign-house-rules-section">
-                <CardHeader>
-                  <CardDescription>
-                    Rules that apply to every player in this campaign.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p
-                        id="stackable-inspiration-label"
-                        className="text-heading font-medium"
-                      >
-                        Stackable heroic inspiration
-                      </p>
-                      <p className="text-muted text-sm">
-                        When on, players can hold more than one Heroic
-                        Inspiration. When off, they follow classic rules (at
-                        most one).
-                      </p>
-                    </div>
-                    <Switch
-                      checked={stackableInspiration}
-                      onCheckedChange={handleToggleStackableInspiration}
-                      aria-labelledby="stackable-inspiration-label"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
         )}
 
         {/* NPC Management */}
