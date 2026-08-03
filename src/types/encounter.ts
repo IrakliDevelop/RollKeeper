@@ -226,7 +226,7 @@ export interface CombatConfig {
   hpStateBands: HpStateBand[];
   enemyConditionsDisplay: EnemyConditionsDisplay;
   /** DM-defined condition presets available in every combat. */
-  customStatuses: string[];
+  customStatuses?: string[];
 }
 
 export const DEFAULT_HP_STATE_BANDS: HpStateBand[] = [
