@@ -5,15 +5,32 @@ import { Plus } from 'lucide-react';
 import type { DetailSectionProps } from './DetailHeader';
 import { DEBUFF_PALETTE, BUFF_PALETTE } from '../effectPalettes';
 import { ActiveEffectChip } from './ActiveEffectChip';
+import { useEncounterStore } from '@/store/encounterStore';
 
 type PaletteTab = 'conditions' | 'buffs';
 
 export function DetailEffects({ entity, actions }: DetailSectionProps) {
   const [tab, setTab] = useState<PaletteTab>('conditions');
   const [customInput, setCustomInput] = useState('');
+  const customStatuses = useEncounterStore(
+    state => state.combatConfig.customStatuses ?? []
+  );
 
   const activeNames = new Set(entity.conditions.map(c => c.name));
-  const palette = tab === 'conditions' ? DEBUFF_PALETTE : BUFF_PALETTE;
+  const palette =
+    tab === 'conditions'
+      ? [
+          ...DEBUFF_PALETTE,
+          ...customStatuses
+            .filter(
+              name =>
+                !DEBUFF_PALETTE.some(
+                  entry => entry.name.toLowerCase() === name.toLowerCase()
+                )
+            )
+            .map(name => ({ name, kind: 'debuff' as const })),
+        ]
+      : BUFF_PALETTE;
 
   const handleAddCustom = () => {
     const name = customInput.trim();

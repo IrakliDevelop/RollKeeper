@@ -225,6 +225,8 @@ export interface CombatConfig {
   enemyHpDisplay: EnemyHpDisplay;
   hpStateBands: HpStateBand[];
   enemyConditionsDisplay: EnemyConditionsDisplay;
+  /** DM-defined condition presets available in every combat. */
+  customStatuses: string[];
 }
 
 export const DEFAULT_HP_STATE_BANDS: HpStateBand[] = [
@@ -240,6 +242,7 @@ export const DEFAULT_COMBAT_CONFIG: CombatConfig = {
   enemyHpDisplay: 'off',
   hpStateBands: DEFAULT_HP_STATE_BANDS,
   enemyConditionsDisplay: 'off',
+  customStatuses: [],
 };
 
 export interface NPCInventoryItem {
