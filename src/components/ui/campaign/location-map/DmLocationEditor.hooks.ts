@@ -123,6 +123,10 @@ export interface DmLocationEditorState {
   selectedElementId: string | null;
   isDmOnly: boolean;
   handleToggleDmOnly: () => void;
+  hiddenPlacementActive: boolean;
+  handleToggleHiddenPlacement: () => void;
+  hiddenElementCount: number;
+  handleRevealAll: () => void;
 
   // Loading states
   syncing: boolean;
@@ -172,6 +176,7 @@ export function useDmLocationEditor(
   const autoSaveRef = useRef<AutoSave | null>(null);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
+  const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
   const [syncStatus, setSyncStatus] = useState<
     BattleMapConnectionStatus | 'disabled'
   >('disabled');
@@ -227,6 +232,8 @@ export function useDmLocationEditor(
     selectedElementId != null
       ? (dmOnlyElements[selectedElementId] ?? false)
       : false;
+  const [hiddenPlacementActive, setHiddenPlacementActive] = useState(false);
+  const hiddenPlacementActiveRef = useRef(false);
 
   // Loading states
   const [syncing, setSyncing] = useState(false);
@@ -354,6 +361,23 @@ export function useDmLocationEditor(
       vp.store.on('add', saveAndMarkDirty);
       vp.store.on('remove', saveAndMarkDirty);
       vp.store.on('update', saveAndMarkDirty);
+
+      // Register before live sync starts so a newly-created local element is
+      // marked DM-only before the sync client resolves its audience. Remote
+      // additions (including player tokens) must never inherit this setting.
+      hiddenPlacementUnsubRef.current?.();
+      hiddenPlacementUnsubRef.current = vp.store.on('add', (element, meta) => {
+        if (
+          mode !== 'battlemap' ||
+          !hiddenPlacementActiveRef.current ||
+          (meta?.origin !== undefined && meta.origin !== 'local')
+        ) {
+          return;
+        }
+        useBattleMapStore
+          .getState()
+          .setDmOnly(campaignCode, location.id, element.id, true);
+      });
 
       // Layers aren't synced: player tokens arrive referencing player-*
       // layer ids that don't exist on this canvas and would sort at layer
@@ -483,6 +507,7 @@ export function useDmLocationEditor(
       autoSaveRef.current?.stop();
       connectionRef.current?.stop();
       pinUnsubRef.current?.();
+      hiddenPlacementUnsubRef.current?.();
     };
   }, []);
 
@@ -618,6 +643,32 @@ export function useDmLocationEditor(
     mode,
     getVp,
   ]);
+
+  const handleToggleHiddenPlacement = useCallback(() => {
+    setHiddenPlacementActive(current => {
+      const next = !current;
+      hiddenPlacementActiveRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const handleRevealAll = useCallback(() => {
+    if (mode !== 'battlemap') return;
+    const vp = getVp();
+    if (!vp) return;
+    const hiddenIds = Object.keys(
+      useBattleMapStore.getState().battleMaps[campaignCode]?.[location.id]
+        ?.dmOnlyElements ?? {}
+    );
+    if (hiddenIds.length === 0) return;
+
+    battleMapStoreUpdate(campaignCode, location.id, { dmOnlyElements: {} });
+    // Re-emit surviving elements after clearing their flags. The sync client
+    // stamps them for the player audience and publishes an upsert immediately.
+    for (const id of hiddenIds) {
+      if (vp.store.getById(id)) vp.store.update(id, {});
+    }
+  }, [mode, getVp, campaignCode, location.id, battleMapStoreUpdate]);
 
   const handleDeleteSelected = useCallback(() => {
     const vp = getVp();
@@ -925,6 +976,10 @@ export function useDmLocationEditor(
     selectedElementId,
     isDmOnly,
     handleToggleDmOnly,
+    hiddenPlacementActive,
+    handleToggleHiddenPlacement,
+    hiddenElementCount: Object.keys(dmOnlyElements).length,
+    handleRevealAll,
     syncing,
     hasUnsyncedChanges,
     lastSyncedAt,

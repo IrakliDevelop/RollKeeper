@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 
 import { DmVttToolbar } from '@/components/ui/campaign/dm-vtt/DmVttToolbar';
 
@@ -19,6 +19,10 @@ describe('DmVttToolbar', () => {
       <DmVttToolbar
         onClearDrawings={vi.fn()}
         tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive={false}
+        onToggleHiddenPlacement={vi.fn()}
+        hiddenElementCount={0}
+        onRevealAll={vi.fn()}
       />
     );
     const toolbar = container.firstChild as HTMLElement;
@@ -27,5 +31,31 @@ describe('DmVttToolbar', () => {
     expect(classes).not.toEqual(
       expect.arrayContaining([expect.stringMatching(/^min-\[1350px\]:top-3$/)])
     );
+  });
+
+  it('toggles hidden placement and offers reveal all', () => {
+    const onToggle = vi.fn();
+    const onRevealAll = vi.fn();
+    render(
+      <DmVttToolbar
+        onClearDrawings={vi.fn()}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive
+        onToggleHiddenPlacement={onToggle}
+        hiddenElementCount={2}
+        onRevealAll={onRevealAll}
+      />
+    );
+
+    const placement = screen.getByRole('button', {
+      name: 'Place hidden elements',
+    });
+    expect(placement).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(placement);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Reveal all hidden elements (2)' })
+    );
+    expect(onToggle).toHaveBeenCalledOnce();
+    expect(onRevealAll).toHaveBeenCalledOnce();
   });
 });

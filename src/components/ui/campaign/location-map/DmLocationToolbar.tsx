@@ -24,6 +24,8 @@ import {
   Move,
   RotateCcw,
   RotateCw,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { useActiveTool, useHistory, useSelectionOps } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
@@ -82,6 +84,10 @@ export default function DmLocationToolbar({
   selectedElementId,
   isDmOnly,
   onToggleDmOnly,
+  hiddenPlacementActive,
+  onToggleHiddenPlacement,
+  hiddenElementCount,
+  onRevealAll,
   mode,
   onOpenTvDisplay,
   syncStatus,
@@ -225,6 +231,36 @@ export default function DmLocationToolbar({
 
       {/* Right group */}
       <div className="ml-auto flex items-center gap-1">
+        {mode === 'battlemap' && (
+          <>
+            <Button
+              variant={hiddenPlacementActive ? 'warning' : 'ghost'}
+              onClick={onToggleHiddenPlacement}
+              title={
+                hiddenPlacementActive
+                  ? 'New elements are hidden from players'
+                  : 'New elements are visible to players'
+              }
+              aria-pressed={hiddenPlacementActive}
+              className="flex items-center gap-1.5 px-2 py-1 text-xs"
+            >
+              <EyeOff size={14} />
+              {hiddenPlacementActive ? 'Placing hidden' : 'Place hidden'}
+            </Button>
+            {hiddenElementCount > 0 && (
+              <Button
+                variant="ghost"
+                onClick={onRevealAll}
+                title={`Reveal all ${hiddenElementCount} hidden element${hiddenElementCount === 1 ? '' : 's'} to players`}
+                className="flex items-center gap-1.5 px-2 py-1 text-xs"
+              >
+                <Eye size={14} />
+                Reveal all ({hiddenElementCount})
+              </Button>
+            )}
+          </>
+        )}
+
         {/* DM-only toggle — only shown when a single element is selected */}
         {selectedElementId != null && (
           <DmOnlyToggle isDmOnly={isDmOnly} onToggle={onToggleDmOnly} />

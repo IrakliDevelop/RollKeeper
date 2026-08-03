@@ -62,6 +62,10 @@ const baseProps: DmLocationToolbarProps = {
   selectedElementId: null,
   isDmOnly: false,
   onToggleDmOnly: vi.fn(),
+  hiddenPlacementActive: false,
+  onToggleHiddenPlacement: vi.fn(),
+  hiddenElementCount: 0,
+  onRevealAll: vi.fn(),
   mode: 'battlemap',
   syncStatus: 'disabled',
 };
@@ -111,5 +115,26 @@ describe('DmLocationToolbar rotation buttons', () => {
   it('renders the Align trigger in the center group', () => {
     render(<DmLocationToolbar {...baseProps} />);
     expect(screen.getByTitle('Align & distribute')).toBeInTheDocument();
+  });
+
+  it('shows hidden-placement state and reveals all hidden elements', () => {
+    const onToggle = vi.fn();
+    const onRevealAll = vi.fn();
+    render(
+      <DmLocationToolbar
+        {...baseProps}
+        hiddenPlacementActive
+        onToggleHiddenPlacement={onToggle}
+        hiddenElementCount={3}
+        onRevealAll={onRevealAll}
+      />
+    );
+
+    const placement = screen.getByRole('button', { name: 'Placing hidden' });
+    expect(placement).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(placement);
+    fireEvent.click(screen.getByRole('button', { name: 'Reveal all (3)' }));
+    expect(onToggle).toHaveBeenCalledOnce();
+    expect(onRevealAll).toHaveBeenCalledOnce();
   });
 });
