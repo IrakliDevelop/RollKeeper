@@ -51,11 +51,18 @@ const baseStatBlock: MonsterStatBlock = {
   passivePerception: 26,
   traits: [
     {
+      id: 'trait-1',
       name: 'Legendary Resistance',
       text: 'If the dragon fails a save, it can choose to succeed instead.',
     },
   ],
-  actions: [{ name: 'Multiattack', text: 'The dragon makes three attacks.' }],
+  actions: [
+    {
+      id: 'action-1',
+      name: 'Multiattack',
+      text: 'The dragon makes three attacks.',
+    },
+  ],
   bonusActions: [],
   reactions: [],
   lairActions: [],
@@ -253,6 +260,7 @@ describe('CombatantDetail — monster with full stat block', () => {
         ...baseStatBlock,
         lairActions: [
           {
+            id: 'lair-1',
             name: 'Grasping Roots',
             text: '<p>Roots erupt from the ground.</p>',
           },
@@ -261,7 +269,7 @@ describe('CombatantDetail — monster with full stat block', () => {
     };
     render(<CombatantDetail entity={entityWithLair} actions={actions} />);
 
-    expect(screen.getByText('Grasping Roots.')).toBeInTheDocument();
+    expect(screen.getByText(/Grasping Roots/)).toBeInTheDocument();
   });
 
   it('legendary Use is disabled when action cost exceeds remaining', () => {

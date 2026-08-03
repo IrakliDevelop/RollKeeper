@@ -5,6 +5,7 @@ import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StatBlockTraits } from '@/components/ui/encounter/combat-screen/detail/StatBlockTraits';
 import type {
+  MonsterAbility,
   MonsterStatBlock,
   NpcResource,
   StatBlockEntry,
@@ -55,6 +56,7 @@ function statBlock(actions: StatBlockEntry[]): MonsterStatBlock {
 }
 
 const LINKED_ENTRY: StatBlockEntry = {
+  id: 'entry-1',
   name: 'Elemental Form',
   text: 'Transforms.',
   resourceCost: { resourceId: 'res-1', amount: 2 },
@@ -135,7 +137,33 @@ describe('StatBlockTraits — resource costs', () => {
         onUseEntry={vi.fn()}
       />
     );
-    expect(screen.getByText('(3/Day)')).toBeVisible();
+    expect(screen.getByText(/3\/Day/)).toBeVisible();
     expect(screen.getByText('2× Wild Shape')).toBeVisible();
+  });
+
+  it('trackable entry renders inline pips wired to onUseAbilityEntry', () => {
+    const onUseAbilityEntry = vi.fn();
+    const sb = statBlock([
+      { id: 'entry-a', name: 'Smite', text: 'holy', uses: 2 },
+    ]);
+    const abilities: MonsterAbility[] = [
+      {
+        id: 'entry-a',
+        name: 'Smite',
+        description: 'holy',
+        usageType: 'per-day',
+        maxUses: 2,
+        usedUses: 0,
+      },
+    ];
+    const { getByLabelText } = render(
+      <StatBlockTraits
+        statBlock={sb}
+        abilities={abilities}
+        onUseAbilityEntry={onUseAbilityEntry}
+      />
+    );
+    getByLabelText('Smite use 1 (available)').click();
+    expect(onUseAbilityEntry).toHaveBeenCalled();
   });
 });

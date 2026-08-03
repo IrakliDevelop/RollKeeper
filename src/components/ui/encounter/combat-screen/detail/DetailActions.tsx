@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { Pencil } from 'lucide-react';
 import type { DetailSectionProps } from './DetailHeader';
 import { LegendarySection } from './LegendarySection';
-import { TrackableAbilitiesSection } from './TrackableAbilitiesSection';
 import { StatBlockTraits } from './StatBlockTraits';
 import { DetailResources } from './NpcResourceList';
 import { StatBlockEntriesEditor } from '../StatBlockEntriesEditor';
@@ -82,7 +81,6 @@ export function DetailActions({ entity, actions }: DetailSectionProps) {
   return (
     <div className="border-divider space-y-4 border-t p-4">
       <LegendarySection entity={entity} actions={actions} />
-      <TrackableAbilitiesSection entity={entity} actions={actions} />
       <DetailResources entity={entity} actions={actions} />
       {entity.monsterStatBlock && (
         <div className="space-y-3">
@@ -125,6 +123,7 @@ export function DetailActions({ entity, actions }: DetailSectionProps) {
               statBlock={entity.monsterStatBlock}
               spellcasting={entity.spellcasting}
               resources={entity.resources}
+              abilities={entity.abilities}
               onUseEntry={(entry: StatBlockEntry) => {
                 if (entry.resourceCost) {
                   actions.onSpendResource(
@@ -133,6 +132,12 @@ export function DetailActions({ entity, actions }: DetailSectionProps) {
                     entry.resourceCost.amount
                   );
                 }
+              }}
+              onUseAbilityEntry={(entry: StatBlockEntry) => {
+                if (entry.id) actions.onUseAbility(entity.id, entry.id);
+              }}
+              onRestoreAbilityEntry={(entry: StatBlockEntry) => {
+                if (entry.id) actions.onRestoreAbility(entity.id, entry.id);
               }}
             />
           )}
