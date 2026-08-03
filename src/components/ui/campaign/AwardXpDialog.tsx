@@ -80,6 +80,10 @@ export function AwardXpDialog({
     );
     setOutcomes(nextOutcomes);
     setFailedAwards(nextFailed);
+    // Clear amount after successful send (no failures remain)
+    if (nextFailed.size === 0) {
+      setAmount(undefined);
+    }
     setSending(false);
   };
 
