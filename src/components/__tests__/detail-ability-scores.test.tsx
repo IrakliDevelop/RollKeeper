@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { DetailAbilityScores } from '@/components/ui/encounter/combat-screen/detail/DetailAbilityScores';
 import type { EncounterEntity, MonsterStatBlock } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
@@ -113,5 +113,46 @@ describe('DetailAbilityScores — saves column', () => {
     // CON is no longer proficient — falls back to its +3 modifier.
     expect(screen.getByText('SAVE +3')).toHaveClass('text-muted');
     expect(screen.queryByText('SAVE +8')).not.toBeInTheDocument();
+  });
+
+  it('calculates proficient saves from PB and lets manual values override or reset', () => {
+    const actions = makeActions();
+    const entity: EncounterEntity = {
+      ...monsterEntity,
+      proficiencyBonus: 3,
+      monsterStatBlock: {
+        ...statBlock,
+        saveProficiencies: ['str'],
+        saves: '',
+      },
+    };
+    const { rerender } = render(
+      <DetailAbilityScores entity={entity} actions={actions} />
+    );
+
+    expect(screen.getByText('SAVE +8')).toBeInTheDocument();
+    rerender(
+      <DetailAbilityScores
+        entity={{
+          ...entity,
+          monsterStatBlock: { ...entity.monsterStatBlock!, saves: 'STR +11' },
+        }}
+        actions={actions}
+      />
+    );
+
+    expect(screen.getByText('SAVE +11')).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Reset STR saving throw' })
+    );
+    expect(actions.onUpdate).toHaveBeenCalledWith(
+      'monster-1',
+      expect.objectContaining({
+        monsterStatBlock: expect.objectContaining({
+          saveProficiencies: ['str'],
+          saves: '',
+        }),
+      })
+    );
   });
 });
