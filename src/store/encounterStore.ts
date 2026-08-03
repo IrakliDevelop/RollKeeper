@@ -1021,7 +1021,9 @@ export const useEncounterStore = create<EncounterStoreState>()(
           target.source === 'npc' ? resolveLinkedNpc(entity) : null;
         if (linked?.npc) {
           const npc = linked.npc;
-          if (!findEntryById(npc.monsterStatBlock, abilityId)) {
+          const npcEntry = findEntryById(npc.monsterStatBlock, abilityId);
+          if (!npcEntry || !getEntryAbilityConfig(npcEntry)) {
+            // Deletion is authoritative: drop the ability from the entity.
             set(state => ({
               encounters: updateEntityInEncounter(
                 state.encounters,
