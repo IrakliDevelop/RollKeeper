@@ -83,12 +83,15 @@ function makeActions(): EntityActions {
     onSetConditionRounds: vi.fn(),
     onUseAbility: vi.fn(),
     onRestoreAbility: vi.fn(),
+    onSpendResource: vi.fn(() => true),
+    onRestoreResource: vi.fn(),
     onUseLegendaryAction: vi.fn(),
     onResetLegendaryActions: vi.fn(),
     onSetConcentration: vi.fn(),
     onUseLairAction: vi.fn(),
     onSetInitiative: vi.fn(),
     onLongRest: vi.fn(),
+    onShortRest: vi.fn(),
   };
 }
 
@@ -243,12 +246,15 @@ function makeStore() {
     setConditionRounds: vi.fn(),
     useAbility: vi.fn(),
     restoreAbility: vi.fn(),
+    spendEntityResource: vi.fn(() => true),
+    restoreEntityResource: vi.fn(),
     useLegendaryAction: vi.fn(),
     resetLegendaryActions: vi.fn(),
     setConcentration: vi.fn(),
     useLairAction: vi.fn(),
     setInitiative: vi.fn(),
     longRestEntity: vi.fn(),
+    shortRestEntity: vi.fn(),
   };
 }
 

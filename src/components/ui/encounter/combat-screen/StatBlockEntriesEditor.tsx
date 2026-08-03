@@ -10,12 +10,9 @@ import {
   replaceToHit,
   statBlockHtmlToPlainText,
 } from '@/utils/statBlockText';
+import type { StatBlockEntry } from '@/types/encounter';
 
-export interface StatBlockEntry {
-  name: string;
-  text: string;
-  uses?: number;
-}
+export type { StatBlockEntry };
 
 interface StatBlockEntriesEditorProps {
   title: string;

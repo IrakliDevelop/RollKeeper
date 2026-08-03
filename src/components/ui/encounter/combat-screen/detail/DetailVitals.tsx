@@ -197,13 +197,23 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
         </button>
       )}
 
-      {/* Long rest */}
-      <button
-        onClick={() => actions.onLongRest(entity.id)}
-        className="border-divider text-muted hover:text-body hover:bg-surface-raised w-full rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
-      >
-        Long Rest
-      </button>
+      {/* Rests */}
+      <div className="flex gap-2">
+        {!isPlayer && (
+          <button
+            onClick={() => actions.onShortRest(entity.id)}
+            className="border-divider text-muted hover:text-body hover:bg-surface-raised flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+          >
+            Short Rest
+          </button>
+        )}
+        <button
+          onClick={() => actions.onLongRest(entity.id)}
+          className="border-divider text-muted hover:text-body hover:bg-surface-raised flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+        >
+          Long Rest
+        </button>
+      </div>
     </div>
   );
 }

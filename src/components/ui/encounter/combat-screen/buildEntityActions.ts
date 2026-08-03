@@ -47,6 +47,18 @@ interface Store {
     entityId: string,
     abilityId: string
   ) => void;
+  spendEntityResource: (
+    encounterId: string,
+    entityId: string,
+    resourceId: string,
+    amount: number
+  ) => boolean;
+  restoreEntityResource: (
+    encounterId: string,
+    entityId: string,
+    resourceId: string,
+    amount: number
+  ) => void;
   useLegendaryAction: (
     encounterId: string,
     entityId: string,
@@ -65,6 +77,7 @@ interface Store {
   ) => void;
   setInitiative: (encounterId: string, entityId: string, value: number) => void;
   longRestEntity: (encounterId: string, entityId: string) => void;
+  shortRestEntity: (encounterId: string, entityId: string) => void;
 }
 
 export interface BuildEntityActionsDeps {
@@ -197,6 +210,10 @@ export function buildEntityActions(
       store.useAbility(encounterId, entityId, abilityId),
     onRestoreAbility: (entityId, abilityId) =>
       store.restoreAbility(encounterId, entityId, abilityId),
+    onSpendResource: (entityId, resourceId, amount) =>
+      store.spendEntityResource(encounterId, entityId, resourceId, amount),
+    onRestoreResource: (entityId, resourceId, amount) =>
+      store.restoreEntityResource(encounterId, entityId, resourceId, amount),
     onUseLegendaryAction: (entityId, actionId) =>
       store.useLegendaryAction(encounterId, entityId, actionId),
     onResetLegendaryActions: entityId =>
@@ -208,6 +225,7 @@ export function buildEntityActions(
     onSetInitiative: (entityId, value) =>
       store.setInitiative(encounterId, entityId, value),
     onLongRest: entityId => store.longRestEntity(encounterId, entityId),
+    onShortRest: entityId => store.shortRestEntity(encounterId, entityId),
 
     onViewPlayer,
     onViewNPC,
