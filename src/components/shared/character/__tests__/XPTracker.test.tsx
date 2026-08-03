@@ -73,26 +73,22 @@ describe('XPTracker', () => {
     expect(input).toHaveValue(null);
   });
 
-  it('shows level-up alert when XP reaches next level threshold', () => {
-    vi.useFakeTimers();
-    // currentXP=13500 + add 500 = 14000 >= 14000 (level 6 threshold)
-    // shouldLevelUp(14000, 5) => calculateLevelFromXP(14000) = 6 > 5 => true
-    render(<XPTracker {...defaultProps} currentXP={13500} />);
+  it('shows persistent badge when pendingLevelUp prop is set', () => {
+    // After PR #205, the level-up indicator is persistent and derived from the prop
+    // The component no longer auto-shows transient alerts on XP changes
+    render(
+      <XPTracker {...defaultProps} currentXP={13500} pendingLevelUp={true} />
+    );
 
-    const input = screen.getByPlaceholderText('XP to add...');
-    fireEvent.change(input, { target: { value: '500' } });
+    expect(screen.getByText(/level up available/i)).toBeInTheDocument();
+  });
 
-    const addButton = screen.getByRole('button', { name: 'Add' });
-    fireEvent.click(addButton);
+  it('does not show badge when pendingLevelUp prop is false', () => {
+    render(
+      <XPTracker {...defaultProps} currentXP={13500} pendingLevelUp={false} />
+    );
 
-    expect(screen.getByText('LEVEL UP!')).toBeInTheDocument();
-
-    act(() => {
-      vi.advanceTimersByTime(3000);
-    });
-    expect(screen.queryByText('LEVEL UP!')).not.toBeInTheDocument();
-
-    vi.useRealTimers();
+    expect(screen.queryByText(/level up available/i)).not.toBeInTheDocument();
   });
 
   it('does not show level-up alert when below threshold', () => {

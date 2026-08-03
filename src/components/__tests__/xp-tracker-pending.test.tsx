@@ -65,10 +65,13 @@ describe('XPTracker pending level-up', () => {
         pendingLevelUp
         onAddXP={mockHandlers.onAddXP}
         onSetXP={mockHandlers.onSetXP}
+        hideThresholds
       />
     );
     const pendingLabels = screen.getAllByText(/level-up pending/i);
     expect(pendingLabels.length).toBeGreaterThan(0);
+    // Verify that the numeric "0 XP" to-next-level figure is suppressed
+    expect(screen.queryByText(/0 XP/)).toBeNull();
   });
 
   it('shows the normal to-next-level figure when not pending', () => {
