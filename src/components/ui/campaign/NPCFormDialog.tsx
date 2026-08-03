@@ -9,8 +9,6 @@ import {
   Trash2,
   Edit3,
   ImageIcon,
-  ArrowUp,
-  ArrowDown,
   CircleUserRound,
   ScrollText,
   Package,
@@ -59,13 +57,18 @@ import {
   formDataToNpcInventoryPatch,
 } from '@/utils/npcInventoryItemForm';
 import { NPCSpellListEditor } from './NPCSpellListEditor';
+import { AbilityListEditor } from './AbilityListEditor';
+import { NpcResourcesEditor } from './NpcResourcesEditor';
 import type { Spell } from '@/types/character';
-
-interface NamedText {
-  name: string;
-  text: string;
-  uses?: number;
-}
+import type { StatBlockEntry } from '@/types/encounter';
+import {
+  finalizeResourceDrafts,
+  isResourceDraftValid,
+  isResourceCostValid,
+  sanitizeEntryResourceCosts,
+  stripDanglingResourceCosts,
+  type NpcResourceDraft,
+} from '@/utils/npcResources';
 
 interface NPCFormDialogProps {
   open: boolean;
@@ -173,11 +176,11 @@ function hasSubstantiveStatBlock(
     hpFormula: string;
     speed: string;
   },
-  traits: NamedText[],
-  actions: NamedText[],
-  bonusActions: NamedText[],
-  reactions: NamedText[],
-  lairActions: NamedText[],
+  traits: StatBlockEntry[],
+  actions: StatBlockEntry[],
+  bonusActions: StatBlockEntry[],
+  reactions: StatBlockEntry[],
+  lairActions: StatBlockEntry[],
   bestiarySourceId: string | null
 ): boolean {
   const nonDefaultScore = Object.values(scores).some(
@@ -294,11 +297,14 @@ export function NPCFormDialog({
   const [passivesOverridden, setPassivesOverridden] = useState(false);
 
   // Traits / Actions / Bonus Actions / Reactions / Lair Actions
-  const [traits, setTraits] = useState<NamedText[]>([]);
-  const [actions, setActions] = useState<NamedText[]>([]);
-  const [bonusActions, setBonusActions] = useState<NamedText[]>([]);
-  const [reactions, setReactions] = useState<NamedText[]>([]);
-  const [lairActions, setLairActions] = useState<NamedText[]>([]);
+  const [traits, setTraits] = useState<StatBlockEntry[]>([]);
+  const [actions, setActions] = useState<StatBlockEntry[]>([]);
+  const [bonusActions, setBonusActions] = useState<StatBlockEntry[]>([]);
+  const [reactions, setReactions] = useState<StatBlockEntry[]>([]);
+  const [lairActions, setLairActions] = useState<StatBlockEntry[]>([]);
+
+  // Class resources
+  const [resources, setResources] = useState<NpcResourceDraft[]>([]);
 
   // Inventory
   const [inventoryItems, setInventoryItems] = useState<NPCInventoryItem[]>([]);
@@ -374,6 +380,7 @@ export function NPCFormDialog({
       setBestiarySourceName(editingNpc.bestiarySourceId ? editingNpc.name : '');
       setLoreHtml(editingNpc.loreHtml ?? '');
       setInventoryItems(editingNpc.inventory ?? []);
+      setResources(editingNpc.resources?.map(r => ({ ...r })) ?? []);
       setActiveFormTab('basic');
 
       // Spellcasting
@@ -474,11 +481,23 @@ export function NPCFormDialog({
         setSenses(sb.senses || '');
         setLanguages(sb.languages || '');
         setCr(sb.cr || '');
-        setTraits(sb.traits?.map(t => ({ ...t })) ?? []);
-        setActions(sb.actions?.map(a => ({ ...a })) ?? []);
-        setBonusActions(sb.bonusActions?.map(b => ({ ...b })) ?? []);
-        setReactions(sb.reactions?.map(r => ({ ...r })) ?? []);
-        setLairActions(sb.lairActions?.map(l => ({ ...l })) ?? []);
+        setTraits(
+          sanitizeEntryResourceCosts(sb.traits?.map(t => ({ ...t })) ?? [])
+        );
+        setActions(
+          sanitizeEntryResourceCosts(sb.actions?.map(a => ({ ...a })) ?? [])
+        );
+        setBonusActions(
+          sanitizeEntryResourceCosts(
+            sb.bonusActions?.map(b => ({ ...b })) ?? []
+          )
+        );
+        setReactions(
+          sanitizeEntryResourceCosts(sb.reactions?.map(r => ({ ...r })) ?? [])
+        );
+        setLairActions(
+          sanitizeEntryResourceCosts(sb.lairActions?.map(l => ({ ...l })) ?? [])
+        );
       } else if (editingNpc.abilityScores) {
         setStr(editingNpc.abilityScores.str);
         setDex(editingNpc.abilityScores.dex);
@@ -529,6 +548,7 @@ export function NPCFormDialog({
     setBonusActions([]);
     setReactions([]);
     setLairActions([]);
+    setResources([]);
     setHitDiceMax(0);
     setHitDieCurrent(0);
     setHitDieType('d8');
@@ -559,6 +579,7 @@ export function NPCFormDialog({
     setBestiarySourceName('');
     setLoreHtml('');
     setInventoryItems([]);
+    setResources([]);
     setBestiaryQuery('');
     setBestiaryResults([]);
     setGroup('');
@@ -713,6 +734,21 @@ export function NPCFormDialog({
     setBestiarySourceName('');
   };
 
+  const handleDeleteResource = (resourceId: string) => {
+    setResources(prev => prev.filter(r => r.id !== resourceId));
+    const strip = (entries: StatBlockEntry[]) =>
+      entries.map(e =>
+        e.resourceCost?.resourceId === resourceId
+          ? { ...e, resourceCost: undefined }
+          : e
+      );
+    setTraits(strip(traits));
+    setActions(strip(actions));
+    setBonusActions(strip(bonusActions));
+    setReactions(strip(reactions));
+    setLairActions(strip(lairActions));
+  };
+
   // ---------- Portrait Upload ----------
 
   const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -761,6 +797,10 @@ export function NPCFormDialog({
 
   const handleSubmit = () => {
     if (!name.trim()) return;
+
+    const finalResources =
+      resources.length > 0 ? finalizeResourceDrafts(resources) : undefined;
+    const validResourceIds = new Set((finalResources ?? []).map(r => r.id));
 
     const scores = { str, dex, con, int, wis, cha };
     const detailFields = {
@@ -819,11 +859,26 @@ export function NPCFormDialog({
           : [],
         senses: senses || '',
         passivePerception: passivePerception,
-        traits: traits.filter(t => t.name.trim()),
-        actions: actions.filter(a => a.name.trim()),
-        bonusActions: bonusActions.filter(a => a.name.trim()),
-        reactions: reactions.filter(r => r.name.trim()),
-        lairActions: lairActions.filter(a => a.name.trim()),
+        traits: stripDanglingResourceCosts(
+          sanitizeEntryResourceCosts(traits.filter(t => t.name.trim())),
+          validResourceIds
+        ),
+        actions: stripDanglingResourceCosts(
+          sanitizeEntryResourceCosts(actions.filter(a => a.name.trim())),
+          validResourceIds
+        ),
+        bonusActions: stripDanglingResourceCosts(
+          sanitizeEntryResourceCosts(bonusActions.filter(a => a.name.trim())),
+          validResourceIds
+        ),
+        reactions: stripDanglingResourceCosts(
+          sanitizeEntryResourceCosts(reactions.filter(r => r.name.trim())),
+          validResourceIds
+        ),
+        lairActions: stripDanglingResourceCosts(
+          sanitizeEntryResourceCosts(lairActions.filter(a => a.name.trim())),
+          validResourceIds
+        ),
         cr: cr || '0',
         type: creatureType,
         size,
@@ -864,6 +919,7 @@ export function NPCFormDialog({
         inventoryItems.length > 0
           ? inventoryItems.filter(item => item.name.trim())
           : undefined,
+      resources: finalResources,
       spellcasting: spellcastingEnabled
         ? {
             casterLevel,
@@ -891,7 +947,12 @@ export function NPCFormDialog({
     onOpenChange(false);
   };
 
-  const canSubmit = name.trim().length > 0;
+  const canSubmit =
+    name.trim().length > 0 &&
+    resources.every(isResourceDraftValid) &&
+    [traits, actions, bonusActions, reactions, lairActions].every(list =>
+      list.every(isResourceCostValid)
+    );
   const submitLabel = editingNpc ? 'Save Changes' : 'Create NPC';
 
   const editingInventoryItem = editingInventoryItemId
@@ -1446,31 +1507,43 @@ export function NPCFormDialog({
                     </div>
                   </div>
 
+                  {/* ===== Class Resources ===== */}
+                  <NpcResourcesEditor
+                    resources={resources}
+                    onChange={setResources}
+                    onDeleteResource={handleDeleteResource}
+                  />
+
                   {/* ===== Traits / Actions / Reactions ===== */}
                   <AbilityListEditor
                     label="Traits"
                     items={traits}
                     onChange={setTraits}
+                    resources={resources}
                   />
                   <AbilityListEditor
                     label="Actions"
                     items={actions}
                     onChange={setActions}
+                    resources={resources}
                   />
                   <AbilityListEditor
                     label="Bonus Actions"
                     items={bonusActions}
                     onChange={setBonusActions}
+                    resources={resources}
                   />
                   <AbilityListEditor
                     label="Reactions"
                     items={reactions}
                     onChange={setReactions}
+                    resources={resources}
                   />
                   <AbilityListEditor
                     label="Lair Actions"
                     items={lairActions}
                     onChange={setLairActions}
+                    resources={resources}
                   />
                 </>
               )}
@@ -1848,130 +1921,5 @@ export function NPCFormDialog({
         itemsLoading={dbItemsLoading}
       />
     </>
-  );
-}
-
-function AbilityListEditor({
-  label,
-  items,
-  onChange,
-}: {
-  label: string;
-  items: NamedText[];
-  onChange: (items: NamedText[]) => void;
-}) {
-  const handleAdd = () => {
-    onChange([...items, { name: '', text: '' }]);
-  };
-
-  const handleUpdate = (
-    index: number,
-    field: 'name' | 'text',
-    value: string
-  ) => {
-    const updated = items.map((item, i) =>
-      i === index ? { ...item, [field]: value } : item
-    );
-    onChange(updated);
-  };
-
-  const handleUsesChange = (index: number, value: number | undefined) => {
-    const updated = items.map((item, i) =>
-      i === index ? { ...item, uses: value } : item
-    );
-    onChange(updated);
-  };
-
-  const handleRemove = (index: number) => {
-    onChange(items.filter((_, i) => i !== index));
-  };
-
-  const handleMoveUp = (index: number) => {
-    if (index <= 0) return;
-    const updated = [...items];
-    [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
-    onChange(updated);
-  };
-
-  const handleMoveDown = (index: number) => {
-    if (index >= items.length - 1) return;
-    const updated = [...items];
-    [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
-    onChange(updated);
-  };
-
-  return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between">
-        <label className="text-heading text-sm font-medium">{label}</label>
-        <button
-          onClick={handleAdd}
-          className="text-accent-purple-text flex items-center gap-1 text-xs font-medium opacity-80 hover:opacity-100"
-        >
-          <Plus size={12} />
-          Add
-        </button>
-      </div>
-      {items.length === 0 ? (
-        <p className="text-faint text-xs">No {label.toLowerCase()} added</p>
-      ) : (
-        <div className="space-y-2">
-          {items.map((item, index) => (
-            <div
-              key={index}
-              className="border-divider bg-surface-raised rounded-lg border p-2"
-            >
-              <div className="mb-1 flex items-center gap-2">
-                {/* Reorder buttons */}
-                <div className="flex shrink-0 flex-col">
-                  <button
-                    onClick={() => handleMoveUp(index)}
-                    disabled={index === 0}
-                    className="text-muted hover:text-heading disabled:text-faint p-0.5 transition-colors disabled:cursor-not-allowed"
-                    title="Move up"
-                  >
-                    <ArrowUp size={12} />
-                  </button>
-                  <button
-                    onClick={() => handleMoveDown(index)}
-                    disabled={index === items.length - 1}
-                    className="text-muted hover:text-heading disabled:text-faint p-0.5 transition-colors disabled:cursor-not-allowed"
-                    title="Move down"
-                  >
-                    <ArrowDown size={12} />
-                  </button>
-                </div>
-                <Input
-                  value={item.name}
-                  onChange={e => handleUpdate(index, 'name', e.target.value)}
-                  placeholder={`${label.slice(0, -1)} name`}
-                  className="flex-1"
-                />
-                <NumberInput
-                  min={0}
-                  value={item.uses}
-                  onChange={v => handleUsesChange(index, v)}
-                  allowEmpty
-                  placeholder="Uses"
-                  className="w-18"
-                  title="Uses per day (leave empty for unlimited)"
-                />
-                <button
-                  onClick={() => handleRemove(index)}
-                  className="text-muted hover:text-accent-red-text p-1 transition-colors"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-              <CompactRichTextEditor
-                content={item.text}
-                onChange={value => handleUpdate(index, 'text', value)}
-                placeholder="Description..."
-              />
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
