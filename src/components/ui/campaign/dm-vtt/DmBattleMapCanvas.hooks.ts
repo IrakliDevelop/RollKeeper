@@ -58,6 +58,10 @@ export interface DmBattleMapCanvasState {
   tools: Tool[];
   handleReady: (vp: Viewport) => void;
   handleClearDrawings: () => void;
+  hiddenPlacementActive: boolean;
+  handleToggleHiddenPlacement: () => void;
+  hiddenElementCount: number;
+  handleRevealAll: () => void;
 }
 
 /**
@@ -82,6 +86,15 @@ export function useDmBattleMapCanvas({
   const autoSaveRef = useRef<AutoSave | null>(null);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
+  const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
+  const [hiddenPlacementActive, setHiddenPlacementActive] = useState(false);
+  const hiddenPlacementActiveRef = useRef(false);
+  const hiddenElementCount = useBattleMapStore(
+    state =>
+      Object.keys(
+        state.battleMaps[campaignCode]?.[battleMapId]?.dmOnlyElements ?? {}
+      ).length
+  );
   // The connection is created once inside the fire-once `handleReady`
   // callback; a plain closure over `onPoke` would go stale if the prop's
   // identity changes later (e.g. encounterId change) after the connection
@@ -158,12 +171,28 @@ export function useDmBattleMapCanvas({
       vp.store.on('remove', saveOnLocalOps);
       vp.store.on('update', saveOnLocalOps);
 
+      // Attach before live sync so a local addition is marked private before
+      // the sync client resolves the audience for its first outbound upsert.
+      hiddenPlacementUnsubRef.current?.();
+      hiddenPlacementUnsubRef.current = vp.store.on('add', (element, meta) => {
+        if (
+          !hiddenPlacementActiveRef.current ||
+          (meta?.origin !== undefined && meta.origin !== 'local')
+        ) {
+          return;
+        }
+        useBattleMapStore
+          .getState()
+          .setDmOnly(campaignCode, battleMapId, element.id, true);
+      });
+
       // Mirror unknown remote layers (player tokens) into the player band —
       // without this they sort at layer order 0, under DM-added images.
       // Covers both new elements (add) and relay snapshot reconcile
       // re-applying remote elements as full updates (including layerId).
       attachUnknownLayerMirror(vp, 'dm', () => vp.requestRender());
       pinUnsubRef.current?.();
+      hiddenPlacementUnsubRef.current?.();
       // Play canvas never arranges maps — the annotations layer (DM tokens,
       // notes, text) must stay unlocked, repairing any state persisted locked
       // by the setup editor's arrange-maps mode.
@@ -241,5 +270,38 @@ export function useDmBattleMapCanvas({
     viewport.requestRender();
   }, [viewport]);
 
-  return { viewport, status, tools, handleReady, handleClearDrawings };
+  const handleToggleHiddenPlacement = useCallback(() => {
+    setHiddenPlacementActive(current => {
+      const next = !current;
+      hiddenPlacementActiveRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const handleRevealAll = useCallback(() => {
+    if (!viewport) return;
+    const hiddenIds = Object.keys(
+      useBattleMapStore.getState().battleMaps[campaignCode]?.[battleMapId]
+        ?.dmOnlyElements ?? {}
+    );
+    if (hiddenIds.length === 0) return;
+    useBattleMapStore
+      .getState()
+      .updateBattleMap(campaignCode, battleMapId, { dmOnlyElements: {} });
+    for (const id of hiddenIds) {
+      if (viewport.store.getById(id)) viewport.store.update(id, {});
+    }
+  }, [viewport, campaignCode, battleMapId]);
+
+  return {
+    viewport,
+    status,
+    tools,
+    handleReady,
+    handleClearDrawings,
+    hiddenPlacementActive,
+    handleToggleHiddenPlacement,
+    hiddenElementCount,
+    handleRevealAll,
+  };
 }

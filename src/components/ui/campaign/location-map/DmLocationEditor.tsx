@@ -32,6 +32,10 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     selectedElementId,
     isDmOnly,
     handleToggleDmOnly,
+    hiddenPlacementActive,
+    handleToggleHiddenPlacement,
+    hiddenElementCount,
+    handleRevealAll,
     syncing,
     hasUnsyncedChanges,
     lastSyncedAt,
@@ -95,6 +99,10 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             selectedElementId={selectedElementId}
             isDmOnly={isDmOnly}
             onToggleDmOnly={handleToggleDmOnly}
+            hiddenPlacementActive={hiddenPlacementActive}
+            onToggleHiddenPlacement={handleToggleHiddenPlacement}
+            hiddenElementCount={hiddenElementCount}
+            onRevealAll={handleRevealAll}
             mode={mode}
             onOpenTvDisplay={handleOpenTvDisplay}
             syncStatus={syncStatus}

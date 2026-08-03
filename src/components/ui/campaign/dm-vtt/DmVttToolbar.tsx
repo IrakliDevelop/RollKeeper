@@ -30,6 +30,10 @@ const DM_TOOLS: { name: string; label: string; Icon: typeof Hand }[] = [
 export interface DmVttToolbarProps {
   onClearDrawings: () => void;
   tokenInfoToggle: { mode: TokenInfoMode | null; onCycle: () => void };
+  hiddenPlacementActive: boolean;
+  onToggleHiddenPlacement: () => void;
+  hiddenElementCount: number;
+  onRevealAll: () => void;
 }
 
 const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
@@ -52,6 +56,10 @@ const TOKEN_INFO_LABEL: Record<TokenInfoMode, string> = {
 export function DmVttToolbar({
   onClearDrawings,
   tokenInfoToggle,
+  hiddenPlacementActive,
+  onToggleHiddenPlacement,
+  hiddenElementCount,
+  onRevealAll,
 }: DmVttToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const TokenInfoIcon = TOKEN_INFO_ICON[tokenInfoToggle.mode ?? 'compact'];
@@ -72,6 +80,37 @@ export function DmVttToolbar({
         ))}
       </div>
       <div className="flex items-center gap-1">
+        <Button
+          variant={hiddenPlacementActive ? 'warning' : 'ghost'}
+          onClick={onToggleHiddenPlacement}
+          className="min-h-[44px] px-2"
+          title={
+            hiddenPlacementActive
+              ? 'New elements are hidden from players'
+              : 'New elements are visible to players'
+          }
+          aria-label="Place hidden elements"
+          aria-pressed={hiddenPlacementActive}
+        >
+          <EyeOff size={16} />
+          <span className="ml-1.5 hidden text-xs xl:inline">
+            {hiddenPlacementActive ? 'Placing hidden' : 'Place hidden'}
+          </span>
+        </Button>
+        {hiddenElementCount > 0 && (
+          <Button
+            variant="ghost"
+            onClick={onRevealAll}
+            className="min-h-[44px] px-2"
+            title={`Reveal all ${hiddenElementCount} hidden element${hiddenElementCount === 1 ? '' : 's'}`}
+            aria-label={`Reveal all hidden elements (${hiddenElementCount})`}
+          >
+            <Eye size={16} />
+            <span className="ml-1.5 hidden text-xs xl:inline">
+              Reveal all ({hiddenElementCount})
+            </span>
+          </Button>
+        )}
         <Button
           variant="ghost"
           onClick={onClearDrawings}

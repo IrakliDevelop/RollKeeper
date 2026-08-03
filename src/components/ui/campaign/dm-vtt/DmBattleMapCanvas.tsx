@@ -19,8 +19,16 @@ export type { DmBattleMapCanvasProps };
  */
 export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
   const { children, tokenInfoToggle } = props;
-  const { viewport, tools, handleReady, handleClearDrawings } =
-    useDmBattleMapCanvas(props);
+  const {
+    viewport,
+    tools,
+    handleReady,
+    handleClearDrawings,
+    hiddenPlacementActive,
+    handleToggleHiddenPlacement,
+    hiddenElementCount,
+    handleRevealAll,
+  } = useDmBattleMapCanvas(props);
 
   return (
     <ViewportContext.Provider value={viewport}>
@@ -36,6 +44,10 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
           <DmVttToolbar
             onClearDrawings={handleClearDrawings}
             tokenInfoToggle={tokenInfoToggle}
+            hiddenPlacementActive={hiddenPlacementActive}
+            onToggleHiddenPlacement={handleToggleHiddenPlacement}
+            hiddenElementCount={hiddenElementCount}
+            onRevealAll={handleRevealAll}
           />
         )}
         {viewport && (

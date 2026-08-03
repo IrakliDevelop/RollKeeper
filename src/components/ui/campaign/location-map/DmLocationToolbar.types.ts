@@ -24,6 +24,10 @@ export interface DmLocationToolbarProps {
   selectedElementId: string | null;
   isDmOnly: boolean;
   onToggleDmOnly: () => void;
+  hiddenPlacementActive: boolean;
+  onToggleHiddenPlacement: () => void;
+  hiddenElementCount: number;
+  onRevealAll: () => void;
   /** Whether canvas has changed since last sync */
   hasUnsyncedChanges: boolean;
   /** ISO timestamp of last successful sync, or null if never synced */
