@@ -6,6 +6,7 @@ import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/forms/button';
 import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { MoonPhaseIcon } from './MoonPhaseIcon';
+import { EventMarker } from './EventMarker';
 import type {
   CalendarConfig,
   CalendarDate,
@@ -297,12 +298,14 @@ export function CalendarGrid({
                     config
                   );
                   const transitions = getPhaseTransitions(totalDays, config);
-                  const dayEventCount = events.filter(
-                    e =>
-                      e.year === browseYear &&
-                      e.month === browseMonth &&
-                      e.day === day
-                  ).length;
+                  const dayEvents = events
+                    .filter(
+                      e =>
+                        e.year === browseYear &&
+                        e.month === browseMonth &&
+                        e.day === day
+                    )
+                    .sort((a, b) => a.createdAt - b.createdAt);
 
                   return (
                     <td
@@ -319,7 +322,7 @@ export function CalendarGrid({
                         onClick={() =>
                           onDayClick?.(browseYear, browseMonth, day)
                         }
-                        className="mx-auto flex w-full flex-col items-center focus:outline-none"
+                        className="mx-auto flex min-h-14 w-full flex-col items-center focus:outline-none"
                       >
                         <div
                           className={cn(
@@ -333,21 +336,15 @@ export function CalendarGrid({
                         >
                           {day + 1}
                         </div>
-                        {dayEventCount > 0 && (
-                          <div className="mt-0.5 flex items-center justify-center gap-0.5">
-                            {dayEventCount <= 3 ? (
-                              Array.from({ length: dayEventCount }, (_, i) => (
-                                <span
-                                  key={i}
-                                  className="bg-accent-blue-text inline-block h-1.5 w-1.5 rounded-full"
-                                />
-                              ))
-                            ) : (
-                              <>
-                                <span className="bg-accent-blue-text inline-block h-1.5 w-1.5 rounded-full" />
-                                <span className="bg-accent-blue-text inline-block h-1.5 w-1.5 rounded-full" />
-                                <span className="bg-accent-blue-text inline-block h-1.5 w-1.5 rounded-full" />
-                              </>
+                        {dayEvents.length > 0 && (
+                          <div className="mt-0.5 flex max-w-full flex-wrap items-center justify-center gap-0.5">
+                            {dayEvents.slice(0, 5).map(e => (
+                              <EventMarker key={e.id} event={e} size="grid" />
+                            ))}
+                            {dayEvents.length > 5 && (
+                              <span className="text-faint text-[9px] leading-none">
+                                +{dayEvents.length - 5}
+                              </span>
                             )}
                           </div>
                         )}
