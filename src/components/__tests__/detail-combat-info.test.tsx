@@ -88,14 +88,16 @@ const playerEntity: EncounterEntity = {
 };
 
 describe('DetailCombatInfo — field inventory', () => {
-  it('monster with a stat block: renders all fields including Initiative Mod and Proficiency Bonus', () => {
+  it('monster with a stat block: renders detail fields; Init/PB/Speed live in the header now', () => {
     const actions = makeActions();
     render(<DetailCombatInfo entity={monsterEntity} actions={actions} />);
 
     expect(screen.getByText('Combat Details')).toBeInTheDocument();
-    expect(screen.getByLabelText('Initiative Mod')).toHaveValue(1);
-    expect(screen.getByLabelText('Proficiency Bonus')).toHaveValue(2);
-    expect(screen.getByLabelText('Speed')).toHaveValue('30 ft.');
+    expect(screen.queryByLabelText('Initiative Mod')).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Proficiency Bonus')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Speed')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Saving Throws')).toHaveValue(
       'Str +5, Con +4'
     );
@@ -111,57 +113,6 @@ describe('DetailCombatInfo — field inventory', () => {
     expect(screen.getByLabelText('Senses')).toHaveValue('Darkvision 60 ft.');
     expect(screen.getByLabelText('Languages')).toHaveValue('Common');
     expect(screen.getByLabelText('Passive Perception')).toHaveValue(13);
-  });
-
-  it('editing Initiative Mod commits initiativeModifier via onUpdate (rolled initiative untouched)', async () => {
-    const actions = makeActions();
-    const user = userEvent.setup();
-    render(<DetailCombatInfo entity={monsterEntity} actions={actions} />);
-
-    const input = screen.getByLabelText('Initiative Mod');
-    await user.clear(input);
-    await user.type(input, '3');
-    await user.tab();
-
-    expect(actions.onUpdate).toHaveBeenCalledWith('monster-1', {
-      initiativeModifier: 3,
-    });
-    expect(actions.onSetInitiative).not.toHaveBeenCalled();
-    expect(actions.onUpdate).not.toHaveBeenCalledWith(
-      'monster-1',
-      expect.objectContaining({ initiative: expect.anything() })
-    );
-  });
-
-  it('clearing Initiative Mod to empty is a no-op (modifier cannot be null)', async () => {
-    const actions = makeActions();
-    const user = userEvent.setup();
-    render(<DetailCombatInfo entity={monsterEntity} actions={actions} />);
-
-    const input = screen.getByLabelText('Initiative Mod');
-    await user.clear(input);
-    await user.tab();
-
-    expect(actions.onUpdate).not.toHaveBeenCalledWith(
-      'monster-1',
-      expect.objectContaining({ initiativeModifier: expect.anything() })
-    );
-    expect(actions.onSetInitiative).not.toHaveBeenCalled();
-  });
-
-  it('editing Proficiency Bonus commits via onUpdate on blur', async () => {
-    const actions = makeActions();
-    const user = userEvent.setup();
-    render(<DetailCombatInfo entity={monsterEntity} actions={actions} />);
-
-    const input = screen.getByLabelText('Proficiency Bonus');
-    await user.clear(input);
-    await user.type(input, '4');
-    await user.tab();
-
-    expect(actions.onUpdate).toHaveBeenCalledWith('monster-1', {
-      proficiencyBonus: 4,
-    });
   });
 
   it('editing a stat-block field (Skills) patches monsterStatBlock via onUpdate', async () => {
@@ -240,14 +191,17 @@ describe('DetailCombatInfo — field inventory', () => {
 });
 
 describe('DetailCombatInfo — player entities stay read-only', () => {
-  it('player: Initiative Mod renders as signed static text, Proficiency Bonus is hidden', () => {
+  it('player: Initiative Mod and Proficiency Bonus rows are gone (they live in the header)', () => {
     const actions = makeActions();
-    render(<DetailCombatInfo entity={playerEntity} actions={actions} />);
+    const syncedPlayer: EncounterEntity = {
+      ...playerEntity,
+      monsterStatBlock: statBlock,
+    };
+    render(<DetailCombatInfo entity={syncedPlayer} actions={actions} />);
 
-    expect(screen.getByText('Initiative Mod')).toBeInTheDocument();
-    expect(screen.getByText('+3')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Initiative Mod')).not.toBeInTheDocument();
+    expect(screen.queryByText('Initiative Mod')).not.toBeInTheDocument();
     expect(screen.queryByText('Proficiency Bonus')).not.toBeInTheDocument();
+    expect(screen.queryByText('Speed')).not.toBeInTheDocument();
   });
 
   it('player entity with a synced stat block never renders editable inputs', () => {
@@ -258,9 +212,9 @@ describe('DetailCombatInfo — player entities stay read-only', () => {
     };
     render(<DetailCombatInfo entity={syncedPlayer} actions={actions} />);
 
-    expect(screen.getByText('Speed')).toBeInTheDocument();
-    expect(screen.getByText('30 ft.')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Speed')).not.toBeInTheDocument();
+    expect(screen.getByText('Saving Throws')).toBeInTheDocument();
+    expect(screen.getByText('Str +5, Con +4')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Saving Throws')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Skills')).not.toBeInTheDocument();
   });
 });
@@ -282,6 +236,27 @@ describe('DetailCombatInfo — hidden when there is nothing to show', () => {
     };
     const { container } = render(
       <DetailCombatInfo entity={bareEntity} actions={actions} />
+    );
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('renders nothing when only initiative modifier and proficiency bonus are set (they live in the header now)', () => {
+    const actions = makeActions();
+    const headerOnlyEntity: EncounterEntity = {
+      id: 'bare-2',
+      type: 'monster',
+      name: 'Mystery',
+      initiative: null,
+      initiativeModifier: 2,
+      proficiencyBonus: 3,
+      currentHp: 1,
+      maxHp: 1,
+      tempHp: 0,
+      armorClass: 10,
+      conditions: [],
+    };
+    const { container } = render(
+      <DetailCombatInfo entity={headerOnlyEntity} actions={actions} />
     );
     expect(container.firstChild).toBeNull();
   });
