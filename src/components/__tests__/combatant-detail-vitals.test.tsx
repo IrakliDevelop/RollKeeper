@@ -258,7 +258,9 @@ describe('DetailHeader', () => {
     expect(actions.onUpdate).toHaveBeenCalledWith('npc-1', {
       name: 'Goblin Boss',
     });
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('textbox', { name: 'Combatant name' })
+    ).not.toBeInTheDocument();
   });
 
   it('non-player: rename commits on blur too', async () => {
@@ -289,7 +291,9 @@ describe('DetailHeader', () => {
     await user.keyboard('{Escape}');
 
     expect(actions.onUpdate).not.toHaveBeenCalled();
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('textbox', { name: 'Combatant name' })
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Goblin')).toBeInTheDocument();
   });
 
