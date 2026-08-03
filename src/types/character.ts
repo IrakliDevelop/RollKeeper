@@ -579,6 +579,9 @@ export interface CharacterState {
   level: number; // Total character level (for backwards compatibility)
 
   experience: number;
+  // DM XP award ids already applied to this character (idempotency guard).
+  // Optional so legacy characters need no migration; capped at 150 entries.
+  appliedDmXpAwardIds?: string[];
   background: string;
   alignment: string;
   creatureType: string;
