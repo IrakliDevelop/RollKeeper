@@ -32,6 +32,7 @@ export interface CampaignPlayer {
   currentHp: number;
   maxHp: number;
   dexterity: number;
+  avatarUrl?: string;
 }
 
 export function buildPlayerEntity(
@@ -53,6 +54,7 @@ export function buildPlayerEntity(
     campaignCode,
     isHidden: false,
     color: playerColors?.[player.id],
+    avatarUrl: player.avatarUrl,
   };
 }
 
@@ -99,6 +101,7 @@ export function buildNpcEntity(
     npcSourceId: npc.id,
     campaignCode: opts.campaignCode,
     spellcasting: buildNpcSpellcasting(npc),
+    avatarUrl: npc.avatarUrl,
   };
 }
 

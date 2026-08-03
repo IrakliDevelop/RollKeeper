@@ -1,7 +1,10 @@
 import { createImage, createShape } from '@fieldnotes/core';
 
 import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
-import { tokenAvatarUrl } from '@/components/ui/campaign/location-map/PlayerTokenTool';
+import {
+  buildCircularTokenUrl,
+  tokenAvatarUrl,
+} from '@/components/ui/campaign/location-map/PlayerTokenTool';
 import {
   snapTokenCenter,
   TOKEN_ELEMENT_ZINDEX,
@@ -61,6 +64,25 @@ export interface DmTokenConfig {
   tokenSize?: TokenCellSize;
   /** Fired once after placement (tool has handed back to select). */
   onPlaced: () => void;
+}
+
+/** Builds the same circular, ringed portrait used by player-placed tokens. */
+export async function prepareCombatantTokenAvatar(
+  entity: Pick<
+    EncounterEntity,
+    'id' | 'avatarUrl' | 'type' | 'playerDisposition'
+  > &
+    Partial<Pick<EncounterEntity, 'legendaryActions'>>
+): Promise<string | undefined> {
+  const avatar = tokenAvatarUrl(entity.avatarUrl);
+  if (!avatar) return undefined;
+  return (
+    (await buildCircularTokenUrl(
+      avatar,
+      dispositionColor(entity),
+      `combatant-${entity.id}`
+    )) ?? avatar
+  );
 }
 
 /** Stamps a grid-snapped, creature-size-aware combatant token and adds it to the store. */

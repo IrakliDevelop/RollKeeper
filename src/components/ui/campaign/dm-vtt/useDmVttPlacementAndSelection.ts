@@ -2,7 +2,10 @@
 
 import { useCallback, useRef, useState } from 'react';
 
-import { dispositionColor } from './combatantToken';
+import {
+  dispositionColor,
+  prepareCombatantTokenAvatar,
+} from './combatantToken';
 import { selectedEntityId as resolveSelectedEntity } from './useCombatantTokens';
 
 import type { Viewport } from '@fieldnotes/core';
@@ -51,7 +54,7 @@ export function useDmVttPlacementAndSelection({
   }, []);
 
   const armPlacement = useCallback(
-    (entity: EncounterEntity) => {
+    async (entity: EncounterEntity) => {
       if (status !== 'live') {
         addToast({
           type: 'info',
@@ -63,7 +66,7 @@ export function useDmVttPlacementAndSelection({
       const config: DmTokenConfig = {
         entityId: entity.id,
         name: entity.name,
-        avatarUrl: entity.avatarUrl,
+        avatarUrl: await prepareCombatantTokenAvatar(entity),
         color: entity.color ?? dispositionColor(entity),
         tokenSize: entity.tokenSize,
         onPlaced: () => {
