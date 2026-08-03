@@ -1,19 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getRedis,
+  getRawRedis,
   campaignSharedKey,
   campaignMessagesKey,
   campaignEffectsKey,
   campaignTransfersKey,
   campaignPlayersKey,
+  campaignXpKey,
   refreshCampaignTTL,
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
 import { verifyDmAuthority } from '@/lib/dmAuth';
 import { sendInitiativePoke } from '@/lib/relayPoke';
+import {
+  enqueueXpAward,
+  readXpAwards,
+  ackXpAward,
+  validateDmXpAward,
+} from '@/lib/xpAwardQueue';
 import type {
   DmMessage,
   DmEffect,
+  DmXpAward,
+  DmXpAwardEnvelope,
   SharedCalendar,
   SharedCalendarPlayer,
   SharedCampaignState,
@@ -104,6 +114,7 @@ export async function GET(
     let dmEffects: DmEffect[] = [];
     let customCounter: SharedCampaignState['customCounter'] = null;
     let transfers: ItemTransfer[] = [];
+    let xpAwards: DmXpAwardEnvelope[] = [];
 
     if (playerId) {
       const [messagesRaw, effectsRaw, countersRaw, transfersRaw] =
@@ -139,6 +150,11 @@ export async function GET(
             ? JSON.parse(transfersRaw)
             : transfersRaw;
       }
+
+      xpAwards = await readXpAwards(
+        getRawRedis(),
+        campaignXpKey(code, playerId)
+      );
     }
 
     await refreshCampaignTTL(redis, code);
@@ -153,6 +169,7 @@ export async function GET(
       battleMap,
       initiativeRequest,
       settings,
+      xpAwards,
     };
     return NextResponse.json(state);
   } catch (error) {
@@ -280,6 +297,52 @@ export async function POST(
       return NextResponse.json({ success: true });
     }
 
+    if (feature === 'xp') {
+      const { playerId: targetPlayerId, award } = data as {
+        playerId: string;
+        award: DmXpAward;
+      };
+
+      if (!targetPlayerId || typeof targetPlayerId !== 'string') {
+        return NextResponse.json(
+          { error: 'playerId is required for xp' },
+          { status: 400 }
+        );
+      }
+
+      const validationError = validateDmXpAward(award);
+      if (validationError) {
+        return NextResponse.json({ error: validationError }, { status: 400 });
+      }
+
+      // Never create queue keys for players who are not in the campaign
+      const isMember = await redis.sismember(
+        campaignPlayersKey(code),
+        targetPlayerId
+      );
+      if (!isMember) {
+        return NextResponse.json(
+          { error: 'playerId is not a member of this campaign' },
+          { status: 400 }
+        );
+      }
+
+      const result = await enqueueXpAward(
+        getRawRedis(),
+        campaignXpKey(code, targetPlayerId),
+        award
+      );
+      if (result === 'full') {
+        return NextResponse.json(
+          { error: 'XP award queue is full for this player' },
+          { status: 409 }
+        );
+      }
+
+      await refreshCampaignTTL(redis, code);
+      return NextResponse.json({ success: true });
+    }
+
     if (feature === 'item_transfer') {
       const { transfer, playerId: targetPlayerId } = data as {
         transfer: ItemTransfer;
@@ -386,6 +449,18 @@ export async function DELETE(
           });
         }
       }
+      return NextResponse.json({ success: true });
+    }
+
+    if (type === 'xp') {
+      const { receipt } = body;
+      if (!receipt || typeof receipt !== 'string') {
+        return NextResponse.json(
+          { error: 'receipt is required' },
+          { status: 400 }
+        );
+      }
+      await ackXpAward(getRawRedis(), campaignXpKey(code, playerId), receipt);
       return NextResponse.json({ success: true });
     }
 
