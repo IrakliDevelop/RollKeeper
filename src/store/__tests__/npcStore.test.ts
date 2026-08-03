@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import type { NpcResource } from '@/types/encounter';
 import { useNPCStore, migrateNpcPersistedState } from '@/store/npcStore';
 
 const CAMPAIGN = 'test-campaign';
@@ -655,5 +656,153 @@ describe('migrateNpcPersistedState v2 → v3 (AoE back-fill)', () => {
       npcsByCampaign: Record<string, { name: string }[]>;
     };
     expect(migrated.npcsByCampaign['camp-x']).toHaveLength(1);
+  });
+});
+
+function makeResource(overrides: Partial<NpcResource> = {}): NpcResource {
+  return {
+    id: 'res-ws',
+    name: 'Wild Shape',
+    icon: 'paw-print',
+    color: 'emerald',
+    displayStyle: 'pips',
+    maxUses: 4,
+    usesExpended: 0,
+    shortRestReset: 1,
+    ...overrides,
+  };
+}
+
+function createNpcWithResources(resources: NpcResource[]): string {
+  const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+    name: 'Druid Elder',
+    armorClass: '13',
+    maxHp: 45,
+    speed: '30 ft.',
+    resources,
+  });
+  return id;
+}
+
+describe('npcStore — class resources', () => {
+  beforeEach(() => {
+    useNPCStore.setState({ npcsByCampaign: {} });
+  });
+
+  describe('spendNpcResource', () => {
+    it('spends exactly amount and returns true when affordable', () => {
+      const id = createNpcWithResources([makeResource({ usesExpended: 1 })]);
+      const ok = useNPCStore
+        .getState()
+        .spendNpcResource(CAMPAIGN, id, 'res-ws', 2);
+      expect(ok).toBe(true);
+      expect(
+        useNPCStore.getState().getNPC(CAMPAIGN, id)!.resources![0].usesExpended
+      ).toBe(3);
+    });
+
+    it('is atomic: cost 2 with only 1 remaining mutates nothing and returns false', () => {
+      const id = createNpcWithResources([makeResource({ usesExpended: 3 })]);
+      const ok = useNPCStore
+        .getState()
+        .spendNpcResource(CAMPAIGN, id, 'res-ws', 2);
+      expect(ok).toBe(false);
+      expect(
+        useNPCStore.getState().getNPC(CAMPAIGN, id)!.resources![0].usesExpended
+      ).toBe(3);
+    });
+
+    it('unknown resourceId is a no-op returning false', () => {
+      const id = createNpcWithResources([makeResource()]);
+      expect(
+        useNPCStore.getState().spendNpcResource(CAMPAIGN, id, 'nope', 1)
+      ).toBe(false);
+    });
+
+    it('rejects zero, negative, and fractional amounts without mutation', () => {
+      const id = createNpcWithResources([makeResource({ usesExpended: 2 })]);
+      for (const bad of [0, -1, 1.5]) {
+        expect(
+          useNPCStore.getState().spendNpcResource(CAMPAIGN, id, 'res-ws', bad)
+        ).toBe(false);
+      }
+      expect(
+        useNPCStore.getState().getNPC(CAMPAIGN, id)!.resources![0].usesExpended
+      ).toBe(2);
+    });
+  });
+
+  describe('restoreNpcResource', () => {
+    it('restores amount, flooring at 0', () => {
+      const id = createNpcWithResources([makeResource({ usesExpended: 1 })]);
+      useNPCStore.getState().restoreNpcResource(CAMPAIGN, id, 'res-ws', 3);
+      expect(
+        useNPCStore.getState().getNPC(CAMPAIGN, id)!.resources![0].usesExpended
+      ).toBe(0);
+    });
+
+    it('ignores zero, negative, and fractional amounts (a negative restore must not raise expenditure)', () => {
+      const id = createNpcWithResources([makeResource({ usesExpended: 2 })]);
+      for (const bad of [0, -3, 0.5]) {
+        useNPCStore.getState().restoreNpcResource(CAMPAIGN, id, 'res-ws', bad);
+      }
+      expect(
+        useNPCStore.getState().getNPC(CAMPAIGN, id)!.resources![0].usesExpended
+      ).toBe(2);
+    });
+  });
+
+  describe('shortRestNPC', () => {
+    it('applies per-resource short rest rules and touches nothing else', () => {
+      const id = createNpcWithResources([
+        makeResource({ id: 'a', usesExpended: 3, shortRestReset: 1 }),
+        makeResource({ id: 'b', usesExpended: 2, shortRestReset: 'all' }),
+        makeResource({ id: 'c', usesExpended: 2, shortRestReset: 0 }),
+      ]);
+      useNPCStore.getState().updateNPC(CAMPAIGN, id, { currentHp: 10 });
+      useNPCStore.getState().shortRestNPC(CAMPAIGN, id);
+      const npc = useNPCStore.getState().getNPC(CAMPAIGN, id)!;
+      expect(npc.resources!.map(r => r.usesExpended)).toEqual([2, 0, 2]);
+      expect(npc.currentHp).toBe(10); // HP untouched by short rest
+    });
+
+    it('is a no-op for legacy NPCs without resources', () => {
+      const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+        name: 'Legacy Bob',
+        armorClass: '10',
+        maxHp: 8,
+        speed: '30 ft.',
+      });
+      expect(() =>
+        useNPCStore.getState().shortRestNPC(CAMPAIGN, id)
+      ).not.toThrow();
+      expect(
+        useNPCStore.getState().getNPC(CAMPAIGN, id)!.resources
+      ).toBeUndefined();
+    });
+  });
+
+  describe('longRestNPC — resources', () => {
+    it('zeroes every resource regardless of shortRestReset', () => {
+      const id = createNpcWithResources([
+        makeResource({ id: 'a', usesExpended: 3, shortRestReset: 0 }),
+        makeResource({ id: 'b', usesExpended: 2, shortRestReset: 'all' }),
+      ]);
+      useNPCStore.getState().longRestNPC(CAMPAIGN, id);
+      const npc = useNPCStore.getState().getNPC(CAMPAIGN, id)!;
+      expect(npc.resources!.map(r => r.usesExpended)).toEqual([0, 0]);
+    });
+
+    it('still works for legacy NPCs without resources', () => {
+      const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+        name: 'Legacy Bob',
+        armorClass: '10',
+        maxHp: 8,
+        currentHp: 3,
+        speed: '30 ft.',
+      });
+      useNPCStore.getState().longRestNPC(CAMPAIGN, id);
+      expect(useNPCStore.getState().getNPC(CAMPAIGN, id)!.currentHp).toBe(8);
+    });
   });
 });
