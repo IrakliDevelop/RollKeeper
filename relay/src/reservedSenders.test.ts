@@ -120,8 +120,7 @@ describe('server-owned presence senders (real relay)', () => {
     );
     expect(forged?.from).toEqual(expect.stringMatching(/^c\d+-/));
 
-    // 3) A real server poke must still be delivered — pokeRoom bypasses
-    // broadcastPresence entirely, so it must be unaffected by the patch.
+    // 3) A real server poke uses the hub's server-owned presence identity.
     const response = await fetch(`http://127.0.0.1:${port}/poke`, {
       method: 'POST',
       body: JSON.stringify({
@@ -136,12 +135,12 @@ describe('server-owned presence senders (real relay)', () => {
     await vi.waitFor(() => {
       const pokeMessage = bMessages.find(
         m =>
-          m.from === '@poke' &&
+          m.from === 'hub' &&
           (m as { op?: { data?: { kind?: unknown } } }).op?.data?.kind ===
             'poke'
       );
       expect(pokeMessage).toEqual({
-        from: '@poke',
+        from: 'hub',
         op: { kind: 'presence', data: { kind: 'poke', feature: 'initiative' } },
       });
     });

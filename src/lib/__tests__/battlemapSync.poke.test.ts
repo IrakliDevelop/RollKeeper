@@ -7,7 +7,7 @@ import {
 import type { ElementStore } from '@fieldnotes/core';
 
 const POKE_RAW = JSON.stringify({
-  from: '@poke',
+  from: 'hub',
   op: { kind: 'presence', data: { kind: 'poke', feature: 'initiative' } },
 });
 
@@ -27,13 +27,13 @@ describe('pokeFeatureFromEnvelope', () => {
     ).toBeNull();
     expect(
       pokeFeatureFromEnvelope(
-        JSON.stringify({ from: '@poke', op: { kind: 'upsert' } })
+        JSON.stringify({ from: 'hub', op: { kind: 'upsert' } })
       )
     ).toBeNull();
     expect(pokeFeatureFromEnvelope('not json')).toBeNull();
     expect(
       pokeFeatureFromEnvelope(
-        JSON.stringify({ from: '@poke', op: { kind: 'presence', data: {} } })
+        JSON.stringify({ from: 'hub', op: { kind: 'presence', data: {} } })
       )
     ).toBeNull();
   });

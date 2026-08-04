@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { SyncHub } from '@fieldnotes/sync-server';
+import { InMemoryHubFanout, SyncHub } from '@fieldnotes/sync-server';
 import WebSocket from 'ws';
 import { pokeRoom, handlePokeRequest } from './poke.js';
 import { signBattleMapToken } from './token.js';
@@ -9,22 +9,16 @@ import { startRelay, type RelayHandle } from './server.js';
 const SECRET = 'test-secret';
 const ROOM = 'CAMP1:map-42';
 
-/** Mirrors the real `SyncHub` shape: `rooms` maps room -> connection ids,
- * and the actual connection objects (with `send`) live in `conns`. */
 function fakeHub(rooms: Record<string, { send: (m: string) => void }[]>) {
-  const conns = new Map<string, { send: (m: string) => void }>();
-  const roomMap = new Map<string, Set<string>>();
+  const hub = new SyncHub();
   let counter = 0;
   for (const [room, list] of Object.entries(rooms)) {
-    const ids = new Set<string>();
     for (const conn of list) {
       const id = `c${++counter}`;
-      conns.set(id, conn);
-      ids.add(id);
+      hub.addConnection({ id, room, send: conn.send });
     }
-    roomMap.set(room, ids);
   }
-  return { rooms: roomMap, conns } as unknown as SyncHub;
+  return hub;
 }
 
 /** Minimal async-iterable POST request carrying a JSON body. */
@@ -69,7 +63,7 @@ describe('pokeRoom', () => {
 
     expect(sent).toBe(2);
     const expected = JSON.stringify({
-      from: '@poke',
+      from: 'hub',
       op: { kind: 'presence', data: { kind: 'poke', feature: 'initiative' } },
     });
     expect(a.send).toHaveBeenCalledWith(expected);
@@ -232,9 +226,78 @@ describe('poke integration (real relay)', () => {
               'poke'
         );
       expect(pokeMessage).toEqual({
-        from: '@poke',
+        from: 'hub',
         op: { kind: 'presence', data: { kind: 'poke', feature: 'initiative' } },
       });
     });
+  });
+});
+
+describe('cross-instance poke integration (real relays)', () => {
+  const handles: RelayHandle[] = [];
+  let socket: WebSocket | null = null;
+
+  afterEach(async () => {
+    socket?.close();
+    socket = null;
+    await Promise.all(handles.splice(0).map(handle => handle.close()));
+  });
+
+  it('fans a poke from one relay to a room member on another relay', async () => {
+    const fanout = new InMemoryHubFanout();
+    const origin = await startRelay({ secret: SECRET, port: 0, fanout });
+    const remote = await startRelay({ secret: SECRET, port: 0, fanout });
+    handles.push(origin, remote);
+    socket = new WebSocket(
+      `ws://127.0.0.1:${remote.address().port}?room=${encodeURIComponent(ROOM)}&token=${encodeURIComponent(
+        signBattleMapToken(
+          {
+            userId: 'p1',
+            role: 'player',
+            room: ROOM,
+            exp: Date.now() + 30_000,
+          },
+          SECRET
+        )
+      )}`
+    );
+    const messages: Envelope[] = [];
+    socket.on('message', data =>
+      messages.push(JSON.parse(String(data)) as Envelope)
+    );
+    await vi.waitFor(() => expect(socket?.readyState).toBe(WebSocket.OPEN));
+    socket.send(
+      JSON.stringify({ from: 'ready-remote', op: { kind: 'request-snapshot' } })
+    );
+    await vi.waitFor(() =>
+      expect(
+        messages.some(
+          message =>
+            message.op.kind === 'snapshot' && message.op.to === 'ready-remote'
+        )
+      ).toBe(true)
+    );
+    messages.length = 0;
+
+    const response = await fetch(
+      `http://127.0.0.1:${origin.address().port}/poke`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          room: ROOM,
+          feature: 'roster',
+          token: dmToken(),
+        }),
+      }
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ sent: 0 });
+    await vi.waitFor(() =>
+      expect(messages).toContainEqual({
+        from: 'hub',
+        op: { kind: 'presence', data: { kind: 'poke', feature: 'roster' } },
+      })
+    );
   });
 });

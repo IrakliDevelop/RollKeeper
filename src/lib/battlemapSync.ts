@@ -42,7 +42,7 @@ export function computeSeedIds(
   return local.filter(el => !presentIds.has(el.id)).map(el => el.id);
 }
 
-/** Parses a relay poke envelope: `{from:'@poke', op:{kind:'presence', data:{kind:'poke', feature}}}`. */
+/** Parses a server-owned relay poke presence envelope. */
 export function pokeFeatureFromEnvelope(raw: string): string | null {
   let env: {
     from?: string;
@@ -53,7 +53,7 @@ export function pokeFeatureFromEnvelope(raw: string): string | null {
   } catch {
     return null;
   }
-  if (env?.from !== '@poke') return null;
+  if (env?.from !== 'hub') return null;
   const op = env.op;
   if (op?.kind !== 'presence' || op.data?.kind !== 'poke') return null;
   return typeof op.data.feature === 'string' ? op.data.feature : null;

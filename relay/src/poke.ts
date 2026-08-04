@@ -2,47 +2,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { SyncHub } from '@fieldnotes/sync-server';
 import { verifyBattleMapToken } from './token.js';
 
-/** Narrow structural view of the hub's private registries — same
- * private-access workaround. `rooms` maps room -> connection
- * ids; the actual connection objects (with `send`) live in `conns`. */
-interface RoomConnection {
-  send(message: string): void;
-}
-interface HubInternals {
-  rooms: Map<string, Set<string>>;
-  conns: Map<string, RoomConnection>;
-}
-
 /**
- * Broadcasts a content-free poke to every socket in a room as a synthetic
- * presence message. Bypasses `broadcastPresence` deliberately: that method
- * records `presenceIds` (driving presence-leave on disconnect) and skips the
- * sender connection — neither applies to a server-originated poke.
- * The sync client's presence dispatch is stateless, so `from: '@poke'`
- * pollutes no client-side bookkeeping.
- * NOTE: broadcasts only to locally-connected sockets (bypasses hub fanout) — fine for single-instance deploy; revisit if relay runs multiple instances.
+ * Broadcasts a content-free poke as server-owned ephemeral presence. The
+ * returned count covers this relay instance; configured hub fan-out delivers
+ * the same poke to room members connected to other instances.
  */
 export function pokeRoom(hub: SyncHub, room: string, feature: string): number {
-  const internals = hub as unknown as HubInternals;
-  const memberIds = internals.rooms.get(room);
-  if (!memberIds || memberIds.size === 0) return 0;
-  const message = JSON.stringify({
-    from: '@poke',
-    op: { kind: 'presence', data: { kind: 'poke', feature } },
-  });
-  let sent = 0;
-  for (const id of memberIds) {
-    const conn = internals.conns.get(id);
-    if (!conn) continue;
-    try {
-      conn.send(message);
-      sent++;
-    } catch (err) {
-      // dead socket — the heartbeat reaps it; poke is best-effort
-      console.warn('[poke] send failed:', err);
-    }
-  }
-  return sent;
+  return hub.broadcastPresence(room, { kind: 'poke', feature });
 }
 
 const MAX_BODY_BYTES = 4096;
