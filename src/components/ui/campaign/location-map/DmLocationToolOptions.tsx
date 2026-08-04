@@ -7,6 +7,7 @@ import type {
   MeasureToolOptions,
   NoteToolOptions,
   PencilToolOptions,
+  PingToolOptions,
   ShapeToolOptions,
   TemplateRenderStyle,
   TemplateShape,
@@ -87,6 +88,9 @@ export default function DmLocationToolOptions({
   const [laserOpts, setLaserOpts] = useToolOptions<
     LaserToolOptions & Record<string, unknown>
   >('laser');
+  const [pingOpts, setPingOpts] = useToolOptions<
+    PingToolOptions & Record<string, unknown>
+  >('ping');
 
   const showOptionsBar =
     (activeTool === 'pencil' && pencilOpts !== undefined) ||
@@ -97,7 +101,8 @@ export default function DmLocationToolOptions({
     (mode === 'battlemap' &&
       (activeTool === 'measure' ||
         activeTool === 'template' ||
-        (activeTool === 'laser' && laserOpts !== undefined)));
+        (activeTool === 'laser' && laserOpts !== undefined) ||
+        (activeTool === 'ping' && pingOpts !== undefined)));
 
   if (!showOptionsBar) return null;
 
@@ -112,11 +117,13 @@ export default function DmLocationToolOptions({
           ? noteOpts?.backgroundColor
           : activeTool === 'laser'
             ? laserOpts?.color
-            : activeTool === 'arrow'
-              ? arrowOpts?.color
-              : activeTool === 'pencil'
-                ? pencilOpts?.color
-                : '#334155';
+            : activeTool === 'ping'
+              ? pingOpts?.color
+              : activeTool === 'arrow'
+                ? arrowOpts?.color
+                : activeTool === 'pencil'
+                  ? pencilOpts?.color
+                  : '#334155';
 
   const handleColorChange = (color: string) => {
     if (activeTool === 'shape') setShapeOpts({ strokeColor: color });
@@ -126,6 +133,7 @@ export default function DmLocationToolOptions({
     else if (activeTool === 'pencil') setPencilOpts({ color });
     else if (activeTool === 'template') setTemplateOpts({ strokeColor: color });
     else if (activeTool === 'laser') setLaserOpts({ color });
+    else if (activeTool === 'ping') setPingOpts({ color });
   };
 
   return (

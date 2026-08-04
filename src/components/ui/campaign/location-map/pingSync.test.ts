@@ -412,6 +412,41 @@ describe('attachPingInput', () => {
     expect(sent).toHaveLength(0);
   });
 
+  it('followTool mirrors the ping tool color at attach time', () => {
+    const tool = new PingTool({ color: '#F4C430' });
+    const { container, sent } = setup({ followTool: tool, hotkey: 'p' });
+
+    fire(container, 'pointermove', { clientX: 1, clientY: 2 });
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' }));
+
+    expect(sent[0]).toMatchObject({ kind: 'ping', color: '#F4C430' });
+  });
+
+  it('followTool tracks ping tool color changes (the options-bar swatches)', () => {
+    const tool = new PingTool({ color: '#F4C430' });
+    const { container, sent } = setup({ followTool: tool, hotkey: 'p' });
+
+    tool.setOptions({ color: '#3b82f6' }); // DM picks a swatch
+    fire(container, 'pointermove', { clientX: 1, clientY: 2 });
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' }));
+
+    expect(sent[0]).toMatchObject({ kind: 'ping', color: '#3b82f6' });
+  });
+
+  it('cleanup unsubscribes from followTool option changes', () => {
+    const tool = new PingTool({ color: '#F4C430' });
+    const { container, sent, cleanup } = setup({
+      followTool: tool,
+      hotkey: 'p',
+    });
+    cleanup();
+
+    expect(() => tool.setOptions({ color: '#3b82f6' })).not.toThrow();
+    fire(container, 'pointermove', { clientX: 1, clientY: 2 });
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' }));
+    expect(sent).toHaveLength(0);
+  });
+
   it('a detached domLayer (no parent element) attaches nothing and cleans up as a no-op', () => {
     const vp = makeViewport();
     const overlay = new RemotePingOverlay(vp);
