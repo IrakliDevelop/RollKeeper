@@ -19,6 +19,29 @@ export async function GET(
     const raw = await redis.get<SyncedLocation>(campaignLocationKey(code, id));
     await refreshCampaignTTL(redis, code);
     if (!raw) {
+      // Older deployments refreshed only the list key, allowing a detail key
+      // to expire while its metadata remained. Return the original map as a
+      // degraded fallback until the DM republishes the full location.
+      const metadataRaw = await redis.get<LocationMetadata[]>(
+        campaignLocationsKey(code)
+      );
+      const locations: LocationMetadata[] = metadataRaw
+        ? Array.isArray(metadataRaw)
+          ? metadataRaw
+          : (JSON.parse(metadataRaw as unknown as string) as LocationMetadata[])
+        : [];
+      const metadata = locations.find(location => location.id === id);
+
+      if (metadata) {
+        const fallback: SyncedLocation = {
+          ...metadata,
+          mapImageSize: { w: 0, h: 0 },
+          canvasState: '',
+          gridEnabled: false,
+        };
+        return NextResponse.json({ location: fallback });
+      }
+
       return NextResponse.json(
         { error: 'Location not found' },
         { status: 404 }
