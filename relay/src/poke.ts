@@ -3,7 +3,7 @@ import type { SyncHub } from '@fieldnotes/sync-server';
 import { verifyBattleMapToken } from './token.js';
 
 /** Narrow structural view of the hub's private registries — same
- * private-access pattern as `corrections.ts`. `rooms` maps room -> connection
+ * private-access workaround. `rooms` maps room -> connection
  * ids; the actual connection objects (with `send`) live in `conns`. */
 interface RoomConnection {
   send(message: string): void;

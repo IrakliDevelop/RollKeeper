@@ -7,10 +7,8 @@ import { signBattleMapToken } from './token.js';
 import { DM_AUDIENCE } from './policies.js';
 
 /**
- * Integration test for the C1 fix: it drives the REAL relay (real HTTP
- * server, real WebSocketServer, real SyncHub with our policies wired in —
- * only the storage backend is swapped for an in-memory one) so it exercises
- * the exact code path `sendCorrection` runs on, not a reimplementation of it.
+ * Integration test for upstream correction filtering: it drives the real
+ * relay with the published, unpatched SyncHub and RollKeeper's policies.
  */
 
 const SECRET = 'corrections-test-secret';
@@ -83,7 +81,7 @@ function send(ws: WebSocket, envelope: Envelope): void {
   ws.send(JSON.stringify(envelope));
 }
 
-describe('sendCorrection canRead leak (C1 fix, real relay)', () => {
+describe('upstream correction filtering (real relay)', () => {
   let handle: RelayHandle;
   let port: number;
 
@@ -185,24 +183,17 @@ async function runScenario(
   expect(elements.map(e => e.id).sort()).toEqual([NORMAL_ID]);
   expect(elements.some(e => e.id === HIDDEN_ID)).toBe(false);
 
-  // 2. Player attempts to remove the hidden element — authorize denies it
-  // (hidden elements are untouchable by players). The correction must not
-  // leak the hidden element's bytes: either a `remove`, or at minimum no
-  // upsert carrying audience:'dm' element bytes.
+  // 2. Player attempts to remove the hidden element — authorize denies it.
+  // The upstream correction must be a byte-free remove, never a canonical
+  // upsert containing the hidden element.
   send(player.ws, { from: 'p1', op: { kind: 'remove', id: HIDDEN_ID } });
   const removeCorrection = await player.waitFor(
-    m => m.op.kind === 'remove' || m.op.kind === 'upsert'
+    m => m.op.kind === 'remove' && m.op.id === HIDDEN_ID
   );
-  if (removeCorrection.op.kind === 'upsert') {
-    const el = removeCorrection.op.element as {
-      id: string;
-      audience?: string;
-    };
-    expect(el.audience).not.toBe(DM_AUDIENCE);
-  } else {
-    expect(removeCorrection.op.kind).toBe('remove');
-    expect(removeCorrection.op.id).toBe(HIDDEN_ID);
-  }
+  expect(removeCorrection).toEqual({
+    from: 'hub',
+    op: { kind: 'remove', id: HIDDEN_ID },
+  });
 
   // 3. Sanity: the DM is never denied, and must not be over-filtered — a
   // DM request-snapshot still includes the hidden element.

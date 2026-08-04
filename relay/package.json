@@ -16,7 +16,7 @@
   "dependencies": {
     "@fieldnotes/core": "0.53.0",
     "@fieldnotes/sync": "0.7.1",
-    "@fieldnotes/sync-server": "0.10.1",
+    "@fieldnotes/sync-server": "0.10.2",
     "redis": "^4.7.0"
   },
   "devDependencies": {
