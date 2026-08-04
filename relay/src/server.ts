@@ -6,7 +6,6 @@ import type { HubBackend, SyncHub } from '@fieldnotes/sync-server';
 import { makePolicies } from './policies.js';
 import { BufferedRedisBackend } from './backend.js';
 import { patchSendCorrectionLeak } from './corrections.js';
-import { patchReservedPresenceSenders } from './reservedSenders.js';
 import { handlePokeRequest } from './poke.js';
 
 export interface StartRelayOptions {
@@ -60,7 +59,6 @@ export async function startRelay(
   });
   // Upstream sendCorrection leak — see corrections.ts.
   patchSendCorrectionLeak(hub, policies.canRead);
-  patchReservedPresenceSenders(hub);
 
   pokeHandler = (req, res) =>
     void handlePokeRequest(hub, opts.secret, req, res).catch(err => {
