@@ -87,9 +87,7 @@ export function XPTracker({
       {/* Current XP and Level Display */}
       <div
         className={
-          compact
-            ? 'flex items-center justify-between'
-            : 'grid grid-cols-2 gap-4'
+          compact ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-2 gap-4'
         }
       >
         <div className="text-center">
@@ -130,10 +128,15 @@ export function XPTracker({
             )}
           </div>
           <div
-            className={`bg-bg-tertiary w-full rounded-full ${compact ? 'h-2' : 'h-3'}`}
+            className={`bg-divider-strong w-full overflow-hidden rounded-full ring-1 ring-black/10 dark:ring-white/10 ${compact ? 'h-2.5' : 'h-3'}`}
+            role="progressbar"
+            aria-label={`XP progress to level ${currentLevel + 1}`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Number(progress.toFixed(1))}
           >
             <div
-              className={`rounded-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-500 ease-out ${compact ? 'h-2' : 'h-3'}`}
+              className={`rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 shadow-sm transition-all duration-500 ease-out ${compact ? 'h-2.5' : 'h-3'}`}
               style={{ width: `${progress}%` }}
             />
           </div>

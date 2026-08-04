@@ -95,6 +95,8 @@ interface OverviewTabProps {
   campaignCode?: string;
   dmId?: string;
   playerId?: string;
+  projectedExperience?: number;
+  pendingXpAwardCount?: number;
 }
 
 export function OverviewTab({
@@ -105,6 +107,8 @@ export function OverviewTab({
   campaignCode,
   dmId,
   playerId,
+  projectedExperience,
+  pendingXpAwardCount,
 }: OverviewTabProps) {
   const currentHp = char.hitPoints?.current ?? 0;
   const maxHp = char.hitPoints?.max ?? 0;
@@ -170,6 +174,9 @@ export function OverviewTab({
             dmId={dmId}
             playerId={playerId}
             lastSyncedXp={char.experience ?? 0}
+            currentLevel={level}
+            projectedXp={projectedExperience}
+            pendingAwardCount={pendingXpAwardCount}
           />
         </div>
       )}

@@ -4,8 +4,15 @@ import {
   campaignKey,
   campaignPlayersKey,
   campaignPlayerKey,
+  campaignXpKey,
+  getRawRedis,
   refreshCampaignTTL,
 } from '@/lib/redis';
+import {
+  countUniqueXpAwards,
+  projectXpFromAwards,
+  readXpAwards,
+} from '@/lib/xpAwardQueue';
 import { CampaignData, CampaignPlayerData } from '@/types/campaign';
 
 export async function GET(
@@ -50,6 +57,21 @@ export async function GET(
           players.push(parsed);
         }
       }
+
+      await Promise.all(
+        players.map(async player => {
+          const pending = await readXpAwards(
+            getRawRedis(),
+            campaignXpKey(code, player.playerId)
+          );
+          const awards = pending.map(entry => entry.award);
+          player.projectedExperience = projectXpFromAwards(
+            player.characterData.experience ?? 0,
+            awards
+          );
+          player.pendingXpAwardCount = countUniqueXpAwards(awards);
+        })
+      );
 
       players.sort((a, b) => a.playerId.localeCompare(b.playerId));
     }

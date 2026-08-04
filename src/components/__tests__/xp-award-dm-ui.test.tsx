@@ -40,9 +40,15 @@ describe('XpAwardControl', () => {
         dmId="dm-1"
         playerId="p-1"
         lastSyncedXp={1200}
+        currentLevel={3}
       />
     );
-    expect(screen.getByText(/last synced: 1,200 xp/i)).toBeTruthy();
+    expect(screen.getByText('1,200')).toBeTruthy();
+    expect(screen.getByText('1,500 XP')).toBeTruthy();
+    expect(screen.getByText('16.7% to Level 4')).toBeTruthy();
+    expect(
+      screen.getByRole('progressbar', { name: /xp progress to level 4/i })
+    ).toHaveAttribute('aria-valuenow', '16.7');
 
     await user.type(screen.getByLabelText('XP to add'), '300');
     await user.click(screen.getByRole('button', { name: /send/i }));
@@ -54,6 +60,32 @@ describe('XpAwardControl', () => {
     expect(body.data.playerId).toBe('p-1');
     expect(body.data.award).toMatchObject({ mode: 'add', amount: 300 });
     expect(body.data.award.id).toBeTruthy();
+    expect(screen.getByText('1,500')).toBeTruthy();
+    expect(screen.getByText(/projected · 1 pending/i)).toBeTruthy();
+  });
+
+  it('starts from the persisted projection and applies set awards immediately', async () => {
+    const user = userEvent.setup();
+    render(
+      <XpAwardControl
+        campaignCode="ABC"
+        dmId="dm-1"
+        playerId="p-1"
+        lastSyncedXp={1200}
+        projectedXp={1500}
+        pendingAwardCount={1}
+        currentLevel={3}
+      />
+    );
+
+    expect(screen.getByText('1,500')).toBeTruthy();
+    await user.click(screen.getByLabelText(/toggle between add and set xp/i));
+    await user.type(screen.getByLabelText('Total XP'), '900');
+    await user.click(screen.getByRole('button', { name: /send/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('900')).toBeTruthy();
+    expect(screen.getByText(/projected · 2 pending/i)).toBeTruthy();
   });
 
   it('retry re-posts the ORIGINAL award with the same id', async () => {
@@ -69,6 +101,7 @@ describe('XpAwardControl', () => {
         dmId="dm-1"
         playerId="p-1"
         lastSyncedXp={0}
+        currentLevel={1}
       />
     );
     await user.type(screen.getByLabelText('XP to add'), '100');
@@ -95,6 +128,7 @@ describe('XpAwardControl', () => {
         dmId="dm-1"
         playerId="p-1"
         lastSyncedXp={0}
+        currentLevel={1}
       />
     );
 

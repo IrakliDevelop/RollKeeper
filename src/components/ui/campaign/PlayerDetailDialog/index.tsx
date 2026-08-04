@@ -143,6 +143,8 @@ export function PlayerDetailDialog({
               campaignCode={campaignCode}
               dmId={dmId}
               playerId={player.playerId}
+              projectedExperience={player.projectedExperience}
+              pendingXpAwardCount={player.pendingXpAwardCount}
             />
           )}
           {activeTab === 'spells' && showSpellsTab && <SpellsTab char={char} />}
