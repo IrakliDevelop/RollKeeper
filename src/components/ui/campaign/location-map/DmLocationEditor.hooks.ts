@@ -62,11 +62,6 @@ function proxyUrl(url: string): string {
   return url;
 }
 
-/** Viewport exposes historyRecorder at runtime for batched store ops */
-type ViewportHistoryAccess = {
-  historyRecorder: { begin: () => void; commit: () => void };
-};
-
 /** Upload to S3 via /api/assets/upload; base64 data-URL fallback when S3 is
  *  not configured. Returns the canonical (non-proxied) src to store. */
 async function uploadCanvasImage(file: File): Promise<string> {
@@ -680,13 +675,7 @@ export function useDmLocationEditor(
       vp.store.getById(id)
     );
     if (ids.length === 0) return;
-    const { historyRecorder } = vp as unknown as ViewportHistoryAccess;
-    historyRecorder.begin();
-    for (const id of ids) {
-      vp.store.remove(id);
-    }
-    historyRecorder.commit();
-    vp.requestRender();
+    vp.removeElements(ids);
     setSelectedElementId(null);
   }, [getVp]);
 

@@ -48,11 +48,6 @@ export interface DmBattleMapCanvasProps {
   tokenInfoToggle: { mode: TokenInfoMode | null; onCycle: () => void };
 }
 
-/** Viewport exposes historyRecorder at runtime for batched store ops. */
-type ViewportHistoryAccess = {
-  historyRecorder: { begin: () => void; commit: () => void };
-};
-
 const DRAWING_TYPES = new Set(['stroke', 'arrow', 'template']);
 
 export interface DmBattleMapCanvasState {
@@ -287,13 +282,7 @@ export function useDmBattleMapCanvas({
     if (!window.confirm('Clear all drawings (pencil, arrows, templates)?')) {
       return;
     }
-    const { historyRecorder } = viewport as unknown as ViewportHistoryAccess;
-    historyRecorder.begin();
-    for (const id of ids) {
-      viewport.store.remove(id);
-    }
-    historyRecorder.commit();
-    viewport.requestRender();
+    viewport.removeElements(ids);
   }, [viewport]);
 
   const handleToggleHiddenPlacement = useCallback(() => {
