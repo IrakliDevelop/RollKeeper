@@ -42,6 +42,25 @@ describe('DmLocationToolOptions pencil options', () => {
     });
   });
 
+  it('shows laser colors in battle-map mode and updates the laser tool', () => {
+    mockActiveTool = 'laser';
+    mockToolOptions = { laser: { color: '#F4C430', width: 3 } };
+    render(<DmLocationToolOptions mode="battlemap" />);
+
+    fireEvent.click(screen.getByTitle('#ef4444'));
+    expect(setOptionsSpies['laser']).toHaveBeenCalledWith({
+      color: '#ef4444',
+    });
+  });
+
+  it('does not show laser options outside battle-map mode', () => {
+    mockActiveTool = 'laser';
+    mockToolOptions = { laser: { color: '#F4C430', width: 3 } };
+    const { container } = render(<DmLocationToolOptions mode="location" />);
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it('renders nothing when no pencil tool is registered (location editor)', () => {
     mockToolOptions = { pencil: undefined };
     const { container } = render(<DmLocationToolOptions mode="location" />);
