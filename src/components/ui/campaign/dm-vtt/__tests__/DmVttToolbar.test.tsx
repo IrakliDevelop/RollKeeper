@@ -5,6 +5,7 @@ import { DmVttToolbar } from '@/components/ui/campaign/dm-vtt/DmVttToolbar';
 
 vi.mock('@fieldnotes/react', () => ({
   useActiveTool: () => ['select', vi.fn()] as const,
+  useToolOptions: () => [undefined, vi.fn()] as const,
 }));
 
 describe('DmVttToolbar', () => {
@@ -31,11 +32,7 @@ describe('DmVttToolbar', () => {
     ).toBeInTheDocument();
   });
 
-  it('always sits below the fixed top bar (top-16), never sharing its row', () => {
-    // Regression pin for the wide-viewport overlap bug: a `min-[1350px]:top-3`
-    // variant previously moved the toolbar into `DmVttTopBar`'s row at
-    // >=1350px, hiding the drawing tools behind the top bar's controls. The
-    // toolbar must stay at `top-16` at every width.
+  it('uses one wrapping command dock instead of an independently positioned tool strip', () => {
     const { container } = render(
       <DmVttToolbar
         onClearDrawings={vi.fn()}
@@ -49,12 +46,13 @@ describe('DmVttToolbar', () => {
         onToggleSelectedDmOnly={vi.fn()}
       />
     );
-    const toolbar = container.firstChild as HTMLElement;
-    const classes = toolbar.className.split(/\s+/);
-    expect(classes).toContain('top-20');
-    expect(classes).not.toEqual(
-      expect.arrayContaining([expect.stringMatching(/^min-\[1350px\]:top-3$/)])
-    );
+    const dock = container.firstChild as HTMLElement;
+    expect(dock).toHaveAttribute('data-testid', 'dm-vtt-command-dock');
+    expect(dock.className).toContain('flex-col');
+    expect(dock.className).toContain('w-fit');
+    expect(dock.className).toContain('max-w-[calc(100%-2rem)]');
+    expect(dock.className).not.toContain('overflow-x-auto');
+    expect(dock.querySelector('.flex-wrap')).toBeInTheDocument();
   });
 
   it('toggles hidden placement and offers reveal all', () => {
