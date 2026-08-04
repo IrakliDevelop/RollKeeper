@@ -28,6 +28,7 @@ import {
   Eye,
   EyeOff,
   Zap,
+  MapPin,
 } from 'lucide-react';
 import { useActiveTool, useHistory, useSelectionOps } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
@@ -52,6 +53,7 @@ const BATTLEMAP_TOOL_DEFS = [
   { name: 'template', icon: Sparkles, label: 'Template' },
   { name: 'eraser', icon: Eraser, label: 'Eraser' },
   { name: 'laser', icon: Zap, label: 'Laser pointer' },
+  { name: 'ping', icon: MapPin, label: 'Ping (look here)' },
 ] as const;
 
 function formatSyncTime(iso: string): string {

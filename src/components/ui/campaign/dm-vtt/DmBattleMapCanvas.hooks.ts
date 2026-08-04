@@ -10,6 +10,7 @@ import {
   ShapeTool,
   EraserTool,
   LaserTool,
+  PingTool,
   AutoSave,
   type Tool,
   type Viewport,
@@ -37,6 +38,10 @@ import {
   attachLaserBroadcast,
   attachRemoteLaserTrails,
 } from '@/components/ui/campaign/location-map/laserSync';
+import {
+  attachPingBroadcast,
+  attachRemotePings,
+} from '@/components/ui/campaign/location-map/pingSync';
 
 import type { TokenInfoMode } from '@/components/ui/campaign/token-overlay';
 
@@ -148,6 +153,9 @@ export function useDmBattleMapCanvas({
       // Ephemeral pointer in the DM accent color; trails broadcast as
       // presence when the room connection is up (see attachLaserBroadcast).
       new LaserTool({ color: '#F4C430', width: 3 }),
+      // Ephemeral "look here" pulse; taps broadcast as presence when the
+      // room connection is up (see attachPingBroadcast).
+      new PingTool({ color: '#F4C430' }),
       new DmTokenTool(tokenConfigRef),
     ];
   }, [tokenConfigRef]);
@@ -273,12 +281,20 @@ export function useDmBattleMapCanvas({
         // buffers until the first snapshot if the socket is still connecting.
         publishOwnedLayers(vp, 'dm', def => connection.publishLayerUpsert(def));
 
-        // Laser pointer: broadcast this DM's trails, render everyone else's.
+        // Laser pointer + map pings: broadcast this DM's, render everyone
+        // else's.
         laserCleanupRef.current?.();
-        const laserCleanups = [attachRemoteLaserTrails(vp, connection)];
+        const laserCleanups = [
+          attachRemoteLaserTrails(vp, connection),
+          attachRemotePings(vp, connection),
+        ];
         const laserTool = vp.toolManager.getTool<LaserTool>('laser');
         if (laserTool) {
           laserCleanups.push(attachLaserBroadcast(laserTool, connection));
+        }
+        const pingTool = vp.toolManager.getTool<PingTool>('ping');
+        if (pingTool) {
+          laserCleanups.push(attachPingBroadcast(pingTool, connection));
         }
         laserCleanupRef.current = () => {
           for (const cleanup of laserCleanups) cleanup();

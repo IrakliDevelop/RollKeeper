@@ -772,6 +772,119 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
     conn.stop();
   });
 
+  it('poke + laser + ping presence coexist over the real attachments: each overlay renders only its kind, nothing persists, leave clears both', async () => {
+    // RemotePingOverlay/RemoteLaserOverlay animate via raf; keep them inert.
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1)
+    );
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+
+    const { attachRemotePings } = await import(
+      '@/components/ui/campaign/location-map/pingSync'
+    );
+    const { attachRemoteLaserTrails } = await import(
+      '@/components/ui/campaign/location-map/laserSync'
+    );
+
+    const overlays: ((ctx: CanvasRenderingContext2D) => void)[] = [];
+    const vp = {
+      registerOverlay(draw: (ctx: CanvasRenderingContext2D) => void) {
+        overlays.push(draw);
+        return () => {
+          const index = overlays.indexOf(draw);
+          if (index >= 0) overlays.splice(index, 1);
+        };
+      },
+      requestRender: vi.fn(),
+    };
+
+    const store = new ElementStore();
+    const pokes: string[] = [];
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'map-1',
+      store,
+      clientId: 'player-1',
+      tokenRequest: { role: 'player', battleMapId: 'map-1', playerId: 'p1' },
+      onStatus: s => statuses.push(s),
+      onPoke: feature => pokes.push(feature),
+      transportFactory: () => fakeTransport,
+    });
+    await flushMicro();
+    const cleanupPings = attachRemotePings(vp, conn);
+    const cleanupLasers = attachRemoteLaserTrails(vp, conn);
+    fakeTransport.emitMessage(snapshotEnvelope('player-1', []));
+
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'hub',
+        op: { kind: 'presence', data: { kind: 'poke', feature: 'players' } },
+      })
+    );
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'conn-dm',
+        op: { kind: 'presence', data: laserPayload },
+      })
+    );
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'conn-dm',
+        op: {
+          kind: 'presence',
+          data: { kind: 'ping', x: 100, y: 200, color: '#F4C430' },
+        },
+      })
+    );
+
+    // Count what each overlay draws: pings fill a center dot, lasers stroke
+    // segments — a mock 2d context distinguishes them.
+    const counts = () => {
+      let fills = 0;
+      let strokes = 0;
+      const ctx = {
+        save: vi.fn(),
+        restore: vi.fn(),
+        beginPath: vi.fn(),
+        arc: vi.fn(),
+        moveTo: vi.fn(),
+        lineTo: vi.fn(),
+        stroke: vi.fn(() => (strokes += 1)),
+        fill: vi.fn(() => (fills += 1)),
+        globalAlpha: 1,
+        strokeStyle: '',
+        fillStyle: '',
+        lineWidth: 0,
+        lineCap: '',
+        lineJoin: '',
+      } as unknown as CanvasRenderingContext2D;
+      for (const draw of [...overlays]) draw(ctx);
+      return { fills, strokes };
+    };
+
+    expect(pokes).toEqual(['players']); // poke parsing undisturbed
+    const drawn = counts();
+    expect(drawn.fills).toBe(1); // exactly one ping pulse
+    expect(drawn.strokes).toBeGreaterThan(0); // laser trail rendered
+    // Ephemerality: presence never touches the element store.
+    expect(store.snapshot()).toEqual([]);
+
+    // Presence-leave clears both overlays for that sender immediately.
+    fakeTransport.emitMessage(
+      JSON.stringify({ from: 'conn-dm', op: { kind: 'presence-leave' } })
+    );
+    const afterLeave = counts();
+    expect(afterLeave.fills).toBe(0);
+    expect(afterLeave.strokes).toBe(0);
+
+    cleanupPings();
+    cleanupLasers();
+    expect(overlays).toHaveLength(0);
+    conn.stop();
+  });
+
   it('presence unsubscribe stops delivery', async () => {
     const seen: unknown[] = [];
     const conn = await startConnection();

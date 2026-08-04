@@ -13,6 +13,7 @@ import {
   TemplateTool,
   EraserTool,
   LaserTool,
+  PingTool,
   AutoSave,
   type Layer,
   type Tool,
@@ -36,6 +37,7 @@ import {
 } from './layerContract';
 import { makeApplyRemoteLayer, publishOwnedLayers } from './layerSync';
 import { attachLaserBroadcast, attachRemoteLaserTrails } from './laserSync';
+import { attachPingBroadcast, attachRemotePings } from './pingSync';
 import { pinGridToMapLayer } from './gridPin';
 import { nextMapImagePosition } from './mapImagePlacement';
 import {
@@ -285,6 +287,9 @@ export function useDmLocationEditor(
       // Ephemeral pointer; trails broadcast as presence while the battlemap
       // room connection is up (see attachLaserBroadcast).
       baseTools.push(new LaserTool({ color: '#F4C430', width: 3 }));
+      // Ephemeral "look here" pulse; taps broadcast as presence while the
+      // battlemap room connection is up (see attachPingBroadcast).
+      baseTools.push(new PingTool({ color: '#F4C430' }));
     }
 
     return baseTools;
@@ -428,12 +433,20 @@ export function useDmLocationEditor(
         // canvas (created before layer sync, or on another device).
         publishOwnedLayers(vp, 'dm', def => connection.publishLayerUpsert(def));
 
-        // Laser pointer: broadcast this DM's trails, render everyone else's.
+        // Laser pointer + map pings: broadcast this DM's, render everyone
+        // else's.
         laserCleanupRef.current?.();
-        const laserCleanups = [attachRemoteLaserTrails(vp, connection)];
+        const laserCleanups = [
+          attachRemoteLaserTrails(vp, connection),
+          attachRemotePings(vp, connection),
+        ];
         const laserTool = vp.toolManager.getTool<LaserTool>('laser');
         if (laserTool) {
           laserCleanups.push(attachLaserBroadcast(laserTool, connection));
+        }
+        const pingTool = vp.toolManager.getTool<PingTool>('ping');
+        if (pingTool) {
+          laserCleanups.push(attachPingBroadcast(pingTool, connection));
         }
         laserCleanupRef.current = () => {
           for (const cleanup of laserCleanups) cleanup();
