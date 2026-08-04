@@ -2,9 +2,11 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createClient } from 'redis';
 import { createSyncServer } from '@fieldnotes/sync-server';
-import type { HubBackend, SyncHub } from '@fieldnotes/sync-server';
+import type { HubBackend, HubFanout, SyncHub } from '@fieldnotes/sync-server';
+import { RedisHubFanout } from '@fieldnotes/sync-redis';
 import { makePolicies } from './policies.js';
 import { BufferedRedisBackend } from './backend.js';
+import { EphemeralHubFanout } from './ephemeral-fanout.js';
 import { handlePokeRequest } from './poke.js';
 
 export interface StartRelayOptions {
@@ -13,6 +15,8 @@ export interface StartRelayOptions {
   port?: number;
   /** Override the storage backend (e.g. MemoryHubBackend in tests). */
   backend?: HubBackend;
+  /** Cross-instance ephemeral and durable-operation fan-out. */
+  fanout?: HubFanout;
 }
 
 export interface RelayHandle {
@@ -55,6 +59,7 @@ export async function startRelay(
     server,
     ...policies,
     ...(opts.backend ? { backend: opts.backend } : {}),
+    ...(opts.fanout ? { fanout: opts.fanout } : {}),
   });
 
   pokeHandler = (req, res) =>
@@ -87,6 +92,9 @@ async function main(): Promise<void> {
 
   let backend: BufferedRedisBackend | undefined;
   let redisClient: ReturnType<typeof createClient> | undefined;
+  let fanoutPublisher: ReturnType<typeof createClient> | undefined;
+  let fanoutSubscriber: ReturnType<typeof createClient> | undefined;
+  let fanout: RedisHubFanout | undefined;
   if (process.env.REDIS_URL) {
     redisClient = createClient({ url: process.env.REDIS_URL });
     redisClient.on('error', err => console.error('[redis]', err));
@@ -95,20 +103,41 @@ async function main(): Promise<void> {
       flushIntervalMs: Number(process.env.FLUSH_INTERVAL_MS ?? 3000),
       roomTtlSeconds: Number(process.env.ROOM_TTL_SECONDS ?? 172800),
     });
-    console.log('[relay] using buffered Redis backend');
+    fanoutPublisher = redisClient.duplicate();
+    fanoutSubscriber = redisClient.duplicate();
+    fanoutPublisher.on('error', err =>
+      console.error('[redis:fanout:publish]', err)
+    );
+    fanoutSubscriber.on('error', err =>
+      console.error('[redis:fanout:subscribe]', err)
+    );
+    await Promise.all([fanoutPublisher.connect(), fanoutSubscriber.connect()]);
+    fanout = new RedisHubFanout(fanoutPublisher, fanoutSubscriber, {
+      onError: err => console.error('[redis:fanout]', err),
+    });
+    console.log(
+      '[relay] using buffered Redis backend and cross-instance presence fanout'
+    );
   } else {
     console.log(
       '[relay] REDIS_URL not set — in-memory rooms (state lost on restart)'
     );
   }
 
-  const { close } = await startRelay({ secret, port, backend });
+  const { close } = await startRelay({
+    secret,
+    port,
+    backend,
+    fanout: fanout ? new EphemeralHubFanout(fanout) : undefined,
+  });
   console.log(`[relay] listening on :${port}`);
 
   const shutdown = async (): Promise<void> => {
     console.log('[relay] shutting down…');
     await close();
     await backend?.stopAndFlush();
+    await fanoutSubscriber?.quit();
+    await fanoutPublisher?.quit();
     await redisClient?.quit();
     process.exit(0);
   };
