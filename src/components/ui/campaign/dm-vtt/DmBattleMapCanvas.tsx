@@ -1,7 +1,6 @@
 'use client';
 
 import { FieldNotesCanvas, ViewportContext } from '@fieldnotes/react';
-import DmLocationToolOptions from '@/components/ui/campaign/location-map/DmLocationToolOptions';
 import { DmVttToolbar } from './DmVttToolbar';
 import {
   useDmBattleMapCanvas,
@@ -18,7 +17,7 @@ export type { DmBattleMapCanvasProps };
  * init/persistence/connection wiring.
  */
 export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
-  const { children, tokenInfoToggle } = props;
+  const { children, sessionControls, tokenInfoToggle } = props;
   const {
     viewport,
     tools,
@@ -45,6 +44,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
         />
         {viewport && (
           <DmVttToolbar
+            sessionControls={sessionControls}
             onClearDrawings={handleClearDrawings}
             tokenInfoToggle={tokenInfoToggle}
             hiddenPlacementActive={hiddenPlacementActive}
@@ -55,11 +55,6 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
             selectedElementIsDmOnly={selectedElementIsDmOnly}
             onToggleSelectedDmOnly={handleToggleSelectedDmOnly}
           />
-        )}
-        {viewport && (
-          <div className="border-divider absolute top-[8.25rem] left-1/2 z-10 max-w-[92vw] -translate-x-1/2 overflow-hidden rounded-xl border shadow-lg">
-            <DmLocationToolOptions mode="battlemap" />
-          </div>
         )}
         {viewport && children}
       </div>

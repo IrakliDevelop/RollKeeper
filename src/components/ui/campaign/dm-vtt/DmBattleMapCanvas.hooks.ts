@@ -50,6 +50,8 @@ export interface DmBattleMapCanvasProps {
   campaignCode: string;
   battleMapId: string;
   dmId: string;
+  /** Map/session controls rendered as the command dock's first row. */
+  sessionControls?: React.ReactNode;
   /** Chrome rendered inside the ViewportContext.Provider. */
   children?: React.ReactNode;
   onStatus?: (status: BattleMapConnectionStatus) => void;

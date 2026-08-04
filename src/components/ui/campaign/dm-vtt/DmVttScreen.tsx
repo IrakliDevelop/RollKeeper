@@ -68,6 +68,19 @@ export function DmVttScreen({
       tokenConfigRef={vtt.tokenConfigRef}
       onSelectionChange={vtt.onSelectionChange}
       tokenInfoToggle={{ mode: tokenInfoMode, onCycle: cycleTokenInfo }}
+      sessionControls={
+        <DmVttTopBar
+          campaignCode={campaignCode}
+          battleMapId={battleMapId}
+          dmId={dmId}
+          mapName={vtt.battleMap?.name ?? 'Battle Map'}
+          status={vtt.status}
+          gridMode={gridMode}
+          onSetGridMode={vtt.setGridMode}
+          mode={mode}
+          onModeChange={onModeChange}
+        />
+      }
     >
       <TokenDecorationLayer decorations={decorations} mode={tokenInfoMode} />
       <TokenPlacementController
@@ -82,17 +95,6 @@ export function DmVttScreen({
         />
       )}
       <div className="pointer-events-none absolute inset-0 z-10">
-        <DmVttTopBar
-          campaignCode={campaignCode}
-          battleMapId={battleMapId}
-          dmId={dmId}
-          mapName={vtt.battleMap?.name ?? 'Battle Map'}
-          status={vtt.status}
-          gridMode={gridMode}
-          onSetGridMode={vtt.setGridMode}
-          mode={mode}
-          onModeChange={onModeChange}
-        />
         <RosterTray
           entities={vtt.linkedEntities}
           placedIndex={vtt.placedIndex}
