@@ -9,6 +9,7 @@ import {
   TextTool,
   ShapeTool,
   EraserTool,
+  LaserTool,
   AutoSave,
   type Tool,
   type Viewport,
@@ -32,6 +33,10 @@ import {
   makeApplyRemoteLayer,
   publishOwnedLayers,
 } from '@/components/ui/campaign/location-map/layerSync';
+import {
+  attachLaserBroadcast,
+  attachRemoteLaserTrails,
+} from '@/components/ui/campaign/location-map/laserSync';
 
 import type { TokenInfoMode } from '@/components/ui/campaign/token-overlay';
 
@@ -90,6 +95,7 @@ export function useDmBattleMapCanvas({
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const autoSaveRef = useRef<AutoSave | null>(null);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
+  const laserCleanupRef = useRef<(() => void) | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
   const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
   const [hiddenPlacementActive, setHiddenPlacementActive] = useState(false);
@@ -139,6 +145,9 @@ export function useDmBattleMapCanvas({
         renderStyle: 'geometric',
       }),
       new EraserTool({ radius: 12, mode: 'stroke' }),
+      // Ephemeral pointer in the DM accent color; trails broadcast as
+      // presence when the room connection is up (see attachLaserBroadcast).
+      new LaserTool({ color: '#F4C430', width: 3 }),
       new DmTokenTool(tokenConfigRef),
     ];
   }, [tokenConfigRef]);
@@ -263,6 +272,17 @@ export function useDmBattleMapCanvas({
         // canvas (created before layer sync, or on another device). Ledger
         // buffers until the first snapshot if the socket is still connecting.
         publishOwnedLayers(vp, 'dm', def => connection.publishLayerUpsert(def));
+
+        // Laser pointer: broadcast this DM's trails, render everyone else's.
+        laserCleanupRef.current?.();
+        const laserCleanups = [attachRemoteLaserTrails(vp, connection)];
+        const laserTool = vp.toolManager.getTool<LaserTool>('laser');
+        if (laserTool) {
+          laserCleanups.push(attachLaserBroadcast(laserTool, connection));
+        }
+        laserCleanupRef.current = () => {
+          for (const cleanup of laserCleanups) cleanup();
+        };
       }
 
       onViewportReady?.(vp);
@@ -280,6 +300,7 @@ export function useDmBattleMapCanvas({
   useEffect(() => {
     return () => {
       autoSaveRef.current?.stop();
+      laserCleanupRef.current?.();
       connectionRef.current?.stop();
       pinUnsubRef.current?.();
     };

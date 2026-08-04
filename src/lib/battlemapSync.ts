@@ -119,6 +119,23 @@ export interface BattleMapConnection {
    */
   publishLayerUpsert: (definition: Layer) => void;
   publishLayerRemove: (id: string) => void;
+  /**
+   * Sends ephemeral presence to the room (laser trails). Fire-and-forget:
+   * dropped — never queued — unless the connection is live, so stale trails
+   * cannot replay after a reconnect. Never enters canvas state or the
+   * durable operation queue.
+   */
+  sendPresence: (data: unknown) => void;
+  /**
+   * Observes room presence. `from` is the relay's server-owned connection id
+   * — an opaque per-sender key, NOT a clientId. Hub pokes also arrive here
+   * (`from === 'hub'`, `data.kind === 'poke'`); consumers must discriminate
+   * on `data.kind`. Handlers survive credential rebuilds. Returns
+   * unsubscribe.
+   */
+  onPresence: (handler: (from: string, data: unknown) => void) => () => void;
+  /** Observes presence departures (same `from` key). Returns unsubscribe. */
+  onPresenceLeave: (handler: (from: string) => void) => () => void;
 }
 
 export function createManagedBattleMapConnection(
@@ -164,5 +181,13 @@ export function createManagedBattleMapConnection(
     publishLayerRemove: (id: string): void => {
       connection.publishLayerRemove(id);
     },
+    sendPresence: (data: unknown): void => {
+      connection.sendPresence(data);
+    },
+    onPresence: (
+      handler: (from: string, data: unknown) => void
+    ): (() => void) => connection.onPresence(handler),
+    onPresenceLeave: (handler: (from: string) => void): (() => void) =>
+      connection.onPresenceLeave(handler),
   };
 }
