@@ -147,6 +147,20 @@ describe('DetailVitals', () => {
     expect(screen.getByText('synced')).toBeInTheDocument();
   });
 
+  it.each([
+    ['player', playerEntity],
+    ['NPC', npcEntity],
+  ])('does not offer rest actions for a %s in combat', (_label, entity) => {
+    render(<DetailVitals entity={entity} actions={makeActions()} />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Short Rest' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Long Rest' })
+    ).not.toBeInTheDocument();
+  });
+
   it('NPC death-save failure toggle calls onUpdate with incremented failures', async () => {
     const npcAtZeroHp: EncounterEntity = {
       ...npcEntity,

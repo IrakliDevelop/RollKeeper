@@ -14,6 +14,7 @@ import {
   Redo2,
   Trash2,
   Eraser,
+  X,
   Download,
   Loader2,
   Check,
@@ -48,6 +49,7 @@ const BASE_TOOL_DEFS = [
 const BATTLEMAP_TOOL_DEFS = [
   { name: 'measure', icon: Ruler, label: 'Measure' },
   { name: 'template', icon: Sparkles, label: 'Template' },
+  { name: 'eraser', icon: Eraser, label: 'Eraser' },
 ] as const;
 
 function formatSyncTime(iso: string): string {
@@ -194,7 +196,7 @@ export default function DmLocationToolbar({
           title="Clear canvas"
           className="text-accent-red-text h-8 w-8 p-0"
         >
-          <Eraser size={15} />
+          <X size={15} />
         </Button>
       </div>
 

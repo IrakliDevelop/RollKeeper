@@ -11,6 +11,7 @@ import {
   StickyNote,
   Shapes,
   Eraser,
+  Scissors,
   Eye,
   Minus,
   EyeOff,
@@ -31,6 +32,7 @@ const DM_TOOLS: { name: string; label: string; Icon: typeof Hand }[] = [
   { name: 'note', label: 'Sticky Note', Icon: StickyNote },
   { name: 'measure', label: 'Measure', Icon: Ruler },
   { name: 'template', label: 'Template', Icon: Circle },
+  { name: 'eraser', label: 'Eraser', Icon: Eraser },
 ];
 
 export interface DmVttToolbarProps {
@@ -152,7 +154,7 @@ export function DmVttToolbar({
           title="Clear drawings"
           aria-label="Clear drawings"
         >
-          <Eraser size={16} />
+          <Scissors size={16} />
         </Button>
         <Button
           variant="ghost"

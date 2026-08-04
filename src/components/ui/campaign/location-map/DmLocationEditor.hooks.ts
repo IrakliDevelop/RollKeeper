@@ -11,6 +11,7 @@ import {
   TextTool,
   ShapeTool,
   TemplateTool,
+  EraserTool,
   AutoSave,
   type Tool,
   type Viewport,
@@ -242,7 +243,7 @@ export function useDmLocationEditor(
   const { sharedWithPlayers, handleToggleShareWithPlayers } =
     useShareWithPlayers(campaignCode, dmId, location, mode === 'battlemap');
 
-  // Build tools once — no PencilTool or EraserTool for the location editor
+  // Build tools once. Battle-map setup also supports FieldNotes' stroke eraser.
   const tools = useMemo<Tool[]>(() => {
     const baseTools: Tool[] = [
       new HandTool(),
@@ -271,6 +272,7 @@ export function useDmLocationEditor(
           renderStyle: 'geometric',
         })
       );
+      baseTools.push(new EraserTool({ radius: 12, mode: 'stroke' }));
     }
 
     return baseTools;
