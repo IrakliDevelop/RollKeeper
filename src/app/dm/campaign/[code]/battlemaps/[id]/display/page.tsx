@@ -9,6 +9,8 @@ import {
   createManagedBattleMapConnection,
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
+import { ensureCanonicalLayers } from '@/components/ui/campaign/location-map/layerContract';
+import { makeApplyRemoteLayer } from '@/components/ui/campaign/location-map/layerSync';
 
 function DisplayCanvas() {
   const params = useParams();
@@ -26,6 +28,10 @@ function DisplayCanvas() {
 
   const handleReady = (vp: Viewport) => {
     viewportRef.current = vp;
+    // Canonical bands so map/annotation elements stack correctly; custom and
+    // player layer definitions arrive over layer sync. Read-only view — the
+    // 'player' lock stance is irrelevant here.
+    ensureCanonicalLayers(vp, 'player');
     if (!relayUrl || !displayKey) return;
     connectionRef.current?.stop();
     connectionRef.current = createManagedBattleMapConnection({
@@ -35,6 +41,11 @@ function DisplayCanvas() {
       store: vp.store,
       clientId: `display-${code}`,
       tokenRequest: { role: 'display', battleMapId: id, displayKey },
+      layers: {
+        applyLayer: makeApplyRemoteLayer(vp, 'display', {
+          onApplied: () => vp.requestRender(),
+        }),
+      },
       onStatus: s => {
         setStatus(s);
         if (s === 'live') {

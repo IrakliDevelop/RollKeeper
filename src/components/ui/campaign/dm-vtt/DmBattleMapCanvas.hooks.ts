@@ -26,9 +26,12 @@ import {
 } from '@/components/ui/campaign/dm-vtt/combatantToken';
 import {
   migrateCanvasToContract,
-  attachUnknownLayerMirror,
   subscribePinCanonicalLayers,
 } from '@/components/ui/campaign/location-map/layerContract';
+import {
+  makeApplyRemoteLayer,
+  publishOwnedLayers,
+} from '@/components/ui/campaign/location-map/layerSync';
 
 import type { TokenInfoMode } from '@/components/ui/campaign/token-overlay';
 
@@ -207,11 +210,6 @@ export function useDmBattleMapCanvas({
           .setDmOnly(campaignCode, battleMapId, element.id, true);
       });
 
-      // Mirror unknown remote layers (player tokens) into the player band —
-      // without this they sort at layer order 0, under DM-added images.
-      // Covers both new elements (add) and relay snapshot reconcile
-      // re-applying remote elements as full updates (including layerId).
-      attachUnknownLayerMirror(vp, 'dm', () => vp.requestRender());
       pinUnsubRef.current?.();
       // Play canvas never arranges maps — the annotations layer (DM tokens,
       // notes, text) must stay unlocked, repairing any state persisted locked
@@ -233,7 +231,7 @@ export function useDmBattleMapCanvas({
       const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
       if (relayUrl) {
         connectionRef.current?.stop();
-        connectionRef.current = createManagedBattleMapConnection({
+        const connection = createManagedBattleMapConnection({
           relayUrl,
           campaignCode,
           battleMapId,
@@ -246,12 +244,25 @@ export function useDmBattleMapCanvas({
               ?.dmOnlyElements[el.id]
               ? 'dm'
               : undefined,
+          // Layer definitions sync (replaces the unknown-layer mirror):
+          // winning remote records apply through history-transparent *Direct
+          // calls; the pin subscription above re-pins bands on every change.
+          layers: {
+            applyLayer: makeApplyRemoteLayer(vp, 'dm', {
+              onApplied: () => vp.requestRender(),
+            }),
+          },
           onStatus: s => {
             setStatus(s);
             onStatusProp?.(s);
           },
           onPoke: feature => onPokeRef.current?.(feature),
         });
+        connectionRef.current = connection;
+        // Teach peers and late joiners the custom layers persisted in this
+        // canvas (created before layer sync, or on another device). Ledger
+        // buffers until the first snapshot if the socket is still connecting.
+        publishOwnedLayers(vp, 'dm', def => connection.publishLayerUpsert(def));
       }
 
       onViewportReady?.(vp);

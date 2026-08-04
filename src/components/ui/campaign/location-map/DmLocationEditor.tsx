@@ -57,6 +57,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handleFitToMap,
     arrangeMapsActive,
     handleToggleArrangeMaps,
+    publishLayerUpsert,
+    publishLayerRemove,
   } = useDmLocationEditor(props);
 
   return (
@@ -158,6 +160,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                 unlinkEncounter(props.campaignCode, props.location.id, id)
               }
               onClose={() => setLayersPanelOpen(false)}
+              publishLayerUpsert={publishLayerUpsert}
+              publishLayerRemove={publishLayerRemove}
             />
           )}
 

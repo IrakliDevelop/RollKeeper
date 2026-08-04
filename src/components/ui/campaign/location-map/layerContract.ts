@@ -3,9 +3,11 @@ import type { ElementStore, LayerManager } from '@fieldnotes/core';
 /**
  * Canonical layer bands shared by ALL battlemap canvases (DM setup editor,
  * DM play canvas, player canvas). The FieldNotes SDK paints elements sorted
- * by (layerOrder, zIndex) with zIndex compared only WITHIN a layer, and
- * layers are not synced between clients — so stacking is only deterministic
- * if every canvas assigns the same order band to the same layer id:
+ * by (layerOrder, zIndex) with zIndex compared only WITHIN a layer — so
+ * stacking is only deterministic if every canvas assigns the same order band
+ * to the same layer id. Custom and player layer definitions now sync between
+ * clients (`layerSync.ts` over `@fieldnotes/sync` layer records); the bands
+ * below remain RollKeeper policy, re-pinned locally on every layer change:
  *
  *   layer-map (0, locked)            map images + grid
  *   layer-annotations (100)          DM annotations + combatant tokens
@@ -154,60 +156,6 @@ export function subscribePinCanonicalLayers(
       pinning = false;
     }
   });
-}
-
-/**
- * Layers don't sync: a remote element can reference a layer id this canvas
- * has never seen (old clients mid-rollout, other players' layers). Mirror it
- * locally into the right band so stacking stays deterministic. Locked for
- * players (can't touch remote content anyway); unlocked for the DM (keeps
- * the DM able to drag player tokens).
- */
-export function mirrorUnknownLayer(
-  vp: ViewportLike,
-  layerId: string,
-  role: CanvasRole
-): void {
-  if (!layerId || vp.layerManager.getLayer(layerId)) return;
-  const isPlayerLayer = layerId.startsWith(PLAYER_LAYER_PREFIX);
-  vp.layerManager.addLayerDirect({
-    id: layerId,
-    name: 'Remote layer',
-    visible: true,
-    locked: role === 'player',
-    order: isPlayerLayer ? PLAYER_BAND_ORDER : CUSTOM_BAND_ORDER,
-    opacity: 1,
-  });
-  pinCanonicalLayers(vp);
-}
-
-/**
- * Register the unknown-layer mirror on a store. Both 'add' AND 'update' must
- * be covered: relay snapshot reconcile re-applies remote elements as full
- * updates (including layerId), so a layerId referencing a layer this canvas
- * no longer has (e.g. pre-migration legacy ids restored from the relay's
- * persisted room state) can arrive on either event. Returns an unsubscribe
- * for both listeners.
- */
-export function attachUnknownLayerMirror(
-  vp: ViewportLike,
-  role: CanvasRole,
-  onMirrored?: () => void
-): () => void {
-  const check = (layerId: string | undefined) => {
-    if (layerId && !vp.layerManager.getLayer(layerId)) {
-      mirrorUnknownLayer(vp, layerId, role);
-      onMirrored?.();
-    }
-  };
-  const unsubAdd = vp.store.on('add', el => check(el.layerId));
-  const unsubUpdate = vp.store.on('update', ({ current }) =>
-    check(current.layerId)
-  );
-  return () => {
-    unsubAdd();
-    unsubUpdate();
-  };
 }
 
 /**

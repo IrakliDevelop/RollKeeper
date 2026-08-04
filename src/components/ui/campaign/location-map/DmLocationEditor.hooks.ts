@@ -13,6 +13,7 @@ import {
   TemplateTool,
   EraserTool,
   AutoSave,
+  type Layer,
   type Tool,
   type Viewport,
 } from '@fieldnotes/core';
@@ -21,6 +22,7 @@ import { useLocationStore } from '@/store/locationStore';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import {
   createManagedBattleMapConnection,
+  type BattleMapConnection,
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import { openTvDisplay } from '@/lib/openTvDisplay';
@@ -28,10 +30,10 @@ import { useShareWithPlayers } from './useShareWithPlayers';
 import {
   ensureCanonicalLayers,
   migrateCanvasToContract,
-  attachUnknownLayerMirror,
   subscribePinCanonicalLayers,
   MAP_LAYER_ID,
 } from './layerContract';
+import { makeApplyRemoteLayer, publishOwnedLayers } from './layerSync';
 import { pinGridToMapLayer } from './gridPin';
 import { nextMapImagePosition } from './mapImagePlacement';
 import {
@@ -158,6 +160,10 @@ export interface DmLocationEditorState {
   // Arrange maps (battlemap mode only)
   arrangeMapsActive: boolean;
   handleToggleArrangeMaps: () => void;
+
+  // Layer sync (battlemap mode; no-ops when live sync is off)
+  publishLayerUpsert: (definition: Layer) => void;
+  publishLayerRemove: (id: string) => void;
 }
 
 export function useDmLocationEditor(
@@ -170,7 +176,7 @@ export function useDmLocationEditor(
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mapImageInputRef = useRef<HTMLInputElement>(null);
   const autoSaveRef = useRef<AutoSave | null>(null);
-  const connectionRef = useRef<{ stop: () => void } | null>(null);
+  const connectionRef = useRef<BattleMapConnection | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
   const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
   const [syncStatus, setSyncStatus] = useState<
@@ -376,13 +382,6 @@ export function useDmLocationEditor(
           .setDmOnly(campaignCode, location.id, element.id, true);
       });
 
-      // Layers aren't synced: player tokens arrive referencing player-*
-      // layer ids that don't exist on this canvas and would sort at layer
-      // order 0 — UNDER the annotations layer where DM-added images live.
-      // Mirror unknown layers into their canonical band instead. Covers both
-      // new elements (add) and relay snapshot reconcile re-applying remote
-      // elements as full updates (including layerId) on reconnect.
-      attachUnknownLayerMirror(vp, 'dm', () => vp.requestRender());
       pinUnsubRef.current?.();
       pinUnsubRef.current = subscribePinCanonicalLayers(vp, () => ({
         mapUnlocked: arrangeActiveRef.current,
@@ -395,7 +394,7 @@ export function useDmLocationEditor(
       // getState() (a captured snapshot would go stale after the first toggle).
       if (mode === 'battlemap' && process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL) {
         connectionRef.current?.stop();
-        connectionRef.current = createManagedBattleMapConnection({
+        const connection = createManagedBattleMapConnection({
           relayUrl: process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL,
           campaignCode,
           battleMapId: location.id,
@@ -408,8 +407,20 @@ export function useDmLocationEditor(
               ?.dmOnlyElements[el.id]
               ? 'dm'
               : undefined,
+          // Layer definitions sync (replaces the unknown-layer mirror):
+          // winning remote records apply through history-transparent *Direct
+          // calls; the pin subscription above re-pins bands on every change.
+          layers: {
+            applyLayer: makeApplyRemoteLayer(vp, 'dm', {
+              onApplied: () => vp.requestRender(),
+            }),
+          },
           onStatus: setSyncStatus,
         });
+        connectionRef.current = connection;
+        // Teach peers and late joiners the custom layers persisted in this
+        // canvas (created before layer sync, or on another device).
+        publishOwnedLayers(vp, 'dm', def => connection.publishLayerUpsert(def));
       }
     },
     [location, onSave, mode, campaignCode, dmId]
@@ -947,6 +958,15 @@ export function useDmLocationEditor(
     if (vp) _fitCameraToMap(vp, location.mapImageSize);
   }, [getVp, location.mapImageSize]);
 
+  // Stable across renders; reads the live connection so the layers panel can
+  // broadcast panel edits. Setup mode has no connection — silently local.
+  const publishLayerUpsert = useCallback((definition: Layer) => {
+    connectionRef.current?.publishLayerUpsert(definition);
+  }, []);
+  const publishLayerRemove = useCallback((id: string) => {
+    connectionRef.current?.publishLayerRemove(id);
+  }, []);
+
   return {
     mode,
     canvasRef,
@@ -992,5 +1012,7 @@ export function useDmLocationEditor(
     handleFitToMap,
     arrangeMapsActive,
     handleToggleArrangeMaps,
+    publishLayerUpsert,
+    publishLayerRemove,
   };
 }

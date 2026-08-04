@@ -6,7 +6,8 @@ import { signBattleMapToken } from './token.js';
 
 const SECRET = 'test-secret';
 const ROOM = 'ABC123:bm-1';
-const { authenticate, authorize, canRead } = makePolicies(SECRET);
+const { authenticate, authorize, authorizeLayer, canRead } =
+  makePolicies(SECRET);
 
 function req(url: string): { req: IncomingMessage; room: string } {
   return { req: { url } as IncomingMessage, room: ROOM };
@@ -222,5 +223,107 @@ describe('canRead', () => {
     expect(canRead({ ...base, role: 'display', audience: DM_AUDIENCE })).toBe(
       false
     );
+  });
+});
+
+describe('authorizeLayer', () => {
+  const layerDef = (id: string) => ({
+    id,
+    name: id,
+    visible: true,
+    locked: false,
+    order: 500,
+    opacity: 1,
+  });
+  const upsertOp = (id: string) =>
+    ({
+      kind: 'layer-upsert',
+      layer: layerDef(id),
+      version: 1,
+      editor: 'x',
+    }) as const;
+  const removeOp = (id: string) =>
+    ({ kind: 'layer-remove', id, version: 2, editor: 'x' }) as const;
+  const base = { room: ROOM };
+
+  it('dm may edit any layer definition', () => {
+    expect(
+      authorizeLayer({
+        ...base,
+        userId: 'dm1',
+        role: 'dm',
+        op: upsertOp('layer-props'),
+      })
+    ).toBe(true);
+    expect(
+      authorizeLayer({
+        ...base,
+        userId: 'dm1',
+        role: 'dm',
+        op: removeOp('player-p1'),
+      })
+    ).toBe(true);
+  });
+
+  it('a player may only define or remove their own player layer', () => {
+    expect(
+      authorizeLayer({
+        ...base,
+        userId: 'p1',
+        role: 'player',
+        op: upsertOp('player-p1'),
+      })
+    ).toBe(true);
+    expect(
+      authorizeLayer({
+        ...base,
+        userId: 'p1',
+        role: 'player',
+        op: removeOp('player-p1'),
+      })
+    ).toBe(true);
+    expect(
+      authorizeLayer({
+        ...base,
+        userId: 'p1',
+        role: 'player',
+        op: upsertOp('player-p2'),
+      })
+    ).toBe(false);
+    expect(
+      authorizeLayer({
+        ...base,
+        userId: 'p1',
+        role: 'player',
+        op: upsertOp('layer-annotations'),
+      })
+    ).toBe(false);
+    expect(
+      authorizeLayer({
+        ...base,
+        userId: 'p1',
+        role: 'player',
+        op: removeOp('layer-map'),
+      })
+    ).toBe(false);
+  });
+
+  it('display and unknown roles are read-only; missing userId fails closed', () => {
+    expect(
+      authorizeLayer({
+        ...base,
+        userId: 'd1',
+        role: 'display',
+        op: upsertOp('player-d1'),
+      })
+    ).toBe(false);
+    expect(
+      authorizeLayer({
+        ...base,
+        userId: undefined,
+        role: 'player',
+        op: upsertOp('player-undefined'),
+      })
+    ).toBe(false);
   });
 });
