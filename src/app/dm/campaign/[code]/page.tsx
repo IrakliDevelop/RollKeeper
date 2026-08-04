@@ -106,6 +106,10 @@ export default function CampaignViewPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPlayer, setSelectedPlayer] =
     useState<CampaignPlayerData | null>(null);
+  const currentSelectedPlayer = selectedPlayer
+    ? (players.find(player => player.playerId === selectedPlayer.playerId) ??
+      selectedPlayer)
+    : null;
   const [editingCounterLabel, setEditingCounterLabel] = useState(false);
   const [counterLabelInput, setCounterLabelInput] = useState('');
   const [messageTarget, setMessageTarget] = useState<
@@ -715,25 +719,29 @@ export default function CampaignViewPage() {
       </main>
 
       {/* Player Detail Dialog */}
-      {selectedPlayer && (
+      {currentSelectedPlayer && (
         <PlayerDetailDialog
-          open={!!selectedPlayer}
+          open={!!currentSelectedPlayer}
           onOpenChange={open => {
             if (!open) setSelectedPlayer(null);
           }}
-          player={selectedPlayer}
+          player={currentSelectedPlayer}
           customCounterLabel={customCounterLabel}
           counterValue={
-            localCampaign?.playerCounters?.[selectedPlayer.playerId] ?? 0
+            localCampaign?.playerCounters?.[currentSelectedPlayer.playerId] ?? 0
           }
           onAdjustCounter={
             customCounterLabel
               ? delta =>
-                  adjustPlayerCounter(code, selectedPlayer.playerId, delta)
+                  adjustPlayerCounter(
+                    code,
+                    currentSelectedPlayer.playerId,
+                    delta
+                  )
               : undefined
           }
           onSendMessage={() => {
-            setMessageTarget(selectedPlayer);
+            setMessageTarget(currentSelectedPlayer);
             setSelectedPlayer(null);
           }}
           campaignCode={code}

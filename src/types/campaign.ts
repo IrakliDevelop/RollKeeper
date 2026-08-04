@@ -13,6 +13,10 @@ export interface CampaignPlayerData {
   characterName: string;
   characterData: CharacterState;
   lastSynced: string;
+  /** XP after applying queued DM awards to characterData.experience. */
+  projectedExperience?: number;
+  /** Number of DM XP awards not yet consumed by the player. */
+  pendingXpAwardCount?: number;
 }
 
 export interface CampaignInfo {

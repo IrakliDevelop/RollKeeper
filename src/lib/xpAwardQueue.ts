@@ -6,6 +6,28 @@ export const XP_QUEUE_CAP = 100;
 const XP_AWARD_ID_MAX_LENGTH = 64;
 const XP_AWARD_DATE_MAX_LENGTH = 40;
 
+/** Apply pending DM awards to a synced XP baseline without mutating it. */
+export function projectXpFromAwards(
+  syncedXp: number,
+  awards: readonly DmXpAward[]
+): number {
+  const appliedIds = new Set<string>();
+  return awards.reduce(
+    (xp, award) => {
+      if (appliedIds.has(award.id)) return xp;
+      appliedIds.add(award.id);
+      return award.mode === 'set'
+        ? Math.max(0, award.amount)
+        : Math.max(0, xp + award.amount);
+    },
+    Math.max(0, syncedXp)
+  );
+}
+
+export function countUniqueXpAwards(awards: readonly DmXpAward[]): number {
+  return new Set(awards.map(award => award.id)).size;
+}
+
 // Atomic capped enqueue: cap check, append, and expiry refresh in one script
 // so concurrent requests can never both observe length 99 and overshoot.
 // KEYS[1] = queue key; ARGV[1] = serialized award; ARGV[2] = cap; ARGV[3] = ttl.
