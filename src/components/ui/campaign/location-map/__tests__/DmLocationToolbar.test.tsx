@@ -117,6 +117,13 @@ describe('DmLocationToolbar rotation buttons', () => {
     expect(screen.getByTitle('Align & distribute')).toBeInTheDocument();
   });
 
+  it('offers an eraser tool separately from clearing the canvas', () => {
+    render(<DmLocationToolbar {...baseProps} />);
+
+    expect(screen.getByTitle('Eraser')).toBeInTheDocument();
+    expect(screen.getByTitle('Clear canvas')).toBeInTheDocument();
+  });
+
   it('shows hidden-placement state and reveals all hidden elements', () => {
     const onToggle = vi.fn();
     const onRevealAll = vi.fn();

@@ -8,6 +8,7 @@ import {
   NoteTool,
   TextTool,
   ShapeTool,
+  EraserTool,
   AutoSave,
   type Tool,
   type Viewport,
@@ -134,6 +135,7 @@ export function useDmBattleMapCanvas({
         feetPerCell: 5,
         renderStyle: 'geometric',
       }),
+      new EraserTool({ radius: 12, mode: 'stroke' }),
       new DmTokenTool(tokenConfigRef),
     ];
   }, [tokenConfigRef]);

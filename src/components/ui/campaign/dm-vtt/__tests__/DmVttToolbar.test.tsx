@@ -10,6 +10,27 @@ vi.mock('@fieldnotes/react', () => ({
 describe('DmVttToolbar', () => {
   afterEach(() => cleanup());
 
+  it('offers a real eraser tool separately from clearing drawings', () => {
+    render(
+      <DmVttToolbar
+        onClearDrawings={vi.fn()}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive={false}
+        onToggleHiddenPlacement={vi.fn()}
+        hiddenElementCount={0}
+        onRevealAll={vi.fn()}
+        selectedElementId={null}
+        selectedElementIsDmOnly={false}
+        onToggleSelectedDmOnly={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Eraser' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Clear drawings' })
+    ).toBeInTheDocument();
+  });
+
   it('always sits below the fixed top bar (top-16), never sharing its row', () => {
     // Regression pin for the wide-viewport overlap bug: a `min-[1350px]:top-3`
     // variant previously moved the toolbar into `DmVttTopBar`'s row at
