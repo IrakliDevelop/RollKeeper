@@ -1,7 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { PingTool, type Camera, type OverlayRenderer } from '@fieldnotes/core';
+import {
+  PingTool,
+  RemotePingOverlay,
+  type Camera,
+  type OverlayRenderer,
+} from '@fieldnotes/core';
 import type { ToolContext, PointerState } from '@fieldnotes/core';
-import { attachPingBroadcast, attachRemotePings } from './pingSync';
+import {
+  attachPingBroadcast,
+  attachPingInput,
+  attachRemotePings,
+} from './pingSync';
 
 // Deterministic raf: callbacks run only when explicitly flushed (unused by
 // pings' assertions but keeps overlay animation loops inert).
@@ -192,16 +201,25 @@ describe('attachRemotePings', () => {
     expect(drawnPings(vp.overlays[0])).toBe(1);
   });
 
-  it('cleanup unsubscribes handlers and disposes the overlay', () => {
+  it('dispose unsubscribes handlers and disposes the overlay', () => {
     const vp = makeViewport();
     const connection = makeConnection();
-    const cleanup = attachRemotePings(vp, connection);
+    const remotePings = attachRemotePings(vp, connection);
 
-    cleanup();
+    remotePings.dispose();
     expect(vp.overlays).toHaveLength(0);
     expect(vp.unregisterCalls).toBe(1);
     expect(connection.presenceHandlers.size).toBe(0);
     expect(connection.leaveHandlers.size).toBe(0);
+  });
+
+  it('exposes its overlay so the DM self-pulse can share it', () => {
+    const vp = makeViewport();
+    const connection = makeConnection();
+    const remotePings = attachRemotePings(vp, connection);
+
+    remotePings.overlay.apply('self', ping(3, 4));
+    expect(drawnPings(vp.overlays[0])).toBe(1);
   });
 
   it('coexists with a laser overlay on the same connection — each renders only its kind', () => {
@@ -223,5 +241,191 @@ describe('attachRemotePings', () => {
 
     expect(drawnPings(vp.overlays[0])).toBe(1); // only the ping
     expect(seenByOther).toHaveLength(3); // other subscribers see everything
+  });
+});
+
+describe('attachPingInput', () => {
+  function makeViewport() {
+    const overlays: OverlayRenderer[] = [];
+    return {
+      overlays,
+      registerOverlay(draw: OverlayRenderer): () => void {
+        overlays.push(draw);
+        return () => {
+          const index = overlays.indexOf(draw);
+          if (index >= 0) overlays.splice(index, 1);
+        };
+      },
+      requestRender: vi.fn(),
+    };
+  }
+
+  /** Real DOM: container div wrapping a domLayer div, like the Viewport DOM. */
+  function makeDom() {
+    const container = document.createElement('div');
+    const domLayer = document.createElement('div');
+    container.appendChild(domLayer);
+    document.body.appendChild(container);
+    return { container, domLayer };
+  }
+
+  // Identity camera: screen coords are world coords.
+  const camera = {
+    screenToWorld: (p: { x: number; y: number }) => ({ ...p }),
+  };
+
+  function fire(
+    el: HTMLElement,
+    type: string,
+    opts: PointerEventInit & { clientX?: number; clientY?: number } = {}
+  ): void {
+    el.dispatchEvent(
+      new PointerEvent(type, {
+        bubbles: true,
+        pointerId: 1,
+        pointerType: 'touch',
+        button: 0,
+        ...opts,
+      })
+    );
+  }
+
+  function drawnPings(overlay: OverlayRenderer | undefined): number {
+    let fills = 0;
+    const ctx = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      arc: vi.fn(),
+      stroke: vi.fn(),
+      fill: vi.fn(() => {
+        fills += 1;
+      }),
+      globalAlpha: 1,
+      strokeStyle: '',
+      fillStyle: '',
+      lineWidth: 0,
+    } as unknown as CanvasRenderingContext2D;
+    overlay?.(ctx);
+    return fills;
+  }
+
+  function setup(options: Parameters<typeof attachPingInput>[3] = {}) {
+    const vp = makeViewport();
+    const { container, domLayer } = makeDom();
+    const overlay = new RemotePingOverlay(vp);
+    const sent: unknown[] = [];
+    const cleanup = attachPingInput(
+      { domLayer, camera },
+      overlay,
+      { sendPresence: data => sent.push(data) },
+      options
+    );
+    return { vp, container, domLayer, overlay, sent, cleanup };
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    document.body.innerHTML = '';
+  });
+
+  it('a long-press broadcasts presence and renders the self pulse on the shared overlay', () => {
+    const { vp, container, sent } = setup({ color: '#F4C430' });
+
+    fire(container, 'pointerdown', { clientX: 30, clientY: 40 });
+    vi.advanceTimersByTime(600);
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      kind: 'ping',
+      x: 30,
+      y: 40,
+      color: '#F4C430',
+    });
+    expect(drawnPings(vp.overlays[0])).toBe(1);
+  });
+
+  it('a drag past the slop never pings', () => {
+    const { container, sent } = setup();
+
+    fire(container, 'pointerdown', { clientX: 30, clientY: 40 });
+    fire(container, 'pointermove', { clientX: 90, clientY: 40 });
+    vi.advanceTimersByTime(600);
+
+    expect(sent).toHaveLength(0);
+  });
+
+  it('the shouldPing veto suppresses the long-press (active ping tool)', () => {
+    const { container, sent } = setup({ shouldPing: () => false });
+
+    fire(container, 'pointerdown', { clientX: 30, clientY: 40 });
+    vi.advanceTimersByTime(600);
+
+    expect(sent).toHaveLength(0);
+  });
+
+  it('the hotkey pings at the hovered position, but not while typing', () => {
+    const { vp, container, sent } = setup({ hotkey: 'p' });
+
+    fire(container, 'pointermove', { clientX: 12, clientY: 34 });
+
+    // Typing "p" into a form control must not ping.
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'p', bubbles: true })
+    );
+    expect(sent).toHaveLength(0);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' }));
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ kind: 'ping', x: 12, y: 34 });
+    expect(drawnPings(vp.overlays[0])).toBe(1);
+  });
+
+  it('modified or repeated hotkey presses are ignored', () => {
+    const { container, sent } = setup({ hotkey: 'p' });
+    fire(container, 'pointermove', { clientX: 1, clientY: 2 });
+
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'p', ctrlKey: true })
+    );
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'p', repeat: true })
+    );
+    expect(sent).toHaveLength(0);
+  });
+
+  it('cleanup removes the long-press and hotkey listeners', () => {
+    const { container, sent, cleanup } = setup({ hotkey: 'p' });
+    fire(container, 'pointermove', { clientX: 1, clientY: 2 });
+
+    cleanup();
+
+    fire(container, 'pointerdown', { clientX: 30, clientY: 40 });
+    vi.advanceTimersByTime(600);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' }));
+    expect(sent).toHaveLength(0);
+  });
+
+  it('a detached domLayer (no parent element) attaches nothing and cleans up as a no-op', () => {
+    const vp = makeViewport();
+    const overlay = new RemotePingOverlay(vp);
+    const domLayer = document.createElement('div'); // no parent
+    const sent: unknown[] = [];
+    const cleanup = attachPingInput(
+      { domLayer, camera },
+      overlay,
+      { sendPresence: data => sent.push(data) },
+      { hotkey: 'p' }
+    );
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' }));
+    expect(sent).toHaveLength(0);
+    expect(() => cleanup()).not.toThrow();
   });
 });

@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/campaign/location-map/laserSync';
 import {
   attachPingBroadcast,
+  attachPingInput,
   attachRemotePings,
 } from '@/components/ui/campaign/location-map/pingSync';
 
@@ -284,9 +285,10 @@ export function useDmBattleMapCanvas({
         // Laser pointer + map pings: broadcast this DM's, render everyone
         // else's.
         laserCleanupRef.current?.();
+        const remotePings = attachRemotePings(vp, connection);
         const laserCleanups = [
           attachRemoteLaserTrails(vp, connection),
-          attachRemotePings(vp, connection),
+          remotePings.dispose,
         ];
         const laserTool = vp.toolManager.getTool<LaserTool>('laser');
         if (laserTool) {
@@ -296,6 +298,16 @@ export function useDmBattleMapCanvas({
         if (pingTool) {
           laserCleanups.push(attachPingBroadcast(pingTool, connection));
         }
+        // Always-available DM pings: long-press with any tool + "P" at the
+        // cursor, self-pulse through the shared receive overlay. The veto
+        // skips the ping tool, whose own tap already pinged on pointer down.
+        laserCleanups.push(
+          attachPingInput(vp, remotePings.overlay, connection, {
+            color: '#F4C430',
+            hotkey: 'p',
+            shouldPing: () => vp.toolManager.activeTool?.name !== 'ping',
+          })
+        );
         laserCleanupRef.current = () => {
           for (const cleanup of laserCleanups) cleanup();
         };
