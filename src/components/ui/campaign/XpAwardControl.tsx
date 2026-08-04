@@ -100,7 +100,7 @@ export function XpAwardControl({
   };
 
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(16rem,22rem)_minmax(0,1fr)]">
+    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,22rem)]">
       <XPTracker
         currentXP={displayedXp}
         currentLevel={currentLevel}
