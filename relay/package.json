@@ -14,7 +14,7 @@
     "type-check": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@fieldnotes/core": "0.52.2",
+    "@fieldnotes/core": "0.53.0",
     "@fieldnotes/sync": "0.7.1",
     "@fieldnotes/sync-server": "0.10.1",
     "redis": "^4.7.0"

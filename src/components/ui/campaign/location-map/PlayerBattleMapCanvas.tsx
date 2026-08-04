@@ -85,11 +85,6 @@ interface PlayerBattleMapCanvasProps {
   tokenInfoToggle?: { mode: TokenInfoMode | null; onCycle: () => void };
 }
 
-/** Viewport exposes historyRecorder at runtime for batched store ops. */
-type ViewportHistoryAccess = {
-  historyRecorder: { begin: () => void; commit: () => void };
-};
-
 const PLAYER_TOOLS: {
   name: string;
   label: string;
@@ -340,14 +335,8 @@ export function PlayerBattleMapCanvas({
     if (!selectTool) return;
     const ids = selectTool.selectedIds.filter(id => vp.store.getById(id));
     if (ids.length === 0) return;
-    const { historyRecorder } = vp as unknown as ViewportHistoryAccess;
-    historyRecorder.begin();
-    for (const id of ids) {
-      vp.store.remove(id);
-    }
-    historyRecorder.commit();
+    vp.removeElements(ids);
     selectTool.setSelection([]);
-    vp.requestRender();
   }, [viewport]);
 
   useEffect(() => () => connectionRef.current?.stop(), []);

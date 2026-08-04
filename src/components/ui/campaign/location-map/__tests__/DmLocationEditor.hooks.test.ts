@@ -64,6 +64,15 @@ function makeStubViewport() {
     removeGrid: vi.fn(),
     addGrid: vi.fn(),
     updateGrid: vi.fn(),
+    removeElements: vi.fn((ids: Iterable<string>) => {
+      let removed = 0;
+      for (const id of new Set(ids)) {
+        if (!store.getById(id)) continue;
+        store.remove(id);
+        removed += 1;
+      }
+      return removed;
+    }),
     requestRender: vi.fn(),
   };
   return { vp: vp as unknown as Viewport, store, elementId };
@@ -104,7 +113,7 @@ async function setup(mode: 'location' | 'battlemap') {
   });
   // Sanity: syncSelection picked up the stub's single selected element.
   expect(result.current.selectedElementId).toBe(elementId);
-  return { store, result, elementId };
+  return { vp, store, result, elementId };
 }
 
 describe('useDmLocationEditor — handleToggleDmOnly mode gating', () => {
@@ -120,6 +129,17 @@ describe('useDmLocationEditor — handleToggleDmOnly mode gating', () => {
       process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = savedRelayUrl;
     }
     vi.clearAllMocks();
+  });
+
+  it('deletes the selection through the public Fieldnotes batch API', async () => {
+    const { vp, store, result, elementId } = await setup('location');
+
+    act(() => {
+      result.current.handleDeleteSelected();
+    });
+
+    expect(vp.removeElements).toHaveBeenCalledWith([elementId]);
+    expect(store.getById(elementId)).toBeUndefined();
   });
 
   it('location mode: toggling visibility does NOT touch the canvas store (no dirty/save side effects)', async () => {
