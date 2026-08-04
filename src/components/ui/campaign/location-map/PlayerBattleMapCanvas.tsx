@@ -51,6 +51,7 @@ import {
 } from './layerContract';
 import { makeApplyRemoteLayer, publishOwnedLayers } from './layerSync';
 import { attachRemoteLaserTrails } from './laserSync';
+import { attachRemotePings } from './pingSync';
 import {
   PlayerTokenTool,
   PlayerTemplateTool,
@@ -339,11 +340,17 @@ export function PlayerBattleMapCanvas({
       def => connection.publishLayerUpsert(def),
       ownLayerId
     );
-    // Render remote laser trails (DM pointer). Players do not broadcast —
-    // product policy today; the wiring is role-based so enabling them later
-    // is configuration, not code.
+    // Render remote laser trails + map pings (DM pointer). Players do not
+    // broadcast — product policy today; the wiring is role-based so enabling
+    // them later is configuration, not code.
     laserCleanupRef.current?.();
-    laserCleanupRef.current = attachRemoteLaserTrails(vp, connection);
+    const presenceCleanups = [
+      attachRemoteLaserTrails(vp, connection),
+      attachRemotePings(vp, connection),
+    ];
+    laserCleanupRef.current = () => {
+      for (const cleanup of presenceCleanups) cleanup();
+    };
   };
 
   const handleDeleteSelected = useCallback(() => {

@@ -12,6 +12,7 @@ import {
 import { ensureCanonicalLayers } from '@/components/ui/campaign/location-map/layerContract';
 import { makeApplyRemoteLayer } from '@/components/ui/campaign/location-map/layerSync';
 import { attachRemoteLaserTrails } from '@/components/ui/campaign/location-map/laserSync';
+import { attachRemotePings } from '@/components/ui/campaign/location-map/pingSync';
 
 function DisplayCanvas() {
   const params = useParams();
@@ -57,9 +58,15 @@ function DisplayCanvas() {
       },
     });
     connectionRef.current = connection;
-    // Render remote laser trails (DM pointer) on the TV view.
+    // Render remote laser trails + map pings (DM pointer) on the TV view.
     laserCleanupRef.current?.();
-    laserCleanupRef.current = attachRemoteLaserTrails(vp, connection);
+    const presenceCleanups = [
+      attachRemoteLaserTrails(vp, connection),
+      attachRemotePings(vp, connection),
+    ];
+    laserCleanupRef.current = () => {
+      for (const cleanup of presenceCleanups) cleanup();
+    };
   };
 
   useEffect(
