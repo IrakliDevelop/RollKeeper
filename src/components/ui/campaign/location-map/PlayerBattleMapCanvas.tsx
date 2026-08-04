@@ -346,7 +346,7 @@ export function PlayerBattleMapCanvas({
     laserCleanupRef.current?.();
     const presenceCleanups = [
       attachRemoteLaserTrails(vp, connection),
-      attachRemotePings(vp, connection),
+      attachRemotePings(vp, connection).dispose,
     ];
     laserCleanupRef.current = () => {
       for (const cleanup of presenceCleanups) cleanup();

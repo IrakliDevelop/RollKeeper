@@ -780,7 +780,7 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
     );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
 
-    const { attachRemotePings } = await import(
+    const { attachRemotePings, attachPingInput } = await import(
       '@/components/ui/campaign/location-map/pingSync'
     );
     const { attachRemoteLaserTrails } = await import(
@@ -813,7 +813,7 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
       transportFactory: () => fakeTransport,
     });
     await flushMicro();
-    const cleanupPings = attachRemotePings(vp, conn);
+    const remotePings = attachRemotePings(vp, conn);
     const cleanupLasers = attachRemoteLaserTrails(vp, conn);
     fakeTransport.emitMessage(snapshotEnvelope('player-1', []));
 
@@ -879,7 +879,49 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
     expect(afterLeave.fills).toBe(0);
     expect(afterLeave.strokes).toBe(0);
 
-    cleanupPings();
+    // DM PingInput (ping-at-cursor path) over the same live connection:
+    // one presence frame on the wire + a self pulse on the shared overlay.
+    const container = document.createElement('div');
+    const domLayer = document.createElement('div');
+    container.appendChild(domLayer);
+    document.body.appendChild(container);
+    const cleanupPingInput = attachPingInput(
+      { domLayer, camera: { screenToWorld: p => ({ ...p }) } },
+      remotePings.overlay,
+      conn,
+      { color: '#F4C430', hotkey: 'p' }
+    );
+    const sentBefore = fakeTransport.sent.length;
+    container.dispatchEvent(
+      new PointerEvent('pointermove', {
+        bubbles: true,
+        pointerId: 1,
+        pointerType: 'mouse',
+        clientX: 40,
+        clientY: 50,
+      })
+    );
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' }));
+
+    const pingFrames = fakeTransport.sent
+      .slice(sentBefore)
+      .map(
+        frame => JSON.parse(frame) as { op: { kind: string; data?: unknown } }
+      )
+      .filter(envelope => envelope.op.kind === 'presence');
+    expect(pingFrames).toHaveLength(1);
+    expect(pingFrames[0]?.op.data).toMatchObject({
+      kind: 'ping',
+      x: 40,
+      y: 50,
+      color: '#F4C430',
+    });
+    expect(counts().fills).toBe(1); // the self pulse, on the shared overlay
+    expect(store.snapshot()).toEqual([]); // still nothing persisted
+
+    cleanupPingInput();
+    container.remove();
+    remotePings.dispose();
     cleanupLasers();
     expect(overlays).toHaveLength(0);
     conn.stop();
