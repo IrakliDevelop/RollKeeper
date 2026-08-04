@@ -657,3 +657,143 @@ describe('createManagedBattleMapConnection layer sync (call-site wiring)', () =>
     conn.stop();
   });
 });
+
+describe('createManagedBattleMapConnection presence (laser)', () => {
+  let fakeTransport: FakeTransport;
+  let statuses: BattleMapConnectionStatus[];
+
+  beforeEach(() => {
+    fakeTransport = new FakeTransport();
+    statuses = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ token: 'test-token' }),
+      })
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const flushMicro = (): Promise<void> =>
+    new Promise(resolve => setTimeout(resolve, 0));
+
+  const startConnection = async (onPoke?: (feature: string) => void) => {
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'map-1',
+      store: new ElementStore(),
+      clientId: 'dm-1',
+      tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+      onStatus: s => statuses.push(s),
+      onPoke,
+      transportFactory: () => fakeTransport,
+    });
+    await flushMicro();
+    return conn;
+  };
+
+  const sentPresenceData = (sent: string[]): unknown[] =>
+    sent
+      .map(m => JSON.parse(m) as { op: { kind: string; data?: unknown } })
+      .filter(e => e.op.kind === 'presence')
+      .map(e => e.op.data);
+
+  const laserPayload = {
+    kind: 'laser',
+    points: [
+      { x: 1, y: 2 },
+      { x: 3, y: 4 },
+    ],
+    color: '#F4C430',
+    width: 3,
+    fadeMs: 1200,
+  };
+
+  it('sendPresence delivers only while live and drops (never queues) otherwise', async () => {
+    const conn = await startConnection();
+
+    conn.sendPresence(laserPayload); // still connecting — dropped
+    expect(sentPresenceData(fakeTransport.sent)).toEqual([]);
+
+    fakeTransport.emitMessage(snapshotEnvelope('dm-1', []));
+    conn.sendPresence(laserPayload);
+    expect(sentPresenceData(fakeTransport.sent)).toEqual([laserPayload]);
+
+    // Transient drop: offline until the resync snapshot lands again.
+    fakeTransport.emitClose(1006);
+    conn.sendPresence({ ...laserPayload, points: [{ x: 9, y: 9 }] });
+    fakeTransport.emitReconnect();
+    conn.sendPresence({ ...laserPayload, points: [{ x: 8, y: 8 }] });
+    fakeTransport.emitMessage(snapshotEnvelope('dm-1', []));
+
+    // Nothing produced while offline/connecting ever reaches the wire.
+    expect(sentPresenceData(fakeTransport.sent)).toEqual([laserPayload]);
+    conn.stop();
+  });
+
+  it('laser presence and hub pokes coexist: onPoke still fires, onPresence sees both, leave delivers the sender key', async () => {
+    const pokes: string[] = [];
+    const presence: [string, unknown][] = [];
+    const leaves: string[] = [];
+    const conn = await startConnection(feature => pokes.push(feature));
+    conn.onPresence((from, data) => presence.push([from, data]));
+    conn.onPresenceLeave(from => leaves.push(from));
+    fakeTransport.emitMessage(snapshotEnvelope('dm-1', []));
+
+    // A hub poke arrives as a presence frame with the server-owned sender.
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'hub',
+        op: { kind: 'presence', data: { kind: 'poke', feature: 'players' } },
+      })
+    );
+    // A remote laser trail arrives from a relay connection id.
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'conn-42',
+        op: { kind: 'presence', data: laserPayload },
+      })
+    );
+    fakeTransport.emitMessage(
+      JSON.stringify({ from: 'conn-42', op: { kind: 'presence-leave' } })
+    );
+
+    expect(pokes).toEqual(['players']); // poke parsing undisturbed
+    expect(presence).toEqual([
+      ['hub', { kind: 'poke', feature: 'players' }],
+      ['conn-42', laserPayload],
+    ]);
+    expect(leaves).toEqual(['conn-42']);
+    conn.stop();
+  });
+
+  it('presence unsubscribe stops delivery', async () => {
+    const seen: unknown[] = [];
+    const conn = await startConnection();
+    const unsubscribe = conn.onPresence((_from, data) => seen.push(data));
+    fakeTransport.emitMessage(snapshotEnvelope('dm-1', []));
+
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'conn-1',
+        op: { kind: 'presence', data: laserPayload },
+      })
+    );
+    expect(seen).toEqual([laserPayload]);
+
+    unsubscribe();
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'conn-1',
+        op: { kind: 'presence', data: laserPayload },
+      })
+    );
+    expect(seen).toEqual([laserPayload]);
+    conn.stop();
+  });
+});

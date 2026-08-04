@@ -15,6 +15,7 @@ import {
   Eye,
   Minus,
   EyeOff,
+  Zap,
 } from 'lucide-react';
 import { useActiveTool } from '@fieldnotes/react';
 
@@ -33,6 +34,7 @@ const DM_TOOLS: { name: string; label: string; Icon: typeof Hand }[] = [
   { name: 'measure', label: 'Measure', Icon: Ruler },
   { name: 'template', label: 'Template', Icon: Circle },
   { name: 'eraser', label: 'Eraser', Icon: Eraser },
+  { name: 'laser', label: 'Laser pointer', Icon: Zap },
 ];
 
 export interface DmVttToolbarProps {

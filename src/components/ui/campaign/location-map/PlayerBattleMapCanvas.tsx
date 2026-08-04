@@ -50,6 +50,7 @@ import {
   subscribePinCanonicalLayers,
 } from './layerContract';
 import { makeApplyRemoteLayer, publishOwnedLayers } from './layerSync';
+import { attachRemoteLaserTrails } from './laserSync';
 import {
   PlayerTokenTool,
   PlayerTemplateTool,
@@ -216,6 +217,7 @@ export function PlayerBattleMapCanvas({
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const [hasSelection, setHasSelection] = useState(false);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
+  const laserCleanupRef = useRef<(() => void) | null>(null);
   // The connection is created once inside the fire-once `handleReady`
   // callback; a plain closure over `onPoke` would go stale if the prop's
   // identity changes later after the connection is already established.
@@ -337,6 +339,11 @@ export function PlayerBattleMapCanvas({
       def => connection.publishLayerUpsert(def),
       ownLayerId
     );
+    // Render remote laser trails (DM pointer). Players do not broadcast —
+    // product policy today; the wiring is role-based so enabling them later
+    // is configuration, not code.
+    laserCleanupRef.current?.();
+    laserCleanupRef.current = attachRemoteLaserTrails(vp, connection);
   };
 
   const handleDeleteSelected = useCallback(() => {
@@ -350,7 +357,13 @@ export function PlayerBattleMapCanvas({
     selectTool.setSelection([]);
   }, [viewport]);
 
-  useEffect(() => () => connectionRef.current?.stop(), []);
+  useEffect(
+    () => () => {
+      laserCleanupRef.current?.();
+      connectionRef.current?.stop();
+    },
+    []
+  );
 
   return (
     <ViewportContext.Provider value={viewport}>

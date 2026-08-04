@@ -11,6 +11,7 @@ import {
 } from '@/lib/battlemapSync';
 import { ensureCanonicalLayers } from '@/components/ui/campaign/location-map/layerContract';
 import { makeApplyRemoteLayer } from '@/components/ui/campaign/location-map/layerSync';
+import { attachRemoteLaserTrails } from '@/components/ui/campaign/location-map/laserSync';
 
 function DisplayCanvas() {
   const params = useParams();
@@ -21,6 +22,7 @@ function DisplayCanvas() {
 
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const connectionRef = useRef<{ stop: () => void } | null>(null);
+  const laserCleanupRef = useRef<(() => void) | null>(null);
   const viewportRef = useRef<Viewport | null>(null);
   const toolsRef = useRef([new HandTool()]);
 
@@ -34,7 +36,7 @@ function DisplayCanvas() {
     ensureCanonicalLayers(vp, 'player');
     if (!relayUrl || !displayKey) return;
     connectionRef.current?.stop();
-    connectionRef.current = createManagedBattleMapConnection({
+    const connection = createManagedBattleMapConnection({
       relayUrl,
       campaignCode: code,
       battleMapId: id,
@@ -54,9 +56,19 @@ function DisplayCanvas() {
         }
       },
     });
+    connectionRef.current = connection;
+    // Render remote laser trails (DM pointer) on the TV view.
+    laserCleanupRef.current?.();
+    laserCleanupRef.current = attachRemoteLaserTrails(vp, connection);
   };
 
-  useEffect(() => () => connectionRef.current?.stop(), []);
+  useEffect(
+    () => () => {
+      laserCleanupRef.current?.();
+      connectionRef.current?.stop();
+    },
+    []
+  );
 
   // F toggles fullscreen (kept from the old display page)
   useEffect(() => {

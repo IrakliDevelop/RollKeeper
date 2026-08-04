@@ -12,6 +12,7 @@ import {
   ShapeTool,
   TemplateTool,
   EraserTool,
+  LaserTool,
   AutoSave,
   type Layer,
   type Tool,
@@ -34,6 +35,7 @@ import {
   MAP_LAYER_ID,
 } from './layerContract';
 import { makeApplyRemoteLayer, publishOwnedLayers } from './layerSync';
+import { attachLaserBroadcast, attachRemoteLaserTrails } from './laserSync';
 import { pinGridToMapLayer } from './gridPin';
 import { nextMapImagePosition } from './mapImagePlacement';
 import {
@@ -177,6 +179,7 @@ export function useDmLocationEditor(
   const mapImageInputRef = useRef<HTMLInputElement>(null);
   const autoSaveRef = useRef<AutoSave | null>(null);
   const connectionRef = useRef<BattleMapConnection | null>(null);
+  const laserCleanupRef = useRef<(() => void) | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
   const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
   const [syncStatus, setSyncStatus] = useState<
@@ -279,6 +282,9 @@ export function useDmLocationEditor(
         })
       );
       baseTools.push(new EraserTool({ radius: 12, mode: 'stroke' }));
+      // Ephemeral pointer; trails broadcast as presence while the battlemap
+      // room connection is up (see attachLaserBroadcast).
+      baseTools.push(new LaserTool({ color: '#F4C430', width: 3 }));
     }
 
     return baseTools;
@@ -421,6 +427,17 @@ export function useDmLocationEditor(
         // Teach peers and late joiners the custom layers persisted in this
         // canvas (created before layer sync, or on another device).
         publishOwnedLayers(vp, 'dm', def => connection.publishLayerUpsert(def));
+
+        // Laser pointer: broadcast this DM's trails, render everyone else's.
+        laserCleanupRef.current?.();
+        const laserCleanups = [attachRemoteLaserTrails(vp, connection)];
+        const laserTool = vp.toolManager.getTool<LaserTool>('laser');
+        if (laserTool) {
+          laserCleanups.push(attachLaserBroadcast(laserTool, connection));
+        }
+        laserCleanupRef.current = () => {
+          for (const cleanup of laserCleanups) cleanup();
+        };
       }
     },
     [location, onSave, mode, campaignCode, dmId]
@@ -513,6 +530,7 @@ export function useDmLocationEditor(
         arrangeSessionRef.current = null;
       }
       autoSaveRef.current?.stop();
+      laserCleanupRef.current?.();
       connectionRef.current?.stop();
       pinUnsubRef.current?.();
       hiddenPlacementUnsubRef.current?.();
