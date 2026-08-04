@@ -5,6 +5,7 @@ import type {
   ArrowToolOptions,
   MeasureToolOptions,
   NoteToolOptions,
+  PencilToolOptions,
   ShapeToolOptions,
   TemplateRenderStyle,
   TemplateShape,
@@ -61,6 +62,9 @@ export default function DmLocationToolOptions({
   mode = 'location',
 }: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
+  const [pencilOpts, setPencilOpts] = useToolOptions<
+    PencilToolOptions & Record<string, unknown>
+  >('pencil');
   const [arrowOpts, setArrowOpts] = useToolOptions<
     ArrowToolOptions & Record<string, unknown>
   >('arrow');
@@ -81,6 +85,7 @@ export default function DmLocationToolOptions({
   >('template');
 
   const showOptionsBar =
+    (activeTool === 'pencil' && pencilOpts !== undefined) ||
     activeTool === 'arrow' ||
     activeTool === 'note' ||
     activeTool === 'text' ||
@@ -101,13 +106,16 @@ export default function DmLocationToolOptions({
           ? noteOpts?.backgroundColor
           : activeTool === 'arrow'
             ? arrowOpts?.color
-            : '#334155';
+            : activeTool === 'pencil'
+              ? pencilOpts?.color
+              : '#334155';
 
   const handleColorChange = (color: string) => {
     if (activeTool === 'shape') setShapeOpts({ strokeColor: color });
     else if (activeTool === 'text') setTextOpts({ color });
     else if (activeTool === 'note') setNoteOpts({ backgroundColor: color });
     else if (activeTool === 'arrow') setArrowOpts({ color });
+    else if (activeTool === 'pencil') setPencilOpts({ color });
     else if (activeTool === 'template') setTemplateOpts({ strokeColor: color });
   };
 
@@ -176,6 +184,23 @@ export default function DmLocationToolOptions({
           </div>
         </label>
       </div>
+
+      {activeTool === 'pencil' && pencilOpts && (
+        <>
+          <div className="bg-divider h-6 w-px" />
+          <span className="text-muted text-xs font-medium">Width</span>
+          <input
+            type="range"
+            min={1}
+            max={12}
+            step={0.5}
+            value={pencilOpts.width ?? 2}
+            onChange={e => setPencilOpts({ width: Number(e.target.value) })}
+            className="w-20"
+          />
+          <span className="text-muted text-xs">{pencilOpts.width ?? 2}px</span>
+        </>
+      )}
 
       {activeTool === 'note' && noteOpts && (
         <>
