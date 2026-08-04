@@ -86,8 +86,14 @@ export function attachRemotePings(
 const SELF_SENDER = 'self';
 
 export interface AttachPingInputOptions {
-  /** Emission color (the DM accent, matching the `PingTool` registration). */
+  /** Emission color fallback when no `followTool` is given. */
   color?: string;
+  /**
+   * Keep the input's color mirrored to this `PingTool`'s (initial value and
+   * every option change), so the options-bar swatches restyle long-press and
+   * hotkey pings together with tool taps. Takes precedence over `color`.
+   */
+  followTool?: PingTool;
   /**
    * Product hotkey for ping-at-cursor (the SDK ships no binding). Ignored
    * while focus is in a form control or contenteditable; modifier chords and
@@ -119,9 +125,10 @@ export function attachPingInput(
   const element = vp.domLayer.parentElement;
   if (!element) return () => {};
 
+  const initialColor = options.followTool?.getOptions().color ?? options.color;
   const input = new PingInput(element, vp.camera, {
     longPressEnabled: true,
-    ...(options.color !== undefined ? { color: options.color } : {}),
+    ...(initialColor !== undefined ? { color: initialColor } : {}),
     ...(options.shouldPing !== undefined
       ? { shouldPing: options.shouldPing }
       : {}),
@@ -131,6 +138,15 @@ export function attachPingInput(
     connection.sendPresence(presence);
     overlay.apply(SELF_SENDER, presence);
   });
+
+  let unsubscribeToolOptions: (() => void) | undefined;
+  const followTool = options.followTool;
+  if (followTool) {
+    unsubscribeToolOptions = followTool.onOptionsChange(() => {
+      const color = followTool.getOptions().color;
+      if (color !== undefined) input.setOptions({ color });
+    });
+  }
 
   let removeHotkey: (() => void) | undefined;
   if (options.hotkey !== undefined) {
@@ -156,6 +172,7 @@ export function attachPingInput(
 
   return () => {
     removeHotkey?.();
+    unsubscribeToolOptions?.();
     unsubscribe();
     input.dispose();
   };

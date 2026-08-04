@@ -304,6 +304,8 @@ export function useDmBattleMapCanvas({
         laserCleanups.push(
           attachPingInput(vp, remotePings.overlay, connection, {
             color: '#F4C430',
+            // Options-bar swatch changes restyle long-press/hotkey pings too.
+            ...(pingTool ? { followTool: pingTool } : {}),
             hotkey: 'p',
             shouldPing: () => vp.toolManager.activeTool?.name !== 'ping',
           })

@@ -66,4 +66,22 @@ describe('DmLocationToolOptions pencil options', () => {
     const { container } = render(<DmLocationToolOptions mode="location" />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('shows ping colors in battle-map mode and updates the ping tool', () => {
+    mockActiveTool = 'ping';
+    mockToolOptions = { ping: { color: '#F4C430' } };
+    render(<DmLocationToolOptions mode="battlemap" />);
+
+    fireEvent.click(screen.getByTitle('#3b82f6'));
+    expect(setOptionsSpies['ping']).toHaveBeenCalledWith({
+      color: '#3b82f6',
+    });
+  });
+
+  it('does not show ping options outside battle-map mode', () => {
+    mockActiveTool = 'ping';
+    mockToolOptions = { ping: { color: '#F4C430' } };
+    const { container } = render(<DmLocationToolOptions mode="location" />);
+    expect(container).toBeEmptyDOMElement();
+  });
 });
