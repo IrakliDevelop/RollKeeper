@@ -10,6 +10,7 @@ import {
   PLAYER_LAYER_PREFIX,
 } from './layerContract';
 import type { EditorMode } from './DmLocationEditor.types';
+import type { Layer } from '@fieldnotes/core';
 
 interface DmLocationLayersPanelProps {
   mode: EditorMode;
@@ -18,6 +19,9 @@ interface DmLocationLayersPanelProps {
   onLinkEncounter: (id: string) => void;
   onUnlinkEncounter: (id: string) => void;
   onClose: () => void;
+  /** Battlemap mode: broadcast panel edits over layer sync (custom layers only). */
+  publishLayerUpsert?: (definition: Layer) => void;
+  publishLayerRemove?: (id: string) => void;
 }
 
 export default function DmLocationLayersPanel({
@@ -27,6 +31,8 @@ export default function DmLocationLayersPanel({
   onLinkEncounter,
   onUnlinkEncounter,
   onClose,
+  publishLayerUpsert,
+  publishLayerRemove,
 }: DmLocationLayersPanelProps) {
   const viewport = useViewport();
   const {
@@ -40,6 +46,14 @@ export default function DmLocationLayersPanel({
   } = useLayers();
   const allElements = useElements();
 
+  // Canonical bands are locally pinned per role and never broadcast; only
+  // custom layer definitions ride layer sync.
+  const publishIfCustom = (id: string) => {
+    if (id === MAP_LAYER_ID || id === ANNOTATIONS_LAYER_ID) return;
+    const layer = viewport.layerManager.getLayer(id);
+    if (layer) publishLayerUpsert?.(layer);
+  };
+
   return (
     <div className="border-divider bg-surface-raised flex w-52 flex-col border-l">
       <div className="border-divider flex items-center justify-between border-b px-3 py-2">
@@ -49,7 +63,8 @@ export default function DmLocationLayersPanel({
             variant="ghost"
             className="h-6 w-6 p-0"
             onClick={() => {
-              createLayer();
+              const layer = createLayer();
+              publishIfCustom(layer.id);
               viewport.requestRender();
             }}
             title="Add layer"
@@ -113,6 +128,7 @@ export default function DmLocationLayersPanel({
                   onClick={e => {
                     e.stopPropagation();
                     setVisible(layer.id, !layer.visible);
+                    publishIfCustom(layer.id);
                     viewport.requestRender();
                   }}
                   title={layer.visible ? 'Hide layer' : 'Show layer'}
@@ -133,6 +149,7 @@ export default function DmLocationLayersPanel({
                     onClick={e => {
                       e.stopPropagation();
                       setLocked(layer.id, !layer.locked);
+                      publishIfCustom(layer.id);
                       viewport.requestRender();
                     }}
                     title={layer.locked ? 'Unlock layer' : 'Lock layer'}
@@ -154,6 +171,12 @@ export default function DmLocationLayersPanel({
                     onClick={e => {
                       e.stopPropagation();
                       removeLayer(layer.id);
+                      if (
+                        layer.id !== MAP_LAYER_ID &&
+                        layer.id !== ANNOTATIONS_LAYER_ID
+                      ) {
+                        publishLayerRemove?.(layer.id);
+                      }
                       viewport.requestRender();
                     }}
                     className="text-muted hover:text-accent-red-text shrink-0"

@@ -2,10 +2,13 @@ import {
   createManagedSyncConnection,
   type ManagedSyncStatus,
   type ManagedSyncTransport,
+  type RemoteLayerUpdate,
   type ResolveLocalOnly,
 } from '@fieldnotes/sync';
-import type { ElementStore, CanvasElement } from '@fieldnotes/core';
+import type { ElementStore, CanvasElement, Layer } from '@fieldnotes/core';
 import type { BattleMapRole } from '@/lib/battlemapToken';
+
+export type { RemoteLayerUpdate };
 
 export type BattleMapConnectionStatus = ManagedSyncStatus;
 
@@ -83,6 +86,15 @@ export interface ManagedConnectionOptions {
    * on every bootstrap/reconcile snapshot (SDK `resolveLocalOnly` hooks).
    */
   seedLocal?: boolean;
+  /**
+   * Opt into versioned layer-definition sync (SDK `layers` option). The hook
+   * receives only records that win the deterministic (version, editor)
+   * ordering; RollKeeper applies them through history-transparent
+   * `LayerManager` `*Direct` calls with role policy overlaid (see
+   * `layerSync.ts`). Publishing stays explicit via the returned
+   * `publishLayerUpsert`/`publishLayerRemove`.
+   */
+  layers?: { applyLayer: (update: RemoteLayerUpdate) => void };
   onStatus?: (s: BattleMapConnectionStatus) => void;
   /** Fires when the relay pokes this room (e.g. initiative changed → refetch /shared). */
   onPoke?: (feature: string) => void;
@@ -97,9 +109,21 @@ export interface ManagedConnectionOptions {
  * transient reconnect, token refresh after terminal auth closes (4401), and
  * bounded auth retry ending in `denied`.
  */
+export interface BattleMapConnection {
+  stop: () => void;
+  /**
+   * Publishes a layer definition edit (stamped and versioned by the SDK).
+   * While disconnected the edit lands in the connection's ledger and is
+   * re-pushed after the next authoritative snapshot. Throws when the
+   * connection was created without the `layers` option.
+   */
+  publishLayerUpsert: (definition: Layer) => void;
+  publishLayerRemove: (id: string) => void;
+}
+
 export function createManagedBattleMapConnection(
   opts: ManagedConnectionOptions
-): { stop: () => void } {
+): BattleMapConnection {
   const room = `${opts.campaignCode}:${opts.battleMapId}`;
 
   const connection = createManagedSyncConnection({
@@ -111,6 +135,7 @@ export function createManagedBattleMapConnection(
     // calls the hook synchronously for every snapshot addressed to us, so no
     // raw-frame parsing or deferred reseeding is needed.
     resolveLocalOnly: opts.seedLocal ? preserveHubUnknown : undefined,
+    layers: opts.layers,
     resolveUrl: async () => {
       const token = await mintBattleMapToken(
         opts.campaignCode,
@@ -132,6 +157,12 @@ export function createManagedBattleMapConnection(
   return {
     stop: (): void => {
       connection.stop();
+    },
+    publishLayerUpsert: (definition: Layer): void => {
+      connection.publishLayerUpsert(definition);
+    },
+    publishLayerRemove: (id: string): void => {
+      connection.publishLayerRemove(id);
     },
   };
 }

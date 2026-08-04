@@ -1,14 +1,29 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   ElementStore,
+  LayerManager,
   createShape,
   type CanvasElement,
+  type Layer,
 } from '@fieldnotes/core';
 import {
   createManagedBattleMapConnection,
   type BattleMapConnectionStatus,
   type BattleMapTransport,
 } from '@/lib/battlemapSync';
+import {
+  ANNOTATIONS_LAYER_ID,
+  CUSTOM_BAND_ORDER,
+  PLAYER_BAND_ORDER,
+  ensureCanonicalLayers,
+  migrateCanvasToContract,
+  subscribePinCanonicalLayers,
+  type ViewportLike,
+} from '@/components/ui/campaign/location-map/layerContract';
+import {
+  makeApplyRemoteLayer,
+  publishOwnedLayers,
+} from '@/components/ui/campaign/location-map/layerSync';
 
 // No @fieldnotes/sync mocking: the real managed lifecycle + SyncClient run
 // against an injected fake transport, so these tests exercise the actual
@@ -344,5 +359,301 @@ describe('createManagedBattleMapConnection', () => {
     const sends = fakeTransport.sent.length;
     store.add(el('late'));
     expect(fakeTransport.sent.length).toBe(sends);
+  });
+});
+
+describe('createManagedBattleMapConnection layer sync (call-site wiring)', () => {
+  let fakeTransport: FakeTransport;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fakeTransport = new FakeTransport();
+    fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ token: 'test-token' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const flushMicro = (): Promise<void> =>
+    new Promise(resolve => setTimeout(resolve, 0));
+
+  function makeCanvas(role: 'dm' | 'player'): ViewportLike {
+    const store = new ElementStore();
+    const layerManager = new LayerManager(store);
+    const vp = { store, layerManager };
+    ensureCanonicalLayers(vp, role);
+    migrateCanvasToContract(vp, role);
+    return vp;
+  }
+
+  function layerDef(id: string, overrides: Partial<Layer> = {}): Layer {
+    return {
+      id,
+      name: id,
+      visible: true,
+      locked: false,
+      order: CUSTOM_BAND_ORDER,
+      opacity: 1,
+      ...overrides,
+    };
+  }
+
+  function record(definition: Layer, version = 1, editor = 'remote') {
+    return { id: definition.id, version, editor, definition };
+  }
+
+  const sentLayerOps = (
+    sent: string[]
+  ): { kind: string; layer?: Layer; version?: number; editor?: string }[] =>
+    sent
+      .map(m => JSON.parse(m) as { op: { kind: string } })
+      .map(e => e.op as { kind: string; layer?: Layer; version?: number })
+      .filter(op => op.kind === 'layer-upsert' || op.kind === 'layer-remove');
+
+  function connect(
+    vp: ViewportLike,
+    roleWiring: 'dm' | 'player' | 'display',
+    clientId: string,
+    ownLayerId?: string
+  ) {
+    return createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'map-1',
+      store: vp.store as ElementStore,
+      clientId,
+      tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: clientId },
+      seedLocal: roleWiring === 'dm',
+      layers: {
+        applyLayer: makeApplyRemoteLayer(vp, roleWiring, { ownLayerId }),
+      },
+      transportFactory: () => fakeTransport,
+    });
+  }
+
+  it('DM canvas: join snapshot applies layer records before elements, bands pinned (VTT/editor wiring)', async () => {
+    const vp = makeCanvas('dm');
+    subscribePinCanonicalLayers(vp, () => ({ annotationsLocked: false }));
+    const events: string[] = [];
+    vp.layerManager.on('create', l => events.push(`layer:${l.id}`));
+    vp.store.on('add', element => events.push(`el:${element.id}`));
+
+    const conn = connect(vp, 'dm', 'dm-1');
+    await flushMicro();
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'hub',
+        op: {
+          kind: 'snapshot',
+          to: 'dm-1',
+          elements: [
+            { ...el('img'), layerId: ANNOTATIONS_LAYER_ID },
+            { ...el('tok'), layerId: 'player-char9' },
+          ],
+          layers: [
+            record(
+              layerDef('player-char9', { order: PLAYER_BAND_ORDER }),
+              1,
+              'char9'
+            ),
+            record(layerDef('layer-props', { order: 42 }), 1, 'dm-other'),
+          ],
+        },
+      })
+    );
+
+    // The token's layer exists before the token itself lands.
+    expect(events.indexOf('layer:player-char9')).toBeGreaterThanOrEqual(0);
+    expect(events.indexOf('layer:player-char9')).toBeLessThan(
+      events.indexOf('el:tok')
+    );
+    // Bands re-pinned by the subscription, even for a raw record order.
+    expect(vp.layerManager.getLayer('layer-props')?.order).toBe(
+      CUSTOM_BAND_ORDER
+    );
+    expect(vp.layerManager.getLayer('player-char9')?.order).toBe(
+      PLAYER_BAND_ORDER
+    );
+    // DM keeps player layers unlocked (can drag player tokens).
+    expect(vp.layerManager.getLayer('player-char9')?.locked).toBe(false);
+    conn.stop();
+  });
+
+  it('DM canvas: connect-time publishOwnedLayers teaches peers pre-existing custom layers', async () => {
+    const vp = makeCanvas('dm');
+    vp.layerManager.addLayerDirect(layerDef('layer-props'));
+
+    const conn = connect(vp, 'dm', 'dm-1');
+    // Production publishes immediately after creating the connection, while
+    // the token mint is still in flight — the ledger must buffer it.
+    publishOwnedLayers(vp, 'dm', def => conn.publishLayerUpsert(def));
+    await flushMicro();
+    fakeTransport.emitMessage(snapshotEnvelope('dm-1', []));
+
+    const ops = sentLayerOps(fakeTransport.sent);
+    expect(ops).toHaveLength(1);
+    expect(ops[0]?.kind).toBe('layer-upsert');
+    expect(ops[0]?.layer?.id).toBe('layer-props');
+    expect(ops[0]?.editor).toBe('dm-1');
+    conn.stop();
+  });
+
+  it('DM canvas: an offline layer edit survives a 4401 rebuild and beats a stale reconcile record', async () => {
+    vi.useFakeTimers();
+    try {
+      const vp = makeCanvas('dm');
+      const applied: string[] = [];
+      const conn = createManagedBattleMapConnection({
+        relayUrl: 'wss://relay.example',
+        campaignCode: 'CODE',
+        battleMapId: 'map-1',
+        store: vp.store as ElementStore,
+        clientId: 'dm-1',
+        tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+        seedLocal: true,
+        layers: {
+          applyLayer: update => {
+            applied.push(update.record.definition?.name ?? 'tombstone');
+            makeApplyRemoteLayer(vp, 'dm')(update);
+          },
+        },
+        transportFactory: () => fakeTransport,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      fakeTransport.emitMessage(
+        JSON.stringify({
+          from: 'hub',
+          op: {
+            kind: 'snapshot',
+            to: 'dm-1',
+            elements: [],
+            layers: [record(layerDef('layer-props', { name: 'v1' }), 1)],
+          },
+        })
+      );
+      expect(applied).toEqual(['v1']);
+
+      // Token expires; the DM renames the layer while detached.
+      fakeTransport.emitClose(4401);
+      conn.publishLayerUpsert(
+        layerDef('layer-props', { name: 'renamed offline' })
+      );
+      await vi.advanceTimersByTimeAsync(2_000); // re-mint + rebuild
+
+      const sentBefore = fakeTransport.sent.length;
+      // Reconcile snapshot still carries the stale v1 record.
+      fakeTransport.emitMessage(
+        JSON.stringify({
+          from: 'hub',
+          op: {
+            kind: 'snapshot',
+            to: 'dm-1',
+            elements: [],
+            layers: [record(layerDef('layer-props', { name: 'v1' }), 1)],
+          },
+        })
+      );
+
+      // Stale record must not fire the hook again; the newer offline edit is re-pushed.
+      expect(applied).toEqual(['v1']);
+      const repushed = sentLayerOps(fakeTransport.sent.slice(sentBefore));
+      expect(repushed).toHaveLength(1);
+      expect(repushed[0]?.layer?.name).toBe('renamed offline');
+      expect(repushed[0]?.version).toBe(2);
+      conn.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('player canvas: publishes its own layer, applies remote layers locked, own layer never locked or removed', async () => {
+    const vp = makeCanvas('player');
+    const ownLayerId = 'player-char1';
+    vp.layerManager.addLayerDirect(
+      layerDef(ownLayerId, { name: 'My elements', order: PLAYER_BAND_ORDER })
+    );
+    vp.layerManager.setActiveLayer(ownLayerId);
+    subscribePinCanonicalLayers(vp, () => ({ annotationsLocked: true }));
+
+    const conn = connect(vp, 'player', 'char1', ownLayerId);
+    publishOwnedLayers(
+      vp,
+      'player',
+      def => conn.publishLayerUpsert(def),
+      ownLayerId
+    );
+    await flushMicro();
+    fakeTransport.emitMessage(snapshotEnvelope('char1', []));
+
+    const ops = sentLayerOps(fakeTransport.sent);
+    expect(ops.map(op => op.layer?.id)).toEqual([ownLayerId]);
+
+    // DM custom layer arrives: locked for the player.
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'relay-conn',
+        op: {
+          kind: 'layer-upsert',
+          layer: layerDef('layer-props', { locked: false }),
+          version: 1,
+          editor: 'dm-1',
+        },
+      })
+    );
+    expect(vp.layerManager.getLayer('layer-props')?.locked).toBe(true);
+
+    // A rogue tombstone for the own layer is ignored.
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'relay-conn',
+        op: {
+          kind: 'layer-remove',
+          id: ownLayerId,
+          version: 9,
+          editor: 'dm-1',
+        },
+      })
+    );
+    expect(vp.layerManager.getLayer(ownLayerId)).toBeDefined();
+    expect(vp.layerManager.getLayer(ownLayerId)?.locked).toBe(false);
+    conn.stop();
+  });
+
+  it('display canvas: applies snapshot layer records locked and publishes nothing', async () => {
+    const vp = makeCanvas('player'); // display also ensures canonical bands
+    const conn = connect(vp, 'display', 'display-CODE');
+    await flushMicro();
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'hub',
+        op: {
+          kind: 'snapshot',
+          to: 'display-CODE',
+          elements: [{ ...el('tok'), layerId: 'player-char9' }],
+          layers: [
+            record(
+              layerDef('player-char9', {
+                order: PLAYER_BAND_ORDER,
+                locked: false,
+              }),
+              1,
+              'char9'
+            ),
+          ],
+        },
+      })
+    );
+
+    expect(vp.layerManager.getLayer('player-char9')?.locked).toBe(true);
+    expect(vp.layerManager.getLayer('player-char9')?.order).toBe(
+      PLAYER_BAND_ORDER
+    );
+    expect(sentLayerOps(fakeTransport.sent)).toEqual([]);
+    conn.stop();
   });
 });

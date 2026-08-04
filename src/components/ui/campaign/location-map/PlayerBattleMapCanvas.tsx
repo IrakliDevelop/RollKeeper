@@ -44,12 +44,12 @@ import {
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import DmLocationToolOptions from './DmLocationToolOptions';
-import { ensurePlayerLayer } from './playerLayer';
+import { ensurePlayerLayer, playerLayerId } from './playerLayer';
 import {
   ensureCanonicalLayers,
-  attachUnknownLayerMirror,
   subscribePinCanonicalLayers,
 } from './layerContract';
+import { makeApplyRemoteLayer, publishOwnedLayers } from './layerSync';
 import {
   PlayerTokenTool,
   PlayerTemplateTool,
@@ -286,15 +286,6 @@ export function PlayerBattleMapCanvas({
     // writes to it anyway).
     subscribePinCanonicalLayers(vp, () => ({ annotationsLocked: true }));
 
-    // Layers aren't synced: remote elements can reference layer ids that
-    // don't exist here (old clients, other players). Mirror each unknown
-    // layer locked into its band — hit-test and marquee skip remote content
-    // (the relay rejects player writes to it anyway), and stacking matches
-    // the DM's view. Covers both new elements (add) and relay snapshot
-    // reconcile re-applying remote elements as full updates (including
-    // layerId) on reconnect.
-    attachUnknownLayerMirror(vp, 'player', () => vp.requestRender());
-
     // Selection state for the touch-friendly delete button.
     const selectTool = vp.toolManager.getTool<SelectTool>('select');
     if (selectTool) {
@@ -312,13 +303,24 @@ export function PlayerBattleMapCanvas({
     const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
     if (!relayUrl) return;
     connectionRef.current?.stop();
-    connectionRef.current = createManagedBattleMapConnection({
+    const ownLayerId = playerLayerId(characterId);
+    const connection = createManagedBattleMapConnection({
       relayUrl,
       campaignCode,
       battleMapId,
       store: vp.store,
       clientId: characterId,
       tokenRequest: { role: 'player', battleMapId, playerId: characterId },
+      // Layer definitions sync (replaces the unknown-layer mirror): remote
+      // layers apply locked for players — hit-test and marquee skip content
+      // they cannot edit (the relay rejects their writes to it anyway) —
+      // while their own layer is never locked or removed by remote records.
+      layers: {
+        applyLayer: makeApplyRemoteLayer(vp, 'player', {
+          ownLayerId,
+          onApplied: () => vp.requestRender(),
+        }),
+      },
       onStatus: s => {
         setStatus(s);
         onStatusProp?.(s);
@@ -326,6 +328,15 @@ export function PlayerBattleMapCanvas({
       },
       onPoke: feature => onPokeRef.current?.(feature),
     });
+    connectionRef.current = connection;
+    // Teach the room this player's own layer (the relay only accepts a
+    // player's writes to player-<characterId>).
+    publishOwnedLayers(
+      vp,
+      'player',
+      def => connection.publishLayerUpsert(def),
+      ownLayerId
+    );
   };
 
   const handleDeleteSelected = useCallback(() => {

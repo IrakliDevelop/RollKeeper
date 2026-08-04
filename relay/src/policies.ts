@@ -1,6 +1,7 @@
 import type {
   Authenticate,
   Authorize,
+  AuthorizeLayer,
   CanRead,
   OwnedElement,
 } from '@fieldnotes/sync-server';
@@ -9,12 +10,15 @@ import { verifyBattleMapToken } from './token.js';
 export const DM_AUDIENCE = 'dm';
 
 /**
- * The whole security model of the live battle map lives in these three hooks.
+ * The whole security model of the live battle map lives in these hooks.
  * They run on the relay; clients never see elements canRead filters out.
+ * Layer definitions are presentation-only (never element bytes), so
+ * authorizeLayer guards edit ownership, not privacy.
  */
 export function makePolicies(secret: string): {
   authenticate: Authenticate;
   authorize: Authorize;
+  authorizeLayer: AuthorizeLayer;
   canRead: CanRead;
 } {
   const authenticate: Authenticate = ({ req, room }) => {
@@ -55,5 +59,15 @@ export function makePolicies(secret: string): {
   const canRead: CanRead = ({ role, audience }) =>
     audience !== DM_AUDIENCE || role === 'dm';
 
-  return { authenticate, authorize, canRead };
+  // The DM owns the scene; a player may only define/edit their own
+  // player-<characterId> layer; the display is read-only. A denied edit is
+  // answered by the hub with an authoritative correction to the sender.
+  const authorizeLayer: AuthorizeLayer = ({ role, userId, op }) => {
+    if (role === 'dm') return true;
+    if (role !== 'player') return false;
+    const layerId = op.kind === 'layer-upsert' ? op.layer.id : op.id;
+    return userId !== undefined && layerId === `player-${userId}`;
+  };
+
+  return { authenticate, authorize, authorizeLayer, canRead };
 }
