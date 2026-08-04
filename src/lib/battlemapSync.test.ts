@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { CanvasElement, ElementStore } from '@fieldnotes/core';
 import {
-  computeSeedIds,
+  ElementStore,
+  createShape,
+  type CanvasElement,
+} from '@fieldnotes/core';
+import {
   createManagedBattleMapConnection,
   type BattleMapConnectionStatus,
   type BattleMapTransport,
@@ -9,22 +12,13 @@ import {
 
 // No @fieldnotes/sync mocking: the real managed lifecycle + SyncClient run
 // against an injected fake transport, so these tests exercise the actual
-// adoption seam (RollKeeper glue over createManagedSyncConnection).
+// adoption seam (RollKeeper glue over createManagedSyncConnection and its
+// authoritative bootstrap/reconcile hooks).
 
-const el = (id: string) => ({ id }) as CanvasElement;
-
-describe('computeSeedIds', () => {
-  it('returns ids of local elements missing from the snapshot', () => {
-    expect(computeSeedIds([el('a'), el('b'), el('c')], new Set(['b']))).toEqual(
-      ['a', 'c']
-    );
-  });
-  it('returns empty when snapshot covers everything', () => {
-    expect(computeSeedIds([el('a')], new Set(['a']))).toEqual([]);
-  });
-  it('returns everything for an empty room', () => {
-    expect(computeSeedIds([el('a'), el('b')], new Set())).toEqual(['a', 'b']);
-  });
+/** Structurally valid element — the SDK validates snapshot elements. */
+const el = (id: string): CanvasElement => ({
+  ...createShape({ position: { x: 0, y: 0 }, size: { w: 1, h: 1 } }),
+  id,
 });
 
 class FakeTransport implements BattleMapTransport {
@@ -59,53 +53,29 @@ class FakeTransport implements BattleMapTransport {
   emitMessage(message: string): void {
     for (const h of [...this.msgHandlers]) h(message);
   }
+  emitReconnect(): void {
+    for (const h of [...this.reconnectHandlers]) h();
+  }
   emitClose(code: number): void {
     for (const h of [...this.closeHandlers]) h(code, '');
   }
 }
 
-interface FakeStore {
-  snapshot: ReturnType<typeof vi.fn>;
-  getById: ReturnType<typeof vi.fn>;
-  update: ReturnType<typeof vi.fn>;
-  add: ReturnType<typeof vi.fn>;
-  remove: ReturnType<typeof vi.fn>;
-  clear: ReturnType<typeof vi.fn>;
-  on: ReturnType<typeof vi.fn>;
-  /** test helper: simulate SyncClient's destructive reconcile deleting an id */
-  simulateRemove: (id: string) => void;
-}
-
-function makeFakeStore(initial: CanvasElement[]): FakeStore {
-  let elements = [...initial];
-  return {
-    snapshot: vi.fn(() => [...elements]),
-    getById: vi.fn((id: string) => elements.find(e => e.id === id)),
-    update: vi.fn(),
-    add: vi.fn((element: CanvasElement) => {
-      elements.push(element);
-    }),
-    remove: vi.fn((id: string) => {
-      elements = elements.filter(e => e.id !== id);
-    }),
-    clear: vi.fn(() => {
-      elements = [];
-    }),
-    // the real SyncClient subscribes to store mutations on start()
-    on: vi.fn(() => () => {}),
-    simulateRemove: (id: string) => {
-      elements = elements.filter(e => e.id !== id);
-    },
-  };
-}
-
 const snapshotEnvelope = (to: string, ids: string[]): string =>
   JSON.stringify({
     from: 'hub',
-    op: { kind: 'snapshot', to, elements: ids.map(id => ({ id })) },
+    op: { kind: 'snapshot', to, elements: ids.map(id => el(id)) },
   });
 
-/** Flush pending microtasks + one macrotask (covers the deferred seed). */
+const sentUpsertIds = (sent: string[]): string[] =>
+  sent
+    .map(
+      m => JSON.parse(m) as { op: { kind: string; element?: { id: string } } }
+    )
+    .filter(e => e.op.kind === 'upsert' && e.op.element)
+    .map(e => (e.op.element as { id: string }).id);
+
+/** Flush pending microtasks (token mint) — nothing here defers to macrotasks. */
 const flush = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -131,7 +101,7 @@ describe('createManagedBattleMapConnection', () => {
   });
 
   const startConnection = async (
-    store: FakeStore,
+    store: ElementStore,
     seedLocal = true,
     onPoke?: (feature: string) => void
   ) => {
@@ -139,7 +109,7 @@ describe('createManagedBattleMapConnection', () => {
       relayUrl: 'wss://relay.example',
       campaignCode: 'CODE',
       battleMapId: 'map-1',
-      store: store as unknown as ElementStore,
+      store,
       clientId: 'dm-1',
       tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
       seedLocal,
@@ -156,7 +126,7 @@ describe('createManagedBattleMapConnection', () => {
   };
 
   it('mints via the campaign token route and connects with a room+token URL', async () => {
-    const store = makeFakeStore([]);
+    const store = new ElementStore();
     const conn = await startConnection(store);
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -177,81 +147,127 @@ describe('createManagedBattleMapConnection', () => {
     conn.stop();
   });
 
-  it('goes live and seeds missing local elements on a snapshot addressed to us', async () => {
-    const store = makeFakeStore([el('a'), el('b'), el('c')]);
+  it('goes live and synchronously re-pushes hub-unknown seed elements on the bootstrap snapshot', async () => {
+    const store = new ElementStore();
+    store.add(el('a'));
+    store.add(el('b'));
+    store.add(el('c'));
     const conn = await startConnection(store);
     expect(statuses).toEqual(['connecting']);
 
     fakeTransport.emitMessage(snapshotEnvelope('dm-1', ['b']));
-    expect(statuses).toEqual(['connecting', 'live']);
 
-    await flush(); // run the deferred seed
-    expect(store.update).toHaveBeenCalledWith('a', {});
-    expect(store.update).toHaveBeenCalledWith('c', {});
-    expect(store.update).not.toHaveBeenCalledWith('b', {});
-    expect(store.add).not.toHaveBeenCalled();
+    // No deferred macrotask: live + seed happen inside the snapshot dispatch.
+    expect(statuses).toEqual(['connecting', 'live']);
+    expect(sentUpsertIds(fakeTransport.sent).sort()).toEqual(['a', 'c']);
+    expect(store.getById('a')).toBeDefined();
+    expect(store.getById('b')).toBeDefined();
+    expect(store.getById('c')).toBeDefined();
 
     conn.stop();
   });
 
   it('ignores snapshots addressed to a different client', async () => {
-    const store = makeFakeStore([el('a')]);
+    const store = new ElementStore();
+    store.add(el('a'));
     const conn = await startConnection(store);
 
     fakeTransport.emitMessage(snapshotEnvelope('someone-else', []));
-    await flush();
 
     expect(statuses).not.toContain('live');
-    expect(store.update).not.toHaveBeenCalled();
-    expect(store.add).not.toHaveBeenCalled();
+    expect(sentUpsertIds(fakeTransport.sent)).toEqual([]);
+    expect(store.getById('a')).toBeDefined();
 
     conn.stop();
   });
 
-  it('re-adds elements deleted by reconcile before the deferred seed runs (resync)', async () => {
-    const store = makeFakeStore([el('a'), el('b')]);
-    const conn = await startConnection(store);
+  it('keeps hub-unknown local elements across a rebuild while hub-deleted elements stay deleted', async () => {
+    vi.useFakeTimers();
+    try {
+      const store = new ElementStore();
+      store.add(el('a'));
+      store.add(el('b'));
+      const conn = createManagedBattleMapConnection({
+        relayUrl: 'wss://relay.example',
+        campaignCode: 'CODE',
+        battleMapId: 'map-1',
+        store,
+        clientId: 'dm-1',
+        tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+        seedLocal: true,
+        onStatus: s => statuses.push(s),
+        transportFactory: url => {
+          transportUrls.push(url);
+          return fakeTransport;
+        },
+      });
+      await vi.advanceTimersByTimeAsync(0); // token mint resolves
 
-    // first snapshot: hub already has everything
-    fakeTransport.emitMessage(snapshotEnvelope('dm-1', ['a', 'b']));
-    await flush();
-    expect(store.update).not.toHaveBeenCalled();
-    expect(store.add).not.toHaveBeenCalled();
+      // Bootstrap: the hub already knows both seeds — nothing to push.
+      fakeTransport.emitMessage(snapshotEnvelope('dm-1', ['a', 'b']));
+      expect(statuses).toEqual(['connecting', 'live']);
+      expect(sentUpsertIds(fakeTransport.sent)).toEqual([]);
 
-    // reconnect resync: hub lost 'b'; SyncClient's reconcile deletes it
-    // locally after our watcher captured localBefore but before the seed runs
-    fakeTransport.emitMessage(snapshotEnvelope('dm-1', ['a']));
-    store.simulateRemove('b');
-    await flush();
+      // Terminal auth close: the managed lifecycle tears the client down and
+      // re-mints. While no client is attached, the host loads a new
+      // local-authoritative element the hub has never seen.
+      fakeTransport.emitClose(4401);
+      const sendsWhileDown = fakeTransport.sent.length;
+      store.add(el('n'));
+      expect(fakeTransport.sent.length).toBe(sendsWhileDown); // detached — nothing sent
 
-    expect(store.add).toHaveBeenCalledTimes(1);
-    expect(store.add).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'b' })
-    );
-    expect(store.update).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(2_000); // backoff + re-mint + rebuild
+      expect(transportUrls).toHaveLength(2);
+      const sentBefore = fakeTransport.sent.length;
+
+      // The hub deleted 'b' while we were away.
+      fakeTransport.emitMessage(snapshotEnvelope('dm-1', ['a']));
+
+      expect(store.getById('a')).toBeDefined();
+      expect(store.getById('b')).toBeUndefined(); // deleted-while-away — no zombie
+      expect(store.getById('n')).toBeDefined(); // hub-unknown — preserved
+      expect(sentUpsertIds(fakeTransport.sent.slice(sentBefore))).toEqual([
+        'n',
+      ]);
+      conn.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not push local-only elements when seedLocal is off', async () => {
+    const store = new ElementStore();
+    store.add(el('x'));
+    const conn = await startConnection(store, false);
+
+    fakeTransport.emitMessage(snapshotEnvelope('dm-1', []));
+
+    expect(statuses).toEqual(['connecting', 'live']);
+    expect(sentUpsertIds(fakeTransport.sent)).toEqual([]);
+    expect(store.getById('x')).toBeDefined(); // bootstrap merge keeps it locally
 
     conn.stop();
   });
 
   it('does not change status on non-snapshot envelopes', async () => {
-    const store = makeFakeStore([el('a')]);
+    const store = new ElementStore();
+    store.add(el('a'));
     const conn = await startConnection(store);
     const before = [...statuses];
 
     fakeTransport.emitMessage(
       JSON.stringify({ from: 'peer', op: { kind: 'presence', data: {} } })
     );
-    await flush();
 
     expect(statuses).toEqual(before);
-    expect(store.update).not.toHaveBeenCalled();
-    expect(store.add).not.toHaveBeenCalled();
+    expect(store.getById('a')).toBeDefined();
+    expect(sentUpsertIds(fakeTransport.sent)).toEqual([]);
 
     conn.stop();
   });
 
   it('delivers hub pokes to onPoke and ignores non-hub or non-poke frames', async () => {
-    const store = makeFakeStore([]);
+    const store = new ElementStore();
     const pokes: string[] = [];
     const conn = await startConnection(store, false, f => pokes.push(f));
 
@@ -281,12 +297,12 @@ describe('createManagedBattleMapConnection', () => {
   it('reports denied after bounded consecutive 4401 closes (token no longer accepted)', async () => {
     vi.useFakeTimers();
     try {
-      const store = makeFakeStore([]);
+      const store = new ElementStore();
       const conn = createManagedBattleMapConnection({
         relayUrl: 'wss://relay.example',
         campaignCode: 'CODE',
         battleMapId: 'map-1',
-        store: store as unknown as ElementStore,
+        store,
         clientId: 'dm-1',
         tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
         onStatus: s => statuses.push(s),
@@ -317,16 +333,16 @@ describe('createManagedBattleMapConnection', () => {
     }
   });
 
-  it('stop() prevents the deferred seed from mutating the store', async () => {
-    const store = makeFakeStore([el('a')]);
+  it('stop() closes the transport and detaches the store', async () => {
+    const store = new ElementStore();
     const conn = await startConnection(store);
-
     fakeTransport.emitMessage(snapshotEnvelope('dm-1', []));
-    conn.stop(); // before the deferred seed macrotask runs
-    await flush();
 
-    expect(store.update).not.toHaveBeenCalled();
-    expect(store.add).not.toHaveBeenCalled();
+    conn.stop();
     expect(fakeTransport.closed).toBe(true);
+
+    const sends = fakeTransport.sent.length;
+    store.add(el('late'));
+    expect(fakeTransport.sent.length).toBe(sends);
   });
 });

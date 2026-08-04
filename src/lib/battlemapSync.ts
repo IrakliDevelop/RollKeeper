@@ -2,6 +2,7 @@ import {
   createManagedSyncConnection,
   type ManagedSyncStatus,
   type ManagedSyncTransport,
+  type ResolveLocalOnly,
 } from '@fieldnotes/sync';
 import type { ElementStore, CanvasElement } from '@fieldnotes/core';
 import type { BattleMapRole } from '@/lib/battlemapToken';
@@ -34,13 +35,19 @@ export async function mintBattleMapToken(
   }
 }
 
-/** Local elements the hub doesn't know about yet (must be pushed by us). */
-export function computeSeedIds(
-  local: CanvasElement[],
-  presentIds: Set<string>
-): string[] {
-  return local.filter(el => !presentIds.has(el.id)).map(el => el.id);
-}
+/**
+ * DM seeding policy for the SDK's authoritative bootstrap/reconcile hooks:
+ * local-authoritative elements the hub has never seen (DB-loaded seeds,
+ * elements added while detached) are preserved and re-pushed through the
+ * normal local-upsert path, while hub-known absences are deliberate
+ * deletions and stay deleted — a DM reconnect can no longer discard seed
+ * elements, and deleted-while-away elements are not resurrected.
+ */
+const preserveHubUnknown: ResolveLocalOnly = context => ({
+  preserve: context.localOnly
+    .filter(entry => !entry.hubKnown)
+    .map(entry => entry.element.id),
+});
 
 /** Parses a server-owned relay poke presence envelope. */
 export function pokeFeatureFromEnvelope(raw: string): string | null {
@@ -71,7 +78,10 @@ export interface ManagedConnectionOptions {
   clientId: string;
   tokenRequest: BattleMapTokenRequest;
   resolveAudience?: (el: CanvasElement) => string | undefined;
-  /** DM only: push local elements missing from each snapshot. */
+  /**
+   * DM only: preserve and re-push local elements the hub does not know yet
+   * on every bootstrap/reconcile snapshot (SDK `resolveLocalOnly` hooks).
+   */
   seedLocal?: boolean;
   onStatus?: (s: BattleMapConnectionStatus) => void;
   /** Fires when the relay pokes this room (e.g. initiative changed → refetch /shared). */
@@ -90,57 +100,17 @@ export interface ManagedConnectionOptions {
 export function createManagedBattleMapConnection(
   opts: ManagedConnectionOptions
 ): { stop: () => void } {
-  let stopped = false;
   const room = `${opts.campaignCode}:${opts.battleMapId}`;
-
-  // Handles EVERY snapshot addressed to us (not just the first): on a
-  // transport-internal reconnect SyncClient re-requests a snapshot and runs a
-  // destructive reconcile that deletes local elements absent from the hub —
-  // each resync needs a fresh reseed or those elements are lost. This runs on
-  // the raw frame BEFORE the SyncClient applies the merge (the managed
-  // lifecycle subscribes onTransportMessage first), so local state is captured
-  // synchronously and the deferred seed runs after the merge/reconcile.
-  // Temporary workaround until Fieldnotes ships explicit
-  // authoritative-bootstrap/reconcile hooks.
-  const seedFromSnapshot = (raw: string): void => {
-    let env: {
-      from?: string;
-      op?: { kind?: string; to?: string; elements?: { id: string }[] };
-    };
-    try {
-      env = JSON.parse(raw) as typeof env;
-    } catch {
-      return; // non-JSON frame — ignore
-    }
-    const op = env?.op;
-    if (!op || op.kind !== 'snapshot') return;
-    // Snapshots are addressed; ignore ones targeted at other clients.
-    if (op.to !== opts.clientId) return;
-    // Capture local state SYNCHRONOUSLY, before SyncClient's own handler
-    // (subscribed after us) applies the merge/reconcile for this snapshot.
-    const localBefore = opts.store.snapshot();
-    const present = new Set((op.elements ?? []).map(e => e.id));
-    setTimeout(() => {
-      if (stopped) return;
-      const missing = new Set(computeSeedIds(localBefore, present));
-      for (const el of localBefore) {
-        if (!missing.has(el.id)) continue;
-        if (opts.store.getById(el.id)) {
-          // no-op update re-emits the element as a local upsert
-          opts.store.update(el.id, {});
-        } else {
-          // reconcile just deleted it — re-adding re-emits it as a
-          // local upsert so it gets pushed back to the hub
-          opts.store.add(el);
-        }
-      }
-    }, 0);
-  };
 
   const connection = createManagedSyncConnection({
     store: opts.store,
     clientId: opts.clientId,
     resolveAudience: opts.resolveAudience,
+    // Seeding rides the SDK's authoritative bootstrap/reconcile hooks: the
+    // managed lifecycle persists hub knowledge across credential rebuilds and
+    // calls the hook synchronously for every snapshot addressed to us, so no
+    // raw-frame parsing or deferred reseeding is needed.
+    resolveLocalOnly: opts.seedLocal ? preserveHubUnknown : undefined,
     resolveUrl: async () => {
       const token = await mintBattleMapToken(
         opts.campaignCode,
@@ -150,22 +120,17 @@ export function createManagedBattleMapConnection(
       return `${opts.relayUrl}?room=${encodeURIComponent(room)}&token=${encodeURIComponent(token)}`;
     },
     onStatus: opts.onStatus,
-    onTransportMessage:
-      opts.seedLocal || opts.onPoke
-        ? raw => {
-            if (opts.seedLocal) seedFromSnapshot(raw);
-            if (opts.onPoke) {
-              const feature = pokeFeatureFromEnvelope(raw);
-              if (feature) opts.onPoke(feature);
-            }
-          }
-        : undefined,
+    onTransportMessage: opts.onPoke
+      ? raw => {
+          const feature = pokeFeatureFromEnvelope(raw);
+          if (feature) opts.onPoke?.(feature);
+        }
+      : undefined,
     transportFactory: opts.transportFactory,
   });
 
   return {
     stop: (): void => {
-      stopped = true;
       connection.stop();
     },
   };
