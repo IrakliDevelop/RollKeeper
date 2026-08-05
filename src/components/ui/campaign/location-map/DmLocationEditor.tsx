@@ -59,6 +59,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handleToggleArrangeMaps,
     publishLayerUpsert,
     publishLayerRemove,
+    measureSharing,
+    handleSetMeasureSharing,
   } = useDmLocationEditor(props);
 
   return (
@@ -115,7 +117,15 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
           />
         )}
 
-        {viewport && <DmLocationToolOptions mode={mode} />}
+        {viewport && (
+          <DmLocationToolOptions
+            mode={mode}
+            measureSharing={{
+              enabled: measureSharing,
+              onChange: handleSetMeasureSharing,
+            }}
+          />
+        )}
 
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           {arrangeMapsActive && (
