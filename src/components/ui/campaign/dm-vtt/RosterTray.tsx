@@ -60,7 +60,14 @@ export function RosterTray({
   const groups = groupRosterEntities(entities);
 
   return (
-    <div className="bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] bottom-0 left-0 flex w-[clamp(150px,16vw,180px)] flex-col overflow-hidden rounded-tr-2xl border shadow-xl">
+    <div
+      className="bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] left-0 flex max-h-[70vh] w-[clamp(150px,16vw,180px)] flex-col overflow-hidden rounded-r-2xl border shadow-xl"
+      style={{
+        maxHeight:
+          'min(70dvh, calc(100dvh - var(--dm-vtt-panel-top, 8rem) - 12rem))',
+      }}
+      data-testid="dm-vtt-roster-panel"
+    >
       <div className="border-divider flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2.5">
         <span className="text-heading text-sm font-semibold">👥 Roster</span>
         <Button
@@ -72,7 +79,7 @@ export function RosterTray({
           ▸
         </Button>
       </div>
-      <div className="flex-1 overflow-y-auto px-2 py-2">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
         {!hasLinkedEncounter ? (
           <p className="text-muted px-1 py-2 text-xs">
             Link an encounter in Setup mode

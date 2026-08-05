@@ -72,9 +72,22 @@ export function StudioPanel({
   const selectedEntity = encounter?.entities.find(
     e => e.id === selectedEntityId
   );
+  const maxPanelHeight =
+    activeTab === 'initiative'
+      ? 'min(70dvh, calc(100dvh - var(--dm-vtt-panel-top, 8rem) - 0.75rem))'
+      : 'calc(100dvh - var(--dm-vtt-panel-top, 8rem) - 0.75rem)';
 
   return (
-    <div className="bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-0 bottom-0 flex w-[min(390px,40vw)] flex-col overflow-hidden rounded-tl-2xl border shadow-xl">
+    <div
+      className={`bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-0 flex w-[min(390px,40vw)] flex-col overflow-hidden rounded-l-2xl border shadow-xl ${
+        activeTab === 'initiative'
+          ? 'max-h-[70vh]'
+          : 'max-h-[calc(100vh-var(--dm-vtt-panel-top,8rem)-0.75rem)]'
+      }`}
+      style={{ maxHeight: maxPanelHeight }}
+      data-testid="dm-vtt-studio-panel"
+      data-active-tab={activeTab}
+    >
       <div className="border-divider flex shrink-0 items-center justify-between gap-2 border-b px-2 py-1.5">
         <div className="flex items-center gap-1">
           {TABS.map(({ key, icon, label }) => (
@@ -113,7 +126,7 @@ export function StudioPanel({
           {followNote}
         </p>
       )}
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {activeTab === 'initiative' ? (
           <InitiativeTab
             encounter={encounter}
