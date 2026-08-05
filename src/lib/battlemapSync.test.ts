@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   ElementStore,
   LayerManager,
+  MeasureTool,
   createShape,
   type CanvasElement,
   type Layer,
+  type PointerState,
 } from '@fieldnotes/core';
 import {
   createManagedBattleMapConnection,
@@ -923,6 +925,205 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
     container.remove();
     remotePings.dispose();
     cleanupLasers();
+    expect(overlays).toHaveLength(0);
+    conn.stop();
+  });
+
+  it('poke + laser + ping + measure presence coexist over the real attachments: measure sends exactly one presence frame, the remote overlay applies it presence-only, leave clears every overlay', async () => {
+    // MeasureTool's onMeasurement is raf-coalesced (see measureSync.test.ts):
+    // callbacks are captured and only run on an explicit flushFrame(). The
+    // ping/laser overlays above never have their raf callback invoked either
+    // way, so a capturing stub is a compatible drop-in for this test.
+    let rafCallbacks: FrameRequestCallback[] = [];
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((cb: FrameRequestCallback) => {
+        rafCallbacks.push(cb);
+        return 1;
+      })
+    );
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const flushFrame = () => {
+      const cbs = rafCallbacks;
+      rafCallbacks = [];
+      for (const cb of cbs) cb(0);
+    };
+    const pt = (x: number, y: number): PointerState => ({
+      x,
+      y,
+      pressure: 0.5,
+      pointerType: 'mouse',
+      shiftKey: false,
+    });
+
+    const { attachRemotePings } = await import(
+      '@/components/ui/campaign/location-map/pingSync'
+    );
+    const { attachRemoteLaserTrails } = await import(
+      '@/components/ui/campaign/location-map/laserSync'
+    );
+    const { attachMeasureBroadcast, attachRemoteMeasurements } = await import(
+      '@/components/ui/campaign/location-map/measureSync'
+    );
+
+    // Ping/laser overlays share this host, mirroring the sibling test above
+    // (their draw functions are exercised through a mock 2D context).
+    const overlays: ((ctx: CanvasRenderingContext2D) => void)[] = [];
+    const vp = {
+      registerOverlay(draw: (ctx: CanvasRenderingContext2D) => void) {
+        overlays.push(draw);
+        return () => {
+          const index = overlays.indexOf(draw);
+          if (index >= 0) overlays.splice(index, 1);
+        };
+      },
+      requestRender: vi.fn(),
+    };
+    // The measure overlay gets its own host: RemoteMeasureOverlay's real
+    // draw calls (setLineDash/roundRect/fillText/measureText) don't fit the
+    // slim ping/laser canvas mock below, and this test asserts remote-side
+    // state via activeSenderCount rather than drawing it.
+    const measureHost = {
+      registerOverlay: (draw: (ctx: CanvasRenderingContext2D) => void) => {
+        void draw;
+        return () => {};
+      },
+      requestRender: vi.fn(),
+    };
+
+    const store = new ElementStore();
+    const pokes: string[] = [];
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'map-1',
+      store,
+      clientId: 'player-1',
+      tokenRequest: { role: 'player', battleMapId: 'map-1', playerId: 'p1' },
+      onStatus: s => statuses.push(s),
+      onPoke: feature => pokes.push(feature),
+      transportFactory: () => fakeTransport,
+    });
+    await flushMicro();
+    const remotePings = attachRemotePings(vp, conn);
+    const cleanupLasers = attachRemoteLaserTrails(vp, conn);
+    const remoteMeasurements = attachRemoteMeasurements(measureHost, conn);
+    const measureTool = new MeasureTool();
+    const measureHandle = attachMeasureBroadcast(measureTool, conn);
+    fakeTransport.emitMessage(snapshotEnvelope('player-1', []));
+
+    const counts = () => {
+      let fills = 0;
+      let strokes = 0;
+      const ctx = {
+        save: vi.fn(),
+        restore: vi.fn(),
+        beginPath: vi.fn(),
+        arc: vi.fn(),
+        moveTo: vi.fn(),
+        lineTo: vi.fn(),
+        stroke: vi.fn(() => (strokes += 1)),
+        fill: vi.fn(() => (fills += 1)),
+        globalAlpha: 1,
+        strokeStyle: '',
+        fillStyle: '',
+        lineWidth: 0,
+        lineCap: '',
+        lineJoin: '',
+      } as unknown as CanvasRenderingContext2D;
+      for (const draw of [...overlays]) draw(ctx);
+      return { fills, strokes };
+    };
+
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'hub',
+        op: { kind: 'presence', data: { kind: 'poke', feature: 'players' } },
+      })
+    );
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'conn-dm',
+        op: { kind: 'presence', data: laserPayload },
+      })
+    );
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'conn-dm',
+        op: {
+          kind: 'presence',
+          data: { kind: 'ping', x: 100, y: 200, color: '#F4C430' },
+        },
+      })
+    );
+    // Remote receive path: a shared-ruler frame from the same foreign
+    // sender. The overlay applies it (presence-only — nothing persists).
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'conn-dm',
+        op: {
+          kind: 'presence',
+          data: {
+            kind: 'measure',
+            start: { x: 0, y: 0 },
+            end: { x: 30, y: 40 },
+            cells: 10,
+            feet: 50,
+            color: '#F4C430',
+          },
+        },
+      })
+    );
+
+    expect(pokes).toEqual(['players']); // poke parsing undisturbed
+    const drawn = counts();
+    expect(drawn.fills).toBe(1); // exactly one ping pulse
+    expect(drawn.strokes).toBeGreaterThan(0); // laser trail rendered
+    expect(remoteMeasurements.overlay.activeSenderCount).toBe(1); // remote ruler applied
+    expect(store.snapshot()).toEqual([]); // presence-only: nothing persisted
+
+    // Local broadcast path: enable sharing, drive one measurement, flush the
+    // coalesced raf emission — exactly one presence frame reaches the wire.
+    measureHandle.setSharing(true);
+    const sentBeforeMeasure = fakeTransport.sent.length;
+    const measureCtx = {
+      camera: { screenToWorld: (p: { x: number; y: number }) => ({ ...p }) },
+      store: {} as ElementStore,
+      requestRender: vi.fn(),
+    } as unknown as Parameters<MeasureTool['onPointerDown']>[1];
+    measureTool.onPointerDown(pt(10, 20), measureCtx);
+    measureTool.onPointerMove(pt(13, 24), measureCtx);
+    flushFrame();
+
+    const measureFrames = fakeTransport.sent
+      .slice(sentBeforeMeasure)
+      .map(
+        frame => JSON.parse(frame) as { op: { kind: string; data?: unknown } }
+      )
+      .filter(envelope => envelope.op.kind === 'presence');
+    expect(measureFrames).toHaveLength(1);
+    const measurePayload = measureFrames[0]?.op.data as {
+      kind: string;
+      feet: number;
+    };
+    expect(measurePayload.kind).toBe('measure');
+    expect(Number.isFinite(measurePayload.feet)).toBe(true);
+    expect(store.snapshot()).toEqual([]); // still nothing persisted
+
+    // Presence-leave clears every overlay for that sender immediately.
+    fakeTransport.emitMessage(
+      JSON.stringify({ from: 'conn-dm', op: { kind: 'presence-leave' } })
+    );
+    const afterLeave = counts();
+    expect(afterLeave.fills).toBe(0);
+    expect(afterLeave.strokes).toBe(0);
+    expect(remoteMeasurements.overlay.activeSenderCount).toBe(0);
+    expect(store.snapshot()).toEqual([]); // presence-only, end to end
+
+    measureHandle.dispose();
+    remotePings.dispose();
+    cleanupLasers();
+    remoteMeasurements.dispose();
     expect(overlays).toHaveLength(0);
     conn.stop();
   });
