@@ -53,13 +53,13 @@ export function DmVttTopBar({
   onModeChange,
 }: DmVttTopBarProps) {
   return (
-    <div className="bg-surface-raised border-divider pointer-events-auto fixed top-3 left-4 flex min-h-[44px] items-center gap-3 rounded-2xl border px-3 py-1.5 shadow-xl">
+    <div className="bg-surface-raised/95 border-divider pointer-events-auto fixed inset-x-0 top-0 flex h-14 items-center gap-3 border-b px-3 shadow-xl backdrop-blur-sm">
       <Link href={`/dm/campaign/${campaignCode}/battlemaps`}>
         <Button variant="ghost" size="lg" aria-label="Back to battle maps">
           <ArrowLeft size={18} />
         </Button>
       </Link>
-      <span className="text-heading max-w-[160px] truncate text-sm font-semibold">
+      <span className="text-heading hidden max-w-[140px] truncate text-sm font-semibold sm:block">
         {mapName}
       </span>
       <div className="border-divider flex items-center gap-0.5 rounded-lg border p-0.5">
@@ -68,7 +68,7 @@ export function DmVttTopBar({
             key={key}
             variant={gridMode === key ? 'primary' : 'ghost'}
             onClick={() => onSetGridMode(key)}
-            className="min-h-[44px] px-2 text-xs"
+            className="min-h-[40px] px-2 text-xs"
           >
             {label}
           </Button>
@@ -79,7 +79,7 @@ export function DmVttTopBar({
         size="lg"
         leftIcon={<Monitor size={16} />}
         onClick={() => openTvDisplay(campaignCode, battleMapId, dmId)}
-        className="text-xs"
+        className="ml-auto hidden text-xs md:flex"
       >
         Open Display
       </Button>
@@ -104,7 +104,7 @@ export function DmVttTopBar({
             key={key}
             variant={mode === key ? 'primary' : 'ghost'}
             onClick={() => onModeChange(key)}
-            className="min-h-[44px] px-2 text-xs"
+            className="min-h-[40px] px-2 text-xs"
           >
             {label}
           </Button>

@@ -56,7 +56,7 @@ export function DmVttToolbar({
   const [activeTool, setTool] = useActiveTool();
   const TokenInfoIcon = TOKEN_INFO_ICON[tokenInfoToggle.mode ?? 'compact'];
   return (
-    <div className="bg-surface-raised border-divider absolute top-16 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-xl border p-1 shadow-lg">
+    <div className="bg-surface-raised border-divider absolute top-14 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-b-xl border border-t-0 p-1 shadow-lg xl:top-1 xl:rounded-xl xl:border">
       <div className="flex items-center gap-1">
         {DM_TOOLS.map(({ name, label, Icon }) => (
           <Button

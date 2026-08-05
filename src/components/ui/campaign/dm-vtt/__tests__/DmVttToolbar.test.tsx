@@ -10,11 +10,7 @@ vi.mock('@fieldnotes/react', () => ({
 describe('DmVttToolbar', () => {
   afterEach(() => cleanup());
 
-  it('always sits below the fixed top bar (top-16), never sharing its row', () => {
-    // Regression pin for the wide-viewport overlap bug: a `min-[1350px]:top-3`
-    // variant previously moved the toolbar into `DmVttTopBar`'s row at
-    // >=1350px, hiding the drawing tools behind the top bar's controls. The
-    // toolbar must stay at `top-16` at every width.
+  it('shares the top dock on wide screens and stacks below it when narrow', () => {
     const { container } = render(
       <DmVttToolbar
         onClearDrawings={vi.fn()}
@@ -23,9 +19,7 @@ describe('DmVttToolbar', () => {
     );
     const toolbar = container.firstChild as HTMLElement;
     const classes = toolbar.className.split(/\s+/);
-    expect(classes).toContain('top-16');
-    expect(classes).not.toEqual(
-      expect.arrayContaining([expect.stringMatching(/^min-\[1350px\]:top-3$/)])
-    );
+    expect(classes).toContain('top-14');
+    expect(classes).toContain('xl:top-1');
   });
 });

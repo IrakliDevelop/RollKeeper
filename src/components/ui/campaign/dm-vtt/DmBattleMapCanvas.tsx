@@ -32,6 +32,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
           className="h-full w-full"
           snapToGrid
         />
+        {viewport && children}
         {viewport && (
           <DmVttToolbar
             onClearDrawings={handleClearDrawings}
@@ -39,11 +40,10 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
           />
         )}
         {viewport && (
-          <div className="border-divider absolute top-[7.25rem] left-1/2 z-10 max-w-[92vw] -translate-x-1/2 overflow-hidden rounded-xl border shadow-lg">
+          <div className="border-divider absolute top-[7rem] left-1/2 z-10 max-w-[92vw] -translate-x-1/2 overflow-hidden rounded-xl border shadow-lg xl:top-14 xl:rounded-t-none xl:border-t-0">
             <DmLocationToolOptions mode="battlemap" />
           </div>
         )}
-        {viewport && children}
       </div>
     </ViewportContext.Provider>
   );

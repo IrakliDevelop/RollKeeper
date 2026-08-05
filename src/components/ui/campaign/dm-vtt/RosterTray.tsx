@@ -50,7 +50,7 @@ export function RosterTray({
       <button
         onClick={onToggleCollapsed}
         title="Expand roster"
-        className="bg-surface-raised border-divider text-heading pointer-events-auto fixed top-[78px] left-4 flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-3 text-xs font-bold tracking-wider shadow-xl"
+        className="bg-surface-raised border-divider text-heading pointer-events-auto fixed top-[164px] left-0 flex min-h-[44px] items-center gap-1.5 rounded-r-2xl border px-3 text-xs font-bold tracking-wider shadow-xl xl:top-14"
       >
         <span aria-hidden>👥</span> ROSTER
       </button>
@@ -60,7 +60,7 @@ export function RosterTray({
   const groups = groupRosterEntities(entities);
 
   return (
-    <div className="bg-surface-raised border-divider pointer-events-auto fixed top-[78px] left-4 flex max-h-[calc(100vh-102px)] w-[180px] flex-col overflow-hidden rounded-2xl border shadow-xl">
+    <div className="bg-surface-raised border-divider pointer-events-auto fixed top-[164px] bottom-0 left-0 flex w-[clamp(150px,16vw,180px)] flex-col overflow-hidden rounded-tr-2xl border shadow-xl xl:top-14">
       <div className="border-divider flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2.5">
         <span className="text-heading text-sm font-semibold">👥 Roster</span>
         <Button
