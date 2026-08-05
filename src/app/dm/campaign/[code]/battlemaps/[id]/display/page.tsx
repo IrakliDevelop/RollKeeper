@@ -13,6 +13,7 @@ import { ensureCanonicalLayers } from '@/components/ui/campaign/location-map/lay
 import { makeApplyRemoteLayer } from '@/components/ui/campaign/location-map/layerSync';
 import { attachRemoteLaserTrails } from '@/components/ui/campaign/location-map/laserSync';
 import { attachRemotePings } from '@/components/ui/campaign/location-map/pingSync';
+import { attachRemoteMeasurements } from '@/components/ui/campaign/location-map/measureSync';
 
 function DisplayCanvas() {
   const params = useParams();
@@ -63,6 +64,7 @@ function DisplayCanvas() {
     const presenceCleanups = [
       attachRemoteLaserTrails(vp, connection),
       attachRemotePings(vp, connection).dispose,
+      attachRemoteMeasurements(vp, connection).dispose,
     ];
     laserCleanupRef.current = () => {
       for (const cleanup of presenceCleanups) cleanup();

@@ -30,6 +30,8 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     selectedElementId,
     selectedElementIsDmOnly,
     handleToggleSelectedDmOnly,
+    measureSharing,
+    handleSetMeasureSharing,
   } = useDmBattleMapCanvas(props);
 
   return (
@@ -54,6 +56,10 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
             selectedElementId={selectedElementId}
             selectedElementIsDmOnly={selectedElementIsDmOnly}
             onToggleSelectedDmOnly={handleToggleSelectedDmOnly}
+            measureSharing={{
+              enabled: measureSharing,
+              onChange: handleSetMeasureSharing,
+            }}
           />
         )}
         {viewport && children}

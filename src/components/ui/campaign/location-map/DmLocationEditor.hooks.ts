@@ -42,6 +42,11 @@ import {
   attachPingInput,
   attachRemotePings,
 } from './pingSync';
+import {
+  attachMeasureBroadcast,
+  attachRemoteMeasurements,
+  type MeasureBroadcastHandle,
+} from './measureSync';
 import { pinGridToMapLayer } from './gridPin';
 import { nextMapImagePosition } from './mapImagePlacement';
 import {
@@ -172,6 +177,10 @@ export interface DmLocationEditorState {
   // Layer sync (battlemap mode; no-ops when live sync is off)
   publishLayerUpsert: (definition: Layer) => void;
   publishLayerRemove: (id: string) => void;
+
+  // Shared live ruler (battlemap mode; no-ops when live sync is off)
+  measureSharing: boolean;
+  handleSetMeasureSharing: (enabled: boolean) => void;
 }
 
 export function useDmLocationEditor(
@@ -245,6 +254,15 @@ export function useDmLocationEditor(
       : false;
   const [hiddenPlacementActive, setHiddenPlacementActive] = useState(false);
   const hiddenPlacementActiveRef = useRef(false);
+  const [measureSharing, setMeasureSharing] = useState(false);
+  const measureSharingRef = useRef(false);
+  const measureBroadcastRef = useRef<MeasureBroadcastHandle | null>(null);
+
+  const handleSetMeasureSharing = useCallback((enabled: boolean) => {
+    measureSharingRef.current = enabled;
+    setMeasureSharing(enabled);
+    measureBroadcastRef.current?.setSharing(enabled);
+  }, []);
 
   // Loading states
   const [syncing, setSyncing] = useState(false);
@@ -441,9 +459,11 @@ export function useDmLocationEditor(
         // else's.
         laserCleanupRef.current?.();
         const remotePings = attachRemotePings(vp, connection);
+        const remoteMeasures = attachRemoteMeasurements(vp, connection);
         const laserCleanups = [
           attachRemoteLaserTrails(vp, connection),
           remotePings.dispose,
+          remoteMeasures.dispose,
         ];
         const laserTool = vp.toolManager.getTool<LaserTool>('laser');
         if (laserTool) {
@@ -452,6 +472,22 @@ export function useDmLocationEditor(
         const pingTool = vp.toolManager.getTool<PingTool>('ping');
         if (pingTool) {
           laserCleanups.push(attachPingBroadcast(pingTool, connection));
+        }
+        const measureTool = vp.toolManager.getTool<MeasureTool>('measure');
+        if (measureTool) {
+          const measureBroadcast = attachMeasureBroadcast(
+            measureTool,
+            connection
+          );
+          // Reattachment (viewport/connection rebuild) must not silently
+          // revert to private while the toggle still says shared — apply the
+          // latest value now.
+          measureBroadcast.setSharing(measureSharingRef.current);
+          measureBroadcastRef.current = measureBroadcast;
+          laserCleanups.push(() => {
+            measureBroadcastRef.current = null;
+            measureBroadcast.dispose();
+          });
         }
         // Always-available DM pings: long-press with any tool + "P" at the
         // cursor, self-pulse through the shared receive overlay. The veto
@@ -1062,5 +1098,7 @@ export function useDmLocationEditor(
     handleToggleArrangeMaps,
     publishLayerUpsert,
     publishLayerRemove,
+    measureSharing,
+    handleSetMeasureSharing,
   };
 }

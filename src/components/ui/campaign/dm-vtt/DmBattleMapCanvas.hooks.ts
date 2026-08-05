@@ -43,6 +43,11 @@ import {
   attachPingInput,
   attachRemotePings,
 } from '@/components/ui/campaign/location-map/pingSync';
+import {
+  attachMeasureBroadcast,
+  attachRemoteMeasurements,
+  type MeasureBroadcastHandle,
+} from '@/components/ui/campaign/location-map/measureSync';
 
 import type { TokenInfoMode } from '@/components/ui/campaign/token-overlay';
 
@@ -80,6 +85,8 @@ export interface DmBattleMapCanvasState {
   selectedElementId: string | null;
   selectedElementIsDmOnly: boolean;
   handleToggleSelectedDmOnly: () => void;
+  measureSharing: boolean;
+  handleSetMeasureSharing: (enabled: boolean) => void;
 }
 
 /**
@@ -111,6 +118,16 @@ export function useDmBattleMapCanvas({
   const [selectedElementId, setSelectedElementId] = useState<string | null>(
     null
   );
+  const [measureSharing, setMeasureSharing] = useState(false);
+  const measureSharingRef = useRef(false);
+  const measureBroadcastRef = useRef<MeasureBroadcastHandle | null>(null);
+
+  const handleSetMeasureSharing = useCallback((enabled: boolean) => {
+    measureSharingRef.current = enabled;
+    setMeasureSharing(enabled);
+    measureBroadcastRef.current?.setSharing(enabled);
+  }, []);
+
   const hiddenElementCount = useBattleMapStore(
     state =>
       Object.keys(
@@ -288,9 +305,11 @@ export function useDmBattleMapCanvas({
         // else's.
         laserCleanupRef.current?.();
         const remotePings = attachRemotePings(vp, connection);
+        const remoteMeasures = attachRemoteMeasurements(vp, connection);
         const laserCleanups = [
           attachRemoteLaserTrails(vp, connection),
           remotePings.dispose,
+          remoteMeasures.dispose,
         ];
         const laserTool = vp.toolManager.getTool<LaserTool>('laser');
         if (laserTool) {
@@ -299,6 +318,22 @@ export function useDmBattleMapCanvas({
         const pingTool = vp.toolManager.getTool<PingTool>('ping');
         if (pingTool) {
           laserCleanups.push(attachPingBroadcast(pingTool, connection));
+        }
+        const measureTool = vp.toolManager.getTool<MeasureTool>('measure');
+        if (measureTool) {
+          const measureBroadcast = attachMeasureBroadcast(
+            measureTool,
+            connection
+          );
+          // Reattachment (viewport/connection rebuild) must not silently
+          // revert to private while the toggle still says shared — apply the
+          // latest value now.
+          measureBroadcast.setSharing(measureSharingRef.current);
+          measureBroadcastRef.current = measureBroadcast;
+          laserCleanups.push(() => {
+            measureBroadcastRef.current = null;
+            measureBroadcast.dispose();
+          });
         }
         // Always-available DM pings: long-press with any tool + "P" at the
         // cursor, self-pulse through the shared receive overlay. The veto
@@ -397,5 +432,7 @@ export function useDmBattleMapCanvas({
     selectedElementId,
     selectedElementIsDmOnly,
     handleToggleSelectedDmOnly,
+    measureSharing,
+    handleSetMeasureSharing,
   };
 }

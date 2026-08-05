@@ -21,7 +21,9 @@ import {
 import { useActiveTool } from '@fieldnotes/react';
 
 import { Button } from '@/components/ui/forms/button';
-import DmLocationToolOptions from '@/components/ui/campaign/location-map/DmLocationToolOptions';
+import DmLocationToolOptions, {
+  type MeasureSharingControl,
+} from '@/components/ui/campaign/location-map/DmLocationToolOptions';
 
 import { useEffect, useRef, type ReactNode } from 'react';
 
@@ -53,6 +55,7 @@ export interface DmVttToolbarProps {
   selectedElementId: string | null;
   selectedElementIsDmOnly: boolean;
   onToggleSelectedDmOnly: () => void;
+  measureSharing?: MeasureSharingControl;
 }
 
 const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
@@ -87,6 +90,7 @@ export function DmVttToolbar({
   selectedElementId,
   selectedElementIsDmOnly,
   onToggleSelectedDmOnly,
+  measureSharing,
 }: DmVttToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const TokenInfoIcon = TOKEN_INFO_ICON[tokenInfoToggle.mode ?? 'compact'];
@@ -218,7 +222,10 @@ export function DmVttToolbar({
         </div>
       </div>
       <div className="border-divider border-t empty:hidden">
-        <DmLocationToolOptions mode="battlemap" />
+        <DmLocationToolOptions
+          mode="battlemap"
+          measureSharing={measureSharing}
+        />
       </div>
     </div>
   );
