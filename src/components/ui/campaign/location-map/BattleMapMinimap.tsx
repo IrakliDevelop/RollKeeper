@@ -19,9 +19,16 @@ interface BattleMapMinimapProps {
  * is similarly claimed (`RosterTray`, `CombatPanel`). A bottom-right minimap
  * would sit directly behind/in front of those panels whenever they're
  * expanded, which is their default state. `bottom-20` keeps clearance above
- * the bottom-center `TurnControl` pill (DM, active-encounter only) and the
- * player's `InitiativeRollPrompt` occupies the same band only briefly and
- * layers above (z-40) it during that transient interaction.
+ * the bottom-center `TurnControl` pill (DM, active-encounter only).
+ *
+ * Stacking: both host canvases render `<BattleMapMinimap />` as an EARLIER
+ * sibling of `{viewport && children}`, both at the same `z-10`. Same-z-index
+ * siblings paint in DOM order (later wins), so rendering the minimap first
+ * means product overlays carried in `children` — e.g. the player's
+ * `InitiativeRollPrompt`, which briefly occupies the same bottom-center band
+ * — paint on top of the minimap by DOM order alone, not because of any
+ * z-index difference. Do not reorder past `children` without re-checking
+ * this.
  */
 export function BattleMapMinimap({
   defaultCollapsed = false,
