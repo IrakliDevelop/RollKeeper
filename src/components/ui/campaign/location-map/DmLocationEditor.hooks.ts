@@ -11,7 +11,11 @@ import {
   TextTool,
   ShapeTool,
   TemplateTool,
+  EraserTool,
+  LaserTool,
+  PingTool,
   AutoSave,
+  type Layer,
   type Tool,
   type Viewport,
 } from '@fieldnotes/core';
@@ -20,6 +24,7 @@ import { useLocationStore } from '@/store/locationStore';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import {
   createManagedBattleMapConnection,
+  type BattleMapConnection,
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import { openTvDisplay } from '@/lib/openTvDisplay';
@@ -27,10 +32,21 @@ import { useShareWithPlayers } from './useShareWithPlayers';
 import {
   ensureCanonicalLayers,
   migrateCanvasToContract,
-  attachUnknownLayerMirror,
   subscribePinCanonicalLayers,
   MAP_LAYER_ID,
 } from './layerContract';
+import { makeApplyRemoteLayer, publishOwnedLayers } from './layerSync';
+import { attachLaserBroadcast, attachRemoteLaserTrails } from './laserSync';
+import {
+  attachPingBroadcast,
+  attachPingInput,
+  attachRemotePings,
+} from './pingSync';
+import {
+  attachMeasureBroadcast,
+  attachRemoteMeasurements,
+  type MeasureBroadcastHandle,
+} from './measureSync';
 import { pinGridToMapLayer } from './gridPin';
 import { nextMapImagePosition } from './mapImagePlacement';
 import {
@@ -61,11 +77,6 @@ function proxyUrl(url: string): string {
   }
   return url;
 }
-
-/** Viewport exposes historyRecorder at runtime for batched store ops */
-type ViewportHistoryAccess = {
-  historyRecorder: { begin: () => void; commit: () => void };
-};
 
 /** Upload to S3 via /api/assets/upload; base64 data-URL fallback when S3 is
  *  not configured. Returns the canonical (non-proxied) src to store. */
@@ -123,6 +134,10 @@ export interface DmLocationEditorState {
   selectedElementId: string | null;
   isDmOnly: boolean;
   handleToggleDmOnly: () => void;
+  hiddenPlacementActive: boolean;
+  handleToggleHiddenPlacement: () => void;
+  hiddenElementCount: number;
+  handleRevealAll: () => void;
 
   // Loading states
   syncing: boolean;
@@ -158,6 +173,14 @@ export interface DmLocationEditorState {
   // Arrange maps (battlemap mode only)
   arrangeMapsActive: boolean;
   handleToggleArrangeMaps: () => void;
+
+  // Layer sync (battlemap mode; no-ops when live sync is off)
+  publishLayerUpsert: (definition: Layer) => void;
+  publishLayerRemove: (id: string) => void;
+
+  // Shared live ruler (battlemap mode; no-ops when live sync is off)
+  measureSharing: boolean;
+  handleSetMeasureSharing: (enabled: boolean) => void;
 }
 
 export function useDmLocationEditor(
@@ -170,8 +193,10 @@ export function useDmLocationEditor(
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mapImageInputRef = useRef<HTMLInputElement>(null);
   const autoSaveRef = useRef<AutoSave | null>(null);
-  const connectionRef = useRef<{ stop: () => void } | null>(null);
+  const connectionRef = useRef<BattleMapConnection | null>(null);
+  const laserCleanupRef = useRef<(() => void) | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
+  const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
   const [syncStatus, setSyncStatus] = useState<
     BattleMapConnectionStatus | 'disabled'
   >('disabled');
@@ -227,6 +252,17 @@ export function useDmLocationEditor(
     selectedElementId != null
       ? (dmOnlyElements[selectedElementId] ?? false)
       : false;
+  const [hiddenPlacementActive, setHiddenPlacementActive] = useState(false);
+  const hiddenPlacementActiveRef = useRef(false);
+  const [measureSharing, setMeasureSharing] = useState(false);
+  const measureSharingRef = useRef(false);
+  const measureBroadcastRef = useRef<MeasureBroadcastHandle | null>(null);
+
+  const handleSetMeasureSharing = useCallback((enabled: boolean) => {
+    measureSharingRef.current = enabled;
+    setMeasureSharing(enabled);
+    measureBroadcastRef.current?.setSharing(enabled);
+  }, []);
 
   // Loading states
   const [syncing, setSyncing] = useState(false);
@@ -240,7 +276,7 @@ export function useDmLocationEditor(
   const { sharedWithPlayers, handleToggleShareWithPlayers } =
     useShareWithPlayers(campaignCode, dmId, location, mode === 'battlemap');
 
-  // Build tools once — no PencilTool or EraserTool for the location editor
+  // Build tools once. Battle-map setup also supports FieldNotes' stroke eraser.
   const tools = useMemo<Tool[]>(() => {
     const baseTools: Tool[] = [
       new HandTool(),
@@ -269,6 +305,13 @@ export function useDmLocationEditor(
           renderStyle: 'geometric',
         })
       );
+      baseTools.push(new EraserTool({ radius: 12, mode: 'stroke' }));
+      // Ephemeral pointer; trails broadcast as presence while the battlemap
+      // room connection is up (see attachLaserBroadcast).
+      baseTools.push(new LaserTool({ color: '#F4C430', width: 3 }));
+      // Ephemeral "look here" pulse; taps broadcast as presence while the
+      // battlemap room connection is up (see attachPingBroadcast).
+      baseTools.push(new PingTool({ color: '#F4C430' }));
     }
 
     return baseTools;
@@ -355,13 +398,23 @@ export function useDmLocationEditor(
       vp.store.on('remove', saveAndMarkDirty);
       vp.store.on('update', saveAndMarkDirty);
 
-      // Layers aren't synced: player tokens arrive referencing player-*
-      // layer ids that don't exist on this canvas and would sort at layer
-      // order 0 — UNDER the annotations layer where DM-added images live.
-      // Mirror unknown layers into their canonical band instead. Covers both
-      // new elements (add) and relay snapshot reconcile re-applying remote
-      // elements as full updates (including layerId) on reconnect.
-      attachUnknownLayerMirror(vp, 'dm', () => vp.requestRender());
+      // Register before live sync starts so a newly-created local element is
+      // marked DM-only before the sync client resolves its audience. Remote
+      // additions (including player tokens) must never inherit this setting.
+      hiddenPlacementUnsubRef.current?.();
+      hiddenPlacementUnsubRef.current = vp.store.on('add', (element, meta) => {
+        if (
+          mode !== 'battlemap' ||
+          !hiddenPlacementActiveRef.current ||
+          (meta?.origin !== undefined && meta.origin !== 'local')
+        ) {
+          return;
+        }
+        useBattleMapStore
+          .getState()
+          .setDmOnly(campaignCode, location.id, element.id, true);
+      });
+
       pinUnsubRef.current?.();
       pinUnsubRef.current = subscribePinCanonicalLayers(vp, () => ({
         mapUnlocked: arrangeActiveRef.current,
@@ -374,7 +427,7 @@ export function useDmLocationEditor(
       // getState() (a captured snapshot would go stale after the first toggle).
       if (mode === 'battlemap' && process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL) {
         connectionRef.current?.stop();
-        connectionRef.current = createManagedBattleMapConnection({
+        const connection = createManagedBattleMapConnection({
           relayUrl: process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL,
           campaignCode,
           battleMapId: location.id,
@@ -387,8 +440,70 @@ export function useDmLocationEditor(
               ?.dmOnlyElements[el.id]
               ? 'dm'
               : undefined,
+          // Layer definitions sync (replaces the unknown-layer mirror):
+          // winning remote records apply through history-transparent *Direct
+          // calls; the pin subscription above re-pins bands on every change.
+          layers: {
+            applyLayer: makeApplyRemoteLayer(vp, 'dm', {
+              onApplied: () => vp.requestRender(),
+            }),
+          },
           onStatus: setSyncStatus,
         });
+        connectionRef.current = connection;
+        // Teach peers and late joiners the custom layers persisted in this
+        // canvas (created before layer sync, or on another device).
+        publishOwnedLayers(vp, 'dm', def => connection.publishLayerUpsert(def));
+
+        // Laser pointer + map pings: broadcast this DM's, render everyone
+        // else's.
+        laserCleanupRef.current?.();
+        const remotePings = attachRemotePings(vp, connection);
+        const remoteMeasures = attachRemoteMeasurements(vp, connection);
+        const laserCleanups = [
+          attachRemoteLaserTrails(vp, connection),
+          remotePings.dispose,
+          remoteMeasures.dispose,
+        ];
+        const laserTool = vp.toolManager.getTool<LaserTool>('laser');
+        if (laserTool) {
+          laserCleanups.push(attachLaserBroadcast(laserTool, connection));
+        }
+        const pingTool = vp.toolManager.getTool<PingTool>('ping');
+        if (pingTool) {
+          laserCleanups.push(attachPingBroadcast(pingTool, connection));
+        }
+        const measureTool = vp.toolManager.getTool<MeasureTool>('measure');
+        if (measureTool) {
+          const measureBroadcast = attachMeasureBroadcast(
+            measureTool,
+            connection
+          );
+          // Reattachment (viewport/connection rebuild) must not silently
+          // revert to private while the toggle still says shared — apply the
+          // latest value now.
+          measureBroadcast.setSharing(measureSharingRef.current);
+          measureBroadcastRef.current = measureBroadcast;
+          laserCleanups.push(() => {
+            measureBroadcastRef.current = null;
+            measureBroadcast.dispose();
+          });
+        }
+        // Always-available DM pings: long-press with any tool + "P" at the
+        // cursor, self-pulse through the shared receive overlay. The veto
+        // skips the ping tool, whose own tap already pinged on pointer down.
+        laserCleanups.push(
+          attachPingInput(vp, remotePings.overlay, connection, {
+            color: '#F4C430',
+            // Options-bar swatch changes restyle long-press/hotkey pings too.
+            ...(pingTool ? { followTool: pingTool } : {}),
+            hotkey: 'p',
+            shouldPing: () => vp.toolManager.activeTool?.name !== 'ping',
+          })
+        );
+        laserCleanupRef.current = () => {
+          for (const cleanup of laserCleanups) cleanup();
+        };
       }
     },
     [location, onSave, mode, campaignCode, dmId]
@@ -481,8 +596,10 @@ export function useDmLocationEditor(
         arrangeSessionRef.current = null;
       }
       autoSaveRef.current?.stop();
+      laserCleanupRef.current?.();
       connectionRef.current?.stop();
       pinUnsubRef.current?.();
+      hiddenPlacementUnsubRef.current?.();
     };
   }, []);
 
@@ -619,6 +736,32 @@ export function useDmLocationEditor(
     getVp,
   ]);
 
+  const handleToggleHiddenPlacement = useCallback(() => {
+    setHiddenPlacementActive(current => {
+      const next = !current;
+      hiddenPlacementActiveRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const handleRevealAll = useCallback(() => {
+    if (mode !== 'battlemap') return;
+    const vp = getVp();
+    if (!vp) return;
+    const hiddenIds = Object.keys(
+      useBattleMapStore.getState().battleMaps[campaignCode]?.[location.id]
+        ?.dmOnlyElements ?? {}
+    );
+    if (hiddenIds.length === 0) return;
+
+    battleMapStoreUpdate(campaignCode, location.id, { dmOnlyElements: {} });
+    // Re-emit surviving elements after clearing their flags. The sync client
+    // stamps them for the player audience and publishes an upsert immediately.
+    for (const id of hiddenIds) {
+      if (vp.store.getById(id)) vp.store.update(id, {});
+    }
+  }, [mode, getVp, campaignCode, location.id, battleMapStoreUpdate]);
+
   const handleDeleteSelected = useCallback(() => {
     const vp = getVp();
     if (!vp) return;
@@ -629,13 +772,7 @@ export function useDmLocationEditor(
       vp.store.getById(id)
     );
     if (ids.length === 0) return;
-    const { historyRecorder } = vp as unknown as ViewportHistoryAccess;
-    historyRecorder.begin();
-    for (const id of ids) {
-      vp.store.remove(id);
-    }
-    historyRecorder.commit();
-    vp.requestRender();
+    vp.removeElements(ids);
     setSelectedElementId(null);
   }, [getVp]);
 
@@ -905,6 +1042,15 @@ export function useDmLocationEditor(
     if (vp) _fitCameraToMap(vp, location.mapImageSize);
   }, [getVp, location.mapImageSize]);
 
+  // Stable across renders; reads the live connection so the layers panel can
+  // broadcast panel edits. Setup mode has no connection — silently local.
+  const publishLayerUpsert = useCallback((definition: Layer) => {
+    connectionRef.current?.publishLayerUpsert(definition);
+  }, []);
+  const publishLayerRemove = useCallback((id: string) => {
+    connectionRef.current?.publishLayerRemove(id);
+  }, []);
+
   return {
     mode,
     canvasRef,
@@ -925,6 +1071,10 @@ export function useDmLocationEditor(
     selectedElementId,
     isDmOnly,
     handleToggleDmOnly,
+    hiddenPlacementActive,
+    handleToggleHiddenPlacement,
+    hiddenElementCount: Object.keys(dmOnlyElements).length,
+    handleRevealAll,
     syncing,
     hasUnsyncedChanges,
     lastSyncedAt,
@@ -946,5 +1096,9 @@ export function useDmLocationEditor(
     handleFitToMap,
     arrangeMapsActive,
     handleToggleArrangeMaps,
+    publishLayerUpsert,
+    publishLayerRemove,
+    measureSharing,
+    handleSetMeasureSharing,
   };
 }

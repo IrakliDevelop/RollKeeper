@@ -114,12 +114,15 @@ export function EncounterView({
     setConditionRounds,
     useAbility: expendAbility,
     restoreAbility,
+    spendEntityResource,
+    restoreEntityResource,
     useLegendaryAction: expendLegendaryAction,
     resetLegendaryActions,
     setConcentration,
     useLairAction: expendLairAction,
     setInitiative,
     longRestEntity,
+    shortRestEntity,
     setPendingInitiativeRequest,
   } = useEncounterStore();
 
@@ -205,6 +208,7 @@ export function EncounterView({
     currentHp: p.characterData?.hitPoints?.current ?? 0,
     maxHp: p.characterData?.hitPoints?.max ?? 0,
     dexterity: p.characterData?.abilities?.dexterity ?? 10,
+    avatarUrl: p.characterData?.avatar,
   }));
 
   // Build player sync timestamp map for freshness indicators
@@ -244,12 +248,15 @@ export function EncounterView({
               setConditionRounds,
               useAbility: expendAbility,
               restoreAbility,
+              spendEntityResource,
+              restoreEntityResource,
               useLegendaryAction: expendLegendaryAction,
               resetLegendaryActions,
               setConcentration,
               useLairAction: expendLairAction,
               setInitiative,
               longRestEntity,
+              shortRestEntity,
             },
             syncPlayerEffects,
             onViewPlayer: playerCharacterId => {

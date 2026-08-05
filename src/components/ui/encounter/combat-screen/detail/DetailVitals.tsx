@@ -196,14 +196,6 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
           Spend Hit Die ({entity.hitDice?.dieType})
         </button>
       )}
-
-      {/* Long rest */}
-      <button
-        onClick={() => actions.onLongRest(entity.id)}
-        className="border-divider text-muted hover:text-body hover:bg-surface-raised w-full rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
-      >
-        Long Rest
-      </button>
     </div>
   );
 }

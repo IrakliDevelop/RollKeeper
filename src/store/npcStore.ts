@@ -8,6 +8,16 @@ import {
   resetNPCSpellcasting,
 } from '@/utils/npcSpellcasting';
 import { detectSpellAoe } from '@/utils/spellAoeDetection';
+import {
+  applyShortRest,
+  applyLongRest,
+  isValidResourceAmount,
+} from '@/utils/npcResources';
+import {
+  ensureStatBlockEntryIds,
+  getEntryAbilityConfig,
+  findEntryById,
+} from '@/utils/statBlockAbilities';
 
 const NPC_STORAGE_KEY = 'rollkeeper-npc-data';
 
@@ -15,6 +25,31 @@ function generateId(): string {
   return (
     'npc-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9)
   );
+}
+
+/**
+ * Ids are a store invariant: any stat block entering the store is normalized,
+ * and abilityUsage is pruned to live entry ids and clamped to current maxima.
+ */
+function normalizeNpcWrite(npc: CampaignNPC): CampaignNPC {
+  if (!npc.monsterStatBlock) {
+    // No stat block → no entries → any remaining usage keys are orphans.
+    return npc.abilityUsage ? { ...npc, abilityUsage: undefined } : npc;
+  }
+  const statBlock = ensureStatBlockEntryIds(npc.monsterStatBlock);
+  let abilityUsage = npc.abilityUsage;
+  if (abilityUsage) {
+    const next: Record<string, number> = {};
+    for (const [entryId, used] of Object.entries(abilityUsage)) {
+      const entry = findEntryById(statBlock, entryId);
+      if (!entry) continue; // orphan — entry deleted
+      const config = getEntryAbilityConfig(entry);
+      if (!config) continue; // no longer trackable
+      next[entryId] = Math.min(Math.max(0, used), config.maxUses);
+    }
+    abilityUsage = next;
+  }
+  return { ...npc, monsterStatBlock: statBlock, abilityUsage };
 }
 
 function arrayMove<T>(arr: T[], fromIndex: number, toIndex: number): T[] {
@@ -75,6 +110,33 @@ interface NPCStoreState {
     spellId: string
   ) => void;
   longRestNPC: (campaignCode: string, npcId: string) => void;
+  /** Atomic all-or-nothing spend; false = insufficient uses or unknown id (no mutation). */
+  spendNpcResource: (
+    campaignCode: string,
+    npcId: string,
+    resourceId: string,
+    amount: number
+  ) => boolean;
+  restoreNpcResource: (
+    campaignCode: string,
+    npcId: string,
+    resourceId: string,
+    amount: number
+  ) => void;
+  /** Restores class resources per their shortRestReset rule. Touches nothing else. */
+  shortRestNPC: (campaignCode: string, npcId: string) => void;
+  /** Atomic ability use: increments abilityUsage AND spends the entry's resourceCost (if any) — or neither. */
+  useNpcAbility: (
+    campaignCode: string,
+    npcId: string,
+    entryId: string
+  ) => boolean;
+  /** Ability counter only — never refunds the resource. */
+  restoreNpcAbility: (
+    campaignCode: string,
+    npcId: string,
+    entryId: string
+  ) => void;
 }
 
 export function migrateNpcPersistedState(
@@ -119,6 +181,17 @@ export function migrateNpcPersistedState(
     }
   }
 
+  if (version < 4) {
+    // Backfill stable entry ids (idempotent, collision-safe, repairs duplicates).
+    for (const npcs of Object.values(state.npcsByCampaign ?? {})) {
+      for (const npc of npcs) {
+        if (npc.monsterStatBlock) {
+          npc.monsterStatBlock = ensureStatBlockEntryIds(npc.monsterStatBlock);
+        }
+      }
+    }
+  }
+
   return state as NPCStoreState;
 }
 
@@ -130,13 +203,13 @@ export const useNPCStore = create<NPCStoreState>()(
       createNPC: (campaignCode, npcData) => {
         const id = generateId();
         const now = new Date().toISOString();
-        const npc: CampaignNPC = {
+        const npc: CampaignNPC = normalizeNpcWrite({
           ...npcData,
           id,
           campaignCode,
           createdAt: now,
           updatedAt: now,
-        };
+        });
         set(state => {
           const existing = state.npcsByCampaign[campaignCode] ?? [];
           return {
@@ -157,7 +230,11 @@ export const useNPCStore = create<NPCStoreState>()(
               ...state.npcsByCampaign,
               [campaignCode]: existing.map(npc =>
                 npc.id === id
-                  ? { ...npc, ...updates, updatedAt: new Date().toISOString() }
+                  ? normalizeNpcWrite({
+                      ...npc,
+                      ...updates,
+                      updatedAt: new Date().toISOString(),
+                    })
                   : npc
               ),
             },
@@ -398,9 +475,204 @@ export const useNPCStore = create<NPCStoreState>()(
                         spellcasting: resetNPCSpellcasting(npc.spellcasting),
                       }
                     : {}),
+                  ...(npc.resources
+                    ? { resources: applyLongRest(npc.resources) }
+                    : {}),
+                  ...(npc.abilityUsage
+                    ? {
+                        abilityUsage: Object.fromEntries(
+                          Object.keys(npc.abilityUsage).map(k => [k, 0])
+                        ),
+                      }
+                    : {}),
                   updatedAt: new Date().toISOString(),
                 };
               }),
+            },
+          };
+        });
+      },
+
+      spendNpcResource: (campaignCode, npcId, resourceId, amount) => {
+        if (!isValidResourceAmount(amount)) return false;
+        const npc = get().getNPC(campaignCode, npcId);
+        const resource = npc?.resources?.find(r => r.id === resourceId);
+        if (!resource) return false;
+        if (resource.maxUses - resource.usesExpended < amount) return false; // no expenditure mutation
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(n =>
+                n.id === npcId
+                  ? {
+                      ...n,
+                      resources: n.resources?.map(r =>
+                        r.id === resourceId
+                          ? { ...r, usesExpended: r.usesExpended + amount }
+                          : r
+                      ),
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : n
+              ),
+            },
+          };
+        });
+        return true;
+      },
+
+      restoreNpcResource: (campaignCode, npcId, resourceId, amount) => {
+        if (!isValidResourceAmount(amount)) return; // negative restore must not raise expenditure
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(n =>
+                n.id === npcId
+                  ? {
+                      ...n,
+                      resources: n.resources?.map(r =>
+                        r.id === resourceId
+                          ? {
+                              ...r,
+                              usesExpended: Math.max(
+                                0,
+                                r.usesExpended - amount
+                              ),
+                            }
+                          : r
+                      ),
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : n
+              ),
+            },
+          };
+        });
+      },
+
+      useNpcAbility: (campaignCode, npcId, entryId) => {
+        const npc = get().getNPC(campaignCode, npcId);
+        if (!npc) return false;
+        const entry = findEntryById(npc.monsterStatBlock, entryId);
+        if (!entry) return false;
+        const config = getEntryAbilityConfig(entry);
+        if (!config) return false; // untrackable → no-op
+        const used = npc.abilityUsage?.[entryId] ?? 0;
+        if (used >= config.maxUses) return false; // at max — no expenditure mutation
+
+        // Atomic combined cost: validate and resolve BEFORE mutating anything.
+        const cost = entry.resourceCost;
+        let nextResources = npc.resources;
+        if (cost) {
+          if (!isValidResourceAmount(cost.amount)) return false; // malformed cost — atomic rejection
+          const resource = npc.resources?.find(r => r.id === cost.resourceId);
+          if (!resource) return false; // missing resource — neither counter moves
+          if (resource.maxUses - resource.usesExpended < cost.amount) {
+            return false; // insufficient — neither counter moves
+          }
+          nextResources = npc.resources!.map(r =>
+            r.id === cost.resourceId
+              ? { ...r, usesExpended: r.usesExpended + cost.amount }
+              : r
+          );
+        }
+
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(n =>
+                n.id === npcId
+                  ? {
+                      ...n,
+                      abilityUsage: {
+                        ...(n.abilityUsage ?? {}),
+                        [entryId]: used + 1,
+                      },
+                      resources: nextResources,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : n
+              ),
+            },
+          };
+        });
+        return true;
+      },
+
+      restoreNpcAbility: (campaignCode, npcId, entryId) => {
+        const npc = get().getNPC(campaignCode, npcId);
+        if (!npc) return;
+        // Unknown/untrackable no-op rule: an orphaned usage key must not be
+        // mutated when the entry was deleted or is no longer trackable.
+        const entry = findEntryById(npc.monsterStatBlock, entryId);
+        if (!entry || !getEntryAbilityConfig(entry)) return;
+        const used = npc.abilityUsage?.[entryId] ?? 0;
+        if (used <= 0) return;
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(n =>
+                n.id === npcId
+                  ? {
+                      ...n,
+                      abilityUsage: {
+                        ...(n.abilityUsage ?? {}),
+                        [entryId]: used - 1,
+                      },
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : n
+              ),
+            },
+          };
+        });
+      },
+
+      shortRestNPC: (campaignCode, npcId) => {
+        set(state => {
+          const existing = state.npcsByCampaign[campaignCode] ?? [];
+          return {
+            npcsByCampaign: {
+              ...state.npcsByCampaign,
+              [campaignCode]: existing.map(n =>
+                n.id === npcId && (n.resources || n.abilityUsage)
+                  ? {
+                      ...n,
+                      ...(n.resources
+                        ? { resources: applyShortRest(n.resources) }
+                        : {}),
+                      ...(n.abilityUsage
+                        ? {
+                            abilityUsage: Object.fromEntries(
+                              Object.entries(n.abilityUsage).map(
+                                ([entryId, used]) => {
+                                  const entry = findEntryById(
+                                    n.monsterStatBlock,
+                                    entryId
+                                  );
+                                  const config = entry
+                                    ? getEntryAbilityConfig(entry)
+                                    : null;
+                                  return config?.restType === 'short'
+                                    ? [entryId, 0]
+                                    : [entryId, used];
+                                }
+                              )
+                            ),
+                          }
+                        : {}),
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : n
+              ),
             },
           };
         });
@@ -409,7 +681,7 @@ export const useNPCStore = create<NPCStoreState>()(
     {
       name: NPC_STORAGE_KEY,
       storage: createJSONStorage(() => createSafeStorage()),
-      version: 3,
+      version: 4,
       migrate: migrateNpcPersistedState,
     }
   )

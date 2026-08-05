@@ -23,6 +23,7 @@ import {
   Languages,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
+import { XpAwardControl } from '@/components/ui/campaign/XpAwardControl';
 import { SectionTitle, ensureArray, formatMod } from './shared';
 import { calculateEncumbrance, EncumbranceInfo } from '@/utils/encumbrance';
 import {
@@ -91,6 +92,11 @@ interface OverviewTabProps {
   customCounterLabel?: string;
   counterValue: number;
   onAdjustCounter?: (delta: number) => void;
+  campaignCode?: string;
+  dmId?: string;
+  playerId?: string;
+  projectedExperience?: number;
+  pendingXpAwardCount?: number;
 }
 
 export function OverviewTab({
@@ -98,6 +104,11 @@ export function OverviewTab({
   customCounterLabel,
   counterValue,
   onAdjustCounter,
+  campaignCode,
+  dmId,
+  playerId,
+  projectedExperience,
+  pendingXpAwardCount,
 }: OverviewTabProps) {
   const currentHp = char.hitPoints?.current ?? 0;
   const maxHp = char.hitPoints?.max ?? 0;
@@ -263,7 +274,7 @@ export function OverviewTab({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* ── Left Column: Skills + Encumbrance ── */}
+        {/* ── Left Column: Skills ── */}
         <div className="space-y-4">
           <div>
             <SectionTitle icon={<Scroll size={14} />}>Skills</SectionTitle>
@@ -316,7 +327,40 @@ export function OverviewTab({
               </div>
             </div>
           </div>
+        </div>
 
+        {/* ── Right Column: Conditions, Defenses, Senses, Attunement ── */}
+        <div className="space-y-4">
+          <ConditionsSection char={char} />
+          <DefensesSection char={char} />
+          <SensesSection char={char} />
+          <LanguagesSection char={char} />
+
+          {attunement && (
+            <div>
+              <SectionTitle icon={<Link2 size={14} />}>Attunement</SectionTitle>
+              <div className="text-body text-sm">
+                {attunement.used} / {attunement.max} slots used
+              </div>
+            </div>
+          )}
+        </div>
+
+        {campaignCode && dmId && playerId && (
+          <div className="bg-surface-secondary rounded-lg p-3 lg:col-span-2">
+            <XpAwardControl
+              campaignCode={campaignCode}
+              dmId={dmId}
+              playerId={playerId}
+              lastSyncedXp={char.experience ?? 0}
+              currentLevel={level}
+              projectedXp={projectedExperience}
+              pendingAwardCount={pendingXpAwardCount}
+            />
+          </div>
+        )}
+
+        <div className="space-y-4">
           {/* Encumbrance */}
           <div>
             <SectionTitle icon={<Weight size={14} />}>Encumbrance</SectionTitle>
@@ -339,23 +383,6 @@ export function OverviewTab({
           </div>
 
           <CurrencySection char={char} />
-        </div>
-
-        {/* ── Right Column: Conditions, Defenses, Senses, Attunement ── */}
-        <div className="space-y-4">
-          <ConditionsSection char={char} />
-          <DefensesSection char={char} />
-          <SensesSection char={char} />
-          <LanguagesSection char={char} />
-
-          {attunement && (
-            <div>
-              <SectionTitle icon={<Link2 size={14} />}>Attunement</SectionTitle>
-              <div className="text-body text-sm">
-                {attunement.used} / {attunement.max} slots used
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

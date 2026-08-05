@@ -29,12 +29,15 @@ function makeActions(): EntityActions {
     onSetConditionRounds: vi.fn(),
     onUseAbility: vi.fn(),
     onRestoreAbility: vi.fn(),
+    onSpendResource: vi.fn(() => true),
+    onRestoreResource: vi.fn(),
     onUseLegendaryAction: vi.fn(),
     onResetLegendaryActions: vi.fn(),
     onSetConcentration: vi.fn(),
     onUseLairAction: vi.fn(),
     onSetInitiative: vi.fn(),
     onLongRest: vi.fn(),
+    onShortRest: vi.fn(),
   };
 }
 
@@ -142,6 +145,20 @@ describe('DetailVitals', () => {
     render(<DetailVitals entity={playerEntity} actions={actions} />);
 
     expect(screen.getByText('synced')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['player', playerEntity],
+    ['NPC', npcEntity],
+  ])('does not offer rest actions for a %s in combat', (_label, entity) => {
+    render(<DetailVitals entity={entity} actions={makeActions()} />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Short Rest' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Long Rest' })
+    ).not.toBeInTheDocument();
   });
 
   it('NPC death-save failure toggle calls onUpdate with incremented failures', async () => {

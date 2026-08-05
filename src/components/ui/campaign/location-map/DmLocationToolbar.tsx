@@ -14,6 +14,7 @@ import {
   Redo2,
   Trash2,
   Eraser,
+  X,
   Download,
   Loader2,
   Check,
@@ -24,6 +25,10 @@ import {
   Move,
   RotateCcw,
   RotateCw,
+  Eye,
+  EyeOff,
+  Zap,
+  MapPin,
 } from 'lucide-react';
 import { useActiveTool, useHistory, useSelectionOps } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
@@ -46,6 +51,9 @@ const BASE_TOOL_DEFS = [
 const BATTLEMAP_TOOL_DEFS = [
   { name: 'measure', icon: Ruler, label: 'Measure' },
   { name: 'template', icon: Sparkles, label: 'Template' },
+  { name: 'eraser', icon: Eraser, label: 'Eraser' },
+  { name: 'laser', icon: Zap, label: 'Laser pointer' },
+  { name: 'ping', icon: MapPin, label: 'Ping (look here)' },
 ] as const;
 
 function formatSyncTime(iso: string): string {
@@ -82,6 +90,10 @@ export default function DmLocationToolbar({
   selectedElementId,
   isDmOnly,
   onToggleDmOnly,
+  hiddenPlacementActive,
+  onToggleHiddenPlacement,
+  hiddenElementCount,
+  onRevealAll,
   mode,
   onOpenTvDisplay,
   syncStatus,
@@ -188,7 +200,7 @@ export default function DmLocationToolbar({
           title="Clear canvas"
           className="text-accent-red-text h-8 w-8 p-0"
         >
-          <Eraser size={15} />
+          <X size={15} />
         </Button>
       </div>
 
@@ -225,6 +237,39 @@ export default function DmLocationToolbar({
 
       {/* Right group */}
       <div className="ml-auto flex items-center gap-1">
+        {mode === 'battlemap' && (
+          <>
+            <Button
+              variant={hiddenPlacementActive ? 'warning' : 'ghost'}
+              onClick={onToggleHiddenPlacement}
+              title={
+                hiddenPlacementActive
+                  ? 'New elements are hidden from players'
+                  : 'New elements are visible to players'
+              }
+              aria-pressed={hiddenPlacementActive}
+              className="flex items-center gap-1.5 px-2 py-1 text-xs"
+            >
+              <EyeOff size={14} />
+              {hiddenPlacementActive ? 'Placing hidden' : 'Place hidden'}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={onRevealAll}
+              disabled={hiddenElementCount === 0}
+              title={
+                hiddenElementCount === 0
+                  ? 'No hidden elements to reveal'
+                  : `Reveal all ${hiddenElementCount} hidden element${hiddenElementCount === 1 ? '' : 's'} to players`
+              }
+              className="flex items-center gap-1.5 px-2 py-1 text-xs"
+            >
+              <Eye size={14} />
+              Reveal all ({hiddenElementCount})
+            </Button>
+          </>
+        )}
+
         {/* DM-only toggle — only shown when a single element is selected */}
         {selectedElementId != null && (
           <DmOnlyToggle isDmOnly={isDmOnly} onToggle={onToggleDmOnly} />

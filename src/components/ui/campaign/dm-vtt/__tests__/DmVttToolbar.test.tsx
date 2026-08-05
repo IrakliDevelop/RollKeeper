@@ -1,25 +1,89 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 
 import { DmVttToolbar } from '@/components/ui/campaign/dm-vtt/DmVttToolbar';
 
 vi.mock('@fieldnotes/react', () => ({
   useActiveTool: () => ['select', vi.fn()] as const,
+  useToolOptions: () => [undefined, vi.fn()] as const,
 }));
 
 describe('DmVttToolbar', () => {
   afterEach(() => cleanup());
 
-  it('shares the top dock on wide screens and stacks below it when narrow', () => {
+  it('offers a real eraser tool separately from clearing drawings', () => {
+    render(
+      <DmVttToolbar
+        onClearDrawings={vi.fn()}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive={false}
+        onToggleHiddenPlacement={vi.fn()}
+        hiddenElementCount={0}
+        onRevealAll={vi.fn()}
+        selectedElementId={null}
+        selectedElementIsDmOnly={false}
+        onToggleSelectedDmOnly={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Eraser' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Clear drawings' })
+    ).toBeInTheDocument();
+  });
+
+  it('uses one wrapping command dock instead of an independently positioned tool strip', () => {
     const { container } = render(
       <DmVttToolbar
         onClearDrawings={vi.fn()}
         tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive={false}
+        onToggleHiddenPlacement={vi.fn()}
+        hiddenElementCount={0}
+        onRevealAll={vi.fn()}
+        selectedElementId={null}
+        selectedElementIsDmOnly={false}
+        onToggleSelectedDmOnly={vi.fn()}
       />
     );
-    const toolbar = container.firstChild as HTMLElement;
-    const classes = toolbar.className.split(/\s+/);
-    expect(classes).toContain('top-14');
-    expect(classes).toContain('xl:top-1');
+    const dock = container.firstChild as HTMLElement;
+    expect(dock).toHaveAttribute('data-testid', 'dm-vtt-command-dock');
+    expect(dock.className).toContain('flex-col');
+    expect(dock.className).toContain('w-fit');
+    expect(dock.className).toContain('max-w-[calc(100%-2rem)]');
+    expect(dock.className).not.toContain('overflow-x-auto');
+    expect(dock.querySelector('.flex-wrap')).toBeInTheDocument();
+  });
+
+  it('toggles hidden placement and offers reveal all', () => {
+    const onToggle = vi.fn();
+    const onRevealAll = vi.fn();
+    render(
+      <DmVttToolbar
+        onClearDrawings={vi.fn()}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive
+        onToggleHiddenPlacement={onToggle}
+        hiddenElementCount={2}
+        onRevealAll={onRevealAll}
+        selectedElementId="trap-1"
+        selectedElementIsDmOnly
+        onToggleSelectedDmOnly={vi.fn()}
+      />
+    );
+
+    const placement = screen.getByRole('button', {
+      name: 'Place hidden elements',
+    });
+    expect(placement).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(placement);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Reveal all hidden elements (2)' })
+    );
+    expect(onToggle).toHaveBeenCalledOnce();
+    expect(onRevealAll).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole('button', { name: 'Reveal selected element' })
+    ).toBeInTheDocument();
   });
 });

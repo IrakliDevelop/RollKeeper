@@ -2,7 +2,10 @@
 
 import { useCallback, useRef, useState } from 'react';
 
-import { dispositionColor } from './combatantToken';
+import {
+  dispositionColor,
+  prepareCombatantTokenAvatar,
+} from './combatantToken';
 import { selectedEntityId as resolveSelectedEntity } from './useCombatantTokens';
 
 import type { Viewport } from '@fieldnotes/core';
@@ -60,18 +63,22 @@ export function useDmVttPlacementAndSelection({
         });
         return;
       }
-      const config: DmTokenConfig = {
-        entityId: entity.id,
-        name: entity.name,
-        avatarUrl: entity.avatarUrl,
-        color: entity.color ?? dispositionColor(entity),
-        tokenSize: entity.tokenSize,
-        onPlaced: () => {
-          setPendingPlacement(null); // SYNCHRONOUS — see comment above.
-          selectEntity(entity.id);
-        },
+      const arm = (avatarUrl?: string) => {
+        const config: DmTokenConfig = {
+          entityId: entity.id,
+          name: entity.name,
+          avatarUrl,
+          color: entity.color ?? dispositionColor(entity),
+          tokenSize: entity.tokenSize,
+          onPlaced: () => {
+            setPendingPlacement(null); // SYNCHRONOUS — see comment above.
+            selectEntity(entity.id);
+          },
+        };
+        setPendingPlacement({ entityName: entity.name, config });
       };
-      setPendingPlacement({ entityName: entity.name, config });
+      if (entity.avatarUrl) void prepareCombatantTokenAvatar(entity).then(arm);
+      else arm();
     },
     [status, addToast, selectEntity]
   );

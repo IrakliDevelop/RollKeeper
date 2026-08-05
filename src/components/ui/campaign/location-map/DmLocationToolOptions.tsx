@@ -3,8 +3,11 @@
 import type { ShapeKind } from '@fieldnotes/core';
 import type {
   ArrowToolOptions,
+  LaserToolOptions,
   MeasureToolOptions,
   NoteToolOptions,
+  PencilToolOptions,
+  PingToolOptions,
   ShapeToolOptions,
   TemplateRenderStyle,
   TemplateShape,
@@ -12,6 +15,7 @@ import type {
   TextToolOptions,
 } from '@fieldnotes/core';
 import { useActiveTool, useToolOptions } from '@fieldnotes/react';
+import { Switch } from '@/components/ui/forms/switch';
 import type { EditorMode } from './DmLocationEditor.types';
 
 const COLOR_SWATCHES = [
@@ -53,14 +57,24 @@ const TEMPLATE_RENDER_STYLES: {
   },
 ];
 
+export interface MeasureSharingControl {
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+}
+
 interface DmLocationToolOptionsProps {
   mode?: EditorMode;
+  measureSharing?: MeasureSharingControl;
 }
 
 export default function DmLocationToolOptions({
   mode = 'location',
+  measureSharing,
 }: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
+  const [pencilOpts, setPencilOpts] = useToolOptions<
+    PencilToolOptions & Record<string, unknown>
+  >('pencil');
   const [arrowOpts, setArrowOpts] = useToolOptions<
     ArrowToolOptions & Record<string, unknown>
   >('arrow');
@@ -79,14 +93,24 @@ export default function DmLocationToolOptions({
   const [templateOpts, setTemplateOpts] = useToolOptions<
     TemplateToolOptions & Record<string, unknown>
   >('template');
+  const [laserOpts, setLaserOpts] = useToolOptions<
+    LaserToolOptions & Record<string, unknown>
+  >('laser');
+  const [pingOpts, setPingOpts] = useToolOptions<
+    PingToolOptions & Record<string, unknown>
+  >('ping');
 
   const showOptionsBar =
+    (activeTool === 'pencil' && pencilOpts !== undefined) ||
     activeTool === 'arrow' ||
     activeTool === 'note' ||
     activeTool === 'text' ||
     activeTool === 'shape' ||
     (mode === 'battlemap' &&
-      (activeTool === 'measure' || activeTool === 'template'));
+      (activeTool === 'measure' ||
+        activeTool === 'template' ||
+        (activeTool === 'laser' && laserOpts !== undefined) ||
+        (activeTool === 'ping' && pingOpts !== undefined)));
 
   if (!showOptionsBar) return null;
 
@@ -99,16 +123,28 @@ export default function DmLocationToolOptions({
         ? textOpts?.color
         : activeTool === 'note'
           ? noteOpts?.backgroundColor
-          : activeTool === 'arrow'
-            ? arrowOpts?.color
-            : '#334155';
+          : activeTool === 'laser'
+            ? laserOpts?.color
+            : activeTool === 'ping'
+              ? pingOpts?.color
+              : activeTool === 'arrow'
+                ? arrowOpts?.color
+                : activeTool === 'pencil'
+                  ? pencilOpts?.color
+                  : activeTool === 'measure'
+                    ? measureOpts?.color
+                    : '#334155';
 
   const handleColorChange = (color: string) => {
     if (activeTool === 'shape') setShapeOpts({ strokeColor: color });
     else if (activeTool === 'text') setTextOpts({ color });
     else if (activeTool === 'note') setNoteOpts({ backgroundColor: color });
     else if (activeTool === 'arrow') setArrowOpts({ color });
+    else if (activeTool === 'pencil') setPencilOpts({ color });
     else if (activeTool === 'template') setTemplateOpts({ strokeColor: color });
+    else if (activeTool === 'laser') setLaserOpts({ color });
+    else if (activeTool === 'ping') setPingOpts({ color });
+    else if (activeTool === 'measure') setMeasureOpts({ color });
   };
 
   return (
@@ -176,6 +212,23 @@ export default function DmLocationToolOptions({
           </div>
         </label>
       </div>
+
+      {activeTool === 'pencil' && pencilOpts && (
+        <>
+          <div className="bg-divider h-6 w-px" />
+          <span className="text-muted text-xs font-medium">Width</span>
+          <input
+            type="range"
+            min={1}
+            max={12}
+            step={0.5}
+            value={pencilOpts.width ?? 2}
+            onChange={e => setPencilOpts({ width: Number(e.target.value) })}
+            className="w-20"
+          />
+          <span className="text-muted text-xs">{pencilOpts.width ?? 2}px</span>
+        </>
+      )}
 
       {activeTool === 'note' && noteOpts && (
         <>
@@ -305,6 +358,19 @@ export default function DmLocationToolOptions({
           <span className="text-muted w-8 text-xs">
             {measureOpts.feetPerCell ?? 5}
           </span>
+          {measureSharing && (
+            <>
+              <div className="bg-divider h-6 w-px" />
+              <label className="text-muted flex items-center gap-2 text-xs font-medium">
+                Share with players
+                <Switch
+                  checked={measureSharing.enabled}
+                  onCheckedChange={measureSharing.onChange}
+                  aria-label="Share with players"
+                />
+              </label>
+            </>
+          )}
         </>
       )}
 

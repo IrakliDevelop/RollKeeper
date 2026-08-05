@@ -16,7 +16,7 @@ const mockMint = vi.mocked(mintBattleMapToken);
 
 const pokeEnvelope = (feature: string): string =>
   JSON.stringify({
-    from: '@poke',
+    from: 'hub',
     op: { kind: 'presence', data: { kind: 'poke', feature } },
   });
 

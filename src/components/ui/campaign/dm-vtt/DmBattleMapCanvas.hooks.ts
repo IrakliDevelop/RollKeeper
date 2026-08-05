@@ -5,6 +5,12 @@ import {
   ArrowTool,
   MeasureTool,
   TemplateTool,
+  NoteTool,
+  TextTool,
+  ShapeTool,
+  EraserTool,
+  LaserTool,
+  PingTool,
   AutoSave,
   type Tool,
   type Viewport,
@@ -22,9 +28,26 @@ import {
 } from '@/components/ui/campaign/dm-vtt/combatantToken';
 import {
   migrateCanvasToContract,
-  attachUnknownLayerMirror,
   subscribePinCanonicalLayers,
 } from '@/components/ui/campaign/location-map/layerContract';
+import {
+  makeApplyRemoteLayer,
+  publishOwnedLayers,
+} from '@/components/ui/campaign/location-map/layerSync';
+import {
+  attachLaserBroadcast,
+  attachRemoteLaserTrails,
+} from '@/components/ui/campaign/location-map/laserSync';
+import {
+  attachPingBroadcast,
+  attachPingInput,
+  attachRemotePings,
+} from '@/components/ui/campaign/location-map/pingSync';
+import {
+  attachMeasureBroadcast,
+  attachRemoteMeasurements,
+  type MeasureBroadcastHandle,
+} from '@/components/ui/campaign/location-map/measureSync';
 
 import type { TokenInfoMode } from '@/components/ui/campaign/token-overlay';
 
@@ -32,6 +55,8 @@ export interface DmBattleMapCanvasProps {
   campaignCode: string;
   battleMapId: string;
   dmId: string;
+  /** Map/session controls rendered as the command dock's first row. */
+  sessionControls?: React.ReactNode;
   /** Chrome rendered inside the ViewportContext.Provider. */
   children?: React.ReactNode;
   onStatus?: (status: BattleMapConnectionStatus) => void;
@@ -45,11 +70,6 @@ export interface DmBattleMapCanvasProps {
   tokenInfoToggle: { mode: TokenInfoMode | null; onCycle: () => void };
 }
 
-/** Viewport exposes historyRecorder at runtime for batched store ops. */
-type ViewportHistoryAccess = {
-  historyRecorder: { begin: () => void; commit: () => void };
-};
-
 const DRAWING_TYPES = new Set(['stroke', 'arrow', 'template']);
 
 export interface DmBattleMapCanvasState {
@@ -58,6 +78,15 @@ export interface DmBattleMapCanvasState {
   tools: Tool[];
   handleReady: (vp: Viewport) => void;
   handleClearDrawings: () => void;
+  hiddenPlacementActive: boolean;
+  handleToggleHiddenPlacement: () => void;
+  hiddenElementCount: number;
+  handleRevealAll: () => void;
+  selectedElementId: string | null;
+  selectedElementIsDmOnly: boolean;
+  handleToggleSelectedDmOnly: () => void;
+  measureSharing: boolean;
+  handleSetMeasureSharing: (enabled: boolean) => void;
 }
 
 /**
@@ -81,7 +110,37 @@ export function useDmBattleMapCanvas({
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const autoSaveRef = useRef<AutoSave | null>(null);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
+  const laserCleanupRef = useRef<(() => void) | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
+  const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
+  const [hiddenPlacementActive, setHiddenPlacementActive] = useState(false);
+  const hiddenPlacementActiveRef = useRef(false);
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(
+    null
+  );
+  const [measureSharing, setMeasureSharing] = useState(false);
+  const measureSharingRef = useRef(false);
+  const measureBroadcastRef = useRef<MeasureBroadcastHandle | null>(null);
+
+  const handleSetMeasureSharing = useCallback((enabled: boolean) => {
+    measureSharingRef.current = enabled;
+    setMeasureSharing(enabled);
+    measureBroadcastRef.current?.setSharing(enabled);
+  }, []);
+
+  const hiddenElementCount = useBattleMapStore(
+    state =>
+      Object.keys(
+        state.battleMaps[campaignCode]?.[battleMapId]?.dmOnlyElements ?? {}
+      ).length
+  );
+  const selectedElementIsDmOnly = useBattleMapStore(state =>
+    selectedElementId
+      ? (state.battleMaps[campaignCode]?.[battleMapId]?.dmOnlyElements[
+          selectedElementId
+        ] ?? false)
+      : false
+  );
   // The connection is created once inside the fire-once `handleReady`
   // callback; a plain closure over `onPoke` would go stale if the prop's
   // identity changes later (e.g. encounterId change) after the connection
@@ -96,12 +155,27 @@ export function useDmBattleMapCanvas({
       selectTool,
       new PencilTool({ color: '#F4C430', width: 2.6 }),
       new ArrowTool({ color: '#F4C430', width: 2 }),
+      new ShapeTool({
+        shape: 'rectangle',
+        strokeColor: '#F4C430',
+        strokeWidth: 2,
+        fillColor: 'transparent',
+      }),
+      new TextTool(),
+      new NoteTool(),
       new MeasureTool({ feetPerCell: 5 }),
       new TemplateTool({
         templateShape: 'circle',
         feetPerCell: 5,
         renderStyle: 'geometric',
       }),
+      new EraserTool({ radius: 12, mode: 'stroke' }),
+      // Ephemeral pointer in the DM accent color; trails broadcast as
+      // presence when the room connection is up (see attachLaserBroadcast).
+      new LaserTool({ color: '#F4C430', width: 3 }),
+      // Ephemeral "look here" pulse; taps broadcast as presence when the
+      // room connection is up (see attachPingBroadcast).
+      new PingTool({ color: '#F4C430' }),
       new DmTokenTool(tokenConfigRef),
     ];
   }, [tokenConfigRef]);
@@ -158,11 +232,21 @@ export function useDmBattleMapCanvas({
       vp.store.on('remove', saveOnLocalOps);
       vp.store.on('update', saveOnLocalOps);
 
-      // Mirror unknown remote layers (player tokens) into the player band —
-      // without this they sort at layer order 0, under DM-added images.
-      // Covers both new elements (add) and relay snapshot reconcile
-      // re-applying remote elements as full updates (including layerId).
-      attachUnknownLayerMirror(vp, 'dm', () => vp.requestRender());
+      // Attach before live sync so a local addition is marked private before
+      // the sync client resolves the audience for its first outbound upsert.
+      hiddenPlacementUnsubRef.current?.();
+      hiddenPlacementUnsubRef.current = vp.store.on('add', (element, meta) => {
+        if (
+          !hiddenPlacementActiveRef.current ||
+          (meta?.origin !== undefined && meta.origin !== 'local')
+        ) {
+          return;
+        }
+        useBattleMapStore
+          .getState()
+          .setDmOnly(campaignCode, battleMapId, element.id, true);
+      });
+
       pinUnsubRef.current?.();
       // Play canvas never arranges maps — the annotations layer (DM tokens,
       // notes, text) must stay unlocked, repairing any state persisted locked
@@ -173,6 +257,9 @@ export function useDmBattleMapCanvas({
 
       const selectTool = vp.toolManager.getTool<SelectTool>('select');
       selectTool?.onSelectionChange(() => {
+        setSelectedElementId(
+          selectTool.selectedIds.length === 1 ? selectTool.selectedIds[0] : null
+        );
         onSelectionChange?.(selectTool.selectedIds);
       });
 
@@ -181,7 +268,7 @@ export function useDmBattleMapCanvas({
       const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
       if (relayUrl) {
         connectionRef.current?.stop();
-        connectionRef.current = createManagedBattleMapConnection({
+        const connection = createManagedBattleMapConnection({
           relayUrl,
           campaignCode,
           battleMapId,
@@ -194,12 +281,75 @@ export function useDmBattleMapCanvas({
               ?.dmOnlyElements[el.id]
               ? 'dm'
               : undefined,
+          // Layer definitions sync (replaces the unknown-layer mirror):
+          // winning remote records apply through history-transparent *Direct
+          // calls; the pin subscription above re-pins bands on every change.
+          layers: {
+            applyLayer: makeApplyRemoteLayer(vp, 'dm', {
+              onApplied: () => vp.requestRender(),
+            }),
+          },
           onStatus: s => {
             setStatus(s);
             onStatusProp?.(s);
           },
           onPoke: feature => onPokeRef.current?.(feature),
         });
+        connectionRef.current = connection;
+        // Teach peers and late joiners the custom layers persisted in this
+        // canvas (created before layer sync, or on another device). Ledger
+        // buffers until the first snapshot if the socket is still connecting.
+        publishOwnedLayers(vp, 'dm', def => connection.publishLayerUpsert(def));
+
+        // Laser pointer + map pings: broadcast this DM's, render everyone
+        // else's.
+        laserCleanupRef.current?.();
+        const remotePings = attachRemotePings(vp, connection);
+        const remoteMeasures = attachRemoteMeasurements(vp, connection);
+        const laserCleanups = [
+          attachRemoteLaserTrails(vp, connection),
+          remotePings.dispose,
+          remoteMeasures.dispose,
+        ];
+        const laserTool = vp.toolManager.getTool<LaserTool>('laser');
+        if (laserTool) {
+          laserCleanups.push(attachLaserBroadcast(laserTool, connection));
+        }
+        const pingTool = vp.toolManager.getTool<PingTool>('ping');
+        if (pingTool) {
+          laserCleanups.push(attachPingBroadcast(pingTool, connection));
+        }
+        const measureTool = vp.toolManager.getTool<MeasureTool>('measure');
+        if (measureTool) {
+          const measureBroadcast = attachMeasureBroadcast(
+            measureTool,
+            connection
+          );
+          // Reattachment (viewport/connection rebuild) must not silently
+          // revert to private while the toggle still says shared — apply the
+          // latest value now.
+          measureBroadcast.setSharing(measureSharingRef.current);
+          measureBroadcastRef.current = measureBroadcast;
+          laserCleanups.push(() => {
+            measureBroadcastRef.current = null;
+            measureBroadcast.dispose();
+          });
+        }
+        // Always-available DM pings: long-press with any tool + "P" at the
+        // cursor, self-pulse through the shared receive overlay. The veto
+        // skips the ping tool, whose own tap already pinged on pointer down.
+        laserCleanups.push(
+          attachPingInput(vp, remotePings.overlay, connection, {
+            color: '#F4C430',
+            // Options-bar swatch changes restyle long-press/hotkey pings too.
+            ...(pingTool ? { followTool: pingTool } : {}),
+            hotkey: 'p',
+            shouldPing: () => vp.toolManager.activeTool?.name !== 'ping',
+          })
+        );
+        laserCleanupRef.current = () => {
+          for (const cleanup of laserCleanups) cleanup();
+        };
       }
 
       onViewportReady?.(vp);
@@ -217,6 +367,7 @@ export function useDmBattleMapCanvas({
   useEffect(() => {
     return () => {
       autoSaveRef.current?.stop();
+      laserCleanupRef.current?.();
       connectionRef.current?.stop();
       pinUnsubRef.current?.();
     };
@@ -232,14 +383,56 @@ export function useDmBattleMapCanvas({
     if (!window.confirm('Clear all drawings (pencil, arrows, templates)?')) {
       return;
     }
-    const { historyRecorder } = viewport as unknown as ViewportHistoryAccess;
-    historyRecorder.begin();
-    for (const id of ids) {
-      viewport.store.remove(id);
-    }
-    historyRecorder.commit();
-    viewport.requestRender();
+    viewport.removeElements(ids);
   }, [viewport]);
 
-  return { viewport, status, tools, handleReady, handleClearDrawings };
+  const handleToggleHiddenPlacement = useCallback(() => {
+    setHiddenPlacementActive(current => {
+      const next = !current;
+      hiddenPlacementActiveRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const handleRevealAll = useCallback(() => {
+    if (!viewport) return;
+    const hiddenIds = Object.keys(
+      useBattleMapStore.getState().battleMaps[campaignCode]?.[battleMapId]
+        ?.dmOnlyElements ?? {}
+    );
+    if (hiddenIds.length === 0) return;
+    useBattleMapStore
+      .getState()
+      .updateBattleMap(campaignCode, battleMapId, { dmOnlyElements: {} });
+    for (const id of hiddenIds) {
+      if (viewport.store.getById(id)) viewport.store.update(id, {});
+    }
+  }, [viewport, campaignCode, battleMapId]);
+
+  const handleToggleSelectedDmOnly = useCallback(() => {
+    if (!viewport || !selectedElementId) return;
+    useBattleMapStore
+      .getState()
+      .toggleDmOnly(campaignCode, battleMapId, selectedElementId);
+    if (viewport.store.getById(selectedElementId)) {
+      viewport.store.update(selectedElementId, {});
+    }
+  }, [viewport, selectedElementId, campaignCode, battleMapId]);
+
+  return {
+    viewport,
+    status,
+    tools,
+    handleReady,
+    handleClearDrawings,
+    hiddenPlacementActive,
+    handleToggleHiddenPlacement,
+    hiddenElementCount,
+    handleRevealAll,
+    selectedElementId,
+    selectedElementIsDmOnly,
+    handleToggleSelectedDmOnly,
+    measureSharing,
+    handleSetMeasureSharing,
+  };
 }

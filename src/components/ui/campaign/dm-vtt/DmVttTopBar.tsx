@@ -35,7 +35,7 @@ const MODE_OPTIONS: { key: DmVttMode; label: string }[] = [
 ];
 
 /**
- * Top chrome bar for the DM VTT play screen: back link, map name, grid
+ * Session-controls row for the DM VTT command dock: back link, map name, grid
  * segmented control (mirrors `useDmVttGrid`'s `setGridMode`), TV display
  * launcher (Task 1's `openTvDisplay` helper), a live-status chip (the
  * chip's single home — the Play toolbar no longer duplicates it), and the
@@ -53,13 +53,13 @@ export function DmVttTopBar({
   onModeChange,
 }: DmVttTopBarProps) {
   return (
-    <div className="bg-surface-raised/95 border-divider pointer-events-auto fixed inset-x-0 top-0 flex h-14 items-center gap-3 border-b px-3 shadow-xl backdrop-blur-sm">
+    <div className="flex min-h-[44px] min-w-0 items-center justify-center gap-2 px-2 py-1 sm:gap-3 sm:px-3">
       <Link href={`/dm/campaign/${campaignCode}/battlemaps`}>
         <Button variant="ghost" size="lg" aria-label="Back to battle maps">
           <ArrowLeft size={18} />
         </Button>
       </Link>
-      <span className="text-heading hidden max-w-[140px] truncate text-sm font-semibold sm:block">
+      <span className="text-heading min-w-0 flex-1 truncate text-sm font-semibold sm:max-w-[160px] sm:flex-none">
         {mapName}
       </span>
       <div className="border-divider flex items-center gap-0.5 rounded-lg border p-0.5">
@@ -68,7 +68,7 @@ export function DmVttTopBar({
             key={key}
             variant={gridMode === key ? 'primary' : 'ghost'}
             onClick={() => onSetGridMode(key)}
-            className="min-h-[40px] px-2 text-xs"
+            className="min-h-[44px] px-2 text-xs"
           >
             {label}
           </Button>
@@ -79,12 +79,13 @@ export function DmVttTopBar({
         size="lg"
         leftIcon={<Monitor size={16} />}
         onClick={() => openTvDisplay(campaignCode, battleMapId, dmId)}
-        className="ml-auto hidden text-xs md:flex"
+        className="min-h-[44px] min-w-[44px] px-2 text-xs lg:px-3"
+        aria-label="Open display"
       >
-        Open Display
+        <span className="hidden lg:inline">Open Display</span>
       </Button>
       <span
-        className={`rounded-full px-2 py-0.5 text-xs ${
+        className={`h-2.5 w-2.5 shrink-0 rounded-full sm:h-auto sm:w-auto sm:px-2 sm:py-0.5 sm:text-xs ${
           status === 'live'
             ? 'bg-accent-emerald-bg text-accent-emerald-text'
             : status === 'denied'
@@ -92,11 +93,13 @@ export function DmVttTopBar({
               : 'bg-accent-amber-bg text-accent-amber-text'
         }`}
       >
-        {status === 'live'
-          ? 'Live'
-          : status === 'denied'
-            ? 'Access denied'
-            : 'Connecting…'}
+        <span className="sr-only sm:not-sr-only">
+          {status === 'live'
+            ? 'Live'
+            : status === 'denied'
+              ? 'Access denied'
+              : 'Connecting…'}
+        </span>
       </span>
       <div className="border-divider flex items-center gap-0.5 rounded-lg border p-0.5">
         {MODE_OPTIONS.map(({ key, label }) => (
@@ -104,7 +107,7 @@ export function DmVttTopBar({
             key={key}
             variant={mode === key ? 'primary' : 'ghost'}
             onClick={() => onModeChange(key)}
-            className="min-h-[40px] px-2 text-xs"
+            className="min-h-[44px] px-2 text-xs"
           >
             {label}
           </Button>

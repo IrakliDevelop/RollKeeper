@@ -52,6 +52,21 @@ export interface ItemTransfer {
   sentAt: string; // ISO timestamp
 }
 
+// DM-granted XP award queued for a player (applied idempotently by id)
+export interface DmXpAward {
+  id: string; // crypto.randomUUID() on the DM client
+  mode: 'add' | 'set';
+  amount: number; // finite integer; add >= 1, set >= 0
+  awardedAt: string; // ISO timestamp
+}
+
+// Queue entry returned by GET: award plus the exact stored Redis-list string,
+// echoed back verbatim on DELETE so the server can LREM the precise entry.
+export interface DmXpAwardEnvelope {
+  award: DmXpAward;
+  receipt: string;
+}
+
 // DM custom counter synced per-player (e.g. "Desperation Points")
 export interface SharedCustomCounter {
   label: string;
@@ -155,6 +170,7 @@ export interface SharedCampaignState {
   battleMap: SharedBattleMapState | null;
   initiativeRequest: InitiativeRollRequest | null;
   settings: { stackableInspiration: boolean } | null;
+  xpAwards: DmXpAwardEnvelope[];
 }
 
 // POST body for DM pushing shared state

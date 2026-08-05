@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   ElementStore,
   LayerManager,
@@ -15,11 +15,10 @@ import {
   ensureCanonicalLayers,
   pinCanonicalLayers,
   subscribePinCanonicalLayers,
-  mirrorUnknownLayer,
-  attachUnknownLayerMirror,
   migrateCanvasToContract,
   type ViewportLike,
 } from '@/components/ui/campaign/location-map/layerContract';
+import { makeApplyRemoteLayer } from '@/components/ui/campaign/location-map/layerSync';
 
 function makeVp(): ViewportLike {
   const store = new ElementStore();
@@ -204,80 +203,6 @@ describe('subscribePinCanonicalLayers', () => {
   });
 });
 
-describe('mirrorUnknownLayer', () => {
-  it('puts player-* ids in the player band, locked for role player', () => {
-    const vp = makeCleanVp('player');
-    mirrorUnknownLayer(vp, 'player-remote', 'player');
-    expect(layer(vp, 'player-remote').order).toBe(PLAYER_BAND_ORDER);
-    expect(layer(vp, 'player-remote').locked).toBe(true);
-  });
-
-  it('is unlocked for role dm and no-ops on a known layer', () => {
-    const vp = makeCleanVp();
-    mirrorUnknownLayer(vp, 'player-remote', 'dm');
-    expect(layer(vp, 'player-remote').locked).toBe(false);
-    const before = layer(vp, 'player-remote');
-    mirrorUnknownLayer(vp, 'player-remote', 'dm');
-    expect(layer(vp, 'player-remote')).toEqual(before);
-  });
-
-  it('puts non-player unknown ids in the custom band', () => {
-    const vp = makeCleanVp();
-    mirrorUnknownLayer(vp, 'layer-oldclient', 'dm');
-    expect(layer(vp, 'layer-oldclient').order).toBe(CUSTOM_BAND_ORDER);
-  });
-});
-
-describe('attachUnknownLayerMirror', () => {
-  it('mirrors an unknown layerId on add', () => {
-    const vp = makeCleanVp();
-    const onMirrored = vi.fn();
-    attachUnknownLayerMirror(vp, 'dm', onMirrored);
-    addImageOn(vp, 'player-remote');
-    expect(vp.layerManager.getLayer('player-remote')).toBeDefined();
-    expect(onMirrored).toHaveBeenCalledTimes(1);
-  });
-
-  it('mirrors an unknown layerId when an existing element is moved via update (relay snapshot reconcile regression)', () => {
-    // Regression for C1: relay snapshot reconcile re-applies remote elements
-    // via store.update(id, el) — a full replace including layerId — not
-    // store.add. An add-only mirror misses this and the element ends up
-    // referencing a layer this canvas no longer has.
-    const vp = makeCleanVp();
-    const elId = addImageOn(vp, ANNOTATIONS_LAYER_ID);
-    const onMirrored = vi.fn();
-    attachUnknownLayerMirror(vp, 'dm', onMirrored);
-    vp.store.update(elId, { layerId: 'player-ghost' });
-    expect(vp.layerManager.getLayer('player-ghost')).toBeDefined();
-    expect(layer(vp, 'player-ghost').order).toBe(PLAYER_BAND_ORDER);
-    expect(onMirrored).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not create a layer when an update targets a known layer', () => {
-    const vp = makeCleanVp();
-    const elId = addImageOn(vp, ANNOTATIONS_LAYER_ID);
-    const before = vp.layerManager.getLayers().length;
-    const onMirrored = vi.fn();
-    attachUnknownLayerMirror(vp, 'dm', onMirrored);
-    vp.store.update(elId, { zIndex: 5 });
-    expect(vp.layerManager.getLayers().length).toBe(before);
-    expect(onMirrored).not.toHaveBeenCalled();
-  });
-
-  it('unsubscribe stops both the add and update mirror paths', () => {
-    const vp = makeCleanVp();
-    const elId = addImageOn(vp, ANNOTATIONS_LAYER_ID);
-    const unsubscribe = attachUnknownLayerMirror(vp, 'dm');
-    unsubscribe();
-    addImageOn(vp, 'player-after-unsub-add');
-    vp.store.update(elId, { layerId: 'player-after-unsub-update' });
-    expect(vp.layerManager.getLayer('player-after-unsub-add')).toBeUndefined();
-    expect(
-      vp.layerManager.getLayer('player-after-unsub-update')
-    ).toBeUndefined();
-  });
-});
-
 describe('migrateCanvasToContract', () => {
   function legacyVp(): { vp: ViewportLike; bgId: string; annId: string } {
     const vp = makeVp();
@@ -414,8 +339,27 @@ describe('bug regression: DM-added image vs player token', () => {
     const vp = makeVp();
     ensureCanonicalLayers(vp, 'dm');
     const imageId = addImageOn(vp, ANNOTATIONS_LAYER_ID, 0);
-    // Remote token arrives referencing a layer this canvas has never seen.
-    mirrorUnknownLayer(vp, 'player-char1', 'dm');
+    // The player layer definition now arrives over layer sync before the
+    // token that references it (snapshots apply layers first).
+    makeApplyRemoteLayer(
+      vp,
+      'dm'
+    )({
+      source: 'op',
+      record: {
+        id: 'player-char1',
+        version: 1,
+        editor: 'char1',
+        definition: {
+          id: 'player-char1',
+          name: 'My elements',
+          visible: true,
+          locked: false,
+          order: PLAYER_BAND_ORDER,
+          opacity: 1,
+        },
+      },
+    });
     const tokenId = addImageOn(vp, 'player-char1', 1000);
     const order = vp.store.getAll().map(el => el.id);
     expect(order.indexOf(tokenId)).toBeGreaterThan(order.indexOf(imageId));

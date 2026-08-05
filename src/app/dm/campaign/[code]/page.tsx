@@ -25,6 +25,7 @@ import {
   ChevronDown,
   ChevronRight,
   ScrollText,
+  TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Switch } from '@/components/ui/forms/switch';
@@ -39,6 +40,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { PlayerSummaryCard } from '@/components/ui/campaign/PlayerSummaryCard';
 import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
 import { SendMessageDialog } from '@/components/ui/campaign/SendMessageDialog';
+import { AwardXpDialog } from '@/components/ui/campaign/AwardXpDialog';
 import { NPCSection } from '@/components/ui/campaign/NPCSection';
 import { useCampaignSync } from '@/hooks/useCampaignSync';
 import { useDmCounterSync } from '@/hooks/useDmCounterSync';
@@ -104,6 +106,10 @@ export default function CampaignViewPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPlayer, setSelectedPlayer] =
     useState<CampaignPlayerData | null>(null);
+  const currentSelectedPlayer = selectedPlayer
+    ? (players.find(player => player.playerId === selectedPlayer.playerId) ??
+      selectedPlayer)
+    : null;
   const [editingCounterLabel, setEditingCounterLabel] = useState(false);
   const [counterLabelInput, setCounterLabelInput] = useState('');
   const [messageTarget, setMessageTarget] = useState<
@@ -122,6 +128,7 @@ export default function CampaignViewPage() {
   );
   const [npcSendDialogOpen, setNpcSendDialogOpen] = useState(false);
   const [isNpcSendingItem, setIsNpcSendingItem] = useState(false);
+  const [awardXpOpen, setAwardXpOpen] = useState(false);
 
   const playersSectionOpen =
     localCampaign?.dmDashboardUi?.playersSectionOpen ?? true;
@@ -451,6 +458,74 @@ export default function CampaignViewPage() {
       </div>
 
       <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+        {/* House Rules */}
+        {!loading && !error && (
+          <div>
+            <div className="mb-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setDmDashboardUi(code, {
+                    houseRulesSectionOpen: !houseRulesSectionOpen,
+                  })
+                }
+                className="text-muted hover:text-body hover:bg-surface-secondary shrink-0 rounded-md p-1 transition-colors"
+                aria-expanded={houseRulesSectionOpen}
+                aria-controls="dm-campaign-house-rules-section"
+                title={
+                  houseRulesSectionOpen
+                    ? 'Collapse house rules'
+                    : 'Expand house rules'
+                }
+              >
+                {houseRulesSectionOpen ? (
+                  <ChevronDown size={20} />
+                ) : (
+                  <ChevronRight size={20} />
+                )}
+              </button>
+              <div className="flex min-w-0 items-center gap-2">
+                <ScrollText size={20} className="text-muted shrink-0" />
+                <h2 className="text-heading text-lg font-semibold">
+                  House Rules
+                </h2>
+              </div>
+            </div>
+
+            {houseRulesSectionOpen && (
+              <Card id="dm-campaign-house-rules-section">
+                <CardHeader>
+                  <CardDescription>
+                    Rules that apply to every player in this campaign.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p
+                        id="stackable-inspiration-label"
+                        className="text-heading font-medium"
+                      >
+                        Stackable heroic inspiration
+                      </p>
+                      <p className="text-muted text-sm">
+                        When on, players can hold more than one Heroic
+                        Inspiration. When off, they follow classic rules (at
+                        most one).
+                      </p>
+                    </div>
+                    <Switch
+                      checked={stackableInspiration}
+                      onCheckedChange={handleToggleStackableInspiration}
+                      aria-labelledby="stackable-inspiration-label"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-muted animate-pulse text-lg">
@@ -539,6 +614,14 @@ export default function CampaignViewPage() {
                   >
                     Message All
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<TrendingUp size={14} />}
+                    onClick={() => setAwardXpOpen(true)}
+                  >
+                    Award XP
+                  </Button>
                 </div>
               </div>
 
@@ -622,74 +705,6 @@ export default function CampaignViewPage() {
           </>
         )}
 
-        {/* House Rules */}
-        {!loading && !error && (
-          <div>
-            <div className="mb-4 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setDmDashboardUi(code, {
-                    houseRulesSectionOpen: !houseRulesSectionOpen,
-                  })
-                }
-                className="text-muted hover:text-body hover:bg-surface-secondary shrink-0 rounded-md p-1 transition-colors"
-                aria-expanded={houseRulesSectionOpen}
-                aria-controls="dm-campaign-house-rules-section"
-                title={
-                  houseRulesSectionOpen
-                    ? 'Collapse house rules'
-                    : 'Expand house rules'
-                }
-              >
-                {houseRulesSectionOpen ? (
-                  <ChevronDown size={20} />
-                ) : (
-                  <ChevronRight size={20} />
-                )}
-              </button>
-              <div className="flex min-w-0 items-center gap-2">
-                <ScrollText size={20} className="text-muted shrink-0" />
-                <h2 className="text-heading text-lg font-semibold">
-                  House Rules
-                </h2>
-              </div>
-            </div>
-
-            {houseRulesSectionOpen && (
-              <Card id="dm-campaign-house-rules-section">
-                <CardHeader>
-                  <CardDescription>
-                    Rules that apply to every player in this campaign.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p
-                        id="stackable-inspiration-label"
-                        className="text-heading font-medium"
-                      >
-                        Stackable heroic inspiration
-                      </p>
-                      <p className="text-muted text-sm">
-                        When on, players can hold more than one Heroic
-                        Inspiration. When off, they follow classic rules (at
-                        most one).
-                      </p>
-                    </div>
-                    <Switch
-                      checked={stackableInspiration}
-                      onCheckedChange={handleToggleStackableInspiration}
-                      aria-labelledby="stackable-inspiration-label"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
-
         {/* NPC Management */}
         {!loading && !error && (
           <NPCSection
@@ -704,27 +719,33 @@ export default function CampaignViewPage() {
       </main>
 
       {/* Player Detail Dialog */}
-      {selectedPlayer && (
+      {currentSelectedPlayer && (
         <PlayerDetailDialog
-          open={!!selectedPlayer}
+          open={!!currentSelectedPlayer}
           onOpenChange={open => {
             if (!open) setSelectedPlayer(null);
           }}
-          player={selectedPlayer}
+          player={currentSelectedPlayer}
           customCounterLabel={customCounterLabel}
           counterValue={
-            localCampaign?.playerCounters?.[selectedPlayer.playerId] ?? 0
+            localCampaign?.playerCounters?.[currentSelectedPlayer.playerId] ?? 0
           }
           onAdjustCounter={
             customCounterLabel
               ? delta =>
-                  adjustPlayerCounter(code, selectedPlayer.playerId, delta)
+                  adjustPlayerCounter(
+                    code,
+                    currentSelectedPlayer.playerId,
+                    delta
+                  )
               : undefined
           }
           onSendMessage={() => {
-            setMessageTarget(selectedPlayer);
+            setMessageTarget(currentSelectedPlayer);
             setSelectedPlayer(null);
           }}
+          campaignCode={code}
+          dmId={dmId}
         />
       )}
 
@@ -746,6 +767,14 @@ export default function CampaignViewPage() {
         onClose={() => setMessageTarget(null)}
         players={players}
         targetPlayer={messageTarget === 'all' ? null : messageTarget}
+        campaignCode={code}
+        dmId={dmId}
+      />
+
+      <AwardXpDialog
+        open={awardXpOpen}
+        onClose={() => setAwardXpOpen(false)}
+        players={players}
         campaignCode={code}
         dmId={dmId}
       />

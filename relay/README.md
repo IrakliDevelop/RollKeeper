@@ -6,13 +6,18 @@ Auth = short-lived HMAC tokens minted by the Next.js app (`/api/campaign/[code]/
 
 ## Env
 
-| Var | Required | Notes |
-|---|---|---|
+| Var                      | Required | Notes                                                                                           |
+| ------------------------ | -------- | ----------------------------------------------------------------------------------------------- |
 | `BATTLEMAP_RELAY_SECRET` | yes | must equal the Vercel app's value |
 | `PORT` | no | Railway injects it; default 8787 |
-| `REDIS_URL` | no | e.g. `rediss://default:<pass>@<host>:6379` (Upstash TCP). Unset → in-memory |
+| `REDIS_URL` | no | Upstash TCP URL; enables buffered persistence and cross-instance ephemeral presence/poke fan-out |
 | `FLUSH_INTERVAL_MS` | no | default 3000 |
 | `ROOM_TTL_SECONDS` | no | default 172800 (2 days) |
+
+When Redis is enabled, the relay opens one backend connection plus dedicated publish and subscribe
+connections. Fan-out is intentionally limited to presence traffic because the buffered backend is
+memory-first and not a shared canonical backend. Durable canvas operations remain instance-local;
+server pokes, client presence, and disconnect presence leave events cross relay instances.
 
 ## Local dev
 

@@ -33,6 +33,7 @@ import {
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { MonsterStatBlockPanel } from '@/components/ui/encounter/MonsterStatBlockPanel';
+import { NpcResourceList } from '@/components/ui/encounter/combat-screen/detail/NpcResourceList';
 import { NPCStatBlockExport } from './NPCStatBlockExport';
 import RichTextRenderer from '@/components/ui/utils/RichTextRenderer';
 import {
@@ -42,7 +43,11 @@ import {
 import type { InventoryFormData } from '@/components/ui/game/inventory/ItemForm';
 import { useItemsData } from '@/hooks/useItemsData';
 import { useMagicItemsData } from '@/hooks/useMagicItemsData';
-import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
+import type {
+  CampaignNPC,
+  NPCInventoryItem,
+  StatBlockEntry,
+} from '@/types/encounter';
 import { formatCurrencyFromCopper } from '@/utils/currency';
 import { parseArmorClass, parseAcBonus } from '@/utils/calculations';
 import {
@@ -782,8 +787,114 @@ export function NPCDetailDialog({
             <div className="space-y-4">
               <CombatSummaryBar npc={npc} />
               <ExtraStatsBadges npc={npc} />
+
+              {!readOnly && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      useNPCStore
+                        .getState()
+                        .shortRestNPC(npc.campaignCode, npc.id)
+                    }
+                  >
+                    Short Rest
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      useNPCStore
+                        .getState()
+                        .longRestNPC(npc.campaignCode, npc.id)
+                    }
+                  >
+                    Long Rest
+                  </Button>
+                </div>
+              )}
+
+              {npc.resources && npc.resources.length > 0 && (
+                <NpcResourceList
+                  resources={npc.resources}
+                  readOnly={readOnly}
+                  onSpend={(resourceId, amount) =>
+                    useNPCStore
+                      .getState()
+                      .spendNpcResource(
+                        npc.campaignCode,
+                        npc.id,
+                        resourceId,
+                        amount
+                      )
+                  }
+                  onRestore={(resourceId, amount) =>
+                    useNPCStore
+                      .getState()
+                      .restoreNpcResource(
+                        npc.campaignCode,
+                        npc.id,
+                        resourceId,
+                        amount
+                      )
+                  }
+                />
+              )}
+
               {statBlock ? (
-                <MonsterStatBlockPanel statBlock={statBlock} />
+                <MonsterStatBlockPanel
+                  statBlock={statBlock}
+                  resources={npc.resources}
+                  abilityUsage={npc.abilityUsage}
+                  readOnly={readOnly}
+                  onUseEntry={
+                    readOnly
+                      ? undefined
+                      : (entry: StatBlockEntry) => {
+                          if (entry.resourceCost) {
+                            useNPCStore
+                              .getState()
+                              .spendNpcResource(
+                                npc.campaignCode,
+                                npc.id,
+                                entry.resourceCost.resourceId,
+                                entry.resourceCost.amount
+                              );
+                          }
+                        }
+                  }
+                  onUseAbilityEntry={
+                    readOnly
+                      ? undefined
+                      : entry => {
+                          if (entry.id) {
+                            useNPCStore
+                              .getState()
+                              .useNpcAbility(
+                                npc.campaignCode,
+                                npc.id,
+                                entry.id
+                              );
+                          }
+                        }
+                  }
+                  onRestoreAbilityEntry={
+                    readOnly
+                      ? undefined
+                      : entry => {
+                          if (entry.id) {
+                            useNPCStore
+                              .getState()
+                              .restoreNpcAbility(
+                                npc.campaignCode,
+                                npc.id,
+                                entry.id
+                              );
+                          }
+                        }
+                  }
+                />
               ) : (
                 <>
                   {npc.abilityScores && (

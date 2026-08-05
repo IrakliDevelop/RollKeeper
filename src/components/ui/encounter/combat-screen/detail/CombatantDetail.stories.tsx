@@ -16,12 +16,15 @@ const defaultActions: EntityActions = {
   onSetConditionRounds: fn(),
   onUseAbility: fn(),
   onRestoreAbility: fn(),
+  onSpendResource: fn(() => true),
+  onRestoreResource: fn(),
   onUseLegendaryAction: fn(),
   onResetLegendaryActions: fn(),
   onSetConcentration: fn(),
   onUseLairAction: fn(),
   onSetInitiative: fn(),
   onLongRest: fn(),
+  onShortRest: fn(),
 };
 
 const dragonStatBlock: MonsterStatBlock = {

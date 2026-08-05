@@ -2,12 +2,26 @@
 
 import React from 'react';
 import { NumberField } from '@/components/ui/forms/NumberInput';
-import { MonsterStatBlock } from '@/types/encounter';
-import { formatUsesLabel } from '@/utils/encounterConverter';
+import type {
+  MonsterStatBlock,
+  NpcResource,
+  StatBlockEntry,
+  MonsterAbility,
+} from '@/types/encounter';
+import { getEntryAbilityConfig } from '@/utils/statBlockAbilities';
+import { StatBlockEntryRow } from '@/components/ui/encounter/combat-screen/detail/StatBlockEntryRow';
 
 interface MonsterStatBlockPanelProps {
   statBlock: MonsterStatBlock;
   onUpdate?: (updates: Partial<MonsterStatBlock>) => void;
+  /** When provided, entries with resourceCost render a cost badge + Use button. */
+  resources?: NpcResource[];
+  /** entryId → usedUses (from CampaignNPC.abilityUsage). */
+  abilityUsage?: Record<string, number>;
+  onUseEntry?: (entry: StatBlockEntry) => void;
+  onUseAbilityEntry?: (entry: StatBlockEntry) => void;
+  onRestoreAbilityEntry?: (entry: StatBlockEntry) => void;
+  readOnly?: boolean;
 }
 
 const ABILITIES = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
@@ -36,9 +50,21 @@ function StatRow({
 function TraitBlock({
   title,
   entries,
+  resources,
+  abilityUsage,
+  onUseEntry,
+  onUseAbilityEntry,
+  onRestoreAbilityEntry,
+  readOnly,
 }: {
   title: string;
-  entries: Array<{ name: string; text: string; uses?: number }>;
+  entries: StatBlockEntry[];
+  resources?: NpcResource[];
+  abilityUsage?: Record<string, number>;
+  onUseEntry?: (entry: StatBlockEntry) => void;
+  onUseAbilityEntry?: (entry: StatBlockEntry) => void;
+  onRestoreAbilityEntry?: (entry: StatBlockEntry) => void;
+  readOnly?: boolean;
 }) {
   if (!entries || entries.length === 0) return null;
   return (
@@ -47,23 +73,34 @@ function TraitBlock({
         {title}
       </h5>
       {entries.map((entry, i) => {
-        const usesLabel = formatUsesLabel(entry.name, entry.uses);
+        const config = entry.id ? getEntryAbilityConfig(entry) : null;
+        const ability: MonsterAbility | undefined =
+          config && entry.id
+            ? {
+                id: entry.id,
+                name: entry.name,
+                description: entry.text,
+                usageType: config.usageType,
+                rechargeOn: config.rechargeOn,
+                maxUses: config.maxUses,
+                usedUses: Math.min(
+                  Math.max(0, abilityUsage?.[entry.id] ?? 0),
+                  config.maxUses
+                ),
+                restType: config.restType,
+              }
+            : undefined;
         return (
-          <div key={i} className="text-sm">
-            <span className="text-heading font-semibold italic">
-              {entry.name}.
-            </span>
-            {usesLabel && (
-              <span className="text-heading font-semibold italic">
-                {' '}
-                ({usesLabel})
-              </span>
-            )}{' '}
-            <span
-              className="text-body statblock-rich-text"
-              dangerouslySetInnerHTML={{ __html: entry.text }}
-            />
-          </div>
+          <StatBlockEntryRow
+            key={entry.id ?? i}
+            entry={entry}
+            ability={onUseAbilityEntry || readOnly ? ability : undefined}
+            resources={resources}
+            onUseAbility={onUseAbilityEntry}
+            onRestoreAbility={onRestoreAbilityEntry}
+            onSpendCost={onUseEntry}
+            readOnly={readOnly}
+          />
         );
       })}
     </div>
@@ -73,6 +110,12 @@ function TraitBlock({
 export function MonsterStatBlockPanel({
   statBlock,
   onUpdate,
+  resources,
+  abilityUsage,
+  onUseEntry,
+  onUseAbilityEntry,
+  onRestoreAbilityEntry,
+  readOnly,
 }: MonsterStatBlockPanelProps) {
   return (
     <div className="border-accent-red-border bg-surface space-y-3 rounded-lg border p-3">
@@ -154,19 +197,64 @@ export function MonsterStatBlockPanel({
       </div>
 
       {/* Traits */}
-      <TraitBlock title="Traits" entries={statBlock.traits} />
+      <TraitBlock
+        title="Traits"
+        entries={statBlock.traits}
+        resources={resources}
+        abilityUsage={abilityUsage}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+        readOnly={readOnly}
+      />
 
       {/* Actions */}
-      <TraitBlock title="Actions" entries={statBlock.actions} />
+      <TraitBlock
+        title="Actions"
+        entries={statBlock.actions}
+        resources={resources}
+        abilityUsage={abilityUsage}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+        readOnly={readOnly}
+      />
 
       {/* Bonus Actions */}
-      <TraitBlock title="Bonus Actions" entries={statBlock.bonusActions} />
+      <TraitBlock
+        title="Bonus Actions"
+        entries={statBlock.bonusActions}
+        resources={resources}
+        abilityUsage={abilityUsage}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+        readOnly={readOnly}
+      />
 
       {/* Reactions */}
-      <TraitBlock title="Reactions" entries={statBlock.reactions} />
+      <TraitBlock
+        title="Reactions"
+        entries={statBlock.reactions}
+        resources={resources}
+        abilityUsage={abilityUsage}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+        readOnly={readOnly}
+      />
 
       {/* Lair Actions */}
-      <TraitBlock title="Lair Actions" entries={statBlock.lairActions} />
+      <TraitBlock
+        title="Lair Actions"
+        entries={statBlock.lairActions}
+        resources={resources}
+        abilityUsage={abilityUsage}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+        readOnly={readOnly}
+      />
     </div>
   );
 }

@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { dispositionColor, stampCombatantToken } from './combatantToken';
+import {
+  dispositionColor,
+  prepareCombatantTokenAvatar,
+  stampCombatantToken,
+} from './combatantToken';
 
 import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
 
@@ -132,6 +136,9 @@ export function useRosterDrag({
             vp.camera.zoom
           )
         : null;
+      const preparedAvatar = entity.avatarUrl
+        ? prepareCombatantTokenAvatar(entity)
+        : null;
 
       const handleMove = (ev: PointerEvent) => {
         const start = startPointRef.current;
@@ -161,11 +168,17 @@ export function useRosterDrag({
         if (!vp || !canvasEl) return;
         const rect = canvasEl.getBoundingClientRect();
         if (!isInsideRect(rect, ev.clientX, ev.clientY)) return;
-        stampAtScreenPoint(vp, canvasEl, entity, {
-          x: ev.clientX,
-          y: ev.clientY,
-        });
-        onDropPlaced(entity.id);
+        const place = (avatarUrl?: string) => {
+          stampAtScreenPoint(
+            vp,
+            canvasEl,
+            avatarUrl ? { ...entity, avatarUrl } : entity,
+            { x: ev.clientX, y: ev.clientY }
+          );
+          onDropPlaced(entity.id);
+        };
+        if (preparedAvatar) void preparedAvatar.then(place);
+        else place();
       };
 
       window.addEventListener('pointermove', handleMove);

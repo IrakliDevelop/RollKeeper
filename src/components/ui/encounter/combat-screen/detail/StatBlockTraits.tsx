@@ -2,43 +2,54 @@
 
 import React from 'react';
 import { renderStatBlockEntryText } from '@/utils/statBlockText';
-import { formatUsesLabel } from '@/utils/encounterConverter';
-import type { MonsterStatBlock, MonsterSpellcasting } from '@/types/encounter';
+import { StatBlockEntryRow } from './StatBlockEntryRow';
+import type {
+  MonsterAbility,
+  MonsterStatBlock,
+  MonsterSpellcasting,
+  NpcResource,
+  StatBlockEntry,
+} from '@/types/encounter';
 
 interface TraitBlockProps {
   title: string;
-  entries: Array<{ name: string; text: string; uses?: number }>;
+  entries: StatBlockEntry[];
+  resources?: NpcResource[];
+  abilities?: MonsterAbility[];
+  onUseEntry?: (entry: StatBlockEntry) => void;
+  onUseAbilityEntry?: (entry: StatBlockEntry) => void;
+  onRestoreAbilityEntry?: (entry: StatBlockEntry) => void;
 }
 
-function TraitBlock({ title, entries }: TraitBlockProps) {
+function TraitBlock({
+  title,
+  entries,
+  resources,
+  abilities,
+  onUseEntry,
+  onUseAbilityEntry,
+  onRestoreAbilityEntry,
+}: TraitBlockProps) {
   if (!entries || entries.length === 0) return null;
   return (
     <div className="space-y-1.5">
       <h5 className="text-heading border-divider border-b pb-0.5 text-xs font-semibold tracking-wider uppercase">
         {title}
       </h5>
-      {entries.map((entry, i) => {
-        const usesLabel = formatUsesLabel(entry.name, entry.uses);
-        return (
-          <div key={i} className="text-sm">
-            <span className="text-heading font-semibold italic">
-              {entry.name}.
-            </span>
-            {usesLabel && (
-              <span className="text-heading font-semibold italic">
-                {' '}
-                ({usesLabel})
-              </span>
-            )}{' '}
-            <span
-              className="text-body"
-              dangerouslySetInnerHTML={{
-                __html: renderStatBlockEntryText(entry.text),
-              }}
-            />
-          </div>
-        );
-      })}
+      {entries.map((entry, i) => (
+        <StatBlockEntryRow
+          key={entry.id ?? i}
+          entry={entry}
+          ability={
+            entry.id ? abilities?.find(a => a.id === entry.id) : undefined
+          }
+          resources={resources}
+          onUseAbility={onUseAbilityEntry}
+          onRestoreAbility={onRestoreAbilityEntry}
+          onSpendCost={onUseEntry}
+          renderText={renderStatBlockEntryText}
+        />
+      ))}
     </div>
   );
 }
@@ -92,11 +103,21 @@ function SpellcastingBlock({ spellcasting: sc }: SpellcastingBlockProps) {
 interface StatBlockTraitsProps {
   statBlock: MonsterStatBlock;
   spellcasting?: MonsterSpellcasting;
+  resources?: NpcResource[];
+  abilities?: MonsterAbility[];
+  onUseEntry?: (entry: StatBlockEntry) => void;
+  onUseAbilityEntry?: (entry: StatBlockEntry) => void;
+  onRestoreAbilityEntry?: (entry: StatBlockEntry) => void;
 }
 
 export function StatBlockTraits({
   statBlock,
   spellcasting,
+  resources,
+  abilities,
+  onUseEntry,
+  onUseAbilityEntry,
+  onRestoreAbilityEntry,
 }: StatBlockTraitsProps) {
   const hasSections =
     statBlock.traits.length > 0 ||
@@ -110,11 +131,51 @@ export function StatBlockTraits({
 
   return (
     <div className="space-y-3">
-      <TraitBlock title="Traits" entries={statBlock.traits} />
-      <TraitBlock title="Actions" entries={statBlock.actions} />
-      <TraitBlock title="Bonus Actions" entries={statBlock.bonusActions} />
-      <TraitBlock title="Reactions" entries={statBlock.reactions} />
-      <TraitBlock title="Lair Actions" entries={statBlock.lairActions} />
+      <TraitBlock
+        title="Traits"
+        entries={statBlock.traits}
+        resources={resources}
+        abilities={abilities}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+      />
+      <TraitBlock
+        title="Actions"
+        entries={statBlock.actions}
+        resources={resources}
+        abilities={abilities}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+      />
+      <TraitBlock
+        title="Bonus Actions"
+        entries={statBlock.bonusActions}
+        resources={resources}
+        abilities={abilities}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+      />
+      <TraitBlock
+        title="Reactions"
+        entries={statBlock.reactions}
+        resources={resources}
+        abilities={abilities}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+      />
+      <TraitBlock
+        title="Lair Actions"
+        entries={statBlock.lairActions}
+        resources={resources}
+        abilities={abilities}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+      />
       {spellcasting && <SpellcastingBlock spellcasting={spellcasting} />}
     </div>
   );

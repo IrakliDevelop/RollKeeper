@@ -1,6 +1,10 @@
 // Encounter tracker types for DM combat management
 
 import { Spell } from './character';
+import type {
+  ClassResourceIcon,
+  ClassResourceColor,
+} from '@/utils/classResources';
 
 export interface EncounterCondition {
   id: string;
@@ -24,6 +28,45 @@ export interface MonsterAbility {
   maxUses?: number;
   usedUses: number;
   restType?: 'short' | 'long' | 'dawn';
+  /**
+   * Provenance: 'npc' = backed by a CampaignNPC entry (authoritative sync);
+   * 'entity' = per-encounter only (monsters, custom, combat-added entries).
+   * Absent on legacy data = treated as 'entity'.
+   */
+  source?: 'npc' | 'entity';
+}
+
+/** Shared shape for the five stat-block entry sections. */
+export interface StatBlockEntry {
+  /** Stable instance id, unique within a stat block. Store-enforced (npcStore migration + create/update normalization); encounter MonsterAbility.id matches it. */
+  id?: string;
+  name: string;
+  text: string;
+  /** Static per-day/authoring uses hint (feeds the abilities pipeline). */
+  uses?: number;
+  /** Link to an NpcResource: using this feature spends `amount` uses. */
+  resourceCost?: {
+    resourceId: string; // NpcResource.id (instance id)
+    amount: number; // positive integer, default 1
+  };
+}
+
+/**
+ * A class-resource pool attached to an NPC (Wild Shape, Channel Divinity, …).
+ * CampaignNPC.resources is the persistent source of truth for usage;
+ * EncounterEntity.resources is a per-add snapshot with the same ids.
+ * Long rest always restores everything; only short-rest recovery is configurable.
+ */
+export interface NpcResource {
+  id: string; // instance id, stable across NPC ↔ entity snapshots
+  definitionId?: string; // ClassResourceDefinition.id when registry-picked; absent = custom
+  name: string;
+  icon: ClassResourceIcon;
+  color: ClassResourceColor;
+  displayStyle: 'pips' | 'pool';
+  maxUses: number; // DM-entered positive integer (NPCs have no level)
+  usesExpended: number; // 0..maxUses
+  shortRestReset: 'all' | number; // number = restore up to N on short rest; 0 = none
 }
 
 export interface LegendaryActionPool {
@@ -81,11 +124,11 @@ export interface MonsterStatBlock {
   conditionImmunities: string[];
   senses: string;
   passivePerception: number;
-  traits: Array<{ name: string; text: string; uses?: number }>;
-  actions: Array<{ name: string; text: string; uses?: number }>;
-  reactions: Array<{ name: string; text: string; uses?: number }>;
-  bonusActions: Array<{ name: string; text: string; uses?: number }>;
-  lairActions: Array<{ name: string; text: string; uses?: number }>;
+  traits: StatBlockEntry[];
+  actions: StatBlockEntry[];
+  reactions: StatBlockEntry[];
+  bonusActions: StatBlockEntry[];
+  lairActions: StatBlockEntry[];
   cr: string;
   type: string;
   size: string;
@@ -134,6 +177,8 @@ export interface EncounterEntity {
   abilities?: MonsterAbility[];
   legendaryActions?: LegendaryActionPool;
   spellcasting?: MonsterSpellcasting;
+  /** Snapshot of the source NPC's class resources (ids preserved). */
+  resources?: NpcResource[];
 
   // Monster source reference
   monsterSourceId?: string; // ProcessedMonster id for stat block lookup
@@ -225,6 +270,8 @@ export interface CombatConfig {
   enemyHpDisplay: EnemyHpDisplay;
   hpStateBands: HpStateBand[];
   enemyConditionsDisplay: EnemyConditionsDisplay;
+  /** DM-defined condition presets available in every combat. */
+  customStatuses?: string[];
 }
 
 export const DEFAULT_HP_STATE_BANDS: HpStateBand[] = [
@@ -240,6 +287,7 @@ export const DEFAULT_COMBAT_CONFIG: CombatConfig = {
   enemyHpDisplay: 'off',
   hpStateBands: DEFAULT_HP_STATE_BANDS,
   enemyConditionsDisplay: 'off',
+  customStatuses: [],
 };
 
 export interface NPCInventoryItem {
@@ -309,6 +357,12 @@ export interface CampaignNPC {
 
   // Spellcasting
   spellcasting?: NPCSpellcasting;
+
+  // Class-resource pools (authoritative usage state; see NpcResource)
+  resources?: NpcResource[];
+
+  // Per-ability usage (entryId → usedUses). Authoritative, like resources.
+  abilityUsage?: Record<string, number>;
 
   // UI state: which spell tab sections are collapsed
   collapsedSpellSections?: string[]; // e.g. ['stats', 'slotTracker', 'spells']

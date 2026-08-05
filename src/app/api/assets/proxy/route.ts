@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const ALLOWED_HOST_SUFFIX = '.s3.eu-central-1.amazonaws.com';
 const MAX_PROXY_SIZE = 50 * 1024 * 1024; // 50 MB
+
+function configuredS3Hostname(): string | null {
+  const bucket = process.env.AWS_S3_BUCKET_NAME;
+  const region = process.env.AWS_S3_REGION;
+
+  if (!bucket || !region) return null;
+  return `${bucket}.s3.${region}.amazonaws.com`;
+}
 
 /**
  * Proxies an S3 image through our own origin so the browser never
@@ -27,9 +34,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
   }
 
-  if (!parsed.hostname.endsWith(ALLOWED_HOST_SUFFIX)) {
+  const allowedHostname = configuredS3Hostname();
+  if (!allowedHostname) {
     return NextResponse.json(
-      { error: 'URL not allowed — only S3 images can be proxied' },
+      { error: 'S3 is not configured' },
+      { status: 503 }
+    );
+  }
+
+  if (parsed.protocol !== 'https:' || parsed.hostname !== allowedHostname) {
+    return NextResponse.json(
+      { error: 'URL not allowed — only configured S3 images can be proxied' },
       { status: 403 }
     );
   }

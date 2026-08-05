@@ -20,6 +20,10 @@ export function seedRedisSet(key: string, members: string[]) {
   sets.set(key, new Set(members));
 }
 
+export function seedRedisList(key: string, values: string[]) {
+  lists.set(key, [...values]);
+}
+
 export function getRedisStore() {
   return store;
 }
@@ -131,6 +135,47 @@ export const mockRedis = {
     return 'OK';
   }),
 
+  rpush: vi.fn(async (key: string, ...values: string[]) => {
+    if (!lists.has(key)) lists.set(key, []);
+    const list = lists.get(key)!;
+    list.push(...values);
+    return list.length;
+  }),
+
+  lrem: vi.fn(async (key: string, count: number, value: string) => {
+    const list = lists.get(key);
+    if (!list) return 0;
+    const limit = count === 0 ? Infinity : Math.abs(count);
+    let removed = 0;
+    // count >= 0 removes head-to-tail — the only direction the app uses
+    for (let i = 0; i < list.length && removed < limit; ) {
+      if (list[i] === value) {
+        list.splice(i, 1);
+        removed++;
+      } else {
+        i++;
+      }
+    }
+    return removed;
+  }),
+
+  llen: vi.fn(async (key: string) => (lists.get(key) ?? []).length),
+
+  // Emulates the ONE Lua script in src/lib/xpAwardQueue.ts (atomic capped
+  // enqueue). Extend the branch if another script is ever added.
+  eval: vi.fn(async (script: string, keys: string[], args: string[]) => {
+    if (script.includes('RPUSH') && script.includes('LLEN')) {
+      const [key] = keys;
+      const [value, cap] = args;
+      const list = lists.get(key) ?? [];
+      if (list.length >= Number(cap)) return 'full';
+      lists.set(key, list);
+      list.push(value);
+      return 'ok';
+    }
+    throw new Error('mockRedis.eval: unrecognized script');
+  }),
+
   hset: vi.fn(async (key: string, field: string, value: string) => {
     if (!hashes.has(key)) hashes.set(key, new Map());
     const h = hashes.get(key)!;
@@ -166,7 +211,10 @@ export const mockRedis = {
 
 vi.mock('@/lib/redis', () => ({
   getRedis: () => mockRedis,
+  getRawRedis: () => mockRedis,
   campaignKey: (code: string) => `campaign:${code}`,
+  campaignXpKey: (code: string, playerId: string) =>
+    `campaign:${code}:xp:${playerId}`,
   campaignPlayersKey: (code: string) => `campaign:${code}:players`,
   campaignPlayerKey: (code: string, playerId: string) =>
     `campaign:${code}:player:${playerId}`,

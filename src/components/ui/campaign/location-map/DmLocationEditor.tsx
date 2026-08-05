@@ -32,6 +32,10 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     selectedElementId,
     isDmOnly,
     handleToggleDmOnly,
+    hiddenPlacementActive,
+    handleToggleHiddenPlacement,
+    hiddenElementCount,
+    handleRevealAll,
     syncing,
     hasUnsyncedChanges,
     lastSyncedAt,
@@ -53,6 +57,10 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handleFitToMap,
     arrangeMapsActive,
     handleToggleArrangeMaps,
+    publishLayerUpsert,
+    publishLayerRemove,
+    measureSharing,
+    handleSetMeasureSharing,
   } = useDmLocationEditor(props);
 
   return (
@@ -95,6 +103,10 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             selectedElementId={selectedElementId}
             isDmOnly={isDmOnly}
             onToggleDmOnly={handleToggleDmOnly}
+            hiddenPlacementActive={hiddenPlacementActive}
+            onToggleHiddenPlacement={handleToggleHiddenPlacement}
+            hiddenElementCount={hiddenElementCount}
+            onRevealAll={handleRevealAll}
             mode={mode}
             onOpenTvDisplay={handleOpenTvDisplay}
             syncStatus={syncStatus}
@@ -105,7 +117,15 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
           />
         )}
 
-        {viewport && <DmLocationToolOptions mode={mode} />}
+        {viewport && (
+          <DmLocationToolOptions
+            mode={mode}
+            measureSharing={{
+              enabled: measureSharing,
+              onChange: handleSetMeasureSharing,
+            }}
+          />
+        )}
 
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           {arrangeMapsActive && (
@@ -150,6 +170,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                 unlinkEncounter(props.campaignCode, props.location.id, id)
               }
               onClose={() => setLayersPanelOpen(false)}
+              publishLayerUpsert={publishLayerUpsert}
+              publishLayerRemove={publishLayerRemove}
             />
           )}
 

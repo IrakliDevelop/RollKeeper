@@ -44,12 +44,15 @@ import {
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import DmLocationToolOptions from './DmLocationToolOptions';
-import { ensurePlayerLayer } from './playerLayer';
+import { ensurePlayerLayer, playerLayerId } from './playerLayer';
 import {
   ensureCanonicalLayers,
-  attachUnknownLayerMirror,
   subscribePinCanonicalLayers,
 } from './layerContract';
+import { makeApplyRemoteLayer, publishOwnedLayers } from './layerSync';
+import { attachRemoteLaserTrails } from './laserSync';
+import { attachRemotePings } from './pingSync';
+import { attachRemoteMeasurements } from './measureSync';
 import {
   PlayerTokenTool,
   PlayerTemplateTool,
@@ -84,11 +87,6 @@ interface PlayerBattleMapCanvasProps {
   /** Show/hide/compact toggle for the token decoration overlay (optional — non-VTT routes render no toggle). */
   tokenInfoToggle?: { mode: TokenInfoMode | null; onCycle: () => void };
 }
-
-/** Viewport exposes historyRecorder at runtime for batched store ops. */
-type ViewportHistoryAccess = {
-  historyRecorder: { begin: () => void; commit: () => void };
-};
 
 const PLAYER_TOOLS: {
   name: string;
@@ -221,6 +219,7 @@ export function PlayerBattleMapCanvas({
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const [hasSelection, setHasSelection] = useState(false);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
+  const laserCleanupRef = useRef<(() => void) | null>(null);
   // The connection is created once inside the fire-once `handleReady`
   // callback; a plain closure over `onPoke` would go stale if the prop's
   // identity changes later after the connection is already established.
@@ -291,15 +290,6 @@ export function PlayerBattleMapCanvas({
     // writes to it anyway).
     subscribePinCanonicalLayers(vp, () => ({ annotationsLocked: true }));
 
-    // Layers aren't synced: remote elements can reference layer ids that
-    // don't exist here (old clients, other players). Mirror each unknown
-    // layer locked into its band — hit-test and marquee skip remote content
-    // (the relay rejects player writes to it anyway), and stacking matches
-    // the DM's view. Covers both new elements (add) and relay snapshot
-    // reconcile re-applying remote elements as full updates (including
-    // layerId) on reconnect.
-    attachUnknownLayerMirror(vp, 'player', () => vp.requestRender());
-
     // Selection state for the touch-friendly delete button.
     const selectTool = vp.toolManager.getTool<SelectTool>('select');
     if (selectTool) {
@@ -317,13 +307,24 @@ export function PlayerBattleMapCanvas({
     const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
     if (!relayUrl) return;
     connectionRef.current?.stop();
-    connectionRef.current = createManagedBattleMapConnection({
+    const ownLayerId = playerLayerId(characterId);
+    const connection = createManagedBattleMapConnection({
       relayUrl,
       campaignCode,
       battleMapId,
       store: vp.store,
       clientId: characterId,
       tokenRequest: { role: 'player', battleMapId, playerId: characterId },
+      // Layer definitions sync (replaces the unknown-layer mirror): remote
+      // layers apply locked for players — hit-test and marquee skip content
+      // they cannot edit (the relay rejects their writes to it anyway) —
+      // while their own layer is never locked or removed by remote records.
+      layers: {
+        applyLayer: makeApplyRemoteLayer(vp, 'player', {
+          ownLayerId,
+          onApplied: () => vp.requestRender(),
+        }),
+      },
       onStatus: s => {
         setStatus(s);
         onStatusProp?.(s);
@@ -331,6 +332,27 @@ export function PlayerBattleMapCanvas({
       },
       onPoke: feature => onPokeRef.current?.(feature),
     });
+    connectionRef.current = connection;
+    // Teach the room this player's own layer (the relay only accepts a
+    // player's writes to player-<characterId>).
+    publishOwnedLayers(
+      vp,
+      'player',
+      def => connection.publishLayerUpsert(def),
+      ownLayerId
+    );
+    // Render remote laser trails + map pings (DM pointer). Players do not
+    // broadcast — product policy today; the wiring is role-based so enabling
+    // them later is configuration, not code.
+    laserCleanupRef.current?.();
+    const presenceCleanups = [
+      attachRemoteLaserTrails(vp, connection),
+      attachRemotePings(vp, connection).dispose,
+      attachRemoteMeasurements(vp, connection).dispose,
+    ];
+    laserCleanupRef.current = () => {
+      for (const cleanup of presenceCleanups) cleanup();
+    };
   };
 
   const handleDeleteSelected = useCallback(() => {
@@ -340,17 +362,17 @@ export function PlayerBattleMapCanvas({
     if (!selectTool) return;
     const ids = selectTool.selectedIds.filter(id => vp.store.getById(id));
     if (ids.length === 0) return;
-    const { historyRecorder } = vp as unknown as ViewportHistoryAccess;
-    historyRecorder.begin();
-    for (const id of ids) {
-      vp.store.remove(id);
-    }
-    historyRecorder.commit();
+    vp.removeElements(ids);
     selectTool.setSelection([]);
-    vp.requestRender();
   }, [viewport]);
 
-  useEffect(() => () => connectionRef.current?.stop(), []);
+  useEffect(
+    () => () => {
+      laserCleanupRef.current?.();
+      connectionRef.current?.stop();
+    },
+    []
+  );
 
   return (
     <ViewportContext.Provider value={viewport}>

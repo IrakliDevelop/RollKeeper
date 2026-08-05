@@ -14,7 +14,7 @@ export function PlacementBanner({
   onCancel,
 }: PlacementBannerProps) {
   return (
-    <div className="pointer-events-auto fixed top-16 left-1/2 z-20 -translate-x-1/2">
+    <div className="pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] left-1/2 z-20 -translate-x-1/2">
       <div className="bg-accent-blue-bg border-accent-blue-border flex min-h-[44px] items-center gap-2 rounded-xl border px-3 py-1.5 shadow-lg">
         <span className="text-accent-blue-text text-sm font-medium">
           📍 Click the map to place {entityName}

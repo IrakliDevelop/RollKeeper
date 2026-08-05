@@ -4,10 +4,10 @@ import React, { useState } from 'react';
 import { Pencil } from 'lucide-react';
 import type { DetailSectionProps } from './DetailHeader';
 import { LegendarySection } from './LegendarySection';
-import { TrackableAbilitiesSection } from './TrackableAbilitiesSection';
 import { StatBlockTraits } from './StatBlockTraits';
+import { DetailResources } from './NpcResourceList';
 import { StatBlockEntriesEditor } from '../StatBlockEntriesEditor';
-import type { MonsterStatBlock } from '@/types/encounter';
+import type { MonsterStatBlock, StatBlockEntry } from '@/types/encounter';
 
 function LairActionsSection({ entity, actions }: DetailSectionProps) {
   const lairActions = entity.lairActions;
@@ -62,6 +62,7 @@ export function DetailActions({ entity, actions }: DetailSectionProps) {
   const hasContent =
     entity.legendaryActions != null ||
     (entity.abilities?.length ?? 0) > 0 ||
+    (entity.resources?.length ?? 0) > 0 ||
     entity.monsterStatBlock != null ||
     entity.spellcasting != null;
 
@@ -80,7 +81,7 @@ export function DetailActions({ entity, actions }: DetailSectionProps) {
   return (
     <div className="border-divider space-y-4 border-t p-4">
       <LegendarySection entity={entity} actions={actions} />
-      <TrackableAbilitiesSection entity={entity} actions={actions} />
+      <DetailResources entity={entity} actions={actions} />
       {entity.monsterStatBlock && (
         <div className="space-y-3">
           {canEditBlock && (
@@ -121,6 +122,23 @@ export function DetailActions({ entity, actions }: DetailSectionProps) {
             <StatBlockTraits
               statBlock={entity.monsterStatBlock}
               spellcasting={entity.spellcasting}
+              resources={entity.resources}
+              abilities={entity.abilities}
+              onUseEntry={(entry: StatBlockEntry) => {
+                if (entry.resourceCost) {
+                  actions.onSpendResource(
+                    entity.id,
+                    entry.resourceCost.resourceId,
+                    entry.resourceCost.amount
+                  );
+                }
+              }}
+              onUseAbilityEntry={(entry: StatBlockEntry) => {
+                if (entry.id) actions.onUseAbility(entity.id, entry.id);
+              }}
+              onRestoreAbilityEntry={(entry: StatBlockEntry) => {
+                if (entry.id) actions.onRestoreAbility(entity.id, entry.id);
+              }}
             />
           )}
         </div>

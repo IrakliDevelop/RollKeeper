@@ -1,15 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import WebSocket from 'ws';
+import { createShape } from '@fieldnotes/core';
 import { MemoryHubBackend } from '@fieldnotes/sync-server';
 import { startRelay, type RelayHandle } from './server.js';
 import { signBattleMapToken } from './token.js';
 import { DM_AUDIENCE } from './policies.js';
 
 /**
- * Integration test for the C1 fix: it drives the REAL relay (real HTTP
- * server, real WebSocketServer, real SyncHub with our policies wired in —
- * only the storage backend is swapped for an in-memory one) so it exercises
- * the exact code path `sendCorrection` runs on, not a reimplementation of it.
+ * Integration test for upstream correction filtering: it drives the real
+ * relay with the published, unpatched SyncHub and RollKeeper's policies.
  */
 
 const SECRET = 'corrections-test-secret';
@@ -82,7 +81,7 @@ function send(ws: WebSocket, envelope: Envelope): void {
   ws.send(JSON.stringify(envelope));
 }
 
-describe('sendCorrection canRead leak (C1 fix, real relay)', () => {
+describe('upstream correction filtering (real relay)', () => {
   let handle: RelayHandle;
   let port: number;
 
@@ -124,6 +123,18 @@ async function runScenario(
 ): Promise<void> {
   await Promise.all([dm.opened, player.opened]);
 
+  // The WebSocket open event precedes completion of asynchronous relay auth.
+  // Round-trip a snapshot request so both peers are admitted before broadcasts.
+  send(dm.ws, { from: 'ready-dm', op: { kind: 'request-snapshot' } });
+  send(player.ws, {
+    from: 'ready-player',
+    op: { kind: 'request-snapshot' },
+  });
+  await Promise.all([
+    dm.waitFor(m => m.op.kind === 'snapshot' && m.op.to === 'ready-dm'),
+    player.waitFor(m => m.op.kind === 'snapshot' && m.op.to === 'ready-player'),
+  ]);
+
   // Seed the room: a DM-hidden element and a normal one. Sent in order on
   // the same connection — the hub's per-room queue guarantees hidden-1 is
   // applied to the backend before normal-1, so once the player observes
@@ -132,12 +143,28 @@ async function runScenario(
     from: 'dm-1',
     op: {
       kind: 'upsert',
-      element: { id: HIDDEN_ID, type: 'shape', audience: DM_AUDIENCE },
+      element: {
+        ...createShape({
+          position: { x: 0, y: 0 },
+          size: { w: 10, h: 10 },
+        }),
+        id: HIDDEN_ID,
+        audience: DM_AUDIENCE,
+      },
     },
   });
   send(dm.ws, {
     from: 'dm-1',
-    op: { kind: 'upsert', element: { id: NORMAL_ID, type: 'shape' } },
+    op: {
+      kind: 'upsert',
+      element: {
+        ...createShape({
+          position: { x: 20, y: 0 },
+          size: { w: 10, h: 10 },
+        }),
+        id: NORMAL_ID,
+      },
+    },
   });
   await player.waitFor(
     m =>
@@ -150,30 +177,23 @@ async function runScenario(
   // hidden-1 absent.
   send(player.ws, { from: 'p1', op: { kind: 'clear' } });
   const snapshotCorrection = await player.waitFor(
-    m => m.op.kind === 'snapshot'
+    m => m.op.kind === 'snapshot' && m.op.to === 'p1'
   );
   const elements = snapshotCorrection.op.elements as { id: string }[];
   expect(elements.map(e => e.id).sort()).toEqual([NORMAL_ID]);
   expect(elements.some(e => e.id === HIDDEN_ID)).toBe(false);
 
-  // 2. Player attempts to remove the hidden element — authorize denies it
-  // (hidden elements are untouchable by players). The correction must not
-  // leak the hidden element's bytes: either a `remove`, or at minimum no
-  // upsert carrying audience:'dm' element bytes.
+  // 2. Player attempts to remove the hidden element — authorize denies it.
+  // The upstream correction must be a byte-free remove, never a canonical
+  // upsert containing the hidden element.
   send(player.ws, { from: 'p1', op: { kind: 'remove', id: HIDDEN_ID } });
   const removeCorrection = await player.waitFor(
-    m => m.op.kind === 'remove' || m.op.kind === 'upsert'
+    m => m.op.kind === 'remove' && m.op.id === HIDDEN_ID
   );
-  if (removeCorrection.op.kind === 'upsert') {
-    const el = removeCorrection.op.element as {
-      id: string;
-      audience?: string;
-    };
-    expect(el.audience).not.toBe(DM_AUDIENCE);
-  } else {
-    expect(removeCorrection.op.kind).toBe('remove');
-    expect(removeCorrection.op.id).toBe(HIDDEN_ID);
-  }
+  expect(removeCorrection).toEqual({
+    from: 'hub',
+    op: { kind: 'remove', id: HIDDEN_ID },
+  });
 
   // 3. Sanity: the DM is never denied, and must not be over-filtered — a
   // DM request-snapshot still includes the hidden element.

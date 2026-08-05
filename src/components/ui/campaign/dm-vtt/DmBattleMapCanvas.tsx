@@ -1,7 +1,6 @@
 'use client';
 
 import { FieldNotesCanvas, ViewportContext } from '@fieldnotes/react';
-import DmLocationToolOptions from '@/components/ui/campaign/location-map/DmLocationToolOptions';
 import { DmVttToolbar } from './DmVttToolbar';
 import {
   useDmBattleMapCanvas,
@@ -18,9 +17,22 @@ export type { DmBattleMapCanvasProps };
  * init/persistence/connection wiring.
  */
 export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
-  const { children, tokenInfoToggle } = props;
-  const { viewport, tools, handleReady, handleClearDrawings } =
-    useDmBattleMapCanvas(props);
+  const { children, sessionControls, tokenInfoToggle } = props;
+  const {
+    viewport,
+    tools,
+    handleReady,
+    handleClearDrawings,
+    hiddenPlacementActive,
+    handleToggleHiddenPlacement,
+    hiddenElementCount,
+    handleRevealAll,
+    selectedElementId,
+    selectedElementIsDmOnly,
+    handleToggleSelectedDmOnly,
+    measureSharing,
+    handleSetMeasureSharing,
+  } = useDmBattleMapCanvas(props);
 
   return (
     <ViewportContext.Provider value={viewport}>
@@ -32,18 +44,25 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
           className="h-full w-full"
           snapToGrid
         />
-        {viewport && children}
         {viewport && (
           <DmVttToolbar
+            sessionControls={sessionControls}
             onClearDrawings={handleClearDrawings}
             tokenInfoToggle={tokenInfoToggle}
+            hiddenPlacementActive={hiddenPlacementActive}
+            onToggleHiddenPlacement={handleToggleHiddenPlacement}
+            hiddenElementCount={hiddenElementCount}
+            onRevealAll={handleRevealAll}
+            selectedElementId={selectedElementId}
+            selectedElementIsDmOnly={selectedElementIsDmOnly}
+            onToggleSelectedDmOnly={handleToggleSelectedDmOnly}
+            measureSharing={{
+              enabled: measureSharing,
+              onChange: handleSetMeasureSharing,
+            }}
           />
         )}
-        {viewport && (
-          <div className="border-divider absolute top-[7rem] left-1/2 z-10 max-w-[92vw] -translate-x-1/2 overflow-hidden rounded-xl border shadow-lg xl:top-14 xl:rounded-t-none xl:border-t-0">
-            <DmLocationToolOptions mode="battlemap" />
-          </div>
-        )}
+        {viewport && children}
       </div>
     </ViewportContext.Provider>
   );

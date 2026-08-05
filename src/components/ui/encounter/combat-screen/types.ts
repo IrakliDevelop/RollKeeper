@@ -19,12 +19,24 @@ export interface EntityActions {
   ) => void;
   onUseAbility: (entityId: string, abilityId: string) => void;
   onRestoreAbility: (entityId: string, abilityId: string) => void;
+  /** Atomic resource spend; false = rejected (insufficient/deleted). */
+  onSpendResource: (
+    entityId: string,
+    resourceId: string,
+    amount: number
+  ) => boolean;
+  onRestoreResource: (
+    entityId: string,
+    resourceId: string,
+    amount: number
+  ) => void;
   onUseLegendaryAction: (entityId: string, actionId: string) => void;
   onResetLegendaryActions: (entityId: string) => void;
   onSetConcentration: (entityId: string, spellName: string | null) => void;
   onUseLairAction: (entityId: string, actionId: string) => void;
   onSetInitiative: (entityId: string, value: number) => void;
   onLongRest: (entityId: string) => void;
+  onShortRest: (entityId: string) => void;
   onViewPlayer?: (playerCharacterId: string) => void;
   onViewNPC?: (npcSourceId: string, entityId: string) => void;
   onChangePlayerColor?: (

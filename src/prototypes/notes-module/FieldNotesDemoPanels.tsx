@@ -86,11 +86,6 @@ const TOOL_DEFS: {
   { name: 'laser', icon: Zap, label: 'Laser Pointer' },
 ];
 
-/** Viewport exposes historyRecorder for batched deletes (same as keyboard). */
-type ViewportHistoryAccess = {
-  historyRecorder: { begin: () => void; commit: () => void };
-};
-
 const ALIGN_BUTTONS: {
   edge: AlignEdge;
   icon: typeof AlignStartHorizontal;
@@ -374,13 +369,7 @@ export function FieldNotesDemoToolbar({
 
   const handleDeleteSelected = () => {
     if (selectedIds.length === 0) return;
-    const { historyRecorder } = viewport as unknown as ViewportHistoryAccess;
-    historyRecorder.begin();
-    for (const id of selectedIds) {
-      viewport.store.remove(id);
-    }
-    historyRecorder.commit();
-    viewport.requestRender();
+    viewport.removeElements(selectedIds);
   };
 
   const handleExport = () => {

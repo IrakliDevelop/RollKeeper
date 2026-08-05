@@ -5,10 +5,11 @@ import type {
   MonsterStatBlock,
 } from '@/types/encounter';
 import type { ProcessedMonster } from '@/types/bestiary';
+import { monsterToEncounterEntity } from '@/utils/encounterConverter';
 import {
-  monsterToEncounterEntity,
-  buildAbilitiesFromStatBlock,
-} from '@/utils/encounterConverter';
+  ensureStatBlockEntryIds,
+  buildAbilitiesFromNormalizedBlock,
+} from '@/utils/statBlockAbilities';
 import { buildNpcSpellcasting } from './buildNpcSpellcasting';
 import { parseArmorClass, parseAcBonus } from '@/utils/calculations';
 
@@ -32,6 +33,7 @@ export interface CampaignPlayer {
   currentHp: number;
   maxHp: number;
   dexterity: number;
+  avatarUrl?: string;
 }
 
 export function buildPlayerEntity(
@@ -53,6 +55,7 @@ export function buildPlayerEntity(
     campaignCode,
     isHidden: false,
     color: playerColors?.[player.id],
+    avatarUrl: player.avatarUrl,
   };
 }
 
@@ -67,8 +70,11 @@ export function buildNpcEntity(
   npc: CampaignNPC,
   opts: NpcBuildOpts
 ): Omit<EncounterEntity, 'id'> {
-  const abilities = npc.monsterStatBlock
-    ? buildAbilitiesFromStatBlock(npc.monsterStatBlock)
+  const statBlock = npc.monsterStatBlock
+    ? ensureStatBlockEntryIds(npc.monsterStatBlock)
+    : undefined;
+  const abilities = statBlock
+    ? buildAbilitiesFromNormalizedBlock(statBlock, npc.abilityUsage, 'npc')
     : [];
 
   return {
@@ -93,12 +99,14 @@ export function buildNpcEntity(
     isHidden: opts.isHidden,
     playerAlias: opts.playerAlias,
     playerDisposition: opts.playerDisposition,
-    monsterStatBlock: npc.monsterStatBlock,
+    monsterStatBlock: statBlock,
     abilities,
     hitDice: npc.hitDice ? { ...npc.hitDice } : undefined,
     npcSourceId: npc.id,
     campaignCode: opts.campaignCode,
     spellcasting: buildNpcSpellcasting(npc),
+    resources: npc.resources?.map(r => ({ ...r })),
+    avatarUrl: npc.avatarUrl,
   };
 }
 
@@ -162,6 +170,10 @@ export interface CustomBuildOpts {
 export function buildCustomEntity(
   opts: CustomBuildOpts
 ): Omit<EncounterEntity, 'id'> {
+  const statBlock = opts.statBlock
+    ? ensureStatBlockEntryIds(opts.statBlock)
+    : undefined;
+
   return {
     type: opts.type,
     name: opts.name.trim(),
@@ -176,9 +188,9 @@ export function buildCustomEntity(
     isHidden: opts.isHidden,
     playerAlias: opts.playerAlias?.trim() || undefined,
     playerDisposition: opts.playerDisposition,
-    monsterStatBlock: opts.statBlock,
-    abilities: opts.statBlock
-      ? buildAbilitiesFromStatBlock(opts.statBlock)
+    monsterStatBlock: statBlock,
+    abilities: statBlock
+      ? buildAbilitiesFromNormalizedBlock(statBlock)
       : undefined,
   };
 }
