@@ -53,16 +53,19 @@ export function DmVttTopBar({
   onModeChange,
 }: DmVttTopBarProps) {
   return (
-    <div className="flex min-h-[44px] min-w-0 items-center justify-center gap-2 px-2 py-1 sm:gap-3 sm:px-3">
-      <Link href={`/dm/campaign/${campaignCode}/battlemaps`}>
+    <div className="scrollbar-thin flex min-h-[52px] min-w-0 items-center justify-start gap-2 overflow-x-auto overscroll-x-contain px-2 py-1 sm:gap-3 sm:px-3">
+      <Link
+        href={`/dm/campaign/${campaignCode}/battlemaps`}
+        className="shrink-0"
+      >
         <Button variant="ghost" size="lg" aria-label="Back to battle maps">
           <ArrowLeft size={18} />
         </Button>
       </Link>
-      <span className="text-heading min-w-0 flex-1 truncate text-sm font-semibold sm:max-w-[160px] sm:flex-none">
+      <span className="text-heading min-w-[5rem] flex-1 truncate text-sm font-semibold sm:max-w-[160px] sm:flex-none">
         {mapName}
       </span>
-      <div className="border-divider flex items-center gap-0.5 rounded-lg border p-0.5">
+      <div className="border-divider flex shrink-0 items-center gap-0.5 rounded-lg border p-0.5">
         {GRID_OPTIONS.map(({ key, label }) => (
           <Button
             key={key}
@@ -101,7 +104,7 @@ export function DmVttTopBar({
               : 'Connecting…'}
         </span>
       </span>
-      <div className="border-divider flex items-center gap-0.5 rounded-lg border p-0.5">
+      <div className="border-divider flex shrink-0 items-center gap-0.5 rounded-lg border p-0.5">
         {MODE_OPTIONS.map(({ key, label }) => (
           <Button
             key={key}
