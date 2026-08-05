@@ -80,6 +80,22 @@ describe('BattleMapMinimap', () => {
     ).toBeNull();
   });
 
+  it('supports a bottom-left placement for the DM canvas', () => {
+    render(
+      <FieldNotesCanvas>
+        <BattleMapMinimap placement="bottom-left" />
+      </FieldNotesCanvas>
+    );
+
+    const wrapper = screen
+      .getByRole('button', { name: 'Collapse minimap' })
+      .closest('[data-minimap-placement]');
+    expect(wrapper).toHaveAttribute('data-minimap-placement', 'bottom-left');
+    expect(wrapper?.className).toContain('bottom-3');
+    expect(wrapper?.className).toContain('left-3');
+    expect(wrapper?.className).not.toContain('left-1/2');
+  });
+
   it('clicking expand from a collapsed state reveals the canvas (player flow: collapsed -> tap -> overview)', () => {
     const { container } = render(
       <FieldNotesCanvas>

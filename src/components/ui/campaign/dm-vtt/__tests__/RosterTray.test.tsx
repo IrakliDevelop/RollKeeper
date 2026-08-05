@@ -91,6 +91,15 @@ describe('RosterTray', () => {
     expect(screen.getByText('Goblin')).toBeInTheDocument();
   });
 
+  it('sizes to its content with a viewport-aware height cap', () => {
+    render(<RosterTray {...baseProps()} />);
+    const panel = screen.getByTestId('dm-vtt-roster-panel');
+
+    expect(panel.className).not.toContain('bottom-0');
+    expect(panel.className).toContain('max-h-[70vh]');
+    expect(panel.style.maxHeight).toContain('70dvh');
+  });
+
   it('dims a placed row and shows "On map"; clicking it calls onSelectEntity', () => {
     const onSelectEntity = vi.fn();
     const onArmPlacement = vi.fn();

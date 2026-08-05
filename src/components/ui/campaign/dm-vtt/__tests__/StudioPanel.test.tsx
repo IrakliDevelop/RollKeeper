@@ -146,6 +146,29 @@ describe('StudioPanel', () => {
     ]);
   });
 
+  it('keeps initiative content-sized with a viewport-aware height cap', () => {
+    render(<StudioPanel {...baseProps()} />);
+    const panel = screen.getByTestId('dm-vtt-studio-panel');
+
+    expect(panel).toHaveAttribute('data-active-tab', 'initiative');
+    expect(panel.className).not.toContain('bottom-0');
+    expect(panel.className).toContain('max-h-[70vh]');
+    expect(panel.style.maxHeight).toContain('70dvh');
+  });
+
+  it('lets selected details use all remaining viewport height', () => {
+    render(
+      <StudioPanel
+        {...baseProps({ activeTab: 'selected', selectedEntityId: 'm1' })}
+      />
+    );
+    const panel = screen.getByTestId('dm-vtt-studio-panel');
+
+    expect(panel).toHaveAttribute('data-active-tab', 'selected');
+    expect(panel.style.maxHeight).not.toContain('min(70dvh');
+    expect(panel.style.maxHeight).toContain('100dvh');
+  });
+
   it('clicking a row calls onSelectEntity with that entity id', () => {
     const onSelectEntity = vi.fn();
     render(<StudioPanel {...baseProps({ onSelectEntity })} />);
