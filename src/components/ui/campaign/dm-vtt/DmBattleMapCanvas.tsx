@@ -1,6 +1,7 @@
 'use client';
 
 import { FieldNotesCanvas, ViewportContext } from '@fieldnotes/react';
+import { BattleMapMinimap } from '@/components/ui/campaign/location-map/BattleMapMinimap';
 import { DmVttToolbar } from './DmVttToolbar';
 import {
   useDmBattleMapCanvas,
@@ -63,6 +64,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
           />
         )}
         {viewport && children}
+        {viewport && <BattleMapMinimap />}
       </div>
     </ViewportContext.Provider>
   );
