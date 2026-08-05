@@ -62,7 +62,7 @@ export function StudioPanel({
       <button
         onClick={onToggleCollapsed}
         title="Expand combat panel"
-        className="bg-surface-raised border-divider text-heading pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-4 flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-3 text-xs font-bold tracking-wider shadow-xl"
+        className="bg-surface-raised border-divider text-heading pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-0 flex min-h-[44px] items-center gap-1.5 rounded-l-2xl border px-3 text-xs font-bold tracking-wider shadow-xl"
       >
         <span aria-hidden>📋</span> COMBAT
       </button>
@@ -74,7 +74,7 @@ export function StudioPanel({
   );
 
   return (
-    <div className="bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-4 flex max-h-[calc(100vh-var(--dm-vtt-panel-top,8rem)-1.5rem)] w-[min(390px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border shadow-xl">
+    <div className="bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-0 bottom-0 flex w-[min(390px,40vw)] flex-col overflow-hidden rounded-tl-2xl border shadow-xl">
       <div className="border-divider flex shrink-0 items-center justify-between gap-2 border-b px-2 py-1.5">
         <div className="flex items-center gap-1">
           {TABS.map(({ key, icon, label }) => (
@@ -94,7 +94,7 @@ export function StudioPanel({
             href={encounterHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-accent-blue-text px-1 text-xs font-semibold hover:underline"
+            className="text-accent-blue-text hidden px-1 text-xs font-semibold hover:underline lg:block"
           >
             Encounter page ↗
           </Link>
