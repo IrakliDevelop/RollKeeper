@@ -38,6 +38,7 @@ import {
   type Tool,
   type Viewport,
 } from '@fieldnotes/core';
+import { BattleMapMinimap } from './BattleMapMinimap';
 import { PlayerHandTool } from './PlayerHandTool';
 import {
   createManagedBattleMapConnection,
@@ -412,6 +413,7 @@ export function PlayerBattleMapCanvas({
           </div>
         )}
         {viewport && children}
+        {viewport && <BattleMapMinimap defaultCollapsed />}
       </div>
     </ViewportContext.Provider>
   );
