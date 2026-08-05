@@ -80,6 +80,22 @@ describe('BattleMapMinimap', () => {
     ).toBeNull();
   });
 
+  it('places the player minimap at the bottom-center edge by default', () => {
+    render(
+      <FieldNotesCanvas>
+        <BattleMapMinimap />
+      </FieldNotesCanvas>
+    );
+
+    const wrapper = screen
+      .getByRole('button', { name: 'Collapse minimap' })
+      .closest('[data-minimap-placement]');
+    expect(wrapper).toHaveAttribute('data-minimap-placement', 'bottom-center');
+    expect(wrapper?.className).toContain('bottom-3');
+    expect(wrapper?.className).toContain('left-1/2');
+    expect(wrapper?.className).not.toContain('bottom-20');
+  });
+
   it('supports a bottom-left placement for the DM canvas', () => {
     render(
       <FieldNotesCanvas>
