@@ -85,3 +85,65 @@ describe('DmLocationToolOptions pencil options', () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe('DmLocationToolOptions measure sharing control', () => {
+  beforeEach(() => {
+    mockActiveTool = 'measure';
+    mockToolOptions = { measure: { color: '#FF5722', feetPerCell: 5 } };
+    for (const key of Object.keys(setOptionsSpies)) delete setOptionsSpies[key];
+  });
+
+  afterEach(() => cleanup());
+
+  it('renders no share control when measureSharing is not provided', () => {
+    render(<DmLocationToolOptions mode="battlemap" />);
+
+    expect(screen.queryByLabelText(/share with players/i)).toBeNull();
+  });
+
+  it('renders the share toggle unchecked by default state and fires onChange', () => {
+    const onChange = vi.fn();
+    render(
+      <DmLocationToolOptions
+        mode="battlemap"
+        measureSharing={{ enabled: false, onChange }}
+      />
+    );
+
+    const toggle = screen.getByLabelText(/share with players/i);
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+
+    fireEvent.click(toggle);
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it('reflects enabled sharing state', () => {
+    const onChange = vi.fn();
+    render(
+      <DmLocationToolOptions
+        mode="battlemap"
+        measureSharing={{ enabled: true, onChange }}
+      />
+    );
+
+    const toggle = screen.getByLabelText(/share with players/i);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('sets measureOpts.color when a swatch is clicked', () => {
+    render(<DmLocationToolOptions mode="battlemap" />);
+
+    fireEvent.click(screen.getByTitle('#22c55e'));
+    expect(setOptionsSpies['measure']).toHaveBeenCalledWith({
+      color: '#22c55e',
+    });
+  });
+
+  it('reflects measureOpts.color as the active color for the measure tool', () => {
+    mockToolOptions = { measure: { color: '#3b82f6', feetPerCell: 5 } };
+    render(<DmLocationToolOptions mode="battlemap" />);
+
+    const swatch = screen.getByTitle('#3b82f6');
+    expect(swatch.className).toContain('border-accent-blue-border');
+  });
+});

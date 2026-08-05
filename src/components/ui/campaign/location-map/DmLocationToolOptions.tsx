@@ -15,6 +15,7 @@ import type {
   TextToolOptions,
 } from '@fieldnotes/core';
 import { useActiveTool, useToolOptions } from '@fieldnotes/react';
+import { Switch } from '@/components/ui/forms/switch';
 import type { EditorMode } from './DmLocationEditor.types';
 
 const COLOR_SWATCHES = [
@@ -56,12 +57,19 @@ const TEMPLATE_RENDER_STYLES: {
   },
 ];
 
+export interface MeasureSharingControl {
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+}
+
 interface DmLocationToolOptionsProps {
   mode?: EditorMode;
+  measureSharing?: MeasureSharingControl;
 }
 
 export default function DmLocationToolOptions({
   mode = 'location',
+  measureSharing,
 }: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
   const [pencilOpts, setPencilOpts] = useToolOptions<
@@ -123,7 +131,9 @@ export default function DmLocationToolOptions({
                 ? arrowOpts?.color
                 : activeTool === 'pencil'
                   ? pencilOpts?.color
-                  : '#334155';
+                  : activeTool === 'measure'
+                    ? measureOpts?.color
+                    : '#334155';
 
   const handleColorChange = (color: string) => {
     if (activeTool === 'shape') setShapeOpts({ strokeColor: color });
@@ -134,6 +144,7 @@ export default function DmLocationToolOptions({
     else if (activeTool === 'template') setTemplateOpts({ strokeColor: color });
     else if (activeTool === 'laser') setLaserOpts({ color });
     else if (activeTool === 'ping') setPingOpts({ color });
+    else if (activeTool === 'measure') setMeasureOpts({ color });
   };
 
   return (
@@ -347,6 +358,19 @@ export default function DmLocationToolOptions({
           <span className="text-muted w-8 text-xs">
             {measureOpts.feetPerCell ?? 5}
           </span>
+          {measureSharing && (
+            <>
+              <div className="bg-divider h-6 w-px" />
+              <label className="text-muted flex items-center gap-2 text-xs font-medium">
+                Share with players
+                <Switch
+                  checked={measureSharing.enabled}
+                  onCheckedChange={measureSharing.onChange}
+                  aria-label="Share with players"
+                />
+              </label>
+            </>
+          )}
         </>
       )}
 
