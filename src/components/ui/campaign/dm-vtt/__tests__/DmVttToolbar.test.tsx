@@ -32,7 +32,7 @@ describe('DmVttToolbar', () => {
     ).toBeInTheDocument();
   });
 
-  it('uses one wrapping command dock instead of an independently positioned tool strip', () => {
+  it('uses an edge-to-edge responsive command rail', () => {
     const { container } = render(
       <DmVttToolbar
         onClearDrawings={vi.fn()}
@@ -49,10 +49,10 @@ describe('DmVttToolbar', () => {
     const dock = container.firstChild as HTMLElement;
     expect(dock).toHaveAttribute('data-testid', 'dm-vtt-command-dock');
     expect(dock.className).toContain('flex-col');
-    expect(dock.className).toContain('w-fit');
-    expect(dock.className).toContain('max-w-[calc(100%-2rem)]');
-    expect(dock.className).not.toContain('overflow-x-auto');
-    expect(dock.querySelector('.flex-wrap')).toBeInTheDocument();
+    expect(dock.className).toContain('inset-x-0');
+    expect(dock.className).toContain('w-full');
+    expect(dock.className).toContain('2xl:flex-row');
+    expect(dock.querySelector('.overflow-x-auto')).toBeInTheDocument();
   });
 
   it('toggles hidden placement and offers reveal all', () => {

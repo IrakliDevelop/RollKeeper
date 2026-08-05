@@ -124,12 +124,16 @@ export function DmVttToolbar({
   return (
     <div
       ref={dockRef}
-      className="bg-surface-raised border-divider pointer-events-auto fixed top-3 left-1/2 z-20 flex w-fit max-w-[calc(100%-2rem)] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border shadow-xl min-[1512px]:max-w-[1480px]"
+      className="bg-surface-raised border-divider pointer-events-auto fixed inset-x-0 top-0 z-20 flex w-full flex-col overflow-hidden border-b shadow-xl 2xl:flex-row 2xl:flex-wrap"
       data-testid="dm-vtt-command-dock"
     >
-      {sessionControls}
-      <div className="border-divider flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t p-1">
-        <div className="flex flex-wrap items-center justify-center gap-1">
+      {sessionControls && (
+        <div className="border-divider min-w-0 shrink-0 border-b 2xl:border-r 2xl:border-b-0">
+          {sessionControls}
+        </div>
+      )}
+      <div className="scrollbar-thin flex min-w-0 flex-1 items-center gap-3 overflow-x-auto overscroll-x-contain px-2 py-1">
+        <div className="flex shrink-0 items-center gap-1">
           {DM_TOOLS.map(({ name, label, Icon }) => (
             <Button
               key={name}
@@ -143,7 +147,7 @@ export function DmVttToolbar({
             </Button>
           ))}
         </div>
-        <div className="border-divider flex flex-wrap items-center justify-center gap-1 border-l pl-3">
+        <div className="border-divider flex shrink-0 items-center gap-1 border-l pl-3">
           <Button
             variant={hiddenPlacementActive ? 'warning' : 'ghost'}
             onClick={onToggleHiddenPlacement}
@@ -221,7 +225,7 @@ export function DmVttToolbar({
           </Button>
         </div>
       </div>
-      <div className="border-divider border-t empty:hidden">
+      <div className="border-divider w-full border-t empty:hidden">
         <DmLocationToolOptions
           mode="battlemap"
           measureSharing={measureSharing}
