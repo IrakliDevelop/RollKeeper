@@ -63,8 +63,8 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
             }}
           />
         )}
-        {viewport && children}
         {viewport && <BattleMapMinimap />}
+        {viewport && children}
       </div>
     </ViewportContext.Provider>
   );

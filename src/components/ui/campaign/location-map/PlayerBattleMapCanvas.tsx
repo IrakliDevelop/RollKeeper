@@ -412,8 +412,8 @@ export function PlayerBattleMapCanvas({
             </Link>
           </div>
         )}
-        {viewport && children}
         {viewport && <BattleMapMinimap defaultCollapsed />}
+        {viewport && children}
       </div>
     </ViewportContext.Provider>
   );
