@@ -112,6 +112,28 @@ describe('BattleMapMinimap', () => {
     expect(wrapper?.className).not.toContain('left-1/2');
   });
 
+  it('prevents browser zoom for wheel gestures over the minimap', () => {
+    render(
+      <FieldNotesCanvas>
+        <BattleMapMinimap />
+      </FieldNotesCanvas>
+    );
+
+    const wrapper = screen
+      .getByRole('button', { name: 'Collapse minimap' })
+      .closest('[data-minimap-placement]')!;
+    const wheel = new WheelEvent('wheel', {
+      bubbles: true,
+      cancelable: true,
+      deltaY: -100,
+      ctrlKey: true,
+    });
+
+    wrapper.dispatchEvent(wheel);
+
+    expect(wheel.defaultPrevented).toBe(true);
+  });
+
   it('clicking expand from a collapsed state reveals the canvas (player flow: collapsed -> tap -> overview)', () => {
     const { container } = render(
       <FieldNotesCanvas>

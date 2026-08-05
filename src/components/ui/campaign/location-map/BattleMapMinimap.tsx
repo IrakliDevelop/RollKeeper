@@ -1,6 +1,9 @@
 'use client';
 
-import { Minimap } from '@fieldnotes/react';
+import { useEffect, useRef } from 'react';
+import { Minimap, useViewport } from '@fieldnotes/react';
+
+const ZOOM_SENSITIVITY = 1e-3;
 
 interface BattleMapMinimapProps {
   /** Player surfaces start collapsed (quiet player UI); DM starts open. */
@@ -33,8 +36,36 @@ export function BattleMapMinimap({
   defaultCollapsed = false,
   placement = 'bottom-center',
 }: BattleMapMinimapProps) {
+  const viewport = useViewport();
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const visibleRect = viewport.getVisibleRect();
+      const currentZoom = viewport.camera.zoom;
+      const zoomFactor = Math.max(0.1, 1 - event.deltaY * ZOOM_SENSITIVITY);
+
+      // The gesture originates on the overview rather than the main canvas,
+      // so preserve the main viewport's center as the stable zoom anchor.
+      viewport.camera.zoomAt(currentZoom * zoomFactor, {
+        x: (visibleRect.w * currentZoom) / 2,
+        y: (visibleRect.h * currentZoom) / 2,
+      });
+    };
+
+    wrapper.addEventListener('wheel', handleWheel, { passive: false });
+    return () => wrapper.removeEventListener('wheel', handleWheel);
+  }, [viewport]);
+
   return (
     <div
+      ref={wrapperRef}
       className={`absolute z-10 ${
         placement === 'bottom-left'
           ? 'bottom-3 left-3'
