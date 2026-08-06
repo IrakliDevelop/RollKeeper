@@ -52,15 +52,14 @@ describe('statBlockHtmlToPlainText', () => {
 });
 
 describe('plainTextToBadgedHtml', () => {
-  test('badges attack label, to-hit, and damage dice with correct classes/titles', () => {
+  test('formats attack label, to-hit, and damage dice with restrained typography', () => {
     const result = plainTextToBadgedHtml(ZOMBIE_PLAIN);
 
-    expect(result).toContain(
-      'data-app-icon="attack" title="Melee Weapon Attack:"'
-    );
-    expect(result).toContain('data-app-icon="target" title="+3"');
-    expect(result).toContain('data-app-icon="damage" title="1d6 + 1"');
-    expect(result).toContain('lucide-swords app-inline-icon');
+    expect(result).toContain('<strong><em>Melee Weapon Attack:</em></strong>');
+    expect(result).toContain('<strong>+3</strong>');
+    expect(result).toContain('<strong>1d6 + 1</strong>');
+    expect(result).not.toContain('data-app-icon');
+    expect(result).not.toContain('<svg');
     expect(result).toContain('to hit, reach 5 ft., one target.');
     expect(result).toContain('bludgeoning damage.');
   });
@@ -69,8 +68,7 @@ describe('plainTextToBadgedHtml', () => {
     const result = plainTextToBadgedHtml(
       'The target must succeed on a DC 13 Wisdom saving throw.'
     );
-    expect(result).toContain('data-app-icon="save" title="DC 13"');
-    expect(result).toContain('lucide-shield app-inline-icon');
+    expect(result).toContain('<strong>DC 13</strong>');
   });
 
   test('HTML-escapes plain text before badging', () => {
@@ -80,18 +78,16 @@ describe('plainTextToBadgedHtml', () => {
 
   test('badges "Ranged Weapon Attack:" and "Melee or Ranged Weapon Attack:" labels', () => {
     expect(plainTextToBadgedHtml('Ranged Weapon Attack: +5 to hit')).toContain(
-      'data-app-icon="attack" title="Ranged Weapon Attack:"'
+      '<strong><em>Ranged Weapon Attack:</em></strong>'
     );
     expect(
       plainTextToBadgedHtml('Melee or Ranged Weapon Attack: +5 to hit')
-    ).toContain(
-      'data-app-icon="attack" title="Melee or Ranged Weapon Attack:"'
-    );
+    ).toContain('<strong><em>Melee or Ranged Weapon Attack:</em></strong>');
   });
 
   test('badges bare "Melee Attack:" / "Ranged Attack:" labels', () => {
     expect(plainTextToBadgedHtml('Melee Attack: +4 to hit')).toContain(
-      'data-app-icon="attack" title="Melee Attack:"'
+      '<strong><em>Melee Attack:</em></strong>'
     );
   });
 
@@ -99,9 +95,9 @@ describe('plainTextToBadgedHtml', () => {
     const result = plainTextToBadgedHtml(
       'Melee Weapon Attack: +3 to hit, 4 (1d6 + 1) bludgeoning damage. DC 13 save.'
     );
-    // Only one span per distinct badge type/value expected, not nested/duplicated matches.
-    const spanCount = (result.match(/<span /g) || []).length;
-    expect(spanCount).toBe(4);
+    // One strong element per distinct type/value, with no nested rematches.
+    const strongCount = (result.match(/<strong>/g) || []).length;
+    expect(strongCount).toBe(4);
   });
 
   test('is collision-proof against user text containing the literal placeholder token', () => {
@@ -112,24 +108,25 @@ describe('plainTextToBadgedHtml', () => {
     // internal `<<SBT_BADGE_N>>` substitution sentinel (which is only ever
     // introduced after escaping).
     expect(result).toContain('&lt;&lt;SBT_BADGE_0&gt;&gt;');
-    expect(result).toContain('data-app-icon="target" title="+3"');
+    expect(result).toContain('<strong>+3</strong>');
     expect(result).not.toContain('undefined');
   });
 });
 
 describe('renderStatBlockEntryText', () => {
-  test('upgrades legacy badge icons without changing their text', () => {
+  test('normalizes legacy badge icons to typography without changing text', () => {
     const result = renderStatBlockEntryText(ZOMBIE_HTML);
     expect(result).not.toMatch(/⚔️|🎯|💥/u);
-    expect(result).toContain('data-app-icon="attack"');
-    expect(result).toContain('data-app-icon="target"');
-    expect(result).toContain('data-app-icon="damage"');
+    expect(result).toContain('<strong><em>Melee Weapon Attack:</em></strong>');
+    expect(result).toContain('<strong>+3</strong>');
+    expect(result).toContain('<strong>1d6 + 1</strong>');
+    expect(result).not.toContain('data-app-icon');
     expect(statBlockHtmlToPlainText(result)).toBe(ZOMBIE_PLAIN);
   });
 
-  test('badges plain text input', () => {
+  test('formats plain text input', () => {
     const result = renderStatBlockEntryText(ZOMBIE_PLAIN);
-    expect(result).toContain('<span');
+    expect(result).toContain('<strong>');
     expect(result).toContain('to hit');
   });
 

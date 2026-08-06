@@ -179,32 +179,6 @@ export const WEATHER_ICONS = {
   cold: 'weatherCold',
 } as const satisfies Record<string, IconName>;
 
-export const REFERENCE_ICONS = {
-  item: 'item',
-  spell: 'spell',
-  filter: 'search',
-  dice: 'dice',
-  creature: 'monster',
-  condition: 'inspiration',
-  action: 'abilities',
-  skill: 'target',
-  sense: 'visibility',
-  damage: 'damage',
-  scaledamage: 'experience',
-  atk: 'attack',
-  atkr: 'rangedAttack',
-  hit: 'target',
-  h: 'damage',
-  dc: 'save',
-  actSave: 'save',
-  actSaveFail: 'remove',
-  actSaveSuccess: 'confirm',
-  actTrigger: 'reaction',
-  actResponse: 'reaction',
-  hitYourSpellAttack: 'spell',
-  unknown: 'unknown',
-} as const satisfies Record<string, IconName>;
-
 export function getIconName<T extends string>(
   mapping: Partial<Record<T, IconName>>,
   value: T | null | undefined,

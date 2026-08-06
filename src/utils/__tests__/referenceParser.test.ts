@@ -37,9 +37,26 @@ describe('parseReferences', () => {
     const result = parseReferences('Cast {@spell Fireball|PHB} now.');
     expect(result.html).not.toContain('{@spell');
     expect(result.html).toContain('Fireball');
-    expect(result.html).toContain('data-app-icon="spell"');
-    expect(result.html).toContain('lucide-wand-sparkles');
+    expect(result.html).toContain('<em>Fireball</em>');
+    expect(result.html).not.toContain('data-app-icon');
+    expect(result.html).not.toContain('<svg');
     expect(result.html).not.toContain('✨');
+  });
+
+  it('uses restrained typography for dense rules references', () => {
+    const result = parseReferences(
+      '{@atk mw} {@hit 7} to hit. {@h 8} ({@damage 1d8 + 4}) damage; {@condition prone}.'
+    );
+
+    expect(result.html).toContain(
+      '<strong><em>Melee Weapon Attack:</em></strong>'
+    );
+    expect(result.html).toContain('<strong>+7</strong>');
+    expect(result.html).toContain('<strong><em>Hit: 8</em></strong>');
+    expect(result.html).toContain('<strong>1d8 + 4</strong>');
+    expect(result.html).toContain('underline decoration-dotted');
+    expect(result.html).not.toContain('data-app-icon');
+    expect(result.html).not.toContain('<svg');
   });
 
   it('handles mixed text with multiple reference types', () => {
@@ -163,9 +180,9 @@ describe('hasReferences', () => {
 });
 
 describe('getFormattedHtml', () => {
-  it('returns HTML string with references converted to spans', () => {
+  it('returns HTML with references converted to semantic typography', () => {
     const html = getFormattedHtml('{@spell Fireball|PHB}');
-    expect(html).toContain('<span');
+    expect(html).toContain('<em>Fireball</em>');
     expect(html).toContain('Fireball');
     expect(html).not.toContain('{@spell');
   });
