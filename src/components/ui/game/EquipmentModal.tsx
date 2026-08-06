@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/feedback/dialog';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { Button } from '@/components/ui/forms/button';
+import { AppIcon } from '@/components/ui/icons';
 import { WeaponForm, MagicItemForm } from './equipment';
 import { WeaponCard } from './equipment/WeaponCard';
 import { MagicItemCard } from './equipment/MagicItemCard';
@@ -413,7 +414,11 @@ export default function EquipmentModal({
     >
       <DialogContent size="xl">
         <DialogHeader>
-          <DialogTitle>{`⚔️ Equipment & Magic Items (Attunement: ${totalAttuned}/${character.attunementSlots.max})`}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <AppIcon name="inventory" className="h-5 w-5" />
+            Equipment & Magic Items (Attunement: {totalAttuned}/
+            {character.attunementSlots.max})
+          </DialogTitle>
         </DialogHeader>
         <DialogBody>
           {/* Show forms if active, otherwise show main content */}

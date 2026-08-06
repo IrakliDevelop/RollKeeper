@@ -19,6 +19,7 @@ import { HitPoints, ClassInfo } from '@/types/character';
 import { isDying, isDead, isStabilized } from '@/utils/hpCalculations';
 import { Button } from '@/components/ui/forms';
 import { NumberField } from '@/components/ui/forms/NumberInput';
+import { AppIcon, type IconName } from '@/components/ui/icons';
 
 interface HitPointTrackerProps {
   hitPoints: HitPoints;
@@ -197,12 +198,12 @@ export function HitPointTracker({
     return 'text-accent-green-text';
   };
 
-  const getStatusText = () => {
-    if (isCharacterDead) return '💀 Dead';
-    if (isCharacterDying) return '💔 Dying';
-    if (isCharacterStabilized) return '😵 Stabilized';
-    if (isUnconscious) return '😵 Unconscious';
-    return '❤️ Alive';
+  const getStatus = (): { icon: IconName; text: string } => {
+    if (isCharacterDead) return { icon: 'monster', text: 'Dead' };
+    if (isCharacterDying) return { icon: 'criticalFailure', text: 'Dying' };
+    if (isCharacterStabilized) return { icon: 'confirm', text: 'Stabilized' };
+    if (isUnconscious) return { icon: 'prohibited', text: 'Unconscious' };
+    return { icon: 'healing', text: 'Alive' };
   };
 
   const containerClasses = compact
@@ -225,9 +226,10 @@ export function HitPointTracker({
             Hit Points
           </h3>
           <div
-            className={`rounded-full px-3 py-1 text-sm font-medium ${getStatusColor()}`}
+            className={`flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${getStatusColor()}`}
           >
-            {getStatusText()}
+            <AppIcon name={getStatus().icon} className="h-3.5 w-3.5" />
+            {getStatus().text}
           </div>
         </div>
       )}

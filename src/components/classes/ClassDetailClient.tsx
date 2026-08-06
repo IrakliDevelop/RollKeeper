@@ -21,6 +21,7 @@ import {
   Circle,
   Info,
 } from 'lucide-react';
+import { AppIcon } from '@/components/ui/icons';
 
 interface ClassDetailClientProps {
   classData: ProcessedClass;
@@ -676,7 +677,10 @@ export default function ClassDetailClient({
                 <div className="border-divider bg-surface-raised rounded-xl border p-8 shadow-xl backdrop-blur-sm">
                   <div className="mb-6 flex items-center gap-3">
                     <div className="border-accent-amber-border bg-accent-amber-bg flex h-10 w-10 items-center justify-center rounded-lg border">
-                      <div className="text-accent-amber-text font-bold">⚔️</div>
+                      <AppIcon
+                        name="inventory"
+                        className="text-accent-amber-text h-5 w-5"
+                      />
                     </div>
                     <h3 className="text-heading text-2xl font-bold">
                       Starting Equipment

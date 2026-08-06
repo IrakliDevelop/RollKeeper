@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 
 import { Input } from '@/components/ui/forms/input';
+import { AppIcon } from '@/components/ui/icons';
 import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import type { ToastData } from '@/components/ui/feedback/Toast';
@@ -84,7 +85,7 @@ export function DockSpells(props: DockSpellsProps) {
   if (castableSpells.length === 0) {
     return (
       <div className="border-divider bg-surface-raised rounded-lg border-2 p-8 text-center">
-        <div className="mb-3 text-5xl">🔮</div>
+        <AppIcon name="spell" className="text-muted mx-auto mb-3 h-12 w-12" />
         <p className="text-heading text-lg font-semibold">No spells prepared</p>
         <p className="text-muted mt-2 text-sm">
           Prepare spells in the Spellcasting tab to see them here.

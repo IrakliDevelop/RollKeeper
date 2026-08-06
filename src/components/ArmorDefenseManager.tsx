@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { Input } from '@/components/ui/forms/input';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { AppIcon } from '@/components/ui/icons';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Checkbox } from '@/components/ui/forms/checkbox';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
@@ -611,7 +612,8 @@ function ArmorCard({
 
           {armor.stealthDisadvantage && (
             <Badge variant="danger" size="sm" className="mb-2">
-              ⚠️ Stealth Disadvantage
+              <AppIcon name="error" className="h-3.5 w-3.5" />
+              Stealth Disadvantage
             </Badge>
           )}
 

@@ -27,6 +27,7 @@ import {
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
+import { AppIcon } from '@/components/ui/icons';
 import {
   Dialog,
   DialogContent,
@@ -281,7 +282,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
   if (equippedWeapons.length === 0) {
     return (
       <div className="border-divider bg-surface-raised rounded-lg border p-6 text-center">
-        <div className="mb-3 text-5xl">🗡️</div>
+        <AppIcon name="weapon" className="text-muted mx-auto mb-3 h-12 w-12" />
         <p className="text-heading font-semibold">No weapons equipped</p>
         <p className="text-muted mt-1 text-sm">
           Equip weapons in the Equipment section to see them here.
@@ -353,13 +354,17 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                 {/* Attack and Damage stats */}
                 <div className="mb-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-muted">🎯 Attack:</span>
+                    <span className="text-muted flex items-center gap-1">
+                      <AppIcon name="attack" className="h-3.5 w-3.5" /> Attack:
+                    </span>
                     <span className="text-accent-red-text-muted font-bold">
                       {attackString}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-muted">⚔️ Damage:</span>
+                    <span className="text-muted flex items-center gap-1">
+                      <AppIcon name="damage" className="h-3.5 w-3.5" /> Damage:
+                    </span>
                     <span className="text-accent-blue-text-muted font-bold">
                       {damageString}
                     </span>
@@ -368,7 +373,10 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
 
                 {versatileDamageString && (
                   <div className="mb-3 flex items-center gap-1.5 text-sm">
-                    <span className="text-muted">🗡️ Versatile:</span>
+                    <span className="text-muted flex items-center gap-1">
+                      <AppIcon name="weapon" className="h-3.5 w-3.5" />{' '}
+                      Versatile:
+                    </span>
                     <span className="text-accent-purple-text-muted font-bold">
                       {versatileDamageString}
                     </span>
@@ -555,8 +563,10 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
 
       <div className="border-accent-blue-border bg-accent-blue-bg mt-4 rounded-lg border p-3">
         <p className="text-accent-blue-text text-center text-sm">
-          <strong>💡 Quick Reference:</strong> Manage your full weapon inventory
-          in the{' '}
+          <strong className="inline-flex items-center gap-1">
+            <AppIcon name="tip" className="h-3.5 w-3.5" /> Quick Reference:
+          </strong>{' '}
+          Manage your full weapon inventory in the{' '}
           <button
             onClick={() => switchToTab('equipment')}
             className="text-accent-blue-text-muted hover:text-accent-blue-text font-semibold underline transition-colors hover:no-underline"
