@@ -118,6 +118,7 @@ export function useDmBattleMapCanvas({
   const laserCleanupRef = useRef<(() => void) | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
   const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
+  const selectionUnsubRef = useRef<(() => void) | null>(null);
   const [hiddenPlacementActive, setHiddenPlacementActive] = useState(false);
   const hiddenPlacementActiveRef = useRef(false);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(
@@ -265,12 +266,14 @@ export function useDmBattleMapCanvas({
         annotationsLocked: false,
       }));
 
-      const selectTool = vp.toolManager.getTool<SelectTool>('select');
-      selectTool?.onSelectionChange(() => {
-        setSelectedElementId(
-          selectTool.selectedIds.length === 1 ? selectTool.selectedIds[0] : null
-        );
-        onSelectionChange?.(selectTool.selectedIds);
+      // `viewport.onSelectionChange` is a persistent, viewport-owned emitter
+      // (unlike the tool-level one, it works regardless of registration
+      // order) and `getSelectedIds()` never surfaces stale ids.
+      selectionUnsubRef.current?.();
+      selectionUnsubRef.current = vp.onSelectionChange(() => {
+        const ids = vp.getSelectedIds();
+        setSelectedElementId(ids.length === 1 ? ids[0] : null);
+        onSelectionChange?.(ids);
       });
 
       // Live sync — resolver reads Zustand LIVE via getState() (a captured
@@ -380,6 +383,7 @@ export function useDmBattleMapCanvas({
       laserCleanupRef.current?.();
       connectionRef.current?.stop();
       pinUnsubRef.current?.();
+      selectionUnsubRef.current?.();
     };
   }, []);
 

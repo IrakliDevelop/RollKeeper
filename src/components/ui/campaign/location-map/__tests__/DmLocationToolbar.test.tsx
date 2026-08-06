@@ -35,13 +35,6 @@ vi.mock('@fieldnotes/react', () => ({
   }),
 }));
 
-// The Delete button's count hook reads the viewport directly — stub it so
-// the toolbar renders without a canvas.
-vi.mock(
-  '@/components/ui/campaign/location-map/useSelectToolSelectionCount',
-  () => ({ useSelectToolSelectionCount: () => 0 })
-);
-
 const baseProps: DmLocationToolbarProps = {
   onPickImage: vi.fn(),
   onDelete: vi.fn(),
@@ -78,10 +71,11 @@ describe('DmLocationToolbar rotation buttons', () => {
 
   afterEach(() => cleanup());
 
-  it('renders both rotate buttons disabled when nothing is selected', () => {
+  it('renders both rotate buttons and the delete button disabled when nothing is selected', () => {
     render(<DmLocationToolbar {...baseProps} />);
     expect(screen.getByTitle('Rotate 90° clockwise')).toBeDisabled();
     expect(screen.getByTitle('Rotate 90° counter-clockwise')).toBeDisabled();
+    expect(screen.getByTitle('Delete selected')).toBeDisabled();
   });
 
   it('enables the buttons with a selection and forwards clicks', () => {
@@ -89,7 +83,9 @@ describe('DmLocationToolbar rotation buttons', () => {
     render(<DmLocationToolbar {...baseProps} />);
     const cw = screen.getByTitle('Rotate 90° clockwise');
     const ccw = screen.getByTitle('Rotate 90° counter-clockwise');
+    const del = screen.getByTitle('Delete selected');
     expect(cw).toBeEnabled();
+    expect(del).toBeEnabled();
     fireEvent.click(cw);
     fireEvent.click(ccw);
     expect(rotateCW).toHaveBeenCalledTimes(1);

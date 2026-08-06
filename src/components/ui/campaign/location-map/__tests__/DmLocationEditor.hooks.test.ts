@@ -33,26 +33,36 @@ function makeStubViewport() {
   const store = new ElementStore();
   const layerManager = new LayerManager(store);
 
-  // One pre-existing element so syncSelection (filters selectedIds against
-  // the store) and handleToggleDmOnly (`store.getById` guard) have something
-  // real to select. The id is SDK-generated, not a fixed string.
+  // One pre-existing element so syncSelection (via getSelectedIds()) and
+  // handleToggleDmOnly (`store.getById` guard) have something real to
+  // select. The id is SDK-generated, not a fixed string.
   const el = createShape({ position: { x: 0, y: 0 }, size: { w: 10, h: 10 } });
   store.add(el);
   const elementId = el.id;
   vi.spyOn(store, 'update');
 
-  const selectTool = { name: 'select', selectedIds: [elementId] };
+  // Mirrors the real Viewport's persistent selection emitter: `selectedIds`
+  // is mutable (delete flows below reassign it) so `getSelectedIds()` always
+  // reflects the current selection, same guarantee the real SDK makes.
+  const selectionState = { selectedIds: [elementId] as string[] };
+  const selectionListeners = new Set<() => void>();
   const vp = {
     store,
     layerManager,
-    // No parentElement → handleReady skips the pointer listeners; selection
-    // is driven by the direct syncSelection() call at the end of handleReady.
     domLayer: document.createElement('div'),
     toolManager: {
-      getTool: vi.fn(() => selectTool),
+      getTool: vi.fn(() => ({
+        name: 'select',
+        selectedIds: selectionState.selectedIds,
+      })),
       onChange: vi.fn(),
       activeTool: { name: 'select' },
     },
+    getSelectedIds: vi.fn(() => selectionState.selectedIds),
+    onSelectionChange: vi.fn((listener: () => void) => {
+      selectionListeners.add(listener);
+      return () => selectionListeners.delete(listener);
+    }),
     camera: {
       setZoom: vi.fn(),
       moveTo: vi.fn(),
@@ -71,6 +81,10 @@ function makeStubViewport() {
         store.remove(id);
         removed += 1;
       }
+      selectionState.selectedIds = selectionState.selectedIds.filter(id =>
+        store.getById(id)
+      );
+      for (const listener of selectionListeners) listener();
       return removed;
     }),
     requestRender: vi.fn(),
