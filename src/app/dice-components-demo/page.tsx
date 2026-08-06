@@ -7,6 +7,7 @@ import { DiceButton } from '@/components/ui/game/DiceButton';
 import NotHydrated from '@/components/ui/feedback/NotHydrated';
 import { RollSummary } from '@/types/dice';
 import { useHydration } from '@/hooks/useHydration';
+import { AppIcon } from '@/components/ui/icons';
 
 export default function DiceComponentsDemo() {
   const hasHydrated = useHydration();
@@ -24,7 +25,8 @@ export default function DiceComponentsDemo() {
       <div className="relative z-10 mx-auto max-w-6xl space-y-8">
         <div className="text-center">
           <h1 className="mb-4 text-3xl font-bold text-gray-900">
-            🎲 Modular Dice Components Demo
+            <AppIcon name="dice" className="mr-2 inline h-7 w-7" />
+            Modular Dice Components Demo
           </h1>
           <p className="mb-6 text-gray-600">
             Showcase of reusable dice rolling components that can be plugged
@@ -41,7 +43,8 @@ export default function DiceComponentsDemo() {
         {/* Full DiceRoller Component */}
         <section className="rounded-lg bg-white p-6 shadow">
           <h2 className="mb-4 text-2xl font-bold text-gray-800">
-            📦 Full DiceRoller Component
+            <AppIcon name="item" className="mr-2 inline h-6 w-6" />
+            Full DiceRoller Component
           </h2>
           <p className="mb-4 text-gray-600">
             Complete dice rolling interface with controls, history, and
@@ -78,7 +81,8 @@ export default function DiceComponentsDemo() {
         {/* Individual DiceButton Examples */}
         <section className="rounded-lg bg-white p-6 shadow">
           <h2 className="mb-4 text-2xl font-bold text-gray-800">
-            🎲 Individual DiceButton Components
+            <AppIcon name="dice" className="mr-2 inline h-6 w-6" />
+            Individual DiceButton Components
           </h2>
           <p className="mb-4 text-gray-600">
             Lightweight buttons that can be embedded anywhere
@@ -206,7 +210,8 @@ export default function DiceComponentsDemo() {
         {/* Minimal DiceRoller */}
         <section className="rounded-lg bg-white p-6 shadow">
           <h2 className="mb-4 text-2xl font-bold text-gray-800">
-            ⚡ Minimal DiceRoller
+            <AppIcon name="reaction" className="mr-2 inline h-6 w-6" />
+            Minimal DiceRoller
           </h2>
           <p className="mb-4 text-gray-600">
             Stripped down version with only essential features
@@ -228,7 +233,8 @@ export default function DiceComponentsDemo() {
         {/* Usage Examples */}
         <section className="rounded-lg bg-white p-6 shadow">
           <h2 className="mb-4 text-2xl font-bold text-gray-800">
-            📝 Usage Examples
+            <AppIcon name="features" className="mr-2 inline h-6 w-6" />
+            Usage Examples
           </h2>
 
           <div className="space-y-4">
@@ -286,7 +292,8 @@ export default function DiceComponentsDemo() {
         {/* Integration Notes */}
         <section className="rounded-lg border border-blue-200 bg-blue-50 p-6">
           <h2 className="mb-4 text-xl font-bold text-blue-800">
-            🔧 Integration Notes
+            <AppIcon name="proficiencies" className="mr-2 inline h-5 w-5" />
+            Integration Notes
           </h2>
           <ul className="space-y-2 text-blue-700">
             <li>

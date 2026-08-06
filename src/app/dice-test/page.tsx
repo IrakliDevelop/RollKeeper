@@ -8,6 +8,7 @@ import DiceBox from '@3d-dice/dice-box';
 import { DiceRollResults, RollSummary } from '@/types/dice';
 import { calculateRollSummary, autoClearDice } from '@/utils/diceUtils';
 import { DiceResultDisplay } from '@/components/ui/game/DiceResultDisplay';
+import { AppIcon } from '@/components/ui/icons';
 
 export default function DiceTestPage() {
   const [diceBox, setDiceBox] = useState<typeof DiceBox | null>(null);
@@ -182,7 +183,8 @@ export default function DiceTestPage() {
               disabled={!isInitialized}
               className="w-full rounded-lg bg-red-500 px-4 py-3 font-semibold text-white transition-colors hover:bg-red-600 disabled:bg-gray-300"
             >
-              🧹 Clear All Dice from Screen
+              <AppIcon name="delete" className="mr-2 inline h-4 w-4" />
+              Clear All Dice from Screen
             </button>
 
             {/* Auto-clear delay setting */}

@@ -29,6 +29,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { JoinCampaignDialog } from '@/components/ui/campaign/JoinCampaignDialog';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import { DataSafetyBanner } from '@/components/ui/feedback/DataSafetyBanner';
+import { AppIcon } from '@/components/ui/icons';
 import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
 import {
   exportAllCharactersToFile,
@@ -723,7 +724,8 @@ export default function PlayerDashboardPage() {
                 </div>
 
                 <p className="text-faint text-center text-sm">
-                  More features coming soon! 🎲{' '}
+                  More features coming soon!{' '}
+                  <AppIcon name="dice" className="inline h-4 w-4" />{' '}
                   <span className="text-amber-500">maybe</span>
                 </p>
               </div>
