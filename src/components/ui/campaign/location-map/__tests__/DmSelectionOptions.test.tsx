@@ -77,10 +77,27 @@ describe('DmSelectionOptions', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders nothing when style details are null (empty/stale/style-less selection)', () => {
+  it('renders arrange ops (no style controls) when style details are null (style-less selection, e.g. an image)', () => {
     mockDetails = null;
-    const { container } = render(<DmSelectionOptions />);
-    expect(container).toBeEmptyDOMElement();
+    render(<DmSelectionOptions />);
+    // Count label and arrange actions still render for a style-less selection.
+    expect(screen.getByText('2 selected')).toBeInTheDocument();
+    expect(screen.getByTitle('Align & distribute')).toBeInTheDocument();
+    expect(
+      screen.getByTitle('Rotate 90° counter-clockwise')
+    ).toBeInTheDocument();
+    expect(screen.getByTitle('Rotate 90° clockwise')).toBeInTheDocument();
+    expect(screen.getByTitle('Lock')).toBeInTheDocument();
+    expect(screen.getByTitle('Delete selected')).toBeInTheDocument();
+    // No style controls, since there's no style to control.
+    expect(
+      screen.queryByRole('radiogroup', { name: 'Stroke color' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('radiogroup', { name: 'Fill color' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Stroke width')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Font size')).not.toBeInTheDocument();
   });
 
   it('shows the selected count', () => {
@@ -275,6 +292,7 @@ describe('DmSelectionOptions', () => {
       ...screen.getAllByRole('radio'),
       screen.getByLabelText('Stroke width'),
       screen.getByLabelText('Font size'),
+      screen.getByTitle('Align & distribute'),
       screen.getByTitle('Rotate 90° clockwise'),
       screen.getByTitle('Rotate 90° counter-clockwise'),
       screen.getByTitle('Group'),

@@ -113,8 +113,14 @@ export default function DmLocationToolOptions({
     PingToolOptions & Record<string, unknown>
   >('ping');
 
+  // Single source of truth for whether the select-tool branch renders — used
+  // both to decide if the bar shows at all and, below, to gate the branch
+  // itself, so the two conditions can't drift apart.
+  const showSelectionOptions =
+    selectionControls === true && activeTool === 'select' && selectedCount > 0;
+
   const showOptionsBar =
-    (selectionControls && activeTool === 'select' && selectedCount > 0) ||
+    showSelectionOptions ||
     (activeTool === 'pencil' && pencilOpts !== undefined) ||
     activeTool === 'arrow' ||
     activeTool === 'note' ||
@@ -163,7 +169,7 @@ export default function DmLocationToolOptions({
 
   return (
     <div className="border-divider bg-surface-secondary flex flex-wrap items-center gap-3 border-b px-4 py-1.5">
-      {selectionControls && activeTool === 'select' && <DmSelectionOptions />}
+      {showSelectionOptions && <DmSelectionOptions />}
       {activeTool === 'shape' && shapeOpts && (
         <>
           <span className="text-muted text-xs font-medium">Shape</span>
