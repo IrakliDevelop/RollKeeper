@@ -65,6 +65,78 @@ describe('npcStore (campaign-scoped)', () => {
     });
   });
 
+  describe('duplicateNPC', () => {
+    it('copies all NPC data with a fresh identity and independent nested data', () => {
+      const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+        name: 'Town Guard',
+        armorClass: '16 (chain mail)',
+        maxHp: 18,
+        currentHp: 11,
+        speed: '30 ft.',
+        tags: ['guard', 'human'],
+        inventory: [
+          { id: 'item-1', name: 'Spear', quantity: 1, equipped: true },
+        ],
+      });
+
+      const duplicateId = useNPCStore.getState().duplicateNPC(CAMPAIGN, id);
+      const [source, duplicate] = useNPCStore
+        .getState()
+        .getNPCsForCampaign(CAMPAIGN);
+
+      expect(duplicateId).toMatch(/^npc-/);
+      expect(duplicateId).not.toBe(id);
+      expect(duplicate).toMatchObject({
+        name: 'Town Guard (Copy)',
+        armorClass: source.armorClass,
+        maxHp: source.maxHp,
+        currentHp: source.currentHp,
+        speed: source.speed,
+        tags: source.tags,
+        inventory: source.inventory,
+      });
+      expect(duplicate.tags).not.toBe(source.tags);
+      expect(duplicate.inventory).not.toBe(source.inventory);
+      expect(duplicate.inventory?.[0]).not.toBe(source.inventory?.[0]);
+    });
+
+    it('numbers repeated copies without colliding with existing names', () => {
+      const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+        name: 'Bandit',
+        armorClass: '12',
+        maxHp: 11,
+        speed: '30 ft.',
+      });
+
+      useNPCStore.getState().duplicateNPC(CAMPAIGN, id);
+      useNPCStore.getState().duplicateNPC(CAMPAIGN, id);
+      const copyId = useNPCStore
+        .getState()
+        .getNPCsForCampaign(CAMPAIGN)
+        .find(npc => npc.name === 'Bandit (Copy)')!.id;
+      useNPCStore.getState().duplicateNPC(CAMPAIGN, copyId);
+
+      expect(
+        useNPCStore
+          .getState()
+          .getNPCsForCampaign(CAMPAIGN)
+          .map(npc => npc.name)
+      ).toEqual([
+        'Bandit',
+        'Bandit (Copy)',
+        'Bandit (Copy 2)',
+        'Bandit (Copy 3)',
+      ]);
+    });
+
+    it('does nothing when the source NPC does not exist', () => {
+      expect(
+        useNPCStore.getState().duplicateNPC(CAMPAIGN, 'missing')
+      ).toBeUndefined();
+      expect(useNPCStore.getState().getNPCsForCampaign(CAMPAIGN)).toEqual([]);
+    });
+  });
+
   describe('updateNPC', () => {
     it('merges updates and preserves unchanged fields', () => {
       const id = useNPCStore.getState().createNPC(CAMPAIGN, {

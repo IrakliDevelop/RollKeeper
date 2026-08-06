@@ -27,6 +27,20 @@ function generateId(): string {
   );
 }
 
+function getDuplicateName(name: string, existingNpcs: CampaignNPC[]): string {
+  const baseName = name.replace(/ \(Copy(?: \d+)?\)$/, '');
+  const existingNames = new Set(existingNpcs.map(npc => npc.name));
+  const firstCopyName = `${baseName} (Copy)`;
+
+  if (!existingNames.has(firstCopyName)) return firstCopyName;
+
+  let copyNumber = 2;
+  while (existingNames.has(`${baseName} (Copy ${copyNumber})`)) {
+    copyNumber += 1;
+  }
+  return `${baseName} (Copy ${copyNumber})`;
+}
+
 /**
  * Ids are a store invariant: any stat block entering the store is normalized,
  * and abilityUsage is pruned to live entry ids and clamped to current maxima.
@@ -66,6 +80,7 @@ interface NPCStoreState {
     campaignCode: string,
     npc: Omit<CampaignNPC, 'id' | 'campaignCode' | 'createdAt' | 'updatedAt'>
   ) => string;
+  duplicateNPC: (campaignCode: string, id: string) => string | undefined;
   updateNPC: (
     campaignCode: string,
     id: string,
@@ -220,6 +235,33 @@ export const useNPCStore = create<NPCStoreState>()(
           };
         });
         return id;
+      },
+
+      duplicateNPC: (campaignCode, id) => {
+        const existing = get().npcsByCampaign[campaignCode] ?? [];
+        const source = existing.find(npc => npc.id === id);
+        if (!source) return undefined;
+
+        const duplicateId = generateId();
+        const now = new Date().toISOString();
+        const duplicate = normalizeNpcWrite({
+          ...structuredClone(source),
+          id: duplicateId,
+          name: getDuplicateName(source.name, existing),
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        set(state => ({
+          npcsByCampaign: {
+            ...state.npcsByCampaign,
+            [campaignCode]: [
+              ...(state.npcsByCampaign[campaignCode] ?? []),
+              duplicate,
+            ],
+          },
+        }));
+        return duplicateId;
       },
 
       updateNPC: (campaignCode, id, updates) => {
