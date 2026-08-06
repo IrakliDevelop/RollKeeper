@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { User, Heart, Star, Link, AlertTriangle } from 'lucide-react';
 import { CharacterBackground } from '@/types/character';
 import { RichTextEditor } from '@/components/ui/forms';
+import { AppIcon } from '@/components/ui/icons';
 
 interface CharacterBackgroundEditorProps {
   background: CharacterBackground;
@@ -149,8 +150,9 @@ export default function CharacterBackgroundEditor({
 
           <div className="text-muted max-w-sm text-xs">
             <details className="cursor-pointer">
-              <summary className="hover:text-body font-medium">
-                💡 Tips for {activeTabConfig.label}
+              <summary className="hover:text-body inline-flex items-center gap-1 font-medium">
+                <AppIcon name="tip" className="h-3.5 w-3.5" /> Tips for{' '}
+                {activeTabConfig.label}
               </summary>
               <div className="mt-2 space-y-1">
                 {activeTab === 'backstory' && (

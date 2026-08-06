@@ -2,24 +2,22 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  X,
-  Dice6,
-  Shield,
-  Zap,
-  CheckCircle2,
-  XCircle,
-  Info,
-  Moon,
-} from 'lucide-react';
+import { X } from 'lucide-react';
+import { AppIcon, type IconName } from '@/components/ui/icons';
+
+export interface ToastDetail {
+  text: string;
+  icon?: IconName;
+}
 
 export interface ToastData {
   id: string;
   type: 'attack' | 'save' | 'damage' | 'info' | 'success' | 'error' | 'rest';
   title: string;
   message: string;
+  icon?: IconName;
   duration?: number;
-  details?: string[];
+  details?: Array<string | ToastDetail>;
 }
 
 interface ToastProps {
@@ -69,24 +67,25 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
     }
   };
 
-  const getIcon = () => {
+  const getIconName = (): IconName => {
+    if (toast.icon) return toast.icon;
     switch (toast.type) {
       case 'attack':
-        return <Dice6 size={22} className="text-white drop-shadow-lg" />;
+        return 'attack';
       case 'save':
-        return <Shield size={22} className="text-white drop-shadow-lg" />;
+        return 'save';
       case 'damage':
-        return <Zap size={22} className="text-white drop-shadow-lg" />;
+        return 'damage';
       case 'success':
-        return <CheckCircle2 size={22} className="text-white drop-shadow-lg" />;
+        return 'confirm';
       case 'error':
-        return <XCircle size={22} className="text-white drop-shadow-lg" />;
+        return 'error';
       case 'rest':
-        return <Moon size={22} className="text-white drop-shadow-lg" />;
+        return 'restLong';
       case 'info':
-        return <Info size={22} className="text-white drop-shadow-lg" />;
+        return 'unknown';
       default:
-        return <Dice6 size={22} className="text-white drop-shadow-lg" />;
+        return 'dice';
     }
   };
 
@@ -115,7 +114,10 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
         <div className="flex items-start gap-3">
           {/* Icon with glowing effect */}
           <div className="flex-shrink-0 rounded-lg bg-white/20 p-2 ring-1 ring-white/30 backdrop-blur-sm">
-            {getIcon()}
+            <AppIcon
+              name={getIconName()}
+              className="h-[22px] w-[22px] text-white drop-shadow-lg"
+            />
           </div>
 
           <div className="min-w-0 flex-1">
@@ -138,15 +140,26 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
 
             {toast.details && toast.details.length > 0 && (
               <div className="mt-3 space-y-1.5 rounded-lg bg-black/20 px-3 py-2 backdrop-blur-sm">
-                {toast.details.map((detail, index) => (
-                  <div
-                    key={index}
-                    className="flex items-start gap-2 text-xs font-medium text-white/90"
-                  >
-                    <span className="mt-0.5 text-white/60">•</span>
-                    <span>{detail}</span>
-                  </div>
-                ))}
+                {toast.details.map((detail, index) => {
+                  const item =
+                    typeof detail === 'string' ? { text: detail } : detail;
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-start gap-2 text-xs font-medium text-white/90"
+                    >
+                      {item.icon ? (
+                        <AppIcon
+                          name={item.icon}
+                          className="mt-0.5 h-3 w-3 shrink-0 text-white/70"
+                        />
+                      ) : (
+                        <span className="mt-0.5 text-white/60">•</span>
+                      )}
+                      <span>{item.text}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -223,30 +236,38 @@ export const useToast = () => {
       damageType?: string
     ) => {
       const total = roll + bonus;
-      let title = `🎲 ${weaponName}`;
+      let title = weaponName;
+      let icon: IconName = 'attack';
       let message = `${roll} + ${bonus} = ${total}`;
-      const details: string[] = [];
+      const details: ToastDetail[] = [];
 
       if (isCrit) {
-        title += ' ✨ CRITICAL!';
+        title += ' — CRITICAL!';
+        icon = 'criticalSuccess';
         message = `${roll} (CRIT!) + ${bonus} = ${total}`;
       } else if (roll === 1) {
-        title += ' 💥 FUMBLE!';
+        title += ' — FUMBLE!';
+        icon = 'criticalFailure';
         message = `${roll} (FUMBLE!) + ${bonus} = ${total}`;
       }
 
       if (damage) {
-        details.push(
-          `💥 Damage: ${damage}${damageType ? ` (${damageType})` : ''}`
-        );
+        details.push({
+          icon: 'damage',
+          text: `Damage: ${damage}${damageType ? ` (${damageType})` : ''}`,
+        });
         if (isCrit) {
-          details.push("🔥 Don't forget to double the damage dice!");
+          details.push({
+            icon: 'criticalSuccess',
+            text: "Don't forget to double the damage dice!",
+          });
         }
       }
 
       addToast({
         type: 'attack',
         title,
+        icon,
         message,
         details,
         duration: isCrit ? 7000 : 5000,
@@ -263,19 +284,20 @@ export const useToast = () => {
       damage?: string,
       damageType?: string
     ) => {
-      const details: string[] = [];
+      const details: ToastDetail[] = [];
 
       if (damage) {
-        details.push(
-          `💥 Damage: ${damage}${damageType ? ` (${damageType})` : ''}`
-        );
-        details.push('✅ Success: Half damage');
-        details.push('❌ Failure: Full damage');
+        details.push({
+          icon: 'damage',
+          text: `Damage: ${damage}${damageType ? ` (${damageType})` : ''}`,
+        });
+        details.push({ icon: 'confirm', text: 'Success: Half damage' });
+        details.push({ icon: 'remove', text: 'Failure: Full damage' });
       }
 
       addToast({
         type: 'save',
-        title: `🛡️ ${spellName}`,
+        title: spellName,
         message: `DC ${saveDC}${saveType ? ` ${saveType} Save` : ' Save'}`,
         details,
         duration: 6000,
@@ -293,11 +315,14 @@ export const useToast = () => {
     ) => {
       addToast({
         type: 'damage',
-        title: `💥 ${weaponName}${versatile ? ' (Versatile)' : ''}`,
+        title: `${weaponName}${versatile ? ' (Versatile)' : ''}`,
         message: `Damage: ${damageRoll}`,
         details: damageType
           ? [
-              `🗡️ ${damageType.charAt(0).toUpperCase() + damageType.slice(1)} damage`,
+              {
+                icon: 'weapon',
+                text: `${damageType.charAt(0).toUpperCase() + damageType.slice(1)} damage`,
+              },
             ]
           : [],
         duration: 4000,
@@ -309,7 +334,8 @@ export const useToast = () => {
   const showShortRest = useCallback(() => {
     addToast({
       type: 'rest',
-      title: '☀️ Short Rest Complete',
+      title: 'Short Rest Complete',
+      icon: 'restShort',
       message: 'Your character has taken a short rest',
       details: [
         'Short rest abilities restored',
@@ -324,7 +350,8 @@ export const useToast = () => {
   const showLongRest = useCallback(() => {
     addToast({
       type: 'rest',
-      title: '🌙 Long Rest Complete',
+      title: 'Long Rest Complete',
+      icon: 'restLong',
       message: 'Your character has taken a long rest',
       details: [
         'All abilities restored',

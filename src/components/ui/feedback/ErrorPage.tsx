@@ -10,6 +10,7 @@ import {
   Shield,
   Wand2,
 } from 'lucide-react';
+import { AppIcon } from '@/components/ui/icons';
 
 interface ErrorPageProps {
   error?: Error;
@@ -191,8 +192,9 @@ export default function ErrorPage({
 
           {/* Footer message */}
           <div className="mt-8 border-t border-slate-600 pt-6">
-            <p className="text-xs text-gray-400">
-              💀 Even the greatest heroes sometimes fail their saving throws 💀
+            <p className="flex items-center justify-center gap-1.5 text-xs text-gray-400">
+              <AppIcon name="monster" className="h-3.5 w-3.5" />
+              Even the greatest heroes sometimes fail their saving throws
             </p>
           </div>
         </div>

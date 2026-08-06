@@ -5,6 +5,7 @@ import { SpellSlots, PactMagic } from '@/types/character';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
 import { RotateCcw, Zap } from 'lucide-react';
+import { AppIcon } from '@/components/ui/icons';
 
 interface SpellSlotTrackerProps {
   spellSlots: SpellSlots;
@@ -242,8 +243,9 @@ export function SpellSlotTracker({
             )}
           </div>
           {!compact && (
-            <p className="text-accent-purple-text-muted text-xs italic">
-              ⚡ Pact magic slots recharge on a short rest
+            <p className="text-accent-purple-text-muted flex items-center gap-1 text-xs italic">
+              <AppIcon name="reaction" className="h-3.5 w-3.5" />
+              Pact magic slots recharge on a short rest
             </p>
           )}
         </div>
@@ -252,8 +254,9 @@ export function SpellSlotTracker({
       {/* Usage Guide */}
       {!readonly && !hideControls && !compact && (
         <div className="border-accent-purple-border text-muted border-t-2 pt-2 text-xs">
-          <p>
-            💡 Click empty slots to mark as used • Click used slots to mark as
+          <p className="flex items-center gap-1">
+            <AppIcon name="tip" className="h-3.5 w-3.5 shrink-0" />
+            Click empty slots to mark as used • Click used slots to mark as
             available
           </p>
         </div>

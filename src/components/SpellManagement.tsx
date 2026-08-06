@@ -23,6 +23,7 @@ import {
   Zap,
   Infinity,
 } from 'lucide-react';
+import { AppIcon } from '@/components/ui/icons';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
@@ -1403,7 +1404,8 @@ export const SpellManagement: React.FC = () => {
                   <div className="text-accent-green-text flex items-center gap-2">
                     <Wand2 className="h-5 w-5" />
                     <p className="text-sm font-medium">
-                      ✨ Spell details loaded! Review and adjust as needed.
+                      <AppIcon name="confirm" className="inline h-4 w-4" />{' '}
+                      Spell details loaded! Review and adjust as needed.
                     </p>
                   </div>
                 </div>

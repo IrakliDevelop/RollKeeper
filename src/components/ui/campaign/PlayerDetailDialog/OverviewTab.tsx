@@ -21,6 +21,7 @@ import {
   ShieldOff,
   Eye,
   Languages,
+  Check,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import { XpAwardControl } from '@/components/ui/campaign/XpAwardControl';
@@ -264,7 +265,9 @@ export function OverviewTab({
                 <div className="text-body text-xs">{formatMod(mod)}</div>
                 {saveProf && (
                   <div className="mt-0.5 text-[9px] text-green-600 dark:text-green-400">
-                    Save ✓
+                    <span className="inline-flex items-center gap-0.5">
+                      Save <Check className="h-2.5 w-2.5" />
+                    </span>
                   </div>
                 )}
               </div>

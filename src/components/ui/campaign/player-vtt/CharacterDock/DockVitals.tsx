@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Pencil } from 'lucide-react';
 
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import { useCharacterStore } from '@/store/characterStore';
@@ -108,7 +109,9 @@ export function DockVitals({ addToast }: DockVitalsProps) {
           className="border-divider hover:bg-surface-secondary min-h-[44px] rounded-lg border p-2 text-center"
         >
           <div className="text-heading text-xl font-bold">{totalAC}</div>
-          <div className="text-faint text-xs uppercase">AC ✎</div>
+          <div className="text-faint flex items-center justify-center gap-1 text-xs uppercase">
+            AC <Pencil className="h-3 w-3" />
+          </div>
         </button>
         <div className="border-divider rounded-lg border p-2 text-center">
           <div className="text-heading text-xl font-bold">

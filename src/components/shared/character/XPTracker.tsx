@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { TrendingUp } from 'lucide-react';
 import { Button, Input, Switch } from '@/components/ui/forms';
+import { AppIcon } from '@/components/ui/icons';
 import {
   getXPForLevel,
   getXPToNextLevel,
@@ -151,9 +152,10 @@ export function XPTracker({
       {isMaxLevel && (
         <div className="border-accent-amber-border bg-accent-amber-bg rounded-md border p-3 text-center">
           <div
-            className={`text-accent-amber-text font-medium ${compact ? 'text-xs' : 'text-sm'}`}
+            className={`text-accent-amber-text flex items-center justify-center gap-1 font-medium ${compact ? 'text-xs' : 'text-sm'}`}
           >
-            🎉 Maximum Level Reached! 🎉
+            <AppIcon name="criticalSuccess" className="h-4 w-4" />
+            Maximum Level Reached!
           </div>
         </div>
       )}
@@ -168,7 +170,9 @@ export function XPTracker({
               <span
                 className={`text-sm font-medium ${mode === 'add' ? 'text-accent-indigo-text-muted' : 'text-muted'}`}
               >
-                ➕ Add XP
+                <span className="inline-flex items-center gap-1">
+                  <AppIcon name="experience" className="h-3.5 w-3.5" /> Add XP
+                </span>
               </span>
               <Switch
                 checked={mode === 'set'}
@@ -179,7 +183,9 @@ export function XPTracker({
               <span
                 className={`text-sm font-medium ${mode === 'set' ? 'text-accent-indigo-text-muted' : 'text-muted'}`}
               >
-                ✏️ Set XP
+                <span className="inline-flex items-center gap-1">
+                  <TrendingUp className="h-3.5 w-3.5" /> Set XP
+                </span>
               </span>
             </div>
           )}

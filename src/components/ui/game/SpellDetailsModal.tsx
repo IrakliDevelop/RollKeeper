@@ -14,6 +14,7 @@ import {
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
 import { getScaledSpellDamage } from '@/utils/cantripScaling';
+import { AppIcon } from '@/components/ui/icons';
 
 interface SpellDetailsModalProps {
   spell: Spell;
@@ -71,22 +72,25 @@ export default function SpellDetailsModal({
                   </Badge>
                   {spell.ritual && (
                     <Badge variant="warning" size="sm">
-                      🕯️ Ritual
+                      <AppIcon name="ritual" className="h-3.5 w-3.5" /> Ritual
                     </Badge>
                   )}
                   {spell.concentration && (
                     <Badge variant="warning" size="sm">
-                      🧠 Concentration
+                      <AppIcon name="concentration" className="h-3.5 w-3.5" />
+                      Concentration
                     </Badge>
                   )}
                   {spell.isPrepared && (
                     <Badge variant="success" size="sm">
-                      ✓ Prepared
+                      <AppIcon name="confirm" className="h-3.5 w-3.5" />{' '}
+                      Prepared
                     </Badge>
                   )}
                   {spell.isAlwaysPrepared && (
                     <Badge variant="success" size="sm">
-                      ⭐ Always Prepared
+                      <AppIcon name="criticalSuccess" className="h-3.5 w-3.5" />
+                      Always Prepared
                     </Badge>
                   )}
                 </div>
