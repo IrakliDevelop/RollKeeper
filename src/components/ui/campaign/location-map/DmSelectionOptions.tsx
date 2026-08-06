@@ -58,7 +58,11 @@ function SwatchRow({
                 ? 'border-accent-blue-border scale-110'
                 : 'border-divider hover:scale-105'
             }`}
-            style={{ backgroundColor: color }}
+            style={{
+              backgroundColor: color,
+              boxShadow:
+                color === '#ffffff' ? 'inset 0 0 0 1px #e2e8f0' : 'none',
+            }}
           />
         );
       })}
@@ -88,10 +92,15 @@ export default function DmSelectionOptions() {
   } = useSelectionOps();
   const [details, applyStyle] = useSelectionStyleDetails();
 
-  if (selectedCount === 0 || !details) return null;
+  if (selectedCount === 0) return null;
 
-  const has = (field: keyof ElementStyle) => details.applicable.includes(field);
-  const isMixed = (field: keyof ElementStyle) => details.mixed.includes(field);
+  // `details` is null for style-less selections (e.g. images) — arrange
+  // actions (align, rotate, group, lock, delete) still apply to those, so
+  // only the per-field style controls below gate on it.
+  const has = (field: keyof ElementStyle) =>
+    details !== null && details.applicable.includes(field);
+  const isMixed = (field: keyof ElementStyle) =>
+    details !== null && details.mixed.includes(field);
 
   return (
     <div
@@ -106,7 +115,7 @@ export default function DmSelectionOptions() {
         <SwatchRow
           label="Stroke color"
           mixedTitle="Mixed stroke colors — click to unify"
-          active={details.common.color}
+          active={details?.common.color}
           mixed={isMixed('color')}
           onSelect={color => applyStyle({ color })}
         />
@@ -115,7 +124,7 @@ export default function DmSelectionOptions() {
         <SwatchRow
           label="Fill color"
           mixedTitle="Mixed fill colors — click to unify"
-          active={details.common.fillColor}
+          active={details?.common.fillColor}
           mixed={isMixed('fillColor')}
           onSelect={color => applyStyle({ fillColor: color })}
         />
@@ -125,7 +134,9 @@ export default function DmSelectionOptions() {
           type="range"
           min={1}
           max={12}
-          value={isMixed('strokeWidth') ? 4 : (details.common.strokeWidth ?? 4)}
+          value={
+            isMixed('strokeWidth') ? 4 : (details?.common.strokeWidth ?? 4)
+          }
           aria-label={
             isMixed('strokeWidth') ? 'Stroke width (mixed)' : 'Stroke width'
           }
@@ -138,7 +149,7 @@ export default function DmSelectionOptions() {
           type="range"
           min={10}
           max={72}
-          value={isMixed('fontSize') ? 16 : (details.common.fontSize ?? 16)}
+          value={isMixed('fontSize') ? 16 : (details?.common.fontSize ?? 16)}
           aria-label={isMixed('fontSize') ? 'Font size (mixed)' : 'Font size'}
           className="h-11"
           onChange={e => applyStyle({ fontSize: Number(e.target.value) })}

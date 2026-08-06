@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { act, render, screen, cleanup } from '@testing-library/react';
-import { Viewport, SelectTool, createShape } from '@fieldnotes/core';
+import {
+  Viewport,
+  SelectTool,
+  createShape,
+  createImage,
+} from '@fieldnotes/core';
 import {
   ViewportContext,
   useSelectionOps,
@@ -83,6 +88,9 @@ function SelectionProbe() {
       <span data-testid="selected-count">{selectedCount}</span>
       <span data-testid="mixed-fields">
         {details ? details.mixed.join(',') : ''}
+      </span>
+      <span data-testid="details-null">
+        {details === null ? 'null' : 'set'}
       </span>
     </div>
   );
@@ -174,5 +182,51 @@ describe('selection eventing against the real SDK pipeline', () => {
     expect(
       screen.getByTestId('mixed-fields').textContent?.split(',')
     ).not.toContain('color');
+  });
+
+  it('selecting a style-less element (image) yields a non-empty count with null style details', () => {
+    // Images have no style fields (see getElementStyle's default case), so
+    // ElementStore.getSelectionStyleDetails() returns null for an
+    // all-image selection even though the selection itself isn't empty.
+    // DmSelectionOptions must still render its arrange ops (rotate, group,
+    // lock, delete) in that case — this proves the real SDK produces the
+    // details=null / selectedCount>0 combination that regressed.
+    stubCanvas();
+
+    container = document.createElement('div');
+    Object.defineProperty(container, 'clientWidth', {
+      value: 800,
+      configurable: true,
+    });
+    Object.defineProperty(container, 'clientHeight', {
+      value: 600,
+      configurable: true,
+    });
+    document.body.appendChild(container);
+
+    viewport = new Viewport(container);
+    const selectTool = new SelectTool();
+    act(() => {
+      viewport?.toolManager.register(selectTool);
+    });
+
+    render(
+      <ViewportContext.Provider value={viewport}>
+        <SelectionProbe />
+      </ViewportContext.Provider>
+    );
+
+    const image = createImage({
+      position: { x: 0, y: 0 },
+      size: { w: 10, h: 10 },
+      src: 'data:image/png;base64,',
+    });
+    act(() => {
+      viewport?.store.add(image);
+      selectTool.setSelection([image.id]);
+    });
+
+    expect(screen.getByTestId('selected-count').textContent).toBe('1');
+    expect(screen.getByTestId('details-null').textContent).toBe('null');
   });
 });
