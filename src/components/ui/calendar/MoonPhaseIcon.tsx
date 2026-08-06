@@ -18,14 +18,14 @@ const SIZE_CLASSES = {
 };
 
 const PHASE_PATHS: Record<MoonPhaseName, string | null> = {
-  'new-moon': null,
-  'waxing-crescent': 'M12 3a9 9 0 0 1 0 18c3.2-3.1 3.2-14.9 0-18Z',
-  'first-quarter': 'M12 3a9 9 0 0 1 0 18Z',
-  'waxing-gibbous': 'M12 3a9 9 0 0 1 0 18c-3.2-3.1-3.2-14.9 0-18Z',
-  'full-moon': 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z',
-  'waning-gibbous': 'M12 3a9 9 0 0 0 0 18c3.2-3.1 3.2-14.9 0-18Z',
-  'last-quarter': 'M12 3a9 9 0 0 0 0 18Z',
-  'waning-crescent': 'M12 3a9 9 0 0 0 0 18c-3.2-3.1-3.2-14.9 0-18Z',
+  'new-moon': 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z',
+  'waxing-crescent': 'M12 3a9 9 0 0 0 0 18c3.2-3.1 3.2-14.9 0-18Z',
+  'first-quarter': 'M12 3a9 9 0 0 0 0 18Z',
+  'waxing-gibbous': 'M12 3a9 9 0 0 0 0 18c-3.2-3.1-3.2-14.9 0-18Z',
+  'full-moon': null,
+  'waning-gibbous': 'M12 3a9 9 0 0 1 0 18c3.2-3.1 3.2-14.9 0-18Z',
+  'last-quarter': 'M12 3a9 9 0 0 1 0 18Z',
+  'waning-crescent': 'M12 3a9 9 0 0 1 0 18c-3.2-3.1-3.2-14.9 0-18Z',
 };
 
 export function MoonPhaseIcon({
@@ -52,7 +52,7 @@ export function MoonPhaseIcon({
             cy="12"
             r="9"
             fill="currentColor"
-            opacity={phase === 'new-moon' ? 0.25 : 0.12}
+            opacity={phase === 'full-moon' ? 0.25 : 0.12}
           />
           {PHASE_PATHS[phase] && (
             <path d={PHASE_PATHS[phase]!} fill="currentColor" />
