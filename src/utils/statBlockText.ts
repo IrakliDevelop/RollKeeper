@@ -1,3 +1,9 @@
+import type { IconName } from '@/components/ui/icons';
+import {
+  renderIconHtml,
+  replaceLegacyBadgeIcon,
+} from '@/components/ui/icons/iconHtml';
+
 /**
  * Conversion utilities between plain stat block action text and the
  * badge-span HTML produced by `formatReferenceHtml` (see
@@ -17,32 +23,32 @@ const BASE_BADGE_CLASSES =
 
 type BadgeType = 'atk' | 'hit' | 'dc' | 'damage';
 
-const BADGE_STYLES: Record<BadgeType, { classes: string; icon: string }> = {
+const BADGE_STYLES: Record<BadgeType, { classes: string; icon: IconName }> = {
   atk: {
     classes:
       'bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20',
-    icon: '⚔️',
+    icon: 'attack',
   },
   hit: {
     classes:
       'bg-emerald-600/10 text-emerald-400 border border-emerald-600/20 hover:bg-emerald-600/20',
-    icon: '🎯',
+    icon: 'target',
   },
   dc: {
     classes:
       'bg-blue-600/10 text-blue-400 border border-blue-600/20 hover:bg-blue-600/20',
-    icon: '🔢',
+    icon: 'save',
   },
   damage: {
     classes:
       'bg-red-600/10 text-red-400 border border-red-600/20 hover:bg-red-600/20',
-    icon: '💥',
+    icon: 'damage',
   },
 };
 
 function badgeSpan(type: BadgeType, displayText: string): string {
   const { classes, icon } = BADGE_STYLES[type];
-  return `<span class="${BASE_BADGE_CLASSES} ${classes}" title="${displayText}">${icon} ${displayText}</span>`;
+  return `<span class="${BASE_BADGE_CLASSES} ${classes}" data-app-icon="${icon}" title="${displayText}">${renderIconHtml(icon)} ${displayText}</span>`;
 }
 
 const HTML_ENTITIES: Record<string, string> = {
@@ -91,7 +97,7 @@ export function statBlockHtmlToPlainText(html: string): string {
   const withSpansUnwrapped = html.replace(
     SPAN_REGEX,
     (_match, inner: string) => {
-      const trimmed = inner.trim();
+      const trimmed = inner.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, '').trim();
       const firstSpaceIndex = trimmed.indexOf(' ');
 
       if (firstSpaceIndex === -1) {
@@ -165,15 +171,34 @@ export function plainTextToBadgedHtml(text: string): string {
 }
 
 const HTML_TAG_REGEX = /<[a-z][^>]*>/i;
+const BADGE_SPAN_REGEX = /<span\b([^>]*)>([\s\S]*?)<\/span>/gi;
+
+function upgradeLegacyBadgeHtml(html: string): string {
+  return html.replace(
+    BADGE_SPAN_REGEX,
+    (span, attributes: string, content: string) => {
+      let icon: IconName | null = null;
+      if (attributes.includes('bg-violet-')) icon = 'attack';
+      else if (attributes.includes('bg-emerald-')) icon = 'target';
+      else if (attributes.includes('bg-blue-')) icon = 'save';
+      else if (attributes.includes('bg-red-')) icon = 'damage';
+      if (!icon) return span;
+
+      const upgradedAttributes = attributes.includes('data-app-icon=')
+        ? attributes
+        : `${attributes} data-app-icon="${icon}"`;
+      return `<span${upgradedAttributes}>${replaceLegacyBadgeIcon(content, icon)}</span>`;
+    }
+  );
+}
 
 /**
- * Render a stat block entry's text for display. Legacy entries that already
- * contain badge-span HTML are returned as-is (short-circuit); plain text
- * entries are badged via `plainTextToBadgedHtml`.
+ * Render a stat block entry's text for display. Legacy badge HTML is upgraded
+ * to canonical SVG icons without mutating stored data; plain text is badged.
  */
 export function renderStatBlockEntryText(text: string): string {
   if (HTML_TAG_REGEX.test(text)) {
-    return text;
+    return upgradeLegacyBadgeHtml(text);
   }
 
   return plainTextToBadgedHtml(text);

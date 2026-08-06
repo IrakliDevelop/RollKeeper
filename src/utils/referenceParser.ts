@@ -1,3 +1,6 @@
+import { REFERENCE_ICONS, getIconName } from '@/components/ui/icons';
+import { renderIconHtml } from '@/components/ui/icons/iconHtml';
+
 export interface ParsedReference {
   type:
     | 'item'
@@ -298,152 +301,129 @@ function formatReferenceHtml(reference: ParsedReference): string {
     'inline-flex items-center gap-1 px-2 py-1 rounded text-sm font-medium transition-colors';
 
   let typeClasses = '';
-  let icon = '';
 
   switch (reference.type) {
     case 'item':
       typeClasses =
         'bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20';
-      icon = '⚔️';
       break;
 
     case 'spell':
       typeClasses =
         'bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20';
-      icon = '✨';
       break;
 
     case 'filter':
       typeClasses =
         'bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20';
-      icon = '🔍';
       break;
 
     case 'dice':
       typeClasses =
         'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20';
-      icon = '🎲';
       break;
 
     case 'creature':
       typeClasses =
         'bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20';
-      icon = '🐉';
       break;
 
     case 'condition':
       typeClasses =
         'bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20';
-      icon = '💫';
       break;
 
     case 'action':
       typeClasses =
         'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20';
-      icon = '⚡';
       break;
 
     case 'skill':
       typeClasses =
         'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20';
-      icon = '🎯';
       break;
 
     case 'sense':
       typeClasses =
         'bg-pink-500/10 text-pink-400 border border-pink-500/20 hover:bg-pink-500/20';
-      icon = '👁️';
       break;
 
     case 'damage':
       typeClasses =
         'bg-red-600/10 text-red-400 border border-red-600/20 hover:bg-red-600/20';
-      icon = '💥';
       break;
 
     case 'scaledamage':
       typeClasses =
         'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20';
-      icon = '📈';
       break;
 
     case 'atk':
       typeClasses =
         'bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20';
-      icon = '⚔️';
       break;
 
     case 'atkr':
       typeClasses =
         'bg-violet-600/10 text-violet-400 border border-violet-600/20 hover:bg-violet-600/20';
-      icon = '🏹';
       break;
 
     case 'hit':
       typeClasses =
         'bg-emerald-600/10 text-emerald-400 border border-emerald-600/20 hover:bg-emerald-600/20';
-      icon = '🎯';
       break;
 
     case 'h':
       typeClasses =
         'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20';
-      icon = '💥';
       break;
 
     case 'dc':
       typeClasses =
         'bg-blue-600/10 text-blue-400 border border-blue-600/20 hover:bg-blue-600/20';
-      icon = '🔢';
       break;
 
     case 'actSave':
       typeClasses =
         'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/20';
-      icon = '🛡️';
       break;
 
     case 'actSaveFail':
       typeClasses =
         'bg-red-700/10 text-red-400 border border-red-700/20 hover:bg-red-700/20';
-      icon = '❌';
       break;
 
     case 'actSaveSuccess':
       typeClasses =
         'bg-green-600/10 text-green-400 border border-green-600/20 hover:bg-green-600/20';
-      icon = '✅';
       break;
 
     case 'actTrigger':
       typeClasses =
         'bg-orange-600/10 text-orange-400 border border-orange-600/20 hover:bg-orange-600/20';
-      icon = '⚡';
       break;
 
     case 'actResponse':
       typeClasses =
         'bg-indigo-600/10 text-indigo-400 border border-indigo-600/20 hover:bg-indigo-600/20';
-      icon = '↩️';
       break;
 
     case 'hitYourSpellAttack':
       typeClasses =
         'bg-purple-600/10 text-purple-400 border border-purple-600/20 hover:bg-purple-600/20';
-      icon = '✨';
       break;
 
     default:
       typeClasses =
         'bg-slate-500/10 text-slate-400 border border-slate-500/20 hover:bg-slate-500/20';
-      icon = '❓';
   }
 
   const title = reference.source
     ? `${reference.displayText} (${reference.source})`
     : reference.displayText;
 
-  return `<span class="${baseClasses} ${typeClasses}" title="${title}">${icon} ${reference.displayText}</span>`;
+  const iconName = getIconName(REFERENCE_ICONS, reference.type, 'unknown');
+  return `<span class="${baseClasses} ${typeClasses}" data-app-icon="${iconName}" title="${title}">${renderIconHtml(iconName)} ${reference.displayText}</span>`;
 }
 
 /**

@@ -37,6 +37,9 @@ describe('parseReferences', () => {
     const result = parseReferences('Cast {@spell Fireball|PHB} now.');
     expect(result.html).not.toContain('{@spell');
     expect(result.html).toContain('Fireball');
+    expect(result.html).toContain('data-app-icon="spell"');
+    expect(result.html).toContain('lucide-wand-sparkles');
+    expect(result.html).not.toContain('✨');
   });
 
   it('handles mixed text with multiple reference types', () => {
