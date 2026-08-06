@@ -94,21 +94,20 @@ export type WeatherType =
 export const WEATHER_OPTIONS: {
   type: WeatherType;
   label: string;
-  icon: string;
 }[] = [
-  { type: 'clear', label: 'Clear', icon: '☀️' },
-  { type: 'cloudy', label: 'Cloudy', icon: '⛅' },
-  { type: 'overcast', label: 'Overcast', icon: '☁️' },
-  { type: 'fog', label: 'Fog', icon: '🌫️' },
-  { type: 'rain', label: 'Rain', icon: '🌧️' },
-  { type: 'heavy-rain', label: 'Heavy Rain', icon: '🌧️' },
-  { type: 'thunderstorm', label: 'Thunderstorm', icon: '⛈️' },
-  { type: 'snow', label: 'Snow', icon: '🌨️' },
-  { type: 'blizzard', label: 'Blizzard', icon: '❄️' },
-  { type: 'hail', label: 'Hail', icon: '🧊' },
-  { type: 'wind', label: 'Windy', icon: '💨' },
-  { type: 'hot', label: 'Hot', icon: '🔥' },
-  { type: 'cold', label: 'Cold', icon: '🥶' },
+  { type: 'clear', label: 'Clear' },
+  { type: 'cloudy', label: 'Cloudy' },
+  { type: 'overcast', label: 'Overcast' },
+  { type: 'fog', label: 'Fog' },
+  { type: 'rain', label: 'Rain' },
+  { type: 'heavy-rain', label: 'Heavy Rain' },
+  { type: 'thunderstorm', label: 'Thunderstorm' },
+  { type: 'snow', label: 'Snow' },
+  { type: 'blizzard', label: 'Blizzard' },
+  { type: 'hail', label: 'Hail' },
+  { type: 'wind', label: 'Windy' },
+  { type: 'hot', label: 'Hot' },
+  { type: 'cold', label: 'Cold' },
 ];
 
 export interface CampaignCalendar {

@@ -22,6 +22,7 @@ import type {
   WeatherType,
 } from '@/types/calendar';
 import { MOON_PHASE_LABELS, WEATHER_OPTIONS } from '@/types/calendar';
+import { AppIcon, WEATHER_ICONS, getIconName } from '@/components/ui/icons';
 import { formatDate, formatTime } from '@/utils/calendarCalculations';
 
 interface TimeDisplayProps {
@@ -177,7 +178,15 @@ export function TimeDisplay({
         )}
         {weatherInfo && (
           <Badge variant="info" className="text-xs">
-            {weatherInfo.icon} {weatherInfo.label}
+            <AppIcon
+              name={getIconName(
+                WEATHER_ICONS,
+                weatherInfo.type,
+                'weatherClear'
+              )}
+              className="h-3.5 w-3.5"
+            />{' '}
+            {weatherInfo.label}
           </Badge>
         )}
         {moonPhases.map(mp => (

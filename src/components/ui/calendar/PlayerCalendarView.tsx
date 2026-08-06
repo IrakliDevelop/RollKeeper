@@ -36,6 +36,7 @@ import {
   getDayPeriod,
 } from '@/utils/calendarCalculations';
 import { WEATHER_OPTIONS, type WeatherType } from '@/types/calendar';
+import { AppIcon, WEATHER_ICONS, getIconName } from '@/components/ui/icons';
 import type { SelectedDay } from './CalendarGrid';
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import type { CalendarEvent, CalendarEventInput } from '@/types/calendar';
@@ -110,7 +111,14 @@ function SyncedTimeDisplay({
         <>
           <div className="border-divider h-8 border-l" />
           <div className="flex items-center gap-1.5">
-            <span className="text-xl">{weatherInfo.icon}</span>
+            <AppIcon
+              name={getIconName(
+                WEATHER_ICONS,
+                weatherInfo.type,
+                'weatherClear'
+              )}
+              className="h-5 w-5"
+            />
             <span className="text-body text-sm font-medium">
               {weatherInfo.label}
             </span>
