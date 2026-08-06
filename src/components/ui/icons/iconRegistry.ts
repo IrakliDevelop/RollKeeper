@@ -6,6 +6,12 @@ import {
   BookOpen,
   Brain,
   CalendarDays,
+  Cloud,
+  CloudFog,
+  CloudHail,
+  CloudLightning,
+  CloudRain,
+  CloudSun,
   Check,
   CircleHelp,
   Coins,
@@ -31,9 +37,12 @@ import {
   Sparkles,
   Star,
   Sun,
+  Snowflake,
   Swords,
   Target,
   Telescope,
+  ThermometerSnowflake,
+  ThermometerSun,
   Trash2,
   TrendingUp,
   User,
@@ -45,6 +54,7 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react';
+import { LevelUpIcon } from './customIcons';
 
 /**
  * Canonical semantic icons for RollKeeper.
@@ -72,6 +82,7 @@ export const ICONS = {
   inspiration: Sparkles,
   inventory: Backpack,
   item: Package,
+  levelUp: LevelUpIcon,
   location: MapPin,
   magicItem: Gem,
   map: Map,
@@ -100,6 +111,17 @@ export const ICONS = {
   weapon: Swords,
   weaponCraft: Anvil,
   weatherClear: Sun,
+  weatherCloudy: CloudSun,
+  weatherOvercast: Cloud,
+  weatherFog: CloudFog,
+  weatherRain: CloudRain,
+  weatherHeavyRain: CloudRain,
+  weatherStorm: CloudLightning,
+  weatherSnow: Snowflake,
+  weatherBlizzard: Wind,
+  weatherHail: CloudHail,
+  weatherHot: ThermometerSun,
+  weatherCold: ThermometerSnowflake,
   weatherWind: Wind,
   remove: X,
 } as const satisfies Record<string, LucideIcon>;
@@ -139,6 +161,22 @@ export const MAGIC_ITEM_CATEGORY_ICONS = {
   scroll: 'features',
   artifact: 'magicItem',
   other: 'item',
+} as const satisfies Record<string, IconName>;
+
+export const WEATHER_ICONS = {
+  clear: 'weatherClear',
+  cloudy: 'weatherCloudy',
+  overcast: 'weatherOvercast',
+  fog: 'weatherFog',
+  rain: 'weatherRain',
+  'heavy-rain': 'weatherHeavyRain',
+  thunderstorm: 'weatherStorm',
+  snow: 'weatherSnow',
+  blizzard: 'weatherBlizzard',
+  hail: 'weatherHail',
+  wind: 'weatherWind',
+  hot: 'weatherHot',
+  cold: 'weatherCold',
 } as const satisfies Record<string, IconName>;
 
 export function getIconName<T extends string>(

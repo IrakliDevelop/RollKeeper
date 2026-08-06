@@ -1,6 +1,7 @@
 'use client';
 
 import { WEATHER_OPTIONS, type WeatherType } from '@/types/calendar';
+import { AppIcon, WEATHER_ICONS, getIconName } from '@/components/ui/icons';
 
 interface WeatherPickerProps {
   current?: WeatherType;
@@ -28,7 +29,10 @@ export function WeatherPicker({
             }`}
             title={opt.label}
           >
-            <span>{opt.icon}</span>
+            <AppIcon
+              name={getIconName(WEATHER_ICONS, opt.type, 'weatherClear')}
+              className="h-4 w-4"
+            />
             <span>{opt.label}</span>
           </button>
         ))}

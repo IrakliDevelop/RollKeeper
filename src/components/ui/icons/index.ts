@@ -4,6 +4,7 @@ export {
   ITEM_CATEGORY_ICONS,
   MAGIC_ITEM_CATEGORY_ICONS,
   SPELL_SCHOOL_ICONS,
+  WEATHER_ICONS,
   getIconName,
   type IconName,
 } from './iconRegistry';
