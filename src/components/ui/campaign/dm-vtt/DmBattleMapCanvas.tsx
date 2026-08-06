@@ -2,6 +2,8 @@
 
 import { FieldNotesCanvas, ViewportContext } from '@fieldnotes/react';
 import { BattleMapMinimap } from '@/components/ui/campaign/location-map/BattleMapMinimap';
+import { BattleMapExportControl } from '@/components/ui/campaign/location-map/BattleMapExportControl';
+import { useBattleMapStore } from '@/store/battleMapStore';
 import { DmVttToolbar } from './DmVttToolbar';
 import {
   useDmBattleMapCanvas,
@@ -18,9 +20,17 @@ export type { DmBattleMapCanvasProps };
  * init/persistence/connection wiring.
  */
 export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
-  const { children, sessionControls, tokenInfoToggle } = props;
+  const {
+    children,
+    sessionControls,
+    tokenInfoToggle,
+    campaignCode,
+    battleMapId,
+    onExportError,
+  } = props;
   const {
     viewport,
+    battleMap,
     tools,
     handleReady,
     handleClearDrawings,
@@ -61,6 +71,20 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
               enabled: measureSharing,
               onChange: handleSetMeasureSharing,
             }}
+            exportControl={
+              <BattleMapExportControl
+                getViewport={() => viewport}
+                name={battleMap?.name ?? 'battle-map'}
+                mapImageSize={battleMap?.mapImageSize}
+                getDmOnlyElements={() =>
+                  useBattleMapStore
+                    .getState()
+                    .getBattleMap(campaignCode, battleMapId)?.dmOnlyElements ??
+                  {}
+                }
+                onError={onExportError}
+              />
+            }
           />
         )}
         {viewport && (

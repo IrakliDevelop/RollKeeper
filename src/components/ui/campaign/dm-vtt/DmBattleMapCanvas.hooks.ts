@@ -50,6 +50,7 @@ import {
 } from '@/components/ui/campaign/location-map/measureSync';
 
 import type { TokenInfoMode } from '@/components/ui/campaign/token-overlay';
+import type { BattleMap } from '@/types/battlemap';
 
 export interface DmBattleMapCanvasProps {
   campaignCode: string;
@@ -68,6 +69,8 @@ export interface DmBattleMapCanvasProps {
   onSelectionChange?: (selectedIds: string[]) => void;
   /** Show/hide/compact state for the token decoration layer, surfaced as a toolbar toggle. */
   tokenInfoToggle: { mode: TokenInfoMode | null; onCycle: () => void };
+  /** Surfaces export-control failures (e.g. no viewport, blob export threw). */
+  onExportError: (message: string) => void;
 }
 
 const DRAWING_TYPES = new Set(['stroke', 'arrow', 'template']);
@@ -75,6 +78,8 @@ const DRAWING_TYPES = new Set(['stroke', 'arrow', 'template']);
 export interface DmBattleMapCanvasState {
   viewport: Viewport | null;
   status: BattleMapConnectionStatus;
+  /** Live store lookup — name/mapImageSize source for the export control. */
+  battleMap: BattleMap | undefined;
   tools: Tool[];
   handleReady: (vp: Viewport) => void;
   handleClearDrawings: () => void;
@@ -140,6 +145,11 @@ export function useDmBattleMapCanvas({
           selectedElementId
         ] ?? false)
       : false
+  );
+  // Same store-object reference each render unless the record actually
+  // changes — safe as a selector return without a custom equality fn.
+  const battleMap = useBattleMapStore(
+    state => state.battleMaps[campaignCode]?.[battleMapId]
   );
   // The connection is created once inside the fire-once `handleReady`
   // callback; a plain closure over `onPoke` would go stale if the prop's
@@ -422,6 +432,7 @@ export function useDmBattleMapCanvas({
   return {
     viewport,
     status,
+    battleMap,
     tools,
     handleReady,
     handleClearDrawings,

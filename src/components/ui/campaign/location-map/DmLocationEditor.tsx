@@ -5,14 +5,17 @@ import { FieldNotesCanvas as Canvas, ViewportContext } from '@fieldnotes/react';
 import DmLocationToolbar from './DmLocationToolbar';
 import DmLocationToolOptions from './DmLocationToolOptions';
 import DmLocationLayersPanel from './DmLocationLayersPanel';
+import { BattleMapExportControl } from './BattleMapExportControl';
 import { useDmLocationEditor } from './DmLocationEditor.hooks';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
 import { useBattleMapStore } from '@/store/battleMapStore';
+import { useToast, ToastContainer } from '@/components/ui/feedback/Toast';
 import type { BattleMap } from '@/types/battlemap';
 
 export default function DmLocationEditor(props: DmLocationEditorProps) {
   const linkEncounter = useBattleMapStore(s => s.linkEncounter);
   const unlinkEncounter = useBattleMapStore(s => s.unlinkEncounter);
+  const { toasts, addToast, dismissToast } = useToast();
 
   const {
     canvasRef,
@@ -48,7 +51,6 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handleDeleteSelected,
     handleClear,
     handleSyncToPlayers,
-    handleDownloadExport,
     handleImageFileSelect,
     handlePickMapImage,
     handleMapImageFileSelect,
@@ -61,6 +63,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     publishLayerRemove,
     measureSharing,
     handleSetMeasureSharing,
+    getViewport,
+    getDmOnlyElements,
   } = useDmLocationEditor(props);
 
   return (
@@ -96,7 +100,6 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             onSetGridType={handleSetGridType}
             onUpdateGridSettings={handleUpdateGridSettings}
             onSyncToPlayers={handleSyncToPlayers}
-            onDownloadExport={handleDownloadExport}
             syncing={syncing}
             hasUnsyncedChanges={hasUnsyncedChanges}
             lastSyncedAt={lastSyncedAt}
@@ -114,6 +117,17 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             onToggleShareWithPlayers={handleToggleShareWithPlayers}
             arrangeMapsActive={arrangeMapsActive}
             onToggleArrangeMaps={handleToggleArrangeMaps}
+            exportControl={
+              <BattleMapExportControl
+                getViewport={getViewport}
+                name={props.location.name}
+                mapImageSize={props.location.mapImageSize}
+                getDmOnlyElements={getDmOnlyElements}
+                onError={message =>
+                  addToast({ type: 'error', title: 'Export failed', message })
+                }
+              />
+            }
           />
         )}
 
@@ -198,6 +212,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             </div>
           )}
         </div>
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       </div>
     </ViewportContext.Provider>
   );

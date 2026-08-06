@@ -56,6 +56,7 @@ export interface DmVttToolbarProps {
   selectedElementIsDmOnly: boolean;
   onToggleSelectedDmOnly: () => void;
   measureSharing?: MeasureSharingControl;
+  exportControl?: ReactNode;
 }
 
 const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
@@ -91,6 +92,7 @@ export function DmVttToolbar({
   selectedElementIsDmOnly,
   onToggleSelectedDmOnly,
   measureSharing,
+  exportControl,
 }: DmVttToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const TokenInfoIcon = TOKEN_INFO_ICON[tokenInfoToggle.mode ?? 'compact'];
@@ -223,6 +225,7 @@ export function DmVttToolbar({
           >
             <TokenInfoIcon size={16} />
           </Button>
+          {exportControl}
         </div>
       </div>
       <div className="border-divider w-full border-t empty:hidden">

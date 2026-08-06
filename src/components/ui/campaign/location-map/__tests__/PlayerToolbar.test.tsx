@@ -93,4 +93,17 @@ describe('PlayerToolbar', () => {
     const btn = screen.getByTitle('Place token');
     expect(btn.className).not.toContain('animate-pulse');
   });
+
+  it('renders the export control passed via the exportControl prop', () => {
+    render(
+      <PlayerToolbar
+        status="live"
+        hasSelection={false}
+        onDeleteSelected={vi.fn()}
+        characterId="char-1"
+        exportControl={<button aria-label="Export map">Export</button>}
+      />
+    );
+    expect(screen.getByLabelText('Export map')).toBeInTheDocument();
+  });
 });
