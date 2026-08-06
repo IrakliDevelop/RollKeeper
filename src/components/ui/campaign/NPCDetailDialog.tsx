@@ -32,6 +32,11 @@ import {
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
+import {
+  AppIcon,
+  ITEM_CATEGORY_ICONS,
+  getIconName,
+} from '@/components/ui/icons';
 import { MonsterStatBlockPanel } from '@/components/ui/encounter/MonsterStatBlockPanel';
 import { NpcResourceList } from '@/components/ui/encounter/combat-screen/detail/NpcResourceList';
 import { NPCStatBlockExport } from './NPCStatBlockExport';
@@ -270,16 +275,6 @@ const RARITY_VARIANTS: Record<
   artifact: 'danger',
 };
 
-const CATEGORY_ICON: Record<string, string> = {
-  weapon: '⚔️',
-  armor: '🛡️',
-  tool: '🔧',
-  misc: '📦',
-  magic: '✨',
-  consumable: '🧪',
-  treasure: '💎',
-};
-
 const RARITY_BORDER: Record<string, string> = {
   common: 'border-divider',
   uncommon: 'border-accent-emerald-border',
@@ -306,7 +301,7 @@ function InventoryItemCard({
 }) {
   const borderClass =
     (item.rarity && RARITY_BORDER[item.rarity]) || 'border-divider';
-  const icon = (item.category && CATEGORY_ICON[item.category]) || '📦';
+  const icon = getIconName(ITEM_CATEGORY_ICONS, item.category, 'item');
 
   return (
     <div
@@ -315,7 +310,7 @@ function InventoryItemCard({
     >
       {/* Full-height icon strip */}
       <div className="bg-surface-secondary border-divider flex w-9 shrink-0 items-center justify-center self-stretch border-r-2 text-base">
-        {icon}
+        <AppIcon name={icon} className="h-4 w-4" />
       </div>
       {/* Content */}
       <div className="min-w-0 flex-1 px-2 py-1.5">

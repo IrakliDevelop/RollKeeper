@@ -1,5 +1,6 @@
 import React from 'react';
 import { RollSummary } from '@/types/dice';
+import { AppIcon } from '@/components/ui/icons';
 import {
   formatDiceResults,
   getRollResultColor,
@@ -99,8 +100,12 @@ function DiceResultItem({ summary }: DiceResultItemProps) {
             title={`${die.dieType}: rolled ${die.value}`}
           >
             {die.dieType}: {die.value}
-            {die.value === die.sides && ' 🎉'}
-            {die.value === 1 && ' 💥'}
+            {die.value === die.sides && (
+              <AppIcon name="criticalSuccess" className="ml-1 h-3.5 w-3.5" />
+            )}
+            {die.value === 1 && (
+              <AppIcon name="criticalFailure" className="ml-1 h-3.5 w-3.5" />
+            )}
           </span>
         ))}
       </div>
@@ -112,13 +117,15 @@ function DiceResultItem({ summary }: DiceResultItemProps) {
 
       {/* Critical indicators */}
       {isCritSuccess && (
-        <div className="mt-1 text-xs font-semibold text-green-600">
-          🎉 Critical Success!
+        <div className="mt-1 flex items-center gap-1 text-xs font-semibold text-green-600">
+          <AppIcon name="criticalSuccess" className="h-3.5 w-3.5" />
+          Critical Success!
         </div>
       )}
       {isCritFailure && (
-        <div className="mt-1 text-xs font-semibold text-red-600">
-          💥 Critical Failure!
+        <div className="mt-1 flex items-center gap-1 text-xs font-semibold text-red-600">
+          <AppIcon name="criticalFailure" className="h-3.5 w-3.5" />
+          Critical Failure!
         </div>
       )}
     </div>

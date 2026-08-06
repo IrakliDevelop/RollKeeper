@@ -3,6 +3,7 @@
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/forms/button';
+import { AppIcon, type IconName } from '@/components/ui/icons';
 import { CombatantDetail } from '@/components/ui/encounter/combat-screen/detail/CombatantDetail';
 
 import { InitiativeTab } from './InitiativeTab';
@@ -33,11 +34,14 @@ export interface StudioPanelProps {
   ) => void;
 }
 
-const TABS: { key: 'initiative' | 'selected'; icon: string; label: string }[] =
-  [
-    { key: 'initiative', icon: '⚔', label: 'Initiative' },
-    { key: 'selected', icon: '📋', label: 'Selected' },
-  ];
+const TABS: {
+  key: 'initiative' | 'selected';
+  icon: IconName;
+  label: string;
+}[] = [
+  { key: 'initiative', icon: 'attack', label: 'Initiative' },
+  { key: 'selected', icon: 'character', label: 'Selected' },
+];
 
 /**
  * DM VTT studio panel: right-edge collapsible panel with an Initiative tab
@@ -64,7 +68,7 @@ export function StudioPanel({
         title="Expand combat panel"
         className="bg-surface-raised border-divider text-heading pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-0 flex min-h-[44px] items-center gap-1.5 rounded-l-2xl border px-3 text-xs font-bold tracking-wider shadow-xl"
       >
-        <span aria-hidden>📋</span> COMBAT
+        <AppIcon name="attack" className="h-4 w-4" /> COMBAT
       </button>
     );
   }
@@ -98,7 +102,7 @@ export function StudioPanel({
               className="min-h-[44px] text-xs"
               aria-label={label}
             >
-              <span aria-hidden>{icon}</span> {label}
+              <AppIcon name={icon} className="h-4 w-4" /> {label}
             </Button>
           ))}
         </div>

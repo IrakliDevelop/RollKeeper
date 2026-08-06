@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/forms/button';
+import { AppIcon } from '@/components/ui/icons';
 
 interface PlacementBannerProps {
   entityName: string;
@@ -16,8 +17,9 @@ export function PlacementBanner({
   return (
     <div className="pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] left-1/2 z-20 -translate-x-1/2">
       <div className="bg-accent-blue-bg border-accent-blue-border flex min-h-[44px] items-center gap-2 rounded-xl border px-3 py-1.5 shadow-lg">
-        <span className="text-accent-blue-text text-sm font-medium">
-          📍 Click the map to place {entityName}
+        <span className="text-accent-blue-text flex items-center gap-1.5 text-sm font-medium">
+          <AppIcon name="location" className="h-4 w-4" />
+          Click the map to place {entityName}
         </span>
         <Button variant="ghost" size="lg" onClick={onCancel}>
           Cancel

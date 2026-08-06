@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/forms/button';
+import { AppIcon } from '@/components/ui/icons';
 import type { SharedInitiativeState } from '@/types/sharedState';
 
 import { CombatRow } from './CombatRow';
@@ -34,7 +35,7 @@ export function CombatPanel({
         title="Expand combat panel"
         className="bg-surface-raised border-divider text-heading pointer-events-auto fixed top-[78px] left-4 flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-3 text-xs font-bold tracking-wider shadow-xl"
       >
-        <span aria-hidden>⚔</span> INIT
+        <AppIcon name="attack" className="h-4 w-4" /> INIT
       </button>
     );
   }
@@ -43,7 +44,9 @@ export function CombatPanel({
     <div className="bg-surface-raised border-divider pointer-events-auto fixed top-[78px] left-4 flex max-h-[calc(100vh-102px)] w-[278px] flex-col overflow-hidden rounded-2xl border shadow-xl">
       <div className="border-divider flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2.5">
         <div className="flex min-w-0 flex-col">
-          <span className="text-heading text-sm font-semibold">⚔ Combat</span>
+          <span className="text-heading flex items-center gap-1.5 text-sm font-semibold">
+            <AppIcon name="attack" className="h-4 w-4" /> Combat
+          </span>
           <span className="text-faint text-[11px] font-bold tracking-wider uppercase">
             ROUND {state.round} · {state.turnOrder.length} IN ORDER
           </span>

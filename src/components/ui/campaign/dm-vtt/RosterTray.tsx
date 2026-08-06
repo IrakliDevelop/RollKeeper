@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/forms/button';
+import { AppIcon } from '@/components/ui/icons';
 
 import { RosterRow } from './RosterRow';
 import { groupRosterEntities } from './rosterGroups';
@@ -52,7 +53,7 @@ export function RosterTray({
         title="Expand roster"
         className="bg-surface-raised border-divider text-heading pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] left-0 flex min-h-[44px] items-center gap-1.5 rounded-r-2xl border px-3 text-xs font-bold tracking-wider shadow-xl"
       >
-        <span aria-hidden>👥</span> ROSTER
+        <AppIcon name="party" className="h-4 w-4" /> ROSTER
       </button>
     );
   }
@@ -69,7 +70,9 @@ export function RosterTray({
       data-testid="dm-vtt-roster-panel"
     >
       <div className="border-divider flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2.5">
-        <span className="text-heading text-sm font-semibold">👥 Roster</span>
+        <span className="text-heading flex items-center gap-1.5 text-sm font-semibold">
+          <AppIcon name="party" className="h-4 w-4" /> Roster
+        </span>
         <Button
           variant="ghost"
           size="lg"

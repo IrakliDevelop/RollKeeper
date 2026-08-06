@@ -1,6 +1,7 @@
 'use client';
 
 import { CHESS_PIECES } from '@/components/ui/encounter/combat-screen/TokenChip';
+import { AppIcon } from '@/components/ui/icons';
 
 import type { DecoratedTokenRect } from './TokenDecorationLayer.hooks';
 import type { TokenDecoration } from './TokenDecorationLayer.types';
@@ -25,12 +26,15 @@ export function DeadGlyph({
         lineHeight: 1,
       }}
     >
-      ☠️
+      <AppIcon
+        name="monster"
+        style={{ width: cell * 0.3, height: cell * 0.3 }}
+      />
     </span>
   );
 }
 
-/** Amber ⚡ badge in the token's top-right corner — reaction spent this round. */
+/** Amber reaction badge in the token's top-right corner. */
 export function ReactionUsedGlyph({
   rect,
   cell,
@@ -54,7 +58,10 @@ export function ReactionUsedGlyph({
         lineHeight: 1,
       }}
     >
-      ⚡
+      <AppIcon
+        name="reaction"
+        style={{ width: size * 0.6, height: size * 0.6 }}
+      />
     </span>
   );
 }

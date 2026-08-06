@@ -50,7 +50,7 @@ describe('StatusEffectTray', () => {
     });
     render(<StatusEffectTray />);
 
-    fireEvent.click(screen.getByRole('button', { name: /🧠 CON/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'CON' }));
     expect(screen.getByText(/Concentrating on Bless/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /end concentration/i }));

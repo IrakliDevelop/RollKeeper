@@ -47,8 +47,7 @@ describe('InitiativeRollPrompt', () => {
     const input = screen.getByLabelText('Initiative total');
     expect((input as HTMLInputElement).value).toBe('14');
 
-    // Breakdown shows 🎲 11 + 3
-    expect(screen.getByText('🎲 11 + 3')).toBeInTheDocument();
+    expect(screen.getByText('11 + 3')).toBeInTheDocument();
 
     vi.restoreAllMocks();
   });
@@ -165,7 +164,7 @@ describe('InitiativeRollPrompt', () => {
     const { default: userEvent } = await import('@testing-library/user-event');
     await userEvent.click(rollButton);
 
-    expect(screen.getByText('🎲 11 + 3')).toBeInTheDocument();
+    expect(screen.getByText('11 + 3')).toBeInTheDocument();
 
     const input = screen.getByLabelText('Initiative total');
     await userEvent.clear(input);
@@ -192,8 +191,7 @@ describe('InitiativeRollPrompt', () => {
     const { default: userEvent } = await import('@testing-library/user-event');
     await userEvent.click(rollButton);
 
-    // Breakdown shows 🎲 11 − 2 (with minus sign for negative)
-    expect(screen.getByText('🎲 11 − 2')).toBeInTheDocument();
+    expect(screen.getByText('11 − 2')).toBeInTheDocument();
 
     vi.restoreAllMocks();
   });

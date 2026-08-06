@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
+import { AppIcon } from '@/components/ui/icons';
 import type { ToastData } from '@/components/ui/feedback/Toast';
 import { useCharacterStore } from '@/store/characterStore';
 import { getActiveClassResources } from '@/utils/classResources';
@@ -58,7 +59,7 @@ export function CharacterDock({
         title="Expand character dock"
         className="bg-surface-raised border-divider text-heading pointer-events-auto fixed top-[78px] right-4 flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-3 text-xs font-bold tracking-wider shadow-xl"
       >
-        <span aria-hidden>👤</span> CHAR
+        <AppIcon name="character" className="h-4 w-4" /> CHAR
       </button>
     );
   }

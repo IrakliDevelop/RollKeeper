@@ -16,6 +16,7 @@ import {
   Zap,
   Infinity,
 } from 'lucide-react';
+import { AppIcon } from '@/components/ui/icons';
 import { useCharacterStore } from '@/store/characterStore';
 import { useCastSpell } from '@/hooks/useCastSpell';
 import { Spell } from '@/types/character';
@@ -642,7 +643,7 @@ export function QuickSpells({
   if (actionSpells.length === 0) {
     return (
       <div className="border-divider bg-surface-raised rounded-lg border-2 p-8 text-center">
-        <div className="mb-3 text-5xl">🔮</div>
+        <AppIcon name="spell" className="text-muted mx-auto mb-3 h-12 w-12" />
         <p className="text-heading text-lg font-semibold">No spells prepared</p>
         <p className="text-muted mt-2 text-sm">
           Prepare spells in the Spellcasting tab to see them here.
@@ -801,7 +802,10 @@ export function QuickSpells({
         {/* No results message */}
         {searchQuery && sortedLevels.length === 0 && (
           <div className="border-divider bg-surface-raised rounded-lg border-2 p-8 text-center">
-            <div className="mb-2 text-4xl">🔍</div>
+            <AppIcon
+              name="search"
+              className="text-muted mx-auto mb-2 h-10 w-10"
+            />
             <p className="text-heading font-semibold">No spells found</p>
             <p className="text-muted mt-1 text-sm">
               Try adjusting your search terms or check your prepared spells.

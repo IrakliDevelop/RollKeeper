@@ -16,6 +16,7 @@ import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { Switch } from '@/components/ui/forms/switch';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Badge } from '@/components/ui/layout/badge';
+import { AppIcon } from '@/components/ui/icons';
 
 export const SpellcastingStats: React.FC = () => {
   const { character, updateCharacter } = useCharacterStore();
@@ -28,11 +29,11 @@ export const SpellcastingStats: React.FC = () => {
     return (
       <div className="border-accent-purple-border bg-surface rounded-lg border-2 p-6 shadow-sm">
         <h3 className="text-accent-purple-text mb-4 flex items-center gap-2 text-lg font-bold">
-          <span className="text-accent-purple-text-muted">✨</span>
+          <AppIcon name="spell" className="h-5 w-5" />
           Spellcasting
         </h3>
         <div className="text-muted py-6 text-center">
-          <div className="mb-2 text-4xl">🚫</div>
+          <AppIcon name="prohibited" className="mx-auto mb-2 h-10 w-10" />
           <p className="text-body font-semibold">Not a spellcaster</p>
           <p className="mt-1 text-sm">
             Select a spellcasting class to enable this section.
@@ -90,7 +91,7 @@ export const SpellcastingStats: React.FC = () => {
       {/* Header */}
       <div className="border-divider mb-6 flex items-center justify-between border-b-2 pb-4">
         <h3 className="text-accent-purple-text flex items-center gap-2 text-lg font-bold">
-          <span className="text-accent-purple-text-muted">✨</span>
+          <AppIcon name="spell" className="h-5 w-5" />
           Spellcasting Statistics
         </h3>
         <Button
@@ -109,7 +110,7 @@ export const SpellcastingStats: React.FC = () => {
         <div className="border-accent-purple-border bg-accent-purple-bg rounded-lg border-2 p-4">
           <div className="mb-3 flex items-center justify-between">
             <h4 className="text-accent-purple-text flex items-center gap-2 font-bold">
-              <span className="text-accent-purple-text-muted">🧠</span>
+              <AppIcon name="concentration" className="h-5 w-5" />
               Spellcasting Ability
             </h4>
             {showOverrides && (

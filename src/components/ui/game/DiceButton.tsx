@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSimpleDiceRoll } from '@/hooks/useSimpleDiceRoll';
 import { RollSummary } from '@/types/dice';
+import { AppIcon } from '@/components/ui/icons';
 
 export interface DiceButtonProps {
   notation: string;
@@ -64,7 +65,12 @@ export function DiceButton({
             : `Roll ${notation}`
       }
     >
-      {showDiceIcon && <span className="mr-1">{isRolling ? '⏳' : '🎲'}</span>}
+      {showDiceIcon && (
+        <AppIcon
+          name={isRolling ? 'loading' : 'dice'}
+          className={`mr-1 inline h-4 w-4 ${isRolling ? 'animate-spin' : ''}`}
+        />
+      )}
       {children}
     </button>
   );

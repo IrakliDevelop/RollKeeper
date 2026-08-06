@@ -227,7 +227,7 @@ describe('StudioPanel', () => {
     render(<StudioPanel {...baseProps()} />);
     const row = screen.getByText('Goblin Boss').closest('button')!;
     expect(row).toHaveTextContent(/hidden/i);
-    expect(row).toHaveTextContent('🧠');
+    expect(row.querySelector('.lucide-brain')).toBeInTheDocument();
   });
 
   it('shows the not-started prompt when combat has not begun', () => {
