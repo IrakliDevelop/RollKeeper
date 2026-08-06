@@ -1,41 +1,45 @@
 import type { Metadata } from 'next';
-import {
-  Geist,
-  Geist_Mono,
-  Cinzel_Decorative,
-  Bricolage_Grotesque,
-  Hanken_Grotesk,
-} from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { ThemeProviderWrapper } from './ThemeProviderWrapper';
 
-const geistSans = Geist({
+const geistSans = localFont({
+  src: './fonts/geist-latin.woff2',
   variable: '--font-geist-sans',
-  subsets: ['latin'],
+  weight: '100 900',
+  display: 'swap',
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: './fonts/geist-mono-latin.woff2',
   variable: '--font-geist-mono',
-  subsets: ['latin'],
+  weight: '100 900',
+  display: 'swap',
 });
 
-const cinzelDecorative = Cinzel_Decorative({
+const cinzelDecorative = localFont({
+  src: [
+    { path: './fonts/cinzel-decorative-400-latin.woff2', weight: '400' },
+    { path: './fonts/cinzel-decorative-700-latin.woff2', weight: '700' },
+    { path: './fonts/cinzel-decorative-900-latin.woff2', weight: '900' },
+  ],
   variable: '--font-cinzel-decorative',
-  subsets: ['latin'],
-  weight: ['400', '700', '900'],
+  display: 'swap',
 });
 
-const bricolage = Bricolage_Grotesque({
+const bricolage = localFont({
+  src: './fonts/bricolage-grotesque-latin.woff2',
   variable: '--font-bricolage',
-  subsets: ['latin'],
-  weight: ['600', '700', '800'],
+  weight: '600 800',
+  display: 'swap',
 });
 
-const hanken = Hanken_Grotesk({
+const hanken = localFont({
+  src: './fonts/hanken-grotesk-latin.woff2',
   variable: '--font-hanken',
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
+  weight: '400 800',
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
