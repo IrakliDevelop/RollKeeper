@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ProcessedWeapon } from '@/types/items';
 import { Search, X, Loader2, Sword } from 'lucide-react';
+import { AppIcon } from '@/components/ui/icons';
 import { Badge } from '@/components/ui/layout/badge';
 
 interface WeaponAutocompleteProps {
@@ -192,9 +193,10 @@ export function WeaponAutocomplete({
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-lg">
-                          {item.type === 'R' ? '🏹' : '⚔️'}
-                        </span>
+                        <AppIcon
+                          name={item.type === 'R' ? 'rangedAttack' : 'weapon'}
+                          className="h-5 w-5 shrink-0"
+                        />
                         <div className="min-w-0 flex-1">
                           <p className="text-heading truncate font-medium">
                             {item.name}

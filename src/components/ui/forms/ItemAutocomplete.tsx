@@ -5,6 +5,11 @@ import { ProcessedItem, ProcessedMagicItem } from '@/types/items';
 import { Search, X, Loader2, Package } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import { formatCurrencyFromCopper } from '@/utils/currency';
+import {
+  AppIcon,
+  ITEM_CATEGORY_ICONS,
+  getIconName,
+} from '@/components/ui/icons';
 
 interface ItemAutocompleteProps {
   items: ProcessedItem[];
@@ -59,15 +64,6 @@ const CATEGORY_VARIANTS: Record<
   misc: 'secondary',
   magic: 'warning',
   consumable: 'success',
-};
-
-const CATEGORY_EMOJI: Record<string, string> = {
-  weapon: '⚔️',
-  armor: '🛡️',
-  tool: '🔧',
-  misc: '📦',
-  magic: '✨',
-  consumable: '🧪',
 };
 
 export function ItemAutocomplete({
@@ -210,9 +206,14 @@ export function ItemAutocomplete({
       {selectedItem && (
         <div className="border-accent-purple-border-strong bg-accent-purple-bg mb-2 flex items-center justify-between rounded-lg border-2 px-3 py-2">
           <div className="flex items-center gap-2">
-            <span className="text-lg">
-              {CATEGORY_EMOJI[selectedItem.category] || '📦'}
-            </span>
+            <AppIcon
+              name={getIconName(
+                ITEM_CATEGORY_ICONS,
+                selectedItem.category,
+                'item'
+              )}
+              className="h-5 w-5 shrink-0"
+            />
             <div>
               <p className="text-heading font-medium">{selectedItem.name}</p>
               <p className="text-muted text-xs">
@@ -279,9 +280,14 @@ export function ItemAutocomplete({
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-lg">
-                          {CATEGORY_EMOJI[item.category] || '📦'}
-                        </span>
+                        <AppIcon
+                          name={getIconName(
+                            ITEM_CATEGORY_ICONS,
+                            item.category,
+                            'item'
+                          )}
+                          className="h-5 w-5 shrink-0"
+                        />
                         <div className="min-w-0 flex-1">
                           <p className="text-heading truncate font-medium">
                             {item.name}

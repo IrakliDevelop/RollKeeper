@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Angry, Zap, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import { AppIcon } from '@/components/ui/icons';
 import LevelUpWizard from '@/components/ui/character/LevelUpWizard';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { PlayerCalendarView } from '@/components/ui/calendar/PlayerCalendarView';
@@ -289,7 +290,7 @@ export function createTabbedSheetConfig(
     {
       id: 'actions',
       label: 'Actions',
-      icon: '⚔️',
+      icon: <AppIcon name="attack" className="h-4 w-4" />,
       badge: character.concentration?.isConcentrating ? (
         <span className="bg-accent-orange-bg-strong text-accent-orange-text rounded-full px-1.5 py-0.5 text-[10px] font-medium">
           Conc.
@@ -361,7 +362,7 @@ export function createTabbedSheetConfig(
     {
       id: 'stats',
       label: 'Stats',
-      icon: '📊',
+      icon: <AppIcon name="abilities" className="h-4 w-4" />,
       content: (
         <div className="space-y-6">
           {/* Header row: Basic Info + Quick Stats */}
@@ -476,7 +477,7 @@ export function createTabbedSheetConfig(
     {
       id: 'combat',
       label: 'Combat',
-      icon: '🛡️',
+      icon: <AppIcon name="armor" className="h-4 w-4" />,
       badge:
         (character.summons?.length || 0) > 0 ? (
           <span className="bg-accent-emerald-bg text-accent-emerald-text rounded-full px-1.5 py-0.5 text-[10px] font-medium">
@@ -497,7 +498,7 @@ export function createTabbedSheetConfig(
     {
       id: 'spells',
       label: 'Spells',
-      icon: '✨',
+      icon: <AppIcon name="spell" className="h-4 w-4" />,
       hidden: !characterHasSpells && character.spells.length === 0,
       badge:
         character.spells.length > 0 ? (
@@ -573,7 +574,7 @@ export function createTabbedSheetConfig(
     {
       id: 'inventory',
       label: 'Inventory',
-      icon: '🎒',
+      icon: <AppIcon name="inventory" className="h-4 w-4" />,
       content: (
         <InventoryTabContent character={character} onSendItem={onSendItem} />
       ),
@@ -583,7 +584,7 @@ export function createTabbedSheetConfig(
     {
       id: 'features',
       label: 'Features',
-      icon: '⚡',
+      icon: <AppIcon name="features" className="h-4 w-4" />,
       badge:
         (character.extendedFeatures?.length || 0) > 0 ? (
           <span className="bg-accent-amber-bg text-accent-amber-text rounded-full px-1.5 py-0.5 text-[10px] font-medium">
@@ -605,7 +606,7 @@ export function createTabbedSheetConfig(
     {
       id: 'character',
       label: 'Character',
-      icon: '📋',
+      icon: <AppIcon name="features" className="h-4 w-4" />,
       content: <CharacterTabContent character={character} params={params} />,
     },
 
@@ -613,7 +614,7 @@ export function createTabbedSheetConfig(
     {
       id: 'calendar',
       label: 'Calendar',
-      icon: '📅',
+      icon: <AppIcon name="calendar" className="h-4 w-4" />,
       content: (
         <ErrorBoundary
           fallback={
@@ -637,7 +638,7 @@ export function createTabbedSheetConfig(
     tabs.push({
       id: 'map',
       label: 'Map',
-      icon: '🗺️',
+      icon: <AppIcon name="map" className="h-4 w-4" />,
       content: (
         <ErrorBoundary
           fallback={
@@ -659,11 +660,31 @@ export function createTabbedSheetConfig(
 }
 
 const INVENTORY_SUB_TABS = [
-  { id: 'weapons', label: 'Weapons', icon: '⚔️' },
-  { id: 'magic-items', label: 'Magic Items', icon: '✨' },
-  { id: 'armor', label: 'Armor', icon: '🛡️' },
-  { id: 'items', label: 'Items', icon: '🎒' },
-  { id: 'currency', label: 'Currency', icon: '💰' },
+  {
+    id: 'weapons',
+    label: 'Weapons',
+    icon: <AppIcon name="weapon" className="h-4 w-4" />,
+  },
+  {
+    id: 'magic-items',
+    label: 'Magic Items',
+    icon: <AppIcon name="magicItem" className="h-4 w-4" />,
+  },
+  {
+    id: 'armor',
+    label: 'Armor',
+    icon: <AppIcon name="armor" className="h-4 w-4" />,
+  },
+  {
+    id: 'items',
+    label: 'Items',
+    icon: <AppIcon name="inventory" className="h-4 w-4" />,
+  },
+  {
+    id: 'currency',
+    label: 'Currency',
+    icon: <AppIcon name="currency" className="h-4 w-4" />,
+  },
 ] as const;
 
 type InventorySubTab = (typeof INVENTORY_SUB_TABS)[number]['id'];
@@ -773,8 +794,16 @@ function InventoryTabContent({
 }
 
 const CHARACTER_SUB_TABS = [
-  { id: 'notes', label: 'Session Notes', icon: '📝' },
-  { id: 'details', label: 'Features & Background', icon: '📋' },
+  {
+    id: 'notes',
+    label: 'Session Notes',
+    icon: <AppIcon name="features" className="h-4 w-4" />,
+  },
+  {
+    id: 'details',
+    label: 'Features & Background',
+    icon: <AppIcon name="character" className="h-4 w-4" />,
+  },
 ] as const;
 
 type CharacterSubTab = (typeof CHARACTER_SUB_TABS)[number]['id'];
@@ -827,7 +856,7 @@ function CharacterTabContent({
             const days = params.calendarDays ?? character.daysSpent ?? 0;
             return (
               <span className="border-accent-amber-border text-accent-amber-text inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] px-3 py-1 text-sm font-medium shadow-sm">
-                <span className="text-base">📅</span>
+                <AppIcon name="calendar" className="h-4 w-4" />
                 Campaign Day {days + 1}
               </span>
             );
@@ -906,9 +935,21 @@ function CharacterTabContent({
 }
 
 const COMBAT_SUB_TABS = [
-  { id: 'player', label: 'Player', icon: '🗡️' },
-  { id: 'defenses', label: 'Defenses & Buffs', icon: '🛡️' },
-  { id: 'summons', label: 'Summons', icon: '🐾' },
+  {
+    id: 'player',
+    label: 'Player',
+    icon: <AppIcon name="character" className="h-4 w-4" />,
+  },
+  {
+    id: 'defenses',
+    label: 'Defenses & Buffs',
+    icon: <AppIcon name="armor" className="h-4 w-4" />,
+  },
+  {
+    id: 'summons',
+    label: 'Summons',
+    icon: <AppIcon name="summon" className="h-4 w-4" />,
+  },
 ] as const;
 
 type CombatSubTab = (typeof COMBAT_SUB_TABS)[number]['id'];
@@ -1144,9 +1185,21 @@ function DmCustomCounterDisplay({
 }
 
 const FEATURES_SUB_TABS = [
-  { id: 'abilities', label: 'Abilities', icon: '⚡' },
-  { id: 'inspiration', label: 'Inspiration', icon: '✨' },
-  { id: 'proficiencies', label: 'Proficiencies', icon: '🔧' },
+  {
+    id: 'abilities',
+    label: 'Abilities',
+    icon: <AppIcon name="abilities" className="h-4 w-4" />,
+  },
+  {
+    id: 'inspiration',
+    label: 'Inspiration',
+    icon: <AppIcon name="inspiration" className="h-4 w-4" />,
+  },
+  {
+    id: 'proficiencies',
+    label: 'Proficiencies',
+    icon: <AppIcon name="proficiencies" className="h-4 w-4" />,
+  },
 ] as const;
 
 type FeaturesSubTab = (typeof FEATURES_SUB_TABS)[number]['id'];

@@ -15,7 +15,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 export interface BookmarkTabItem {
   id: string;
   label: string;
-  icon?: string;
+  icon?: React.ReactNode;
   content: ReactNode;
   disabled?: boolean;
   badge?: ReactNode;

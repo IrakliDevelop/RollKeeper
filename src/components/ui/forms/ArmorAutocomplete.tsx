@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ProcessedArmor } from '@/types/items';
 import { Search, X, Loader2, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
+import { AppIcon } from '@/components/ui/icons';
 
 interface ArmorAutocompleteProps {
   items: ProcessedArmor[];
@@ -24,13 +25,6 @@ const RARITY_VARIANTS: Record<
   'very rare': 'primary',
   legendary: 'warning',
   artifact: 'danger',
-};
-
-const CATEGORY_EMOJIS: Record<string, string> = {
-  light: '🧥',
-  medium: '🦺',
-  heavy: '🛡️',
-  shield: '🛡️',
 };
 
 export function ArmorAutocomplete({
@@ -198,9 +192,7 @@ export function ArmorAutocomplete({
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-lg">
-                          {CATEGORY_EMOJIS[item.category] || '🛡️'}
-                        </span>
+                        <AppIcon name="armor" className="h-5 w-5 shrink-0" />
                         <div className="min-w-0 flex-1">
                           <p className="text-heading truncate font-medium">
                             {item.name}

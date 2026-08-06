@@ -41,6 +41,11 @@ import {
   ChevronRight,
   ArrowLeft,
 } from 'lucide-react';
+import {
+  AppIcon,
+  SPELL_SCHOOL_ICONS,
+  getIconName,
+} from '@/components/ui/icons';
 
 interface GrantedSpellPickerProps {
   isOpen: boolean;
@@ -51,17 +56,6 @@ interface GrantedSpellPickerProps {
   allSpells: ProcessedSpell[];
   spellsLoading: boolean;
 }
-
-const SCHOOL_ICONS: Record<string, string> = {
-  Abjuration: '🛡️',
-  Conjuration: '🌀',
-  Divination: '🔮',
-  Enchantment: '💫',
-  Evocation: '⚡',
-  Illusion: '✨',
-  Necromancy: '💀',
-  Transmutation: '🔄',
-};
 
 interface ChooseSlot {
   choice: ParsedChooseSpell;
@@ -415,7 +409,7 @@ function ResolvedSpellRow({
   onToggle: () => void;
 }) {
   const { spell, grantLabel } = resolved;
-  const icon = SCHOOL_ICONS[spell.school] || '✨';
+  const icon = getIconName(SPELL_SCHOOL_ICONS, spell.school, 'spell');
 
   return (
     <button
@@ -436,7 +430,7 @@ function ResolvedSpellRow({
       >
         {!excluded && <Check className="text-accent-purple-text h-3.5 w-3.5" />}
       </div>
-      <span className="text-lg">{icon}</span>
+      <AppIcon name={icon} className="h-5 w-5 shrink-0" />
       <div className="min-w-0 flex-1">
         <p
           className={`text-sm font-medium ${excluded ? 'text-muted line-through' : 'text-heading'}`}
@@ -706,9 +700,14 @@ function SpellBrowseDropdown({
                         : 'hover:bg-surface-hover'
                     )}
                   >
-                    <span className="text-base">
-                      {SCHOOL_ICONS[spell.schoolName] || '✨'}
-                    </span>
+                    <AppIcon
+                      name={getIconName(
+                        SPELL_SCHOOL_ICONS,
+                        spell.schoolName,
+                        'spell'
+                      )}
+                      className="h-5 w-5 shrink-0"
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="text-heading truncate text-sm font-medium">
                         {spell.name}
