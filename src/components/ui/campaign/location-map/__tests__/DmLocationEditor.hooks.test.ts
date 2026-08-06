@@ -145,17 +145,6 @@ describe('useDmLocationEditor — handleToggleDmOnly mode gating', () => {
     vi.clearAllMocks();
   });
 
-  it('deletes the selection through the public Fieldnotes batch API', async () => {
-    const { vp, store, result, elementId } = await setup('location');
-
-    act(() => {
-      result.current.handleDeleteSelected();
-    });
-
-    expect(vp.removeElements).toHaveBeenCalledWith([elementId]);
-    expect(store.getById(elementId)).toBeUndefined();
-  });
-
   it('location mode: toggling visibility does NOT touch the canvas store (no dirty/save side effects)', async () => {
     const { store, result } = await setup('location');
 

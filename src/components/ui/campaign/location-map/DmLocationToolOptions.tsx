@@ -14,7 +14,11 @@ import type {
   TemplateToolOptions,
   TextToolOptions,
 } from '@fieldnotes/core';
-import { useActiveTool, useToolOptions } from '@fieldnotes/react';
+import {
+  useActiveTool,
+  useSelectionOps,
+  useToolOptions,
+} from '@fieldnotes/react';
 import { Switch } from '@/components/ui/forms/switch';
 import DmSelectionOptions from './DmSelectionOptions';
 import type { EditorMode } from './DmLocationEditor.types';
@@ -76,6 +80,11 @@ export default function DmLocationToolOptions({
   selectionControls,
 }: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
+  // Read unconditionally (both DM surfaces render this component inside
+  // ViewportContext.Provider) so the select branch's `showOptionsBar` gate
+  // below can require a non-empty selection — otherwise activating the
+  // select tool with nothing selected would render an empty bordered strip.
+  const { selectedCount } = useSelectionOps();
   const [pencilOpts, setPencilOpts] = useToolOptions<
     PencilToolOptions & Record<string, unknown>
   >('pencil');
@@ -105,7 +114,7 @@ export default function DmLocationToolOptions({
   >('ping');
 
   const showOptionsBar =
-    (selectionControls && activeTool === 'select') ||
+    (selectionControls && activeTool === 'select' && selectedCount > 0) ||
     (activeTool === 'pencil' && pencilOpts !== undefined) ||
     activeTool === 'arrow' ||
     activeTool === 'note' ||

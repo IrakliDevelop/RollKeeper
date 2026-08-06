@@ -206,4 +206,12 @@ describe('DmLocationToolOptions selection branch reachability', () => {
     );
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('regression: stays hidden with selectionControls + select tool active but zero selection (no empty bar strip)', () => {
+    mockSelectedCount = 0;
+    const { container } = render(
+      <DmLocationToolOptions mode="battlemap" selectionControls />
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
 });

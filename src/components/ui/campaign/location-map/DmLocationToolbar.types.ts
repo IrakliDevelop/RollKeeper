@@ -4,7 +4,6 @@ import type { BattleMapConnectionStatus } from '@/lib/battlemapSync';
 
 export interface DmLocationToolbarProps {
   onPickImage: () => void;
-  onDelete: () => void;
   onClear: () => void;
   onFitToMap: () => void;
   gridEnabled: boolean;

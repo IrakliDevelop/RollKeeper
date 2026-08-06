@@ -48,7 +48,6 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     imageUploading,
     handleReady,
     handlePickImage,
-    handleDeleteSelected,
     handleClear,
     handleSyncToPlayers,
     handleImageFileSelect,
@@ -89,7 +88,6 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
           <DmLocationToolbar
             onPickImage={handlePickImage}
             onPickMapImage={handlePickMapImage}
-            onDelete={handleDeleteSelected}
             onClear={handleClear}
             onFitToMap={handleFitToMap}
             gridEnabled={gridEnabled}
@@ -134,6 +132,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
         {viewport && (
           <DmLocationToolOptions
             mode={mode}
+            selectionControls
             measureSharing={{
               enabled: measureSharing,
               onChange: handleSetMeasureSharing,

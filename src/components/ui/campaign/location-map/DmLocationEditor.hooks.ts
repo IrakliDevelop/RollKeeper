@@ -156,7 +156,6 @@ export interface DmLocationEditorState {
   // Handlers
   handleReady: (vp: Viewport) => void;
   handlePickImage: () => void;
-  handleDeleteSelected: () => void;
   handleClear: () => void;
   handleSyncToPlayers: () => Promise<void>;
   handleImageFileSelect: (
@@ -755,17 +754,6 @@ export function useDmLocationEditor(
     }
   }, [mode, getVp, campaignCode, location.id, battleMapStoreUpdate]);
 
-  const handleDeleteSelected = useCallback(() => {
-    const vp = getVp();
-    if (!vp) return;
-    // `getSelectedIds()` never surfaces stale ids, and is empty whenever the
-    // select tool isn't active (SelectTool clears its selection on deactivate).
-    const ids = vp.getSelectedIds();
-    if (ids.length === 0) return;
-    vp.removeElements(ids);
-    setSelectedElementId(null);
-  }, [getVp]);
-
   const handleClear = useCallback(async () => {
     const vp = getVp();
     if (!vp || vp.store.count === 0) return;
@@ -1017,7 +1005,6 @@ export function useDmLocationEditor(
     setImageUploading,
     handleReady,
     handlePickImage,
-    handleDeleteSelected,
     handleClear,
     handleSyncToPlayers,
     handleImageFileSelect,
