@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import {
   render,
   screen,
@@ -31,6 +31,10 @@ function renderControl(
 }
 
 describe('BattleMapExportControl', () => {
+  beforeEach(() => {
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  });
+
   afterEach(() => cleanup());
 
   it('shows the audience radio only when getDmOnlyElements is provided', () => {

@@ -55,7 +55,11 @@ export function BattleMapExportControl({
 
   const handleExport = async () => {
     const vp = getViewport();
-    if (!vp || busy) return;
+    if (!vp) {
+      onError('Map is still loading');
+      return;
+    }
+    if (busy) return;
     setBusy(true);
     try {
       const { blob, filename } = await exporter(vp, {
@@ -110,7 +114,7 @@ export function BattleMapExportControl({
         <div className="bg-surface-raised border-divider absolute top-full right-0 z-30 mt-2 w-56 rounded-xl border p-3 shadow-xl">
           <div className="flex flex-col gap-2">
             {getDmOnlyElements && (
-              <div>
+              <div role="radiogroup" aria-label="Audience">
                 <div className="text-muted mb-1 text-[11px] font-semibold uppercase">
                   Audience
                 </div>
@@ -129,7 +133,7 @@ export function BattleMapExportControl({
               </div>
             )}
 
-            <div>
+            <div role="radiogroup" aria-label="Bounds">
               <div className="text-muted mb-1 text-[11px] font-semibold uppercase">
                 Bounds
               </div>
@@ -147,7 +151,7 @@ export function BattleMapExportControl({
               )}
             </div>
 
-            <div>
+            <div role="radiogroup" aria-label="Format">
               <div className="text-muted mb-1 text-[11px] font-semibold uppercase">
                 Format
               </div>

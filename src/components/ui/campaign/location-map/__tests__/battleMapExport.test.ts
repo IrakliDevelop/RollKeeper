@@ -116,4 +116,31 @@ describe('exportBattleMap', () => {
       })
     ).rejects.toThrow('no image');
   });
+
+  it('omits region when mapImageSize width is zero', async () => {
+    const vp = fakeVp();
+    await exportBattleMap(vp, {
+      audience: 'full',
+      bounds: 'map',
+      format: 'png',
+      name: 'Cave',
+      mapImageSize: { w: 0, h: 100 },
+    });
+    const options = vp.exportImage.mock.calls[0][0];
+    expect(options.region).toBeUndefined();
+  });
+
+  it('defines a filter that returns true for any id when dmOnlyElements is omitted for player audience', async () => {
+    const vp = fakeVp();
+    await exportBattleMap(vp, {
+      audience: 'player',
+      bounds: 'map',
+      format: 'png',
+      name: 'Cave',
+      mapImageSize: { w: 100, h: 100 },
+    });
+    const filter = vp.exportImage.mock.calls[0][0].filter;
+    expect(filter).toBeDefined();
+    expect(filter({ id: 'anything' })).toBe(true);
+  });
 });
