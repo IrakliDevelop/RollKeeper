@@ -55,7 +55,6 @@ const baseProps: DmLocationToolbarProps = {
   onSetGridType: vi.fn(),
   onUpdateGridSettings: vi.fn(),
   onSyncToPlayers: vi.fn(),
-  onDownloadExport: vi.fn(),
   syncing: false,
   hasUnsyncedChanges: false,
   lastSyncedAt: null,

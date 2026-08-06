@@ -39,6 +39,7 @@ import {
   type Viewport,
 } from '@fieldnotes/core';
 import { BattleMapMinimap } from './BattleMapMinimap';
+import { BattleMapExportControl } from './BattleMapExportControl';
 import { PlayerHandTool } from './PlayerHandTool';
 import {
   createManagedBattleMapConnection,
@@ -87,6 +88,8 @@ interface PlayerBattleMapCanvasProps {
   hideBackButton?: boolean;
   /** Show/hide/compact toggle for the token decoration overlay (optional — non-VTT routes render no toggle). */
   tokenInfoToggle?: { mode: TokenInfoMode | null; onCycle: () => void };
+  /** Surfaces export-control failures; the host owns the toast container. */
+  onExportError: (message: string) => void;
 }
 
 const PLAYER_TOOLS: {
@@ -121,12 +124,14 @@ export function PlayerToolbar({
   onDeleteSelected,
   tokenInfoToggle,
   characterId,
+  exportControl,
 }: {
   status: BattleMapConnectionStatus;
   hasSelection: boolean;
   onDeleteSelected: () => void;
   tokenInfoToggle?: { mode: TokenInfoMode | null; onCycle: () => void };
   characterId: string;
+  exportControl?: React.ReactNode;
 }) {
   const [activeTool, setTool] = useActiveTool();
   const TokenInfoIcon = tokenInfoToggle
@@ -159,7 +164,9 @@ export function PlayerToolbar({
           );
         })}
       </div>
-      {(hasSelection || (tokenInfoToggle && TokenInfoIcon)) && (
+      {(hasSelection ||
+        (tokenInfoToggle && TokenInfoIcon) ||
+        exportControl) && (
         <div className="flex items-center gap-1">
           {hasSelection && (
             <Button
@@ -183,6 +190,7 @@ export function PlayerToolbar({
               <TokenInfoIcon size={16} />
             </Button>
           )}
+          {exportControl}
         </div>
       )}
       <span
@@ -215,6 +223,7 @@ export function PlayerBattleMapCanvas({
   spellTemplateConfigRef,
   hideBackButton = false,
   tokenInfoToggle,
+  onExportError,
 }: PlayerBattleMapCanvasProps) {
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
@@ -392,6 +401,13 @@ export function PlayerBattleMapCanvas({
             onDeleteSelected={handleDeleteSelected}
             tokenInfoToggle={tokenInfoToggle}
             characterId={characterId}
+            exportControl={
+              <BattleMapExportControl
+                getViewport={() => viewport}
+                name="battle-map"
+                onError={onExportError}
+              />
+            }
           />
         )}
         {viewport && (

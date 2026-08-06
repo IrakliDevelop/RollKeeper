@@ -68,6 +68,9 @@ export function DmVttScreen({
       tokenConfigRef={vtt.tokenConfigRef}
       onSelectionChange={vtt.onSelectionChange}
       tokenInfoToggle={{ mode: tokenInfoMode, onCycle: cycleTokenInfo }}
+      onExportError={message =>
+        vtt.addToast({ type: 'error', title: 'Export failed', message })
+      }
       sessionControls={
         <DmVttTopBar
           campaignCode={campaignCode}

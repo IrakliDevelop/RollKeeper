@@ -15,7 +15,6 @@ import {
   Trash2,
   Eraser,
   X,
-  Download,
   Loader2,
   Check,
   AlertCircle,
@@ -83,7 +82,6 @@ export default function DmLocationToolbar({
   onSetGridType,
   onUpdateGridSettings,
   onSyncToPlayers,
-  onDownloadExport,
   syncing,
   hasUnsyncedChanges,
   lastSyncedAt,
@@ -101,6 +99,7 @@ export default function DmLocationToolbar({
   onToggleShareWithPlayers,
   arrangeMapsActive,
   onToggleArrangeMaps,
+  exportControl,
 }: DmLocationToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
@@ -328,6 +327,7 @@ export default function DmLocationToolbar({
               Open TV Display
             </Button>
           )}
+          {mode === 'battlemap' && exportControl}
           {mode === 'battlemap' && (
             <span
               className={`rounded-full px-2 py-0.5 text-xs ${
@@ -381,16 +381,7 @@ export default function DmLocationToolbar({
               Sync to Players
             </Button>
           )}
-          {mode !== 'battlemap' && (
-            <Button
-              variant="ghost"
-              onClick={onDownloadExport}
-              title="Download PNG export (debug)"
-              className="h-8 w-8 p-0"
-            >
-              <Download size={15} />
-            </Button>
-          )}
+          {mode !== 'battlemap' && exportControl}
         </div>
       </div>
     </div>

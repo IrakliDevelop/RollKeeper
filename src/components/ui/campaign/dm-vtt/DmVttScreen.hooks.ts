@@ -171,6 +171,7 @@ export function useDmVttScreen({
     setGridMode,
     updateTokenIdentity,
     toasts,
+    addToast,
     dismissToast,
     npcDialog: {
       npc: viewingNpc?.npc ?? null,

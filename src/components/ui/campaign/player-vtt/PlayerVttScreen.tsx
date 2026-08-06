@@ -101,6 +101,9 @@ export function PlayerVttScreen({
       onPoke={handlePoke}
       spellTemplateConfigRef={spellTemplateConfigRef}
       tokenInfoToggle={{ mode: tokenInfoMode, onCycle: cycleTokenInfo }}
+      onExportError={message =>
+        addToast({ type: 'error', title: 'Export failed', message })
+      }
     >
       <TokenDecorationLayer decorations={decorations} mode={tokenInfoMode} />
       <SpellPlacementController

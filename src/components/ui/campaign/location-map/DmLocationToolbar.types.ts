@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { EditorMode } from './DmLocationEditor.types';
 import type { BattleMapConnectionStatus } from '@/lib/battlemapSync';
 
@@ -18,7 +19,6 @@ export interface DmLocationToolbarProps {
     opacity?: number;
   }) => void;
   onSyncToPlayers: () => void;
-  onDownloadExport: () => void;
   syncing: boolean;
   /** ID of the currently selected element, or null if none */
   selectedElementId: string | null;
@@ -45,4 +45,6 @@ export interface DmLocationToolbarProps {
   arrangeMapsActive?: boolean;
   /** Toggle arrange-maps mode, which temporarily unlocks the map layer. */
   onToggleArrangeMaps?: () => void;
+  /** Battle-map export trigger + popover, rendered in both modes. */
+  exportControl?: ReactNode;
 }

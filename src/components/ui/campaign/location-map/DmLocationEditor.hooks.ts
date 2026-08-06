@@ -156,7 +156,6 @@ export interface DmLocationEditorState {
   // Handlers
   handleReady: (vp: Viewport) => void;
   handlePickImage: () => void;
-  handleDownloadExport: () => Promise<void>;
   handleDeleteSelected: () => void;
   handleClear: () => void;
   handleSyncToPlayers: () => Promise<void>;
@@ -181,6 +180,10 @@ export interface DmLocationEditorState {
   // Shared live ruler (battlemap mode; no-ops when live sync is off)
   measureSharing: boolean;
   handleSetMeasureSharing: (enabled: boolean) => void;
+
+  // Battle-map export control
+  getViewport: () => Viewport | null;
+  getDmOnlyElements: () => Record<string, boolean>;
 }
 
 export function useDmLocationEditor(
@@ -805,43 +808,15 @@ export function useDmLocationEditor(
 
       let blob: Blob | null = null;
       try {
-        // Cap export so the largest dimension stays under 4096px
-        // to avoid massive PNGs on large maps
-        const maxDim = Math.max(
-          location.mapImageSize.w,
-          location.mapImageSize.h
-        );
-        const exportScale = maxDim > 2048 ? 1 : 2;
-        const pngBlob = await vp.exportImage({
-          scale: exportScale,
+        blob = await vp.exportImage({
+          scale: 2,
+          scaleMode: 'fit',
+          maxDimension: 4096,
           padding: 0,
+          format: 'jpeg',
+          quality: 0.85,
           filter: (el: { id: string }) => !currentDmOnly[el.id],
         });
-
-        // Convert PNG → JPEG for sync (display-only, much smaller)
-        if (pngBlob) {
-          blob = await new Promise<Blob | null>(resolve => {
-            const img = new window.Image();
-            img.onload = () => {
-              const cvs = document.createElement('canvas');
-              cvs.width = img.width;
-              cvs.height = img.height;
-              const ctx = cvs.getContext('2d');
-              if (!ctx) {
-                resolve(pngBlob);
-                return;
-              }
-              ctx.drawImage(img, 0, 0);
-              cvs.toBlob(
-                jpegBlob => resolve(jpegBlob ?? pngBlob),
-                'image/jpeg',
-                0.85
-              );
-            };
-            img.onerror = () => resolve(pngBlob);
-            img.src = URL.createObjectURL(pngBlob);
-          });
-        }
       } catch (error) {
         console.warn('Failed to export image:', error);
         // exportImage can throw on tainted canvas (cross-origin images
@@ -923,40 +898,10 @@ export function useDmLocationEditor(
     onSyncToPlayers,
   ]);
 
-  const handleDownloadExport = useCallback(async () => {
-    const vp = getVp();
-    if (!vp) return;
-    const currentDmOnly =
-      storeGetLocation(campaignCode, location.id)?.dmOnlyElements ?? {};
-    try {
-      const maxDim = Math.max(location.mapImageSize.w, location.mapImageSize.h);
-      const exportScale = maxDim > 2048 ? 1 : 2;
-      const blob = await vp.exportImage({
-        scale: exportScale,
-        padding: 0,
-        filter: (el: { id: string }) => !currentDmOnly[el.id],
-      });
-      if (!blob) {
-        console.warn('Export returned null');
-        return;
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${location.name || 'map'}-export.png`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('Export failed:', err);
-    }
-  }, [
-    getVp,
-    campaignCode,
-    location.id,
-    location.name,
-    location.mapImageSize,
-    storeGetLocation,
-  ]);
+  const getDmOnlyElements = useCallback(
+    () => storeGetLocation(campaignCode, location.id)?.dmOnlyElements ?? {},
+    [storeGetLocation, campaignCode, location.id]
+  );
 
   const handleImageFileSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1088,7 +1033,6 @@ export function useDmLocationEditor(
     handleDeleteSelected,
     handleClear,
     handleSyncToPlayers,
-    handleDownloadExport,
     handleImageFileSelect,
     handlePickMapImage,
     handleMapImageFileSelect,
@@ -1100,5 +1044,7 @@ export function useDmLocationEditor(
     publishLayerRemove,
     measureSharing,
     handleSetMeasureSharing,
+    getViewport: getVp,
+    getDmOnlyElements,
   };
 }
