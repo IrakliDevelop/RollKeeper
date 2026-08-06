@@ -87,7 +87,7 @@ export default function DmLocationAlignMenu() {
         disabled={!canAlign}
         title="Align & distribute"
         aria-expanded={open}
-        className="flex items-center gap-1.5 px-2 py-1 text-xs"
+        className="flex h-11 items-center gap-1.5 px-2 py-1 text-xs"
       >
         <AlignStartVertical size={15} />
         Align
