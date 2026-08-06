@@ -56,14 +56,11 @@ describe('plainTextToBadgedHtml', () => {
     const result = plainTextToBadgedHtml(ZOMBIE_PLAIN);
 
     expect(result).toContain(
-      'bg-violet-500/10 text-violet-400 border border-violet-500/20 hover:bg-violet-500/20" title="Melee Weapon Attack:">⚔️ Melee Weapon Attack:</span>'
+      'data-app-icon="attack" title="Melee Weapon Attack:"'
     );
-    expect(result).toContain(
-      'bg-emerald-600/10 text-emerald-400 border border-emerald-600/20 hover:bg-emerald-600/20" title="+3">🎯 +3</span>'
-    );
-    expect(result).toContain(
-      'bg-red-600/10 text-red-400 border border-red-600/20 hover:bg-red-600/20" title="1d6 + 1">💥 1d6 + 1</span>'
-    );
+    expect(result).toContain('data-app-icon="target" title="+3"');
+    expect(result).toContain('data-app-icon="damage" title="1d6 + 1"');
+    expect(result).toContain('lucide-swords app-inline-icon');
     expect(result).toContain('to hit, reach 5 ft., one target.');
     expect(result).toContain('bludgeoning damage.');
   });
@@ -72,9 +69,8 @@ describe('plainTextToBadgedHtml', () => {
     const result = plainTextToBadgedHtml(
       'The target must succeed on a DC 13 Wisdom saving throw.'
     );
-    expect(result).toContain(
-      'bg-blue-600/10 text-blue-400 border border-blue-600/20 hover:bg-blue-600/20" title="DC 13">🔢 DC 13</span>'
-    );
+    expect(result).toContain('data-app-icon="save" title="DC 13"');
+    expect(result).toContain('lucide-shield app-inline-icon');
   });
 
   test('HTML-escapes plain text before badging', () => {
@@ -84,18 +80,18 @@ describe('plainTextToBadgedHtml', () => {
 
   test('badges "Ranged Weapon Attack:" and "Melee or Ranged Weapon Attack:" labels', () => {
     expect(plainTextToBadgedHtml('Ranged Weapon Attack: +5 to hit')).toContain(
-      'title="Ranged Weapon Attack:">⚔️ Ranged Weapon Attack:</span>'
+      'data-app-icon="attack" title="Ranged Weapon Attack:"'
     );
     expect(
       plainTextToBadgedHtml('Melee or Ranged Weapon Attack: +5 to hit')
     ).toContain(
-      'title="Melee or Ranged Weapon Attack:">⚔️ Melee or Ranged Weapon Attack:</span>'
+      'data-app-icon="attack" title="Melee or Ranged Weapon Attack:"'
     );
   });
 
   test('badges bare "Melee Attack:" / "Ranged Attack:" labels', () => {
     expect(plainTextToBadgedHtml('Melee Attack: +4 to hit')).toContain(
-      'title="Melee Attack:">⚔️ Melee Attack:</span>'
+      'data-app-icon="attack" title="Melee Attack:"'
     );
   });
 
@@ -116,16 +112,19 @@ describe('plainTextToBadgedHtml', () => {
     // internal `<<SBT_BADGE_N>>` substitution sentinel (which is only ever
     // introduced after escaping).
     expect(result).toContain('&lt;&lt;SBT_BADGE_0&gt;&gt;');
-    expect(result).toContain(
-      'bg-emerald-600/10 text-emerald-400 border border-emerald-600/20 hover:bg-emerald-600/20" title="+3">🎯 +3</span>'
-    );
+    expect(result).toContain('data-app-icon="target" title="+3"');
     expect(result).not.toContain('undefined');
   });
 });
 
 describe('renderStatBlockEntryText', () => {
-  test('returns legacy HTML input unchanged (short-circuit)', () => {
-    expect(renderStatBlockEntryText(ZOMBIE_HTML)).toBe(ZOMBIE_HTML);
+  test('upgrades legacy badge icons without changing their text', () => {
+    const result = renderStatBlockEntryText(ZOMBIE_HTML);
+    expect(result).not.toMatch(/⚔️|🎯|💥/u);
+    expect(result).toContain('data-app-icon="attack"');
+    expect(result).toContain('data-app-icon="target"');
+    expect(result).toContain('data-app-icon="damage"');
+    expect(statBlockHtmlToPlainText(result)).toBe(ZOMBIE_PLAIN);
   });
 
   test('badges plain text input', () => {
