@@ -16,6 +16,7 @@ import {
   Tag,
   Eye,
   Lightbulb,
+  Copy,
 } from 'lucide-react';
 import { useNPCStore } from '@/store/npcStore';
 import { useDmStore } from '@/store/dmStore';
@@ -41,6 +42,7 @@ export function NPCSection({
     getNPCsForCampaign,
     getNPC,
     createNPC,
+    duplicateNPC,
     updateNPC,
     deleteNPC,
     reorderNPCsSubset,
@@ -97,6 +99,10 @@ export function NPCSection({
       deleteNPC(campaignCode, npc.id);
       setSelectedNpc(null);
     }
+  };
+
+  const handleDuplicate = (npc: CampaignNPC) => {
+    duplicateNPC(campaignCode, npc.id);
   };
 
   const handleUpdateInventory = (
@@ -366,6 +372,7 @@ export function NPCSection({
                         <NPCCard
                           npc={npc}
                           onEdit={() => handleEdit(npc)}
+                          onDuplicate={() => handleDuplicate(npc)}
                           onDelete={() => handleDelete(npc)}
                           onClick={() => setSelectedNpc(npc)}
                         />
@@ -395,6 +402,7 @@ export function NPCSection({
                 <NPCCard
                   npc={npc}
                   onEdit={() => handleEdit(npc)}
+                  onDuplicate={() => handleDuplicate(npc)}
                   onDelete={() => handleDelete(npc)}
                   onClick={() => setSelectedNpc(npc)}
                 />
@@ -439,11 +447,13 @@ export function NPCSection({
 function NPCCard({
   npc,
   onEdit,
+  onDuplicate,
   onDelete,
   onClick,
 }: {
   npc: CampaignNPC;
   onEdit: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
   onClick: () => void;
 }) {
@@ -483,6 +493,17 @@ function NPCCard({
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-0.5">
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    onDuplicate();
+                  }}
+                  className="text-muted hover:text-body rounded p-1 transition-colors"
+                  title="Duplicate NPC"
+                  aria-label={`Duplicate ${npc.name}`}
+                >
+                  <Copy size={13} />
+                </button>
                 <button
                   onClick={e => {
                     e.stopPropagation();
@@ -649,6 +670,17 @@ function NPCCard({
               )}
             </div>
             <div className="flex shrink-0 items-center gap-1">
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onDuplicate();
+                }}
+                className="text-muted hover:text-body rounded p-1 transition-colors"
+                title="Duplicate NPC"
+                aria-label={`Duplicate ${npc.name}`}
+              >
+                <Copy size={14} />
+              </button>
               <button
                 onClick={e => {
                   e.stopPropagation();
