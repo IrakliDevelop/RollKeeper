@@ -34,7 +34,6 @@ import { Button } from '@/components/ui/forms/button';
 import DmLocationGridPopover from './DmLocationGridPopover';
 import DmLocationAlignMenu from './DmLocationAlignMenu';
 import DmOnlyToggle from './DmOnlyToggle';
-import { useSelectToolSelectionCount } from './useSelectToolSelectionCount';
 import type { DmLocationToolbarProps } from './DmLocationToolbar.types';
 
 const BASE_TOOL_DEFS = [
@@ -103,7 +102,6 @@ export default function DmLocationToolbar({
 }: DmLocationToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
-  const selectionCount = useSelectToolSelectionCount();
   const { selectedCount, rotateCW, rotateCCW } = useSelectionOps();
   const toolDefs =
     mode === 'battlemap'
@@ -168,7 +166,7 @@ export default function DmLocationToolbar({
         <Button
           variant="ghost"
           onClick={onDelete}
-          disabled={selectionCount === 0}
+          disabled={selectedCount === 0}
           title="Delete selected"
           className="h-8 w-8 p-0"
         >

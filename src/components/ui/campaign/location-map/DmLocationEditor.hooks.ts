@@ -200,6 +200,7 @@ export function useDmLocationEditor(
   const laserCleanupRef = useRef<(() => void) | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
   const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
+  const selectionUnsubRef = useRef<(() => void) | null>(null);
   const [syncStatus, setSyncStatus] = useState<
     BattleMapConnectionStatus | 'disabled'
   >('disabled');
@@ -327,28 +328,16 @@ export function useDmLocationEditor(
       setViewport(vp);
       vpRef.current = vp;
 
-      // Track selected element for DM-only toggle
+      // Track selected element for DM-only toggle. `viewport.onSelectionChange`
+      // is a persistent, viewport-owned emitter: it works whether or not a
+      // select tool is registered yet, and `getSelectedIds()` never surfaces
+      // stale ids (deletions prune the selection before the event fires).
       const syncSelection = () => {
-        const selectTool = vp.toolManager.getTool<SelectTool>('select');
-        if (!selectTool || vp.toolManager.activeTool?.name !== 'select') {
-          setSelectedElementId(null);
-          return;
-        }
-        const ids = selectTool.selectedIds.filter((id: string) =>
-          vp.store.getById(id)
-        );
+        const ids = vp.getSelectedIds();
         setSelectedElementId(ids.length === 1 ? ids[0] : null);
       };
-
-      const wrapper = vp.domLayer.parentElement;
-      if (wrapper) {
-        wrapper.addEventListener('pointerup', syncSelection, { passive: true });
-        wrapper.addEventListener('pointerdown', syncSelection, {
-          passive: true,
-        });
-      }
-      vp.toolManager.onChange(syncSelection);
-      vp.store.on('remove', syncSelection);
+      selectionUnsubRef.current?.();
+      selectionUnsubRef.current = vp.onSelectionChange(syncSelection);
       syncSelection();
 
       // AutoSave — persist to store
@@ -603,6 +592,7 @@ export function useDmLocationEditor(
       connectionRef.current?.stop();
       pinUnsubRef.current?.();
       hiddenPlacementUnsubRef.current?.();
+      selectionUnsubRef.current?.();
     };
   }, []);
 
@@ -768,12 +758,9 @@ export function useDmLocationEditor(
   const handleDeleteSelected = useCallback(() => {
     const vp = getVp();
     if (!vp) return;
-    if (vp.toolManager.activeTool?.name !== 'select') return;
-    const selectTool = vp.toolManager.getTool<SelectTool>('select');
-    if (!selectTool) return;
-    const ids = selectTool.selectedIds.filter((id: string) =>
-      vp.store.getById(id)
-    );
+    // `getSelectedIds()` never surfaces stale ids, and is empty whenever the
+    // select tool isn't active (SelectTool clears its selection on deactivate).
+    const ids = vp.getSelectedIds();
     if (ids.length === 0) return;
     vp.removeElements(ids);
     setSelectedElementId(null);
