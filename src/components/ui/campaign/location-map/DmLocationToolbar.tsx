@@ -12,7 +12,6 @@ import {
   Sparkles,
   Undo2,
   Redo2,
-  Trash2,
   Eraser,
   X,
   Loader2,
@@ -22,17 +21,14 @@ import {
   Maximize,
   Map as MapIcon,
   Move,
-  RotateCcw,
-  RotateCw,
   Eye,
   EyeOff,
   Zap,
   MapPin,
 } from 'lucide-react';
-import { useActiveTool, useHistory, useSelectionOps } from '@fieldnotes/react';
+import { useActiveTool, useHistory } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
 import DmLocationGridPopover from './DmLocationGridPopover';
-import DmLocationAlignMenu from './DmLocationAlignMenu';
 import DmOnlyToggle from './DmOnlyToggle';
 import type { DmLocationToolbarProps } from './DmLocationToolbar.types';
 
@@ -70,7 +66,6 @@ function formatSyncTime(iso: string): string {
 export default function DmLocationToolbar({
   onPickImage,
   onPickMapImage,
-  onDelete,
   onClear,
   onFitToMap,
   gridEnabled,
@@ -102,7 +97,6 @@ export default function DmLocationToolbar({
 }: DmLocationToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
-  const { selectedCount, rotateCW, rotateCCW } = useSelectionOps();
   const toolDefs =
     mode === 'battlemap'
       ? [...BASE_TOOL_DEFS, ...BATTLEMAP_TOOL_DEFS]
@@ -163,34 +157,6 @@ export default function DmLocationToolbar({
         >
           <Maximize size={15} />
         </Button>
-        <Button
-          variant="ghost"
-          onClick={onDelete}
-          disabled={selectedCount === 0}
-          title="Delete selected"
-          className="h-8 w-8 p-0"
-        >
-          <Trash2 size={15} />
-        </Button>
-        <Button
-          variant="ghost"
-          onClick={rotateCCW}
-          disabled={selectedCount === 0}
-          title="Rotate 90° counter-clockwise"
-          className="h-8 w-8 p-0"
-        >
-          <RotateCcw size={15} />
-        </Button>
-        <Button
-          variant="ghost"
-          onClick={rotateCW}
-          disabled={selectedCount === 0}
-          title="Rotate 90° clockwise"
-          className="h-8 w-8 p-0"
-        >
-          <RotateCw size={15} />
-        </Button>
-        <DmLocationAlignMenu />
         <Button
           variant="ghost"
           onClick={onClear}

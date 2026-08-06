@@ -231,6 +231,7 @@ export function DmVttToolbar({
       <div className="border-divider w-full border-t empty:hidden">
         <DmLocationToolOptions
           mode="battlemap"
+          selectionControls
           measureSharing={measureSharing}
         />
       </div>
