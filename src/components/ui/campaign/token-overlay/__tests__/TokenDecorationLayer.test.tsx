@@ -204,8 +204,9 @@ describe('TokenDecorationLayer', () => {
         mode="full"
       />
     );
-    const skull = screen.getByText('☠️');
-    expect(skull).toBeInTheDocument();
+    const skullIcon = document.querySelector('.lucide-skull');
+    expect(skullIcon).toBeInTheDocument();
+    const skull = skullIcon?.parentElement as HTMLElement;
     // Centered inside the 40px token at (100, 200).
     expect(skull.style.left).toBe('100px');
     expect(skull.style.top).toBe('200px');
@@ -227,7 +228,7 @@ describe('TokenDecorationLayer', () => {
         mode="compact"
       />
     );
-    expect(screen.getByText('☠️')).toBeInTheDocument();
+    expect(document.querySelector('.lucide-skull')).toBeInTheDocument();
     expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
   });
 
@@ -296,8 +297,10 @@ describe('TokenDecorationLayer', () => {
         mode="full"
       />
     );
-    expect(screen.getByText('☠️')).toBeInTheDocument();
-    expect(container.querySelector('svg')).not.toBeInTheDocument();
+    expect(container.querySelector('.lucide-skull')).toBeInTheDocument();
+    expect(
+      container.querySelector('.lucide-chess-king')
+    ).not.toBeInTheDocument();
   });
 
   it('renders condition icons inside the token top edge in full mode, capped at 4 with overflow', () => {
