@@ -11,7 +11,7 @@ import React, {
 export interface TabItem {
   id: string;
   label: string;
-  icon?: string;
+  icon?: React.ReactNode;
   content: ReactNode;
   disabled?: boolean;
 }

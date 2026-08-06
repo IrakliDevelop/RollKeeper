@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { AppIcon, type IconName } from '@/components/ui/icons';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { EquippedWeapons } from '@/components/EquippedWeapons';
 import { QuickSpells } from '@/components/QuickSpells';
@@ -46,7 +47,7 @@ interface ActionsSectionProps {
 // Simple collapsible component for subsections
 interface CollapsibleSubsectionProps {
   title: string;
-  icon: string;
+  icon: IconName;
   children: React.ReactNode;
   defaultExpanded?: boolean;
   persistKey: string;
@@ -86,7 +87,7 @@ const CollapsibleSubsection: React.FC<CollapsibleSubsectionProps> = ({
           className="flex flex-1 items-center gap-2 text-left transition-colors hover:opacity-80"
           aria-expanded={isExpanded}
         >
-          <span className="text-lg">{icon}</span>
+          <AppIcon name={icon} className="h-5 w-5 shrink-0" />
           <h3 className="text-heading text-lg font-bold">{title}</h3>
           {isExpanded ? (
             <ChevronDown size={20} className="ml-2" />
@@ -153,7 +154,7 @@ export default function ActionsSection({
       {/* Ready Weapons - Collapsible */}
       <CollapsibleSubsection
         title="Ready Weapons"
-        icon="⚔️"
+        icon="weapon"
         persistKey="ready-weapons"
         defaultExpanded={true}
         badge={
@@ -188,7 +189,7 @@ export default function ActionsSection({
         onResetClassResource && (
           <CollapsibleSubsection
             title="Class Resources"
-            icon="🔥"
+            icon="damage"
             persistKey="class-resources"
             defaultExpanded={true}
             badge={
@@ -221,7 +222,7 @@ export default function ActionsSection({
       {(character.favoriteFeatureIds || []).length > 0 && (
         <CollapsibleSubsection
           title="Quick Features"
-          icon="⚡"
+          icon="abilities"
           persistKey="quick-features"
           defaultExpanded={true}
           badge={
@@ -260,7 +261,7 @@ export default function ActionsSection({
       {/* Quick Spells - Collapsible */}
       <CollapsibleSubsection
         title="Quick Spells"
-        icon="✨"
+        icon="features"
         persistKey="quick-spells"
         defaultExpanded={true}
         badge={

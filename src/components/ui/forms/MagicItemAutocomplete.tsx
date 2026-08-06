@@ -4,6 +4,11 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ProcessedMagicItem } from '@/types/items';
 import { Search, X, Loader2, Wand2 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
+import {
+  AppIcon,
+  MAGIC_ITEM_CATEGORY_ICONS,
+  getIconName,
+} from '@/components/ui/icons';
 
 interface MagicItemAutocompleteProps {
   items: ProcessedMagicItem[];
@@ -24,20 +29,6 @@ const RARITY_VARIANTS: Record<
   'very rare': 'primary',
   legendary: 'warning',
   artifact: 'danger',
-};
-
-const CATEGORY_EMOJI: Record<string, string> = {
-  wondrous: '✨',
-  ring: '💍',
-  wand: '🪄',
-  staff: '🏑',
-  rod: '🔮',
-  armor: '🛡️',
-  shield: '🛡️',
-  potion: '🧪',
-  scroll: '📜',
-  artifact: '⚡',
-  other: '📦',
 };
 
 export function MagicItemAutocomplete({
@@ -210,9 +201,14 @@ export function MagicItemAutocomplete({
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-lg">
-                          {CATEGORY_EMOJI[item.category] || '📦'}
-                        </span>
+                        <AppIcon
+                          name={getIconName(
+                            MAGIC_ITEM_CATEGORY_ICONS,
+                            item.category,
+                            'magicItem'
+                          )}
+                          className="h-5 w-5 shrink-0"
+                        />
                         <div className="min-w-0 flex-1">
                           <p className="text-heading truncate font-medium">
                             {item.name}

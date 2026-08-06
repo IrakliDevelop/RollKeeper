@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { AppIcon, type IconName } from '@/components/ui/icons';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { WeaponInventory } from '@/components/WeaponInventory';
 import ArmorDefenseManager from '@/components/ArmorDefenseManager';
@@ -15,7 +16,7 @@ interface EquipmentSectionProps {
 // Simple collapsible component for subsections
 interface CollapsibleSubsectionProps {
   title: string;
-  icon: string;
+  icon: IconName;
   children: React.ReactNode;
   defaultExpanded?: boolean;
   persistKey: string;
@@ -58,7 +59,7 @@ const CollapsibleSubsection: React.FC<CollapsibleSubsectionProps> = ({
         aria-expanded={isExpanded}
       >
         <div className="flex items-center gap-2">
-          <span className="text-lg">{icon}</span>
+          <AppIcon name={icon} className="h-5 w-5 shrink-0" />
           <h3 className="text-heading text-lg font-bold">{title}</h3>
         </div>
         <div className="flex items-center gap-2">
@@ -85,7 +86,7 @@ export default function EquipmentSection({ character }: EquipmentSectionProps) {
       {/* Equipment & Magic Items - Collapsible */}
       <CollapsibleSubsection
         title="Equipment & Magic Items"
-        icon="⚔️"
+        icon="inventory"
         persistKey="equipment-magic-items"
         defaultExpanded={true}
         badge={
@@ -124,7 +125,7 @@ export default function EquipmentSection({ character }: EquipmentSectionProps) {
       {/* Armor & Defense - Collapsible */}
       <CollapsibleSubsection
         title="Armor & Defense"
-        icon="🛡️"
+        icon="armor"
         persistKey="armor-defense"
         defaultExpanded={true}
         badge={

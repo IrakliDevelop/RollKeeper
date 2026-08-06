@@ -8,6 +8,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ProcessedSpell } from '@/types/spells';
 import { Search, X, Loader2, Sparkles } from 'lucide-react';
+import {
+  AppIcon,
+  SPELL_SCHOOL_ICONS,
+  getIconName,
+} from '@/components/ui/icons';
 
 interface SpellAutocompleteProps {
   spells: ProcessedSpell[];
@@ -17,18 +22,6 @@ interface SpellAutocompleteProps {
   placeholder?: string;
   className?: string;
 }
-
-// School icons mapping
-const SCHOOL_ICONS: Record<string, string> = {
-  Abjuration: '🛡️',
-  Conjuration: '🌀',
-  Divination: '🔮',
-  Enchantment: '💫',
-  Evocation: '⚡',
-  Illusion: '✨',
-  Necromancy: '💀',
-  Transmutation: '🔄',
-};
 
 // Level colors
 const LEVEL_COLORS: Record<number, string> = {
@@ -191,9 +184,14 @@ export function SpellAutocomplete({
       {selectedSpell && (
         <div className="border-accent-purple-border-strong bg-accent-purple-bg mb-2 flex items-center justify-between rounded-lg border-2 px-3 py-2">
           <div className="flex items-center gap-2">
-            <span className="text-lg">
-              {SCHOOL_ICONS[selectedSpell.schoolName] || '✨'}
-            </span>
+            <AppIcon
+              name={getIconName(
+                SPELL_SCHOOL_ICONS,
+                selectedSpell.schoolName,
+                'spell'
+              )}
+              className="h-5 w-5 shrink-0"
+            />
             <div>
               <p className="text-heading font-medium">{selectedSpell.name}</p>
               <p className="text-muted text-xs">
@@ -260,9 +258,14 @@ export function SpellAutocomplete({
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-xl">
-                          {SCHOOL_ICONS[spell.schoolName] || '✨'}
-                        </span>
+                        <AppIcon
+                          name={getIconName(
+                            SPELL_SCHOOL_ICONS,
+                            spell.schoolName,
+                            'spell'
+                          )}
+                          className="h-5 w-5 shrink-0"
+                        />
                         <div className="min-w-0 flex-1">
                           <p className="text-heading truncate font-medium">
                             {spell.name}
