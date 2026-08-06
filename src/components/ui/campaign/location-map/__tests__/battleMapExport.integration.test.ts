@@ -13,7 +13,7 @@ function vpOver(store: ElementStore): ExportCapableViewport {
 }
 
 /** jsdom has no canvas: stub getContext/toBlob, capture created canvas sizes. */
-function stubCanvas(): { widths: () => number[] } {
+function stubCanvas(): { widths: () => number[]; heights: () => number[] } {
   const origCreate = document.createElement.bind(document);
   const created: HTMLCanvasElement[] = [];
   vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
@@ -60,7 +60,10 @@ function stubCanvas(): { widths: () => number[] } {
     }
     return el;
   });
-  return { widths: () => created.map(c => c.width) };
+  return {
+    widths: () => created.map(c => c.width),
+    heights: () => created.map(c => c.height),
+  };
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -89,6 +92,7 @@ describe('battle-map export against the real SDK pipeline', () => {
       name: 't',
     });
     const fullWidth = Math.max(...fullStub.widths());
+    const fullHeight = Math.max(...fullStub.heights());
     vi.restoreAllMocks();
 
     const playerStub = stubCanvas();
@@ -100,11 +104,14 @@ describe('battle-map export against the real SDK pipeline', () => {
       dmOnlyElements: { [secret.id]: true },
     });
     const playerWidth = Math.max(...playerStub.widths());
+    const playerHeight = Math.max(...playerStub.heights());
 
     expect(full.filename).toBe('t-full.png');
     expect(player.filename).toBe('t-player-view.png');
     expect(fullWidth).toBe(480); // (0..240) content bounds × scale 2
+    expect(fullHeight).toBe(480); // (0..240) content bounds × scale 2
     expect(playerWidth).toBe(80); // (0..40) × scale 2 — secret note excluded
+    expect(playerHeight).toBe(80); // (0..40) × scale 2 — secret note excluded
     expect(fullWidth).toBeGreaterThan(playerWidth);
   });
 });
