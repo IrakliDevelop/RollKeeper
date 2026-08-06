@@ -2,6 +2,7 @@
 
 import { Badge } from '@/components/ui/layout/badge';
 import { HPBar } from '@/components/shared/combat/HPBar';
+import { AppIcon } from '@/components/ui/icons';
 import { effectiveAc } from '@/utils/calculations';
 
 import { dispositionColor } from '../combatantToken';
@@ -61,7 +62,7 @@ export function InitiativeRow({
             </span>
             {entity.concentrationSpell && (
               <span title={`Concentrating: ${entity.concentrationSpell}`}>
-                🧠
+                <AppIcon name="concentration" className="h-3.5 w-3.5" />
               </span>
             )}
             {entity.isHidden && (

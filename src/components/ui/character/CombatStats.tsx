@@ -6,6 +6,7 @@ import { formatModifier, getBuffSpeedBonus } from '@/utils/calculations';
 import { Button, Switch } from '@/components/ui/forms';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { CharacterState } from '@/types/character';
+import { AppIcon } from '@/components/ui/icons';
 
 interface CombatStatsProps {
   character: CharacterState;
@@ -66,7 +67,7 @@ export default function CombatStats({
                 className="text-accent-amber-text-muted hover:text-accent-amber-text ml-1 h-4 w-4 p-0"
                 title={`Roll initiative (d20 + ${formatModifier(getInitiativeModifier())})`}
               >
-                🎲
+                <AppIcon name="dice" className="h-3.5 w-3.5" />
               </Button>
             </div>
             <NumberInput

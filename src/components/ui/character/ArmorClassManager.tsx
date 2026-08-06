@@ -6,6 +6,7 @@ import { CharacterState } from '@/types/character';
 import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { Info, Zap } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
+import { AppIcon } from '@/components/ui/icons';
 
 interface ArmorClassManagerProps {
   character: CharacterState;
@@ -108,7 +109,7 @@ export default function ArmorClassManager({
         <div className="border-accent-red-border rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-red-from)] to-[var(--gradient-red-to)] p-6">
           <div className="mb-6 text-center">
             <h3 className="text-accent-red-text mb-3 flex items-center justify-center gap-2 text-xl font-bold">
-              🛡️ ARMOR CLASS
+              <AppIcon name="armor" className="h-5 w-5" /> ARMOR CLASS
             </h3>
             <div className="text-accent-red-text mb-2 text-5xl font-bold">
               {calculateCharacterArmorClass(character)}
@@ -222,9 +223,6 @@ export default function ArmorClassManager({
                       }`}
                     >
                       <span>Shield +</span>
-                      {/* {character.isWearingShield && (
-                        <span className="text-2xl">🛡️</span>
-                      )} */}
                     </button>
                   </Tooltip>
                   <Tooltip content="Shield bonus to AC (typically +2, or more for magical shields)">

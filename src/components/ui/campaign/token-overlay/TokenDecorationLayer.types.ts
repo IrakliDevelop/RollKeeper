@@ -32,6 +32,6 @@ export interface TokenDecoration {
   conditions?: SharedCondition[];
   /** Entity is concentrating → purple ring around the token. */
   isConcentrating?: boolean;
-  /** Reaction spent this round → amber ⚡ corner badge. Omit → no badge. */
+  /** Reaction spent this round → amber corner badge. Omit → no badge. */
   hasUsedReaction?: boolean;
 }

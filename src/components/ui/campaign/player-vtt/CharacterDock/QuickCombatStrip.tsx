@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/forms/button';
+import { AppIcon } from '@/components/ui/icons';
 
 export interface QuickCombatStripProps {
   hasUsedReaction: boolean;
@@ -40,7 +41,10 @@ export function QuickCombatStrip({
             : 'bg-accent-emerald-bg text-accent-emerald-text border-accent-emerald-border'
         }`}
       >
-        ⚡ {hasUsedReaction ? 'Used' : 'Reaction'}
+        <span className="flex items-center justify-center gap-1">
+          <AppIcon name="reaction" className="h-4 w-4" />
+          {hasUsedReaction ? 'Used' : 'Reaction'}
+        </span>
       </button>
 
       <div className="flex items-center gap-1">
@@ -54,7 +58,10 @@ export function QuickCombatStrip({
               : 'border-divider text-faint'
           }`}
         >
-          ✦{stackable ? ` ×${count}` : ''}
+          <span className="flex items-center justify-center gap-1">
+            <AppIcon name="inspiration" className="h-4 w-4" />
+            {stackable ? `×${count}` : ''}
+          </span>
         </button>
         {count > 0 && (
           <Button

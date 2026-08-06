@@ -15,6 +15,7 @@ import {
   DEBUFF_PALETTE,
 } from '@/components/ui/encounter/combat-screen/effectPalettes';
 import { Button } from '@/components/ui/forms/button';
+import { AppIcon } from '@/components/ui/icons';
 import { ConditionBadge } from '@/components/shared/combat/ConditionBadge';
 import { useCharacterStore } from '@/store/characterStore';
 
@@ -43,7 +44,7 @@ export function StatusEffectTray() {
         <Dialog open={concOpen} onOpenChange={setConcOpen}>
           <DialogTrigger asChild>
             <button className="bg-accent-amber-bg border-accent-amber-border text-accent-amber-text flex min-h-[30px] items-center gap-1 rounded-full border px-2.5 text-xs font-semibold">
-              🧠 CON
+              <AppIcon name="concentration" className="h-3.5 w-3.5" /> CON
             </button>
           </DialogTrigger>
           <DialogContent size="sm">

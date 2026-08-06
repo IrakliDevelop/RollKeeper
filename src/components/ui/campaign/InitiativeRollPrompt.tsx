@@ -5,6 +5,7 @@ import { Dices, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { AppIcon } from '@/components/ui/icons';
 
 import type { InitiativeRollRequest } from '@/types/sharedState';
 
@@ -93,7 +94,11 @@ export function InitiativeRollPrompt({
           {sending ? 'Sending…' : 'Confirm'}
         </Button>
       </div>
-      {breakdown && <p className="text-muted mt-1.5 text-xs">🎲 {breakdown}</p>}
+      {breakdown && (
+        <p className="text-muted mt-1.5 flex items-center gap-1 text-xs">
+          <AppIcon name="dice" className="h-3.5 w-3.5" /> {breakdown}
+        </p>
+      )}
       {error && (
         <p className="text-accent-red-text mt-1.5 text-xs">
           Couldn&apos;t send — try again.
