@@ -102,7 +102,7 @@ export default function DmLocationAlignMenu() {
                 variant="ghost"
                 onClick={() => align(edge)}
                 title={title}
-                className="h-8 w-8 p-0"
+                className="h-11 w-11 p-0"
               >
                 <Icon size={15} />
               </Button>
@@ -116,7 +116,7 @@ export default function DmLocationAlignMenu() {
                 onClick={() => distribute(axis)}
                 disabled={!canDistribute}
                 title={title}
-                className="h-8 w-8 p-0"
+                className="h-11 w-11 p-0"
               >
                 <Icon size={15} />
               </Button>

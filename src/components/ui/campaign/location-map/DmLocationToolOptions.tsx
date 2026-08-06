@@ -16,9 +16,10 @@ import type {
 } from '@fieldnotes/core';
 import { useActiveTool, useToolOptions } from '@fieldnotes/react';
 import { Switch } from '@/components/ui/forms/switch';
+import DmSelectionOptions from './DmSelectionOptions';
 import type { EditorMode } from './DmLocationEditor.types';
 
-const COLOR_SWATCHES = [
+export const COLOR_SWATCHES = [
   '#334155',
   '#ef4444',
   '#f97316',
@@ -65,11 +66,14 @@ export interface MeasureSharingControl {
 interface DmLocationToolOptionsProps {
   mode?: EditorMode;
   measureSharing?: MeasureSharingControl;
+  /** Enables the select-tool editing branch (style + arrange controls for the current selection). */
+  selectionControls?: boolean;
 }
 
 export default function DmLocationToolOptions({
   mode = 'location',
   measureSharing,
+  selectionControls,
 }: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
   const [pencilOpts, setPencilOpts] = useToolOptions<
@@ -101,6 +105,7 @@ export default function DmLocationToolOptions({
   >('ping');
 
   const showOptionsBar =
+    (selectionControls && activeTool === 'select') ||
     (activeTool === 'pencil' && pencilOpts !== undefined) ||
     activeTool === 'arrow' ||
     activeTool === 'note' ||
@@ -149,6 +154,7 @@ export default function DmLocationToolOptions({
 
   return (
     <div className="border-divider bg-surface-secondary flex flex-wrap items-center gap-3 border-b px-4 py-1.5">
+      {selectionControls && activeTool === 'select' && <DmSelectionOptions />}
       {activeTool === 'shape' && shapeOpts && (
         <>
           <span className="text-muted text-xs font-medium">Shape</span>
