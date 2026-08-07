@@ -55,6 +55,7 @@ import { makeApplyRemoteLayer, publishOwnedLayers } from './layerSync';
 import { attachRemoteLaserTrails } from './laserSync';
 import { attachRemotePings } from './pingSync';
 import { attachRemoteMeasurements } from './measureSync';
+import { attachFocusReceiver } from './focusSync';
 import {
   PlayerTokenTool,
   PlayerTemplateTool,
@@ -359,6 +360,8 @@ export function PlayerBattleMapCanvas({
       attachRemoteLaserTrails(vp, connection),
       attachRemotePings(vp, connection).dispose,
       attachRemoteMeasurements(vp, connection).dispose,
+      attachFocusReceiver(vp, connection, { role: 'player', color: '#F4C430' })
+        .dispose,
     ];
     laserCleanupRef.current = () => {
       for (const cleanup of presenceCleanups) cleanup();
