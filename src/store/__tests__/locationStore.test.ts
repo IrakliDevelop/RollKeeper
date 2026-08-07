@@ -381,4 +381,37 @@ describe('locationStore', () => {
       expect(otherLocFetched!.name).toBe('City of Waterdeep');
     });
   });
+
+  describe('cameraViews', () => {
+    it('round-trips cameraViews through updateLocation', () => {
+      useLocationStore.getState().addLocation(CAMPAIGN, mockLocation);
+      useLocationStore.getState().updateLocation(CAMPAIGN, 'loc-test-001', {
+        cameraViews: [
+          {
+            id: 'v1',
+            name: 'Goblin ambush',
+            view: { x: 0, y: 0, w: 400, h: 300 },
+          },
+        ],
+      });
+      const saved = useLocationStore
+        .getState()
+        .getLocation(CAMPAIGN, 'loc-test-001');
+      expect(saved?.cameraViews).toEqual([
+        {
+          id: 'v1',
+          name: 'Goblin ambush',
+          view: { x: 0, y: 0, w: 400, h: 300 },
+        },
+      ]);
+    });
+
+    it('treats a location with no cameraViews as valid (no migration needed)', () => {
+      useLocationStore.getState().addLocation(CAMPAIGN, mockLocation);
+      const saved = useLocationStore
+        .getState()
+        .getLocation(CAMPAIGN, 'loc-test-001');
+      expect(saved?.cameraViews).toBeUndefined();
+    });
+  });
 });
