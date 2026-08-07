@@ -1,11 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { Loader2, Layers } from 'lucide-react';
 import { FieldNotesCanvas as Canvas, ViewportContext } from '@fieldnotes/react';
 import DmLocationToolbar from './DmLocationToolbar';
 import DmLocationToolOptions from './DmLocationToolOptions';
 import DmLocationLayersPanel from './DmLocationLayersPanel';
 import { BattleMapExportControl } from './BattleMapExportControl';
+import { BattleMapViewsControl } from './BattleMapViewsControl';
 import { useDmLocationEditor } from './DmLocationEditor.hooks';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
 import { useBattleMapStore } from '@/store/battleMapStore';
@@ -15,7 +17,12 @@ import type { BattleMap } from '@/types/battlemap';
 export default function DmLocationEditor(props: DmLocationEditorProps) {
   const linkEncounter = useBattleMapStore(s => s.linkEncounter);
   const unlinkEncounter = useBattleMapStore(s => s.unlinkEncounter);
+  const updateBattleMap = useBattleMapStore(s => s.updateBattleMap);
   const { toasts, addToast, dismissToast } = useToast();
+  // Session-scoped only — pure UI state, no connection dependency. Off by
+  // default; the DM opts in each session before a focus request can move
+  // anyone else's camera.
+  const [cameraSharing, setCameraSharing] = useState(false);
 
   const {
     canvasRef,
@@ -62,6 +69,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     publishLayerRemove,
     measureSharing,
     handleSetMeasureSharing,
+    handleGoToCameraView,
+    handleSendCameraView,
     getViewport,
     getDmOnlyElements,
   } = useDmLocationEditor(props);
@@ -124,6 +133,41 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                 onError={message =>
                   addToast({ type: 'error', title: 'Export failed', message })
                 }
+              />
+            }
+            viewsControl={
+              <BattleMapViewsControl
+                getViewport={getViewport}
+                views={props.location.cameraViews ?? []}
+                sharingEnabled={cameraSharing}
+                onSharingChange={setCameraSharing}
+                onSaveView={(view, name) => {
+                  const next = [
+                    ...(props.location.cameraViews ?? []),
+                    { id: crypto.randomUUID(), name, view },
+                  ];
+                  updateBattleMap(props.campaignCode, props.location.id, {
+                    cameraViews: next,
+                  });
+                }}
+                onGoToView={handleGoToCameraView}
+                onSend={handleSendCameraView}
+                onRenameView={(id, name) => {
+                  const next = (props.location.cameraViews ?? []).map(v =>
+                    v.id === id ? { ...v, name } : v
+                  );
+                  updateBattleMap(props.campaignCode, props.location.id, {
+                    cameraViews: next,
+                  });
+                }}
+                onDeleteView={id => {
+                  const next = (props.location.cameraViews ?? []).filter(
+                    v => v.id !== id
+                  );
+                  updateBattleMap(props.campaignCode, props.location.id, {
+                    cameraViews: next,
+                  });
+                }}
               />
             }
           />

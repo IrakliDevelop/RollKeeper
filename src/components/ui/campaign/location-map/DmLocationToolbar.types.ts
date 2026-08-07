@@ -46,4 +46,6 @@ export interface DmLocationToolbarProps {
   onToggleArrangeMaps?: () => void;
   /** Battle-map export trigger + popover, rendered in both modes. */
   exportControl?: ReactNode;
+  /** Saved-camera-views popover + focus-broadcast controls (battlemap mode only). */
+  viewsControl?: ReactNode;
 }

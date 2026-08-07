@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { FieldNotesCanvas, ViewportContext } from '@fieldnotes/react';
 import { BattleMapMinimap } from '@/components/ui/campaign/location-map/BattleMapMinimap';
 import { BattleMapExportControl } from '@/components/ui/campaign/location-map/BattleMapExportControl';
+import { BattleMapViewsControl } from '@/components/ui/campaign/location-map/BattleMapViewsControl';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { DmVttToolbar } from './DmVttToolbar';
 import {
@@ -43,7 +45,13 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     handleToggleSelectedDmOnly,
     measureSharing,
     handleSetMeasureSharing,
+    handleGoToCameraView,
+    handleSendCameraView,
   } = useDmBattleMapCanvas(props);
+  // Session-scoped only — pure UI state, no connection dependency. Off by
+  // default; the DM opts in each session before a focus request can move
+  // anyone else's camera.
+  const [cameraSharing, setCameraSharing] = useState(false);
 
   return (
     <ViewportContext.Provider value={viewport}>
@@ -83,6 +91,47 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
                   {}
                 }
                 onError={onExportError}
+              />
+            }
+            viewsControl={
+              <BattleMapViewsControl
+                getViewport={() => viewport}
+                views={battleMap?.cameraViews ?? []}
+                sharingEnabled={cameraSharing}
+                onSharingChange={setCameraSharing}
+                onSaveView={(view, name) => {
+                  const next = [
+                    ...(battleMap?.cameraViews ?? []),
+                    { id: crypto.randomUUID(), name, view },
+                  ];
+                  useBattleMapStore
+                    .getState()
+                    .updateBattleMap(campaignCode, battleMapId, {
+                      cameraViews: next,
+                    });
+                }}
+                onGoToView={handleGoToCameraView}
+                onSend={handleSendCameraView}
+                onRenameView={(id, name) => {
+                  const next = (battleMap?.cameraViews ?? []).map(v =>
+                    v.id === id ? { ...v, name } : v
+                  );
+                  useBattleMapStore
+                    .getState()
+                    .updateBattleMap(campaignCode, battleMapId, {
+                      cameraViews: next,
+                    });
+                }}
+                onDeleteView={id => {
+                  const next = (battleMap?.cameraViews ?? []).filter(
+                    v => v.id !== id
+                  );
+                  useBattleMapStore
+                    .getState()
+                    .updateBattleMap(campaignCode, battleMapId, {
+                      cameraViews: next,
+                    });
+                }}
               />
             }
           />

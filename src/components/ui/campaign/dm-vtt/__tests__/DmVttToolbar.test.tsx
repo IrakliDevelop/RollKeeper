@@ -96,6 +96,27 @@ describe('DmVttToolbar', () => {
     ).toBeInTheDocument();
   });
 
+  it('renders viewsControl next to exportControl', () => {
+    render(
+      <DmVttToolbar
+        onClearDrawings={vi.fn()}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive={false}
+        onToggleHiddenPlacement={vi.fn()}
+        hiddenElementCount={0}
+        onRevealAll={vi.fn()}
+        selectedElementId={null}
+        selectedElementIsDmOnly={false}
+        onToggleSelectedDmOnly={vi.fn()}
+        exportControl={<div data-testid="export-control-marker" />}
+        viewsControl={<div data-testid="views-control-marker" />}
+      />
+    );
+
+    expect(screen.getByTestId('export-control-marker')).toBeInTheDocument();
+    expect(screen.getByTestId('views-control-marker')).toBeInTheDocument();
+  });
+
   it('wires selectionControls into the shared tool options bar', () => {
     render(
       <DmVttToolbar

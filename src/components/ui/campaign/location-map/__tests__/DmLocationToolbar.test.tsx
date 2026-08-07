@@ -76,6 +76,33 @@ describe('DmLocationToolbar', () => {
     expect(screen.getByTitle('Clear canvas')).toBeInTheDocument();
   });
 
+  it('renders viewsControl next to exportControl in battlemap mode', () => {
+    render(
+      <DmLocationToolbar
+        {...baseProps}
+        mode="battlemap"
+        exportControl={<div data-testid="export-control-marker" />}
+        viewsControl={<div data-testid="views-control-marker" />}
+      />
+    );
+    expect(screen.getByTestId('export-control-marker')).toBeInTheDocument();
+    expect(screen.getByTestId('views-control-marker')).toBeInTheDocument();
+  });
+
+  it('does not render viewsControl in location mode', () => {
+    render(
+      <DmLocationToolbar
+        {...baseProps}
+        mode="location"
+        exportControl={<div data-testid="export-control-marker" />}
+        viewsControl={<div data-testid="views-control-marker" />}
+      />
+    );
+    expect(
+      screen.queryByTestId('views-control-marker')
+    ).not.toBeInTheDocument();
+  });
+
   it('shows hidden-placement state and reveals all hidden elements', () => {
     const onToggle = vi.fn();
     const onRevealAll = vi.fn();

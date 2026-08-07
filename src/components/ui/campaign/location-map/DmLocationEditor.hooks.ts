@@ -15,6 +15,9 @@ import {
   LaserTool,
   PingTool,
   AutoSave,
+  type CameraAnimator,
+  type CameraView,
+  type FocusAudience,
   type Layer,
   type Tool,
   type Viewport,
@@ -47,6 +50,11 @@ import {
   attachRemoteMeasurements,
   type MeasureBroadcastHandle,
 } from './measureSync';
+import {
+  attachFocusBroadcast,
+  createLocalCameraAnimator,
+  type FocusBroadcastHandle,
+} from './focusSync';
 import { pinGridToMapLayer } from './gridPin';
 import { nextMapImagePosition } from './mapImagePlacement';
 import {
@@ -180,6 +188,10 @@ export interface DmLocationEditorState {
   measureSharing: boolean;
   handleSetMeasureSharing: (enabled: boolean) => void;
 
+  // Camera focus requests (battlemap mode; no-ops when live sync is off)
+  handleGoToCameraView: (view: CameraView) => void;
+  handleSendCameraView: (view: CameraView, audience: FocusAudience) => void;
+
   // Battle-map export control
   getViewport: () => Viewport | null;
   getDmOnlyElements: () => Record<string, boolean>;
@@ -260,6 +272,8 @@ export function useDmLocationEditor(
   const [measureSharing, setMeasureSharing] = useState(false);
   const measureSharingRef = useRef(false);
   const measureBroadcastRef = useRef<MeasureBroadcastHandle | null>(null);
+  const focusBroadcastRef = useRef<FocusBroadcastHandle | null>(null);
+  const localAnimatorRef = useRef<CameraAnimator | null>(null);
 
   const handleSetMeasureSharing = useCallback((enabled: boolean) => {
     measureSharingRef.current = enabled;
@@ -480,6 +494,26 @@ export function useDmLocationEditor(
             measureBroadcast.dispose();
           });
         }
+        // Camera focus requests ("bring them here"): broadcast this DM's
+        // sends over presence. Stateless by design — see attachFocusBroadcast
+        // — so there is no re-apply after (re)attach, unlike measureBroadcast.
+        const focusBroadcast = attachFocusBroadcast(connection);
+        focusBroadcastRef.current = focusBroadcast;
+        laserCleanups.push(() => {
+          focusBroadcastRef.current = null;
+          focusBroadcast.dispose();
+        });
+
+        // Local "go to this view" for the DM's own camera. A DM device is
+        // never moved by a focus frame, so there is no receiver here — just
+        // the animator, wired through the shared helper so the element and
+        // size sources cannot drift from the receiving call sites.
+        const localAnimator = createLocalCameraAnimator(vp);
+        localAnimatorRef.current = localAnimator;
+        laserCleanups.push(() => {
+          localAnimatorRef.current = null;
+          localAnimator.dispose();
+        });
         // Always-available DM pings: long-press with any tool + "P" at the
         // cursor, self-pulse through the shared receive overlay. The veto
         // skips the ping tool, whose own tap already pinged on pointer down.
@@ -971,6 +1005,17 @@ export function useDmLocationEditor(
     connectionRef.current?.publishLayerRemove(id);
   }, []);
 
+  const handleGoToCameraView = useCallback((view: CameraView) => {
+    localAnimatorRef.current?.animateTo(view);
+  }, []);
+
+  const handleSendCameraView = useCallback(
+    (view: CameraView, audience: FocusAudience) => {
+      focusBroadcastRef.current?.send(view, audience, '#F4C430');
+    },
+    []
+  );
+
   return {
     mode,
     canvasRef,
@@ -1018,6 +1063,8 @@ export function useDmLocationEditor(
     publishLayerRemove,
     measureSharing,
     handleSetMeasureSharing,
+    handleGoToCameraView,
+    handleSendCameraView,
     getViewport: getVp,
     getDmOnlyElements,
   };
