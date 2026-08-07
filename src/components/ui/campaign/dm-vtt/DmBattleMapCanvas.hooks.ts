@@ -288,6 +288,17 @@ export function useDmBattleMapCanvas({
         onSelectionChange?.(ids);
       });
 
+      // Local "go to this view" for the DM's own camera. Unlike
+      // attachFocusBroadcast below, moving your own camera needs no relay
+      // connection at all, so this must run unconditionally here — not
+      // inside the `if (relayUrl)` guard — or the Views popover's "go"
+      // button silently no-ops for every DM running without
+      // NEXT_PUBLIC_BATTLEMAP_RELAY_URL configured. Own cleanup ref (not
+      // laserCleanups) because it is not connection-scoped.
+      localAnimatorRef.current?.dispose();
+      const localAnimator = createLocalCameraAnimator(vp);
+      localAnimatorRef.current = localAnimator;
+
       // Live sync — resolver reads Zustand LIVE via getState() (a captured
       // snapshot would go stale after the first dm-only toggle).
       const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
@@ -363,6 +374,8 @@ export function useDmBattleMapCanvas({
         // Camera focus requests ("bring them here"): broadcast this DM's
         // sends over presence. Stateless by design — see attachFocusBroadcast
         // — so there is no re-apply after (re)attach, unlike measureBroadcast.
+        // Broadcast genuinely needs the connection (unlike the local animator
+        // above, which is set up unconditionally), so it stays gated here.
         const focusBroadcast = attachFocusBroadcast(connection);
         focusBroadcastRef.current = focusBroadcast;
         laserCleanups.push(() => {
@@ -370,16 +383,6 @@ export function useDmBattleMapCanvas({
           focusBroadcast.dispose();
         });
 
-        // Local "go to this view" for the DM's own camera. A DM device is
-        // never moved by a focus frame, so there is no receiver here — just
-        // the animator, wired through the shared helper so the element and
-        // size sources cannot drift from the receiving call sites.
-        const localAnimator = createLocalCameraAnimator(vp);
-        localAnimatorRef.current = localAnimator;
-        laserCleanups.push(() => {
-          localAnimatorRef.current = null;
-          localAnimator.dispose();
-        });
         // Always-available DM pings: long-press with any tool + "P" at the
         // cursor, self-pulse through the shared receive overlay. The veto
         // skips the ping tool, whose own tap already pinged on pointer down.
@@ -413,6 +416,12 @@ export function useDmBattleMapCanvas({
     return () => {
       autoSaveRef.current?.stop();
       laserCleanupRef.current?.();
+      // Disposed after laserCleanupRef (which tears down focusBroadcast) and
+      // before the connection stops, matching the pre-existing teardown
+      // order tests — even though the animator is no longer connection-
+      // scoped, it still needs to go before connectionRef.stop().
+      localAnimatorRef.current?.dispose();
+      localAnimatorRef.current = null;
       connectionRef.current?.stop();
       pinUnsubRef.current?.();
       selectionUnsubRef.current?.();

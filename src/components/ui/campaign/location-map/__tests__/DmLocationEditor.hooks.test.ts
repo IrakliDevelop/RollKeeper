@@ -46,10 +46,17 @@ function makeStubViewport() {
   // reflects the current selection, same guarantee the real SDK makes.
   const selectionState = { selectedIds: [elementId] as string[] };
   const selectionListeners = new Set<() => void>();
+  // handleReady (battlemap mode) now unconditionally wires a local camera
+  // animator via the REAL focusSync.createLocalCameraAnimator (this file
+  // does not mock focusSync) — it reads `domLayer.parentElement`, so the
+  // stub needs an actual wrapper, not a detached node.
+  const wrapper = document.createElement('div');
+  const domLayer = document.createElement('div');
+  wrapper.appendChild(domLayer);
   const vp = {
     store,
     layerManager,
-    domLayer: document.createElement('div'),
+    domLayer,
     toolManager: {
       getTool: vi.fn(() => ({
         name: 'select',

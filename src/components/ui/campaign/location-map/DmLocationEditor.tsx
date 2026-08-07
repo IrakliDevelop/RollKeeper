@@ -17,7 +17,6 @@ import type { BattleMap } from '@/types/battlemap';
 export default function DmLocationEditor(props: DmLocationEditorProps) {
   const linkEncounter = useBattleMapStore(s => s.linkEncounter);
   const unlinkEncounter = useBattleMapStore(s => s.unlinkEncounter);
-  const updateBattleMap = useBattleMapStore(s => s.updateBattleMap);
   const { toasts, addToast, dismissToast } = useToast();
   // Session-scoped only — pure UI state, no connection dependency. Off by
   // default; the DM opts in each session before a focus request can move
@@ -73,6 +72,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handleSendCameraView,
     getViewport,
     getDmOnlyElements,
+    storeUpdateLocation,
   } = useDmLocationEditor(props);
 
   return (
@@ -146,7 +146,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                     ...(props.location.cameraViews ?? []),
                     { id: crypto.randomUUID(), name, view },
                   ];
-                  updateBattleMap(props.campaignCode, props.location.id, {
+                  storeUpdateLocation(props.campaignCode, props.location.id, {
                     cameraViews: next,
                   });
                 }}
@@ -156,7 +156,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                   const next = (props.location.cameraViews ?? []).map(v =>
                     v.id === id ? { ...v, name } : v
                   );
-                  updateBattleMap(props.campaignCode, props.location.id, {
+                  storeUpdateLocation(props.campaignCode, props.location.id, {
                     cameraViews: next,
                   });
                 }}
@@ -164,7 +164,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                   const next = (props.location.cameraViews ?? []).filter(
                     v => v.id !== id
                   );
-                  updateBattleMap(props.campaignCode, props.location.id, {
+                  storeUpdateLocation(props.campaignCode, props.location.id, {
                     cameraViews: next,
                   });
                 }}

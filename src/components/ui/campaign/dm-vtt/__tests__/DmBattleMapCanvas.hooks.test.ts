@@ -181,7 +181,12 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     expect(broadcastSend).toHaveBeenCalledWith(view, 'players', '#F4C430');
   });
 
-  it('handleGoToCameraView/handleSendCameraView are silent no-ops before a connection exists', () => {
+  it('handleGoToCameraView/handleSendCameraView are silent no-ops before handleReady is called (no viewport wired yet)', () => {
+    // NOTE: this is about handleReady never having run — not about the
+    // relay being unset. Do not read this as "no connection means no local
+    // animator either": see the no-relay-configured test below, which
+    // proves the local animator IS created (and handleGoToCameraView DOES
+    // work) once handleReady runs, with no relay URL at all.
     const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
     // handleReady never called — refs are still null.
     expect(() =>
@@ -191,6 +196,34 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
       result.current.handleSendCameraView({ x: 0, y: 0, w: 1, h: 1 }, 'all')
     ).not.toThrow();
     expect(animatorAnimateTo).not.toHaveBeenCalled();
+    expect(broadcastSend).not.toHaveBeenCalled();
+  });
+
+  it('handleGoToCameraView drives the local animator with NO relay URL configured (regression: moving your own camera needs no connection)', () => {
+    delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+    const vp = makeVp();
+    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+
+    act(() => {
+      result.current.handleReady(vp);
+    });
+
+    // The local animator is created regardless of relay configuration...
+    expect(createLocalCameraAnimator).toHaveBeenCalledTimes(1);
+    expect(createLocalCameraAnimator).toHaveBeenCalledWith(vp);
+    // ...while broadcast — which genuinely needs a connection — correctly
+    // stays off.
+    expect(attachFocusBroadcast).not.toHaveBeenCalled();
+
+    const view = { x: 1, y: 2, w: 3, h: 4 };
+    act(() => {
+      result.current.handleGoToCameraView(view);
+    });
+    expect(animatorAnimateTo).toHaveBeenCalledWith(view);
+
+    act(() => {
+      result.current.handleSendCameraView(view, 'players');
+    });
     expect(broadcastSend).not.toHaveBeenCalled();
   });
 

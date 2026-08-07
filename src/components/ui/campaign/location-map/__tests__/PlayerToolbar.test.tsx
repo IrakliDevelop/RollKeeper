@@ -107,6 +107,15 @@ describe('PlayerToolbar', () => {
     expect(screen.getByLabelText('Export map')).toBeInTheDocument();
   });
 
+  // NOTE: this renders PlayerToolbar in isolation, so it guards the toolbar
+  // markup only — it says nothing about PlayerBattleMapCanvas (the actual
+  // mount site), which never passes a viewsControl prop to PlayerToolbar in
+  // the first place. A full canvas-level render needs a live DOM canvas
+  // unavailable in jsdom, so that gap is left open deliberately (see
+  // DmBattleMapCanvas.test.tsx's header comment for the same constraint).
+  // The receive-SIDE hazard this toolbar test does not cover — a DM
+  // targeting the TV moving every player's camera instead — is covered
+  // separately by PlayerBattleMapCanvas.focusOptions.test.ts.
   it('renders no views control — players never send camera focus requests', () => {
     render(
       <PlayerToolbar

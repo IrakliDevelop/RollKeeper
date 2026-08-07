@@ -114,6 +114,12 @@ function makeHookState(
     handleSendCameraView,
     getViewport: vi.fn(() => null),
     getDmOnlyElements: vi.fn(() => ({})),
+    // Mirrors the real hook's mode-switch write (battlemap mode in this
+    // suite) so the onSaveView/onRenameView/onDeleteView round-trip
+    // assertions below still observe the write landing in the real store.
+    storeUpdateLocation: vi.fn((campaignCode: string, id: string, updates) => {
+      useBattleMapStore.getState().updateBattleMap(campaignCode, id, updates);
+    }),
     ...overrides,
   } as DmLocationEditorState & {
     canvasRef: React.RefObject<FieldNotesCanvasRef | null>;
@@ -140,8 +146,8 @@ function getViewsControlProps(): BattleMapViewsControlProps {
   const viewsControl = lastCall?.[0]?.viewsControl as
     | ReactElement<BattleMapViewsControlProps>
     | undefined;
-  expect(viewsControl).toBeDefined();
-  return viewsControl!.props;
+  if (!viewsControl) throw new Error('viewsControl was not rendered');
+  return viewsControl.props;
 }
 
 describe('DmLocationEditor viewsControl wiring (battlemap mode)', () => {
@@ -159,6 +165,14 @@ describe('DmLocationEditor viewsControl wiring (battlemap mode)', () => {
     renderEditor();
     const lastProps = vi.mocked(DmLocationToolbar).mock.calls.at(-1)?.[0];
     expect(lastProps?.viewsControl).toBeTruthy();
+
+    // Default-OFF gate (the only enforcement point for camera sharing):
+    // the mount site must pass sharingEnabled=false, or a focus send could
+    // move another client's camera before the DM opts in for the session.
+    // Mutation-verified: flipping the mount site's `useState(false)` to
+    // `useState(true)` fails this assertion.
+    const props = getViewsControlProps();
+    expect(props.sharingEnabled).toBe(false);
   });
 
   it('onSaveView appends a NEW cameraViews array via updateBattleMap (store round-trip)', () => {
