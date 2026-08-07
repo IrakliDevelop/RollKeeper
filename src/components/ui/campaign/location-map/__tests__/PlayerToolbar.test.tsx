@@ -106,4 +106,16 @@ describe('PlayerToolbar', () => {
     );
     expect(screen.getByLabelText('Export map')).toBeInTheDocument();
   });
+
+  it('renders no views control — players never send camera focus requests', () => {
+    render(
+      <PlayerToolbar
+        status="live"
+        hasSelection={false}
+        onDeleteSelected={vi.fn()}
+        characterId="char-1"
+      />
+    );
+    expect(screen.queryByRole('button', { name: /views/i })).toBeNull();
+  });
 });

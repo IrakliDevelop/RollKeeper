@@ -14,6 +14,7 @@ import { makeApplyRemoteLayer } from '@/components/ui/campaign/location-map/laye
 import { attachRemoteLaserTrails } from '@/components/ui/campaign/location-map/laserSync';
 import { attachRemotePings } from '@/components/ui/campaign/location-map/pingSync';
 import { attachRemoteMeasurements } from '@/components/ui/campaign/location-map/measureSync';
+import { attachFocusReceiver } from '@/components/ui/campaign/location-map/focusSync';
 
 function DisplayCanvas() {
   const params = useParams();
@@ -65,6 +66,8 @@ function DisplayCanvas() {
       attachRemoteLaserTrails(vp, connection),
       attachRemotePings(vp, connection).dispose,
       attachRemoteMeasurements(vp, connection).dispose,
+      attachFocusReceiver(vp, connection, { role: 'display', color: '#F4C430' })
+        .dispose,
     ];
     laserCleanupRef.current = () => {
       for (const cleanup of presenceCleanups) cleanup();
