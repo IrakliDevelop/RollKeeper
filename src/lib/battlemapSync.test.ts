@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
+  Camera,
   ElementStore,
   LayerManager,
   MeasureTool,
@@ -929,7 +930,7 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
     conn.stop();
   });
 
-  it('poke + laser + ping + measure presence coexist over the real attachments: measure sends exactly one presence frame, the remote overlay applies it presence-only, leave clears every overlay', async () => {
+  it('poke + laser + ping + measure + focus presence coexist over the real attachments: focus sends exactly one presence frame, never touches the element store, the other four handlers stay undisturbed in both directions, and leave still clears the per-sender overlays', async () => {
     // MeasureTool's onMeasurement is raf-coalesced (see measureSync.test.ts):
     // callbacks are captured and only run on an explicit flushFrame(). The
     // ping/laser overlays above never have their raf callback invoked either
@@ -965,6 +966,9 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
     const { attachMeasureBroadcast, attachRemoteMeasurements } = await import(
       '@/components/ui/campaign/location-map/measureSync'
     );
+    const { attachFocusBroadcast, attachFocusReceiver } = await import(
+      '@/components/ui/campaign/location-map/focusSync'
+    );
 
     // Ping/laser overlays share this host, mirroring the sibling test above
     // (their draw functions are exercised through a mock 2D context).
@@ -990,6 +994,29 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
       },
       requestRender: vi.fn(),
     };
+    // Focus gets its own host too — deliberately NOT the shared `overlays`
+    // array. Its arrival pulse is a RemotePingOverlay under the hood and
+    // would also call `fill()`, which counts() cannot tell apart from a real
+    // ping pulse. Isolating it keeps `counts()` a clean ping/laser-only
+    // signal, so "focus doesn't disturb ping/laser" is provable rather than
+    // coincidentally true because nothing ever collided.
+    const focusHost = {
+      registerOverlay: (draw: (ctx: CanvasRenderingContext2D) => void) => {
+        void draw;
+        return () => {};
+      },
+      requestRender: vi.fn(),
+    };
+    const focusWrapper = document.createElement('div');
+    const focusDomLayer = document.createElement('div');
+    focusWrapper.appendChild(focusDomLayer);
+    const focusVp = {
+      camera: new Camera(),
+      domLayer: focusDomLayer,
+      getCanvasSize: () => ({ w: 800, h: 600 }),
+      registerOverlay: focusHost.registerOverlay,
+      requestRender: focusHost.requestRender,
+    };
 
     const store = new ElementStore();
     const pokes: string[] = [];
@@ -1010,6 +1037,13 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
     const remoteMeasurements = attachRemoteMeasurements(measureHost, conn);
     const measureTool = new MeasureTool();
     const measureHandle = attachMeasureBroadcast(measureTool, conn);
+    // Focus, wired on the very same connection as the other four. The
+    // receiver is player-role, matching this client's own tokenRequest role.
+    const focus = attachFocusBroadcast(conn);
+    const focusReceived = attachFocusReceiver(focusVp, conn, {
+      role: 'player',
+    });
+    const focusApply = vi.spyOn(focusReceived.receiver, 'apply');
     fakeTransport.emitMessage(snapshotEnvelope('player-1', []));
 
     const counts = () => {
@@ -1081,6 +1115,46 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
     expect(drawn.strokes).toBeGreaterThan(0); // laser trail rendered
     expect(remoteMeasurements.overlay.activeSenderCount).toBe(1); // remote ruler applied
     expect(store.snapshot()).toEqual([]); // presence-only: nothing persisted
+    // The focus receiver saw all four foreign frames (it is subscribed on
+    // the same connection via onPresence) and rejected every one of them —
+    // proving it actively discriminates by payload kind/role rather than
+    // merely never being exercised.
+    expect(focusApply).toHaveBeenCalledTimes(4);
+    expect(focusApply.mock.results.map(r => r.value)).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
+
+    // Remote receive path for focus itself: a foreign DM sends a focus
+    // request addressed to 'players'. The receiver actually applies it —
+    // positive proof of delivery, not merely an absence of the wrong side
+    // effect — while the other four handlers' state stays exactly what it
+    // was: an incoming focus frame must not leak into poke/laser/ping/
+    // measure.
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'conn-dm',
+        op: {
+          kind: 'presence',
+          data: {
+            kind: 'focus',
+            x: 500,
+            y: 500,
+            w: 400,
+            h: 300,
+            audience: 'players',
+          },
+        },
+      })
+    );
+    expect(focusApply).toHaveBeenCalledTimes(5);
+    expect(focusApply).toHaveLastReturnedWith(true);
+    expect(pokes).toEqual(['players']); // still just the one poke
+    expect(counts()).toEqual(drawn); // ping/laser draw counts unchanged
+    expect(remoteMeasurements.overlay.activeSenderCount).toBe(1); // unchanged
+    expect(store.snapshot()).toEqual([]); // focus never touches the store
 
     // Local broadcast path: enable sharing, drive one measurement, flush the
     // coalesced raf emission — exactly one presence frame reaches the wire.
@@ -1110,6 +1184,46 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
     expect(Number.isFinite(measurePayload.feet)).toBe(true);
     expect(store.snapshot()).toEqual([]); // still nothing persisted
 
+    // Local broadcast path for focus: one send, exactly one wire frame.
+    // Mirrors the measure broadcast above — the fake transport has no
+    // server-side echo, so a locally-sent presence frame never loops back
+    // to this same client's own onPresence subscribers (real relays don't
+    // echo a sender's own broadcast either); that's why the positive
+    // "receiver actually applies it" proof above uses an INCOMING frame
+    // from a foreign sender instead. This half only proves the send side:
+    // traffic is not amplified, and sending doesn't disturb anything else.
+    const pokesBeforeFocusSend = [...pokes];
+    const drawnBeforeFocusSend = counts();
+    const activeSendersBeforeFocusSend =
+      remoteMeasurements.overlay.activeSenderCount;
+    const focusApplyCallsBeforeSend = focusApply.mock.calls.length;
+    const sentBeforeFocus = fakeTransport.sent.length;
+    focus.send({ x: 500, y: 500, w: 400, h: 300 }, 'players');
+
+    const focusFrames = fakeTransport.sent
+      .slice(sentBeforeFocus)
+      .map(
+        frame => JSON.parse(frame) as { op: { kind: string; data?: unknown } }
+      )
+      .filter(envelope => envelope.op.kind === 'presence')
+      .filter(
+        envelope =>
+          (envelope.op.data as { kind?: string } | undefined)?.kind === 'focus'
+      );
+    // Exactly one presence frame per send — focus does not amplify traffic.
+    expect(focusFrames).toHaveLength(1);
+    // No self-delivery, and the send disturbs none of the other four
+    // handlers or the receiver's own call count.
+    expect(focusApply.mock.calls.length).toBe(focusApplyCallsBeforeSend);
+    expect(pokes).toEqual(pokesBeforeFocusSend);
+    expect(counts()).toEqual(drawnBeforeFocusSend);
+    expect(remoteMeasurements.overlay.activeSenderCount).toBe(
+      activeSendersBeforeFocusSend
+    );
+    // Focus is ephemeral by contract: never an element, never durable state.
+    expect(store.snapshot()).toEqual([]);
+    expect(store.getAll()).toHaveLength(0);
+
     // Presence-leave clears every overlay for that sender immediately.
     fakeTransport.emitMessage(
       JSON.stringify({ from: 'conn-dm', op: { kind: 'presence-leave' } })
@@ -1120,6 +1234,11 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
     expect(remoteMeasurements.overlay.activeSenderCount).toBe(0);
     expect(store.snapshot()).toEqual([]); // presence-only, end to end
 
+    // Focus has no per-sender state to clear on presence-leave — a focus
+    // request is one-shot and its arrival pulse self-expires — so there is
+    // no cleanup assertion to make for it here, only disposal.
+    focusReceived.dispose();
+    focus.dispose();
     measureHandle.dispose();
     remotePings.dispose();
     cleanupLasers();
