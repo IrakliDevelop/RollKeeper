@@ -63,7 +63,8 @@ import {
   type ArrangeMapsSession,
 } from './arrangeMaps';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
-import type { GridSettings } from '@/types/location';
+import type { GridSettings, LocationMap } from '@/types/location';
+import type { BattleMap } from '@/types/battlemap';
 
 /** `_fitCameraToMap` — retry when the viewport has zero size (layout not ready). */
 const FIT_CAMERA_VIEWPORT_RETRY_MAX = 5;
@@ -195,6 +196,16 @@ export interface DmLocationEditorState {
   // Battle-map export control
   getViewport: () => Viewport | null;
   getDmOnlyElements: () => Record<string, boolean>;
+
+  /** Mode-switching store write (locationStore vs. battleMapStore) — use
+   *  this for ALL writes in the render site rather than reaching into a
+   *  specific store directly, or a location-mode write can silently land in
+   *  the wrong store. */
+  storeUpdateLocation: (
+    campaignCode: string,
+    id: string,
+    updates: Partial<BattleMap> & Partial<LocationMap>
+  ) => void;
 }
 
 export function useDmLocationEditor(
@@ -428,6 +439,20 @@ export function useDmLocationEditor(
         annotationsLocked: arrangeActiveRef.current,
       }));
 
+      // Local "go to this view" for the DM's own camera (battlemap mode
+      // only — the Views popover only renders then, see DmLocationToolbar).
+      // Unlike attachFocusBroadcast below, moving your own camera needs no
+      // relay connection at all, so this must run unconditionally here —
+      // not inside the relay-gated block — or the popover's "go" button
+      // silently no-ops for every DM running without
+      // NEXT_PUBLIC_BATTLEMAP_RELAY_URL configured. Own cleanup ref (not
+      // laserCleanups) because it is not connection-scoped.
+      if (mode === 'battlemap') {
+        localAnimatorRef.current?.dispose();
+        const localAnimator = createLocalCameraAnimator(vp);
+        localAnimatorRef.current = localAnimator;
+      }
+
       // Live sync — battlemap mode only; resolver reads Zustand LIVE via
       // getState() (a captured snapshot would go stale after the first toggle).
       if (mode === 'battlemap' && process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL) {
@@ -497,6 +522,8 @@ export function useDmLocationEditor(
         // Camera focus requests ("bring them here"): broadcast this DM's
         // sends over presence. Stateless by design — see attachFocusBroadcast
         // — so there is no re-apply after (re)attach, unlike measureBroadcast.
+        // Broadcast genuinely needs the connection (unlike the local animator
+        // above, which is set up unconditionally), so it stays gated here.
         const focusBroadcast = attachFocusBroadcast(connection);
         focusBroadcastRef.current = focusBroadcast;
         laserCleanups.push(() => {
@@ -504,16 +531,6 @@ export function useDmLocationEditor(
           focusBroadcast.dispose();
         });
 
-        // Local "go to this view" for the DM's own camera. A DM device is
-        // never moved by a focus frame, so there is no receiver here — just
-        // the animator, wired through the shared helper so the element and
-        // size sources cannot drift from the receiving call sites.
-        const localAnimator = createLocalCameraAnimator(vp);
-        localAnimatorRef.current = localAnimator;
-        laserCleanups.push(() => {
-          localAnimatorRef.current = null;
-          localAnimator.dispose();
-        });
         // Always-available DM pings: long-press with any tool + "P" at the
         // cursor, self-pulse through the shared receive overlay. The veto
         // skips the ping tool, whose own tap already pinged on pointer down.
@@ -622,6 +639,12 @@ export function useDmLocationEditor(
       }
       autoSaveRef.current?.stop();
       laserCleanupRef.current?.();
+      // Disposed after laserCleanupRef (which tears down focusBroadcast) and
+      // before the connection stops, matching the pre-existing teardown
+      // order tests — even though the animator is no longer connection-
+      // scoped, it still needs to go before connectionRef.stop().
+      localAnimatorRef.current?.dispose();
+      localAnimatorRef.current = null;
       connectionRef.current?.stop();
       pinUnsubRef.current?.();
       hiddenPlacementUnsubRef.current?.();
@@ -1067,5 +1090,6 @@ export function useDmLocationEditor(
     handleSendCameraView,
     getViewport: getVp,
     getDmOnlyElements,
+    storeUpdateLocation,
   };
 }

@@ -207,6 +207,29 @@ describe('useDmLocationEditor — focus lifecycle ownership (battlemap mode)', (
     expect(broadcastSend).toHaveBeenCalledWith(view, 'display', '#F4C430');
   });
 
+  it('handleGoToCameraView drives the local animator with NO relay URL configured (regression: moving your own camera needs no connection)', async () => {
+    delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+    const { vp, result } = await setup();
+
+    // The local animator is created regardless of relay configuration...
+    expect(createLocalCameraAnimator).toHaveBeenCalledTimes(1);
+    expect(createLocalCameraAnimator).toHaveBeenCalledWith(vp);
+    // ...while broadcast — which genuinely needs a connection — correctly
+    // stays off.
+    expect(attachFocusBroadcast).not.toHaveBeenCalled();
+
+    const view = { x: 1, y: 2, w: 3, h: 4 };
+    act(() => {
+      result.current.handleGoToCameraView(view);
+    });
+    expect(animatorAnimateTo).toHaveBeenCalledWith(view);
+
+    act(() => {
+      result.current.handleSendCameraView(view, 'display');
+    });
+    expect(broadcastSend).not.toHaveBeenCalled();
+  });
+
   it('unmount disposes focus broadcast + local animator BEFORE stopping the connection', async () => {
     const vp = makeStubViewport();
     const { result, unmount } = renderHook(() =>

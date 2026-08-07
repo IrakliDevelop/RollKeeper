@@ -100,8 +100,8 @@ function getViewsControlProps(): BattleMapViewsControlProps {
   const viewsControl = lastCall?.[0]?.viewsControl as
     | ReactElement<BattleMapViewsControlProps>
     | undefined;
-  expect(viewsControl).toBeDefined();
-  return viewsControl!.props;
+  if (!viewsControl) throw new Error('viewsControl was not rendered');
+  return viewsControl.props;
 }
 
 describe('DmBattleMapCanvas wiring', () => {
@@ -123,6 +123,14 @@ describe('DmBattleMapCanvas wiring', () => {
 
     const lastProps = vi.mocked(DmVttToolbar).mock.calls.at(-1)?.[0];
     expect(lastProps?.viewsControl).toBeTruthy();
+
+    // Default-OFF gate (the only enforcement point for camera sharing):
+    // the mount site must pass sharingEnabled=false, or a focus send could
+    // move another client's camera before the DM opts in for the session.
+    // Mutation-verified: flipping the mount site's `useState(false)` to
+    // `useState(true)` fails this assertion.
+    const props = getViewsControlProps();
+    expect(props.sharingEnabled).toBe(false);
   });
 
   it('does not reach the toolbar before a viewport exists (viewport gate)', () => {
