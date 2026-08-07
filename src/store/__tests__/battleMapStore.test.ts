@@ -424,4 +424,37 @@ describe('battleMapStore', () => {
       ).toHaveLength(1);
     });
   });
+
+  describe('cameraViews', () => {
+    it('round-trips cameraViews through updateBattleMap', () => {
+      useBattleMapStore.getState().addBattleMap(CAMPAIGN, mockBattleMap);
+      useBattleMapStore.getState().updateBattleMap(CAMPAIGN, 'bm-test-001', {
+        cameraViews: [
+          {
+            id: 'v1',
+            name: 'Goblin ambush',
+            view: { x: 0, y: 0, w: 400, h: 300 },
+          },
+        ],
+      });
+      const saved = useBattleMapStore
+        .getState()
+        .getBattleMap(CAMPAIGN, 'bm-test-001');
+      expect(saved?.cameraViews).toEqual([
+        {
+          id: 'v1',
+          name: 'Goblin ambush',
+          view: { x: 0, y: 0, w: 400, h: 300 },
+        },
+      ]);
+    });
+
+    it('treats a map with no cameraViews as valid (no migration needed)', () => {
+      useBattleMapStore.getState().addBattleMap(CAMPAIGN, mockBattleMap);
+      const saved = useBattleMapStore
+        .getState()
+        .getBattleMap(CAMPAIGN, 'bm-test-001');
+      expect(saved?.cameraViews).toBeUndefined();
+    });
+  });
 });

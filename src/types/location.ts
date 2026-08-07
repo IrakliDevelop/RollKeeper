@@ -1,3 +1,5 @@
+import type { SavedCameraView } from './battlemap';
+
 export interface GridSettings {
   gridType: 'square' | 'hex';
   hexOrientation?: 'pointy' | 'flat';
@@ -17,6 +19,7 @@ export interface LocationMap {
   dmOnlyElements: Record<string, boolean>;
   gridEnabled: boolean;
   gridSettings?: GridSettings;
+  cameraViews?: SavedCameraView[];
   createdAt: string;
   updatedAt: string;
 }
