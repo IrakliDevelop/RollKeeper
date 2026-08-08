@@ -28,9 +28,13 @@ import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
 import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
 import { useNPCStore } from '@/store/npcStore';
 import type { MagicItem } from '@/types/character';
+import type { CampaignNPC } from '@/types/encounter';
 import type { CustomMagicItem } from '@/types/magicItemLibrary';
 import type { SendItemTarget } from '../SendItemDialog';
 import { MagicItemLibraryDialog } from './MagicItemLibraryDialog';
+
+const EMPTY_MAGIC_ITEMS: CustomMagicItem[] = [];
+const EMPTY_NPCS: CampaignNPC[] = [];
 
 export function MagicItemLibrarySection({
   campaignCode,
@@ -42,11 +46,13 @@ export function MagicItemLibrarySection({
   onGiveToPlayer: (item: MagicItem, target: SendItemTarget) => Promise<void>;
 }) {
   const items = useMagicItemLibraryStore(
-    state => state.itemsByCampaign[campaignCode] ?? []
+    state => state.itemsByCampaign[campaignCode] ?? EMPTY_MAGIC_ITEMS
   );
   const { createItem, updateItem, deleteItem, duplicateItem } =
     useMagicItemLibraryStore();
-  const npcs = useNPCStore(state => state.npcsByCampaign[campaignCode] ?? []);
+  const npcs = useNPCStore(
+    state => state.npcsByCampaign[campaignCode] ?? EMPTY_NPCS
+  );
   const updateNPC = useNPCStore(state => state.updateNPC);
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState('all');
