@@ -451,7 +451,7 @@ export function NPCSection({
         onSendItemToPlayer={onSendItemToPlayer}
       />
 
-      {npcSectionOpen && onGiveMagicItemToPlayer && (
+      {onGiveMagicItemToPlayer && (
         <MagicItemLibrarySection
           campaignCode={campaignCode}
           players={players}

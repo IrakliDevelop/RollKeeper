@@ -25,13 +25,14 @@ interface DmStoreState {
     code: string,
     playerCharacterId: string
   ) => string | undefined;
-  /** Merge-persist DM dashboard section open/close (Players, NPCs on campaign page). */
+  /** Merge-persist DM dashboard section state on the campaign page. */
   setDmDashboardUi: (
     code: string,
     partial: Partial<{
       playersSectionOpen: boolean;
       houseRulesSectionOpen: boolean;
       npcSectionOpen: boolean;
+      magicItemLibrarySectionOpen: boolean;
       npcCollapsedGroupNames: string[];
       npcInlineSpellSlots: boolean;
       npcSeparateSpellSlotTracker: boolean;
