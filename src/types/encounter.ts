@@ -301,6 +301,8 @@ export interface NPCInventoryItem {
   weight?: number; // per item in lbs
   value?: number; // per item in copper pieces
   rarity?: string; // common, uncommon, rare, very rare, legendary, artifact
+  /** Full reusable definition when this row came from the DM magic item library. */
+  magicItem?: import('./character').MagicItem;
 }
 
 export interface CampaignNPC {

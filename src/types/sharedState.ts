@@ -1,5 +1,5 @@
 import type { CalendarConfig, WeatherType } from './calendar';
-import type { InventoryItem } from './character';
+import type { InventoryItem, MagicItem } from './character';
 import type {
   ChessPiece,
   EnemyConditionsDisplay,
@@ -45,10 +45,11 @@ export interface DmEffect {
 // Item transfer queued for a player (auto-merges on next poll)
 export interface ItemTransfer {
   id: string;
-  item: InventoryItem;
+  item: InventoryItem | MagicItem;
+  itemKind?: 'inventory' | 'magic';
   fromPlayerName: string;
   fromCharacterName: string;
-  fromType: 'player' | 'npc';
+  fromType: 'player' | 'npc' | 'dm';
   sentAt: string; // ISO timestamp
 }
 

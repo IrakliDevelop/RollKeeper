@@ -49,6 +49,7 @@ import {
   Spell,
   SpellSlots,
   InventoryItem,
+  MagicItem,
 } from '@/types/character';
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { NavigationContext } from '@/contexts/NavigationContext';
@@ -234,6 +235,7 @@ export default function CharacterSheet() {
     levelUpAnimationLevel,
     clearLevelUpAnimation,
     addInventoryItem,
+    addMagicItem,
     deleteInventoryItem,
   } = useCharacterStore();
 
@@ -377,17 +379,33 @@ export default function CharacterSheet() {
       if (processedTransferIdsRef.current.has(transfer.id)) continue;
       processedTransferIdsRef.current.add(transfer.id);
 
+      if (transfer.itemKind === 'magic') {
+        const {
+          id: _id,
+          createdAt: _createdAt,
+          updatedAt: _updatedAt,
+          ...item
+        } = transfer.item as MagicItem;
+        void _id;
+        void _createdAt;
+        void _updatedAt;
+        addMagicItem({ ...item, isAttuned: false, isEquipped: false });
+        added = true;
+        continue;
+      }
+
+      const inventoryItem = transfer.item as InventoryItem;
       addInventoryItem({
-        name: transfer.item.name,
-        category: transfer.item.category || 'misc',
-        quantity: transfer.item.quantity,
-        description: transfer.item.description,
-        weight: transfer.item.weight,
-        value: transfer.item.value,
-        rarity: transfer.item.rarity,
-        type: transfer.item.type,
-        location: transfer.item.location || 'Backpack',
-        tags: transfer.item.tags || [],
+        name: inventoryItem.name,
+        category: inventoryItem.category || 'misc',
+        quantity: inventoryItem.quantity,
+        description: inventoryItem.description,
+        weight: inventoryItem.weight,
+        value: inventoryItem.value,
+        rarity: inventoryItem.rarity,
+        type: inventoryItem.type,
+        location: inventoryItem.location || 'Backpack',
+        tags: inventoryItem.tags || [],
       });
       added = true;
     }
@@ -395,7 +413,12 @@ export default function CharacterSheet() {
     if (added) {
       acknowledgeTransfers();
     }
-  }, [sharedState?.transfers, addInventoryItem, acknowledgeTransfers]);
+  }, [
+    sharedState?.transfers,
+    addInventoryItem,
+    addMagicItem,
+    acknowledgeTransfers,
+  ]);
 
   // Latch DM effects into local state for the notification toast before
   // acknowledgment clears them from shared state.
