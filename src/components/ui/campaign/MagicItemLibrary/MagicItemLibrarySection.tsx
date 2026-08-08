@@ -15,13 +15,20 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
-import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import {
+  SelectField,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+} from '@/components/ui/forms/select';
 import { Badge } from '@/components/ui/layout/badge';
 import { Card, CardContent } from '@/components/ui/layout/card';
 import {
   Dialog,
   DialogBody,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -326,24 +333,31 @@ export function MagicItemLibrarySection({
             <DialogTitle>Give {giving?.name}</DialogTitle>
           </DialogHeader>
           <DialogBody className="space-y-3">
-            <p className="text-muted text-sm">
+            <DialogDescription className="text-muted text-sm">
               Choose a player or NPC. The library template will remain
               unchanged.
-            </p>
+            </DialogDescription>
             <SelectField value={recipient} onValueChange={setRecipient}>
-              {players.map(player => (
-                <SelectItem
-                  key={`player:${player.playerId}`}
-                  value={`player:${player.playerId}`}
-                >
-                  {player.characterName} (player)
-                </SelectItem>
-              ))}
-              {npcs.map(npc => (
-                <SelectItem key={`npc:${npc.id}`} value={`npc:${npc.id}`}>
-                  {npc.name} (NPC)
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                <SelectLabel>Players</SelectLabel>
+                {players.map(player => (
+                  <SelectItem
+                    key={`player:${player.playerId}`}
+                    value={`player:${player.playerId}`}
+                  >
+                    {player.characterName}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+              {players.length > 0 && npcs.length > 0 && <SelectSeparator />}
+              <SelectGroup>
+                <SelectLabel>NPCs</SelectLabel>
+                {npcs.map(npc => (
+                  <SelectItem key={`npc:${npc.id}`} value={`npc:${npc.id}`}>
+                    {npc.name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectField>
           </DialogBody>
           <DialogFooter>
