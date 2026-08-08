@@ -65,4 +65,67 @@ describe('MagicItemLibrarySection', () => {
         ?.magicItemLibrarySectionOpen
     ).toBe(false);
   });
+
+  it('groups give recipients into players and NPCs', async () => {
+    const now = '2026-08-08T00:00:00.000Z';
+    useMagicItemLibraryStore.setState({
+      itemsByCampaign: {
+        'empty-campaign': [
+          {
+            id: 'healing-potion',
+            campaignCode: 'empty-campaign',
+            name: 'Potion of Healing',
+            category: 'potion',
+            rarity: 'common',
+            description: 'Restores hit points.',
+            properties: [],
+            requiresAttunement: false,
+            isAttuned: false,
+            tags: [],
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      },
+    });
+    useNPCStore.setState({
+      npcsByCampaign: {
+        'empty-campaign': [
+          {
+            id: 'npc-1',
+            campaignCode: 'empty-campaign',
+            name: 'Sildar',
+            armorClass: '16',
+            maxHp: 27,
+            speed: '30 ft.',
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      },
+    });
+    const user = userEvent.setup();
+    render(
+      <MagicItemLibrarySection
+        campaignCode="empty-campaign"
+        players={[
+          {
+            playerId: 'player-1',
+            playerName: 'Alice',
+            characterId: 'character-1',
+            characterName: 'Aria',
+          },
+        ]}
+        onGiveToPlayer={async () => {}}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Give copy' }));
+    await user.click(screen.getByRole('combobox'));
+
+    expect(screen.getByText('Players')).toBeInTheDocument();
+    expect(screen.getByText('Aria')).toBeInTheDocument();
+    expect(screen.getByText('NPCs')).toBeInTheDocument();
+    expect(screen.getByText('Sildar')).toBeInTheDocument();
+  });
 });
