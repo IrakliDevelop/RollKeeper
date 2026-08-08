@@ -47,7 +47,9 @@ export function ItemTransferNotification({
         const fromLabel =
           transfer.fromType === 'npc'
             ? `${transfer.fromCharacterName} (NPC)`
-            : transfer.fromCharacterName;
+            : transfer.fromType === 'dm'
+              ? 'DM Magic Item Library'
+              : transfer.fromCharacterName;
 
         return (
           <div
@@ -69,7 +71,8 @@ export function ItemTransferNotification({
                   </p>
                   <p className="mt-1 text-base font-bold text-white">
                     {transfer.item.name}
-                    {transfer.item.quantity > 1 &&
+                    {'quantity' in transfer.item &&
+                      transfer.item.quantity > 1 &&
                       ` (x${transfer.item.quantity})`}
                   </p>
                   <p className="mt-1 text-sm text-amber-200">

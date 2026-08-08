@@ -55,7 +55,7 @@ import {
   SendItemTarget,
 } from '@/components/ui/campaign/SendItemDialog';
 import type { ItemTransfer } from '@/types/sharedState';
-import type { InventoryItem } from '@/types/character';
+import type { InventoryItem, MagicItem } from '@/types/character';
 import type { NPCInventoryItem } from '@/types/encounter';
 
 function npcItemToInventoryItem(npcItem: NPCInventoryItem): InventoryItem {
@@ -220,6 +220,45 @@ export default function CampaignViewPage() {
       }
     },
     [code, dmId, npcSendingNpcName, addToast]
+  );
+
+  const handleGiveLibraryMagicItem = useCallback(
+    async (item: MagicItem, target: SendItemTarget) => {
+      const transfer: ItemTransfer = {
+        id: `transfer-${crypto.randomUUID()}`,
+        item,
+        itemKind: 'magic',
+        fromPlayerName: 'DM',
+        fromCharacterName: 'Magic Item Library',
+        fromType: 'dm',
+        sentAt: new Date().toISOString(),
+      };
+      try {
+        const response = await fetch(`/api/campaign/${code}/shared`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            feature: 'item_transfer',
+            data: { transfer, playerId: target.playerId },
+            dmId,
+          }),
+        });
+        if (!response.ok) throw new Error('Failed to give magic item');
+        addToast({
+          type: 'success',
+          title: 'Magic Item Given',
+          message: `${item.name} sent to ${target.characterName}. The library copy was kept.`,
+        });
+      } catch (error) {
+        console.error('Failed to give magic item:', error);
+        addToast({
+          type: 'error',
+          title: 'Magic Item Not Sent',
+          message: `Could not send ${item.name} to ${target.characterName}.`,
+        });
+      }
+    },
+    [addToast, code, dmId]
   );
 
   const handleRemovePlayer = useCallback(async () => {
@@ -709,6 +748,8 @@ export default function CampaignViewPage() {
         {!loading && !error && (
           <NPCSection
             campaignCode={code}
+            players={npcSendTargets}
+            onGiveMagicItemToPlayer={handleGiveLibraryMagicItem}
             onSendItemToPlayer={(item, npcName) => {
               setNpcSendingItem(item);
               setNpcSendingNpcName(npcName);

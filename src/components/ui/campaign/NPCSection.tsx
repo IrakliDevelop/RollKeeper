@@ -28,15 +28,25 @@ import { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
 import { parseAcBonus } from '@/utils/calculations';
 import { NPCFormDialog } from './NPCFormDialog';
 import { NPCDetailDialog } from './NPCDetailDialog';
+import { MagicItemLibrarySection } from './MagicItemLibrary/MagicItemLibrarySection';
+import type { SendItemTarget } from './SendItemDialog';
+import type { MagicItem } from '@/types/character';
 
 interface NPCSectionProps {
   campaignCode: string;
   onSendItemToPlayer?: (item: NPCInventoryItem, npcName: string) => void;
+  players?: SendItemTarget[];
+  onGiveMagicItemToPlayer?: (
+    item: MagicItem,
+    target: SendItemTarget
+  ) => Promise<void>;
 }
 
 export function NPCSection({
   campaignCode,
   onSendItemToPlayer,
+  players = [],
+  onGiveMagicItemToPlayer,
 }: NPCSectionProps) {
   const {
     getNPCsForCampaign,
@@ -440,6 +450,14 @@ export function NPCSection({
         onUpdateInventory={handleUpdateInventory}
         onSendItemToPlayer={onSendItemToPlayer}
       />
+
+      {npcSectionOpen && onGiveMagicItemToPlayer && (
+        <MagicItemLibrarySection
+          campaignCode={campaignCode}
+          players={players}
+          onGiveToPlayer={onGiveMagicItemToPlayer}
+        />
+      )}
     </div>
   );
 }
