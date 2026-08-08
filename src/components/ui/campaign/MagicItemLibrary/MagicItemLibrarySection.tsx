@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import {
+  ChevronDown,
+  ChevronRight,
   Copy,
   Edit3,
   Gift,
@@ -26,6 +28,7 @@ import {
 } from '@/components/ui/feedback/dialog';
 import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
 import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
+import { useDmStore } from '@/store/dmStore';
 import { useNPCStore } from '@/store/npcStore';
 import type { MagicItem } from '@/types/character';
 import type { CampaignNPC } from '@/types/encounter';
@@ -54,6 +57,12 @@ export function MagicItemLibrarySection({
     state => state.npcsByCampaign[campaignCode] ?? EMPTY_NPCS
   );
   const updateNPC = useNPCStore(state => state.updateNPC);
+  const campaign = useDmStore(state =>
+    state.campaigns.find(entry => entry.code === campaignCode)
+  );
+  const setDmDashboardUi = useDmStore(state => state.setDmDashboardUi);
+  const sectionOpen =
+    campaign?.dmDashboardUi?.magicItemLibrarySectionOpen ?? true;
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState('all');
   const [editing, setEditing] = useState<CustomMagicItem | null>(null);
@@ -143,17 +152,41 @@ export function MagicItemLibrarySection({
       aria-labelledby="magic-item-library-heading"
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3
-            id="magic-item-library-heading"
-            className="text-heading flex items-center gap-2 text-lg font-semibold"
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              setDmDashboardUi(campaignCode, {
+                magicItemLibrarySectionOpen: !sectionOpen,
+              })
+            }
+            className="text-muted hover:text-body hover:bg-surface-secondary shrink-0 rounded-md p-1 transition-colors"
+            aria-expanded={sectionOpen}
+            aria-controls="dm-campaign-magic-item-library-section"
+            title={
+              sectionOpen
+                ? 'Collapse magic item library'
+                : 'Expand magic item library'
+            }
           >
-            <Sparkles size={20} className="text-accent-purple-text" /> Magic
-            Item Library ({items.length})
-          </h3>
-          <p className="text-muted text-sm">
-            Reusable campaign templates stay here after you give out a copy.
-          </p>
+            {sectionOpen ? (
+              <ChevronDown size={20} />
+            ) : (
+              <ChevronRight size={20} />
+            )}
+          </button>
+          <div>
+            <h3
+              id="magic-item-library-heading"
+              className="text-heading flex items-center gap-2 text-lg font-semibold"
+            >
+              <Sparkles size={20} className="text-accent-purple-text" /> Magic
+              Item Library ({items.length})
+            </h3>
+            <p className="text-muted text-sm">
+              Reusable campaign templates stay here after you give out a copy.
+            </p>
+          </div>
         </div>
         <Button
           variant="primary"
@@ -168,102 +201,108 @@ export function MagicItemLibrarySection({
         </Button>
       </div>
 
-      {items.length > 0 && (
-        <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_200px]">
-          <Input
-            value={query}
-            onChange={event => setQuery(event.target.value)}
-            placeholder="Search name, group, rarity, or tag…"
-            leftIcon={<Search size={15} />}
-            clearable
-            onClear={() => setQuery('')}
-          />
-          <SelectField value={tag} onValueChange={setTag}>
-            <SelectItem value="all">All tags</SelectItem>
-            {tags.map(value => (
-              <SelectItem key={value} value={value}>
-                {value}
-              </SelectItem>
-            ))}
-          </SelectField>
-        </div>
-      )}
+      {sectionOpen && (
+        <div id="dm-campaign-magic-item-library-section">
+          {items.length > 0 && (
+            <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_200px]">
+              <Input
+                value={query}
+                onChange={event => setQuery(event.target.value)}
+                placeholder="Search name, group, rarity, or tag…"
+                leftIcon={<Search size={15} />}
+                clearable
+                onClear={() => setQuery('')}
+              />
+              <SelectField value={tag} onValueChange={setTag}>
+                <SelectItem value="all">All tags</SelectItem>
+                {tags.map(value => (
+                  <SelectItem key={value} value={value}>
+                    {value}
+                  </SelectItem>
+                ))}
+              </SelectField>
+            </div>
+          )}
 
-      {items.length === 0 ? (
-        <div className="border-divider bg-surface-secondary rounded-lg border-2 border-dashed p-8 text-center">
-          <Sparkles size={36} className="text-faint mx-auto mb-2" />
-          <p className="text-muted text-sm">
-            No custom magic items yet. Start from any compendium item or a blank
-            form.
-          </p>
-        </div>
-      ) : filtered.length === 0 ? (
-        <p className="text-muted py-8 text-center text-sm">
-          No items match these filters.
-        </p>
-      ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map(item => (
-            <Card key={item.id}>
-              <CardContent className="space-y-3 p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h4 className="text-heading font-semibold">{item.name}</h4>
-                    <p className="text-muted text-xs">
-                      {item.group || 'Ungrouped'}
-                    </p>
-                  </div>
-                  <Badge variant="primary" size="sm">
-                    {item.rarity}
-                  </Badge>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {item.tags.map(value => (
-                    <Badge key={value} variant="neutral" size="sm">
-                      {value}
-                    </Badge>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  <Button
-                    variant="secondary"
-                    size="xs"
-                    leftIcon={<Gift size={13} />}
-                    onClick={() => setGiving(item)}
-                  >
-                    Give copy
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    aria-label={`Edit ${item.name}`}
-                    onClick={() => {
-                      setEditing(item);
-                      setEditorOpen(true);
-                    }}
-                  >
-                    <Edit3 size={14} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    aria-label={`Duplicate ${item.name}`}
-                    onClick={() => duplicateItem(campaignCode, item.id)}
-                  >
-                    <Copy size={14} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    aria-label={`Delete ${item.name}`}
-                    onClick={() => setDeleting(item)}
-                  >
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {items.length === 0 ? (
+            <div className="border-divider bg-surface-secondary rounded-lg border-2 border-dashed p-8 text-center">
+              <Sparkles size={36} className="text-faint mx-auto mb-2" />
+              <p className="text-muted text-sm">
+                No custom magic items yet. Start from any compendium item or a
+                blank form.
+              </p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="text-muted py-8 text-center text-sm">
+              No items match these filters.
+            </p>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {filtered.map(item => (
+                <Card key={item.id}>
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="text-heading font-semibold">
+                          {item.name}
+                        </h4>
+                        <p className="text-muted text-xs">
+                          {item.group || 'Ungrouped'}
+                        </p>
+                      </div>
+                      <Badge variant="primary" size="sm">
+                        {item.rarity}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {item.tags.map(value => (
+                        <Badge key={value} variant="neutral" size="sm">
+                          {value}
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      <Button
+                        variant="secondary"
+                        size="xs"
+                        leftIcon={<Gift size={13} />}
+                        onClick={() => setGiving(item)}
+                      >
+                        Give copy
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        aria-label={`Edit ${item.name}`}
+                        onClick={() => {
+                          setEditing(item);
+                          setEditorOpen(true);
+                        }}
+                      >
+                        <Edit3 size={14} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        aria-label={`Duplicate ${item.name}`}
+                        onClick={() => duplicateItem(campaignCode, item.id)}
+                      >
+                        <Copy size={14} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        aria-label={`Delete ${item.name}`}
+                        onClick={() => setDeleting(item)}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

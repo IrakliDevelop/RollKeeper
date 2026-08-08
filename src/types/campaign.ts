@@ -29,12 +29,13 @@ export interface CampaignInfo {
   bannerUrl?: string; // S3 URL for campaign banner image
   /** House rule: allow players to stack more than one Heroic Inspiration. Default false. */
   stackableInspiration?: boolean;
-  /** DM campaign page: collapsible Players / NPCs sections (persisted in localStorage). */
+  /** DM campaign page: collapsible dashboard sections (persisted in localStorage). */
   dmDashboardUi?: {
     playersSectionOpen?: boolean;
     /** House Rules card on the DM campaign page. Default collapsed. */
     houseRulesSectionOpen?: boolean;
     npcSectionOpen?: boolean;
+    magicItemLibrarySectionOpen?: boolean;
     /** Group headers under NPC section (when NPCs use groups); names of collapsed groups. */
     npcCollapsedGroupNames?: string[];
     /** Show slot pips inline inside each spell level header in NPC spell tab. */
