@@ -9,7 +9,6 @@ import {
   Gift,
   Plus,
   Search,
-  Sparkles,
   Trash2,
   UserRound,
 } from 'lucide-react';
@@ -23,6 +22,7 @@ import {
   SelectSeparator,
 } from '@/components/ui/forms/select';
 import { Badge } from '@/components/ui/layout/badge';
+import { AppIcon } from '@/components/ui/icons';
 import { Card, CardContent } from '@/components/ui/layout/card';
 import {
   Dialog,
@@ -187,8 +187,12 @@ export function MagicItemLibrarySection({
               id="magic-item-library-heading"
               className="text-heading flex items-center gap-2 text-lg font-semibold"
             >
-              <Sparkles size={20} className="text-accent-purple-text" /> Magic
-              Item Library ({items.length})
+              <AppIcon
+                name="magicItem"
+                size={20}
+                className="text-accent-purple-text"
+              />{' '}
+              Magic Item Library ({items.length})
             </h3>
             <p className="text-muted text-sm">
               Reusable campaign templates stay here after you give out a copy.
@@ -233,7 +237,11 @@ export function MagicItemLibrarySection({
 
           {items.length === 0 ? (
             <div className="border-divider bg-surface-secondary rounded-lg border-2 border-dashed p-8 text-center">
-              <Sparkles size={36} className="text-faint mx-auto mb-2" />
+              <AppIcon
+                name="magicItem"
+                size={36}
+                className="text-faint mx-auto mb-2"
+              />
               <p className="text-muted text-sm">
                 No custom magic items yet. Start from any compendium item or a
                 blank form.
