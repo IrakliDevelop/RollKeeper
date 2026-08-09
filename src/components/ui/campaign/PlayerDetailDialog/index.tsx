@@ -1,7 +1,13 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { MessageSquare, Package, ScrollText, Wand2 } from 'lucide-react';
+import {
+  Download,
+  MessageSquare,
+  Package,
+  ScrollText,
+  Wand2,
+} from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import {
   Dialog,
@@ -16,6 +22,7 @@ import { InventoryTab } from './InventoryTab';
 import { SpellsTab, characterHasSpellsToShow } from './SpellsTab';
 import { ensureArray } from './shared';
 import { CampaignPlayerData } from '@/types/campaign';
+import { exportCharacterStateToFile } from '@/utils/fileOperations';
 
 type DetailTab = 'overview' | 'spells' | 'inventory';
 
@@ -101,16 +108,27 @@ export function PlayerDetailDialog({
               {char.race || 'Unknown'} · {char.alignment || 'Unaligned'} ·
               Player: {player.playerName}
             </p>
-            {onSendMessage && (
+            <div className="flex shrink-0 items-center gap-1">
               <Button
                 variant="ghost"
                 size="sm"
-                leftIcon={<MessageSquare size={14} />}
-                onClick={onSendMessage}
+                leftIcon={<Download size={14} />}
+                onClick={() => exportCharacterStateToFile(char)}
+                title="Download a player-compatible character backup"
               >
-                Message
+                Export JSON
               </Button>
-            )}
+              {onSendMessage && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<MessageSquare size={14} />}
+                  onClick={onSendMessage}
+                >
+                  Message
+                </Button>
+              )}
+            </div>
           </div>
         </DialogHeader>
 
