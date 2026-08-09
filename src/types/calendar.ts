@@ -58,6 +58,7 @@ export interface CalendarConfig {
   eras: Era[];
   yearOffset: number; // added to raw year for display
   yearStartWeekdayOffset: number; // which weekday index year 0 day 0 falls on
+  weekStartsOn?: number; // weekday index shown in the first column (defaults to 0)
   mechanics: MechanicsConfig;
 }
 

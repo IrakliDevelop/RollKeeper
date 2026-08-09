@@ -19,6 +19,7 @@ import {
 } from '@/utils/calendarCalculations';
 import {
   createDefaultCalendar,
+  createBarovianCalendar,
   createHarptosCalendar,
   createGreyhawkCalendar,
 } from '@/utils/calendarPresets';
@@ -285,6 +286,26 @@ describe('getAllMoonPhases', () => {
 // ── Grid ────────────────────────────────────────────────────────
 
 describe('getMonthGrid', () => {
+  it('shows the default calendar Monday-first', () => {
+    const grid = getMonthGrid(1, 0, defaultConfig);
+    expect(defaultConfig.weekStartsOn).toBe(1);
+    expect(grid[0][6]).toBe(0);
+  });
+
+  it('keeps the Barovian calendar Sunday-first', () => {
+    const barovia = createBarovianCalendar();
+    const grid = getMonthGrid(1, 0, barovia);
+    expect(barovia.weekStartsOn).toBe(0);
+    expect(grid[0][0]).toBe(0);
+  });
+
+  it('uses the configured first visible weekday without changing dates', () => {
+    const sundayFirst = { ...defaultConfig, weekStartsOn: 0 };
+    const mondayFirst = { ...defaultConfig, weekStartsOn: 1 };
+    expect(getMonthGrid(1, 0, sundayFirst)[0][0]).toBe(0);
+    expect(getMonthGrid(1, 0, mondayFirst)[0][6]).toBe(0);
+  });
+
   it('returns correct number of days for a 30-day month', () => {
     const grid = getMonthGrid(1, 0, defaultConfig);
     const actualDays = grid.flat().filter(d => d !== null);
@@ -325,7 +346,7 @@ describe('getMonthGrid', () => {
 
   it('pads first week with nulls when month starts mid-week', () => {
     // Use a config where month 1 starts on a non-zero weekday
-    const grid = getMonthGrid(1, 1, defaultConfig);
+    const grid = getMonthGrid(1, 1, { ...defaultConfig, weekStartsOn: 0 });
     const firstWeek = grid[0];
     // Month 0 has 30 days, day 30 with 7-day week: 30 % 7 = 2 → month 1 starts on weekday 2
     const leadingNulls = firstWeek.filter(d => d === null).length;

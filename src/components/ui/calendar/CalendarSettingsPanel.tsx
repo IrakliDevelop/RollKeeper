@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import type { CalendarConfig } from '@/types/calendar';
 
 interface CalendarSettingsPanelProps {
@@ -23,6 +24,10 @@ export function CalendarSettingsPanel({
   onSave,
 }: CalendarSettingsPanelProps) {
   const [draft, setDraft] = useState<CalendarConfig>(config);
+  const visibleWeekStart =
+    (((draft.weekStartsOn ?? 0) % draft.weekDays.length) +
+      draft.weekDays.length) %
+    draft.weekDays.length;
 
   const update = <K extends keyof CalendarConfig>(
     key: K,
@@ -473,13 +478,28 @@ export function CalendarSettingsPanel({
             helperText="The year number shown at time zero"
           />
           <NumberInput
-            label="First Day of Week"
+            label="Year Starts On"
             min={0}
             max={draft.weekDays.length - 1}
             value={draft.yearStartWeekdayOffset}
             onChange={v => update('yearStartWeekdayOffset', v ?? 0)}
-            helperText={`0 = ${draft.weekDays[0]?.name ?? 'first day'}`}
+            helperText={`Weekday index for the first date (0 = ${draft.weekDays[0]?.name ?? 'first day'})`}
           />
+          <SelectField
+            label="Week Starts On"
+            value={String(visibleWeekStart)}
+            onValueChange={value => update('weekStartsOn', Number(value))}
+            helperText="The first column in month view"
+          >
+            {draft.weekDays.map((weekday, index) => (
+              <SelectItem
+                key={`${weekday.name}-${index}`}
+                value={String(index)}
+              >
+                {weekday.name}
+              </SelectItem>
+            ))}
+          </SelectField>
           <NumberInput
             label="Long Rest (hours)"
             min={1}

@@ -64,6 +64,7 @@ export function createDefaultCalendar(): CalendarConfig {
     eras: [{ name: 'Common Era', abbreviation: 'CE', startYear: 1 }],
     yearOffset: 1,
     yearStartWeekdayOffset: 0,
+    weekStartsOn: 1,
     mechanics: {
       hoursPerLongRest: 8,
       minutesPerShortRest: 60,
@@ -146,6 +147,7 @@ export function createHarptosCalendar(): CalendarConfig {
     eras: [{ name: 'Dalereckoning', abbreviation: 'DR', startYear: 1 }],
     yearOffset: 1490,
     yearStartWeekdayOffset: 0,
+    weekStartsOn: 0,
     mechanics: {
       hoursPerLongRest: 8,
       minutesPerShortRest: 60,
@@ -227,6 +229,7 @@ export function createGreyhawkCalendar(): CalendarConfig {
     eras: [{ name: 'Common Year', abbreviation: 'CY', startYear: 1 }],
     yearOffset: 591,
     yearStartWeekdayOffset: 0,
+    weekStartsOn: 0,
     mechanics: {
       hoursPerLongRest: 8,
       minutesPerShortRest: 60,
@@ -309,6 +312,7 @@ export function createBarovianCalendar(): CalendarConfig {
     eras: [{ name: 'AC', abbreviation: 'AC', startYear: 1 }], // homebrew era
     yearOffset: 1,
     yearStartWeekdayOffset: 0,
+    weekStartsOn: 0,
     mechanics: {
       hoursPerLongRest: 8,
       minutesPerShortRest: 60,
