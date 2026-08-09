@@ -190,6 +190,14 @@ export function CalendarGrid({
   showMoonPhases = true,
 }: CalendarGridProps) {
   const grid = getMonthGrid(browseYear, browseMonth, config);
+  const weekStartsOn =
+    (((config.weekStartsOn ?? 0) % config.weekDays.length) +
+      config.weekDays.length) %
+    config.weekDays.length;
+  const displayedWeekDays = config.weekDays.map(
+    (_, index) =>
+      config.weekDays[(index + weekStartsOn) % config.weekDays.length]
+  );
   const isCurrentMonth =
     currentDate.year === browseYear && currentDate.month === browseMonth;
 
@@ -258,9 +266,9 @@ export function CalendarGrid({
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              {config.weekDays.map(wd => (
+              {displayedWeekDays.map((wd, index) => (
                 <th
-                  key={wd.name}
+                  key={`${wd.name}-${index}`}
                   className="text-muted border-divider border-b px-1 py-2 text-center text-xs font-medium"
                 >
                   <span className="hidden sm:inline">{wd.name}</span>
