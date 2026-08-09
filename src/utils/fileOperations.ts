@@ -1,5 +1,6 @@
-import { CharacterExport } from '@/types/character';
+import { CharacterExport, CharacterState } from '@/types/character';
 import type { PlayerCharacter } from '@/store/playerStore';
+import { APP_VERSION } from '@/utils/constants';
 
 /** A full-roster backup bundle (every character in one file). */
 export interface CharacterBackup {
@@ -69,6 +70,19 @@ export const exportCharacterToFile = (exportData: CharacterExport): void => {
   document.body.appendChild(linkElement);
   linkElement.click();
   document.body.removeChild(linkElement);
+};
+
+/**
+ * Export a character snapshot received from campaign sync. This deliberately
+ * uses the same wrapper as the player-side export so the downloaded file can
+ * be imported without any recovery-specific conversion.
+ */
+export const exportCharacterStateToFile = (character: CharacterState): void => {
+  exportCharacterToFile({
+    version: APP_VERSION,
+    exportDate: new Date().toISOString(),
+    character,
+  });
 };
 
 /**
