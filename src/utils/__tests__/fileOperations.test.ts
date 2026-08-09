@@ -20,7 +20,7 @@ describe('exportCharacterStateToFile', () => {
     exportCharacterStateToFile(character);
 
     expect(click).toHaveBeenCalledOnce();
-    const link = click.mock.instances[0];
+    const link = click.mock.instances[0] as HTMLAnchorElement;
     expect(link.download).toBe('recovered_hero_2026-08-09.json');
 
     const encodedJson = link.href.split(',')[1];
