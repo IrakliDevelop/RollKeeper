@@ -194,12 +194,29 @@ function drawLabel(
   ctx.fillText(label, cx, labelY);
 }
 
-/** Stable key for `onMarkerDataIssue` dedupe: status + a stable serialisation
- * of the raw element data. Wrapped so a pathological payload cannot throw
- * out of the painter. */
+/** `JSON.stringify` replacer that sorts object keys alphabetically (applied
+ * at every nesting level, since the replacer runs per key) so two
+ * semantically identical payloads with different key insertion order
+ * serialise to the same string. */
+function sortKeysReplacer(_key: string, value: unknown): unknown {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    return Object.keys(value as Record<string, unknown>)
+      .sort()
+      .reduce<Record<string, unknown>>((sorted, key) => {
+        sorted[key] = (value as Record<string, unknown>)[key];
+        return sorted;
+      }, {});
+  }
+  return value;
+}
+
+/** Stable key for `onMarkerDataIssue` dedupe: status + a key-order-independent
+ * serialisation of the raw element data, so two semantically identical bad
+ * payloads never spuriously re-emit. Wrapped so a pathological payload
+ * cannot throw out of the painter. */
 function issueKey(status: string, rawData: unknown): string {
   try {
-    return `${status}:${JSON.stringify(rawData)}`;
+    return `${status}:${JSON.stringify(rawData, sortKeysReplacer)}`;
   } catch {
     return `${status}:unserializable`;
   }
@@ -218,16 +235,34 @@ function buildIssue(
   return { elementId, status: 'unsupported' };
 }
 
+interface DiscGeometry {
+  minDim: number;
+  radius: number;
+  cx: number;
+  cy: number;
+}
+
+/**
+ * Shared disc geometry for both the valid and fallback paint paths, so a
+ * future edit to one cannot silently misalign the other. Radius derives from
+ * `min(w, h)` — never `max`, never `w` alone — so a 120x40 element gets the
+ * same disc as a 40x40 one.
+ */
+function discGeometry(size: Readonly<{ w: number; h: number }>): DiscGeometry {
+  const minDim = Math.min(size.w, size.h);
+  const radius = (minDim * MARKER_ICON_SCALE) / 2;
+  const cx = size.w / 2;
+  const cy = radius;
+  return { minDim, radius, cx, cy };
+}
+
 function paintValid(
   ctx: CanvasRenderingContext2D,
   size: Readonly<{ w: number; h: number }>,
   zoom: number,
   data: MarkerElementDataV1
 ): void {
-  const minDim = Math.min(size.w, size.h);
-  const radius = (minDim * MARKER_ICON_SCALE) / 2;
-  const cx = size.w / 2;
-  const cy = radius;
+  const { minDim, radius, cx, cy } = discGeometry(size);
 
   drawDisc(
     ctx,
@@ -248,10 +283,7 @@ function paintFallback(
   ctx: CanvasRenderingContext2D,
   size: Readonly<{ w: number; h: number }>
 ): void {
-  const minDim = Math.min(size.w, size.h);
-  const radius = (minDim * MARKER_ICON_SCALE) / 2;
-  const cx = size.w / 2;
-  const cy = radius;
+  const { radius, cx, cy } = discGeometry(size);
 
   drawDisc(ctx, cx, cy, radius, MARKER_NEUTRAL_CSS);
   drawNeutralGlyph(ctx, cx, cy, radius);

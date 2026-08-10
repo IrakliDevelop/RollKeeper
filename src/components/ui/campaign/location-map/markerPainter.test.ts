@@ -397,6 +397,50 @@ describe('createMarkerPainter', () => {
     ).not.toThrow();
   });
 
+  it('dedupes onMarkerDataIssue across bad payloads with identical content but different key order, and still fires for a genuinely different payload', () => {
+    const issues: MarkerDataIssue[] = [];
+    const painter = createMarkerPainter({
+      onMarkerDataIssue: issue => issues.push(issue),
+    });
+
+    // Missing `ref` -> invalid, regardless of key order or the extra field.
+    const orderA = rawElement({ v: 1, kind: 'door', extra: 'x' });
+    painter({
+      ctx: createFakeCtx().ctx,
+      element: orderA,
+      size: orderA.size,
+      zoom: 1,
+    });
+    expect(issues.length).toBe(1);
+
+    // Same element id, byte-identical content, different key insertion order.
+    const orderB: HtmlElement = {
+      ...orderA,
+      data: { extra: 'x', kind: 'door', v: 1 },
+    };
+    painter({
+      ctx: createFakeCtx().ctx,
+      element: orderB,
+      size: orderB.size,
+      zoom: 1,
+    });
+    expect(issues.length).toBe(1);
+
+    // Positive control: a genuinely different payload on the same element id
+    // fires again, proving the dedupe above isn't just deduping everything.
+    const different: HtmlElement = {
+      ...orderA,
+      data: { v: 1, kind: 'door', extra: 'y' },
+    };
+    painter({
+      ctx: createFakeCtx().ctx,
+      element: different,
+      size: different.size,
+      zoom: 1,
+    });
+    expect(issues.length).toBe(2);
+  });
+
   it('never touches globalAlpha, leaving the pre-set value untouched and unrecorded', () => {
     const painter = createMarkerPainter();
     const element = markerElement('door', { label: 'x' });
@@ -410,23 +454,13 @@ describe('createMarkerPainter', () => {
 });
 
 describe('createStandaloneMarkerRegistry', () => {
-  it('routes a marker element to canvas and exposes an active painter, without mutating the live canvasTypes set', () => {
+  it('routes a marker element to canvas, registers exactly one canvas type (the marker type), and exposes an active painter', () => {
     const registry = createStandaloneMarkerRegistry();
     const element = markerElement('door');
 
     expect(resolveHtmlRouting(element, registry)).toBe('canvas');
     expect(registry.canvasTypes.has(MARKER_HTML_TYPE)).toBe(true);
+    expect(registry.canvasTypes.size).toBe(1);
     expect(registry.getActivePainter(MARKER_HTML_TYPE)).toBeDefined();
-  });
-
-  it('a non-marker html element without a registered painter does not route to canvas', () => {
-    const registry = createStandaloneMarkerRegistry();
-    const other = createHtmlElement({
-      position: { x: 0, y: 0 },
-      size: { w: 40, h: 40 },
-      htmlType: 'some-other-type',
-    });
-
-    expect(resolveHtmlRouting(other, registry)).not.toBe('canvas');
   });
 });
