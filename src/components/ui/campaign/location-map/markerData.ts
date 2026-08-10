@@ -148,7 +148,7 @@ export function parseMarkerData(data: unknown): MarkerDataResult {
 
   const { v, kind, ref, label, color } = data;
 
-  if (typeof v !== 'number' || !Number.isInteger(v) || Number.isNaN(v)) {
+  if (typeof v !== 'number' || !Number.isInteger(v)) {
     return { status: 'invalid', reason: 'marker data v is not an integer' };
   }
   if (v > 1) {

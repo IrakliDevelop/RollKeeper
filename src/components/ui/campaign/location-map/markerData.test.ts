@@ -83,9 +83,15 @@ describe('normalizeMarkerLabel', () => {
   });
 
   it('caps a mixed BMP + astral label at 40 code points with no unpaired surrogate', () => {
-    const input = 'a'.repeat(20) + '😀'.repeat(30); // 50 code points total
+    // The BMP prefix is an ODD length (21) so that a naive UTF-16
+    // `slice(0, 40)` — which counts code *units*, not code points — lands
+    // mid-surrogate-pair: 21 BMP units + 19 more units is an odd number of
+    // units into the emoji run, i.e. a lone high surrogate at the cut. A
+    // correct code-point-aware cap never produces that, so this only passes
+    // when the surrogate-pair-safe implementation is in place.
+    const input = 'a'.repeat(21) + '😀'.repeat(30); // 51 code points total
     const result = normalizeMarkerLabel(input) as string;
-    expect(result).toBe('a'.repeat(20) + '😀'.repeat(20));
+    expect(result).toBe('a'.repeat(21) + '😀'.repeat(19));
     expect(Array.from(result).length).toBe(40);
     // A cut that split a surrogate pair would leave a lone high surrogate
     // (0xD800-0xDBFF) as the last UTF-16 code unit.
@@ -198,7 +204,7 @@ describe('parseMarkerData', () => {
     const result = parseMarkerData(fixture({ kind: 'portal' }));
     expect(result.status).toBe('unsupported');
     if (result.status === 'unsupported') {
-      expect(result.version).toBeUndefined();
+      expect('version' in result).toBe(false);
     }
   });
 
@@ -209,6 +215,26 @@ describe('parseMarkerData', () => {
       expect(result.status).toBe('invalid');
     }
   );
+
+  it('is invalid for an array-shaped payload that is otherwise well-formed (array guard)', () => {
+    // Array.isArray(arrayPayload) is true and typeof arrayPayload === 'object',
+    // so only the `!Array.isArray(data)` clause in isRecord can reject this.
+    // Every other field (v, kind, ref, label, color) is copied straight from
+    // the well-formed fixture, so nothing downstream would reject it either.
+    const arrayPayload = Object.assign([], fixture());
+    const result = parseMarkerData(arrayPayload);
+    expect(result.status).toBe('invalid');
+  });
+
+  it('is invalid for a function-shaped payload that is otherwise well-formed (typeof guard)', () => {
+    // typeof a function is 'function', not 'object', so only the
+    // `typeof data === 'object'` clause in isRecord can reject this. A
+    // function can carry arbitrary own properties, so v/kind/ref/label/color
+    // are all readable off it exactly as they would be off a plain record.
+    const fnPayload = Object.assign(function marker() {}, fixture());
+    const result = parseMarkerData(fnPayload);
+    expect(result.status).toBe('invalid');
+  });
 
   it('is invalid when v is missing', () => {
     expect(parseMarkerData(omit(fixture(), 'v')).status).toBe('invalid');
