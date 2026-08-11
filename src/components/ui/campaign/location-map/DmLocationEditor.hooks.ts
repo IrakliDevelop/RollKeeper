@@ -57,12 +57,17 @@ import {
   type FocusBroadcastHandle,
 } from './focusSync';
 import { DmMarkerTool, type PlaceMarkerRequest } from './DmMarkerTool';
-import { MARKER_MIXED_AUDIENCE_MESSAGE } from './markerAudienceCopy';
+import { applyMarkerAudienceToggle } from './markerAudienceToggle';
 import { buildPublicMarkerDetails } from './markerPublication';
 import { markerRefForElement } from './markerWrites';
 import { MARKER_DEFAULT_COLOR_KEY } from './markerPainter';
+import type { MarkerDataIssue } from './markerPainter';
 import type { MarkerColorKey, MarkerKind } from './markerData';
-import { useMarkerRegistration } from './useMarkerRegistration';
+import {
+  CANVAS_WRITING_TOOL_NAMES,
+  useMarkerRegistration,
+} from './useMarkerRegistration';
+import { useCloseMarkerPanelOnRemove } from './useCloseMarkerPanelOnRemove';
 import { useMarkerWrites } from './useMarkerWrites';
 import { resolveMarkerPanelState } from './MarkerDetailPanel/MarkerDetailPanel.utils';
 import type { MarkerPanelState } from './MarkerDetailPanel/MarkerDetailPanel.types';
@@ -251,6 +256,7 @@ export function useDmLocationEditor(
   const laserCleanupRef = useRef<(() => void) | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
   const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
+  const markerAddGuardUnsubRef = useRef<(() => void) | null>(null);
   const selectionUnsubRef = useRef<(() => void) | null>(null);
   const [syncStatus, setSyncStatus] = useState<
     BattleMapConnectionStatus | 'disabled'
@@ -377,6 +383,14 @@ export function useDmLocationEditor(
     });
   };
 
+  // Same staleness reasoning again: both of these are reached from
+  // subscriptions installed once inside `handleReady`, which outlive every
+  // `markerWrites` identity.
+  const guardLocalMarkerAddRef = useRef(markerWrites.guardLocalMarkerAdd);
+  guardLocalMarkerAddRef.current = markerWrites.guardLocalMarkerAdd;
+  const gcOrphanMarkerDetailsRef = useRef(markerWrites.gcOrphanMarkerDetails);
+  gcOrphanMarkerDetailsRef.current = markerWrites.gcOrphanMarkerDetails;
+
   // Loading states
   const [syncing, setSyncing] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
@@ -443,6 +457,16 @@ export function useDmLocationEditor(
     setActiveMarkerElementId(event.element.id);
   }, []);
 
+  const handleMarkerDataIssue = useCallback((issue: MarkerDataIssue) => {
+    // A DM surface: the operator here can actually act on a malformed pin.
+    // The player and display surfaces stay silent.
+    console.warn(
+      `[markers] element ${issue.elementId} has ${issue.status} marker data` +
+        (issue.reason ? `: ${issue.reason}` : '') +
+        (issue.version !== undefined ? ` (v${issue.version})` : '')
+    );
+  }, []);
+
   // OUTSIDE the relay guard in `handleReady`, and NOT part of `laserCleanups`
   // or any other connection-scoped cleanup: painter registration and
   // activation are connection-independent (spec §7.2). Also unconditional
@@ -452,7 +476,14 @@ export function useDmLocationEditor(
     viewport,
     gesture: 'double',
     onActivateMarker: handleMarkerActivate,
+    onMarkerDataIssue: handleMarkerDataIssue,
     isCameraBusy: () => localAnimatorRef.current?.animating ?? false,
+    // Read the ACTIVE TOOL at gesture time — see the twin comment in
+    // `dm-vtt/DmBattleMapCanvas.hooks.ts`.
+    isActivationSuppressed: () =>
+      CANVAS_WRITING_TOOL_NAMES.has(
+        vpRef.current?.toolManager.activeTool?.name ?? ''
+      ),
   });
 
   const activeMarkerElement =
@@ -473,6 +504,14 @@ export function useDmLocationEditor(
   const handleCloseMarkerPanel = useCallback(() => {
     setActiveMarkerElementId(null);
   }, []);
+
+  // `activeMarkerElement` above is a bare render-time `getById` with no store
+  // subscription — without this the panel would survive its own element.
+  useCloseMarkerPanelOnRemove(
+    viewport,
+    activeMarkerElementId,
+    handleCloseMarkerPanel
+  );
 
   const handleSaveMarkerDetail = useCallback(
     (patch: { title: string; body: string; dmNotes: string }) => {
@@ -530,6 +569,13 @@ export function useDmLocationEditor(
       if (location.canvasState && location.canvasState.trim().length > 0) {
         try {
           vp.loadJSON(location.canvasState);
+          // §6.8: the ONLY point orphan GC may run — a fully successful
+          // deserialization, with refs extracted from the state just loaded.
+          // On the `catch` path below the canvas did NOT load, so GC must not
+          // run there: it would tombstone details whose pins were simply
+          // unreadable. Without a caller the soft delete never runs at all
+          // and detail records, `dmNotes` included, accumulate forever.
+          gcOrphanMarkerDetailsRef.current(location.canvasState);
           const migrated = migrateCanvasToContract(vp, 'dm');
           pinGridToMapLayer(vp);
           _fitCameraToMap(vp, location.mapImageSize);
@@ -584,6 +630,19 @@ export function useDmLocationEditor(
         useBattleMapStore
           .getState()
           .setDmOnly(campaignCode, location.id, element.id, true);
+      });
+
+      // Markers are DM-only by DEFAULT, so unlike the hidden-placement
+      // listener above this one is unconditional — not gated on a toggle, and
+      // not gated on `mode` either (a location map can hold markers too;
+      // `useMarkerWrites` routes the write to whichever store `mode` selects).
+      // Registered BEFORE the live connection below so the mark lands before
+      // the sync client resolves this element's audience, and AFTER
+      // `loadJSON`, because `ElementStore.loadSnapshot` replays an `add` for
+      // every persisted element with no origin meta.
+      markerAddGuardUnsubRef.current?.();
+      markerAddGuardUnsubRef.current = vp.store.on('add', (element, meta) => {
+        guardLocalMarkerAddRef.current(element, meta);
       });
 
       pinUnsubRef.current?.();
@@ -803,6 +862,7 @@ export function useDmLocationEditor(
       connectionRef.current?.stop();
       pinUnsubRef.current?.();
       hiddenPlacementUnsubRef.current?.();
+      markerAddGuardUnsubRef.current?.();
       selectionUnsubRef.current?.();
     };
   }, []);
@@ -922,28 +982,17 @@ export function useDmLocationEditor(
   const handleToggleDmOnly = useCallback(() => {
     if (!selectedElementId) return;
 
-    // Markers move as a sibling SET: publication is `every`, not `some`
-    // (§6.4), so flipping one pin of a shared ref while its twins keep the
-    // old audience would produce a permanently unpublishable marker.
-    const markerRef = markerRefForElement(
-      getVp()?.store.getById(selectedElementId)
-    );
-    if (markerRef !== null) {
-      // Read the audience live rather than from the render-time `isDmOnly`:
-      // `dmOnlyElements` is reached through a store getter whose identity
-      // never changes, so a render-time snapshot can be one toggle behind.
-      const currentDmOnly =
-        storeGetLocation(campaignCode, location.id)?.dmOnlyElements ?? {};
-      const transition = markerWrites.setMarkerAudienceForRef(
-        markerRef,
-        currentDmOnly[selectedElementId] !== true
-      );
-      setMarkerAudienceNotice(
-        transition.status === 'refused' &&
-          transition.reason === 'mixed-audience'
-          ? MARKER_MIXED_AUDIENCE_MESSAGE
-          : null
-      );
+    // Markers move as a sibling SET (§6.4). ONE implementation, shared with
+    // `dm-vtt/DmBattleMapCanvas.hooks.ts` — see `markerAudienceToggle.ts`.
+    const outcome = applyMarkerAudienceToggle({
+      element: getVp()?.store.getById(selectedElementId),
+      selectedElementId,
+      readDmOnlyElements: () =>
+        storeGetLocation(campaignCode, location.id)?.dmOnlyElements ?? {},
+      setMarkerAudienceForRef: markerWrites.setMarkerAudienceForRef,
+    });
+    if (outcome.handled) {
+      setMarkerAudienceNotice(outcome.notice);
       return;
     }
 

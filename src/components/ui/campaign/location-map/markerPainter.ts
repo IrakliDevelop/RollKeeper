@@ -67,9 +67,8 @@ export interface MarkerPainterOptions {
 }
 
 /**
- * Draws the disc backdrop, shared by every status. Radius derives from
- * `min(w, h)` — never `max`, never `w` alone — so a 120x40 element gets the
- * same disc as a 40x40 one.
+ * Draws the disc backdrop, shared by every status. The `min(w, h)` radius rule
+ * lives in `discGeometry` below, which is the single owner of the geometry.
  */
 function drawDisc(
   ctx: CanvasRenderingContext2D,

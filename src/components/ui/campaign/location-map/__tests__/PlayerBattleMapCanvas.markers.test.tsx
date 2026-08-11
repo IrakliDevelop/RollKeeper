@@ -301,3 +301,79 @@ describe('PlayerBattleMapCanvas: no marker placement, no edit affordance, no kin
     controlVp.destroy();
   });
 });
+
+/**
+ * Panel staleness. `activeMarkerElement` is a bare render-time
+ * `viewport.store.getById(...)` with no store subscription, so when the DM
+ * hides a shared marker — the relay sends the player a REMOVE — the open panel
+ * would otherwise keep showing the pin's label and body until some unrelated
+ * re-render happened to knock it over.
+ */
+describe('PlayerBattleMapCanvas: an open marker panel does not outlive its element', () => {
+  beforeEach(() => {
+    mockActiveTool = 'hand';
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
+
+  it('removing the active element closes the panel; removing a DIFFERENT element leaves it open', () => {
+    stubCanvas();
+    const vp = makeViewport();
+    const activateSpy = vi.spyOn(vp, 'onElementActivate');
+
+    const { unmount } = renderPlayer({
+      markers: [{ id: 'ref-1', title: 'Cellar Door', body: 'Locked.' }],
+    });
+    fireReady(vp);
+
+    const makePin = (ref: string) =>
+      createHtmlElement({
+        position: { x: 0, y: 0 },
+        size: { w: 40, h: 40 },
+        htmlType: MARKER_HTML_TYPE,
+        data: { ...buildMarkerData({ kind: 'door', ref }) },
+      });
+    const active = makePin('ref-1');
+    const other = makePin('ref-2');
+    act(() => {
+      vp.store.add(active);
+      vp.store.add(other);
+    });
+
+    const listener = activateSpy.mock.calls[0]?.[0];
+    if (!listener) {
+      throw new Error(
+        'expected useMarkerRegistration to have subscribed via onElementActivate'
+      );
+    }
+    act(() => {
+      listener({
+        element: active,
+        world: { x: 0, y: 0 },
+        pointerType: 'touch',
+        gesture: 'single',
+      });
+    });
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // Positive control FIRST, same harness: an UNRELATED removal must not
+    // close the panel, so the assertion below cannot be satisfied by a
+    // listener that closes on every remove.
+    act(() => {
+      vp.store.remove(other.id);
+    });
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    act(() => {
+      vp.store.remove(active.id);
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    unmount();
+    vp.destroy();
+  });
+});

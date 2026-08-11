@@ -61,14 +61,19 @@ import {
   DmMarkerTool,
   type PlaceMarkerRequest,
 } from '@/components/ui/campaign/location-map/DmMarkerTool';
-import { MARKER_MIXED_AUDIENCE_MESSAGE } from '@/components/ui/campaign/location-map/markerAudienceCopy';
+import { applyMarkerAudienceToggle } from '@/components/ui/campaign/location-map/markerAudienceToggle';
 import { markerRefForElement } from '@/components/ui/campaign/location-map/markerWrites';
+import type { MarkerDataIssue } from '@/components/ui/campaign/location-map/markerPainter';
 import { MARKER_DEFAULT_COLOR_KEY } from '@/components/ui/campaign/location-map/markerPainter';
 import type {
   MarkerColorKey,
   MarkerKind,
 } from '@/components/ui/campaign/location-map/markerData';
-import { useMarkerRegistration } from '@/components/ui/campaign/location-map/useMarkerRegistration';
+import {
+  CANVAS_WRITING_TOOL_NAMES,
+  useMarkerRegistration,
+} from '@/components/ui/campaign/location-map/useMarkerRegistration';
+import { useCloseMarkerPanelOnRemove } from '@/components/ui/campaign/location-map/useCloseMarkerPanelOnRemove';
 import { useMarkerWrites } from '@/components/ui/campaign/location-map/useMarkerWrites';
 import { resolveMarkerPanelState } from '@/components/ui/campaign/location-map/MarkerDetailPanel/MarkerDetailPanel.utils';
 import type { MarkerPanelState } from '@/components/ui/campaign/location-map/MarkerDetailPanel/MarkerDetailPanel.types';
@@ -162,6 +167,7 @@ export function useDmBattleMapCanvas({
   const laserCleanupRef = useRef<(() => void) | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
   const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
+  const markerAddGuardUnsubRef = useRef<(() => void) | null>(null);
   const selectionUnsubRef = useRef<(() => void) | null>(null);
   const [hiddenPlacementActive, setHiddenPlacementActive] = useState(false);
   const hiddenPlacementActiveRef = useRef(false);
@@ -256,8 +262,29 @@ export function useDmBattleMapCanvas({
     });
   };
 
+  // The duplicate/paste/context-menu leak guard, reached through a ref for
+  // the same reason `handlePlaceMarkerRef` is: the `store.on('add')`
+  // subscription is installed once in `handleReady` and outlives every
+  // `markerWrites` identity.
+  const guardLocalMarkerAddRef = useRef(markerWrites.guardLocalMarkerAdd);
+  guardLocalMarkerAddRef.current = markerWrites.guardLocalMarkerAdd;
+  // Same reasoning for orphan GC, which runs once per canvas load.
+  const gcOrphanMarkerDetailsRef = useRef(markerWrites.gcOrphanMarkerDetails);
+  gcOrphanMarkerDetailsRef.current = markerWrites.gcOrphanMarkerDetails;
+
   const handleMarkerActivate = useCallback((event: ElementActivationEvent) => {
     setActiveMarkerElementId(event.element.id);
+  }, []);
+
+  const handleMarkerDataIssue = useCallback((issue: MarkerDataIssue) => {
+    // The DM is the operator who can act on a malformed pin (delete it,
+    // replace it), so this surface gets the diagnostic and the player /
+    // display surfaces stay silent.
+    console.warn(
+      `[markers] element ${issue.elementId} has ${issue.status} marker data` +
+        (issue.reason ? `: ${issue.reason}` : '') +
+        (issue.version !== undefined ? ` (v${issue.version})` : '')
+    );
   }, []);
 
   // OUTSIDE the `if (relayUrl)` guard in `handleReady`, and NOT part of
@@ -267,7 +294,17 @@ export function useDmBattleMapCanvas({
     viewport,
     gesture: 'double',
     onActivateMarker: handleMarkerActivate,
+    onMarkerDataIssue: handleMarkerDataIssue,
     isCameraBusy: () => localAnimatorRef.current?.animating ?? false,
+    // Read the ACTIVE TOOL at gesture time. Core's activation listens on the
+    // wrapper and never consults the tool manager, so without this a
+    // double-tap with the marker tool opens a panel over the pin it just
+    // placed, and a double-tap with the eraser opens a panel on a pin that
+    // has already been deleted.
+    isActivationSuppressed: () =>
+      CANVAS_WRITING_TOOL_NAMES.has(
+        viewportRef.current?.toolManager.activeTool?.name ?? ''
+      ),
   });
 
   const activeMarkerElement =
@@ -288,6 +325,15 @@ export function useDmBattleMapCanvas({
   const handleCloseMarkerPanel = useCallback(() => {
     setActiveMarkerElementId(null);
   }, []);
+
+  // `activeMarkerElement` above is a bare render-time `getById` with no store
+  // subscription, so without this the panel would keep showing a pin deleted
+  // from another device (or by undo) until an unrelated re-render.
+  useCloseMarkerPanelOnRemove(
+    viewport,
+    activeMarkerElementId,
+    handleCloseMarkerPanel
+  );
 
   const handleSaveMarkerDetail = useCallback(
     (patch: { title: string; body: string; dmNotes: string }) => {
@@ -359,6 +405,13 @@ export function useDmBattleMapCanvas({
       if (battleMap?.canvasState && battleMap.canvasState.trim().length > 0) {
         try {
           vp.loadJSON(battleMap.canvasState);
+          // §6.8: the ONLY point orphan GC may run — a fully successful
+          // deserialization, with the refs extracted from the very state that
+          // was loaded. Anything earlier (or on a canvas that failed to load)
+          // would soft-delete details whose pins this client simply could not
+          // read. Without a caller the soft delete never happens at all and
+          // detail records, `dmNotes` included, accumulate forever.
+          gcOrphanMarkerDetailsRef.current(battleMap.canvasState);
         } catch {
           // Corrupt state — start with an empty canvas.
         }
@@ -414,6 +467,18 @@ export function useDmBattleMapCanvas({
         useBattleMapStore
           .getState()
           .setDmOnly(campaignCode, battleMapId, element.id, true);
+      });
+
+      // Markers are DM-only by DEFAULT, so unlike the hidden-placement
+      // listener above this one is unconditional — it is not gated on any
+      // toggle. Registered here, BEFORE the live connection below, so the
+      // mark lands before the sync client's own `add` listener resolves the
+      // element's audience for its first outbound upsert. Registered AFTER
+      // `loadJSON`, because `ElementStore.loadSnapshot` replays an `add` for
+      // every persisted element with no origin meta.
+      markerAddGuardUnsubRef.current?.();
+      markerAddGuardUnsubRef.current = vp.store.on('add', (element, meta) => {
+        guardLocalMarkerAddRef.current(element, meta);
       });
 
       pinUnsubRef.current?.();
@@ -574,6 +639,7 @@ export function useDmBattleMapCanvas({
       localAnimatorRef.current = null;
       connectionRef.current?.stop();
       pinUnsubRef.current?.();
+      markerAddGuardUnsubRef.current?.();
       selectionUnsubRef.current?.();
     };
   }, []);
@@ -628,26 +694,18 @@ export function useDmBattleMapCanvas({
   const handleToggleSelectedDmOnly = useCallback(() => {
     if (!viewport || !selectedElementId) return;
 
-    // Markers move as a sibling SET: publication is `every`, not `some`
-    // (§6.4), so flipping one pin of a shared ref while its twins keep the
-    // old audience would produce a permanently unpublishable marker.
-    const markerRef = markerRefForElement(
-      viewport.store.getById(selectedElementId)
-    );
-    if (markerRef !== null) {
-      const currentDmOnly =
+    // Markers move as a sibling SET (§6.4). ONE implementation, shared with
+    // `DmLocationEditor.hooks.ts` — see `markerAudienceToggle.ts`.
+    const outcome = applyMarkerAudienceToggle({
+      element: viewport.store.getById(selectedElementId),
+      selectedElementId,
+      readDmOnlyElements: () =>
         useBattleMapStore.getState().battleMaps[campaignCode]?.[battleMapId]
-          ?.dmOnlyElements ?? {};
-      const transition = markerWrites.setMarkerAudienceForRef(
-        markerRef,
-        currentDmOnly[selectedElementId] !== true
-      );
-      setMarkerAudienceNotice(
-        transition.status === 'refused' &&
-          transition.reason === 'mixed-audience'
-          ? MARKER_MIXED_AUDIENCE_MESSAGE
-          : null
-      );
+          ?.dmOnlyElements ?? {},
+      setMarkerAudienceForRef: markerWrites.setMarkerAudienceForRef,
+    });
+    if (outcome.handled) {
+      setMarkerAudienceNotice(outcome.notice);
       return;
     }
 

@@ -31,6 +31,7 @@ import {
   parseMarkerData,
 } from './markerData';
 import type { MarkerColorKey, MarkerKind } from './markerData';
+import { MARKER_ELEMENT_ZINDEX } from './tokenSnap';
 
 import type { MarkerDetail } from '@/types/battlemap';
 
@@ -106,6 +107,8 @@ export interface CreateMarkerInput {
   position: Point;
   size: Size;
   layerId: string;
+  /** Escape hatch for a caller that needs a different band. Omit it: the
+   *  default `MARKER_ELEMENT_ZINDEX` is what keeps a pin off the map floor. */
   zIndex?: number;
   title?: string;
   body?: string;
@@ -192,7 +195,11 @@ export function createMarker(
     position: input.position,
     size: input.size,
     layerId: input.layerId,
-    zIndex: input.zIndex,
+    // Never the `createHtmlElement` default of 0: at 0 a pin ties with every
+    // map background element and the SDK breaks (layerOrder, zIndex) ties by
+    // arrival order, so after a resync the pin can paint BENEATH the map.
+    // Same hazard, same remedy as tokens — see tokenSnap.ts's band table.
+    zIndex: input.zIndex ?? MARKER_ELEMENT_ZINDEX,
     htmlType: MARKER_HTML_TYPE,
     data: {
       ...buildMarkerData({
@@ -484,7 +491,10 @@ export function cloneMarkerForMap(
     position: overrides?.position ?? element.position,
     size: overrides?.size ?? element.size,
     layerId: overrides?.layerId ?? element.layerId,
-    zIndex: element.zIndex,
+    // The marker band, not `element.zIndex`: a source pin persisted before
+    // the band existed sits at 0, and a clone must not inherit the "paints
+    // under the map after a resync" hazard from it.
+    zIndex: MARKER_ELEMENT_ZINDEX,
     htmlType: MARKER_HTML_TYPE,
     data: {
       ...buildMarkerData({
@@ -507,6 +517,93 @@ export function cloneMarkerForMap(
       dmNotes: source?.dmNotes,
     }),
   };
+}
+
+export type MarkerAddGuardResult =
+  | {
+      status: 'ignored';
+      reason: 'remote-origin' | 'not-a-marker' | 'already-marked';
+    }
+  /** Marked DM-only. `rewrittenRef` is the fresh ref the pin now carries, or
+   *  `null` when the data could not be parsed and was left untouched. */
+  | { status: 'marked'; rewrittenRef: string | null }
+  /** The audience write did not land (map missing from product state), so
+   *  nothing further was attempted. The pin is on the canvas UNMARKED. */
+  | { status: 'mark-failed' };
+
+/**
+ * Fail-closed guard for markers that enter the canvas store by any route other
+ * than `createMarker`.
+ *
+ * `createMarker` owns the §6.7 ordering, but it is not the only way a marker
+ * element can reach the store. `@fieldnotes/core`'s own canvas actions —
+ * `duplicate` (`mod+d`), `copy`/`paste` (`mod+c` / `mod+v`) and the canvas
+ * context menu, all enabled by default — `structuredClone` the selected
+ * element, assign it a new id and call `store.add` directly. The clone has no
+ * `dmOnlyElements` entry, so `resolveAudience` returns `undefined` and the
+ * very first outbound upsert fans a `secret` or `trap` pin out to every player
+ * and the TV display. A hostile peer can inject the same shape.
+ *
+ * So the invariant this enforces is deliberately stronger than "the create
+ * function orders its writes correctly": NO element with
+ * `htmlType === MARKER_HTML_TYPE` may enter the store from a local origin
+ * without a DM-only mark.
+ *
+ * Two writes, in this order and no other:
+ *  1. `setDmOnly(id, true)` — synchronously, before any later `store.on('add')`
+ *     listener (the sync client's) can resolve this element's audience;
+ *  2. the ref rewrite — the clone gets its OWN ref and its own copy of the
+ *     original's detail content, so it is a fresh POI rather than a
+ *     mixed-audience sibling of the original. Without it, the shared ref is
+ *     permanently wedged: `setMarkerAudienceForRef` refuses every toggle on a
+ *     mixed sibling set and `buildPublicMarkerDetails` drops it, with no
+ *     repair affordance anywhere in the UI.
+ *
+ * Remote-origin adds are left completely alone — exactly as the hidden
+ * placement listener does — because a remote marker's audience is the
+ * originating DM's business, not this client's.
+ *
+ * Data that does not parse `valid` is still marked DM-only (fail closed) but
+ * its data is left alone: there is no trustworthy `ref` to rewrite.
+ */
+export function guardLocalMarkerAdd(
+  deps: MarkerWriteDeps,
+  element: Readonly<CanvasElement>,
+  meta?: { origin?: string }
+): MarkerAddGuardResult {
+  if (meta?.origin !== undefined && meta.origin !== 'local') {
+    return { status: 'ignored', reason: 'remote-origin' };
+  }
+  if (!isMarkerElement(element)) {
+    return { status: 'ignored', reason: 'not-a-marker' };
+  }
+  // The `createMarker` path already marked this id in step 3 of §6.7.
+  // Re-marking would fire a second, redundant product-state write.
+  if (deps.getDmOnlyElements()[element.id] === true) {
+    return { status: 'ignored', reason: 'already-marked' };
+  }
+
+  deps.setDmOnly(element.id, true);
+
+  // Read the mark back for the same reason `insertMarkerRecord` does: both
+  // stores' `setDmOnly` silently no-op when the map is missing, and an
+  // unverified mark is treated as no mark. Rewriting the ref against product
+  // state that cannot record anything would only orphan the detail.
+  if (deps.getDmOnlyElements()[element.id] !== true) {
+    return { status: 'mark-failed' };
+  }
+
+  const cloned = cloneMarkerForMap(element, deps.getMarkers(), () =>
+    nextId(deps)
+  );
+  if (!cloned) return { status: 'marked', rewrittenRef: null };
+
+  deps.setMarkers([...deps.getMarkers(), cloned.detail]);
+  // Only the DATA moves across: the element is already in the store under its
+  // own id, position and layer — `cloned.element` exists purely to carry the
+  // freshly-built, ref-rewritten payload.
+  deps.store.update(element.id, { data: cloned.element.data });
+  return { status: 'marked', rewrittenRef: cloned.detail.id };
 }
 
 /** Writes a clone into the TARGET map using the same §6.7 ordering as

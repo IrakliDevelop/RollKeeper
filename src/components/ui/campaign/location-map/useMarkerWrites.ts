@@ -19,7 +19,7 @@
 
 import { useCallback, useMemo } from 'react';
 
-import type { ElementStore } from '@fieldnotes/core';
+import type { CanvasElement, ElementStore } from '@fieldnotes/core';
 
 import {
   createMarker as createMarkerWrite,
@@ -27,11 +27,13 @@ import {
   editMarkerDetail as editMarkerDetailWrite,
   findMarkerDetail as findMarkerDetailPure,
   gcOrphanMarkerDetails as gcOrphanMarkerDetailsWrite,
+  guardLocalMarkerAdd as guardLocalMarkerAddWrite,
   setMarkerAudienceForRef as setMarkerAudienceForRefWrite,
 } from './markerWrites';
 import type {
   CreateMarkerInput,
   CreateMarkerResult,
+  MarkerAddGuardResult,
   MarkerAudienceTransition,
   MarkerElementStoreLike,
   MarkerWriteDeps,
@@ -69,6 +71,16 @@ export interface MarkerWrites {
     dmOnly: boolean
   ): MarkerAudienceTransition;
   gcOrphanMarkerDetails(canvasState: string | null | undefined): OrphanGcResult;
+  /**
+   * Wire this to `viewport.store.on('add')` on every surface that can author
+   * markers. It is what stops a `mod+d` duplicate, a paste or a context-menu
+   * clone from entering the canvas with no DM-only mark — see
+   * `guardLocalMarkerAdd`. A no-op when the viewport is not mounted yet.
+   */
+  guardLocalMarkerAdd(
+    element: Readonly<CanvasElement>,
+    meta?: { origin?: string }
+  ): MarkerAddGuardResult;
   findMarkerDetail(ref: string): MarkerDetail | undefined;
   markers: readonly MarkerDetail[];
 }
@@ -268,6 +280,20 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
     [depsFor]
   );
 
+  const guardLocalMarkerAdd = useCallback(
+    (
+      element: Readonly<CanvasElement>,
+      meta?: { origin?: string }
+    ): MarkerAddGuardResult => {
+      const viewport = getViewport();
+      // No viewport means no store to rewrite the ref in — and no store that
+      // could have emitted this add in the first place.
+      if (!viewport) return { status: 'ignored', reason: 'not-a-marker' };
+      return guardLocalMarkerAddWrite(depsFor(viewport), element, meta);
+    },
+    [getViewport, depsFor]
+  );
+
   const findMarkerDetail = useCallback(
     (ref: string): MarkerDetail | undefined =>
       findMarkerDetailPure(depsFor(null).getMarkers(), ref),
@@ -281,6 +307,7 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
       editMarkerDetail,
       setMarkerAudienceForRef,
       gcOrphanMarkerDetails,
+      guardLocalMarkerAdd,
       findMarkerDetail,
       markers,
     }),
@@ -290,6 +317,7 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
       editMarkerDetail,
       setMarkerAudienceForRef,
       gcOrphanMarkerDetails,
+      guardLocalMarkerAdd,
       findMarkerDetail,
       markers,
     ]
