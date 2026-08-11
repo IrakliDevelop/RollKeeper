@@ -17,8 +17,6 @@ import { Input } from '@/components/ui/forms/input';
 import { Textarea } from '@/components/ui/forms/textarea';
 import { cn } from '@/utils/cn';
 
-import type { MarkerDetail } from '@/types/battlemap';
-
 import {
   MARKER_PANEL_CONTAINMENT_CLASS,
   MARKER_PANEL_TOUCH_TARGET_CLASS,
@@ -106,9 +104,10 @@ function EditForm({
 
 /** Player read-only view. Title and body ride as plain JSX children — React
  * renders string children as text nodes, never parsed markup — so this must
- * never be swapped for `dangerouslySetInnerHTML`. `detail.dmNotes` is
- * intentionally never passed to this component at all. */
-function ReadOnlyView({ detail }: { detail: MarkerDetail }) {
+ * never be swapped for `dangerouslySetInnerHTML`. This component's prop type
+ * only accepts `title` and `body` strings — `dmNotes` is intentionally never
+ * passed to this component at all, and cannot be reached from inside it. */
+function ReadOnlyView({ title, body }: { title: string; body: string }) {
   return (
     <div className="flex flex-col gap-3">
       <h3
@@ -117,13 +116,13 @@ function ReadOnlyView({ detail }: { detail: MarkerDetail }) {
           MARKER_PANEL_CONTAINMENT_CLASS
         )}
       >
-        {detail.title}
+        {title}
       </h3>
       <div
         data-testid="marker-panel-body"
         className={cn('text-body text-sm', MARKER_PANEL_CONTAINMENT_CLASS)}
       >
-        {detail.body}
+        {body}
       </div>
     </div>
   );
@@ -163,10 +162,26 @@ function renderPanelBody(
         />
       );
     }
-    return <ReadOnlyView detail={state.detail} />;
+    return <ReadOnlyView title={state.detail.title} body={state.detail.body} />;
   }
 
   if (state.kind === 'missing-detail') {
+    // The resolver only ever produces `missing-detail` in DM mode (player
+    // mode gets `unpublished` instead), but this branch must not depend on
+    // callers upholding that — a `missing-detail` state paired with
+    // `mode === 'player'` must never surface the DM edit form or DM notes.
+    if (mode !== 'dm') {
+      const name = state.data.label ?? state.data.kind;
+      return (
+        <p
+          data-testid="marker-panel-state-missing-detail"
+          className="text-body text-sm"
+        >
+          Not published yet — the DM hasn&apos;t shared details for this &quot;
+          {name}&quot; marker.
+        </p>
+      );
+    }
     return (
       <div data-testid="marker-panel-state-missing-detail">
         <p className="text-body mb-3 text-sm">

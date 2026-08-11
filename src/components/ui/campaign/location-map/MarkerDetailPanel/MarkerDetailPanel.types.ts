@@ -3,8 +3,6 @@
  * component's props. See `MarkerDetailPanel.utils.ts` for the resolver and
  * `index.tsx` for the component that renders these states.
  */
-import type { CanvasElement } from '@fieldnotes/core';
-
 import type { MarkerDetail } from '@/types/battlemap';
 
 import type { MarkerElementDataV1 } from '../markerData';
@@ -31,7 +29,3 @@ export interface MarkerDetailPanelProps {
   /** DM mode only. */
   onDelete?: () => void;
 }
-
-/** Re-exported so callers of `resolveMarkerPanelState` need only import from
- * this module or `.utils.ts`, not reach into `@fieldnotes/core` themselves. */
-export type { CanvasElement };

@@ -77,6 +77,23 @@ function required<T>(value: T | null | undefined, what: string): T {
   return value;
 }
 
+/** The four non-`ready` states, shared by the distinctness test and the
+ * touch-target test below — one case table so both stay in sync as states
+ * are added. */
+function nonReadyStateCases(
+  data: ReturnType<typeof buildMarkerData>
+): { mode: MarkerPanelMode; state: MarkerPanelState }[] {
+  return [
+    { mode: 'dm', state: { kind: 'missing-detail', data } },
+    { mode: 'player', state: { kind: 'unpublished', data } },
+    {
+      mode: 'player',
+      state: { kind: 'invalid-data', reason: 'bad payload' },
+    },
+    { mode: 'player', state: { kind: 'unsupported-version', version: 7 } },
+  ];
+}
+
 describe('resolveMarkerPanelState', () => {
   it.each(MARKER_KINDS)(
     'resolves "ready" for a %s marker with a matching, live detail',
@@ -193,6 +210,43 @@ describe('MarkerDetailPanel', () => {
     });
   });
 
+  it('prefills each DM edit field from its own source field (guards against a body/dmNotes field swap)', () => {
+    const state: MarkerPanelState = {
+      kind: 'ready',
+      data: buildMarkerData({ kind: 'npc', ref: 'ref-1' }),
+      detail: detail({
+        title: 'Distinct Title Value',
+        body: 'Distinct Body Value',
+        dmNotes: 'Distinct DM Notes Value',
+      }),
+    };
+
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={state}
+        onClose={() => {}}
+        onSave={() => {}}
+        onDelete={() => {}}
+      />
+    );
+
+    expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe(
+      'Distinct Title Value'
+    );
+    expect((screen.getByLabelText('Body') as HTMLTextAreaElement).value).toBe(
+      'Distinct Body Value'
+    );
+    expect(
+      (
+        screen.getByLabelText(
+          'DM notes — never shown to players'
+        ) as HTMLTextAreaElement
+      ).value
+    ).toBe('Distinct DM Notes Value');
+  });
+
   it('renders player title and body as text nodes, never parsed as markup', () => {
     const dangerousTitle = '<script>window.__pwned = true</script>';
     const dangerousBody = '<img src=x onerror="alert(1)">';
@@ -243,21 +297,55 @@ describe('MarkerDetailPanel', () => {
       />
     );
     // Positive control: same fixture, dm mode, proves the query would have
-    // found the string had player mode also rendered it.
+    // found the string had player mode also rendered it. Symmetric with the
+    // negative assertion above (`getByDisplayValue` + `innerHTML`, matching
+    // `queryByText` + `innerHTML`).
     expect(dm.getByDisplayValue(dmNotesValue)).toBeInTheDocument();
+    expect(dm.baseElement.innerHTML).toContain(dmNotesValue);
+  });
+
+  it('gates the missing-detail edit form on dm mode; player mode gets the read-only treatment (positive control: dm mode renders the form)', () => {
+    const data = buildMarkerData({ kind: 'door', ref: 'ref-1' });
+    const state: MarkerPanelState = { kind: 'missing-detail', data };
+
+    const player = render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={state}
+        onClose={() => {}}
+        onSave={() => {}}
+        onDelete={() => {}}
+      />
+    );
+    expect(player.baseElement.querySelector('textarea')).toBeNull();
+    expect(player.queryByRole('button', { name: 'Save' })).toBeNull();
+    expect(player.queryByRole('button', { name: 'Delete' })).toBeNull();
+    expect(player.baseElement.innerHTML).not.toContain('DM notes');
+    player.unmount();
+
+    // Positive control: the identical fixture in dm mode does render the
+    // edit form, proving the assertions above would have caught it had
+    // player mode also rendered it.
+    const dm = render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={state}
+        onClose={() => {}}
+        onSave={() => {}}
+        onDelete={() => {}}
+      />
+    );
+    expect(dm.baseElement.querySelectorAll('textarea').length).toBe(2);
+    expect(dm.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    expect(dm.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(dm.baseElement.innerHTML).toContain('DM notes');
   });
 
   it('renders four distinct non-ready states with pairwise-distinct testids and messages', () => {
     const data = buildMarkerData({ kind: 'secret', ref: 'ref-1' });
-    const cases: { mode: MarkerPanelMode; state: MarkerPanelState }[] = [
-      { mode: 'dm', state: { kind: 'missing-detail', data } },
-      { mode: 'player', state: { kind: 'unpublished', data } },
-      {
-        mode: 'player',
-        state: { kind: 'invalid-data', reason: 'bad payload' },
-      },
-      { mode: 'player', state: { kind: 'unsupported-version', version: 7 } },
-    ];
+    const cases = nonReadyStateCases(data);
 
     const testids = new Set<string>();
     const messages = new Set<string>();
@@ -307,26 +395,35 @@ describe('MarkerDetailPanel', () => {
     expect(bodyNode.className).toContain(MARKER_PANEL_CONTAINMENT_CLASS);
   });
 
-  it('gives every rendered button the exported touch-target class', () => {
+  it('gives every rendered button the exported touch-target class, across the message states, the DM edit form and the player read-only view', () => {
     const data = buildMarkerData({ kind: 'note', ref: 'ref-1' });
-    const state: MarkerPanelState = { kind: 'missing-detail', data };
+    const cases: { mode: MarkerPanelMode; state: MarkerPanelState }[] = [
+      ...nonReadyStateCases(data),
+      // The panel's own footer ghost Close is the only interactive control
+      // in the player read-only view (and in all three message states
+      // above); without this case it is never covered by this test.
+      { mode: 'player', state: { kind: 'ready', data, detail: detail() } },
+    ];
 
-    const { baseElement } = render(
-      <MarkerDetailPanel
-        open
-        mode="dm"
-        state={state}
-        onClose={() => {}}
-        onSave={() => {}}
-        onDelete={() => {}}
-      />
-    );
+    for (const { mode, state } of cases) {
+      const { baseElement, unmount } = render(
+        <MarkerDetailPanel
+          open
+          mode={mode}
+          state={state}
+          onClose={() => {}}
+          onSave={() => {}}
+          onDelete={() => {}}
+        />
+      );
 
-    const buttons = baseElement.querySelectorAll('button');
-    expect(buttons.length).toBeGreaterThan(0);
-    buttons.forEach(button => {
-      expect(button.className).toContain(MARKER_PANEL_TOUCH_TARGET_CLASS);
-    });
+      const buttons = baseElement.querySelectorAll('button');
+      expect(buttons.length).toBeGreaterThan(0);
+      buttons.forEach(button => {
+        expect(button.className).toContain(MARKER_PANEL_TOUCH_TARGET_CLASS);
+      });
+      unmount();
+    }
   });
 
   it('resets the form when the panel opens on a different marker', () => {
@@ -376,28 +473,28 @@ describe('MarkerDetailPanel', () => {
   });
 
   /**
-   * Scans a dialog subtree for raw Tailwind colour classes, excluding
-   * `<button>` internals. Two exclusions are deliberate, not loopholes:
-   *  - `[role="dialog"]` already excludes the shared `DialogOverlay` scrim
-   *    (`bg-black/50`), a sibling node outside this component's authored
-   *    markup.
-   *  - Every filled `Button` variant this panel is required to use (`primary`
-   *    Save, `danger` Delete) sets `text-white` in the shared `buttonVariants`
-   *    for contrast against its gradient fill — a pre-existing, repo-wide
-   *    design-system convention this component does not control and cannot
-   *    avoid while still using `Button` as instructed. Stripping `<button>`
-   *    subtrees keeps the assertion aimed at MarkerDetailPanel's own
-   *    className choices (headings, paragraphs, wrapper divs) without being
-   *    permanently tripped by a class that already exists on every colored
-   *    button in the app.
+   * Scans a dialog subtree's raw HTML for banned Tailwind colour classes.
+   * Uses `outerHTML`, not `innerHTML`, so the dialog node's own class
+   * attribute is in scope too. Only one token is stripped, globally, rather
+   * than excluding whole `<button>` subtrees: `text-white`. Every filled
+   * `Button` variant this panel is required to use (`primary` Save, `danger`
+   * Delete) sets `text-white` in the shared `buttonVariants` for contrast
+   * against its gradient fill — a pre-existing, repo-wide design-system
+   * convention this component does not control and cannot avoid while still
+   * using `Button` as instructed. Because only that one token is stripped
+   * (not the button markup), a raw colour the component itself passes down
+   * to a `Button`'s `className` (e.g. `bg-gray-800`) stays visible to the
+   * scan.
+   *
+   * `[role="dialog"]` already excludes the shared `DialogOverlay` scrim
+   * (`bg-black/50`), a sibling node outside this component's authored
+   * markup.
    */
-  function nonButtonDialogHtml(dialog: Element): string {
-    const clone = dialog.cloneNode(true) as Element;
-    clone.querySelectorAll('button').forEach(button => button.remove());
-    return clone.innerHTML;
+  function dialogHtmlForColorScan(dialog: Element): string {
+    return dialog.outerHTML.replaceAll('text-white', '');
   }
 
-  it('never emits raw Tailwind colour classes outside <button>s, in dm or player mode', () => {
+  it('never emits raw Tailwind colour classes (other than the unavoidable text-white on Buttons), in dm or player mode', () => {
     const data = buildMarkerData({ kind: 'door', ref: 'ref-1' });
     const readyState: MarkerPanelState = {
       kind: 'ready',
@@ -419,7 +516,7 @@ describe('MarkerDetailPanel', () => {
       dm.baseElement.querySelector('[role="dialog"]'),
       'the dm dialog node'
     );
-    expect(RAW_TAILWIND_COLOR_RE.test(nonButtonDialogHtml(dmDialog))).toBe(
+    expect(RAW_TAILWIND_COLOR_RE.test(dialogHtmlForColorScan(dmDialog))).toBe(
       false
     );
     dm.unmount();
@@ -436,8 +533,8 @@ describe('MarkerDetailPanel', () => {
       player.baseElement.querySelector('[role="dialog"]'),
       'the player dialog node'
     );
-    expect(RAW_TAILWIND_COLOR_RE.test(nonButtonDialogHtml(playerDialog))).toBe(
-      false
-    );
+    expect(
+      RAW_TAILWIND_COLOR_RE.test(dialogHtmlForColorScan(playerDialog))
+    ).toBe(false);
   });
 });
