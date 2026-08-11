@@ -1,5 +1,8 @@
 import type { ExportImageOptions } from '@fieldnotes/core';
 
+import { createStandaloneMarkerRegistry } from './markerPainter';
+import { MARKER_HTML_TYPES } from './markerData';
+
 export interface BattleMapExportRequest {
   audience: 'full' | 'player';
   bounds: 'map' | 'view';
@@ -54,6 +57,23 @@ export async function exportBattleMap(
     padding: 0,
     format: req.format,
   };
+  // A standalone marker-painter registry, built fresh per export call and
+  // thrown away with it — nothing subscribes to it, so no disposal is
+  // needed. This is what makes markers paint into every export with no
+  // viewport mounted, after teardown, or from a background export path,
+  // instead of silently producing a map with the markers missing.
+  options.htmlPainters = createStandaloneMarkerRegistry();
+  // Redundant with the `expect(MARKER_HTML_TYPES)` call already inside
+  // `createStandaloneMarkerRegistry` — kept anyway as defence in depth. If a
+  // future edit ever drops that `expect()` call, this explicit set still
+  // keeps `strictMissingCanvasHtml` below failing loudly instead of
+  // silently letting markers vanish from the export.
+  options.expectedCanvasTypes = MARKER_HTML_TYPES;
+  // Escalates only the 'missing' case (a declared canvas type with no active
+  // painter) to a thrown HtmlPainterMissingError. A DOM-backed html element
+  // with no renderHtml stays a non-fatal diagnostic, so this cannot break
+  // any existing (non-marker) export.
+  options.strictMissingCanvasHtml = true;
   if (req.format === 'jpeg') options.quality = JPEG_QUALITY;
   if (region) options.region = region;
   if (dmOnly) options.filter = el => !dmOnly[el.id];
