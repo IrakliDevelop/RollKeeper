@@ -148,6 +148,12 @@ function makeHarness(
         reads.push('getDmOnlyElements');
         return state.dmOnlyElements;
       },
+      // Required on `MarkerWriteDeps`: an in-memory harness always has its map
+      // in hand, and saying so explicitly is the point — the field used to
+      // default to "readable", which is fail-open in the one path that must
+      // not assume it. Individual tests override it to `() => false` to drive
+      // the unreadable-map case.
+      isMapReadable: () => true,
       setDmOnly: (elementId, dmOnly) => {
         calls.push('setDmOnly');
         setDmOnlyArgs.push([elementId, dmOnly]);
@@ -1210,7 +1216,8 @@ describe('noteMarkerRemoval', () => {
 });
 
 /**
- * The remembered audience is a FLOOR, not an answer.
+ * The remembered audience is a fallback, not an answer: where the ref still
+ * has live siblings, the restore ADOPTS their audience.
  *
  * The tracker snapshots ONE element's audience, but every audience decision
  * the DM can make is per-REF and moves the whole sibling set. Duplicate refs
@@ -1218,7 +1225,7 @@ describe('noteMarkerRemoval', () => {
  * removal and its undo — and replaying the stale snapshot would publish a pin
  * the DM has since hidden, and leave the ref permanently mixed-audience.
  */
-describe('guardLocalMarkerAdd — the restored audience is floored at the ref live siblings', () => {
+describe('guardLocalMarkerAdd — the restored audience adopts the ref live siblings', () => {
   it('restores DM-ONLY when a live sibling of the ref is DM-only, though the removal remembered SHARED', () => {
     const harness = makeHarness();
     harness.deps.removalTracker = createMarkerRemovalTracker();
@@ -1280,7 +1287,7 @@ describe('guardLocalMarkerAdd — the restored audience is floored at the ref li
     expect(harness.state.markers).toEqual([]);
   });
 
-  it('a DM-only sibling of a DIFFERENT ref does not raise the floor', () => {
+  it('a DM-only sibling of a DIFFERENT ref is not adopted', () => {
     const harness = makeHarness();
     harness.deps.removalTracker = createMarkerRemovalTracker();
     const a = seedMarkerElement(harness, 'ref-shared');
@@ -1346,5 +1353,221 @@ describe('noteMarkerRemoval — an unreadable map is not "not DM-only"', () => {
     expect(markerRefForElement(harness.state.elements.get(element.id))).toBe(
       'ref-a'
     );
+  });
+});
+
+/**
+ * The MIRROR of the sequence pinned above, and the one a one-directional floor
+ * left open. Adopting the live sibling audience has to work in BOTH directions:
+ * a remembered DM-only snapshot must be LOWERED to shared when the DM revealed
+ * the ref while the pin was gone, exactly as a remembered shared snapshot is
+ * raised when the DM hid it.
+ *
+ * The consequence of getting this wrong is not a leak but a permanent wedge:
+ * `buildPublicMarkerDetails` is `every`, so the marker the DM just revealed
+ * stops publishing, and `setMarkerAudienceForRef` refuses every later toggle
+ * as `mixed-audience` with no repair affordance in the UI.
+ *
+ * The original (raise) direction is pinned by "restores DM-ONLY when a live
+ * sibling of the ref is DM-only, though the removal remembered SHARED" above —
+ * both directions must hold at once, which is why neither describe may be read
+ * on its own.
+ */
+describe('guardLocalMarkerAdd — adoption is BOTH directions', () => {
+  it('restores SHARED when every live sibling of the ref is shared, though the removal remembered DM-ONLY', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    const a = seedMarkerElement(harness, 'ref-secret');
+    const b = seedMarkerElement(harness, 'ref-secret');
+    // Both DM-only when A leaves, so the snapshot says `wasDmOnly: true`.
+    harness.seedDmOnly(a.id, true);
+    harness.seedDmOnly(b.id, true);
+    expect(noteMarkerRemoval(harness.deps, a)).toBe(true);
+    // `deleteMarker` deliberately leaves the dmOnlyElements entry in place, so
+    // A arrives back MARKED — the write below has to actually clear it.
+    harness.state.elements.delete(a.id);
+    expect(harness.state.dmOnlyElements[a.id]).toBe(true);
+
+    // The DM's most recent explicit instruction for this marker: reveal it.
+    // Only B is live, so the sibling set is [b] and the transition is uniform.
+    expect(setMarkerAudienceForRef(harness.deps, 'ref-secret', false)).toEqual({
+      status: 'applied',
+      elementIds: [b.id],
+      dmOnly: false,
+    });
+
+    // The undo: same element, same id, same ref, no meta.
+    harness.state.elements.set(a.id, a);
+    expect(guardLocalMarkerAdd(harness.deps, a)).toEqual({
+      status: 'restored',
+      wasDmOnly: false,
+    });
+    expect(harness.state.dmOnlyElements[a.id]).toBeUndefined();
+    expect(harness.setDmOnlyArgs).toContainEqual([a.id, false]);
+    // The ref is still left alone — the ref match is what identified the undo.
+    expect(markerRefForElement(harness.state.elements.get(a.id))).toBe(
+      'ref-secret'
+    );
+    // No ref rewrite means no invented detail record either.
+    expect(harness.state.markers).toEqual([]);
+
+    // And the set is uniform again, so the ref is not wedged: the next
+    // transition is applied to BOTH pins rather than refused mixed-audience.
+    const next = setMarkerAudienceForRef(harness.deps, 'ref-secret', true);
+    expect(next.status).toBe('applied');
+    if (next.status !== 'applied') return;
+    expect(next.elementIds.sort()).toEqual([a.id, b.id].sort());
+  });
+
+  it('POSITIVE CONTROL: on the same fixture a duplicate-shaped add — new id, same ref — is still marked DM-only and given its own ref', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    const a = seedMarkerElement(harness, 'ref-secret');
+    const b = seedMarkerElement(harness, 'ref-secret');
+    harness.seedDmOnly(a.id, true);
+    harness.seedDmOnly(b.id, true);
+    expect(noteMarkerRemoval(harness.deps, a)).toBe(true);
+    harness.state.elements.delete(a.id);
+    setMarkerAudienceForRef(harness.deps, 'ref-secret', false);
+
+    // Everything the undo above had EXCEPT the id: a `mod+d` / paste clone
+    // carrying the same ref. It must not read the remembered entry, and the
+    // now-shared sibling must not make it shared either.
+    const clone = seedMarkerElement(harness, 'ref-secret');
+    expect(clone.id).not.toBe(a.id);
+
+    expect(guardLocalMarkerAdd(harness.deps, clone)).toEqual({
+      status: 'marked',
+      rewrittenRef: 'ref-1',
+    });
+    expect(harness.state.dmOnlyElements[clone.id]).toBe(true);
+    expect(markerRefForElement(harness.state.elements.get(clone.id))).toBe(
+      'ref-1'
+    );
+    expect(harness.state.markers.map(m => m.id)).toEqual(['ref-1']);
+  });
+
+  it('with NO live sibling the remembered snapshot is used — a DM-only pin comes back DM-only', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    const only = seedMarkerElement(harness, 'ref-lonely');
+    harness.seedDmOnly(only.id, true);
+
+    expect(noteMarkerRemoval(harness.deps, only)).toBe(true);
+    harness.state.elements.delete(only.id);
+    // Nothing could have instructed anything meanwhile: with zero siblings
+    // `setMarkerAudienceForRef` refuses and writes nothing.
+    expect(setMarkerAudienceForRef(harness.deps, 'ref-lonely', false)).toEqual({
+      status: 'refused',
+      reason: 'no-siblings',
+      elementIds: [],
+    });
+
+    harness.state.elements.set(only.id, only);
+    expect(guardLocalMarkerAdd(harness.deps, only)).toEqual({
+      status: 'restored',
+      wasDmOnly: true,
+    });
+    expect(harness.state.dmOnlyElements[only.id]).toBe(true);
+    expect(markerRefForElement(harness.state.elements.get(only.id))).toBe(
+      'ref-lonely'
+    );
+  });
+
+  it('with NO live sibling the remembered snapshot is used — a SHARED pin comes back shared', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    const only = seedMarkerElement(harness, 'ref-lonely');
+
+    expect(noteMarkerRemoval(harness.deps, only)).toBe(true);
+    harness.state.elements.delete(only.id);
+
+    harness.state.elements.set(only.id, only);
+    expect(guardLocalMarkerAdd(harness.deps, only)).toEqual({
+      status: 'restored',
+      wasDmOnly: false,
+    });
+    expect(harness.state.dmOnlyElements[only.id]).toBeUndefined();
+    // The restored element is EXCLUDED from its own sibling scan: it is back in
+    // the store before this runs, so a scan that counted it would find one
+    // "shared" sibling here and adopt shared even for the DM-only case above.
+    expect(harness.state.elements.has(only.id)).toBe(true);
+    expect(harness.calls).toEqual([]);
+  });
+
+  it('fails closed when the live siblings DISAGREE: there is no instruction to adopt', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    const a = seedMarkerElement(harness, 'ref-mixed');
+    const dmOnlySibling = seedMarkerElement(harness, 'ref-mixed');
+    const sharedSibling = seedMarkerElement(harness, 'ref-mixed');
+    // A already-mixed set, built directly: unreachable through
+    // `setMarkerAudienceForRef` (it refuses one outright) but reachable
+    // through the duplicate leak this guard exists to close.
+    harness.seedDmOnly(dmOnlySibling.id, true);
+    expect(harness.state.dmOnlyElements[sharedSibling.id]).toBeUndefined();
+
+    expect(noteMarkerRemoval(harness.deps, a)).toBe(true);
+    harness.state.elements.delete(a.id);
+    harness.state.elements.set(a.id, a);
+
+    expect(guardLocalMarkerAdd(harness.deps, a)).toEqual({
+      status: 'restored',
+      wasDmOnly: true,
+    });
+    expect(harness.state.dmOnlyElements[a.id]).toBe(true);
+    expect(markerRefForElement(harness.state.elements.get(a.id))).toBe(
+      'ref-mixed'
+    );
+  });
+
+  it('reports restore-failed when the audience write silently no-ops (the map is absent from the store)', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    const a = seedMarkerElement(harness, 'ref-secret');
+    const b = seedMarkerElement(harness, 'ref-secret');
+    harness.seedDmOnly(a.id, true);
+    harness.seedDmOnly(b.id, true);
+    expect(noteMarkerRemoval(harness.deps, a)).toBe(true);
+    harness.state.elements.delete(a.id);
+    setMarkerAudienceForRef(harness.deps, 'ref-secret', false);
+    harness.state.elements.set(a.id, a);
+
+    // Simulates battleMapStore/locationStore's setDmOnly: both silently return
+    // the unchanged state when the map is missing. Installed only now, so the
+    // fixture above is built by the working one.
+    const attempted: Array<[string, boolean]> = [];
+    harness.deps.setDmOnly = (elementId, dmOnly) => {
+      harness.calls.push('setDmOnly');
+      attempted.push([elementId, dmOnly]);
+    };
+
+    expect(guardLocalMarkerAdd(harness.deps, a)).toEqual({
+      status: 'restore-failed',
+      intendedDmOnly: false,
+    });
+    expect(attempted).toEqual([[a.id, false]]);
+    // The write is reported as not landed rather than assumed: A is still
+    // marked, which is exactly what the caller must be able to see.
+    expect(harness.state.dmOnlyElements[a.id]).toBe(true);
+  });
+
+  it('POSITIVE CONTROL: the identical fixture with a working setDmOnly reports restored', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    const a = seedMarkerElement(harness, 'ref-secret');
+    const b = seedMarkerElement(harness, 'ref-secret');
+    harness.seedDmOnly(a.id, true);
+    harness.seedDmOnly(b.id, true);
+    expect(noteMarkerRemoval(harness.deps, a)).toBe(true);
+    harness.state.elements.delete(a.id);
+    setMarkerAudienceForRef(harness.deps, 'ref-secret', false);
+    harness.state.elements.set(a.id, a);
+
+    expect(guardLocalMarkerAdd(harness.deps, a)).toEqual({
+      status: 'restored',
+      wasDmOnly: false,
+    });
+    expect(harness.state.dmOnlyElements[a.id]).toBeUndefined();
   });
 });
