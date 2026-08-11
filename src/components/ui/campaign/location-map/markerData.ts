@@ -53,6 +53,27 @@ export type MarkerColorKey = (typeof MARKER_COLOR_KEYS)[number];
 
 export const MARKER_LABEL_MAX_CODE_POINTS = 40;
 
+/** Detail-record caps, enforced at persist time (spec §6.2). These bound the
+ * product-state record, not the element payload — nothing here travels the
+ * canvas wire. */
+export const MARKER_TITLE_MAX_CODE_POINTS = 120;
+export const MARKER_BODY_MAX_CODE_POINTS = 4000;
+export const MARKER_DM_NOTES_MAX_CODE_POINTS = 4000;
+
+/**
+ * Caps a string to `max` Unicode CODE POINTS. Deliberately iterates via
+ * `Array.from`, which splits on code points (surrogate pairs stay intact) —
+ * never `.slice`/`.length`, which operate on UTF-16 code units and would
+ * truncate an astral-plane character (e.g. most emoji) in half, leaving a lone
+ * surrogate. This is the single home of the code-point rule; every cap in the
+ * marker feature goes through it.
+ */
+export function capCodePoints(value: string, max: number): string {
+  const codePoints = Array.from(value);
+  if (codePoints.length <= max) return value;
+  return codePoints.slice(0, max).join('');
+}
+
 export interface MarkerElementDataV1 {
   v: 1;
   kind: MarkerKind;
@@ -67,17 +88,15 @@ export type MarkerDataResult =
   | { status: 'invalid'; reason: string };
 
 /**
- * Trims and caps a label to 40 Unicode CODE POINTS. Deliberately iterates via
- * `Array.from`, which splits a string on code points (surrogate pairs stay
- * intact) — never `.slice`/`.length`, which operate on UTF-16 code units and
- * would truncate an astral-plane character (e.g. most emoji) in half.
+ * Trims and caps a label to 40 Unicode CODE POINTS, delegating the cap to
+ * `capCodePoints` so the surrogate-pair-safe rule lives in exactly one place.
  * Grapheme clustering via `Intl.Segmenter` is deliberately rejected by spec
  * §6.2 as disproportionate; the cap is documented in code-point terms.
  */
 export function normalizeMarkerLabel(label: string): string | undefined {
   const trimmed = label.trim();
   if (trimmed === '') return undefined;
-  return Array.from(trimmed).slice(0, MARKER_LABEL_MAX_CODE_POINTS).join('');
+  return capCodePoints(trimmed, MARKER_LABEL_MAX_CODE_POINTS);
 }
 
 /**
