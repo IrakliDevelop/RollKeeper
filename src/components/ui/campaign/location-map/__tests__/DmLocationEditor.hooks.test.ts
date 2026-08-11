@@ -95,6 +95,15 @@ function makeStubViewport() {
     removeGrid: vi.fn(),
     addGrid: vi.fn(),
     updateGrid: vi.fn(),
+    // The hook now registers the marker painter + activation on every
+    // viewport, unconditionally (task B10). A real Viewport carries these;
+    // this stub only ever lacked them. No assertion here depends on them —
+    // see DmLocationEditor.hooks.markers.test.ts for the marker coverage.
+    expectCanvasHtmlTypes: vi.fn(() => () => {}),
+    registerHtmlPainter: vi.fn(() => () => {}),
+    setActivation: vi.fn(() => () => {}),
+    onElementActivate: vi.fn(() => () => {}),
+    transaction: <T>(operation: () => T): T => operation(),
     removeElements: vi.fn((ids: Iterable<string>) => {
       let removed = 0;
       for (const id of new Set(ids)) {

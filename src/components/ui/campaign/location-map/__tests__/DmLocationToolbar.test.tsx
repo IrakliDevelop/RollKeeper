@@ -2,6 +2,10 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 
 import DmLocationToolbar from '@/components/ui/campaign/location-map/DmLocationToolbar';
+import {
+  MARKER_MIXED_AUDIENCE_MESSAGE,
+  MARKER_SHARE_REVEALS_CLASSIFICATION,
+} from '@/components/ui/campaign/location-map/markerAudienceCopy';
 
 import type { DmLocationToolbarProps } from '@/components/ui/campaign/location-map/DmLocationToolbar.types';
 
@@ -122,5 +126,74 @@ describe('DmLocationToolbar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reveal all (3)' }));
     expect(onToggle).toHaveBeenCalledOnce();
     expect(onRevealAll).toHaveBeenCalledOnce();
+  });
+});
+
+describe('DmLocationToolbar marker chrome', () => {
+  afterEach(() => cleanup());
+
+  it('offers a Marker tool in battlemap mode but not in location mode (spec §7.2)', () => {
+    const { unmount } = render(<DmLocationToolbar {...baseProps} />);
+    expect(screen.getByTitle('Marker')).toBeInTheDocument();
+    unmount();
+
+    render(<DmLocationToolbar {...baseProps} mode="location" />);
+    expect(screen.queryByTitle('Marker')).not.toBeInTheDocument();
+  });
+
+  it('surfaces the mixed-audience refusal next to the DM-only toggle', () => {
+    render(
+      <DmLocationToolbar
+        {...baseProps}
+        selectedElementId="pin-1"
+        selectedElementIsMarker
+        markerAudienceNotice={MARKER_MIXED_AUDIENCE_MESSAGE}
+      />
+    );
+
+    const notice = screen.getByRole('status');
+    expect(notice).toHaveTextContent(/pins don't currently agree/i);
+    expect(notice).toHaveTextContent(/Set them to match/i);
+  });
+
+  it('renders no notice when there is nothing to explain (same fixture, notice null)', () => {
+    render(
+      <DmLocationToolbar
+        {...baseProps}
+        selectedElementId="pin-1"
+        selectedElementIsMarker
+        markerAudienceNotice={null}
+      />
+    );
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('the DM-only toggle warns that a shared marker publishes its kind, label and colour', () => {
+    render(
+      <DmLocationToolbar
+        {...baseProps}
+        selectedElementId="pin-1"
+        selectedElementIsMarker
+      />
+    );
+
+    const toggle = screen.getByTestId('dm-only-toggle');
+    expect(toggle.getAttribute('title')).toContain(
+      MARKER_SHARE_REVEALS_CLASSIFICATION
+    );
+    expect(toggle.getAttribute('aria-label')).toContain(
+      MARKER_SHARE_REVEALS_CLASSIFICATION
+    );
+  });
+
+  it('a non-marker selection keeps the plain visibility copy', () => {
+    render(<DmLocationToolbar {...baseProps} selectedElementId="shape-1" />);
+
+    const toggle = screen.getByTestId('dm-only-toggle');
+    expect(toggle.getAttribute('title')).toBe('Visible to players');
+    expect(toggle.getAttribute('title')).not.toContain(
+      MARKER_SHARE_REVEALS_CLASSIFICATION
+    );
   });
 });

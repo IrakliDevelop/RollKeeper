@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import type { Viewport, CameraView, FocusAudience } from '@fieldnotes/core';
 
@@ -7,6 +7,8 @@ import { DmBattleMapCanvas } from '@/components/ui/campaign/dm-vtt/DmBattleMapCa
 import { useBattleMapStore } from '@/store/battleMapStore';
 import type { BattleMap } from '@/types/battlemap';
 import type { BattleMapViewsControlProps } from '@/components/ui/campaign/location-map/BattleMapViewsControl';
+import type { MarkerToolControls } from '@/components/ui/campaign/location-map/DmLocationToolOptions';
+import type { MarkerPanelState } from '@/components/ui/campaign/location-map/MarkerDetailPanel/MarkerDetailPanel.types';
 
 // Full component render (real Canvas -> real Viewport) needs a live canvas
 // element unavailable in jsdom; the connection/attach wiring itself is
@@ -33,6 +35,22 @@ const mockHookState = {
   handleSetMeasureSharing: vi.fn(),
   handleGoToCameraView: vi.fn(),
   handleSendCameraView: vi.fn(),
+  markerControls: {
+    kind: 'door',
+    color: 'blue',
+    onKindChange: vi.fn(),
+    onColorChange: vi.fn(),
+  } as MarkerToolControls,
+  selectedElementIsMarker: false,
+  markerAudienceNotice: null as string | null,
+  markerPanelOpen: false,
+  markerPanelState: {
+    kind: 'invalid-data',
+    reason: 'no element is selected',
+  } as MarkerPanelState,
+  handleCloseMarkerPanel: vi.fn(),
+  handleSaveMarkerDetail: vi.fn(),
+  handleDeleteMarker: vi.fn(),
 };
 
 vi.mock('../DmBattleMapCanvas.hooks', async importOriginal => {
@@ -131,6 +149,45 @@ describe('DmBattleMapCanvas wiring', () => {
     // `useState(true)` fails this assertion.
     const props = getViewsControlProps();
     expect(props.sharingEnabled).toBe(false);
+  });
+
+  it('forwards the marker controls, marker selection flag and audience notice into the toolbar', () => {
+    mockHookState.markerControls = {
+      kind: 'trap',
+      color: 'red',
+      onKindChange: vi.fn(),
+      onColorChange: vi.fn(),
+    };
+    mockHookState.selectedElementIsMarker = true;
+    mockHookState.markerAudienceNotice = 'pins disagree';
+
+    renderCanvas();
+
+    const lastProps = vi.mocked(DmVttToolbar).mock.calls.at(-1)?.[0];
+    expect(lastProps?.markerControls).toBe(mockHookState.markerControls);
+    expect(lastProps?.selectedElementIsMarker).toBe(true);
+    expect(lastProps?.markerAudienceNotice).toBe('pins disagree');
+  });
+
+  it('mounts the marker detail panel only while a marker is active', () => {
+    mockHookState.markerPanelOpen = false;
+    const { unmount } = renderCanvas();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    unmount();
+
+    mockHookState.markerPanelOpen = true;
+    mockHookState.markerPanelState = {
+      kind: 'ready',
+      data: { v: 1, kind: 'trap', ref: 'ref-1' },
+      detail: { id: 'ref-1', title: 'Pit', body: 'Deep.', dmNotes: 'DC 15' },
+    };
+    renderCanvas();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    // mode="dm" reaches the panel: the DM edit form (and only it) carries the
+    // dmNotes field.
+    expect(
+      screen.getByLabelText(/DM notes — never shown to players/)
+    ).toHaveValue('DC 15');
   });
 
   it('does not reach the toolbar before a viewport exists (viewport gate)', () => {

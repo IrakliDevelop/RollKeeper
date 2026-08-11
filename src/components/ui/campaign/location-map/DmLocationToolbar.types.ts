@@ -23,6 +23,11 @@ export interface DmLocationToolbarProps {
   selectedElementId: string | null;
   isDmOnly: boolean;
   onToggleDmOnly: () => void;
+  /** The selected element is a marker — the toggle then moves every sibling
+   *  pin sharing its ref, and its copy says what sharing publishes. */
+  selectedElementIsMarker?: boolean;
+  /** Explanation for a refused marker audience transition, or null. */
+  markerAudienceNotice?: string | null;
   hiddenPlacementActive: boolean;
   onToggleHiddenPlacement: () => void;
   hiddenElementCount: number;

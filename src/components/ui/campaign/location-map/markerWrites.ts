@@ -57,6 +57,16 @@ export interface MarkerWriteDeps {
   setDmOnly: (elementId: string, dmOnly: boolean) => void;
   /** Applies audience for MANY element ids in ONE product-state action. */
   setDmOnlyBulk: (updates: Readonly<Record<string, boolean>>) => void;
+  /**
+   * Whether an audience change re-emits each sibling through
+   * `store.update(id, {})` so a live sync client re-stamps its audience.
+   * Defaults to `true` (the battlemap behaviour). Surfaces with no relay —
+   * location mode — pass `false`: the canvas write would only fire their
+   * `store.on('update')` save listener and flip the sync indicator on a pure
+   * visibility toggle. Same reasoning as the shipped per-element toggle in
+   * `DmLocationEditor.hooks.ts` handleToggleDmOnly.
+   */
+  reemitAudience?: boolean;
   /** Injected for determinism in tests. Defaults to `crypto.randomUUID()`. */
   newId?: () => string;
   /** Injected for determinism in tests. Defaults to an ISO timestamp. */
@@ -277,6 +287,21 @@ function isMarkerElement(
 }
 
 /**
+ * The `ref` of `element` when it is a marker whose data is currently VALID,
+ * else null. Re-validates through `parseMarkerData` rather than trusting a
+ * previously-computed result (§6.2), so a pin whose data has gone `invalid`
+ * or `unsupported` is treated as a non-marker by every audience decision that
+ * would otherwise move its siblings.
+ */
+export function markerRefForElement(
+  element: Readonly<CanvasElement> | null | undefined
+): string | null {
+  if (!element || !isMarkerElement(element)) return null;
+  const parsed = parseMarkerData(element.data);
+  return parsed.status === 'valid' ? parsed.data.ref : null;
+}
+
+/**
  * Ids of every canvas element that is a VALID marker pointing at `ref`.
  * Element data is re-validated here rather than trusted (§6.2), and a map id
  * inside marker `data` is never read or trusted.
@@ -334,8 +359,12 @@ export function setMarkerAudienceForRef(
 
   // Re-emit each sibling so the sync client re-stamps its audience (hide ⇒ the
   // relay sends a remove, reveal ⇒ an upsert). Shipped precedent:
-  // DmLocationEditor.hooks.ts handleToggleDmOnly / handleRevealAll.
-  for (const id of elementIds) deps.store.update(id, {});
+  // DmLocationEditor.hooks.ts handleToggleDmOnly / handleRevealAll. Gated for
+  // relay-less surfaces (see `reemitAudience`); the bulk product-state write
+  // above is deliberately OUTSIDE the gate — the audience itself always lands.
+  if (deps.reemitAudience !== false) {
+    for (const id of elementIds) deps.store.update(id, {});
+  }
 
   return { status: 'applied', elementIds, dmOnly };
 }

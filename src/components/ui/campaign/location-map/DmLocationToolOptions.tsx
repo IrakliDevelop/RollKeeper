@@ -19,8 +19,13 @@ import {
   useSelectionOps,
   useToolOptions,
 } from '@fieldnotes/react';
+import { Button } from '@/components/ui/forms/button';
 import { Switch } from '@/components/ui/forms/switch';
 import DmSelectionOptions from './DmSelectionOptions';
+import { MARKER_TOOL_NAME } from './DmMarkerTool';
+import { MARKER_COLOR_KEYS, MARKER_KINDS } from './markerData';
+import type { MarkerColorKey, MarkerKind } from './markerData';
+import { MARKER_COLOR_CSS } from './markerPainter';
 import type { EditorMode } from './DmLocationEditor.types';
 
 export const COLOR_SWATCHES = [
@@ -67,17 +72,32 @@ export interface MeasureSharingControl {
   onChange: (enabled: boolean) => void;
 }
 
+/**
+ * Marker kind + colour, owned by each DM surface's hook and mirrored into the
+ * refs `DmMarkerTool` reads at placement time. `DmMarkerTool` is not an SDK
+ * tool, so `useToolOptions('marker')` cannot reach it — see its class comment.
+ */
+export interface MarkerToolControls {
+  kind: MarkerKind;
+  color: MarkerColorKey;
+  onKindChange(kind: MarkerKind): void;
+  onColorChange(color: MarkerColorKey): void;
+}
+
 interface DmLocationToolOptionsProps {
   mode?: EditorMode;
   measureSharing?: MeasureSharingControl;
   /** Enables the select-tool editing branch (style + arrange controls for the current selection). */
   selectionControls?: boolean;
+  /** Enables the marker kind + colour branch (battlemap mode only). */
+  markerControls?: MarkerToolControls;
 }
 
 export default function DmLocationToolOptions({
   mode = 'location',
   measureSharing,
   selectionControls,
+  markerControls,
 }: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
   // Read unconditionally (both DM surfaces render this component inside
@@ -119,8 +139,18 @@ export default function DmLocationToolOptions({
   const showSelectionOptions =
     selectionControls === true && activeTool === 'select' && selectedCount > 0;
 
+  // Requiring the prop is what makes an empty strip impossible: without it a
+  // surface that activates the marker tool but wires no controls would render
+  // a bordered bar with nothing in it. Same defensive shape as
+  // `pencilOpts !== undefined` and `selectedCount > 0` above.
+  const showMarkerOptions =
+    mode === 'battlemap' &&
+    activeTool === MARKER_TOOL_NAME &&
+    markerControls !== undefined;
+
   const showOptionsBar =
     showSelectionOptions ||
+    showMarkerOptions ||
     (activeTool === 'pencil' && pencilOpts !== undefined) ||
     activeTool === 'arrow' ||
     activeTool === 'note' ||
@@ -193,46 +223,109 @@ export default function DmLocationToolOptions({
         </>
       )}
 
-      <span className="text-muted text-xs font-medium">
-        {activeTool === 'shape'
-          ? 'Stroke'
-          : activeTool === 'note'
-            ? 'Background'
-            : activeTool === 'template'
-              ? 'Outline'
-              : 'Color'}
-      </span>
-      <div className="flex items-center gap-1">
-        {COLOR_SWATCHES.map(color => (
-          <button
-            key={color}
-            type="button"
-            onClick={() => handleColorChange(color)}
-            title={color}
-            className={`h-5 w-5 rounded-full border-2 transition-transform ${
-              activeColor === color
-                ? 'border-accent-blue-border scale-110'
-                : 'border-divider hover:scale-105'
-            }`}
-            style={{
-              backgroundColor: color,
-              boxShadow:
-                color === '#ffffff' ? 'inset 0 0 0 1px #e2e8f0' : 'none',
-            }}
-          />
-        ))}
-        <label className="relative h-5 w-5 cursor-pointer">
-          <input
-            type="color"
-            value={activeColor ?? '#334155'}
-            onChange={e => handleColorChange(e.target.value)}
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          />
-          <div className="border-divider text-muted hover:border-body flex h-5 w-5 items-center justify-center rounded-full border-2 border-dashed text-xs">
-            +
+      {showMarkerOptions && markerControls && (
+        <div
+          data-testid="marker-tool-options"
+          role="group"
+          aria-label="Marker options"
+          className="flex flex-wrap items-center gap-2"
+        >
+          <span className="text-muted text-xs font-medium">Marker</span>
+          <div className="border-divider bg-surface flex flex-wrap items-center gap-0.5 rounded-md border p-0.5">
+            {MARKER_KINDS.map(kind => (
+              <Button
+                key={kind}
+                variant={markerControls.kind === kind ? 'primary' : 'ghost'}
+                onClick={() => markerControls.onKindChange(kind)}
+                title={`Marker kind: ${kind}`}
+                aria-label={`Marker kind: ${kind}`}
+                aria-pressed={markerControls.kind === kind}
+                className="min-h-[44px] min-w-[44px] px-2 text-xs capitalize"
+              >
+                {kind}
+              </Button>
+            ))}
           </div>
-        </label>
-      </div>
+          <div className="bg-divider h-6 w-px" />
+          <span className="text-muted text-xs font-medium">Pin colour</span>
+          <div className="flex items-center gap-1">
+            {MARKER_COLOR_KEYS.map(colorKey => (
+              <Button
+                key={colorKey}
+                variant="ghost"
+                onClick={() => markerControls.onColorChange(colorKey)}
+                title={`Marker colour: ${colorKey}`}
+                aria-label={`Marker colour: ${colorKey}`}
+                aria-pressed={markerControls.color === colorKey}
+                className="min-h-[44px] min-w-[44px] p-0"
+              >
+                <span
+                  data-testid="marker-swatch-fill"
+                  aria-hidden="true"
+                  className={`block h-5 w-5 rounded-full border-2 ${
+                    markerControls.color === colorKey
+                      ? 'border-accent-blue-border scale-110'
+                      : 'border-divider'
+                  }`}
+                  // A literal hex from the painter's palette, deliberately not
+                  // a semantic token: this is the colour the CANVAS paints,
+                  // where `var(--…)` does not resolve. Data, not theming.
+                  style={{ backgroundColor: MARKER_COLOR_CSS[colorKey] }}
+                />
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* The shared strip carries CSS colour STRINGS for the SDK tools. The
+          marker carries a palette KEY, so its picker above owns colour
+          entirely — rendering both would put a dead control (handleColorChange
+          has no 'marker' branch) next to the live one. */}
+      {!showMarkerOptions && (
+        <>
+          <span className="text-muted text-xs font-medium">
+            {activeTool === 'shape'
+              ? 'Stroke'
+              : activeTool === 'note'
+                ? 'Background'
+                : activeTool === 'template'
+                  ? 'Outline'
+                  : 'Color'}
+          </span>
+          <div className="flex items-center gap-1">
+            {COLOR_SWATCHES.map(color => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => handleColorChange(color)}
+                title={color}
+                className={`h-5 w-5 rounded-full border-2 transition-transform ${
+                  activeColor === color
+                    ? 'border-accent-blue-border scale-110'
+                    : 'border-divider hover:scale-105'
+                }`}
+                style={{
+                  backgroundColor: color,
+                  boxShadow:
+                    color === '#ffffff' ? 'inset 0 0 0 1px #e2e8f0' : 'none',
+                }}
+              />
+            ))}
+            <label className="relative h-5 w-5 cursor-pointer">
+              <input
+                type="color"
+                value={activeColor ?? '#334155'}
+                onChange={e => handleColorChange(e.target.value)}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+              <div className="border-divider text-muted hover:border-body flex h-5 w-5 items-center justify-center rounded-full border-2 border-dashed text-xs">
+                +
+              </div>
+            </label>
+          </div>
+        </>
+      )}
 
       {activeTool === 'pencil' && pencilOpts && (
         <>

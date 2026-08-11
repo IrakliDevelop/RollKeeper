@@ -25,11 +25,13 @@ import {
   EyeOff,
   Zap,
   MapPin,
+  Flag,
 } from 'lucide-react';
 import { useActiveTool, useHistory } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
 import DmLocationGridPopover from './DmLocationGridPopover';
 import DmOnlyToggle from './DmOnlyToggle';
+import { MARKER_TOOL_NAME } from './DmMarkerTool';
 import type { DmLocationToolbarProps } from './DmLocationToolbar.types';
 
 const BASE_TOOL_DEFS = [
@@ -48,7 +50,19 @@ const BATTLEMAP_TOOL_DEFS = [
   { name: 'eraser', icon: Eraser, label: 'Eraser' },
   { name: 'laser', icon: Zap, label: 'Laser pointer' },
   { name: 'ping', icon: MapPin, label: 'Ping (look here)' },
+  // Battlemap only (spec §7.2): location mode gets no marker tool.
+  { name: MARKER_TOOL_NAME, icon: Flag, label: 'Marker' },
 ] as const;
+
+/**
+ * Every tool name this toolbar can activate, in both modes. Exported so tests
+ * iterate the real list rather than a retyped copy — a newly added tool then
+ * cannot skip the per-tool checks in `DmLocationToolOptions.test.tsx`.
+ */
+export const DM_LOCATION_TOOL_NAMES: readonly string[] = [
+  ...BASE_TOOL_DEFS,
+  ...BATTLEMAP_TOOL_DEFS,
+].map(def => def.name);
 
 function formatSyncTime(iso: string): string {
   const date = new Date(iso);
@@ -82,6 +96,8 @@ export default function DmLocationToolbar({
   selectedElementId,
   isDmOnly,
   onToggleDmOnly,
+  selectedElementIsMarker,
+  markerAudienceNotice,
   hiddenPlacementActive,
   onToggleHiddenPlacement,
   hiddenElementCount,
@@ -236,7 +252,23 @@ export default function DmLocationToolbar({
 
         {/* DM-only toggle — only shown when a single element is selected */}
         {selectedElementId != null && (
-          <DmOnlyToggle isDmOnly={isDmOnly} onToggle={onToggleDmOnly} />
+          <DmOnlyToggle
+            isDmOnly={isDmOnly}
+            onToggle={onToggleDmOnly}
+            isMarker={selectedElementIsMarker === true}
+          />
+        )}
+
+        {/* A refused audience transition is explained right where it was
+            attempted. `role="status"` so it is announced without stealing
+            focus — the DM is mid-toggle, not mid-dialog. */}
+        {markerAudienceNotice != null && (
+          <span
+            role="status"
+            className="text-accent-amber-text bg-accent-amber-bg border-accent-amber-border max-w-xs rounded border px-2 py-1 text-xs"
+          >
+            {markerAudienceNotice}
+          </span>
         )}
 
         <DmLocationGridPopover

@@ -139,12 +139,18 @@ function makeDeps(
   const transaction = <T>(operation: () => T): T =>
     viewport ? viewport.transaction(operation) : operation();
 
+  // Only battlemap surfaces run a relay connection, so only they need the
+  // per-sibling re-emit after an audience change. See `reemitAudience` in
+  // markerWrites.ts.
+  const reemitAudience = mode === 'battlemap';
+
   if (mode === 'battlemap') {
     const readMap = () =>
       useBattleMapStore.getState().getBattleMap(campaignCode, mapId);
     return {
       store,
       transaction,
+      reemitAudience,
       getMarkers: () => readMap()?.markers ?? EMPTY_MARKERS,
       setMarkers: next =>
         useBattleMapStore
@@ -171,6 +177,7 @@ function makeDeps(
   return {
     store,
     transaction,
+    reemitAudience,
     getMarkers: () => readMap()?.markers ?? EMPTY_MARKERS,
     setMarkers: next =>
       useLocationStore

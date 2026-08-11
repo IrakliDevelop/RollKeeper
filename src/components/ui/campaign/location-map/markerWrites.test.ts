@@ -18,6 +18,7 @@ import {
   editMarkerDetail,
   findMarkerDetail,
   gcOrphanMarkerDetails,
+  markerRefForElement,
   markerSiblingIds,
   setMarkerAudienceForRef,
 } from './markerWrites';
@@ -538,6 +539,35 @@ describe('findMarkerDetail', () => {
   });
 });
 
+describe('markerRefForElement', () => {
+  it('returns the ref for a valid marker element', () => {
+    const harness = makeHarness();
+    const element = seedMarkerElement(harness, 'ref-a');
+    expect(markerRefForElement(element)).toBe('ref-a');
+  });
+
+  it('returns null for null, a non-marker element, and a marker with unreadable data', () => {
+    expect(markerRefForElement(null)).toBeNull();
+    expect(markerRefForElement(undefined)).toBeNull();
+
+    const shape = createHtmlElement({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      htmlType: 'not-a-marker',
+      data: { ...buildMarkerData({ kind: 'door', ref: 'ref-b' }) },
+    });
+    expect(markerRefForElement(shape)).toBeNull();
+
+    const unreadable = createHtmlElement({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      htmlType: MARKER_HTML_TYPE,
+      data: { v: 2, kind: 'door', ref: 'ref-c' },
+    });
+    expect(markerRefForElement(unreadable)).toBeNull();
+  });
+});
+
 describe('markerSiblingIds', () => {
   it('collects only valid marker elements pointing at the ref', () => {
     const harness = makeHarness();
@@ -681,6 +711,95 @@ describe('setMarkerAudienceForRef', () => {
       expect(result.elementIds).toEqual([]);
     }
     expect(harness.calls).toEqual([]);
+  });
+});
+
+/**
+ * The re-emit gate (task B10 §7). The `store.update(id, {})` re-emit exists
+ * solely so a LIVE SYNC client re-stamps each sibling's audience. Location
+ * mode has no relay, so re-emitting there would only fire the surfaces'
+ * `store.on('update')` save listener and flip the sync indicator on a pure
+ * visibility toggle — the same reasoning already shipped for the per-element
+ * toggle in `DmLocationEditor.hooks.ts` handleToggleDmOnly.
+ *
+ * Both directions are asserted on the SAME recorded-calls array so the two
+ * cases cannot drift apart: the bulk product-state write is identical, and
+ * only the `store.update` calls differ.
+ */
+describe('setMarkerAudienceForRef — the re-emit gate', () => {
+  function seedTwoShared(harness: Harness): string[] {
+    const ids = [
+      seedMarkerElement(harness, 'shared-ref').id,
+      seedMarkerElement(harness, 'shared-ref').id,
+    ];
+    for (const id of ids) harness.seedDmOnly(id, false);
+    return ids;
+  }
+
+  it('reemitAudience: false still writes every sibling in one bulk action but issues ZERO store.update calls', () => {
+    const harness = makeHarness();
+    const ids = seedTwoShared(harness);
+
+    const result = setMarkerAudienceForRef(
+      { ...harness.deps, reemitAudience: false },
+      'shared-ref',
+      true
+    );
+
+    expect(result.status).toBe('applied');
+    // The product-state write is untouched by the gate...
+    expect(harness.calls.filter(c => c === 'setDmOnlyBulk')).toHaveLength(1);
+    expect(harness.bulkArgs[0]).toEqual({
+      [ids[0] as string]: true,
+      [ids[1] as string]: true,
+    });
+    expect(harness.state.dmOnlyElements).toEqual({
+      [ids[0] as string]: true,
+      [ids[1] as string]: true,
+    });
+    // ...only the canvas re-emit is suppressed.
+    expect(harness.calls.filter(c => c === 'store.update')).toHaveLength(0);
+    expect(harness.updatedIds).toEqual([]);
+    expect(harness.calls).toEqual(['setDmOnlyBulk']);
+  });
+
+  it('reemitAudience: true issues exactly one store.update per sibling on the identical fixture', () => {
+    const harness = makeHarness();
+    const ids = seedTwoShared(harness);
+
+    const result = setMarkerAudienceForRef(
+      { ...harness.deps, reemitAudience: true },
+      'shared-ref',
+      true
+    );
+
+    expect(result.status).toBe('applied');
+    expect(harness.calls.filter(c => c === 'setDmOnlyBulk')).toHaveLength(1);
+    expect(harness.bulkArgs[0]).toEqual({
+      [ids[0] as string]: true,
+      [ids[1] as string]: true,
+    });
+    expect(harness.state.dmOnlyElements).toEqual({
+      [ids[0] as string]: true,
+      [ids[1] as string]: true,
+    });
+    expect(harness.calls.filter(c => c === 'store.update')).toHaveLength(2);
+    expect(harness.updatedIds.sort()).toEqual([...ids].sort());
+    expect(harness.calls).toEqual([
+      'setDmOnlyBulk',
+      'store.update',
+      'store.update',
+    ]);
+  });
+
+  it('an omitted reemitAudience defaults to re-emitting (the shipped battlemap behaviour)', () => {
+    const harness = makeHarness();
+    const ids = seedTwoShared(harness);
+
+    setMarkerAudienceForRef(harness.deps, 'shared-ref', true);
+
+    expect(harness.calls.filter(c => c === 'store.update')).toHaveLength(2);
+    expect(harness.updatedIds.sort()).toEqual([...ids].sort());
   });
 });
 

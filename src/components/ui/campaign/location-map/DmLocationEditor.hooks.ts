@@ -17,6 +17,7 @@ import {
   AutoSave,
   type CameraAnimator,
   type CameraView,
+  type ElementActivationEvent,
   type FocusAudience,
   type Layer,
   type Tool,
@@ -55,7 +56,17 @@ import {
   createLocalCameraAnimator,
   type FocusBroadcastHandle,
 } from './focusSync';
+import { DmMarkerTool, type PlaceMarkerRequest } from './DmMarkerTool';
+import { MARKER_MIXED_AUDIENCE_MESSAGE } from './markerAudienceCopy';
 import { buildPublicMarkerDetails } from './markerPublication';
+import { markerRefForElement } from './markerWrites';
+import { MARKER_DEFAULT_COLOR_KEY } from './markerPainter';
+import type { MarkerColorKey, MarkerKind } from './markerData';
+import { useMarkerRegistration } from './useMarkerRegistration';
+import { useMarkerWrites } from './useMarkerWrites';
+import { resolveMarkerPanelState } from './MarkerDetailPanel/MarkerDetailPanel.utils';
+import type { MarkerPanelState } from './MarkerDetailPanel/MarkerDetailPanel.types';
+import type { MarkerToolControls } from './DmLocationToolOptions';
 import { pinGridToMapLayer } from './gridPin';
 import { nextMapImagePosition } from './mapImagePlacement';
 import {
@@ -194,6 +205,23 @@ export interface DmLocationEditorState {
   handleGoToCameraView: (view: CameraView) => void;
   handleSendCameraView: (view: CameraView, audience: FocusAudience) => void;
 
+  // ─── Markers (connection-independent; work with no relay URL) ───
+  /** Kind + colour for the marker tool, mirrored into the refs it reads. */
+  markerControls: MarkerToolControls;
+  /** True when the selected element is a marker whose data is currently valid. */
+  selectedElementIsMarker: boolean;
+  /** Explanation for a refused audience transition, or null. */
+  markerAudienceNotice: string | null;
+  markerPanelOpen: boolean;
+  markerPanelState: MarkerPanelState;
+  handleCloseMarkerPanel: () => void;
+  handleSaveMarkerDetail: (patch: {
+    title: string;
+    body: string;
+    dmNotes: string;
+  }) => void;
+  handleDeleteMarker: () => void;
+
   // Battle-map export control
   getViewport: () => Viewport | null;
   getDmOnlyElements: () => Record<string, boolean>;
@@ -293,6 +321,62 @@ export function useDmLocationEditor(
     measureBroadcastRef.current?.setSharing(enabled);
   }, []);
 
+  // ─── Markers ──────────────────────────────────────────────────
+  // Everything below is deliberately connection-independent: no relay read,
+  // no connection ref. Placing and opening markers must work with
+  // NEXT_PUBLIC_BATTLEMAP_RELAY_URL unset (spec §7.2, CONSTRAINTS-B).
+  const [markerKind, setMarkerKind] = useState<MarkerKind>('door');
+  const [markerColor, setMarkerColor] = useState<MarkerColorKey>(
+    MARKER_DEFAULT_COLOR_KEY
+  );
+  const [activeMarkerElementId, setActiveMarkerElementId] = useState<
+    string | null
+  >(null);
+  const [markerAudienceNotice, setMarkerAudienceNotice] = useState<
+    string | null
+  >(null);
+
+  // Read at placement time by `DmMarkerTool`, not captured at construction:
+  // the canvas keeps the first registered tool instance, so a constructor
+  // capture would go stale the moment the DM changes the picker.
+  const markerKindRef = useRef<MarkerKind>(markerKind);
+  markerKindRef.current = markerKind;
+  const markerColorRef = useRef<MarkerColorKey>(markerColor);
+  markerColorRef.current = markerColor;
+
+  // Stable identity (canvasRef is a ref, so no dependency): declared here
+  // rather than reusing `getVp` below, which is defined after this block.
+  const getMarkerViewport = useCallback(
+    () => canvasRef.current?.viewport ?? null,
+    []
+  );
+
+  const markerWrites = useMarkerWrites({
+    mode,
+    campaignCode,
+    mapId: location.id,
+    getViewport: getMarkerViewport,
+  });
+  // Same staleness problem as the picker refs: the tool instance outlives
+  // every `markerWrites` identity, so the placement handler is reached
+  // through a ref rather than captured.
+  const handlePlaceMarkerRef = useRef<(request: PlaceMarkerRequest) => void>(
+    () => {}
+  );
+  handlePlaceMarkerRef.current = (request: PlaceMarkerRequest) => {
+    const vp = getMarkerViewport();
+    if (!vp) return;
+    // The tool writes nothing itself — `createMarker` owns the §6.7 ordering
+    // that marks the element DM-only BEFORE it reaches the canvas store.
+    markerWrites.createMarker({
+      ...request,
+      layerId: vp.layerManager.activeLayerId,
+      title: '',
+      body: '',
+      dmNotes: '',
+    });
+  };
+
   // Loading states
   const [syncing, setSyncing] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
@@ -341,12 +425,78 @@ export function useDmLocationEditor(
       // Ephemeral "look here" pulse; taps broadcast as presence while the
       // battlemap room connection is up (see attachPingBroadcast).
       baseTools.push(new PingTool({ color: '#F4C430' }));
+      // Battlemap only (spec §7.2): location mode gets no marker tool, even
+      // though its painter and activation ARE registered below.
+      baseTools.push(
+        new DmMarkerTool(markerKindRef, markerColorRef, request =>
+          handlePlaceMarkerRef.current(request)
+        )
+      );
     }
 
     return baseTools;
   }, [mode]);
 
   const getVp = useCallback(() => canvasRef.current?.viewport ?? null, []);
+
+  const handleMarkerActivate = useCallback((event: ElementActivationEvent) => {
+    setActiveMarkerElementId(event.element.id);
+  }, []);
+
+  // OUTSIDE the relay guard in `handleReady`, and NOT part of `laserCleanups`
+  // or any other connection-scoped cleanup: painter registration and
+  // activation are connection-independent (spec §7.2). Also unconditional
+  // with respect to `mode` — only the marker TOOL is battlemap-only, because
+  // a location map loaded with markers must still paint them.
+  useMarkerRegistration({
+    viewport,
+    gesture: 'double',
+    onActivateMarker: handleMarkerActivate,
+    isCameraBusy: () => localAnimatorRef.current?.animating ?? false,
+  });
+
+  const activeMarkerElement =
+    activeMarkerElementId !== null
+      ? (viewport?.store.getById(activeMarkerElementId) ?? null)
+      : null;
+  const markerPanelState = resolveMarkerPanelState(
+    activeMarkerElement,
+    markerWrites.markers,
+    'dm'
+  );
+  const activeMarkerRef =
+    markerPanelState.kind === 'ready' ||
+    markerPanelState.kind === 'missing-detail'
+      ? markerPanelState.data.ref
+      : null;
+
+  const handleCloseMarkerPanel = useCallback(() => {
+    setActiveMarkerElementId(null);
+  }, []);
+
+  const handleSaveMarkerDetail = useCallback(
+    (patch: { title: string; body: string; dmNotes: string }) => {
+      if (activeMarkerRef === null) return;
+      markerWrites.editMarkerDetail(activeMarkerRef, patch);
+    },
+    [activeMarkerRef, markerWrites]
+  );
+
+  const handleDeleteMarker = useCallback(() => {
+    if (activeMarkerElementId === null) return;
+    markerWrites.deleteMarker(activeMarkerElementId);
+    setActiveMarkerElementId(null);
+  }, [activeMarkerElementId, markerWrites]);
+
+  const markerControls = useMemo<MarkerToolControls>(
+    () => ({
+      kind: markerKind,
+      color: markerColor,
+      onKindChange: setMarkerKind,
+      onColorChange: setMarkerColor,
+    }),
+    [markerKind, markerColor]
+  );
 
   const handleReady = useCallback(
     async (vp: Viewport) => {
@@ -767,6 +917,33 @@ export function useDmLocationEditor(
 
   const handleToggleDmOnly = useCallback(() => {
     if (!selectedElementId) return;
+
+    // Markers move as a sibling SET: publication is `every`, not `some`
+    // (§6.4), so flipping one pin of a shared ref while its twins keep the
+    // old audience would produce a permanently unpublishable marker.
+    const markerRef = markerRefForElement(
+      getVp()?.store.getById(selectedElementId)
+    );
+    if (markerRef !== null) {
+      // Read the audience live rather than from the render-time `isDmOnly`:
+      // `dmOnlyElements` is reached through a store getter whose identity
+      // never changes, so a render-time snapshot can be one toggle behind.
+      const currentDmOnly =
+        storeGetLocation(campaignCode, location.id)?.dmOnlyElements ?? {};
+      const transition = markerWrites.setMarkerAudienceForRef(
+        markerRef,
+        currentDmOnly[selectedElementId] !== true
+      );
+      setMarkerAudienceNotice(
+        transition.status === 'refused' &&
+          transition.reason === 'mixed-audience'
+          ? MARKER_MIXED_AUDIENCE_MESSAGE
+          : null
+      );
+      return;
+    }
+
+    setMarkerAudienceNotice(null);
     storeToggleDmOnly(campaignCode, location.id, selectedElementId);
     // Battlemap only: re-emit the element so the sync client re-stamps its
     // audience (hide → relay sends players/display a remove; reveal → an
@@ -782,6 +959,8 @@ export function useDmLocationEditor(
     campaignCode,
     location.id,
     storeToggleDmOnly,
+    storeGetLocation,
+    markerWrites,
     mode,
     getVp,
   ]);
@@ -1111,5 +1290,15 @@ export function useDmLocationEditor(
     getViewport: getVp,
     getDmOnlyElements,
     storeUpdateLocation,
+    markerControls,
+    selectedElementIsMarker:
+      selectedElementId !== null &&
+      markerRefForElement(viewport?.store.getById(selectedElementId)) !== null,
+    markerAudienceNotice,
+    markerPanelOpen: activeMarkerElementId !== null,
+    markerPanelState,
+    handleCloseMarkerPanel,
+    handleSaveMarkerDetail,
+    handleDeleteMarker,
   };
 }
