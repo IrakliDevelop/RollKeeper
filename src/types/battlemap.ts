@@ -28,6 +28,20 @@ export interface MarkerDetail {
   deletedAt?: string;
 }
 
+/**
+ * The PUBLIC projection of a `MarkerDetail` — the only marker shape that ever
+ * leaves the DM (spec §6.4). It is deliberately a separate interface rather
+ * than an `Omit<MarkerDetail, 'dmNotes' | 'deletedAt'>`: the projection is
+ * built by an explicit three-field pick in
+ * `location-map/markerPublication.ts`, so a field added to `MarkerDetail`
+ * later is structurally unable to ride through to players.
+ */
+export interface PublicMarkerDetail {
+  id: string;
+  title: string;
+  body: string;
+}
+
 export interface BattleMap {
   id: string;
   campaignCode: string;
@@ -63,5 +77,10 @@ export interface SyncedBattleMap {
   canvasState: string;
   gridEnabled: boolean;
   gridSettings?: GridSettings;
+  /** Public marker projection — `dmNotes` is unreachable by construction.
+   * Built only by `buildPublicMarkerDetails`; never assign a `MarkerDetail`
+   * here. No battle-map payload builder is live today (battle maps sync via
+   * the relay), but the field is part of the synced contract. */
+  markers?: PublicMarkerDetail[];
   updatedAt: string;
 }

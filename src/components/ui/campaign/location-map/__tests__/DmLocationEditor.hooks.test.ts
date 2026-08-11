@@ -1,9 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { ElementStore, LayerManager, createShape } from '@fieldnotes/core';
-import type { Viewport } from '@fieldnotes/core';
+import {
+  ElementStore,
+  LayerManager,
+  createHtmlElement,
+  createShape,
+} from '@fieldnotes/core';
+import type { CanvasElement, Viewport } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useDmLocationEditor } from '../DmLocationEditor.hooks';
+import { MARKER_HTML_TYPE, buildMarkerData } from '../markerData';
+import { useLocationStore } from '@/store/locationStore';
 import type { LocationMap } from '@/types/location';
 
 // AutoSave touches storage adapters / timers we don't need here — stub it,
@@ -77,6 +84,13 @@ function makeStubViewport() {
     },
     loadJSON: vi.fn(),
     exportJSON: vi.fn(() => '{}'),
+    // jsdom has no canvas 2D context, so the real exportImage cannot run.
+    // handleSyncToPlayers already tolerates this (it catches and falls
+    // through to the JSON payload), and the marker projection must be built
+    // from exportJSON regardless of whether a snapshot was produced.
+    exportImage: vi.fn(async () => {
+      throw new Error('exportImage unavailable in jsdom');
+    }),
     addImage: vi.fn(),
     removeGrid: vi.fn(),
     addGrid: vi.fn(),
@@ -246,5 +260,106 @@ describe('useDmLocationEditor — handleOpenTvDisplay popup-blocker survival', (
       expect.stringContaining('dk=dk-9'),
       '_blank'
     );
+  });
+});
+
+describe('useDmLocationEditor — handleSyncToPlayers marker projection', () => {
+  const savedRelayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+  const LOCATION_ENDPOINT = '/api/campaign/TEST01/locations/loc-1';
+
+  beforeEach(() => {
+    delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+    useLocationStore.setState({ locations: {} });
+  });
+
+  afterEach(() => {
+    if (savedRelayUrl !== undefined) {
+      process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = savedRelayUrl;
+    }
+    useLocationStore.setState({ locations: {} });
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  function markerPin(ref: string) {
+    return createHtmlElement({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      layerId: 'markers',
+      htmlType: MARKER_HTML_TYPE,
+      data: { ...buildMarkerData({ kind: 'door', ref }) },
+    });
+  }
+
+  function canvasJson(elements: readonly CanvasElement[]): string {
+    return JSON.stringify({
+      version: 1,
+      camera: { position: { x: 0, y: 0 }, zoom: 1 },
+      elements,
+    });
+  }
+
+  it('posts location.markers as the public projection, with no dmNotes anywhere in the body', async () => {
+    const sharedPin = markerPin('ref-shared');
+    const hiddenPin = markerPin('ref-hidden');
+
+    useLocationStore.getState().addLocation('TEST01', {
+      ...baseLocation,
+      dmOnlyElements: { [hiddenPin.id]: true },
+      markers: [
+        {
+          id: 'ref-shared',
+          title: 'Rusty Door',
+          body: 'The hinges shriek.',
+          dmNotes: 'DMNOTES-SENTINEL-SHARED poison needle in the handle',
+        },
+        {
+          id: 'ref-hidden',
+          title: 'Hidden Cache',
+          body: 'A loose flagstone.',
+          dmNotes: 'DMNOTES-SENTINEL-HIDDEN 400gp and a map',
+        },
+      ],
+    });
+
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { vp, result } = await setup('location');
+    vi.spyOn(vp, 'exportJSON').mockReturnValue(
+      canvasJson([sharedPin, hiddenPin])
+    );
+
+    await act(async () => {
+      await result.current.handleSyncToPlayers();
+    });
+
+    const calls = fetchMock.mock.calls as unknown as Array<
+      [string, { body: string }]
+    >;
+    const call = calls.find(args => args[0] === LOCATION_ENDPOINT);
+    expect(call).toBeDefined();
+    const rawBody = call?.[1].body ?? '';
+    expect(rawBody).not.toBe('');
+    const payload = JSON.parse(rawBody) as {
+      location: { markers?: unknown; name?: string };
+    };
+
+    // The shared marker publishes exactly three fields; the DM-only one does
+    // not publish at all.
+    expect(payload.location.markers).toEqual([
+      { id: 'ref-shared', title: 'Rusty Door', body: 'The hinges shriek.' },
+    ]);
+
+    // Assert on the wire bytes, not on React state: no dmNotes value survives
+    // anywhere in the serialized payload...
+    expect(rawBody).not.toContain('DMNOTES-SENTINEL-SHARED');
+    expect(rawBody).not.toContain('DMNOTES-SENTINEL-HIDDEN');
+    // ...while the published title/body DO, proving the haystack is real and
+    // the assertions above are not passing against an empty body.
+    expect(rawBody).toContain('Rusty Door');
+    expect(rawBody).toContain('The hinges shriek.');
+    // The whole hidden record stays behind, not just its notes.
+    expect(rawBody).not.toContain('Hidden Cache');
   });
 });
