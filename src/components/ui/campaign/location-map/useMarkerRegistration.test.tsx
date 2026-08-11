@@ -1,7 +1,5 @@
-import { StrictMode } from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, cleanup } from '@testing-library/react';
-import { afterEach } from 'vitest';
 import {
   createHtmlElement,
   createNote,
@@ -19,6 +17,7 @@ import {
   type MarkerRegistrationViewport,
 } from './useMarkerRegistration';
 import { MARKER_HTML_TYPE, buildMarkerData } from './markerData';
+import type { MarkerDataIssue } from './markerPainter';
 
 afterEach(() => {
   cleanup();
@@ -122,8 +121,85 @@ function emitToAll(
   }
 }
 
+/**
+ * Hand-built recording fake `CanvasRenderingContext2D` — same shape as the
+ * one in `markerPainter.test.ts` (jsdom has no canvas 2D implementation, so
+ * this is the only way to let a real painter run without throwing). Not
+ * imported from there because it isn't exported (and shouldn't be — it's a
+ * test helper, not part of the source module's public surface); duplicated
+ * here rather than invented differently, per the review finding that this
+ * suite needed its own copy.
+ */
+const RECORDED_METHODS = [
+  'beginPath',
+  'closePath',
+  'fill',
+  'stroke',
+  'arc',
+  'moveTo',
+  'lineTo',
+  'rect',
+  'fillText',
+  'save',
+  'restore',
+  'quadraticCurveTo',
+  'bezierCurveTo',
+  'ellipse',
+] as const;
+
+const RECORDED_PROPS = [
+  'fillStyle',
+  'strokeStyle',
+  'font',
+  'textAlign',
+  'textBaseline',
+  'lineWidth',
+  'globalAlpha',
+] as const;
+
+function createFakeCtx(): {
+  ctx: CanvasRenderingContext2D;
+  calls: string[];
+} {
+  const calls: string[] = [];
+  const target: Record<string, unknown> = {};
+
+  for (const method of RECORDED_METHODS) {
+    target[method] = (...args: unknown[]) => {
+      calls.push(`${method}(${args.join(',')})`);
+      return undefined;
+    };
+  }
+  target.measureText = () => ({ width: 40 });
+
+  const store: Record<string, unknown> = {
+    fillStyle: '#000000',
+    strokeStyle: '#000000',
+    font: '10px sans-serif',
+    textAlign: 'start',
+    textBaseline: 'alphabetic',
+    lineWidth: 1,
+    globalAlpha: 1,
+  };
+
+  for (const prop of RECORDED_PROPS) {
+    Object.defineProperty(target, prop, {
+      enumerable: true,
+      get() {
+        return store[prop];
+      },
+      set(value: unknown) {
+        store[prop] = value;
+        calls.push(`set:${prop}=${String(value)}`);
+      },
+    });
+  }
+
+  return { ctx: target as unknown as CanvasRenderingContext2D, calls };
+}
+
 describe('useMarkerRegistration', () => {
-  it('declares MARKER_HTML_TYPES before registering the painter', () => {
+  it('declares MARKER_HTML_TYPES before registering the painter: call order', () => {
     const d = createViewportDouble();
 
     renderHook(() =>
@@ -135,8 +211,19 @@ describe('useMarkerRegistration', () => {
       'expectCanvasHtmlTypes',
       'registerHtmlPainter',
     ]);
+  });
+
+  it('declares MARKER_HTML_TYPES before registering the painter: registry state observed inside registerHtmlPainter', () => {
+    const d = createViewportDouble();
+
+    renderHook(() =>
+      useMarkerRegistration({ viewport: d.viewport, gesture: 'single' })
+    );
+
     // (b) observed registry state at the moment of registration — the
-    // assertion a reordered implementation cannot satisfy.
+    // assertion a reordered implementation cannot satisfy: this must be
+    // observed as an independent `it`, since a reordered implementation
+    // fails (a) first and the aborted `it` would never reach this line.
     expect(d.observedCanvasTypesAtRegister).toEqual([true]);
   });
 
@@ -207,10 +294,10 @@ describe('useMarkerRegistration', () => {
     const unregister = d.unregisterPainterSpies[0];
     const disposeActivation = d.disposeActivationSpies[0];
     const offActivate = d.offActivateSpies[0];
+    // One representative `toBeDefined` — the guard below subsumes the rest;
+    // asserting all four here would just be re-checking the same recorded-
+    // one-disposer-per-call invariant the guard already enforces.
     expect(release).toBeDefined();
-    expect(unregister).toBeDefined();
-    expect(disposeActivation).toBeDefined();
-    expect(offActivate).toBeDefined();
     if (!release || !unregister || !disposeActivation || !offActivate) {
       throw new Error('expected all four disposers to be recorded');
     }
@@ -237,15 +324,27 @@ describe('useMarkerRegistration', () => {
     // 'canvas' assertion below cannot pass by construction.
     expect(resolveHtmlRouting(element, d.registry)).toBe('dom');
 
+    // `reactStrictMode: true` (not a `wrapper: ({children}) => <StrictMode>…`
+    // indirection) — empirically, wrapping via an intermediate `wrapper`
+    // component does NOT trigger React's dev-mode double-invoke of effects
+    // in this React 19 / RTL setup (verified experimentally: the wrapper
+    // form mounts once, `reactStrictMode: true` mounts twice). Using the
+    // indirect form here would have made this test pass while silently never
+    // exercising Strict-Mode's mount->cleanup->remount at all.
     renderHook(
       () => useMarkerRegistration({ viewport: d.viewport, gesture: 'single' }),
-      {
-        wrapper: ({ children }) => <StrictMode>{children}</StrictMode>,
-      }
+      { reactStrictMode: true }
     );
 
     expect(d.registry.getActivePainter(MARKER_HTML_TYPE)).toBeDefined();
     expect(resolveHtmlRouting(element, d.registry)).toBe('canvas');
+    // The double-invoke actually happened: two full mount-effect cycles (4
+    // calls each) recorded, not one. Without this, the test would silently
+    // degrade into a copy of test 5's mounted-half assertion if Strict-Mode
+    // stopped double-invoking (e.g. a React version change, or reverting to
+    // the inert `wrapper`-based form above) — the assertions above would
+    // still pass on a single mount.
+    expect(d.calls.length).toBe(8);
   });
 
   it('two viewports mounted simultaneously each keep their own registration; unmounting one leaves the other at canvas', () => {
@@ -294,7 +393,12 @@ describe('useMarkerRegistration', () => {
 
     // No second expectCanvasHtmlTypes/registerHtmlPainter/setActivation/
     // onElementActivate cycle — the call log is byte-identical.
-    expect(d.calls.length).toBe(4);
+    expect(d.calls).toEqual([
+      'expectCanvasHtmlTypes',
+      'registerHtmlPainter',
+      'setActivation',
+      'onElementActivate',
+    ]);
 
     const event = activationEvent(markerHtmlElement());
     emitToAll(d.activateListeners, event);
@@ -386,5 +490,56 @@ describe('useMarkerRegistration', () => {
       shape: 'ellipse',
     });
     expect(isActivatable(shapeElement)).toBe(false);
+  });
+
+  it('registers the real marker painter (not a stand-in), wiring onMarkerDataIssue through to it and isCameraBusy through to setActivation', () => {
+    const d = createViewportDouble();
+    const onMarkerDataIssue = vi.fn<(issue: MarkerDataIssue) => void>();
+    const isCameraBusy = vi.fn(() => true);
+
+    renderHook(() =>
+      useMarkerRegistration({
+        viewport: d.viewport,
+        gesture: 'single',
+        onMarkerDataIssue,
+        isCameraBusy,
+      })
+    );
+
+    // Pull the registered painter off the double's (real) registry — pins
+    // painter identity: registering `() => {}` instead of the real marker
+    // painter would leave every other test in this file green.
+    const painter = d.registry.getActivePainter(MARKER_HTML_TYPE);
+    expect(painter).toBeDefined();
+    if (!painter) {
+      throw new Error('expected an active painter to be registered');
+    }
+
+    const badElement = createHtmlElement({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      htmlType: MARKER_HTML_TYPE,
+      data: { v: 1, kind: 'door' }, // missing ref -> invalid
+    });
+    const { ctx } = createFakeCtx();
+
+    expect(() =>
+      painter({ ctx, element: badElement, size: badElement.size, zoom: 1 })
+    ).not.toThrow();
+
+    expect(onMarkerDataIssue).toHaveBeenCalledTimes(1);
+    expect(onMarkerDataIssue).toHaveBeenCalledWith({
+      elementId: badElement.id,
+      status: 'invalid',
+      reason: expect.any(String),
+    });
+
+    // The `isCameraBusy` reaching `setActivation`'s options is the hook's
+    // own ref-reading wrapper, not the caller's function by reference — so
+    // this asserts by behaviour: invoking the option calls through to ours.
+    const options = d.activationOptionsCalls[0];
+    expect(options?.isCameraBusy).toBeDefined();
+    expect(options?.isCameraBusy?.()).toBe(true);
+    expect(isCameraBusy).toHaveBeenCalledTimes(1);
   });
 });
