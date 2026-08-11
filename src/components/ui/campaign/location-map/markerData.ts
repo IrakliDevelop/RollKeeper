@@ -21,10 +21,12 @@ export const MARKER_HTML_TYPES: ReadonlySet<string> = new Set([
   MARKER_HTML_TYPE,
 ]);
 
-/** The audience value RollKeeper stamps on DM-only elements. Matches the
- * existing string literal used by `resolveAudience` in
- * `DmLocationEditor.hooks.ts:468-472` and `DmBattleMapCanvas.hooks.ts:315-319`.
- * Those call sites are NOT refactored in this task. */
+/** The audience value RollKeeper stamps on DM-only elements. This is the
+ * single production source of that value: both `resolveAudience` call sites
+ * (`DmLocationEditor.hooks.ts` and `dm-vtt/DmBattleMapCanvas.hooks.ts`) import
+ * it rather than repeating the literal, so the surfaces and this constant
+ * cannot drift apart — which is what makes the assertion pinning it to `'dm'`
+ * more than a tautology over an unused export. */
 export const DM_AUDIENCE = 'dm';
 
 export const MARKER_KINDS = [

@@ -65,6 +65,7 @@ import { applyMarkerAudienceToggle } from '@/components/ui/campaign/location-map
 import { markerRefForElement } from '@/components/ui/campaign/location-map/markerWrites';
 import type { MarkerDataIssue } from '@/components/ui/campaign/location-map/markerPainter';
 import { MARKER_DEFAULT_COLOR_KEY } from '@/components/ui/campaign/location-map/markerPainter';
+import { DM_AUDIENCE } from '@/components/ui/campaign/location-map/markerData';
 import type {
   MarkerColorKey,
   MarkerKind,
@@ -548,7 +549,7 @@ export function useDmBattleMapCanvas({
           resolveAudience: el =>
             useBattleMapStore.getState().battleMaps[campaignCode]?.[battleMapId]
               ?.dmOnlyElements[el.id]
-              ? 'dm'
+              ? DM_AUDIENCE
               : undefined,
           // Layer definitions sync (replaces the unknown-layer mirror):
           // winning remote records apply through history-transparent *Direct

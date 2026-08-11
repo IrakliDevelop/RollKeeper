@@ -113,10 +113,15 @@ describe('resolveMarkerPanelState', () => {
 
   it('resolves "missing-detail" in dm mode and "unpublished" in player mode when no detail matches', () => {
     const element = markerElement({ ref: 'ref-1' });
-    expect(resolveMarkerPanelState(element, [], 'dm').kind).toBe(
+    // A live, non-deleted detail whose id is NOT the element's ref: the ref
+    // comparison in the resolver's `find` is the sole reason neither call
+    // resolves `ready`. Passing `[]` here would leave that comparison
+    // unpinned (`markers.find(m => !m.deletedAt)` would still be green).
+    const otherMarkers = [detail({ id: 'some-other-ref' })];
+    expect(resolveMarkerPanelState(element, otherMarkers, 'dm').kind).toBe(
       'missing-detail'
     );
-    expect(resolveMarkerPanelState(element, [], 'player').kind).toBe(
+    expect(resolveMarkerPanelState(element, otherMarkers, 'player').kind).toBe(
       'unpublished'
     );
   });
@@ -262,6 +267,12 @@ describe('MarkerDetailPanel', () => {
 
     expect(screen.getByText(dangerousTitle)).toBeInTheDocument();
     expect(screen.getByText(dangerousBody)).toBeInTheDocument();
+    // Which node holds which: the two assertions above are satisfied by a
+    // title/body prop swap, since both values are still on the page. `body`
+    // is the field that publishes to players, so pin it to its own node.
+    expect(screen.getByTestId('marker-panel-body')).toHaveTextContent(
+      dangerousBody
+    );
     expect(baseElement.querySelector('img')).toBeNull();
     expect(baseElement.querySelector('script')).toBeNull();
   });

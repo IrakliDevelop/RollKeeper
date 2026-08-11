@@ -62,6 +62,7 @@ import { buildPublicMarkerDetails } from './markerPublication';
 import { markerRefForElement } from './markerWrites';
 import { MARKER_DEFAULT_COLOR_KEY } from './markerPainter';
 import type { MarkerDataIssue } from './markerPainter';
+import { DM_AUDIENCE } from './markerData';
 import type { MarkerColorKey, MarkerKind } from './markerData';
 import {
   CANVAS_WRITING_TOOL_NAMES,
@@ -700,7 +701,7 @@ export function useDmLocationEditor(
           resolveAudience: el =>
             useBattleMapStore.getState().battleMaps[campaignCode]?.[location.id]
               ?.dmOnlyElements[el.id]
-              ? 'dm'
+              ? DM_AUDIENCE
               : undefined,
           // Layer definitions sync (replaces the unknown-layer mirror):
           // winning remote records apply through history-transparent *Direct

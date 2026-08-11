@@ -349,8 +349,12 @@ export function PlayerBattleMapCanvas({
   // `PublicMarkerDetail` — requires a `dmNotes` field. The player surface must
   // never originate or carry a `dmNotes` value (spec §6.4), so this
   // synthesizes an empty placeholder purely to satisfy the shared resolver's
-  // type signature; `ReadOnlyView` (MarkerDetailPanel's player-mode branch)
-  // never reads `detail.dmNotes` at all, so no real DM content is exposed.
+  // type signature. What makes that safe is STRUCTURAL, not this empty string:
+  // `ReadOnlyView` (MarkerDetailPanel's player-mode branch) takes a
+  // `{ title, body }` prop type, so no `dmNotes` value — placeholder or real —
+  // is ever passed into it or reachable from inside it. Seeding a real secret
+  // here would therefore change nothing on screen; the guarantee is the prop
+  // type, not the value.
   //
   // An EXPLICIT field pick, never `{ ...marker, dmNotes: '' }`: a stray
   // `deletedAt` riding in on the spread would silently downgrade a `ready`

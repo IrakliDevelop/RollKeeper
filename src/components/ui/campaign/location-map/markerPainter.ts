@@ -324,6 +324,11 @@ export function createMarkerPainter(
  * Calls `expect(MARKER_HTML_TYPES)` FIRST, then `register(MARKER_HTML_TYPE, painter)`
  * — `expect()` before `register()`, or a marker would silently route to DOM
  * instead of failing loudly if registration were ever skipped.
+ *
+ * That ordering is not observable through the registry's accessors after the
+ * fact (`canvasTypes` is `declared ∪ {types with a live painter}`), so it is
+ * pinned by call order instead — see "declares the canvas type BEFORE
+ * registering the painter" in `markerPainter.test.ts`.
  */
 export function createStandaloneMarkerRegistry(
   opts?: MarkerPainterOptions

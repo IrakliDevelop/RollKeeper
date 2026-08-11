@@ -1686,7 +1686,7 @@ describe('createManagedBattleMapConnection — player marker filtering (task B11
     return conn;
   };
 
-  it('a hub snapshot that omits the DM-only marker leaves the player store holding only the shared one, and the DM-only id resolves to a non-ready panel state', async () => {
+  it('a hub snapshot that omits the DM-only marker leaves the player store holding only the shared one, and the shared pin resolves to its OWN detail, never the withheld one', async () => {
     const store = new ElementStore();
     const conn = await startPlayerConnection(store);
 
@@ -1699,17 +1699,23 @@ describe('createManagedBattleMapConnection — player marker filtering (task B11
     expect(store.getById('shared-el')).toBeDefined();
     expect(store.getById('dmonly-el')).toBeUndefined();
 
-    // The player surface's own resolver, given the id of an element the
-    // store never received, must not manufacture a "ready" state from
-    // nowhere — proving the player surface itself adds no second path that
-    // could resurrect the filtered pin.
+    // The player surface's own resolver, run against the ONE pin that did
+    // arrive and the two-detail list the player holds: the pin must resolve to
+    // its own detail and only its own. Resolving the filtered id instead would
+    // prove nothing — `store.getById('dmonly-el')` is `undefined` by the
+    // assertion above, so the resolver would return `invalid-data` from its
+    // first branch without ever reaching the ref comparison, the store, or
+    // the connection.
     const markers: MarkerDetail[] = [
       { id: 'shared-ref', title: 'Shared', body: 'Visible', dmNotes: '' },
       { id: 'dmonly-ref', title: 'Secret', body: 'Hidden', dmNotes: 'shh' },
     ];
-    const missingElement = store.getById('dmonly-el') ?? null;
-    const state = resolveMarkerPanelState(missingElement, markers, 'player');
-    expect(state.kind).not.toBe('ready');
+    const sharedElement = store.getById('shared-el') ?? null;
+    const state = resolveMarkerPanelState(sharedElement, markers, 'player');
+    expect(state.kind).toBe('ready');
+    if (state.kind !== 'ready') throw new Error('expected a ready state');
+    expect(state.detail.id).toBe('shared-ref');
+    expect(state.detail.body).toBe('Visible');
 
     conn.stop();
   });

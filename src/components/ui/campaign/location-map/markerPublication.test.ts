@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createHtmlElement } from '@fieldnotes/core';
+import { createHtmlElement, createShape } from '@fieldnotes/core';
 import type { CanvasElement, HtmlElement } from '@fieldnotes/core';
 
 import {
@@ -51,6 +51,20 @@ function rawPin(data: Record<string, unknown>): HtmlElement {
 }
 
 function canvas(elements: readonly CanvasElement[]): string {
+  return JSON.stringify({
+    version: 1,
+    camera: { position: { x: 0, y: 0 }, zoom: 1 },
+    elements,
+  });
+}
+
+/**
+ * The same envelope as `canvas`, but for deliberately ill-formed payloads that
+ * no factory can produce and that therefore cannot be typed as `CanvasElement`.
+ * Persisted and relayed canvas JSON is untrusted (§6.2), so these ARE shapes
+ * `pinIdsByRef` can be handed at runtime.
+ */
+function rawCanvas(elements: readonly unknown[]): string {
   return JSON.stringify({
     version: 1,
     camera: { position: { x: 0, y: 0 }, zoom: 1 },
@@ -115,6 +129,66 @@ describe('buildPublicMarkerDetails — publishes', () => {
     });
 
     expect(result.map(r => r.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('contributes no ref from a non-html element, a foreign htmlType or an id-less pin, while the genuine marker still publishes', () => {
+    // Each of `pinIdsByRef`'s three structural guards gets an element that
+    // ONLY that guard rejects, so each can be mutated away independently and
+    // be seen to fail here.
+    //
+    // 1. `type !== 'html'`: a shape that also carries `htmlType` — the very
+    //    next guard would otherwise catch it, leaving the type check inert.
+    //    Untrusted JSON can carry any field combination; `createShape` can't,
+    //    hence `rawCanvas`.
+    const shapeWithMarkerFields = {
+      ...createShape({
+        position: { x: 0, y: 0 },
+        size: { w: 40, h: 40 },
+        layerId: 'markers',
+      }),
+      htmlType: MARKER_HTML_TYPE,
+      data: { ...buildMarkerData({ kind: 'door', ref: 'ref-shape' }) },
+    };
+    // 2. `htmlType !== MARKER_HTML_TYPE`: a genuine html element that is not
+    //    a marker but carries a marker-shaped payload.
+    const foreignHtml = createHtmlElement({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      layerId: 'markers',
+      htmlType: 'not-a-marker',
+      data: { ...buildMarkerData({ kind: 'door', ref: 'ref-foreign' }) },
+    });
+    // 3. the id guard — the fail-OPEN one. Without an id the audience lookup
+    //    `dmOnlyElements[undefined]` is `undefined`, so `isShared` is `true`
+    //    and the detail would publish regardless of the DM's choice. Seeded
+    //    DM-only here so the mutation's blast radius is the real one.
+    const idless: Record<string, unknown> = { ...pin({ ref: 'ref-idless' }) };
+    const idlessId = idless.id;
+    expect(typeof idlessId).toBe('string');
+    delete idless.id;
+
+    const genuine = pin({ ref: 'ref-genuine' });
+
+    const result = buildPublicMarkerDetails({
+      canvasState: rawCanvas([
+        shapeWithMarkerFields,
+        foreignHtml,
+        idless,
+        genuine,
+      ]),
+      markers: [
+        detail('ref-shape'),
+        detail('ref-foreign'),
+        detail('ref-idless'),
+        detail('ref-genuine'),
+      ],
+      dmOnlyElements: { [String(idlessId)]: true },
+    });
+
+    // Positive control and negative assertion in one: only the real pin's ref
+    // survives, and it survives off this same canvas — so the three omissions
+    // are caused by the guards and not by an unreadable envelope.
+    expect(result.map(r => r.id)).toEqual(['ref-genuine']);
   });
 });
 

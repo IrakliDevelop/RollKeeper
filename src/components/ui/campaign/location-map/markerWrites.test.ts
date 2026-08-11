@@ -851,6 +851,12 @@ describe('gcOrphanMarkerDetails', () => {
     ['a top-level array', '[]'],
     ['a JSON scalar', '42'],
     ['elements that is not an array', '{"elements":{"0":{}}}'],
+    // The ONE case that reaches the root-shape guard's `parsedState === null`
+    // sub-guard: `typeof null === 'object'` and `Array.isArray(null)` is
+    // false, so without it the very next line dereferences null and this
+    // throws a TypeError instead of skipping. Every other row above is
+    // already caught by the `elements`-is-an-array check that follows.
+    ['JSON null', 'null'],
   ])('skips as unexpected-shape for %s', (_label, canvasState) => {
     const harness = makeHarness();
     seedTwoDetails(harness);
@@ -989,9 +995,12 @@ describe('gcOrphanMarkerDetails — real ElementStore round-trip', () => {
     const result = gcOrphanMarkerDetails(harness.deps, serialized);
 
     expect(result).toEqual({ status: 'ran', softDeleted: ['orphan'] });
-    expect(
-      findMarkerDetail(harness.state.markers, 'kept')?.deletedAt
-    ).toBeUndefined();
+    // A RAW `.find`, not `findMarkerDetail`: the latter filters tombstones, so
+    // a `kept` that HAD been soft-deleted would come back `undefined` and
+    // `undefined?.deletedAt` is still `undefined` — the assertion could not
+    // fail. Same shape as the `orphan` lookup below.
+    const kept = harness.state.markers.find(m => m.id === 'kept');
+    expect(kept?.deletedAt).toBeUndefined();
     const orphan = harness.state.markers.find(m => m.id === 'orphan');
     expect(orphan?.deletedAt).toBe(FIXED_NOW);
   });
