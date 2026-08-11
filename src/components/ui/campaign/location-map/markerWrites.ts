@@ -66,11 +66,15 @@ export interface MarkerWriteDeps {
    * missing map into the claim "this pin was shared", so it consults this and
    * remembers nothing when the answer is false.
    *
-   * Optional because a caller with in-memory state (the pure tests) always has
-   * a readable map; omitting it asserts exactly that. `useMarkerWrites` binds
-   * it to the real store lookup on both surfaces.
+   * REQUIRED, deliberately. It was optional once, defaulting to "readable" —
+   * a fail-OPEN default in the one path whose entire purpose is not to assume
+   * readability. Every production caller passes it today, but a future deps
+   * builder that forgot the field would silently re-create the defect this
+   * exists to fix and nothing would fail. Making it required moves that
+   * mistake to compile time. `useMarkerWrites` binds it to the real store
+   * lookup on both surfaces; an in-memory harness passes `() => true`.
    */
-  isMapReadable?: () => boolean;
+  isMapReadable: () => boolean;
   /** Single-element audience write. */
   setDmOnly: (elementId: string, dmOnly: boolean) => void;
   /** Applies audience for MANY element ids in ONE product-state action. */
@@ -576,7 +580,7 @@ export function noteMarkerRemoval(
 ): boolean {
   if (meta?.origin !== undefined && meta.origin !== 'local') return false;
   if (deps.removalTracker === undefined) return false;
-  if (deps.isMapReadable !== undefined && !deps.isMapReadable()) return false;
+  if (!deps.isMapReadable()) return false;
   // Null for a non-marker or for data that no longer parses — with no
   // trustworthy ref there is nothing to match a later add against, and an
   // unmatched add is exactly the fail-closed case.
@@ -596,12 +600,17 @@ export type MarkerAddGuardResult =
       status: 'ignored';
       reason: 'remote-origin' | 'not-a-marker' | 'already-marked';
     }
-  /** Recognised as the UNDO of a delete: the audience the pin had when it was
-   *  removed was restored (or was already in place) and its `ref` was left
-   *  exactly as it arrived. `wasDmOnly` is the audience actually restored —
-   *  the remembered one FLOORED at the ref's live sibling state, so a pin that
-   *  left shared comes back DM-only when the DM hid the ref meanwhile. */
+  /** Recognised as the UNDO of a delete: an audience was restored (or was
+   *  already in place) and the `ref` was left exactly as it arrived.
+   *  `wasDmOnly` is the audience actually restored — the ref's live sibling
+   *  audience where the ref still has siblings, the remembered snapshot only
+   *  where it has none. */
   | { status: 'restored'; wasDmOnly: boolean }
+  /** Recognised as an undo, but the audience write the ref's siblings called
+   *  for did not land (map missing from product state). `intendedDmOnly` is
+   *  the audience that could not be written; the pin is on the canvas carrying
+   *  the one it arrived with, which is NOT it. */
+  | { status: 'restore-failed'; intendedDmOnly: boolean }
   /** Marked DM-only. `rewrittenRef` is the fresh ref the pin now carries, or
    *  `null` when the data could not be parsed and was left untouched. */
   | { status: 'marked'; rewrittenRef: string | null }
@@ -679,33 +688,70 @@ export function guardLocalMarkerAdd(
     remembered !== undefined &&
     remembered.ref === markerRefForElement(element)
   ) {
-    // `wasDmOnly` is a FLOOR, not an answer. The tracker remembers a
-    // PER-ELEMENT snapshot, but the DM's audience decisions are per-REF: they
-    // move the whole sibling set (`setMarkerAudienceForRef`). So the snapshot
-    // goes stale the moment the DM changes the ref's audience between the
-    // removal and the undo — delete one of two shared pins, hide the survivor,
-    // undo, and the remembered `false` would republish the pin the DM just
-    // hid. Worse, it would leave the sibling set MIXED, which
-    // `buildPublicMarkerDetails` drops and `setMarkerAudienceForRef` refuses
-    // to move ever again: a wedge with no repair affordance in the UI.
+    // `wasDmOnly` is a snapshot of ONE element, but the DM's audience
+    // decisions are per-REF: they move the whole sibling set
+    // (`setMarkerAudienceForRef`). So the snapshot goes stale the moment the
+    // DM changes the ref's audience between the removal and the undo, and it
+    // goes stale in BOTH directions:
+    //  - delete one of two SHARED pins, hide the survivor, undo — replaying
+    //    `false` republishes the pin the DM just hid;
+    //  - delete one of two DM-ONLY pins, reveal the survivor, undo — replaying
+    //    `true` brings a hidden pin back against a shared sibling, so the
+    //    marker the DM just revealed stops publishing.
+    // Either way the sibling set is left MIXED, which
+    // `buildPublicMarkerDetails` drops (it is `every`, not `some`) and
+    // `setMarkerAudienceForRef` refuses to move ever again: a wedge with no
+    // repair affordance in the UI.
     //
-    // So: DM-only if the pin was DM-only when it left OR any pin currently
-    // sharing this ref is DM-only. Never the other way round — a shared
-    // remembered audience can be raised by the live siblings, never lowered by
-    // them. That is also what keeps the sibling set uniform.
+    // So the LIVE SIBLINGS win, in either direction: they are the DM's last
+    // explicit instruction for this ref. Adopting them is also what keeps the
+    // sibling set uniform, which is what `setMarkerAudienceForRef` requires
+    // and what keeps the ref repairable. The remembered snapshot is used only
+    // when the ref has NO live sibling — with zero siblings
+    // `setMarkerAudienceForRef` refuses `no-siblings` and writes nothing, so
+    // no instruction could have been issued while the pin was gone.
+    //
+    // The element being restored is EXCLUDED from the scan: `ElementStore.add`
+    // sets its map entry BEFORE emitting, so it is already in `getAll()` here
+    // and would otherwise vote for the very audience under decision.
     const dmOnlyElements = deps.getDmOnlyElements();
-    const siblingDmOnly = markerSiblingIds(deps.store, remembered.ref).some(
-      siblingId => dmOnlyElements[siblingId] === true
-    );
-    const dmOnly = remembered.wasDmOnly || siblingDmOnly;
-    // `deleteMarker` leaves the `dmOnlyElements` entry in place, so a DM-only
-    // pin is usually still marked here; only write when it actually needs it.
-    if (dmOnly && dmOnlyElements[element.id] !== true) {
-      deps.setDmOnly(element.id, true);
+    const siblingAudiences = markerSiblingIds(deps.store, remembered.ref)
+      .filter(siblingId => siblingId !== element.id)
+      .map(siblingId => dmOnlyElements[siblingId] === true);
+
+    let dmOnly: boolean;
+    if (siblingAudiences.length === 0) {
+      dmOnly = remembered.wasDmOnly;
+    } else if (siblingAudiences.every(audience => audience)) {
+      dmOnly = true;
+    } else if (siblingAudiences.every(audience => !audience)) {
+      dmOnly = false;
+    } else {
+      // A sibling set that already disagrees. Unreachable through the
+      // supported paths — `setMarkerAudienceForRef` is the only way to move a
+      // ref and it refuses a mixed set outright — but reachable through the
+      // very leak this guard exists to close. There is no instruction to
+      // adopt, so fail closed.
+      dmOnly = true;
     }
-    // The `ref` is left ALONE either way: the ref match is what identified
-    // this as an undo in the first place, and rewriting it would decouple the
-    // pin from every sibling that shares it.
+
+    // Both directions must actually write. `deleteMarker` deliberately leaves
+    // the `dmOnlyElements` entry in place, so a restored pin can just as
+    // easily arrive MARKED against a ref that is now shared as arrive unmarked
+    // against one that is now DM-only. Only write when the state differs.
+    if ((dmOnlyElements[element.id] === true) !== dmOnly) {
+      deps.setDmOnly(element.id, dmOnly);
+      // Read the mark back for the same reason `insertMarkerRecord` and the
+      // fall-through path below do: both stores' `setDmOnly` silently no-op
+      // when the map is missing from product state, and an unverified write is
+      // treated as no write.
+      if ((deps.getDmOnlyElements()[element.id] === true) !== dmOnly) {
+        return { status: 'restore-failed', intendedDmOnly: dmOnly };
+      }
+    }
+    // The `ref` is left ALONE on every branch: the ref match is what
+    // identified this as an undo in the first place, and rewriting it would
+    // decouple the pin from every sibling that shares it.
     return { status: 'restored', wasDmOnly: dmOnly };
   }
 

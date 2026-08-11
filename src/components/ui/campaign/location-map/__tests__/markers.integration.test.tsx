@@ -268,6 +268,10 @@ function realProductStateDeps(store: ElementStore): MarkerWriteDeps {
         .getState()
         .updateBattleMap(CODE, MAP_ID, { markers: next }),
     getDmOnlyElements: () => readMap()?.dmOnlyElements ?? {},
+    // Bound to the real store lookup, exactly as `useMarkerWrites.makeDeps`
+    // binds it: `{}` from `getDmOnlyElements` above must never be readable as
+    // "every element here is shared".
+    isMapReadable: () => readMap() !== undefined,
     setDmOnly: (elementId, dmOnly) =>
       useBattleMapStore.getState().setDmOnly(CODE, MAP_ID, elementId, dmOnly),
     setDmOnlyBulk: () => {

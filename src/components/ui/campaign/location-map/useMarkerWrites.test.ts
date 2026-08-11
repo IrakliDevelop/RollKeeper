@@ -670,3 +670,80 @@ describe('useMarkerWrites — noteMarkerRemoval fails closed on an unreadable ma
     expect(readBattleMap()?.markers ?? []).toHaveLength(0);
   });
 });
+
+/**
+ * The same wiring, on the LOCATION branch of `makeDeps`.
+ *
+ * `isMapReadable` is bound twice — once per store branch — and the pair above
+ * only ever renders `mode: 'battlemap'`, so the location binding could be
+ * deleted or bound to a constant `true` and nothing would notice. These two are
+ * the matched pair for it: same removal, same element, same mode, the only
+ * difference being whether the bound LOCATION exists.
+ */
+describe('useMarkerWrites — the location branch binds isMapReadable too', () => {
+  const MISSING_MAP_ID = 'does-not-exist';
+
+  it('location mode: an absent location is unreadable, so the removal is not remembered', () => {
+    const viewport = makeViewport();
+    const { result } = renderHook(() =>
+      useMarkerWrites({
+        mode: 'location',
+        campaignCode: CODE,
+        mapId: MISSING_MAP_ID,
+        getViewport: () => viewport,
+      })
+    );
+    const pin = seedSibling(viewport, 'ref-secret');
+    // Exactly what makes the naive read wrong: the audience lookup answers `{}`
+    // for a map that is not there at all, which is not "this pin was shared".
+    expect(
+      useLocationStore.getState().getLocation(CODE, MISSING_MAP_ID)
+    ).toBeUndefined();
+
+    let remembered = true;
+    act(() => {
+      remembered = result.current.noteMarkerRemoval(pin);
+    });
+    expect(remembered).toBe(false);
+
+    // The location is back (persist rehydrated, say) by the time the DM undoes;
+    // with nothing remembered the re-add takes the fail-closed duplicate path.
+    useLocationStore.setState({
+      locations: { [CODE]: { [MISSING_MAP_ID]: locationFixture() } },
+    });
+    act(() => {
+      result.current.guardLocalMarkerAdd(viewport, pin);
+    });
+
+    expect(
+      useLocationStore.getState().getLocation(CODE, MISSING_MAP_ID)
+        ?.dmOnlyElements[pin.id]
+    ).toBe(true);
+  });
+
+  it('POSITIVE CONTROL: location mode with the location PRESENT remembers the identical removal', () => {
+    const viewport = makeViewport();
+    const { result } = renderHook(() =>
+      useMarkerWrites({
+        mode: 'location',
+        campaignCode: CODE,
+        mapId: MAP_ID,
+        getViewport: () => viewport,
+      })
+    );
+    const pin = seedSibling(viewport, 'ref-secret');
+
+    let remembered = false;
+    act(() => {
+      remembered = result.current.noteMarkerRemoval(pin);
+    });
+    expect(remembered).toBe(true);
+
+    act(() => {
+      result.current.guardLocalMarkerAdd(viewport, pin);
+    });
+
+    expect(readLocation()?.dmOnlyElements[pin.id]).toBeUndefined();
+    expect(readLocation()?.markers ?? []).toHaveLength(0);
+  });
+});
