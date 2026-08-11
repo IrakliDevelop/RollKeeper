@@ -257,6 +257,7 @@ export function useDmLocationEditor(
   const pinUnsubRef = useRef<(() => void) | null>(null);
   const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
   const markerAddGuardUnsubRef = useRef<(() => void) | null>(null);
+  const markerRemovalTrackUnsubRef = useRef<(() => void) | null>(null);
   const selectionUnsubRef = useRef<(() => void) | null>(null);
   const [syncStatus, setSyncStatus] = useState<
     BattleMapConnectionStatus | 'disabled'
@@ -388,6 +389,11 @@ export function useDmLocationEditor(
   // `markerWrites` identity.
   const guardLocalMarkerAddRef = useRef(markerWrites.guardLocalMarkerAdd);
   guardLocalMarkerAddRef.current = markerWrites.guardLocalMarkerAdd;
+  // The other half of that guard: what a removal remembers is what lets a
+  // later re-add of the same id be recognised as an UNDO rather than a
+  // duplicate.
+  const noteMarkerRemovalRef = useRef(markerWrites.noteMarkerRemoval);
+  noteMarkerRemovalRef.current = markerWrites.noteMarkerRemoval;
   const gcOrphanMarkerDetailsRef = useRef(markerWrites.gcOrphanMarkerDetails);
   gcOrphanMarkerDetailsRef.current = markerWrites.gcOrphanMarkerDetails;
 
@@ -645,6 +651,18 @@ export function useDmLocationEditor(
         guardLocalMarkerAddRef.current(element, meta);
       });
 
+      // What the guard above discriminates on. `RemoveElementCommand.undo`
+      // re-adds the SAME element with no meta, so without this the guard would
+      // read an undo as a duplicate and silently un-share the pin. Registered
+      // next to the guard because the two are one mechanism.
+      markerRemovalTrackUnsubRef.current?.();
+      markerRemovalTrackUnsubRef.current = vp.store.on(
+        'remove',
+        (element, meta) => {
+          noteMarkerRemovalRef.current(element, meta);
+        }
+      );
+
       pinUnsubRef.current?.();
       pinUnsubRef.current = subscribePinCanonicalLayers(vp, () => ({
         mapUnlocked: arrangeActiveRef.current,
@@ -863,6 +881,7 @@ export function useDmLocationEditor(
       pinUnsubRef.current?.();
       hiddenPlacementUnsubRef.current?.();
       markerAddGuardUnsubRef.current?.();
+      markerRemovalTrackUnsubRef.current?.();
       selectionUnsubRef.current?.();
     };
   }, []);

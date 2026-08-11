@@ -17,10 +17,12 @@
  * editing markers must work with no relay URL configured.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 
 import type { CanvasElement, ElementStore } from '@fieldnotes/core';
 
+import { createMarkerRemovalTracker } from './markerRemovalTracker';
+import type { MarkerRemovalTracker } from './markerRemovalTracker';
 import {
   createMarker as createMarkerWrite,
   deleteMarker as deleteMarkerWrite,
@@ -28,6 +30,7 @@ import {
   findMarkerDetail as findMarkerDetailPure,
   gcOrphanMarkerDetails as gcOrphanMarkerDetailsWrite,
   guardLocalMarkerAdd as guardLocalMarkerAddWrite,
+  noteMarkerRemoval as noteMarkerRemovalWrite,
   setMarkerAudienceForRef as setMarkerAudienceForRefWrite,
 } from './markerWrites';
 import type {
@@ -81,6 +84,16 @@ export interface MarkerWrites {
     element: Readonly<CanvasElement>,
     meta?: { origin?: string }
   ): MarkerAddGuardResult;
+  /**
+   * Wire this to `viewport.store.on('remove')` on every surface that wires
+   * `guardLocalMarkerAdd`. Without it the guard cannot tell the undo of a
+   * delete from a duplicate and would silently un-share an undone pin — see
+   * `noteMarkerRemoval`. Returns whether the removal was remembered.
+   */
+  noteMarkerRemoval(
+    element: Readonly<CanvasElement>,
+    meta?: { origin?: string }
+  ): boolean;
   findMarkerDetail(ref: string): MarkerDetail | undefined;
   markers: readonly MarkerDetail[];
 }
@@ -145,7 +158,8 @@ function makeDeps(
   mode: 'battlemap' | 'location',
   campaignCode: string,
   mapId: string,
-  viewport: MarkerWritesViewport | null
+  viewport: MarkerWritesViewport | null,
+  removalTracker: MarkerRemovalTracker
 ): MarkerWriteDeps {
   const store: MarkerElementStoreLike = viewport?.store ?? NO_CANVAS_STORE;
   const transaction = <T>(operation: () => T): T =>
@@ -163,6 +177,7 @@ function makeDeps(
       store,
       transaction,
       reemitAudience,
+      removalTracker,
       getMarkers: () => readMap()?.markers ?? EMPTY_MARKERS,
       setMarkers: next =>
         useBattleMapStore
@@ -190,6 +205,7 @@ function makeDeps(
     store,
     transaction,
     reemitAudience,
+    removalTracker,
     getMarkers: () => readMap()?.markers ?? EMPTY_MARKERS,
     setMarkers: next =>
       useLocationStore
@@ -227,9 +243,32 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
     (mode === 'battlemap' ? battleMapMarkers : locationMarkers) ??
     EMPTY_MARKERS;
 
+  // Session memory of marker removals, shared by `noteMarkerRemoval` and
+  // `guardLocalMarkerAdd`. Held in a ref, not `useMemo`: it is real session
+  // state and losing it to a cache eviction would make an undo look like a
+  // duplicate. Thrown away whole when the bound map (or surface mode) changes
+  // — a removal on one map can never be undone into another, and keeping the
+  // entries would let a stale id+ref pair from a previous map read as an undo
+  // here. That, plus the tracker's own eviction cap, is the whole bound.
+  const trackerRef = useRef<{ key: string; tracker: MarkerRemovalTracker }>({
+    key: `${mode}|${campaignCode}|${mapId}`,
+    tracker: createMarkerRemovalTracker(),
+  });
+
   const depsFor = useCallback(
-    (viewport: MarkerWritesViewport | null) =>
-      makeDeps(mode, campaignCode, mapId, viewport),
+    (viewport: MarkerWritesViewport | null) => {
+      const key = `${mode}|${campaignCode}|${mapId}`;
+      if (trackerRef.current.key !== key) {
+        trackerRef.current = { key, tracker: createMarkerRemovalTracker() };
+      }
+      return makeDeps(
+        mode,
+        campaignCode,
+        mapId,
+        viewport,
+        trackerRef.current.tracker
+      );
+    },
     [mode, campaignCode, mapId]
   );
 
@@ -294,6 +333,15 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
     [getViewport, depsFor]
   );
 
+  const noteMarkerRemoval = useCallback(
+    (element: Readonly<CanvasElement>, meta?: { origin?: string }): boolean =>
+      // No viewport needed: this only reads product state. It must keep
+      // working for the same reason it exists — the add that undoes this
+      // removal may arrive under a different viewport identity.
+      noteMarkerRemovalWrite(depsFor(null), element, meta),
+    [depsFor]
+  );
+
   const findMarkerDetail = useCallback(
     (ref: string): MarkerDetail | undefined =>
       findMarkerDetailPure(depsFor(null).getMarkers(), ref),
@@ -308,6 +356,7 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
       setMarkerAudienceForRef,
       gcOrphanMarkerDetails,
       guardLocalMarkerAdd,
+      noteMarkerRemoval,
       findMarkerDetail,
       markers,
     }),
@@ -318,6 +367,7 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
       setMarkerAudienceForRef,
       gcOrphanMarkerDetails,
       guardLocalMarkerAdd,
+      noteMarkerRemoval,
       findMarkerDetail,
       markers,
     ]

@@ -842,6 +842,165 @@ describe('useDmLocationEditor — no marker element enters the store unmarked', 
   });
 });
 
+/**
+ * Undo of a delete vs. duplicate — twin of the block in
+ * `dm-vtt/__tests__/DmBattleMapCanvas.hooks.markers.test.ts`.
+ *
+ * `insertClones` (`@fieldnotes/core/dist/index.js:1291-1340`, `mod+d`, paste,
+ * context menu) and `RemoveElementCommand.undo` (`:5538-5540`) BOTH arrive as
+ * a bare `store.add(element)` with no meta. The one difference is the element
+ * id: a clone gets a fresh one, an undo re-adds the same one. These tests
+ * drive exactly those two shapes, in the same session, over the same fixture.
+ */
+describe('useDmLocationEditor — an undo of a delete is not a duplicate', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
+    useBattleMapStore.setState({
+      battleMaps: { [CODE]: { [MAP_ID]: battleMapFixture() } },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    useBattleMapStore.setState({ battleMaps: {} });
+    vi.clearAllMocks();
+  });
+
+  it('undoing the deletion of a SHARED pin leaves it SHARED, with its ref untouched', async () => {
+    const { vp, store, result, select } = await setup('battlemap');
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    const ref = markerDataOf(pin).ref;
+
+    // Shared the way a DM shares one: select the pin, hit the DM-only toggle.
+    act(() => {
+      select([pin.id]);
+    });
+    act(() => {
+      result.current.handleToggleDmOnly();
+    });
+    expect(readMap()?.dmOnlyElements[pin.id]).toBeUndefined();
+
+    // The delete, then EXACTLY what `RemoveElementCommand.undo` does: the same
+    // element object back, same id, same ref, no meta.
+    const removed = structuredClone(store.getById(pin.id)) as HtmlElement;
+    act(() => {
+      store.remove(pin.id);
+    });
+    act(() => {
+      store.add(removed);
+    });
+
+    // Still shared — the undo did not silently un-share the DM's pin.
+    expect(readMap()?.dmOnlyElements[pin.id]).toBeUndefined();
+    // ...and still the SAME point of interest: no ref rewrite, so it is not
+    // decoupled from any sibling that shared this ref, and no second detail
+    // record was invented for it.
+    expect(markerDataOf(store.getById(pin.id) as HtmlElement).ref).toBe(ref);
+    expect((readMap()?.markers ?? []).map(marker => marker.id)).toEqual([ref]);
+  });
+
+  it('undoing the deletion of a DM-ONLY pin leaves it DM-only, with its ref untouched', async () => {
+    const { vp, store, result } = await setup('battlemap');
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    const ref = markerDataOf(pin).ref;
+    expect(readMap()?.dmOnlyElements[pin.id]).toBe(true);
+
+    const removed = structuredClone(store.getById(pin.id)) as HtmlElement;
+    act(() => {
+      store.remove(pin.id);
+    });
+    act(() => {
+      store.add(removed);
+    });
+
+    expect(readMap()?.dmOnlyElements[pin.id]).toBe(true);
+    expect(markerDataOf(store.getById(pin.id) as HtmlElement).ref).toBe(ref);
+    expect((readMap()?.markers ?? []).map(marker => marker.id)).toEqual([ref]);
+  });
+
+  it('POSITIVE CONTROL: the same session, the same ref, a NEW id — still a duplicate, marked DM-only and given its own ref', async () => {
+    const { vp, store, result, select } = await setup('battlemap');
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    const ref = markerDataOf(pin).ref;
+    // Shared first, so "left alone" and "marked" are distinguishable outcomes.
+    act(() => {
+      select([pin.id]);
+    });
+    act(() => {
+      result.current.handleToggleDmOnly();
+    });
+
+    const removed = structuredClone(store.getById(pin.id)) as HtmlElement;
+    act(() => {
+      store.remove(pin.id);
+    });
+
+    // Same ref, same payload, same everything the undo above re-added — except
+    // the id, which is the whole discriminator.
+    const clone = structuredClone(removed) as HtmlElement;
+    clone.id = 'pasted-pin-1';
+    act(() => {
+      store.add(clone);
+    });
+
+    // The leak-closing path is intact: this is NOT read as an undo.
+    expect(readMap()?.dmOnlyElements[clone.id]).toBe(true);
+    const clonedRef = markerDataOf(store.getById(clone.id) as HtmlElement).ref;
+    expect(clonedRef).not.toBe(ref);
+    expect(findDetail(clonedRef)).toBeDefined();
+  });
+
+  it('an add whose id matches a remembered removal but whose REF does not falls through to the fail-closed path', async () => {
+    const { vp, store, result, select } = await setup('battlemap');
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    const ref = markerDataOf(pin).ref;
+    act(() => {
+      select([pin.id]);
+    });
+    act(() => {
+      result.current.handleToggleDmOnly();
+    });
+    expect(readMap()?.dmOnlyElements[pin.id]).toBeUndefined();
+
+    const removed = structuredClone(store.getById(pin.id)) as HtmlElement;
+    act(() => {
+      store.remove(pin.id);
+    });
+
+    // The id of the pin that left, carrying a DIFFERENT ref. Whatever this is,
+    // it is not the thing that was deleted, so the remembered audience must
+    // not be handed to it.
+    const stale = structuredClone(removed) as HtmlElement;
+    stale.data = {
+      ...buildMarkerData({ kind: 'trap', ref: 'some-other-ref' }),
+    };
+    act(() => {
+      store.add(stale);
+    });
+
+    expect(readMap()?.dmOnlyElements[stale.id]).toBe(true);
+    const rewritten = markerDataOf(store.getById(stale.id) as HtmlElement).ref;
+    expect(rewritten).not.toBe('some-other-ref');
+    expect(rewritten).not.toBe(ref);
+  });
+});
+
 describe('useDmLocationEditor — orphan GC runs after a successful canvas load', () => {
   const canvasWithRefs = (refs: string[]): string =>
     JSON.stringify({

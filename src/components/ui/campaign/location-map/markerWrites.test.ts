@@ -10,6 +10,7 @@ import {
   capCodePoints,
   parseMarkerData,
 } from './markerData';
+import { createMarkerRemovalTracker } from './markerRemovalTracker';
 import {
   cloneMarkerForMap,
   cloneMarkerToMap,
@@ -19,7 +20,9 @@ import {
   findMarkerDetail,
   gcOrphanMarkerDetails,
   markerRefForElement,
+  guardLocalMarkerAdd,
   markerSiblingIds,
+  noteMarkerRemoval,
   setMarkerAudienceForRef,
 } from './markerWrites';
 import type { MarkerElementStoreLike, MarkerWriteDeps } from './markerWrites';
@@ -1131,5 +1134,68 @@ describe('cloneMarkerForMap / cloneMarkerToMap', () => {
       data: { ...buildMarkerData({ kind: 'trap', ref: 'src-ref' }) },
     });
     expect(cloneMarkerForMap(isAMarker, [], () => 'new-ref')).not.toBeNull();
+  });
+});
+
+/**
+ * The removal side of the undo/duplicate discriminator. The guard's own
+ * behaviour is driven end-to-end on both DM surfaces; what is unit-tested here
+ * is which removals are remembered at all, because a removal that is wrongly
+ * remembered hands a later add the audience of something else.
+ */
+describe('noteMarkerRemoval', () => {
+  it('remembers a LOCAL marker removal with the audience it had at removal time, so the undo restores it and keeps its ref', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    const element = seedMarkerElement(harness, 'ref-a');
+    harness.seedDmOnly(element.id, true);
+
+    expect(noteMarkerRemoval(harness.deps, element)).toBe(true);
+    harness.seedDmOnly(element.id, false);
+    harness.state.elements.delete(element.id);
+
+    // The undo: same element, same id, same ref, no meta.
+    harness.state.elements.set(element.id, element);
+    expect(guardLocalMarkerAdd(harness.deps, element)).toEqual({
+      status: 'restored',
+      wasDmOnly: true,
+    });
+    expect(harness.state.dmOnlyElements[element.id]).toBe(true);
+    expect(markerRefForElement(harness.state.elements.get(element.id))).toBe(
+      'ref-a'
+    );
+    // No ref rewrite means no invented detail record either.
+    expect(harness.state.markers).toEqual([]);
+  });
+
+  it('does NOT remember a REMOTE-origin removal: the identical local re-add falls through to the fail-closed path', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    const element = seedMarkerElement(harness, 'ref-a');
+
+    expect(noteMarkerRemoval(harness.deps, element, { origin: 'remote' })).toBe(
+      false
+    );
+
+    const result = guardLocalMarkerAdd(harness.deps, element);
+    expect(result).toEqual({ status: 'marked', rewrittenRef: 'ref-1' });
+    expect(harness.state.dmOnlyElements[element.id]).toBe(true);
+    expect(markerRefForElement(harness.state.elements.get(element.id))).toBe(
+      'ref-1'
+    );
+  });
+
+  it('does not remember a non-marker removal, and reports it', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    const notAMarker = createHtmlElement({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      htmlType: 'not-a-marker',
+      data: { ...buildMarkerData({ kind: 'door', ref: 'ref-a' }) },
+    });
+
+    expect(noteMarkerRemoval(harness.deps, notAMarker)).toBe(false);
+    expect(harness.deps.removalTracker.size()).toBe(0);
   });
 });

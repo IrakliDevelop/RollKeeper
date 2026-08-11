@@ -31,6 +31,7 @@ import {
   parseMarkerData,
 } from './markerData';
 import type { MarkerColorKey, MarkerKind } from './markerData';
+import type { MarkerRemovalTracker } from './markerRemovalTracker';
 import { MARKER_ELEMENT_ZINDEX } from './tokenSnap';
 
 import type { MarkerDetail } from '@/types/battlemap';
@@ -68,6 +69,14 @@ export interface MarkerWriteDeps {
    * `DmLocationEditor.hooks.ts` handleToggleDmOnly.
    */
   reemitAudience?: boolean;
+  /**
+   * Session memory of marker removals on THIS map, shared by
+   * `noteMarkerRemoval` (writer) and `guardLocalMarkerAdd` (reader). It is
+   * what lets the guard tell an undo of a delete from a duplicate. Optional:
+   * with no tracker the guard simply never recognises an undo and every
+   * unmarked local add takes the fail-closed duplicate path.
+   */
+  removalTracker?: MarkerRemovalTracker;
   /** Injected for determinism in tests. Defaults to `crypto.randomUUID()`. */
   newId?: () => string;
   /** Injected for determinism in tests. Defaults to an ISO timestamp. */
@@ -519,11 +528,53 @@ export function cloneMarkerForMap(
   };
 }
 
+/**
+ * Records that a marker pin left the canvas store, so a later re-add of the
+ * SAME id carrying the SAME ref can be recognised as the undo of this delete
+ * rather than treated as a duplicate. Wire it to `store.on('remove')` on every
+ * surface that wires `guardLocalMarkerAdd` to `store.on('add')`.
+ *
+ * The audience is read from product state HERE, at removal time, because that
+ * is the last moment it is knowable: nothing in the re-added element says
+ * whether the pin was shared or DM-only.
+ *
+ * Remote-origin removals are not tracked, for the same reason the guard
+ * ignores remote-origin adds: a peer's element is not this client's business,
+ * and remembering it would give a hostile peer a way to have a later local add
+ * of that id treated as "restore to shared".
+ *
+ * Returns whether anything was remembered.
+ */
+export function noteMarkerRemoval(
+  deps: MarkerWriteDeps,
+  element: Readonly<CanvasElement>,
+  meta?: { origin?: string }
+): boolean {
+  if (meta?.origin !== undefined && meta.origin !== 'local') return false;
+  if (deps.removalTracker === undefined) return false;
+  // Null for a non-marker or for data that no longer parses — with no
+  // trustworthy ref there is nothing to match a later add against, and an
+  // unmatched add is exactly the fail-closed case.
+  const ref = markerRefForElement(element);
+  if (ref === null) return false;
+
+  deps.removalTracker.record({
+    id: element.id,
+    ref,
+    wasDmOnly: deps.getDmOnlyElements()[element.id] === true,
+  });
+  return true;
+}
+
 export type MarkerAddGuardResult =
   | {
       status: 'ignored';
       reason: 'remote-origin' | 'not-a-marker' | 'already-marked';
     }
+  /** Recognised as the UNDO of a delete: the audience the pin had when it was
+   *  removed was restored (or was already in place) and its `ref` was left
+   *  exactly as it arrived. */
+  | { status: 'restored'; wasDmOnly: boolean }
   /** Marked DM-only. `rewrittenRef` is the fresh ref the pin now carries, or
    *  `null` when the data could not be parsed and was left untouched. */
   | { status: 'marked'; rewrittenRef: string | null }
@@ -565,6 +616,9 @@ export type MarkerAddGuardResult =
  *
  * Data that does not parse `valid` is still marked DM-only (fail closed) but
  * its data is left alone: there is no trustworthy `ref` to rewrite.
+ *
+ * The one local add this must NOT treat as a duplicate is the undo of a
+ * delete — see the `removalTracker` branch below and `noteMarkerRemoval`.
  */
 export function guardLocalMarkerAdd(
   deps: MarkerWriteDeps,
@@ -577,6 +631,35 @@ export function guardLocalMarkerAdd(
   if (!isMarkerElement(element)) {
     return { status: 'ignored', reason: 'not-a-marker' };
   }
+
+  // UNDO OF A DELETE, not a duplicate. `RemoveElementCommand.undo`
+  // (`@fieldnotes/core/dist/index.js:5538-5540`) re-adds the very same element
+  // with no meta, so it reaches this seam in exactly the shape a `mod+d` clone
+  // does — except for the id, which `insertClones` makes fresh and history
+  // keeps. The id, together with the `ref` the element carried when it left,
+  // is therefore the discriminator.
+  //
+  // Restoring means: put back the audience it had at removal time, and leave
+  // the `ref` ALONE. Rewriting it would silently un-share a shared pin and
+  // decouple it from every sibling that shared that ref — lossy in a way undo
+  // must never be.
+  //
+  // No entry (never removed, evicted, or removed on another map) or a stale
+  // one (id reused with a different ref) falls THROUGH to the fail-closed
+  // duplicate path below. Never to "assume shared".
+  const remembered = deps.removalTracker?.take(element.id);
+  if (
+    remembered !== undefined &&
+    remembered.ref === markerRefForElement(element)
+  ) {
+    // `deleteMarker` leaves the `dmOnlyElements` entry in place, so a DM-only
+    // pin is usually still marked here; only write when it actually needs it.
+    if (remembered.wasDmOnly && deps.getDmOnlyElements()[element.id] !== true) {
+      deps.setDmOnly(element.id, true);
+    }
+    return { status: 'restored', wasDmOnly: remembered.wasDmOnly };
+  }
+
   // The `createMarker` path already marked this id in step 3 of §6.7.
   // Re-marking would fire a second, redundant product-state write.
   if (deps.getDmOnlyElements()[element.id] === true) {
