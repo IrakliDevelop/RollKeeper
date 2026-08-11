@@ -168,6 +168,24 @@ describe('CombatantDetail — monster with full stat block', () => {
     );
   });
 
+  it('saves full stat block edits from the combat editor', async () => {
+    const actions = makeActions();
+    const user = userEvent.setup();
+    render(<CombatantDetail entity={monsterEntity} actions={actions} />);
+
+    await user.click(screen.getByRole('button', { name: 'Edit stat block' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'CR' }), {
+      target: { value: '25' },
+    });
+    await user.click(screen.getByRole('button', { name: 'Save stat block' }));
+
+    expect(actions.onUpdate).toHaveBeenCalledWith('monster-1', {
+      monsterStatBlock: expect.objectContaining({ cr: '25' }),
+      initiativeModifier: 4,
+      proficiencyBonus: 2,
+    });
+  });
+
   it('debuff palette chip calls onAddCondition with kind debuff', async () => {
     const actions = makeActions();
     const user = userEvent.setup();
