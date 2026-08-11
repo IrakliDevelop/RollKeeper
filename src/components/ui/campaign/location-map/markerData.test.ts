@@ -322,7 +322,14 @@ describe('parseMarkerData', () => {
     );
   });
 
-  it('is invalid for color: 7 (non-string)', () => {
+  // Named for what it pins, not for a guard that does not exist separably:
+  // `isMarkerColorKey`'s `typeof value === 'string'` is not a distinct check a
+  // non-string can fail on its own — `MARKER_COLOR_KEYS.includes(7)` is
+  // already false. The `typeof` is there to narrow `unknown` to `string` so
+  // `includes` typechecks (and to mirror `isMarkerKind`); what this case
+  // actually pins is that a non-string colour is rejected by the same
+  // palette-membership rule as an unknown string.
+  it('is invalid for color: 7 — a non-string colour fails palette membership like any other non-key', () => {
     expect(parseMarkerData(fixture({ color: 7 })).status).toBe('invalid');
   });
 

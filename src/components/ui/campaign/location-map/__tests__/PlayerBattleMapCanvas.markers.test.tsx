@@ -31,11 +31,12 @@ vi.mock('@fieldnotes/react', async importOriginal => {
     // REAL `Viewport` built against a stubbed canvas 2D context — see
     // `stubCanvas()`.
     FieldNotesCanvas: vi.fn(() => null),
-    // Forced only for test 4 below (rendering the options strip with
-    // activeTool === MARKER_TOOL_NAME): the player tool list never contains
-    // a marker tool for real (that is exactly what test 2 pins), so there is
-    // no way to reach this state through genuine tool activation. Every
-    // other test in this file leaves this at the harmless default 'hand'.
+    // Forced only for the third test of the first describe below (rendering
+    // the options strip with activeTool === MARKER_TOOL_NAME): the player
+    // tool list never contains a marker tool for real (that is exactly what
+    // the FIRST test pins), so there is no way to reach this state through
+    // genuine tool activation. Every other test in this file leaves this at
+    // the harmless default 'hand'.
     useActiveTool: () => [mockActiveTool, vi.fn()] as const,
   };
 });
@@ -299,6 +300,74 @@ describe('PlayerBattleMapCanvas: no marker placement, no edit affordance, no kin
     );
     expect(screen.getByTestId('marker-tool-options')).toBeInTheDocument();
     controlVp.destroy();
+  });
+});
+
+/**
+ * The `'player'` role argument the surface passes to `resolveMarkerPanelState`.
+ * It is what selects `unpublished` over `missing-detail`, and since a player's
+ * `markers` list is empty until the DM publishes, it is the branch EVERY
+ * marker a player taps resolves through. Nothing else on the branch observes
+ * it: the two states share their copy, so only the testid separates them.
+ */
+describe('PlayerBattleMapCanvas: an unpublished marker resolves in the player role', () => {
+  beforeEach(() => {
+    mockActiveTool = 'hand';
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
+
+  it('tapping a pin with no published detail shows the player "unpublished" state, never the DM "missing-detail" one', () => {
+    stubCanvas();
+    const vp = makeViewport();
+    const activateSpy = vi.spyOn(vp, 'onElementActivate');
+
+    const { unmount } = renderPlayer({ markers: [] });
+    fireReady(vp);
+
+    const markerEl = createHtmlElement({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      htmlType: MARKER_HTML_TYPE,
+      data: { ...buildMarkerData({ kind: 'door', ref: 'ref-unpublished' }) },
+    });
+    act(() => {
+      vp.store.add(markerEl);
+    });
+
+    const listener = activateSpy.mock.calls[0]?.[0];
+    if (!listener) {
+      throw new Error(
+        'expected useMarkerRegistration to have subscribed via onElementActivate'
+      );
+    }
+    act(() => {
+      listener({
+        element: markerEl,
+        world: { x: 0, y: 0 },
+        pointerType: 'touch',
+        gesture: 'single',
+      });
+    });
+
+    const dialog = screen.getByRole('dialog');
+    // The testid is the discriminator: `missing-detail` in player mode renders
+    // byte-identical copy under `marker-panel-state-missing-detail`, so a role
+    // argument of 'dm' here would leave a text-only assertion green.
+    expect(
+      within(dialog).getByTestId('marker-panel-state-unpublished')
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByTestId('marker-panel-state-missing-detail')
+    ).toBeNull();
+    expect(dialog.textContent).toContain('Not published yet');
+
+    unmount();
+    vp.destroy();
   });
 });
 

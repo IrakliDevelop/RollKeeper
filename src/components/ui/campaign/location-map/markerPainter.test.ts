@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
   createHtmlElement,
   resolveHtmlRouting,
+  HtmlPainterRegistry,
   type HtmlElement,
 } from '@fieldnotes/core';
 import {
@@ -13,6 +14,7 @@ import {
 } from './markerPainter';
 import {
   MARKER_HTML_TYPE,
+  MARKER_HTML_TYPES,
   MARKER_KINDS,
   buildMarkerData,
   type MarkerKind,
@@ -246,14 +248,21 @@ describe('createMarkerPainter', () => {
     );
   });
 
-  it('never records a fillText call whose text exceeds the 40 code point cap, for both a local-authorship and a raw untrusted over-long label', () => {
+  // Both arms below are, by design, the SAME path through the painter: it
+  // never trusts the element's `data` and re-caps through `parseMarkerData`
+  // at paint time (§6.2), so a locally-authored label and a hand-written one
+  // are indistinguishable here. The value of the pair is exactly that — the
+  // cap does not depend on provenance — NOT that `buildMarkerData`'s own
+  // ingestion cap is covered; that lives in `markerData.test.ts`
+  // (`capCodePoints` / `MARKER_LABEL_MAX_CODE_POINTS`).
+  it('never records a fillText call whose text exceeds the 40 code point cap, whatever the provenance of the label: capped-at-ingestion and raw untrusted both re-validate at paint time', () => {
     const painter = createMarkerPainter();
     const longLabel = '\u{1F600}'.repeat(100); // 100 astral code points
 
     const viaBuild = markerElement('note', { label: longLabel });
-    const buildRec = createFakeCtx();
+    const viaBuildRec = createFakeCtx();
     painter({
-      ctx: buildRec.ctx,
+      ctx: viaBuildRec.ctx,
       element: viaBuild,
       size: viaBuild.size,
       zoom: 1,
@@ -268,7 +277,7 @@ describe('createMarkerPainter', () => {
     const rawRec = createFakeCtx();
     painter({ ctx: rawRec.ctx, element: viaRaw, size: viaRaw.size, zoom: 1 });
 
-    for (const rec of [buildRec, rawRec]) {
+    for (const rec of [viaBuildRec, rawRec]) {
       const fillTextCalls = rec.calls.filter(call =>
         call.startsWith('fillText(')
       );
@@ -454,6 +463,47 @@ describe('createMarkerPainter', () => {
 });
 
 describe('createStandaloneMarkerRegistry', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('declares the canvas type BEFORE registering the painter', () => {
+    // `HtmlPainterRegistry.canvasTypes` is `declared ∪ {types with a live
+    // painter}`, so once `register()` has run the declaration is invisible to
+    // every accessor: routing, `canvasTypes` and `getActivePainter` all read
+    // the same for `expect(); register()`, for `register(); expect()`, and for
+    // `register()` alone. Call ORDER is therefore the only observable, and it
+    // is load-bearing: with the declaration missing at the moment routing is
+    // first consulted, a marker resolves 'dom' and paints nothing silently
+    // instead of raising `HtmlPainterMissingError`.
+    //
+    // The spies delegate to the real methods (no `mockImplementation`), so the
+    // registry built here is the genuine article.
+    const expectSpy = vi.spyOn(HtmlPainterRegistry.prototype, 'expect');
+    const registerSpy = vi.spyOn(HtmlPainterRegistry.prototype, 'register');
+
+    const registry = createStandaloneMarkerRegistry();
+
+    const recorded = [
+      ...expectSpy.mock.invocationCallOrder.map(order => ({
+        name: 'expect',
+        order,
+      })),
+      ...registerSpy.mock.invocationCallOrder.map(order => ({
+        name: 'register',
+        order,
+      })),
+    ]
+      .sort((a, b) => a.order - b.order)
+      .map(call => call.name);
+
+    expect(recorded).toEqual(['expect', 'register']);
+    expect(expectSpy).toHaveBeenCalledWith(MARKER_HTML_TYPES);
+    // Positive control that the spies observed the real construction path and
+    // not an inert object: the registry that came back is usable.
+    expect(registry.getActivePainter(MARKER_HTML_TYPE)).toBeDefined();
+  });
+
   it('routes a marker element to canvas, registers exactly one canvas type (the marker type), and exposes an active painter', () => {
     const registry = createStandaloneMarkerRegistry();
     const element = markerElement('door');

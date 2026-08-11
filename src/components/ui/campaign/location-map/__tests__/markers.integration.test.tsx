@@ -316,10 +316,15 @@ describe('markers over the real sync connection: the DM audience reaches the wir
    * A live DM connection over the fake transport, with `resolveAudience` wired
    * exactly as `DmLocationEditor.hooks.ts:623-627` and
    * `DmBattleMapCanvas.hooks.ts` wire it: read `dmOnlyElements` out of product
-   * state AT SEND TIME (never a captured snapshot), and stamp the literal
-   * `'dm'` those shipped call sites use. The assertions below compare against
-   * the exported `DM_AUDIENCE`, so this also pins that the constant and the
-   * literal the surfaces actually send have not drifted apart.
+   * state AT SEND TIME (never a captured snapshot), and stamp `DM_AUDIENCE`,
+   * which is now the exact value both shipped call sites import.
+   *
+   * What this test pins is the WIRE ORDERING — that the audience is already on
+   * the marker's first outbound upsert — with a hand-wired `resolveAudience`
+   * standing in for the surfaces' own. It does NOT pin that the surfaces send
+   * this particular value: that is closed structurally instead, by the two
+   * surfaces importing `DM_AUDIENCE` rather than repeating a literal, plus
+   * `markerData.test.ts`'s assertion that `DM_AUDIENCE === 'dm'`.
    */
   const startLiveDmConnection = async (store: ElementStore) => {
     conn = createManagedBattleMapConnection({

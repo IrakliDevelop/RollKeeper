@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 
 import { ElementStore, createHtmlElement } from '@fieldnotes/core';
@@ -427,6 +427,70 @@ describe('useMarkerWrites — bulk audience', () => {
     expect(readBattleMap()?.dmOnlyElements).toEqual({
       'unrelated-element': true,
     });
+  });
+});
+
+describe('useMarkerWrites — the re-emit gate is bound to the surface mode', () => {
+  /**
+   * The gate itself (`deps.reemitAudience !== false`) is covered in
+   * `markerWrites.test.ts`, but only with the flag passed as an explicit
+   * literal — so nothing there can see the BINDING in this file
+   * (`const reemitAudience = mode === 'battlemap'`). These two cases observe
+   * `store.update` through the hook, which is the only place that binding is
+   * made, and they are a matched pair on one fixture: same siblings, same spy,
+   * same call, only `mode` differs.
+   */
+  function renderForMode(
+    mode: 'battlemap' | 'location',
+    viewport: MarkerWritesViewport
+  ) {
+    return renderHook(() =>
+      useMarkerWrites({
+        mode,
+        campaignCode: CODE,
+        mapId: MAP_ID,
+        getViewport: () => viewport,
+      })
+    );
+  }
+
+  it('location mode issues NO canvas re-emit — relay-less surfaces must not dirty the canvas on a pure audience change', () => {
+    const viewport = makeViewport();
+    seedSibling(viewport, 'shared-ref');
+    seedSibling(viewport, 'shared-ref');
+    const update = vi.spyOn(viewport.store, 'update');
+
+    const { result } = renderForMode('location', viewport);
+
+    let transition: MarkerAudienceTransition | undefined;
+    act(() => {
+      transition = result.current.setMarkerAudienceForRef('shared-ref', true);
+    });
+
+    // The audience itself still lands — the gate covers only the re-emit.
+    expect(transition?.status).toBe('applied');
+    expect(transition?.elementIds).toHaveLength(2);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('positive control: battlemap mode re-emits once per sibling on the same fixture and spy', () => {
+    const viewport = makeViewport();
+    seedSibling(viewport, 'shared-ref');
+    seedSibling(viewport, 'shared-ref');
+    const update = vi.spyOn(viewport.store, 'update');
+
+    const { result } = renderForMode('battlemap', viewport);
+
+    let transition: MarkerAudienceTransition | undefined;
+    act(() => {
+      transition = result.current.setMarkerAudienceForRef('shared-ref', true);
+    });
+
+    expect(transition?.status).toBe('applied');
+    expect(update).toHaveBeenCalledTimes(2);
+    for (const id of transition?.elementIds ?? []) {
+      expect(update).toHaveBeenCalledWith(id, {});
+    }
   });
 });
 
