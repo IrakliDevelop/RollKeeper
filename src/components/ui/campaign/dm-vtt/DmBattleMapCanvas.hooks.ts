@@ -485,7 +485,10 @@ export function useDmBattleMapCanvas({
       // every persisted element with no origin meta.
       markerAddGuardUnsubRef.current?.();
       markerAddGuardUnsubRef.current = vp.store.on('add', (element, meta) => {
-        guardLocalMarkerAddRef.current(element, meta);
+        // `vp` is handed over rather than looked up: this is the very store
+        // that emitted the add, and a guard that resolved its viewport through
+        // an accessor would fail OPEN the moment that accessor answered null.
+        guardLocalMarkerAddRef.current(vp, element, meta);
       });
 
       // What the guard above discriminates on. `RemoveElementCommand.undo`

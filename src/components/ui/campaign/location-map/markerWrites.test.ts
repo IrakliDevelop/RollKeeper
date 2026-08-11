@@ -1208,3 +1208,143 @@ describe('noteMarkerRemoval', () => {
     expect(harness.deps.removalTracker.size()).toBe(0);
   });
 });
+
+/**
+ * The remembered audience is a FLOOR, not an answer.
+ *
+ * The tracker snapshots ONE element's audience, but every audience decision
+ * the DM can make is per-REF and moves the whole sibling set. Duplicate refs
+ * within one map are legal (§6.8), so the two can go out of step between a
+ * removal and its undo — and replaying the stale snapshot would publish a pin
+ * the DM has since hidden, and leave the ref permanently mixed-audience.
+ */
+describe('guardLocalMarkerAdd — the restored audience is floored at the ref live siblings', () => {
+  it('restores DM-ONLY when a live sibling of the ref is DM-only, though the removal remembered SHARED', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    const a = seedMarkerElement(harness, 'ref-shared');
+    const b = seedMarkerElement(harness, 'ref-shared');
+    // Both shared when A leaves, so the snapshot says `wasDmOnly: false`.
+    expect(noteMarkerRemoval(harness.deps, a)).toBe(true);
+    harness.state.elements.delete(a.id);
+
+    // The DM's most recent explicit instruction for this marker: hide it. Only
+    // B is live, so the sibling set is [b] and the transition is uniform.
+    expect(setMarkerAudienceForRef(harness.deps, 'ref-shared', true)).toEqual({
+      status: 'applied',
+      elementIds: [b.id],
+      dmOnly: true,
+    });
+
+    // The undo: same element, same id, same ref, no meta.
+    harness.state.elements.set(a.id, a);
+    expect(guardLocalMarkerAdd(harness.deps, a)).toEqual({
+      status: 'restored',
+      wasDmOnly: true,
+    });
+    expect(harness.state.dmOnlyElements[a.id]).toBe(true);
+    // The ref is still left alone — the ref match is what identified the undo.
+    expect(markerRefForElement(harness.state.elements.get(a.id))).toBe(
+      'ref-shared'
+    );
+    expect(harness.state.markers).toEqual([]);
+
+    // And the set is uniform again, so the ref is not wedged: the next
+    // transition is applied to BOTH pins rather than refused mixed-audience.
+    const next = setMarkerAudienceForRef(harness.deps, 'ref-shared', false);
+    expect(next.status).toBe('applied');
+    if (next.status !== 'applied') return;
+    expect(next.elementIds.sort()).toEqual([a.id, b.id].sort());
+  });
+
+  it('POSITIVE CONTROL: with every live sibling shared, the same undo restores it SHARED', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    const a = seedMarkerElement(harness, 'ref-shared');
+    const b = seedMarkerElement(harness, 'ref-shared');
+    expect(noteMarkerRemoval(harness.deps, a)).toBe(true);
+    harness.state.elements.delete(a.id);
+    // The one difference from the test above: nothing hides the ref.
+    expect(harness.state.dmOnlyElements[b.id]).toBeUndefined();
+
+    harness.state.elements.set(a.id, a);
+    expect(guardLocalMarkerAdd(harness.deps, a)).toEqual({
+      status: 'restored',
+      wasDmOnly: false,
+    });
+    expect(harness.state.dmOnlyElements[a.id]).toBeUndefined();
+    expect(harness.calls).toEqual([]);
+    expect(markerRefForElement(harness.state.elements.get(a.id))).toBe(
+      'ref-shared'
+    );
+    expect(harness.state.markers).toEqual([]);
+  });
+
+  it('a DM-only sibling of a DIFFERENT ref does not raise the floor', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    const a = seedMarkerElement(harness, 'ref-shared');
+    const stranger = seedMarkerElement(harness, 'ref-other');
+    harness.seedDmOnly(stranger.id, true);
+
+    expect(noteMarkerRemoval(harness.deps, a)).toBe(true);
+    harness.state.elements.delete(a.id);
+    harness.state.elements.set(a.id, a);
+
+    expect(guardLocalMarkerAdd(harness.deps, a)).toEqual({
+      status: 'restored',
+      wasDmOnly: false,
+    });
+    expect(harness.state.dmOnlyElements[a.id]).toBeUndefined();
+  });
+});
+
+/**
+ * `getDmOnlyElements()` answers `{}` for a map that is not in product state at
+ * all, which is not the same fact as "this pin was shared". Remembering a
+ * removal read in that window would hand a later undo the claim "restore this
+ * to shared" about a pin that may have been a secret.
+ */
+describe('noteMarkerRemoval — an unreadable map is not "not DM-only"', () => {
+  it('remembers nothing while the bound map is unreadable, so the re-add takes the fail-closed path', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    harness.deps.isMapReadable = () => false;
+    // Exactly what a missing map looks like from inside these deps: the
+    // audience read yields `{}` for an element that may well be DM-only.
+    const element = seedMarkerElement(harness, 'ref-a');
+    expect(harness.deps.getDmOnlyElements()[element.id]).toBeUndefined();
+
+    expect(noteMarkerRemoval(harness.deps, element)).toBe(false);
+    expect(harness.deps.removalTracker.size()).toBe(0);
+
+    // The undo-shaped re-add is therefore treated as a duplicate: marked
+    // DM-only and given its own ref.
+    expect(guardLocalMarkerAdd(harness.deps, element)).toEqual({
+      status: 'marked',
+      rewrittenRef: 'ref-1',
+    });
+    expect(harness.state.dmOnlyElements[element.id]).toBe(true);
+    expect(markerRefForElement(harness.state.elements.get(element.id))).toBe(
+      'ref-1'
+    );
+  });
+
+  it('POSITIVE CONTROL: the identical removal on a READABLE map is remembered and restores shared', () => {
+    const harness = makeHarness();
+    harness.deps.removalTracker = createMarkerRemovalTracker();
+    harness.deps.isMapReadable = () => true;
+    const element = seedMarkerElement(harness, 'ref-a');
+
+    expect(noteMarkerRemoval(harness.deps, element)).toBe(true);
+    expect(harness.deps.removalTracker.size()).toBe(1);
+
+    expect(guardLocalMarkerAdd(harness.deps, element)).toEqual({
+      status: 'restored',
+      wasDmOnly: false,
+    });
+    expect(markerRefForElement(harness.state.elements.get(element.id))).toBe(
+      'ref-a'
+    );
+  });
+});

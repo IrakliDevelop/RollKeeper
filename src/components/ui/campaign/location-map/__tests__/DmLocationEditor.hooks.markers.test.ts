@@ -1156,3 +1156,275 @@ describe('useDmLocationEditor — malformed marker data reaches a diagnostic sin
     expect(warn).not.toHaveBeenCalled();
   });
 });
+
+const SHARED_REF = 'ref-shared-by-two-pins';
+
+/**
+ * The fixture the single-pin undo tests above cannot express: TWO pins sharing
+ * one ref (legal — §6.8 permits duplicate refs within one map), both DM-only
+ * to begin with, plus the detail record they both read.
+ *
+ * It matters because the removal tracker remembers a PER-ELEMENT audience
+ * while every audience decision the DM can make is per-REF and moves the whole
+ * sibling set. Only a fixture with a second sibling can put those two out of
+ * step between a removal and its undo.
+ */
+async function setupSharedRefPair() {
+  const harness = makeStubViewport();
+  const a = seedMarkerPin(harness.store, SHARED_REF);
+  const b = seedMarkerPin(harness.store, SHARED_REF);
+  useBattleMapStore.setState({
+    battleMaps: {
+      [CODE]: {
+        [MAP_ID]: battleMapFixture({
+          markers: [
+            {
+              id: SHARED_REF,
+              title: 'Sally port',
+              body: 'Barred from the inside',
+              dmNotes: 'the bar lifts from room 4',
+            },
+          ],
+          dmOnlyElements: { [a.id]: true, [b.id]: true },
+        }),
+      },
+    },
+  });
+
+  const { result } = renderHook(() =>
+    useDmLocationEditor({
+      location: battleMapFixture(),
+      campaignCode: CODE,
+      dmId: 'dm-1',
+      mode: 'battlemap',
+      onSave: vi.fn(),
+      onSyncToPlayers: vi.fn(),
+    })
+  );
+  result.current.canvasRef.current = {
+    viewport: harness.vp,
+  } as unknown as FieldNotesCanvasRef;
+  await act(async () => {
+    await result.current.handleReady(harness.vp);
+  });
+  return { ...harness, result, a, b };
+}
+
+/**
+ * The remembered audience is a FLOOR, not an answer — twin of the block in
+ * `dm-vtt/__tests__/DmBattleMapCanvas.hooks.markers.test.ts`.
+ *
+ * `noteMarkerRemoval` snapshots one element's audience; `handleToggleDmOnly`
+ * moves the whole sibling set of a ref. Between a removal and its undo the DM
+ * can therefore make a decision the snapshot knows nothing about, and replaying
+ * the snapshot would publish a pin the DM has just hidden.
+ */
+describe('useDmLocationEditor — an undone pin cannot rejoin a ref its siblings no longer share', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    useBattleMapStore.setState({ battleMaps: {} });
+    vi.clearAllMocks();
+  });
+
+  it('hiding the ref while one of its pins is deleted makes the undo restore that pin DM-ONLY, not to the stale shared snapshot', async () => {
+    const { store, result, select, a, b } = await setupSharedRefPair();
+
+    // 1. The DM shares the ref: one toggle on either pin moves both.
+    act(() => {
+      select([a.id]);
+    });
+    act(() => {
+      result.current.handleToggleDmOnly();
+    });
+    expect(readMap()?.dmOnlyElements).toEqual({});
+
+    // 2. Delete pin A. The removal is remembered as `wasDmOnly: false`.
+    const removedA = structuredClone(store.getById(a.id)) as HtmlElement;
+    act(() => {
+      store.remove(a.id);
+    });
+
+    // 3. The DM's most recent explicit instruction for this marker: hide it.
+    //    Only B is live, so the sibling set is [b] and it applies uniformly.
+    act(() => {
+      select([b.id]);
+    });
+    act(() => {
+      result.current.handleToggleDmOnly();
+    });
+    expect(readMap()?.dmOnlyElements).toEqual({ [b.id]: true });
+    expect(result.current.markerAudienceNotice).toBeNull();
+
+    // 4. Undo the delete — exactly what `RemoveElementCommand.undo` does.
+    act(() => {
+      store.add(removedA);
+    });
+
+    // The pin comes back HIDDEN: the remembered `shared` was floored at the
+    // ref's live sibling state, so its first upsert cannot publish a secret.
+    expect(readMap()?.dmOnlyElements[a.id]).toBe(true);
+    // ...and it is still the same point of interest: no ref rewrite, no
+    // invented detail record.
+    expect(markerDataOf(store.getById(a.id) as HtmlElement).ref).toBe(
+      SHARED_REF
+    );
+    expect((readMap()?.markers ?? []).map(marker => marker.id)).toEqual([
+      SHARED_REF,
+    ]);
+
+    // 5. The sibling set is uniform again, so the ref is not wedged: the very
+    //    next toggle is APPLIED, not refused as mixed-audience.
+    act(() => {
+      select([a.id]);
+    });
+    act(() => {
+      result.current.handleToggleDmOnly();
+    });
+    expect(result.current.markerAudienceNotice).not.toBe(
+      MARKER_MIXED_AUDIENCE_MESSAGE
+    );
+    expect(result.current.markerAudienceNotice).toBeNull();
+    expect(readMap()?.dmOnlyElements).toEqual({});
+  });
+
+  it('POSITIVE CONTROL: with no intervening audience change, the same fixture restores the undone pin SHARED and leaves its ref alone', async () => {
+    const { store, result, select, a, b } = await setupSharedRefPair();
+
+    act(() => {
+      select([a.id]);
+    });
+    act(() => {
+      result.current.handleToggleDmOnly();
+    });
+    expect(readMap()?.dmOnlyElements).toEqual({});
+
+    const removedA = structuredClone(store.getById(a.id)) as HtmlElement;
+    act(() => {
+      store.remove(a.id);
+    });
+    // Nothing happens to the ref's audience in between — B stays shared.
+    expect(readMap()?.dmOnlyElements[b.id]).toBeUndefined();
+    act(() => {
+      store.add(removedA);
+    });
+
+    // Still shared: the floor raises a remembered audience, it never invents
+    // one. Undo of a delete stays lossless.
+    expect(readMap()?.dmOnlyElements[a.id]).toBeUndefined();
+    expect(readMap()?.dmOnlyElements).toEqual({});
+    expect(markerDataOf(store.getById(a.id) as HtmlElement).ref).toBe(
+      SHARED_REF
+    );
+    expect((readMap()?.markers ?? []).map(marker => marker.id)).toEqual([
+      SHARED_REF,
+    ]);
+  });
+
+  it('undoing the deletion of a DM-ONLY pin of a shared-ref pair leaves it DM-only, with its ref untouched', async () => {
+    const { store, result, a, b } = await setupSharedRefPair();
+    // The fixture starts with both pins DM-only — nothing to toggle.
+    expect(readMap()?.dmOnlyElements).toEqual({ [a.id]: true, [b.id]: true });
+
+    const removedA = structuredClone(store.getById(a.id)) as HtmlElement;
+    act(() => {
+      store.remove(a.id);
+    });
+    act(() => {
+      store.add(removedA);
+    });
+
+    expect(readMap()?.dmOnlyElements[a.id]).toBe(true);
+    expect(markerDataOf(store.getById(a.id) as HtmlElement).ref).toBe(
+      SHARED_REF
+    );
+    expect((readMap()?.markers ?? []).map(marker => marker.id)).toEqual([
+      SHARED_REF,
+    ]);
+    expect(result.current.markerAudienceNotice).toBeNull();
+  });
+
+  it('POSITIVE CONTROL: on the same fixture a duplicate-shaped add — new id, same ref — is still marked DM-only and given its own ref', async () => {
+    const { store, result, select, a } = await setupSharedRefPair();
+
+    act(() => {
+      select([a.id]);
+    });
+    act(() => {
+      result.current.handleToggleDmOnly();
+    });
+    expect(readMap()?.dmOnlyElements).toEqual({});
+
+    const removedA = structuredClone(store.getById(a.id)) as HtmlElement;
+    act(() => {
+      store.remove(a.id);
+    });
+
+    // Everything the undo re-adds, except the id — the discriminator itself.
+    const clone = structuredClone(removedA) as HtmlElement;
+    clone.id = 'pasted-onto-shared-ref';
+    act(() => {
+      store.add(clone);
+    });
+
+    expect(readMap()?.dmOnlyElements[clone.id]).toBe(true);
+    const clonedRef = markerDataOf(store.getById(clone.id) as HtmlElement).ref;
+    expect(clonedRef).not.toBe(SHARED_REF);
+    expect(findDetail(clonedRef)).toMatchObject({
+      id: clonedRef,
+      title: 'Sally port',
+      dmNotes: 'the bar lifts from room 4',
+    });
+  });
+});
+
+/**
+ * The guard receives the viewport whose store emitted the add, rather than
+ * resolving it through `getViewport()`. That accessor can answer null — the
+ * canvas ref detaching, a surface tearing down — and the guard's null branch
+ * used to report `not-a-marker` and mark nothing at all: fail OPEN in the one
+ * path that exists to fail closed.
+ */
+describe('useDmLocationEditor — the add guard does not depend on the viewport accessor', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
+    useBattleMapStore.setState({
+      battleMaps: { [CODE]: { [MAP_ID]: battleMapFixture() } },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    useBattleMapStore.setState({ battleMaps: {} });
+    vi.clearAllMocks();
+  });
+
+  it('a duplicate-shaped add is marked and rewritten even once the canvas ref has gone null', async () => {
+    const { vp, store, result } = await setup('battlemap');
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const original = markerElements(store)[0] as HtmlElement;
+    const originalRef = markerDataOf(original).ref;
+
+    const clone = structuredClone(store.getById(original.id)) as HtmlElement;
+    clone.id = 'cloned-after-detach';
+    // The accessor the guard used to depend on now answers null, while the
+    // store subscription is still live and still emitting.
+    result.current.canvasRef.current = null;
+    expect(result.current.canvasRef.current).toBeNull();
+
+    act(() => {
+      store.add(clone);
+    });
+
+    expect(readMap()?.dmOnlyElements[clone.id]).toBe(true);
+    const clonedRef = markerDataOf(store.getById(clone.id) as HtmlElement).ref;
+    expect(clonedRef).not.toBe(originalRef);
+    expect(findDetail(clonedRef)).toBeDefined();
+  });
+});

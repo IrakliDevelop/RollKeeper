@@ -78,9 +78,17 @@ export interface MarkerWrites {
    * Wire this to `viewport.store.on('add')` on every surface that can author
    * markers. It is what stops a `mod+d` duplicate, a paste or a context-menu
    * clone from entering the canvas with no DM-only mark — see
-   * `guardLocalMarkerAdd`. A no-op when the viewport is not mounted yet.
+   * `guardLocalMarkerAdd`.
+   *
+   * The viewport is an ARGUMENT, not a lookup through `getViewport()`: the
+   * registration site has it in hand (it is the very store that emitted this
+   * add), and routing a security guard through an accessor that can answer
+   * null put a fail-OPEN default in the path — a `getViewport()` that had gone
+   * null meant the clone entered the canvas unmarked and its first upsert
+   * published the pin. There is no null case left to default.
    */
   guardLocalMarkerAdd(
+    viewport: MarkerWritesViewport,
     element: Readonly<CanvasElement>,
     meta?: { origin?: string }
   ): MarkerAddGuardResult;
@@ -184,6 +192,10 @@ function makeDeps(
           .getState()
           .updateBattleMap(campaignCode, mapId, { markers: next }),
       getDmOnlyElements: () => readMap()?.dmOnlyElements ?? {},
+      // The `{}` above is indistinguishable from "no DM-only elements", so
+      // readers that must not mistake a missing map for a shared audience ask
+      // this instead. See `isMapReadable` in markerWrites.ts.
+      isMapReadable: () => readMap() !== undefined,
       setDmOnly: (elementId, dmOnly) =>
         useBattleMapStore
           .getState()
@@ -212,6 +224,8 @@ function makeDeps(
         .getState()
         .updateLocation(campaignCode, mapId, { markers: next }),
     getDmOnlyElements: () => readMap()?.dmOnlyElements ?? {},
+    // Same reasoning as the battlemap branch above.
+    isMapReadable: () => readMap() !== undefined,
     setDmOnly: (elementId, dmOnly) =>
       useLocationStore
         .getState()
@@ -321,16 +335,14 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
 
   const guardLocalMarkerAdd = useCallback(
     (
+      viewport: MarkerWritesViewport,
       element: Readonly<CanvasElement>,
       meta?: { origin?: string }
-    ): MarkerAddGuardResult => {
-      const viewport = getViewport();
-      // No viewport means no store to rewrite the ref in — and no store that
-      // could have emitted this add in the first place.
-      if (!viewport) return { status: 'ignored', reason: 'not-a-marker' };
-      return guardLocalMarkerAddWrite(depsFor(viewport), element, meta);
-    },
-    [getViewport, depsFor]
+    ): MarkerAddGuardResult =>
+      // The caller hands over the viewport whose store emitted this add, so
+      // there is no null path here to degrade through. See the interface.
+      guardLocalMarkerAddWrite(depsFor(viewport), element, meta),
+    [depsFor]
   );
 
   const noteMarkerRemoval = useCallback(
