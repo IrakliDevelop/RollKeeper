@@ -287,7 +287,18 @@ describe('useDmLocationEditor — markers work with no relay URL configured', ()
 
   it('positive control: the identical flow with a relay URL configured behaves identically', async () => {
     vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', 'wss://relay.test');
-    const { vp, store, result } = await setup('battlemap');
+    const { vp, store, result, activationOptions } = await setup('battlemap');
+
+    // Registration must not become conditional on the relay guard in the
+    // other direction either — a mutation that registers the painter ONLY
+    // when the relay URL is unset would still pass every other assertion
+    // in this test while failing here.
+    expect(vp.getHtmlPainters().getActivePainter(MARKER_HTML_TYPE)).toBeTypeOf(
+      'function'
+    );
+    expect(activationOptions).toHaveLength(1);
+    expect(activationOptions[0]).not.toBeNull();
+    expect(activationOptions[0]?.gesture).toBe('double');
 
     act(() => {
       tapMarkerTool(result.current.tools, vp);
@@ -510,6 +521,56 @@ describe('useDmLocationEditor — the DM-only toggle routes markers through thei
     expect(result.current.markerAudienceNotice).toMatch(/DM-only/);
     // The pin that was already shared stayed shared.
     expect(readMap()?.dmOnlyElements[shown.id]).toBeUndefined();
+  });
+
+  it('clears the mixed-audience notice when the selection changes', async () => {
+    useBattleMapStore.setState({
+      battleMaps: { [CODE]: { [MAP_ID]: battleMapFixture() } },
+    });
+    const harness = makeStubViewport();
+    const hidden = seedMarkerPin(harness.store, 'shared-ref');
+    const shown = seedMarkerPin(harness.store, 'shared-ref');
+    useBattleMapStore.setState({
+      battleMaps: {
+        [CODE]: {
+          [MAP_ID]: battleMapFixture({ dmOnlyElements: { [hidden.id]: true } }),
+        },
+      },
+    });
+
+    const { result } = renderHook(() =>
+      useDmLocationEditor({
+        location: battleMapFixture(),
+        campaignCode: CODE,
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: harness.vp,
+    } as unknown as FieldNotesCanvasRef;
+    await act(async () => {
+      await result.current.handleReady(harness.vp);
+    });
+    act(() => {
+      harness.select([hidden.id]);
+    });
+    act(() => {
+      result.current.handleToggleDmOnly();
+    });
+    // Positive control: immediately after the refusal, and before the
+    // selection changes, the notice is present.
+    expect(result.current.markerAudienceNotice).toBe(
+      MARKER_MIXED_AUDIENCE_MESSAGE
+    );
+
+    act(() => {
+      harness.select([shown.id]);
+    });
+
+    expect(result.current.markerAudienceNotice).toBeNull();
   });
 
   it('positive control: a uniform sibling set flips BOTH pins together', async () => {

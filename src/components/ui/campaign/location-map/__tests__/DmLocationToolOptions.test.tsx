@@ -353,7 +353,30 @@ describe('DmLocationToolOptions marker kind + colour picker', () => {
     }
   });
 
-  it.each([...new Set([...DM_LOCATION_TOOL_NAMES, ...DM_VTT_TOOL_NAMES])])(
+  it('renders the marker picker for the marker tool, even amid every other tool option', () => {
+    mockActiveTool = MARKER_TOOL_NAME;
+    mockToolOptions = {
+      pencil: { color: '#F4C430', width: 2.6 },
+      laser: { color: '#F4C430', width: 3 },
+      ping: { color: '#F4C430' },
+      measure: { color: '#FF5722', feetPerCell: 5 },
+      template: { templateShape: 'circle', feetPerCell: 5 },
+    };
+    render(
+      <DmLocationToolOptions mode="battlemap" markerControls={makeControls()} />
+    );
+
+    // Positive control for the loop below: proves the query CAN find the
+    // picker at all, so the loop's negative assertions are discriminating
+    // rather than vacuously true.
+    expect(screen.getByTestId('marker-tool-options')).toBeInTheDocument();
+  });
+
+  it.each(
+    [...new Set([...DM_LOCATION_TOOL_NAMES, ...DM_VTT_TOOL_NAMES])].filter(
+      toolName => toolName !== MARKER_TOOL_NAME
+    )
+  )(
     'does not render the marker picker for the %s tool, even with markerControls supplied',
     toolName => {
       mockActiveTool = toolName;
@@ -374,12 +397,6 @@ describe('DmLocationToolOptions marker kind + colour picker', () => {
         />
       );
 
-      if (toolName === MARKER_TOOL_NAME) {
-        // Positive control inside the same iteration: the one name that MUST
-        // render it does, proving the query above can find the picker at all.
-        expect(screen.getByTestId('marker-tool-options')).toBeInTheDocument();
-        return;
-      }
       expect(
         screen.queryByTestId('marker-tool-options')
       ).not.toBeInTheDocument();

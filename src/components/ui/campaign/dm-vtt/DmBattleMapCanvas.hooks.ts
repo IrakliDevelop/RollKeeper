@@ -431,6 +431,10 @@ export function useDmBattleMapCanvas({
       selectionUnsubRef.current = vp.onSelectionChange(() => {
         const ids = vp.getSelectedIds();
         setSelectedElementId(ids.length === 1 ? ids[0] : null);
+        // A refused mixed-audience notice is about the PREVIOUS selection;
+        // once the DM moves on, leaving it attached to no control would
+        // mislead rather than explain.
+        setMarkerAudienceNotice(null);
         onSelectionChange?.(ids);
       });
 
