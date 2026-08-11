@@ -1,4 +1,4 @@
-import type { SavedCameraView } from './battlemap';
+import type { MarkerDetail, SavedCameraView } from './battlemap';
 
 export interface GridSettings {
   gridType: 'square' | 'hex';
@@ -20,6 +20,9 @@ export interface LocationMap {
   gridEnabled: boolean;
   gridSettings?: GridSettings;
   cameraViews?: SavedCameraView[];
+  /** Marker detail records keyed by their `ref` (see `MarkerDetail.id`).
+   * DM product state — the public projection is added separately in B8. */
+  markers?: MarkerDetail[];
   createdAt: string;
   updatedAt: string;
 }
