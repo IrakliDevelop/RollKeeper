@@ -7,7 +7,6 @@ import {
   createHtmlElement,
   exportImage,
   resolveHtmlRouting,
-  type CanvasElement,
   type ExportImageOptions,
   type HtmlElement,
   type HtmlPainter,
@@ -149,7 +148,9 @@ function stubCanvas(): { fillStyles: () => string[] } {
 // ---------------------------------------------------------------------------
 
 /**
- * Byte-for-byte the `FakeTransport` harness from `src/lib/battlemapSync.test.ts:49-87`.
+ * The `BattleMapTransport` subset of the `FakeTransport` harness from
+ * `src/lib/battlemapSync.test.ts:49-87` — this copy omits `emitReconnect`
+ * and `emitClose`, which nothing in this file exercises.
  * Duplicated rather than imported: importing a `*.test.ts` module would
  * execute its `describe` blocks a second time inside this file's run. Same
  * reasoning as the duplicated fake 2D context in `useMarkerRegistration.test.tsx`.
@@ -198,6 +199,7 @@ const snapshotEnvelope = (to: string): string =>
 interface SentElement {
   id: string;
   audience?: string;
+  type?: string;
 }
 interface SentEnvelope {
   op: { kind: string; element?: SentElement };
@@ -274,6 +276,12 @@ function realProductStateDeps(store: ElementStore): MarkerWriteDeps {
 
 describe('markers over the real sync connection: the DM audience reaches the wire', () => {
   let fakeTransport: FakeTransport;
+  // Hoisted so `afterEach` can always dispose it, even when an earlier
+  // assertion in the test throws: an inline `conn.stop()` at the end of the
+  // test body would never run on failure, leaving the `SyncClient` attached
+  // to the `ElementStore` and the transport open for the rest of the file's
+  // run.
+  let conn: ReturnType<typeof createManagedBattleMapConnection> | undefined;
 
   beforeEach(() => {
     fakeTransport = new FakeTransport();
@@ -290,6 +298,8 @@ describe('markers over the real sync connection: the DM audience reaches the wir
   });
 
   afterEach(() => {
+    conn?.stop();
+    conn = undefined;
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     useBattleMapStore.setState({ battleMaps: {} });
@@ -305,7 +315,7 @@ describe('markers over the real sync connection: the DM audience reaches the wir
    * literal the surfaces actually send have not drifted apart.
    */
   const startLiveDmConnection = async (store: ElementStore) => {
-    const conn = createManagedBattleMapConnection({
+    conn = createManagedBattleMapConnection({
       relayUrl: 'wss://relay.example',
       campaignCode: CODE,
       battleMapId: MAP_ID,
@@ -328,7 +338,7 @@ describe('markers over the real sync connection: the DM audience reaches the wir
 
   it("the marker's FIRST outbound upsert already carries the DM audience, and an unmarked element's first upsert carries none (positive control)", async () => {
     const store = new ElementStore();
-    const conn = await startLiveDmConnection(store);
+    await startLiveDmConnection(store);
 
     // Positive control FIRST, over the identical live connection and the
     // identical wire observation: an element created with no DM-only mark
@@ -359,27 +369,18 @@ describe('markers over the real sync connection: the DM audience reaches the wir
 
     const markerUpserts = upsertsFor(fakeTransport.sent, result.elementId);
     // The marker did reach the wire at all — otherwise "the first upsert is
-    // stamped" would be vacuously true over an empty list.
+    // stamped" would be vacuously true over an empty list, and index 0 really
+    // is the marker's own creation frame, not some other frame that happens
+    // to share an id.
     expect(markerUpserts.length).toBeGreaterThan(0);
-    // THE property: index 0 is the first frame this element ever produced.
-    // Asserting on a later frame would be satisfied by a re-emit that
-    // corrected the audience after a one-frame leak.
+    expect(markerUpserts[0]?.type).toBe('html');
+    // THE property under test: index 0 — the FIRST frame this element ever
+    // produced — already carries the DM audience. A weaker
+    // `markerUpserts.some(u => u.audience === DM_AUDIENCE)` would pass
+    // identically if a later re-emit corrected the audience after a
+    // one-frame leak; asserting on index 0, and on it alone, is what rules
+    // that out.
     expect(markerUpserts[0]?.audience).toBe(DM_AUDIENCE);
-    // And it is the marker element, not something else that happened to share
-    // an id — the wire frame really is the pin under test.
-    const firstMarkerFrame = fakeTransport.sent
-      .map(
-        raw =>
-          JSON.parse(raw) as { op: { kind: string; element?: CanvasElement } }
-      )
-      .find(
-        envelope =>
-          envelope.op.kind === 'upsert' &&
-          envelope.op.element?.id === result.elementId
-      );
-    expect(firstMarkerFrame?.op.element?.type).toBe('html');
-
-    conn.stop();
   });
 });
 
@@ -441,6 +442,9 @@ describe('markers export with no Viewport constructed at all', () => {
       name: 'map',
       mapImageSize: { w: 40, h: 40 },
     });
+    // The export actually painted something — otherwise the assertion below
+    // would be trivially satisfied by an export that painted nothing at all.
+    expect(noteStub.fillStyles().length).toBeGreaterThan(0);
     expect(noteStub.fillStyles()).not.toContain(MARKER_COLOR_CSS.purple);
   });
 });
