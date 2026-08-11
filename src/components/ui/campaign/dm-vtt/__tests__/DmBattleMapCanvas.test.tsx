@@ -53,6 +53,31 @@ const mockHookState = {
   handleDeleteMarker: vi.fn(),
 };
 
+// A handful of tests below mutate marker-related fields on `mockHookState`
+// directly (`markerControls`, `selectedElementIsMarker`,
+// `markerAudienceNotice`, `markerPanelOpen`, `markerPanelState`, `viewport`).
+// `vi.clearAllMocks()` in `beforeEach` only resets mock call history, not
+// these plain field values — without an explicit reset, a value set by one
+// test leaks into every later test in this file.
+function defaultMarkerHookFields() {
+  return {
+    viewport: {} as Viewport,
+    markerControls: {
+      kind: 'door',
+      color: 'blue',
+      onKindChange: vi.fn(),
+      onColorChange: vi.fn(),
+    } as MarkerToolControls,
+    selectedElementIsMarker: false,
+    markerAudienceNotice: null as string | null,
+    markerPanelOpen: false,
+    markerPanelState: {
+      kind: 'invalid-data',
+      reason: 'no element is selected',
+    } as MarkerPanelState,
+  };
+}
+
 vi.mock('../DmBattleMapCanvas.hooks', async importOriginal => {
   const actual =
     await importOriginal<typeof import('../DmBattleMapCanvas.hooks')>();
@@ -129,7 +154,10 @@ describe('DmBattleMapCanvas wiring', () => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    Object.assign(mockHookState, defaultMarkerHookFields());
+  });
 
   it('reaches the toolbar with a live viewsControl once a viewport exists', () => {
     useBattleMapStore.setState({

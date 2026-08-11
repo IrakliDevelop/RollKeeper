@@ -262,7 +262,18 @@ describe('useDmBattleMapCanvas — markers work with no relay URL configured', (
 
   it('positive control: the identical flow with a relay URL configured behaves identically', () => {
     vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', 'wss://relay.test');
-    const { vp, store, result } = setup();
+    const { vp, store, result, activationOptions } = setup();
+
+    // Registration must not become conditional on the relay guard in the
+    // other direction either — a mutation that registers the painter ONLY
+    // when the relay URL is unset would still pass every other assertion
+    // in this test while failing here.
+    expect(vp.getHtmlPainters().getActivePainter(MARKER_HTML_TYPE)).toBeTypeOf(
+      'function'
+    );
+    expect(activationOptions).toHaveLength(1);
+    expect(activationOptions[0]).not.toBeNull();
+    expect(activationOptions[0]?.gesture).toBe('double');
 
     act(() => {
       tapMarkerTool(result.current.tools, vp);
@@ -381,6 +392,41 @@ describe('useDmBattleMapCanvas — the DM-only toggle routes markers through the
     expect(result.current.markerAudienceNotice).toBe(
       MARKER_MIXED_AUDIENCE_MESSAGE
     );
+  });
+
+  it('clears the mixed-audience notice when the selection changes', () => {
+    const harness = makeStubViewport();
+    const hidden = seedMarkerPin(harness.store, 'shared-ref');
+    const shown = seedMarkerPin(harness.store, 'shared-ref');
+    useBattleMapStore.setState({
+      battleMaps: {
+        [CODE]: {
+          [MAP_ID]: battleMapFixture({ dmOnlyElements: { [hidden.id]: true } }),
+        },
+      },
+    });
+
+    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+    act(() => {
+      result.current.handleReady(harness.vp);
+    });
+    act(() => {
+      harness.select([hidden.id]);
+    });
+    act(() => {
+      result.current.handleToggleSelectedDmOnly();
+    });
+    // Positive control: immediately after the refusal, and before the
+    // selection changes, the notice is present.
+    expect(result.current.markerAudienceNotice).toBe(
+      MARKER_MIXED_AUDIENCE_MESSAGE
+    );
+
+    act(() => {
+      harness.select([shown.id]);
+    });
+
+    expect(result.current.markerAudienceNotice).toBeNull();
   });
 
   it('positive control: a uniform sibling set flips BOTH pins together', () => {
