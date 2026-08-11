@@ -61,7 +61,7 @@ import {
 } from '@/utils/npcInventoryItemForm';
 import { NPCSpellTab } from './NPCSpellTab';
 import { useNPCStore } from '@/store/npcStore';
-import { CurrencyManager } from '@/components/shared/character/CurrencyManager';
+import { NPCCurrencyStrip } from './NPCCurrencyStrip';
 import type { Currency } from '@/types/character';
 
 type DetailTab = 'stats' | 'spells' | 'inventory' | 'lore';
@@ -664,12 +664,12 @@ export function NPCDetailDialog({
 
   if (!npc) return null;
 
-  const adjustCurrency = (type: keyof Currency, delta: number) => {
+  const setCurrency = (type: keyof Currency, amount: number) => {
     const currency = { ...EMPTY_CURRENCY, ...npc.currency };
     useNPCStore.getState().updateNPC(npc.campaignCode, npc.id, {
       currency: {
         ...currency,
-        [type]: Math.max(0, currency[type] + delta),
+        [type]: amount,
       },
     });
   };
@@ -936,20 +936,10 @@ export function NPCDetailDialog({
 
           {activeTab === 'inventory' && (
             <div className="space-y-4">
-              <CurrencyManager
+              <NPCCurrencyStrip
                 currency={{ ...EMPTY_CURRENCY, ...npc.currency }}
-                compact
                 readonly={readOnly}
-                onAddCurrency={
-                  readOnly
-                    ? undefined
-                    : (type, amount) => adjustCurrency(type, amount)
-                }
-                onSubtractCurrency={
-                  readOnly
-                    ? undefined
-                    : (type, amount) => adjustCurrency(type, -amount)
-                }
+                onChange={readOnly ? undefined : setCurrency}
               />
               {npc.inventory && npc.inventory.length > 0 ? (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
