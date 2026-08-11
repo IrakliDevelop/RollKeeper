@@ -55,6 +55,7 @@ import {
   createLocalCameraAnimator,
   type FocusBroadcastHandle,
 } from './focusSync';
+import { buildPublicMarkerDetails } from './markerPublication';
 import { pinGridToMapLayer } from './gridPin';
 import { nextMapImagePosition } from './mapImagePlacement';
 import {
@@ -831,8 +832,24 @@ export function useDmLocationEditor(
 
     try {
       // Export canvas as PNG, filtering out DM-only elements
-      const currentDmOnly =
-        storeGetLocation(campaignCode, location.id)?.dmOnlyElements ?? {};
+      const storedLocation = storeGetLocation(campaignCode, location.id);
+      const currentDmOnly = storedLocation?.dmOnlyElements ?? {};
+
+      // Public marker projection (spec §6.4). Derived from the LIVE canvas so
+      // an unsaved pin cannot publish a stale audience, falling back to the
+      // persisted state. `buildPublicMarkerDetails` fails closed on anything
+      // it cannot read, so there is deliberately no second guard here.
+      const publicMarkers = buildPublicMarkerDetails({
+        canvasState: vp.exportJSON() || storedLocation?.canvasState,
+        markers: storedLocation?.markers ?? [],
+        dmOnlyElements: currentDmOnly,
+        onDroppedRef: info => {
+          console.warn(
+            `Marker ${info.ref} not published: ${info.reason} — its pins ` +
+              'disagree about who may see it.'
+          );
+        },
+      });
 
       // Try image export first, fall back to JSON if it fails (e.g. CORS)
       let snapshotUrl: string | undefined;
@@ -895,6 +912,9 @@ export function useDmLocationEditor(
         canvasState: filteredState,
         gridEnabled,
         gridSettings: location.gridSettings,
+        // One more EXPLICIT field. Never convert this literal to a spread of
+        // the stored location: `markers` would then carry `dmNotes`.
+        markers: publicMarkers,
         updatedAt: new Date().toISOString(),
       };
 

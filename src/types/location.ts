@@ -1,4 +1,8 @@
-import type { MarkerDetail, SavedCameraView } from './battlemap';
+import type {
+  MarkerDetail,
+  PublicMarkerDetail,
+  SavedCameraView,
+} from './battlemap';
 
 export interface GridSettings {
   gridType: 'square' | 'hex';
@@ -45,5 +49,9 @@ export interface SyncedLocation {
   canvasState: string; // filtered — no dmOnly elements (legacy, empty when snapshot used)
   gridEnabled: boolean;
   gridSettings?: GridSettings;
+  /** Public marker projection — `dmNotes` is unreachable by construction.
+   * Built only by `buildPublicMarkerDetails`; never assign a `MarkerDetail`
+   * here. */
+  markers?: PublicMarkerDetail[];
   updatedAt: string;
 }
