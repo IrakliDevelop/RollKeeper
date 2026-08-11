@@ -168,6 +168,7 @@ export function useDmBattleMapCanvas({
   const pinUnsubRef = useRef<(() => void) | null>(null);
   const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
   const markerAddGuardUnsubRef = useRef<(() => void) | null>(null);
+  const markerRemovalTrackUnsubRef = useRef<(() => void) | null>(null);
   const selectionUnsubRef = useRef<(() => void) | null>(null);
   const [hiddenPlacementActive, setHiddenPlacementActive] = useState(false);
   const hiddenPlacementActiveRef = useRef(false);
@@ -268,6 +269,11 @@ export function useDmBattleMapCanvas({
   // `markerWrites` identity.
   const guardLocalMarkerAddRef = useRef(markerWrites.guardLocalMarkerAdd);
   guardLocalMarkerAddRef.current = markerWrites.guardLocalMarkerAdd;
+  // The other half of that guard: what a removal remembers is what lets a
+  // later re-add of the same id be recognised as an UNDO rather than a
+  // duplicate. Same ref reasoning as above.
+  const noteMarkerRemovalRef = useRef(markerWrites.noteMarkerRemoval);
+  noteMarkerRemovalRef.current = markerWrites.noteMarkerRemoval;
   // Same reasoning for orphan GC, which runs once per canvas load.
   const gcOrphanMarkerDetailsRef = useRef(markerWrites.gcOrphanMarkerDetails);
   gcOrphanMarkerDetailsRef.current = markerWrites.gcOrphanMarkerDetails;
@@ -481,6 +487,18 @@ export function useDmBattleMapCanvas({
         guardLocalMarkerAddRef.current(element, meta);
       });
 
+      // What the guard above discriminates on. `RemoveElementCommand.undo`
+      // re-adds the SAME element with no meta, so without this the guard would
+      // read an undo as a duplicate and silently un-share the pin. Registered
+      // next to the guard because the two are one mechanism.
+      markerRemovalTrackUnsubRef.current?.();
+      markerRemovalTrackUnsubRef.current = vp.store.on(
+        'remove',
+        (element, meta) => {
+          noteMarkerRemovalRef.current(element, meta);
+        }
+      );
+
       pinUnsubRef.current?.();
       // Play canvas never arranges maps — the annotations layer (DM tokens,
       // notes, text) must stay unlocked, repairing any state persisted locked
@@ -639,7 +657,11 @@ export function useDmBattleMapCanvas({
       localAnimatorRef.current = null;
       connectionRef.current?.stop();
       pinUnsubRef.current?.();
+      // Disposed here for the same reason as every other store subscription;
+      // its absence was an oversight (the location editor already did it).
+      hiddenPlacementUnsubRef.current?.();
       markerAddGuardUnsubRef.current?.();
+      markerRemovalTrackUnsubRef.current?.();
       selectionUnsubRef.current?.();
     };
   }, []);
