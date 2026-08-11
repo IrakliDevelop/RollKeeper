@@ -1254,6 +1254,344 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
     conn.stop();
   });
 
+  it('poke + laser + ping + measure + focus + MARKERS coexist over the real attachments on ONE connection: the marker element stays byte-identical, presence produces no upsert for it, and its own upsert is unaffected', async () => {
+    // Task B12, test 2. Deliberately a SIBLING of the five-feature test above
+    // rather than an in-place edit of it: that test asserts
+    // `store.snapshot()).toEqual([])` in five places, which a marker element
+    // living in the store throughout makes impossible. CONSTRAINTS-B requires
+    // every pre-existing test to stay green UNMODIFIED, so the five-feature
+    // test is left exactly as it was and the sixth feature is added here, with
+    // each `toEqual([])` replaced by its marker-aware equivalent: the store
+    // still holds EXACTLY the marker, byte-identical.
+    let rafCallbacks: FrameRequestCallback[] = [];
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((cb: FrameRequestCallback) => {
+        rafCallbacks.push(cb);
+        return 1;
+      })
+    );
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const flushFrame = () => {
+      const cbs = rafCallbacks;
+      rafCallbacks = [];
+      for (const cb of cbs) cb(0);
+    };
+    const pt = (x: number, y: number): PointerState => ({
+      x,
+      y,
+      pressure: 0.5,
+      pointerType: 'mouse',
+      shiftKey: false,
+    });
+
+    const { attachRemotePings } = await import(
+      '@/components/ui/campaign/location-map/pingSync'
+    );
+    const { attachRemoteLaserTrails } = await import(
+      '@/components/ui/campaign/location-map/laserSync'
+    );
+    const { attachMeasureBroadcast, attachRemoteMeasurements } = await import(
+      '@/components/ui/campaign/location-map/measureSync'
+    );
+    const { attachFocusBroadcast, attachFocusReceiver } = await import(
+      '@/components/ui/campaign/location-map/focusSync'
+    );
+
+    const overlays: ((ctx: CanvasRenderingContext2D) => void)[] = [];
+    const vp = {
+      registerOverlay(draw: (ctx: CanvasRenderingContext2D) => void) {
+        overlays.push(draw);
+        return () => {
+          const index = overlays.indexOf(draw);
+          if (index >= 0) overlays.splice(index, 1);
+        };
+      },
+      requestRender: vi.fn(),
+    };
+    const measureHost = {
+      registerOverlay: (draw: (ctx: CanvasRenderingContext2D) => void) => {
+        void draw;
+        return () => {};
+      },
+      requestRender: vi.fn(),
+    };
+    const focusHost = {
+      registerOverlay: (draw: (ctx: CanvasRenderingContext2D) => void) => {
+        void draw;
+        return () => {};
+      },
+      requestRender: vi.fn(),
+    };
+    const focusWrapper = document.createElement('div');
+    const focusDomLayer = document.createElement('div');
+    focusWrapper.appendChild(focusDomLayer);
+    const focusVp = {
+      camera: new Camera(),
+      domLayer: focusDomLayer,
+      getCanvasSize: () => ({ w: 800, h: 600 }),
+      registerOverlay: focusHost.registerOverlay,
+      requestRender: focusHost.requestRender,
+    };
+
+    const store = new ElementStore();
+    const pokes: string[] = [];
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'map-1',
+      store,
+      clientId: 'player-1',
+      tokenRequest: { role: 'player', battleMapId: 'map-1', playerId: 'p1' },
+      onStatus: s => statuses.push(s),
+      onPoke: feature => pokes.push(feature),
+      transportFactory: () => fakeTransport,
+    });
+    await flushMicro();
+    const remotePings = attachRemotePings(vp, conn);
+    const cleanupLasers = attachRemoteLaserTrails(vp, conn);
+    const remoteMeasurements = attachRemoteMeasurements(measureHost, conn);
+    const measureTool = new MeasureTool();
+    const measureHandle = attachMeasureBroadcast(measureTool, conn);
+    const focus = attachFocusBroadcast(conn);
+    const focusReceived = attachFocusReceiver(focusVp, conn, {
+      role: 'player',
+    });
+    const focusApply = vi.spyOn(focusReceived.receiver, 'apply');
+    fakeTransport.emitMessage(snapshotEnvelope('player-1', []));
+
+    // The sixth feature: a real marker element, added to the SAME store the
+    // five presence attachments share a connection with, while that connection
+    // is already live. Its own upsert reaching the wire is also the positive
+    // control for every "presence produces no upsert" assertion below: it
+    // proves that a genuine element write over this exact harness DOES produce
+    // an upsert, so their absence is a real property and not a dead observer.
+    const marker = createHtmlElement({
+      position: { x: 5, y: 6 },
+      size: { w: 40, h: 40 },
+      htmlType: MARKER_HTML_TYPE,
+      data: {
+        ...buildMarkerData({
+          kind: 'secret',
+          ref: 'marker-ref-1',
+          label: 'Hidden door',
+          color: 'purple',
+        }),
+      },
+    });
+    const markerUpsertCount = () =>
+      sentUpsertIds(fakeTransport.sent).filter(id => id === marker.id).length;
+
+    expect(markerUpsertCount()).toBe(0); // nothing yet
+    store.add(marker);
+    expect(markerUpsertCount()).toBe(1); // the marker's own upsert
+    // Byte-identical baseline, deep-cloned so a later in-place mutation of the
+    // stored element cannot silently update the expectation too.
+    const markerBaseline = JSON.parse(
+      JSON.stringify(store.snapshot())
+    ) as unknown;
+    expect(store.snapshot()).toHaveLength(1);
+
+    const counts = () => {
+      let fills = 0;
+      let strokes = 0;
+      const ctx = {
+        save: vi.fn(),
+        restore: vi.fn(),
+        beginPath: vi.fn(),
+        arc: vi.fn(),
+        moveTo: vi.fn(),
+        lineTo: vi.fn(),
+        stroke: vi.fn(() => (strokes += 1)),
+        fill: vi.fn(() => (fills += 1)),
+        globalAlpha: 1,
+        strokeStyle: '',
+        fillStyle: '',
+        lineWidth: 0,
+        lineCap: '',
+        lineJoin: '',
+      } as unknown as CanvasRenderingContext2D;
+      for (const draw of [...overlays]) draw(ctx);
+      return { fills, strokes };
+    };
+
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'hub',
+        op: { kind: 'presence', data: { kind: 'poke', feature: 'players' } },
+      })
+    );
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'conn-dm',
+        op: { kind: 'presence', data: laserPayload },
+      })
+    );
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'conn-dm',
+        op: {
+          kind: 'presence',
+          data: { kind: 'ping', x: 100, y: 200, color: '#F4C430' },
+        },
+      })
+    );
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'conn-dm',
+        op: {
+          kind: 'presence',
+          data: {
+            kind: 'measure',
+            start: { x: 0, y: 0 },
+            end: { x: 30, y: 40 },
+            cells: 10,
+            feet: 50,
+            color: '#F4C430',
+          },
+        },
+      })
+    );
+
+    expect(pokes).toEqual(['players']); // poke parsing undisturbed
+    const drawn = counts();
+    expect(drawn.fills).toBe(1); // exactly one ping pulse
+    expect(drawn.strokes).toBeGreaterThan(0); // laser trail rendered
+    expect(remoteMeasurements.overlay.activeSenderCount).toBe(1); // remote ruler applied
+    expect(focusApply).toHaveBeenCalledTimes(4);
+    expect(focusApply.mock.results.map(r => r.value)).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
+    // Markers: untouched by four inbound presence frames, and no new upsert.
+    expect(store.snapshot()).toEqual(markerBaseline);
+    expect(markerUpsertCount()).toBe(1);
+
+    // Remote focus receive path.
+    fakeTransport.emitMessage(
+      JSON.stringify({
+        from: 'conn-dm',
+        op: {
+          kind: 'presence',
+          data: {
+            kind: 'focus',
+            x: 500,
+            y: 500,
+            w: 400,
+            h: 300,
+            audience: 'players',
+          },
+        },
+      })
+    );
+    expect(focusApply).toHaveBeenCalledTimes(5);
+    expect(focusApply).toHaveLastReturnedWith(true);
+    expect(pokes).toEqual(['players']);
+    expect(counts()).toEqual(drawn);
+    expect(remoteMeasurements.overlay.activeSenderCount).toBe(1);
+    expect(store.snapshot()).toEqual(markerBaseline); // focus never touches it
+    expect(markerUpsertCount()).toBe(1);
+
+    // Local measure broadcast: exactly one presence frame, still no upsert.
+    measureHandle.setSharing(true);
+    const sentBeforeMeasure = fakeTransport.sent.length;
+    const measureCtx = {
+      camera: { screenToWorld: (p: { x: number; y: number }) => ({ ...p }) },
+      store: {} as ElementStore,
+      requestRender: vi.fn(),
+    } as unknown as Parameters<MeasureTool['onPointerDown']>[1];
+    measureTool.onPointerDown(pt(10, 20), measureCtx);
+    measureTool.onPointerMove(pt(13, 24), measureCtx);
+    flushFrame();
+
+    const measureFrames = fakeTransport.sent
+      .slice(sentBeforeMeasure)
+      .map(
+        frame => JSON.parse(frame) as { op: { kind: string; data?: unknown } }
+      )
+      .filter(envelope => envelope.op.kind === 'presence');
+    expect(measureFrames).toHaveLength(1);
+    const measurePayload = measureFrames[0]?.op.data as {
+      kind: string;
+      feet: number;
+    };
+    expect(measurePayload.kind).toBe('measure');
+    expect(Number.isFinite(measurePayload.feet)).toBe(true);
+    expect(store.snapshot()).toEqual(markerBaseline);
+    expect(markerUpsertCount()).toBe(1);
+
+    // Local focus broadcast: exactly one presence frame per send.
+    const pokesBeforeFocusSend = [...pokes];
+    const drawnBeforeFocusSend = counts();
+    const activeSendersBeforeFocusSend =
+      remoteMeasurements.overlay.activeSenderCount;
+    const focusApplyCallsBeforeSend = focusApply.mock.calls.length;
+    const sentBeforeFocus = fakeTransport.sent.length;
+    focus.send({ x: 500, y: 500, w: 400, h: 300 }, 'players');
+
+    const focusFrames = fakeTransport.sent
+      .slice(sentBeforeFocus)
+      .map(
+        frame => JSON.parse(frame) as { op: { kind: string; data?: unknown } }
+      )
+      .filter(envelope => envelope.op.kind === 'presence')
+      .filter(
+        envelope =>
+          (envelope.op.data as { kind?: string } | undefined)?.kind === 'focus'
+      );
+    expect(focusFrames).toHaveLength(1);
+    expect(focusApply.mock.calls.length).toBe(focusApplyCallsBeforeSend);
+    expect(pokes).toEqual(pokesBeforeFocusSend);
+    expect(counts()).toEqual(drawnBeforeFocusSend);
+    expect(remoteMeasurements.overlay.activeSenderCount).toBe(
+      activeSendersBeforeFocusSend
+    );
+    expect(store.snapshot()).toEqual(markerBaseline);
+    expect(markerUpsertCount()).toBe(1);
+
+    // Presence-leave still clears the per-sender overlays.
+    fakeTransport.emitMessage(
+      JSON.stringify({ from: 'conn-dm', op: { kind: 'presence-leave' } })
+    );
+    const afterLeave = counts();
+    expect(afterLeave.fills).toBe(0);
+    expect(afterLeave.strokes).toBe(0);
+    expect(remoteMeasurements.overlay.activeSenderCount).toBe(0);
+
+    // End to end: after all five presence flows ran in both directions, the
+    // marker element is still there and still BYTE-IDENTICAL — same `data`
+    // (v/kind/ref/label/color), same `htmlType` — and presence produced not one
+    // extra upsert for it.
+    expect(store.snapshot()).toEqual(markerBaseline);
+    expect(markerUpsertCount()).toBe(1);
+    const stored = store.getById(marker.id);
+    expect(stored).toBeDefined();
+    if (!stored || stored.type !== 'html') {
+      throw new Error(
+        'expected the marker html element to still be in the store'
+      );
+    }
+    expect(stored.htmlType).toBe(MARKER_HTML_TYPE);
+    expect(stored.data).toEqual({
+      v: 1,
+      kind: 'secret',
+      ref: 'marker-ref-1',
+      label: 'Hidden door',
+      color: 'purple',
+    });
+
+    focusReceived.dispose();
+    focus.dispose();
+    measureHandle.dispose();
+    remotePings.dispose();
+    cleanupLasers();
+    remoteMeasurements.dispose();
+    expect(overlays).toHaveLength(0);
+    conn.stop();
+  });
+
   it('presence unsubscribe stops delivery', async () => {
     const seen: unknown[] = [];
     const conn = await startConnection();
