@@ -116,6 +116,16 @@ export interface CreateMarkerResult {
  * triggers the first outbound upsert, and it can only be stamped with the DM
  * audience if the flag is already in product state. Reversing these two steps
  * leaks the marker to players for one frame.
+ *
+ * Between marking and adding, the mark is READ BACK and verified. Both
+ * `battleMapStore.setDmOnly` and `locationStore.setDmOnly` silently no-op
+ * (return the unchanged state) when the map is missing from the store — a
+ * real failure mode if persist has not rehydrated yet, the map was removed,
+ * or the wrong map id was passed in. Without this check, `store.add` would
+ * still succeed and the element would land on the canvas with no
+ * `dmOnlyElements` entry at all: the exact leak the ordering exists to
+ * prevent, just moved one layer down. This is fail-closed, not defensive
+ * programming — an unverified mark is treated as no mark.
  */
 function insertMarkerRecord(
   deps: MarkerWriteDeps,
@@ -128,6 +138,20 @@ function insertMarkerRecord(
   // 3. New markers are DM-only by default — BEFORE the element exists on the
   //    canvas. Do not reorder with step 4.
   deps.setDmOnly(element.id, true);
+
+  // 3.5. Verify the mark actually landed before letting the element anywhere
+  //      near the canvas. This throw is deliberately OUTSIDE the try/catch
+  //      below: nothing has reached the canvas yet, so there is nothing for
+  //      the catch's rollback to undo, and firing it here would call
+  //      `setDmOnly(element.id, false)` against a store that just proved it
+  //      cannot persist audience writes for this map in the first place.
+  if (deps.getDmOnlyElements()[element.id] !== true) {
+    throw new Error(
+      `Refusing to add marker element ${element.id}: the DM-only mark did ` +
+        'not land (the bound map is likely missing from the store). The ' +
+        'detail record persists as a harmless recoverable orphan.'
+    );
+  }
 
   // 4. Only now does the element enter the canvas store.
   try {
@@ -199,7 +223,10 @@ export function deleteMarker(deps: MarkerWriteDeps, elementId: string): void {
 /**
  * Patches one detail record. There is no canvas write: every sibling pin
  * sharing the `ref` reads this same record, so they all observe the edit.
- * Returns false when no record carries that id.
+ * Returns false when no LIVE record carries that id — a soft-deleted record
+ * counts as absent here, matching `findMarkerDetail`. Patching a tombstone
+ * would write somewhere no reader (`findMarkerDetail` filters `deletedAt`)
+ * can ever surface it again: a silently lost edit. Fail closed instead.
  */
 export function editMarkerDetail(
   deps: MarkerWriteDeps,
@@ -210,7 +237,7 @@ export function editMarkerDetail(
   let found = false;
 
   const next = markers.map(marker => {
-    if (marker.id !== ref) return marker;
+    if (marker.id !== ref || marker.deletedAt) return marker;
     found = true;
     const updated: MarkerDetail = { ...marker };
     if (patch.title !== undefined) {

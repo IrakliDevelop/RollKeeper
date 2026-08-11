@@ -61,6 +61,10 @@ export const MARKER_BODY_MAX_CODE_POINTS = 4000;
 export const MARKER_DM_NOTES_MAX_CODE_POINTS = 4000;
 
 /**
+ * Its own focused tests (including the astral-plane boundary case) live in
+ * `markerWrites.test.ts`, not here — see the `describe('capCodePoints')`
+ * block there.
+ *
  * Caps a string to `max` Unicode CODE POINTS. Deliberately iterates via
  * `Array.from`, which splits on code points (surrogate pairs stay intact) —
  * never `.slice`/`.length`, which operate on UTF-16 code units and would

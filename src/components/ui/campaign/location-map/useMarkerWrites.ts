@@ -94,6 +94,27 @@ const NO_CANVAS_STORE: MarkerElementStoreLike = {
   getById: () => undefined,
 };
 
+/** True when the bound map is present in its product-state store. Reading
+ *  this before delegating to `createMarker` mirrors the existing no-viewport
+ *  degradation: a pin is never placed for a map that cannot record its
+ *  DM-only mark, rather than relying on `insertMarkerRecord`'s throw to stop
+ *  it after the fact. */
+function mapExists(
+  mode: 'battlemap' | 'location',
+  campaignCode: string,
+  mapId: string
+): boolean {
+  if (mode === 'battlemap') {
+    return (
+      useBattleMapStore.getState().getBattleMap(campaignCode, mapId) !==
+      undefined
+    );
+  }
+  return (
+    useLocationStore.getState().getLocation(campaignCode, mapId) !== undefined
+  );
+}
+
 /** Applies a bulk audience patch with the same semantics as the stores'
  *  single-element `setDmOnly`: true sets the key, false DELETES it. */
 function mergeDmOnly(
@@ -197,9 +218,15 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
     (input: CreateMarkerInput): CreateMarkerResult | null => {
       const viewport = getViewport();
       if (!viewport) return null;
+      // Fail closed, same as the no-viewport case: if the bound map is not
+      // in the store (persist not yet rehydrated, map removed, wrong mapId),
+      // `setDmOnly`/`setMarkers` would no-op and the DM-only mark could never
+      // land. Checked here so nothing is attempted, rather than relying on
+      // `insertMarkerRecord`'s throw after a detail write already happened.
+      if (!mapExists(mode, campaignCode, mapId)) return null;
       return createMarkerWrite(depsFor(viewport), input);
     },
-    [getViewport, depsFor]
+    [getViewport, depsFor, mode, campaignCode, mapId]
   );
 
   const deleteMarker = useCallback(
