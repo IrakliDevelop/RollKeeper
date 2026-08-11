@@ -158,13 +158,15 @@ describe('buildPublicMarkerDetails — publishes', () => {
       htmlType: 'not-a-marker',
       data: { ...buildMarkerData({ kind: 'door', ref: 'ref-foreign' }) },
     });
-    // 3. the id guard — the fail-OPEN one. Without an id the audience lookup
-    //    `dmOnlyElements[undefined]` is `undefined`, so `isShared` is `true`
-    //    and the detail would publish regardless of the DM's choice. Seeded
-    //    DM-only here so the mutation's blast radius is the real one.
+    // 3. the id guard — the fail-OPEN one. Without an id there is nothing to
+    //    look the pin's audience up BY: mutate the guard away and the pushed
+    //    id is `undefined`, so `dmOnlyElements[undefined]` is `undefined`,
+    //    `isShared` is `true`, and the detail publishes no matter what the DM
+    //    chose. No `dmOnlyElements` seed can change that — an id-less pin is
+    //    unreachable from that map by construction — which is exactly why the
+    //    ref has to be dropped here rather than resolved later.
     const idless: Record<string, unknown> = { ...pin({ ref: 'ref-idless' }) };
-    const idlessId = idless.id;
-    expect(typeof idlessId).toBe('string');
+    expect(typeof idless.id).toBe('string');
     delete idless.id;
 
     const genuine = pin({ ref: 'ref-genuine' });
@@ -182,7 +184,7 @@ describe('buildPublicMarkerDetails — publishes', () => {
         detail('ref-idless'),
         detail('ref-genuine'),
       ],
-      dmOnlyElements: { [String(idlessId)]: true },
+      dmOnlyElements: {},
     });
 
     // Positive control and negative assertion in one: only the real pin's ref

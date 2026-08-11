@@ -602,3 +602,71 @@ describe('useMarkerWrites — delete', () => {
     });
   });
 });
+
+/**
+ * `isMapReadable` is what stops `noteMarkerRemoval` reading a MISSING map's
+ * empty `dmOnlyElements` as "this pin was shared". Bound here to the real store
+ * lookup, so this is the wiring test for it: same removal, same element, the
+ * only difference being whether the bound map exists.
+ */
+describe('useMarkerWrites — noteMarkerRemoval fails closed on an unreadable map', () => {
+  const MISSING_MAP_ID = 'does-not-exist';
+
+  it('remembers nothing when the bound map is absent, so the undo-shaped re-add is treated as a duplicate', () => {
+    const viewport = makeViewport();
+    const { result } = renderHook(() =>
+      useMarkerWrites({
+        mode: 'battlemap',
+        campaignCode: CODE,
+        mapId: MISSING_MAP_ID,
+        getViewport: () => viewport,
+      })
+    );
+    const pin = seedSibling(viewport, 'ref-secret');
+
+    let remembered = true;
+    act(() => {
+      remembered = result.current.noteMarkerRemoval(pin);
+    });
+    expect(remembered).toBe(false);
+
+    // The map is back (persist rehydrated, say) by the time the DM undoes.
+    useBattleMapStore.setState({
+      battleMaps: { [CODE]: { [MISSING_MAP_ID]: battleMapFixture() } },
+    });
+    act(() => {
+      result.current.guardLocalMarkerAdd(viewport, pin);
+    });
+
+    expect(
+      useBattleMapStore.getState().getBattleMap(CODE, MISSING_MAP_ID)
+        ?.dmOnlyElements[pin.id]
+    ).toBe(true);
+  });
+
+  it('POSITIVE CONTROL: the identical removal on the PRESENT map is remembered, and the re-add restores it shared', () => {
+    const viewport = makeViewport();
+    const { result } = renderHook(() =>
+      useMarkerWrites({
+        mode: 'battlemap',
+        campaignCode: CODE,
+        mapId: MAP_ID,
+        getViewport: () => viewport,
+      })
+    );
+    const pin = seedSibling(viewport, 'ref-secret');
+
+    let remembered = false;
+    act(() => {
+      remembered = result.current.noteMarkerRemoval(pin);
+    });
+    expect(remembered).toBe(true);
+
+    act(() => {
+      result.current.guardLocalMarkerAdd(viewport, pin);
+    });
+
+    expect(readBattleMap()?.dmOnlyElements[pin.id]).toBeUndefined();
+    expect(readBattleMap()?.markers ?? []).toHaveLength(0);
+  });
+});
