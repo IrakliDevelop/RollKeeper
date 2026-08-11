@@ -61,8 +61,18 @@ import {
 } from '@/utils/npcInventoryItemForm';
 import { NPCSpellTab } from './NPCSpellTab';
 import { useNPCStore } from '@/store/npcStore';
+import { CurrencyManager } from '@/components/shared/character/CurrencyManager';
+import type { Currency } from '@/types/character';
 
 type DetailTab = 'stats' | 'spells' | 'inventory' | 'lore';
+
+const EMPTY_CURRENCY: Currency = {
+  platinum: 0,
+  gold: 0,
+  electrum: 0,
+  silver: 0,
+  copper: 0,
+};
 
 interface NPCDetailDialogProps {
   npc: CampaignNPC | null;
@@ -654,6 +664,16 @@ export function NPCDetailDialog({
 
   if (!npc) return null;
 
+  const adjustCurrency = (type: keyof Currency, delta: number) => {
+    const currency = { ...EMPTY_CURRENCY, ...npc.currency };
+    useNPCStore.getState().updateNPC(npc.campaignCode, npc.id, {
+      currency: {
+        ...currency,
+        [type]: Math.max(0, currency[type] + delta),
+      },
+    });
+  };
+
   const statBlock = npc.monsterStatBlock;
   const typeInfo = statBlock
     ? `${statBlock.size} ${statBlock.type}${statBlock.cr ? ` — CR ${statBlock.cr}` : ''}`
@@ -914,48 +934,66 @@ export function NPCDetailDialog({
             />
           )}
 
-          {activeTab === 'inventory' &&
-            (npc.inventory && npc.inventory.length > 0 ? (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {npc.inventory.map(item => (
-                  <InventoryItemCard
-                    key={item.id}
-                    item={item}
-                    onClick={() => setViewingItem(item)}
-                    onEdit={
-                      onUpdateInventory
-                        ? () => {
-                            setInventoryFormEditingItem(item);
-                            setInventoryFormOpen(true);
-                          }
-                        : undefined
-                    }
-                    onRemove={
-                      onUpdateInventory
-                        ? () => handleRemoveItem(item.id)
-                        : undefined
-                    }
-                    onQuantityChange={
-                      onUpdateInventory
-                        ? qty => handleQuantityChange(item.id, qty)
-                        : undefined
-                    }
-                    onSend={
-                      onSendItemToPlayer
-                        ? () => onSendItemToPlayer(item, npc.name)
-                        : undefined
-                    }
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-1 items-center justify-center text-center">
-                <div>
-                  <Package className="text-faint mx-auto mb-3 h-10 w-10" />
-                  <p className="text-muted text-sm">No inventory items</p>
+          {activeTab === 'inventory' && (
+            <div className="space-y-4">
+              <CurrencyManager
+                currency={{ ...EMPTY_CURRENCY, ...npc.currency }}
+                compact
+                readonly={readOnly}
+                onAddCurrency={
+                  readOnly
+                    ? undefined
+                    : (type, amount) => adjustCurrency(type, amount)
+                }
+                onSubtractCurrency={
+                  readOnly
+                    ? undefined
+                    : (type, amount) => adjustCurrency(type, -amount)
+                }
+              />
+              {npc.inventory && npc.inventory.length > 0 ? (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {npc.inventory.map(item => (
+                    <InventoryItemCard
+                      key={item.id}
+                      item={item}
+                      onClick={() => setViewingItem(item)}
+                      onEdit={
+                        onUpdateInventory
+                          ? () => {
+                              setInventoryFormEditingItem(item);
+                              setInventoryFormOpen(true);
+                            }
+                          : undefined
+                      }
+                      onRemove={
+                        onUpdateInventory
+                          ? () => handleRemoveItem(item.id)
+                          : undefined
+                      }
+                      onQuantityChange={
+                        onUpdateInventory
+                          ? qty => handleQuantityChange(item.id, qty)
+                          : undefined
+                      }
+                      onSend={
+                        onSendItemToPlayer
+                          ? () => onSendItemToPlayer(item, npc.name)
+                          : undefined
+                      }
+                    />
+                  ))}
                 </div>
-              </div>
-            ))}
+              ) : (
+                <div className="flex min-h-40 items-center justify-center text-center">
+                  <div>
+                    <Package className="text-faint mx-auto mb-3 h-10 w-10" />
+                    <p className="text-muted text-sm">No inventory items</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {activeTab === 'lore' &&
             (npc.loreHtml ? (

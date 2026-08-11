@@ -1,6 +1,6 @@
 // Encounter tracker types for DM combat management
 
-import { Spell } from './character';
+import { Currency, Spell } from './character';
 import type {
   ClassResourceIcon,
   ClassResourceColor,
@@ -356,6 +356,7 @@ export interface CampaignNPC {
 
   // Inventory
   inventory?: NPCInventoryItem[];
+  currency?: Currency;
 
   // Spellcasting
   spellcasting?: NPCSpellcasting;
