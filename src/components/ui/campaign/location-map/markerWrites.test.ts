@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { createHtmlElement } from '@fieldnotes/core';
+import { ElementStore, createHtmlElement } from '@fieldnotes/core';
 import type { CanvasElement, HtmlElement } from '@fieldnotes/core';
 
 import {
@@ -246,6 +246,18 @@ describe('capCodePoints', () => {
     expect(capCodePoints('a'.repeat(10), 10)).toBe('a'.repeat(10));
   });
 
+  it('truncates a 10-code-point string to max=9, discriminating from an off-by-one', () => {
+    // The earlier "exactly at the cap unchanged" case above does NOT
+    // distinguish `codePoints.length <= max` from a `< max` off-by-one: when
+    // length === max, `slice(0, max)` on either branch reproduces the same
+    // string, so that mutant is invisible there. Cutting one code point
+    // SHORT of the input length is: expect exactly 9 code points back, not
+    // 10 (untouched) and not 8 (over-truncated).
+    const result = capCodePoints('a'.repeat(10), 9);
+    expect(result).toBe('a'.repeat(9));
+    expect(Array.from(result).length).toBe(9);
+  });
+
   it('caps an astral-plane string on code points, never mid-surrogate-pair', () => {
     // 21 BMP chars + emoji: a naive UTF-16 `.slice(0, 40)` lands an odd number
     // of code units into the emoji run and leaves a lone high surrogate.
@@ -274,9 +286,6 @@ describe('createMarker — §6.7 write ordering', () => {
       'transaction',
       'store.add',
     ]);
-    expect(harness.calls.indexOf('setDmOnly')).toBeLessThan(
-      harness.calls.indexOf('store.add')
-    );
     expect(harness.setDmOnlyArgs).toEqual([[result.elementId, true]]);
     expect(harness.state.dmOnlyElements).toEqual({ [result.elementId]: true });
   });
@@ -369,6 +378,44 @@ describe('createMarker — §6.7 write ordering', () => {
   });
 });
 
+describe('createMarker — fails closed when the DM-only mark cannot land', () => {
+  it('throws without adding the element when setDmOnly no-ops (the map is absent from the store)', () => {
+    const harness = makeHarness();
+    const setDmOnlyCalls: Array<[string, boolean]> = [];
+    // Simulates battleMapStore/locationStore's setDmOnly: both silently
+    // return the unchanged state (no-op) when the map is missing.
+    harness.deps.setDmOnly = (elementId, dmOnly) => {
+      harness.calls.push('setDmOnly');
+      setDmOnlyCalls.push([elementId, dmOnly]);
+    };
+
+    expect(() => createMarker(harness.deps, CREATE_INPUT)).toThrow(
+      /DM-only mark/
+    );
+
+    // The element never reached the canvas at all.
+    expect(harness.calls).toEqual(['setMarkers', 'setDmOnly']);
+    expect(harness.calls).not.toContain('transaction');
+    expect(harness.calls).not.toContain('store.add');
+    expect(harness.state.elements.size).toBe(0);
+    // The catch/rollback path never fires: only the one forward mark attempt
+    // was recorded, no rollback-to-false call.
+    expect(setDmOnlyCalls).toHaveLength(1);
+    expect(setDmOnlyCalls[0]?.[1]).toBe(true);
+    // The detail persists as a harmless recoverable orphan.
+    expect(harness.state.markers).toHaveLength(1);
+  });
+
+  it('positive control: the same fixture with a working setDmOnly does add the element', () => {
+    const harness = makeHarness();
+
+    const result = createMarker(harness.deps, CREATE_INPUT);
+
+    expect(harness.calls).toContain('store.add');
+    expect(harness.state.elements.has(result.elementId)).toBe(true);
+  });
+});
+
 describe('deleteMarker', () => {
   it('removes the element inside a transaction but keeps the detail and the DM-only entry', () => {
     const harness = makeHarness();
@@ -444,6 +491,38 @@ describe('editMarkerDetail', () => {
 
     expect(applied).toBe(false);
     expect(harness.calls).toEqual([]);
+  });
+
+  it('refuses to patch a soft-deleted record and writes nothing', () => {
+    const harness = makeHarness();
+    const created = createMarker(harness.deps, CREATE_INPUT);
+    // Soft-delete directly on state, as GC would.
+    harness.state.markers = harness.state.markers.map(marker =>
+      marker.id === created.ref ? { ...marker, deletedAt: FIXED_NOW } : marker
+    );
+    harness.calls.length = 0;
+
+    const applied = editMarkerDetail(harness.deps, created.ref, {
+      title: 'Should not land',
+    });
+
+    expect(applied).toBe(false);
+    expect(harness.calls).toEqual([]);
+    expect(harness.state.markers[0]?.title).toBe('Front gate');
+    expect(harness.state.markers[0]?.deletedAt).toBe(FIXED_NOW);
+  });
+
+  it('positive control: the same fixture patches a live record', () => {
+    const harness = makeHarness();
+    const created = createMarker(harness.deps, CREATE_INPUT);
+    harness.calls.length = 0;
+
+    const applied = editMarkerDetail(harness.deps, created.ref, {
+      title: 'Now live',
+    });
+
+    expect(applied).toBe(true);
+    expect(harness.state.markers[0]?.title).toBe('Now live');
   });
 });
 
@@ -751,6 +830,48 @@ describe('gcOrphanMarkerDetails', () => {
   });
 });
 
+describe('gcOrphanMarkerDetails — real ElementStore round-trip', () => {
+  // Every fixture above is hand-built JSON matching the ASSUMED shape of a
+  // canvas element. This test instead builds a real `ElementStore`, adds a
+  // marker via the real `createHtmlElement` factory, and serializes it the
+  // way the app persists `canvasState` (a `{ version, camera, elements }`
+  // envelope around `store.getAll()`). If a core upgrade ever moved
+  // `htmlType` (e.g. under `data`), the hand-built fixtures above would keep
+  // passing — they hardcode the old shape — while this test would catch the
+  // drift: the ref scan would match zero markers and tombstone every detail.
+  it('soft-deletes only the genuine orphan when fed a real, serialized canvas element', () => {
+    const harness = makeHarness();
+    harness.seedMarker(detail({ id: 'kept', title: 'Kept' }));
+    harness.seedMarker(detail({ id: 'orphan', title: 'Orphan' }));
+
+    const store = new ElementStore();
+    store.add(
+      createHtmlElement({
+        position: { x: 5, y: 5 },
+        size: { w: 40, h: 40 },
+        layerId: 'layer-1',
+        htmlType: MARKER_HTML_TYPE,
+        data: { ...buildMarkerData({ kind: 'door', ref: 'kept' }) },
+      })
+    );
+
+    const serialized = JSON.stringify({
+      version: 1,
+      camera: { position: { x: 0, y: 0 }, zoom: 1 },
+      elements: store.getAll(),
+    });
+
+    const result = gcOrphanMarkerDetails(harness.deps, serialized);
+
+    expect(result).toEqual({ status: 'ran', softDeleted: ['orphan'] });
+    expect(
+      findMarkerDetail(harness.state.markers, 'kept')?.deletedAt
+    ).toBeUndefined();
+    const orphan = harness.state.markers.find(m => m.id === 'orphan');
+    expect(orphan?.deletedAt).toBe(FIXED_NOW);
+  });
+});
+
 describe('cloneMarkerForMap / cloneMarkerToMap', () => {
   function seedSourceMarker(): {
     source: Harness;
@@ -848,6 +969,13 @@ describe('cloneMarkerForMap / cloneMarkerToMap', () => {
     expect(clone).not.toBeNull();
     expect(clone?.detail.deletedAt).toBeUndefined();
     expect(clone?.detail.id).toBe('new-ref');
+    // A soft-deleted source is treated as MISSING (findMarkerDetail ignores
+    // tombstones), so the clone gets empty content, never the tombstoned
+    // text — content assertions, not just the id/deletedAt shape, so a
+    // change that resurrected tombstone content would fail this test.
+    expect(clone?.detail.title).toBe('');
+    expect(clone?.detail.body).toBe('');
+    expect(clone?.detail.dmNotes).toBe('');
   });
 
   it('returns null and writes nothing when the source element data is not valid', () => {

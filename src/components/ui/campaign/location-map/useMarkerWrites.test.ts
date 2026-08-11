@@ -5,6 +5,7 @@ import { ElementStore, createHtmlElement } from '@fieldnotes/core';
 import type { HtmlElement } from '@fieldnotes/core';
 
 import { MARKER_HTML_TYPE, buildMarkerData } from './markerData';
+import type { MarkerAudienceTransition, OrphanGcResult } from './markerWrites';
 import { useMarkerWrites } from './useMarkerWrites';
 import type { MarkerWritesViewport } from './useMarkerWrites';
 
@@ -265,23 +266,84 @@ describe('useMarkerWrites — no viewport', () => {
       })
     );
 
+    let transition: MarkerAudienceTransition | undefined;
     act(() => {
-      const transition = result.current.setMarkerAudienceForRef('orphan', true);
-      expect(transition).toEqual({
-        status: 'refused',
-        reason: 'no-siblings',
-        elementIds: [],
-      });
+      transition = result.current.setMarkerAudienceForRef('orphan', true);
+    });
+    expect(transition).toEqual({
+      status: 'refused',
+      reason: 'no-siblings',
+      elementIds: [],
     });
 
     // GC reads persisted canvas state, not the viewport, so it still works.
+    let gc: OrphanGcResult | undefined;
     act(() => {
-      const gc = result.current.gcOrphanMarkerDetails(
-        readBattleMap()?.canvasState
-      );
-      expect(gc.status).toBe('ran');
+      gc = result.current.gcOrphanMarkerDetails(readBattleMap()?.canvasState);
     });
+    expect(gc?.status).toBe('ran');
     expect(readBattleMap()?.markers?.[0]?.deletedAt).toBeDefined();
+  });
+});
+
+describe('useMarkerWrites — fails closed when the bound map is absent from the store', () => {
+  // Simulates persist not yet rehydrated, a removed map, or a wrong mapId
+  // passed by the surface wiring: `getBattleMap`/`getLocation` return
+  // undefined even though a viewport IS mounted. `createMarker` must degrade
+  // the same way it does for a null viewport, rather than let
+  // `insertMarkerRecord` throw after a detail write already landed.
+  const MISSING_MAP_ID = 'does-not-exist';
+
+  it('battlemap mode: createMarker returns null and nothing reaches the canvas store', () => {
+    const viewport = makeViewport();
+    const { result } = renderHook(() =>
+      useMarkerWrites({
+        mode: 'battlemap',
+        campaignCode: CODE,
+        mapId: MISSING_MAP_ID,
+        getViewport: () => viewport,
+      })
+    );
+
+    let created: { elementId: string; ref: string } | null = {
+      elementId: 'sentinel',
+      ref: 'sentinel',
+    };
+    act(() => {
+      created = result.current.createMarker(CREATE_INPUT);
+    });
+
+    expect(created).toBeNull();
+    expect(viewport.store.getAll()).toHaveLength(0);
+    expect(
+      useBattleMapStore.getState().getBattleMap(CODE, MISSING_MAP_ID)
+    ).toBeUndefined();
+  });
+
+  it('location mode: createMarker returns null and nothing reaches the canvas store', () => {
+    const viewport = makeViewport();
+    const { result } = renderHook(() =>
+      useMarkerWrites({
+        mode: 'location',
+        campaignCode: CODE,
+        mapId: MISSING_MAP_ID,
+        getViewport: () => viewport,
+      })
+    );
+
+    let created: { elementId: string; ref: string } | null = {
+      elementId: 'sentinel',
+      ref: 'sentinel',
+    };
+    act(() => {
+      created = result.current.createMarker(CREATE_INPUT);
+    });
+
+    expect(created).toBeNull();
+    expect(viewport.store.getAll()).toHaveLength(0);
+    expect(
+      useLocationStore.getState().getLocation(CODE, MISSING_MAP_ID)
+    ).toBeUndefined();
   });
 });
 
@@ -314,15 +376,13 @@ describe('useMarkerWrites — bulk audience', () => {
       }
     });
 
+    let transition: MarkerAudienceTransition | undefined;
     act(() => {
-      const transition = result.current.setMarkerAudienceForRef(
-        'shared-ref',
-        true
-      );
-      expect(transition.status).toBe('applied');
+      transition = result.current.setMarkerAudienceForRef('shared-ref', true);
     });
     unsubscribe();
 
+    expect(transition?.status).toBe('applied');
     expect(dmOnlyWrites).toBe(1);
     expect(readBattleMap()?.dmOnlyElements).toEqual({
       [ids[0] as string]: true,
@@ -423,6 +483,7 @@ describe('useMarkerWrites — no render-time snapshots', () => {
       })
     );
 
+    let applied: boolean | undefined;
     act(() => {
       useBattleMapStore.setState({
         battleMaps: {
@@ -435,12 +496,12 @@ describe('useMarkerWrites — no render-time snapshots', () => {
           },
         },
       });
-      const applied = result.current.editMarkerDetail('late-ref', {
+      applied = result.current.editMarkerDetail('late-ref', {
         title: 'After',
       });
-      expect(applied).toBe(true);
     });
 
+    expect(applied).toBe(true);
     expect(readBattleMap()?.markers).toEqual([
       { id: 'late-ref', title: 'After', body: 'b', dmNotes: 'n' },
     ]);
