@@ -35,6 +35,7 @@ import {
   ArrowTool,
   PencilTool,
   MeasureTool,
+  type ElementActivationEvent,
   type Tool,
   type Viewport,
 } from '@fieldnotes/core';
@@ -46,6 +47,10 @@ import {
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import DmLocationToolOptions from './DmLocationToolOptions';
+import { useMarkerRegistration } from './useMarkerRegistration';
+import { resolveMarkerPanelState } from './MarkerDetailPanel/MarkerDetailPanel.utils';
+import MarkerDetailPanel from './MarkerDetailPanel';
+import type { PublicMarkerDetail } from '@/types/battlemap';
 import { ensurePlayerLayer, playerLayerId } from './playerLayer';
 import {
   ensureCanonicalLayers,
@@ -91,6 +96,19 @@ interface PlayerBattleMapCanvasProps {
   tokenInfoToggle?: { mode: TokenInfoMode | null; onCycle: () => void };
   /** Surfaces export-control failures; the host owns the toast container. */
   onExportError: (message: string) => void;
+  /**
+   * Public marker details available to resolve a tapped pin's panel state.
+   * No caller supplies this yet, and that is correct: `SyncedBattleMap.markers`
+   * is declared but has no live producer (owner decision recorded in task B8)
+   * — battle maps sync live over the relay rather than through the snapshot
+   * payload. So today every shared marker a player taps resolves to the
+   * `unpublished` state, which is exactly spec §6.6's behaviour: until a
+   * detail arrives, a player tapping a shared marker sees its live `label`
+   * and kind with a distinct "details not shared yet" state, because the
+   * label rides the element itself. Defaults to `[]` so the panel still
+   * resolves correctly with no producer wired.
+   */
+  markers?: PublicMarkerDetail[];
 }
 
 const PLAYER_TOOLS: {
@@ -155,7 +173,10 @@ export function PlayerToolbar({
   const needsTokenHint =
     status === 'live' && !hasOwnToken && activeTool !== 'token';
   return (
-    <div className="bg-surface-raised border-divider absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-xl border p-1 shadow-lg">
+    <div
+      data-testid="player-toolbar"
+      className="bg-surface-raised border-divider absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-xl border p-1 shadow-lg"
+    >
       <div className="flex items-center gap-1">
         {PLAYER_TOOLS.map(({ name, label, Icon }) => {
           const isTokenHint = name === 'token' && needsTokenHint;
@@ -237,10 +258,14 @@ export function PlayerBattleMapCanvas({
   hideBackButton = false,
   tokenInfoToggle,
   onExportError,
+  markers = [],
 }: PlayerBattleMapCanvasProps) {
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const [hasSelection, setHasSelection] = useState(false);
+  const [activeMarkerElementId, setActiveMarkerElementId] = useState<
+    string | null
+  >(null);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
   const laserCleanupRef = useRef<(() => void) | null>(null);
   // The connection is created once inside the fire-once `handleReady`
@@ -298,6 +323,42 @@ export function PlayerBattleMapCanvas({
         : []),
     ];
   }, [characterId, spellTemplateConfigRef]);
+
+  const handleMarkerActivate = useCallback((event: ElementActivationEvent) => {
+    setActiveMarkerElementId(event.element.id);
+  }, []);
+
+  // OUTSIDE the `if (relayUrl)` guard in `handleReady`, and NOT part of
+  // `laserCleanupRef` or any other connection-scoped cleanup: painter
+  // registration and single-tap activation are connection-independent (spec
+  // §7.2) — players can open a marker's read-only panel with no relay URL
+  // configured.
+  useMarkerRegistration({
+    viewport,
+    gesture: 'single',
+    onActivateMarker: handleMarkerActivate,
+  });
+
+  const activeMarkerElement =
+    activeMarkerElementId !== null
+      ? (viewport?.store.getById(activeMarkerElementId) ?? null)
+      : null;
+  // `resolveMarkerPanelState`'s `markers` parameter is typed `MarkerDetail[]`
+  // (MarkerDetailPanel.utils.ts), which — unlike `PublicMarkerDetail` —
+  // requires a `dmNotes` field. The player surface must never originate or
+  // carry a `dmNotes` value (spec §6.4), so this synthesizes an empty
+  // placeholder purely to satisfy the shared resolver's type signature;
+  // `ReadOnlyView` (MarkerDetailPanel's player-mode branch) never reads
+  // `detail.dmNotes` at all, so no real DM content is exposed by this
+  // cast-avoidance shim.
+  const markerPanelState = resolveMarkerPanelState(
+    activeMarkerElement,
+    markers.map(marker => ({ ...marker, dmNotes: '' })),
+    'player'
+  );
+  const handleCloseMarkerPanel = useCallback(() => {
+    setActiveMarkerElementId(null);
+  }, []);
 
   const handleReady = (vp: Viewport) => {
     setViewport(vp);
@@ -443,6 +504,19 @@ export function PlayerBattleMapCanvas({
           </div>
         )}
         {viewport && <BattleMapMinimap defaultCollapsed />}
+        {/* Mounted only while a marker is active. Painting and activation
+            are connection-independent, so this panel opens with no relay
+            URL configured — see `useMarkerRegistration` above. Read-only:
+            no `onSave`, no `onDelete` — the player surface asks for
+            mode="player", which MarkerDetailPanel enforces structurally. */}
+        {activeMarkerElementId !== null && (
+          <MarkerDetailPanel
+            open
+            mode="player"
+            state={markerPanelState}
+            onClose={handleCloseMarkerPanel}
+          />
+        )}
         {viewport && children}
       </div>
     </ViewportContext.Provider>

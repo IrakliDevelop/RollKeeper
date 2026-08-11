@@ -4,6 +4,7 @@ import {
   ElementStore,
   LayerManager,
   MeasureTool,
+  createHtmlElement,
   createShape,
   type CanvasElement,
   type Layer,
@@ -27,6 +28,12 @@ import {
   makeApplyRemoteLayer,
   publishOwnedLayers,
 } from '@/components/ui/campaign/location-map/layerSync';
+import {
+  MARKER_HTML_TYPE,
+  buildMarkerData,
+} from '@/components/ui/campaign/location-map/markerData';
+import { resolveMarkerPanelState } from '@/components/ui/campaign/location-map/MarkerDetailPanel/MarkerDetailPanel.utils';
+import type { MarkerDetail } from '@/types/battlemap';
 
 // No @fieldnotes/sync mocking: the real managed lifecycle + SyncClient run
 // against an injected fake transport, so these tests exercise the actual
@@ -1269,6 +1276,123 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
       })
     );
     expect(seen).toEqual([laserPayload]);
+    conn.stop();
+  });
+});
+
+describe('createManagedBattleMapConnection — player marker filtering (task B11)', () => {
+  // What this test pins, and what it deliberately does NOT: the relay's
+  // `canRead` filtering is the actual enforcement boundary for DM-only
+  // markers, and it is not under test here — this file only drives the
+  // client-side connection against a hand-built hub snapshot that MIMICS
+  // what `canRead` produces for a player (the DM-only pin simply absent).
+  // What this pins is narrower and just as load-bearing: that the player
+  // surface's local store ends up holding exactly what the snapshot
+  // contained, with no second path (cache, prior snapshot, local echo) that
+  // could resurrect a filtered element once the relay has excluded it.
+  let fakeTransport: FakeTransport;
+
+  beforeEach(() => {
+    fakeTransport = new FakeTransport();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ token: 'test-token' }),
+      })
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const flushMicro = (): Promise<void> =>
+    new Promise(resolve => setTimeout(resolve, 0));
+
+  /** A structurally valid marker `html` element — the SDK validates
+   * snapshot elements, so this must be a real marker, not a bare stub. */
+  function markerElement(id: string, ref: string): CanvasElement {
+    return {
+      ...createHtmlElement({
+        position: { x: 0, y: 0 },
+        size: { w: 40, h: 40 },
+        htmlType: MARKER_HTML_TYPE,
+        data: { ...buildMarkerData({ kind: 'door', ref }) },
+      }),
+      id,
+    };
+  }
+
+  const markerSnapshotEnvelope = (
+    to: string,
+    elements: CanvasElement[]
+  ): string =>
+    JSON.stringify({ from: 'hub', op: { kind: 'snapshot', to, elements } });
+
+  const startPlayerConnection = async (store: ElementStore) => {
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'map-1',
+      store,
+      clientId: 'player-1',
+      tokenRequest: {
+        role: 'player',
+        battleMapId: 'map-1',
+        playerId: 'player-1',
+      },
+      transportFactory: () => fakeTransport,
+    });
+    await flushMicro();
+    return conn;
+  };
+
+  it('a hub snapshot that omits the DM-only marker leaves the player store holding only the shared one, and the DM-only id resolves to a non-ready panel state', async () => {
+    const store = new ElementStore();
+    const conn = await startPlayerConnection(store);
+
+    const shared = markerElement('shared-el', 'shared-ref');
+    // The DM-only pin is never sent at all — this is what `canRead` produces
+    // for a player, simulated here rather than exercised for real.
+    fakeTransport.emitMessage(markerSnapshotEnvelope('player-1', [shared]));
+
+    expect(store.snapshot().map(el => el.id)).toEqual(['shared-el']);
+    expect(store.getById('shared-el')).toBeDefined();
+    expect(store.getById('dmonly-el')).toBeUndefined();
+
+    // The player surface's own resolver, given the id of an element the
+    // store never received, must not manufacture a "ready" state from
+    // nowhere — proving the player surface itself adds no second path that
+    // could resurrect the filtered pin.
+    const markers: MarkerDetail[] = [
+      { id: 'shared-ref', title: 'Shared', body: 'Visible', dmNotes: '' },
+      { id: 'dmonly-ref', title: 'Secret', body: 'Hidden', dmNotes: 'shh' },
+    ];
+    const missingElement = store.getById('dmonly-el') ?? null;
+    const state = resolveMarkerPanelState(missingElement, markers, 'player');
+    expect(state.kind).not.toBe('ready');
+
+    conn.stop();
+  });
+
+  it('positive control: a hub snapshot containing BOTH ids yields both in the player store', async () => {
+    const store = new ElementStore();
+    const conn = await startPlayerConnection(store);
+
+    const shared = markerElement('shared-el', 'shared-ref');
+    const dmOnly = markerElement('dmonly-el', 'dmonly-ref');
+    fakeTransport.emitMessage(
+      markerSnapshotEnvelope('player-1', [shared, dmOnly])
+    );
+
+    expect(
+      store
+        .snapshot()
+        .map(el => el.id)
+        .sort()
+    ).toEqual(['dmonly-el', 'shared-el']);
+
     conn.stop();
   });
 });

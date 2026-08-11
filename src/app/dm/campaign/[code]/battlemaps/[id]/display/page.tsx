@@ -10,6 +10,7 @@ import {
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import { ensureCanonicalLayers } from '@/components/ui/campaign/location-map/layerContract';
+import { useMarkerRegistration } from '@/components/ui/campaign/location-map/useMarkerRegistration';
 import { makeApplyRemoteLayer } from '@/components/ui/campaign/location-map/layerSync';
 import { attachRemoteLaserTrails } from '@/components/ui/campaign/location-map/laserSync';
 import { attachRemotePings } from '@/components/ui/campaign/location-map/pingSync';
@@ -28,12 +29,28 @@ function DisplayCanvas() {
   const connectionRef = useRef<{ stop: () => void } | null>(null);
   const laserCleanupRef = useRef<(() => void) | null>(null);
   const viewportRef = useRef<Viewport | null>(null);
+  // `useMarkerRegistration` is keyed on the viewport VALUE (not a ref), so it
+  // needs its own state slot even though nothing else on this page reads
+  // viewport-dependent chrome. Keep `viewportRef` too — other code here
+  // reads it synchronously inside `handleReady`. One extra render on ready
+  // is acceptable.
+  const [viewport, setViewport] = useState<Viewport | null>(null);
   const toolsRef = useRef([new HandTool()]);
 
   const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
 
+  // OUTSIDE the `if (relayUrl)` guard below, and NOT part of
+  // `laserCleanupRef`/`connectionRef` or any other connection-scoped
+  // cleanup: painter registration is connection-independent (spec §7.2) and
+  // must work with no relay URL configured. `gesture: null` is the contract
+  // for "register the marker painter, never call setActivation" (task B6)
+  // — the TV display is deliberately non-interactive, so nothing here ever
+  // opens a panel.
+  useMarkerRegistration({ viewport, gesture: null });
+
   const handleReady = (vp: Viewport) => {
     viewportRef.current = vp;
+    setViewport(vp);
     // Canonical bands so map/annotation elements stack correctly; custom and
     // player layer definitions arrive over layer sync. Read-only view — the
     // 'player' lock stance is irrelevant here.
