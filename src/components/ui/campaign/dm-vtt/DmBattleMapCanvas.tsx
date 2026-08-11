@@ -5,6 +5,7 @@ import { FieldNotesCanvas, ViewportContext } from '@fieldnotes/react';
 import { BattleMapMinimap } from '@/components/ui/campaign/location-map/BattleMapMinimap';
 import { BattleMapExportControl } from '@/components/ui/campaign/location-map/BattleMapExportControl';
 import { BattleMapViewsControl } from '@/components/ui/campaign/location-map/BattleMapViewsControl';
+import MarkerDetailPanel from '@/components/ui/campaign/location-map/MarkerDetailPanel';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { DmVttToolbar } from './DmVttToolbar';
 import {
@@ -47,6 +48,14 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     handleSetMeasureSharing,
     handleGoToCameraView,
     handleSendCameraView,
+    markerControls,
+    selectedElementIsMarker,
+    markerAudienceNotice,
+    markerPanelOpen,
+    markerPanelState,
+    handleCloseMarkerPanel,
+    handleSaveMarkerDetail,
+    handleDeleteMarker,
   } = useDmBattleMapCanvas(props);
   // Session-scoped only — pure UI state, no connection dependency. Off by
   // default; the DM opts in each session before a focus request can move
@@ -75,6 +84,9 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
             selectedElementId={selectedElementId}
             selectedElementIsDmOnly={selectedElementIsDmOnly}
             onToggleSelectedDmOnly={handleToggleSelectedDmOnly}
+            selectedElementIsMarker={selectedElementIsMarker}
+            markerAudienceNotice={markerAudienceNotice}
+            markerControls={markerControls}
             measureSharing={{
               enabled: measureSharing,
               onChange: handleSetMeasureSharing,
@@ -138,6 +150,20 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
         )}
         {viewport && (
           <BattleMapMinimap placement="bottom-left" defaultCollapsed />
+        )}
+
+        {/* Mounted only while a marker is active. Painting and activation are
+            connection-independent, so this panel opens with no relay URL
+            configured — see `useMarkerRegistration` in the hook. */}
+        {markerPanelOpen && (
+          <MarkerDetailPanel
+            open
+            mode="dm"
+            state={markerPanelState}
+            onClose={handleCloseMarkerPanel}
+            onSave={handleSaveMarkerDetail}
+            onDelete={handleDeleteMarker}
+          />
         )}
         {viewport && children}
       </div>

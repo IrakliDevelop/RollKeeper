@@ -6,6 +6,7 @@ import { FieldNotesCanvas as Canvas, ViewportContext } from '@fieldnotes/react';
 import DmLocationToolbar from './DmLocationToolbar';
 import DmLocationToolOptions from './DmLocationToolOptions';
 import DmLocationLayersPanel from './DmLocationLayersPanel';
+import MarkerDetailPanel from './MarkerDetailPanel';
 import { BattleMapExportControl } from './BattleMapExportControl';
 import { BattleMapViewsControl } from './BattleMapViewsControl';
 import { useDmLocationEditor } from './DmLocationEditor.hooks';
@@ -73,6 +74,14 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     getViewport,
     getDmOnlyElements,
     storeUpdateLocation,
+    markerControls,
+    selectedElementIsMarker,
+    markerAudienceNotice,
+    markerPanelOpen,
+    markerPanelState,
+    handleCloseMarkerPanel,
+    handleSaveMarkerDetail,
+    handleDeleteMarker,
   } = useDmLocationEditor(props);
 
   return (
@@ -113,6 +122,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             selectedElementId={selectedElementId}
             isDmOnly={isDmOnly}
             onToggleDmOnly={handleToggleDmOnly}
+            selectedElementIsMarker={selectedElementIsMarker}
+            markerAudienceNotice={markerAudienceNotice}
             hiddenPlacementActive={hiddenPlacementActive}
             onToggleHiddenPlacement={handleToggleHiddenPlacement}
             hiddenElementCount={hiddenElementCount}
@@ -181,6 +192,21 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
               enabled: measureSharing,
               onChange: handleSetMeasureSharing,
             }}
+            markerControls={markerControls}
+          />
+        )}
+
+        {/* Mounted only while a marker is active. Painting and activation are
+            connection-independent, so this panel opens with no relay URL
+            configured — see `useMarkerRegistration` in the hook. */}
+        {markerPanelOpen && (
+          <MarkerDetailPanel
+            open
+            mode="dm"
+            state={markerPanelState}
+            onClose={handleCloseMarkerPanel}
+            onSave={handleSaveMarkerDetail}
+            onDelete={handleDeleteMarker}
           />
         )}
 

@@ -3,6 +3,10 @@ import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 
 import { DmVttToolbar } from '@/components/ui/campaign/dm-vtt/DmVttToolbar';
 import DmLocationToolOptions from '@/components/ui/campaign/location-map/DmLocationToolOptions';
+import {
+  MARKER_MIXED_AUDIENCE_MESSAGE,
+  MARKER_SHARE_REVEALS_CLASSIFICATION,
+} from '@/components/ui/campaign/location-map/markerAudienceCopy';
 
 vi.mock('@fieldnotes/react', () => ({
   useActiveTool: () => ['select', vi.fn()] as const,
@@ -135,6 +139,136 @@ describe('DmVttToolbar', () => {
     const lastProps = vi.mocked(DmLocationToolOptions).mock.calls.at(-1)?.[0];
     expect(lastProps).toEqual(
       expect.objectContaining({ mode: 'battlemap', selectionControls: true })
+    );
+  });
+
+  it('offers a Marker tool button', () => {
+    render(
+      <DmVttToolbar
+        onClearDrawings={vi.fn()}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive={false}
+        onToggleHiddenPlacement={vi.fn()}
+        hiddenElementCount={0}
+        onRevealAll={vi.fn()}
+        selectedElementId={null}
+        selectedElementIsDmOnly={false}
+        onToggleSelectedDmOnly={vi.fn()}
+      />
+    );
+
+    const marker = screen.getByRole('button', { name: 'Marker' });
+    expect(marker).toBeInTheDocument();
+    expect(marker.className).toContain('min-h-[44px]');
+    expect(marker.className).toContain('min-w-[44px]');
+  });
+
+  it('threads markerControls through to the shared tool options bar', () => {
+    const markerControls = {
+      kind: 'trap' as const,
+      color: 'red' as const,
+      onKindChange: vi.fn(),
+      onColorChange: vi.fn(),
+    };
+    render(
+      <DmVttToolbar
+        onClearDrawings={vi.fn()}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive={false}
+        onToggleHiddenPlacement={vi.fn()}
+        hiddenElementCount={0}
+        onRevealAll={vi.fn()}
+        selectedElementId={null}
+        selectedElementIsDmOnly={false}
+        onToggleSelectedDmOnly={vi.fn()}
+        markerControls={markerControls}
+      />
+    );
+
+    const lastProps = vi.mocked(DmLocationToolOptions).mock.calls.at(-1)?.[0];
+    expect(lastProps).toEqual(expect.objectContaining({ markerControls }));
+  });
+
+  it('surfaces a refused marker audience transition, and nothing when there is none', () => {
+    const { unmount } = render(
+      <DmVttToolbar
+        onClearDrawings={vi.fn()}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive={false}
+        onToggleHiddenPlacement={vi.fn()}
+        hiddenElementCount={0}
+        onRevealAll={vi.fn()}
+        selectedElementId="pin-1"
+        selectedElementIsDmOnly
+        selectedElementIsMarker
+        onToggleSelectedDmOnly={vi.fn()}
+        markerAudienceNotice={MARKER_MIXED_AUDIENCE_MESSAGE}
+      />
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(
+      /pins don't currently agree/i
+    );
+    unmount();
+
+    render(
+      <DmVttToolbar
+        onClearDrawings={vi.fn()}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive={false}
+        onToggleHiddenPlacement={vi.fn()}
+        hiddenElementCount={0}
+        onRevealAll={vi.fn()}
+        selectedElementId="pin-1"
+        selectedElementIsDmOnly
+        selectedElementIsMarker
+        onToggleSelectedDmOnly={vi.fn()}
+        markerAudienceNotice={null}
+      />
+    );
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('the DM-only toggle warns that a shared marker publishes its kind, label and colour', () => {
+    const { unmount } = render(
+      <DmVttToolbar
+        onClearDrawings={vi.fn()}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive={false}
+        onToggleHiddenPlacement={vi.fn()}
+        hiddenElementCount={0}
+        onRevealAll={vi.fn()}
+        selectedElementId="pin-1"
+        selectedElementIsDmOnly
+        selectedElementIsMarker
+        onToggleSelectedDmOnly={vi.fn()}
+      />
+    );
+    const markerToggle = screen.getByTestId('dm-vtt-dm-only-toggle');
+    expect(markerToggle.getAttribute('title')).toContain(
+      MARKER_SHARE_REVEALS_CLASSIFICATION
+    );
+    expect(markerToggle.getAttribute('aria-label')).toContain(
+      MARKER_SHARE_REVEALS_CLASSIFICATION
+    );
+    unmount();
+
+    // Positive control: a non-marker selection keeps the shipped copy.
+    render(
+      <DmVttToolbar
+        onClearDrawings={vi.fn()}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive={false}
+        onToggleHiddenPlacement={vi.fn()}
+        hiddenElementCount={0}
+        onRevealAll={vi.fn()}
+        selectedElementId="shape-1"
+        selectedElementIsDmOnly
+        onToggleSelectedDmOnly={vi.fn()}
+      />
+    );
+    const plainToggle = screen.getByTestId('dm-vtt-dm-only-toggle');
+    expect(plainToggle.getAttribute('title')).toBe(
+      'Reveal selected element to players'
     );
   });
 });

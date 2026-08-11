@@ -17,13 +17,17 @@ import {
   EyeOff,
   Zap,
   MapPin,
+  Flag,
 } from 'lucide-react';
 import { useActiveTool } from '@fieldnotes/react';
 
 import { Button } from '@/components/ui/forms/button';
 import DmLocationToolOptions, {
+  type MarkerToolControls,
   type MeasureSharingControl,
 } from '@/components/ui/campaign/location-map/DmLocationToolOptions';
+import { MARKER_TOOL_NAME } from '@/components/ui/campaign/location-map/DmMarkerTool';
+import { markerAudienceToggleTitle } from '@/components/ui/campaign/location-map/markerAudienceCopy';
 
 import { useEffect, useRef, type ReactNode } from 'react';
 
@@ -42,7 +46,17 @@ const DM_TOOLS: { name: string; label: string; Icon: typeof Hand }[] = [
   { name: 'eraser', label: 'Eraser', Icon: Eraser },
   { name: 'laser', label: 'Laser pointer', Icon: Zap },
   { name: 'ping', label: 'Ping (look here)', Icon: MapPin },
+  { name: MARKER_TOOL_NAME, label: 'Marker', Icon: Flag },
 ];
+
+/**
+ * Every tool name this toolbar can activate. Exported so tests iterate the
+ * real list rather than a retyped copy — a newly added tool then cannot skip
+ * the per-tool checks in `DmLocationToolOptions.test.tsx`.
+ */
+export const DM_VTT_TOOL_NAMES: readonly string[] = DM_TOOLS.map(
+  def => def.name
+);
 
 export interface DmVttToolbarProps {
   sessionControls?: ReactNode;
@@ -55,6 +69,13 @@ export interface DmVttToolbarProps {
   selectedElementId: string | null;
   selectedElementIsDmOnly: boolean;
   onToggleSelectedDmOnly: () => void;
+  /** The selected element is a marker — the toggle then moves every sibling
+   *  pin sharing its ref, and its copy says what sharing publishes. */
+  selectedElementIsMarker?: boolean;
+  /** Explanation for a refused marker audience transition, or null. */
+  markerAudienceNotice?: string | null;
+  /** Kind + colour for the marker tool; threaded to the shared options bar. */
+  markerControls?: MarkerToolControls;
   measureSharing?: MeasureSharingControl;
   exportControl?: ReactNode;
   viewsControl?: ReactNode;
@@ -92,6 +113,9 @@ export function DmVttToolbar({
   selectedElementId,
   selectedElementIsDmOnly,
   onToggleSelectedDmOnly,
+  selectedElementIsMarker,
+  markerAudienceNotice,
+  markerControls,
   measureSharing,
   exportControl,
   viewsControl,
@@ -188,18 +212,26 @@ export function DmVttToolbar({
           </Button>
           {selectedElementId && (
             <Button
+              data-testid="dm-vtt-dm-only-toggle"
               variant={selectedElementIsDmOnly ? 'warning' : 'ghost'}
               onClick={onToggleSelectedDmOnly}
               className="min-h-[44px] px-2"
+              // A marker's audience moves every sibling pin sharing its ref,
+              // and sharing one also publishes its kind, label and colour
+              // (spec §7.4) — both stated on the control that does it.
               title={
-                selectedElementIsDmOnly
-                  ? 'Reveal selected element to players'
-                  : 'Hide selected element from players'
+                selectedElementIsMarker
+                  ? markerAudienceToggleTitle(selectedElementIsDmOnly)
+                  : selectedElementIsDmOnly
+                    ? 'Reveal selected element to players'
+                    : 'Hide selected element from players'
               }
               aria-label={
-                selectedElementIsDmOnly
-                  ? 'Reveal selected element'
-                  : 'Hide selected element'
+                selectedElementIsMarker
+                  ? markerAudienceToggleTitle(selectedElementIsDmOnly)
+                  : selectedElementIsDmOnly
+                    ? 'Reveal selected element'
+                    : 'Hide selected element'
               }
             >
               {selectedElementIsDmOnly ? (
@@ -208,6 +240,14 @@ export function DmVttToolbar({
                 <EyeOff size={16} />
               )}
             </Button>
+          )}
+          {markerAudienceNotice != null && (
+            <span
+              role="status"
+              className="text-accent-amber-text bg-accent-amber-bg border-accent-amber-border max-w-xs rounded border px-2 py-1 text-xs"
+            >
+              {markerAudienceNotice}
+            </span>
           )}
           <Button
             variant="ghost"
@@ -236,6 +276,7 @@ export function DmVttToolbar({
           mode="battlemap"
           selectionControls
           measureSharing={measureSharing}
+          markerControls={markerControls}
         />
       </div>
     </div>

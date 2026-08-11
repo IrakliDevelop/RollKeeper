@@ -125,6 +125,14 @@ function makeStubViewport() {
     updateGrid: vi.fn(),
     removeElements: vi.fn(() => 0),
     requestRender: vi.fn(),
+    // The hook now registers the marker painter + activation on every
+    // viewport, unconditionally (task B10). A real Viewport carries these;
+    // this stub only ever lacked them, and no assertion here depends on them.
+    expectCanvasHtmlTypes: vi.fn(() => () => {}),
+    registerHtmlPainter: vi.fn(() => () => {}),
+    setActivation: vi.fn(() => () => {}),
+    onElementActivate: vi.fn(() => () => {}),
+    transaction: <T>(operation: () => T): T => operation(),
   };
   return vp as unknown as Viewport;
 }

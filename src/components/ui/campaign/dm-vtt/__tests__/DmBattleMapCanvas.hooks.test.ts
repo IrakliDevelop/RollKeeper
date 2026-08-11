@@ -106,6 +106,15 @@ function makeVp(): Viewport {
     loadJSON: vi.fn(),
     exportJSON: vi.fn(() => '{}'),
     requestRender: vi.fn(),
+    // The hook now registers the marker painter + activation on every
+    // viewport, unconditionally (task B10). A real Viewport carries these;
+    // this stub only ever lacked them, and no assertion here depends on them —
+    // see DmBattleMapCanvas.hooks.markers.test.ts for the marker coverage.
+    expectCanvasHtmlTypes: vi.fn(() => () => {}),
+    registerHtmlPainter: vi.fn(() => () => {}),
+    setActivation: vi.fn(() => () => {}),
+    onElementActivate: vi.fn(() => () => {}),
+    transaction: <T>(operation: () => T): T => operation(),
   } as unknown as Viewport;
 }
 

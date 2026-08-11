@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, screen } from '@testing-library/react';
 import type { Viewport } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 
@@ -133,5 +133,78 @@ describe('DmLocationEditor wiring', () => {
     expect(lastProps).toEqual(
       expect.objectContaining({ mode: 'location', selectionControls: true })
     );
+  });
+
+  it('threads markerControls into the shared tool options bar', () => {
+    const markerControls = {
+      kind: 'secret' as const,
+      color: 'purple' as const,
+      onKindChange: vi.fn(),
+      onColorChange: vi.fn(),
+    };
+    vi.mocked(useDmLocationEditor).mockReturnValue(
+      makeHookState({ markerControls })
+    );
+
+    render(
+      <DmLocationEditor
+        location={baseLocation}
+        campaignCode="TEST01"
+        dmId="dm-1"
+        onSave={vi.fn()}
+        onSyncToPlayers={vi.fn()}
+      />
+    );
+
+    const lastProps = vi.mocked(DmLocationToolOptions).mock.calls.at(-1)?.[0];
+    expect(lastProps).toEqual(expect.objectContaining({ markerControls }));
+  });
+
+  it('mounts the marker detail panel only while a marker is active', () => {
+    vi.mocked(useDmLocationEditor).mockReturnValue(
+      makeHookState({ markerPanelOpen: false })
+    );
+    const { unmount } = render(
+      <DmLocationEditor
+        location={baseLocation}
+        campaignCode="TEST01"
+        dmId="dm-1"
+        onSave={vi.fn()}
+        onSyncToPlayers={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    unmount();
+
+    vi.mocked(useDmLocationEditor).mockReturnValue(
+      makeHookState({
+        markerPanelOpen: true,
+        markerPanelState: {
+          kind: 'ready',
+          data: { v: 1, kind: 'trap', ref: 'ref-1' },
+          detail: {
+            id: 'ref-1',
+            title: 'Pit',
+            body: 'Deep.',
+            dmNotes: 'DC 15',
+          },
+        },
+      })
+    );
+    render(
+      <DmLocationEditor
+        location={baseLocation}
+        campaignCode="TEST01"
+        dmId="dm-1"
+        onSave={vi.fn()}
+        onSyncToPlayers={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    // mode="dm" reaches the panel: the DM edit form (and only it) carries the
+    // dmNotes field.
+    expect(
+      screen.getByLabelText(/DM notes — never shown to players/)
+    ).toHaveValue('DC 15');
   });
 });
