@@ -327,6 +327,12 @@ describe('buildPublicMarkerDetails — fail-closed canvas inputs', () => {
       { name: 'empty string', canvasState: '' },
       { name: 'whitespace only', canvasState: '   ' },
       { name: 'not JSON', canvasState: '{' },
+      // The ONE case that reaches `readCanvasElements`'s `parsedState === null`
+      // sub-guard: `typeof null === 'object'`, so without that guard the very
+      // next line dereferences null and throws a TypeError instead of failing
+      // closed. `'[]'` and `'{"nope":1}'` below are both caught later, by the
+      // `elements`-is-an-array check.
+      { name: 'JSON null', canvasState: 'null' },
       { name: 'object without elements', canvasState: '{"nope":1}' },
       { name: 'a top-level array', canvasState: '[]' },
     ];

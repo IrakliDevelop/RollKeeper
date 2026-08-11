@@ -913,9 +913,12 @@ describe('gcOrphanMarkerDetails', () => {
     expect(harness.calls).toEqual(['setMarkers']);
     // Never a hard delete.
     expect(harness.state.markers).toHaveLength(2);
-    expect(findMarkerDetail(harness.state.markers, 'kept')?.deletedAt).toBe(
-      undefined
-    );
+    // A RAW `.find`, not `findMarkerDetail`: the latter filters tombstones,
+    // so a `kept` that HAD been soft-deleted would come back `undefined` and
+    // `undefined?.deletedAt` is still `undefined` — the assertion could not
+    // fail. Same shape as the `orphan` lookup two lines below.
+    const kept = harness.state.markers.find(m => m.id === 'kept');
+    expect(kept?.deletedAt).toBe(undefined);
     const orphan = harness.state.markers.find(m => m.id === 'orphan');
     expect(orphan?.deletedAt).toBe(FIXED_NOW);
     expect(harness.nowCalls).toBeGreaterThan(0);

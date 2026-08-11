@@ -17,6 +17,7 @@ import type {
   HtmlPainter,
 } from '@fieldnotes/core';
 
+import { MARKER_TOOL_NAME } from './DmMarkerTool';
 import { MARKER_HTML_TYPE, MARKER_HTML_TYPES } from './markerData';
 import { createMarkerPainter, type MarkerDataIssue } from './markerPainter';
 
@@ -40,7 +41,47 @@ export interface UseMarkerRegistrationArgs {
   onMarkerDataIssue?: (issue: MarkerDataIssue) => void;
   /** Composed by the host, e.g. `() => animator.animating`. */
   isCameraBusy?: () => boolean;
+  /**
+   * Host veto making activation inert while a tool that WRITES to the canvas
+   * is active. Read at gesture time, never captured.
+   *
+   * Core's `ElementActivation` listens directly on the viewport wrapper and
+   * never consults the tool manager, so without this a double-tap with the
+   * marker tool selected places a second pin AND opens a modal panel over it,
+   * and a double-tap with the eraser deletes a pin and then opens a panel on
+   * an element that is already gone. `select` and `hand` must NOT suppress:
+   * single-click-to-select plus double-tap-to-open is the specified DM
+   * gesture.
+   */
+  isActivationSuppressed?: () => boolean;
 }
+
+/**
+ * Tools that create or destroy canvas content, for which activation is inert.
+ * Deliberately a denylist of writers rather than an allowlist of readers: a
+ * tool added later that only reads (a future inspector) should keep working
+ * with double-tap-to-open, while a new placement tool is the caller's to add
+ * here. `select` and `hand` are the two the spec requires NOT be listed.
+ */
+export const CANVAS_WRITING_TOOL_NAMES: ReadonlySet<string> = new Set([
+  // RollKeeper tools
+  MARKER_TOOL_NAME,
+  'token', // PlayerTokenTool
+  'dmtoken', // dm-vtt/combatantToken.ts DmTokenTool
+  'spelltemplate', // player-vtt/SpellTemplateTool
+  // @fieldnotes/core tools that add or remove elements
+  'eraser',
+  'pencil',
+  'arrow',
+  'shape',
+  'text',
+  'note',
+  'image',
+  'template',
+]);
+// NOT listed, on purpose: 'select' and 'hand' (the specified DM gesture is
+// single-click-to-select plus double-tap-to-open), and 'measure' / 'laser' /
+// 'ping', which are ephemeral overlays and write no elements.
 
 /**
  * `el.type === 'html' && el.htmlType === MARKER_HTML_TYPE`. Deliberately does
@@ -87,8 +128,22 @@ export function useMarkerRegistration(args: UseMarkerRegistrationArgs): void {
   const isCameraBusyRef = useRef(args.isCameraBusy);
   isCameraBusyRef.current = args.isCameraBusy;
 
+  const isActivationSuppressedRef = useRef(args.isActivationSuppressed);
+  isActivationSuppressedRef.current = args.isActivationSuppressed;
+
   useEffect(() => {
     if (viewport === null) return undefined;
+
+    /**
+     * `isActivatable`, the SDK's intended host filter. Reads the suppression
+     * veto THROUGH THE REF at gesture time — a value captured when the effect
+     * ran would pin the tool that happened to be active at mount, and the
+     * effect deliberately does not re-run on callback identity changes.
+     */
+    const isActivatableMarker = (el: Readonly<CanvasElement>): boolean => {
+      if (isActivationSuppressedRef.current?.() === true) return false;
+      return isMarkerElement(el);
+    };
 
     const releaseDeclaration =
       viewport.expectCanvasHtmlTypes(MARKER_HTML_TYPES);
@@ -103,11 +158,15 @@ export function useMarkerRegistration(args: UseMarkerRegistrationArgs): void {
         ? null
         : viewport.setActivation({
             gesture,
-            isActivatable: isMarkerElement,
+            isActivatable: isActivatableMarker,
             isCameraBusy: () => isCameraBusyRef.current?.() ?? false,
           });
+    // Second gate, for the same reason `isActivatable` is the first: the
+    // activation emitter is viewport-owned and persistent, so an event raised
+    // by some OTHER `setActivation` owner (or by a stale generation) must not
+    // open a panel behind a canvas-writing tool either.
     const offActivate = viewport.onElementActivate(event => {
-      if (!isMarkerElement(event.element)) return;
+      if (!isActivatableMarker(event.element)) return;
       onActivateMarkerRef.current?.(event);
     });
 

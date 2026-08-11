@@ -42,9 +42,10 @@ import {
   buildMarkerData,
   parseMarkerData,
 } from '../markerData';
+import type { MarkerElementDataV1 } from '../markerData';
 import { ANNOTATIONS_LAYER_ID } from '../layerContract';
 import { useBattleMapStore } from '@/store/battleMapStore';
-import type { BattleMap } from '@/types/battlemap';
+import type { BattleMap, MarkerDetail } from '@/types/battlemap';
 
 const CODE = 'TEST01';
 const MAP_ID = 'bm-1';
@@ -653,5 +654,346 @@ describe('useDmLocationEditor — the DM-only toggle routes markers through thei
     expect(readMap()?.dmOnlyElements).toEqual({ [shape.id]: true });
     expect(readMap()?.dmOnlyElements[marker.id]).toBeUndefined();
     expect(result.current.markerAudienceNotice).toBeNull();
+  });
+});
+
+/** The valid marker payload on `element`, or a failed assertion. */
+function markerDataOf(element: HtmlElement | undefined): MarkerElementDataV1 {
+  const parsed = parseMarkerData(element?.data);
+  expect(parsed.status, `expected valid marker data on ${element?.id}`).toBe(
+    'valid'
+  );
+  if (parsed.status !== 'valid') throw new Error('unreachable');
+  return parsed.data;
+}
+
+/**
+ * Counts PRODUCT-STATE AUDIENCE writes by watching `dmOnlyElements` for a new
+ * object identity: `setDmOnly` always rebuilds that object, `updateBattleMap`
+ * always preserves it. No spy, no mock.
+ */
+function trackAudienceWrites(): { count: () => number; stop: () => void } {
+  let previous = readMap()?.dmOnlyElements;
+  let writes = 0;
+  const stop = useBattleMapStore.subscribe(state => {
+    const next = state.battleMaps[CODE]?.[MAP_ID]?.dmOnlyElements;
+    if (next === previous) return;
+    previous = next;
+    writes += 1;
+  });
+  return { count: () => writes, stop };
+}
+
+function findDetail(ref: string): MarkerDetail | undefined {
+  return readMap()?.markers?.find(marker => marker.id === ref);
+}
+
+/** Canvas-2D double good enough to run the real marker painter directly. */
+function fakeCtx(): CanvasRenderingContext2D {
+  return {
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    closePath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
+    arc: vi.fn(),
+    fill: vi.fn(),
+    stroke: vi.fn(),
+    fillText: vi.fn(),
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 0,
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+  } as unknown as CanvasRenderingContext2D;
+}
+
+/**
+ * The `store.on('add')` leak guard — twin of the block in
+ * `dm-vtt/__tests__/DmBattleMapCanvas.hooks.markers.test.ts`. Every other
+ * ordering test drives `createMarker`; `mod+d`, paste and the canvas context
+ * menu do not, they `structuredClone` + `store.add` directly.
+ */
+describe('useDmLocationEditor — no marker element enters the store unmarked', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
+    useBattleMapStore.setState({
+      battleMaps: { [CODE]: { [MAP_ID]: battleMapFixture() } },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    useBattleMapStore.setState({ battleMaps: {} });
+    vi.clearAllMocks();
+  });
+
+  it('a duplicate-shaped local add is marked DM-only AND given its own ref, carrying a copy of the original detail content', async () => {
+    const { vp, store, result, emitActivate } = await setup('battlemap');
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const original = markerElements(store)[0] as HtmlElement;
+    act(() => {
+      emitActivate(original);
+    });
+    act(() => {
+      result.current.handleSaveMarkerDetail({
+        title: 'Hidden door',
+        body: 'DC 20 perception',
+        dmNotes: 'leads to the vault',
+      });
+    });
+    const originalData = markerDataOf(original);
+
+    // EXACTLY what core's `insertClones` does.
+    const clone = structuredClone(store.getById(original.id)) as HtmlElement;
+    clone.id = 'cloned-pin-1';
+    act(() => {
+      store.add(clone);
+    });
+
+    expect(readMap()?.dmOnlyElements[clone.id]).toBe(true);
+
+    const clonedData = markerDataOf(store.getById(clone.id) as HtmlElement);
+    expect(clonedData.ref).not.toBe(originalData.ref);
+    expect(clonedData.kind).toBe(originalData.kind);
+    expect(clonedData.color).toBe(originalData.color);
+
+    expect(findDetail(clonedData.ref)).toMatchObject({
+      id: clonedData.ref,
+      title: 'Hidden door',
+      body: 'DC 20 perception',
+      dmNotes: 'leads to the vault',
+    });
+    expect(markerDataOf(store.getById(original.id) as HtmlElement).ref).toBe(
+      originalData.ref
+    );
+  });
+
+  it('positive control: the createMarker path still writes the audience exactly ONCE — the guard does not double-write', async () => {
+    const { vp, result } = await setup('battlemap');
+    const audience = trackAudienceWrites();
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+
+    expect(audience.count()).toBe(1);
+    audience.stop();
+  });
+
+  it('a REMOTE-origin marker add is left completely alone; the identical element added LOCALLY is marked and rewritten', async () => {
+    const { store } = await setup('battlemap');
+
+    const remote = createHtmlElement({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      layerId: ANNOTATIONS_LAYER_ID,
+      htmlType: MARKER_HTML_TYPE,
+      data: { ...buildMarkerData({ kind: 'secret', ref: 'peer-ref' }) },
+    });
+    act(() => {
+      store.add(remote, { origin: 'remote' });
+    });
+
+    expect(readMap()?.dmOnlyElements[remote.id]).toBeUndefined();
+    expect(markerDataOf(store.getById(remote.id) as HtmlElement).ref).toBe(
+      'peer-ref'
+    );
+
+    // Positive control, same fixture and assertions, local origin.
+    const local = structuredClone(remote) as HtmlElement;
+    local.id = 'local-copy-1';
+    act(() => {
+      store.add(local);
+    });
+
+    expect(readMap()?.dmOnlyElements[local.id]).toBe(true);
+    expect(markerDataOf(store.getById(local.id) as HtmlElement).ref).not.toBe(
+      'peer-ref'
+    );
+  });
+
+  it('a marker whose data does not parse is still marked DM-only, with its data left exactly as it arrived', async () => {
+    const { store } = await setup('battlemap');
+
+    const badData = { v: 1, kind: 'door' };
+    const broken = createHtmlElement({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      layerId: ANNOTATIONS_LAYER_ID,
+      htmlType: MARKER_HTML_TYPE,
+      data: { ...badData },
+    });
+    act(() => {
+      store.add(broken);
+    });
+
+    expect(parseMarkerData(broken.data).status).toBe('invalid');
+    expect(readMap()?.dmOnlyElements[broken.id]).toBe(true);
+    expect((store.getById(broken.id) as HtmlElement).data).toEqual(badData);
+    expect(readMap()?.markers ?? []).toHaveLength(0);
+  });
+});
+
+describe('useDmLocationEditor — orphan GC runs after a successful canvas load', () => {
+  const canvasWithRefs = (refs: string[]): string =>
+    JSON.stringify({
+      version: 1,
+      camera: { position: { x: 0, y: 0 }, zoom: 1 },
+      elements: refs.map((ref, index) => ({
+        id: `pin-${index}`,
+        type: 'html',
+        htmlType: MARKER_HTML_TYPE,
+        position: { x: 0, y: 0 },
+        size: { w: 40, h: 40 },
+        zIndex: 950,
+        locked: false,
+        layerId: ANNOTATIONS_LAYER_ID,
+        data: { ...buildMarkerData({ kind: 'door', ref }) },
+      })),
+    });
+
+  const twoDetails = (): MarkerDetail[] => [
+    { id: 'kept', title: 'Kept', body: '', dmNotes: 'still needed' },
+    { id: 'orphan', title: 'Orphan', body: '', dmNotes: 'leaked forever' },
+  ];
+
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    useBattleMapStore.setState({ battleMaps: {} });
+    vi.clearAllMocks();
+  });
+
+  it('soft-deletes exactly the unreferenced details and leaves the referenced ones untouched', async () => {
+    const map = battleMapFixture({
+      canvasState: canvasWithRefs(['kept']),
+      markers: twoDetails(),
+    });
+    useBattleMapStore.setState({ battleMaps: { [CODE]: { [MAP_ID]: map } } });
+
+    await setup('battlemap', map);
+
+    expect(findDetail('kept')?.deletedAt).toBeUndefined();
+    expect(findDetail('orphan')?.deletedAt).toEqual(expect.any(String));
+    expect(readMap()?.markers).toHaveLength(2);
+  });
+
+  it('positive control: with every detail referenced, nothing is soft-deleted', async () => {
+    const map = battleMapFixture({
+      canvasState: canvasWithRefs(['kept', 'orphan']),
+      markers: twoDetails(),
+    });
+    useBattleMapStore.setState({ battleMaps: { [CODE]: { [MAP_ID]: map } } });
+
+    await setup('battlemap', map);
+
+    expect(findDetail('kept')?.deletedAt).toBeUndefined();
+    expect(findDetail('orphan')?.deletedAt).toBeUndefined();
+  });
+});
+
+describe('useDmLocationEditor — the open panel does not outlive its element', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
+    useBattleMapStore.setState({
+      battleMaps: { [CODE]: { [MAP_ID]: battleMapFixture() } },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    useBattleMapStore.setState({ battleMaps: {} });
+    vi.clearAllMocks();
+  });
+
+  it('removing the active element closes the panel; removing a DIFFERENT element leaves it open', async () => {
+    const { vp, store, result, emitActivate } = await setup('battlemap');
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp, 100, 120);
+    });
+    act(() => {
+      tapMarkerTool(result.current.tools, vp, 300, 320);
+    });
+    const [active, other] = markerElements(store) as HtmlElement[];
+    if (!active || !other) throw new Error('expected two pins');
+
+    act(() => {
+      emitActivate(active);
+    });
+    expect(result.current.markerPanelOpen).toBe(true);
+
+    // Positive control first, on the same harness.
+    act(() => {
+      store.remove(other.id);
+    });
+    expect(result.current.markerPanelOpen).toBe(true);
+
+    act(() => {
+      store.remove(active.id);
+    });
+    expect(result.current.markerPanelOpen).toBe(false);
+  });
+});
+
+describe('useDmLocationEditor — malformed marker data reaches a diagnostic sink', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
+    useBattleMapStore.setState({
+      battleMaps: { [CODE]: { [MAP_ID]: battleMapFixture() } },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    useBattleMapStore.setState({ battleMaps: {} });
+    vi.restoreAllMocks();
+  });
+
+  it('the registered painter is built WITH an onMarkerDataIssue sink that warns (dead in production before this)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { vp } = await setup('battlemap');
+
+    const painter = vp.getHtmlPainters().getActivePainter(MARKER_HTML_TYPE);
+    expect(painter).toBeTypeOf('function');
+    if (!painter) return;
+
+    const broken = createHtmlElement({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      htmlType: MARKER_HTML_TYPE,
+      data: { v: 9 },
+    });
+    painter({
+      ctx: fakeCtx(),
+      element: broken,
+      size: { w: 40, h: 40 },
+      zoom: 1,
+    });
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).toContain(broken.id);
+
+    // Positive control through the identical painter and spy.
+    warn.mockClear();
+    const good = createHtmlElement({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      htmlType: MARKER_HTML_TYPE,
+      data: { ...buildMarkerData({ kind: 'door', ref: 'ok-ref' }) },
+    });
+    painter({ ctx: fakeCtx(), element: good, size: { w: 40, h: 40 }, zoom: 1 });
+    expect(warn).not.toHaveBeenCalled();
   });
 });

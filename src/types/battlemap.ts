@@ -40,6 +40,15 @@ export interface PublicMarkerDetail {
   id: string;
   title: string;
   body: string;
+  /**
+   * Structural refusal, not documentation. Without it a `MarkerDetail` is
+   * assignable to `PublicMarkerDetail` (extra properties survive anything but
+   * a fresh object literal), so `markers: storedLocation.markers` in a sync
+   * payload builder would type-check and ship every `dmNotes` to the players.
+   * `dmNotes?: never` makes that a compile error. Do NOT widen this back:
+   * fix the call site instead, with an explicit field pick.
+   */
+  dmNotes?: never;
 }
 
 export interface BattleMap {

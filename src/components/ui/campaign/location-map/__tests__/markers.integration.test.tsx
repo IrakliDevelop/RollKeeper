@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, cleanup } from '@testing-library/react';
 import {
   ElementStore,
+  SelectTool,
   Viewport,
   createNote,
   createHtmlElement,
@@ -20,11 +21,17 @@ import {
   exportBattleMap,
   type ExportCapableViewport,
 } from '../battleMapExport';
-import { createMarker } from '../markerWrites';
+import { createMarker, guardLocalMarkerAdd } from '../markerWrites';
 import type { MarkerWriteDeps } from '../markerWrites';
 import { DM_AUDIENCE, MARKER_HTML_TYPE, buildMarkerData } from '../markerData';
+import type { MarkerColorKey, MarkerKind } from '../markerData';
 import { MARKER_COLOR_CSS } from '../markerPainter';
-import { useMarkerRegistration } from '../useMarkerRegistration';
+import { DmMarkerTool, MARKER_TOOL_NAME } from '../DmMarkerTool';
+import type { PlaceMarkerRequest } from '../DmMarkerTool';
+import {
+  CANVAS_WRITING_TOOL_NAMES,
+  useMarkerRegistration,
+} from '../useMarkerRegistration';
 
 import { useBattleMapStore } from '@/store/battleMapStore';
 import type { BattleMap } from '@/types/battlemap';
@@ -382,6 +389,61 @@ describe('markers over the real sync connection: the DM audience reaches the wir
     // that out.
     expect(markerUpserts[0]?.audience).toBe(DM_AUDIENCE);
   });
+
+  it("a DUPLICATED pin's first outbound upsert already carries the DM audience, even though nothing in `createMarker` ran for it", async () => {
+    const store = new ElementStore();
+    const deps = realProductStateDeps(store);
+    // The leak guard, wired exactly as both DM surfaces wire it: on the
+    // canvas store, and BEFORE the connection — so the mark lands before the
+    // sync client's own `add` listener resolves this element's audience.
+    store.on('add', (element, meta) =>
+      guardLocalMarkerAdd(deps, element, meta)
+    );
+    await startLiveDmConnection(store);
+
+    // Positive control on the identical wire observation: an element the
+    // guard does not touch reaches the relay with no audience at all, so
+    // "audience === 'dm'" below cannot be an artefact of a fixture that
+    // stamps everything.
+    const plain = createNote({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+    });
+    store.add(plain);
+    expect(
+      upsertsFor(fakeTransport.sent, plain.id)[0]?.audience
+    ).toBeUndefined();
+
+    const created = createMarker(deps, {
+      kind: 'secret',
+      color: 'purple',
+      label: 'False wall',
+      position: { x: 10, y: 20 },
+      size: { w: 40, h: 40 },
+      layerId: 'layer-1',
+      title: 'False wall',
+      body: 'Push the sconce',
+      dmNotes: 'never shared',
+    });
+
+    // EXACTLY what `@fieldnotes/core`'s `insertClones` does for `mod+d`,
+    // paste and the canvas context menu: structuredClone, new id, bare
+    // `store.add`. No `createMarker`, no product-state write of its own.
+    const original = store.getById(created.elementId) as HtmlElement;
+    const clone = structuredClone(original) as HtmlElement;
+    clone.id = 'cloned-pin-1';
+    store.add(clone);
+
+    const cloneUpserts = upsertsFor(fakeTransport.sent, clone.id);
+    // The clone reached the wire at all, so index 0 below is not vacuous.
+    expect(cloneUpserts.length).toBeGreaterThan(0);
+    expect(cloneUpserts[0]?.type).toBe('html');
+    // THE assertion that closes the leak: the FIRST frame this element ever
+    // produced is already DM-stamped. A `.some(...)` here would pass just as
+    // happily if a later re-emit corrected the audience after one leaked
+    // frame had already fanned a `secret` pin out to every player.
+    expect(cloneUpserts[0]?.audience).toBe(DM_AUDIENCE);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -560,5 +622,116 @@ describe('useMarkerRegistration against real Viewports', () => {
     expect(resolveHtmlRouting(element, second.getHtmlPainters())).toBe(
       'canvas'
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. Activation vs. the active tool, over ONE live viewport
+// ---------------------------------------------------------------------------
+
+/**
+ * Core's `ElementActivation` listens directly on the viewport wrapper and
+ * never consults the tool manager, so nothing below the host layer stops a
+ * double-tap from opening a marker panel while a canvas-WRITING tool is
+ * active. Nothing else on the branch drives a real tool and real activation
+ * over the SAME live viewport, which is exactly why the conflict was
+ * invisible: the tool tests drive tools with no activation, and the
+ * activation tests drive activation with no tools.
+ */
+describe('marker activation and the active tool, over one live Viewport', () => {
+  const viewports: Viewport[] = [];
+  const containers: HTMLDivElement[] = [];
+
+  afterEach(() => {
+    cleanup();
+    for (const viewport of viewports.splice(0)) viewport.destroy();
+    for (const container of containers.splice(0)) container.remove();
+    vi.restoreAllMocks();
+  });
+
+  const mountViewport = (): Viewport => {
+    const container = makeContainer();
+    containers.push(container);
+    const viewport = new Viewport(container);
+    viewports.push(viewport);
+    return viewport;
+  };
+
+  /** Two taps in quick succession on the viewport wrapper — the real gesture
+   *  both the tool and `ElementActivation` observe, from the same events. */
+  function doubleTap(target: HTMLElement, x: number, y: number): void {
+    for (let tap = 0; tap < 2; tap += 1) {
+      for (const type of ['pointerdown', 'pointerup']) {
+        target.dispatchEvent(
+          new PointerEvent(type, {
+            bubbles: true,
+            pointerId: 1,
+            pointerType: 'mouse',
+            button: 0,
+            buttons: type === 'pointerdown' ? 1 : 0,
+            clientX: x,
+            clientY: y,
+          })
+        );
+      }
+    }
+  }
+
+  it('with the marker tool active a double-tap places pins and opens NO panel; with `select` active the identical gesture opens it', () => {
+    stubCanvas();
+    const viewport = mountViewport();
+    const wrapper = viewport.domLayer.parentElement;
+    if (!wrapper) throw new Error('expected the viewport wrapper');
+
+    const placements: PlaceMarkerRequest[] = [];
+    const kindRef = { current: 'door' as MarkerKind };
+    const colorRef = { current: 'blue' as MarkerColorKey };
+    viewport.toolManager.register(new SelectTool());
+    viewport.toolManager.register(
+      new DmMarkerTool(kindRef, colorRef, request => placements.push(request))
+    );
+
+    const activated: string[] = [];
+    renderHook(() =>
+      useMarkerRegistration({
+        viewport,
+        gesture: 'double',
+        onActivateMarker: event => activated.push(event.element.id),
+        // The production predicate, verbatim: read the ACTIVE TOOL at
+        // gesture time, never a value captured when the effect ran.
+        isActivationSuppressed: () =>
+          CANVAS_WRITING_TOOL_NAMES.has(
+            viewport.toolManager.activeTool?.name ?? ''
+          ),
+      })
+    );
+
+    const pin = createHtmlElement({
+      position: { x: 100, y: 100 },
+      size: { w: 40, h: 40 },
+      layerId: viewport.layerManager.activeLayerId,
+      htmlType: MARKER_HTML_TYPE,
+      data: { ...buildMarkerData({ kind: 'door', ref: 'ref-1' }) },
+    });
+    viewport.store.add(pin);
+
+    // POSITIVE CONTROL FIRST, so the suppression case below cannot pass
+    // because the gesture never reaches activation at all in this harness.
+    // (First, because the marker tool's taps add pins over the same point
+    // and would change what the hit test finds.)
+    viewport.setTool('select');
+    doubleTap(wrapper, 120, 120);
+    expect(activated).toEqual([pin.id]);
+    expect(placements).toHaveLength(0);
+
+    viewport.setTool(MARKER_TOOL_NAME);
+    doubleTap(wrapper, 120, 120);
+
+    // No SECOND panel: activation stayed inert for the whole gesture...
+    expect(activated).toEqual([pin.id]);
+    // ...while the very same two taps did reach the canvas and place two
+    // pins, which is what proves the gesture was delivered rather than
+    // swallowed by the harness.
+    expect(placements).toHaveLength(2);
   });
 });

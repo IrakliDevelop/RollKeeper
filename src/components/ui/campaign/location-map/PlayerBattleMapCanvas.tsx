@@ -48,6 +48,7 @@ import {
 } from '@/lib/battlemapSync';
 import DmLocationToolOptions from './DmLocationToolOptions';
 import { useMarkerRegistration } from './useMarkerRegistration';
+import { useCloseMarkerPanelOnRemove } from './useCloseMarkerPanelOnRemove';
 import { resolveMarkerPanelState } from './MarkerDetailPanel/MarkerDetailPanel.utils';
 import MarkerDetailPanel from './MarkerDetailPanel';
 import type { PublicMarkerDetail } from '@/types/battlemap';
@@ -343,22 +344,36 @@ export function PlayerBattleMapCanvas({
     activeMarkerElementId !== null
       ? (viewport?.store.getById(activeMarkerElementId) ?? null)
       : null;
-  // `resolveMarkerPanelState`'s `markers` parameter is typed `MarkerDetail[]`
-  // (MarkerDetailPanel.utils.ts), which — unlike `PublicMarkerDetail` —
-  // requires a `dmNotes` field. The player surface must never originate or
-  // carry a `dmNotes` value (spec §6.4), so this synthesizes an empty
-  // placeholder purely to satisfy the shared resolver's type signature;
-  // `ReadOnlyView` (MarkerDetailPanel's player-mode branch) never reads
-  // `detail.dmNotes` at all, so no real DM content is exposed by this
-  // cast-avoidance shim.
+  // `resolveMarkerPanelState`'s `markers` parameter is typed
+  // `readonly MarkerDetail[]` (MarkerDetailPanel.utils.ts), which — unlike
+  // `PublicMarkerDetail` — requires a `dmNotes` field. The player surface must
+  // never originate or carry a `dmNotes` value (spec §6.4), so this
+  // synthesizes an empty placeholder purely to satisfy the shared resolver's
+  // type signature; `ReadOnlyView` (MarkerDetailPanel's player-mode branch)
+  // never reads `detail.dmNotes` at all, so no real DM content is exposed.
+  //
+  // An EXPLICIT field pick, never `{ ...marker, dmNotes: '' }`: a stray
+  // `deletedAt` riding in on the spread would silently downgrade a `ready`
+  // panel to `unpublished`, and this is the last place on the branch where a
+  // marker-shaped value is built from another object.
   const markerPanelState = resolveMarkerPanelState(
     activeMarkerElement,
-    markers.map(marker => ({ ...marker, dmNotes: '' })),
+    markers.map(m => ({ id: m.id, title: m.title, body: m.body, dmNotes: '' })),
     'player'
   );
   const handleCloseMarkerPanel = useCallback(() => {
     setActiveMarkerElementId(null);
   }, []);
+
+  // `activeMarkerElement` above is a bare render-time `getById` with no store
+  // subscription. When the DM hides a marker the relay sends the player a
+  // REMOVE, and without this the open panel would keep showing the pin's
+  // label and body until some unrelated re-render.
+  useCloseMarkerPanelOnRemove(
+    viewport,
+    activeMarkerElementId,
+    handleCloseMarkerPanel
+  );
 
   const handleReady = (vp: Viewport) => {
     setViewport(vp);
