@@ -6,6 +6,7 @@ import { BattleMapMinimap } from '@/components/ui/campaign/location-map/BattleMa
 import { BattleMapExportControl } from '@/components/ui/campaign/location-map/BattleMapExportControl';
 import { BattleMapViewsControl } from '@/components/ui/campaign/location-map/BattleMapViewsControl';
 import MarkerDetailPanel from '@/components/ui/campaign/location-map/MarkerDetailPanel';
+import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { DmVttToolbar } from './DmVttToolbar';
 import {
@@ -59,6 +60,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     handleSaveMarkerDetail,
     handleDeleteMarker,
   } = useDmBattleMapCanvas(props);
+  const { toasts, addToast, dismissToast } = useToast();
   // Session-scoped only — pure UI state, no connection dependency. Off by
   // default; the DM opts in each session before a focus request can move
   // anyone else's camera.
@@ -161,15 +163,27 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
           <MarkerDetailPanel
             open
             mode="dm"
+            campaignCode={props.campaignCode}
+            dmId={props.dmId}
             state={markerPanelState}
             onClose={handleCloseMarkerPanel}
-            onSave={handleSaveMarkerDetail}
+            onSave={patch => {
+              handleSaveMarkerDetail(patch);
+              addToast({
+                type: 'success',
+                title: 'Marker saved',
+                message: 'Marker details were updated.',
+              });
+              handleCloseMarkerPanel();
+            }}
+            onPersist={handleSaveMarkerDetail}
             onDelete={handleDeleteMarker}
             isDmOnly={markerPanelIsDmOnly}
             onAudienceChange={handleSetMarkerAudience}
             audienceNotice={markerAudienceNotice}
           />
         )}
+        <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         {viewport && children}
       </div>
     </ViewportContext.Provider>

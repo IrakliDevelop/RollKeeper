@@ -337,6 +337,7 @@ export function PlayerBattleMapCanvas({
   useMarkerRegistration({
     viewport,
     gesture: 'single',
+    markerDetails: markers,
     onActivateMarker: handleMarkerActivate,
   });
 

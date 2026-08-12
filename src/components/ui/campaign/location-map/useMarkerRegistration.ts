@@ -16,6 +16,7 @@ import type {
   ElementActivationEvent,
   HtmlPainter,
 } from '@fieldnotes/core';
+import type { MarkerDetail, PublicMarkerDetail } from '@/types/battlemap';
 
 import { MARKER_TOOL_NAME } from './DmMarkerTool';
 import { MARKER_HTML_TYPE, MARKER_HTML_TYPES } from './markerData';
@@ -30,6 +31,7 @@ export interface MarkerRegistrationViewport {
   onElementActivate(
     listener: (event: ElementActivationEvent) => void
   ): () => void;
+  requestRender?: () => void;
 }
 
 export interface UseMarkerRegistrationArgs {
@@ -54,6 +56,8 @@ export interface UseMarkerRegistrationArgs {
    * gesture.
    */
   isActivationSuppressed?: () => boolean;
+  /** Product-state details keyed by the marker ref; never written to canvas. */
+  markerDetails?: readonly (MarkerDetail | PublicMarkerDetail)[];
 }
 
 /**
@@ -131,6 +135,15 @@ export function useMarkerRegistration(args: UseMarkerRegistrationArgs): void {
   const isActivationSuppressedRef = useRef(args.isActivationSuppressed);
   isActivationSuppressedRef.current = args.isActivationSuppressed;
 
+  const markerStatusesRef = useRef(new Map<string, MarkerDetail['status']>());
+  markerStatusesRef.current = new Map(
+    (args.markerDetails ?? []).map(detail => [detail.id, detail.status])
+  );
+
+  useEffect(() => {
+    viewport?.requestRender?.();
+  }, [viewport, args.markerDetails]);
+
   useEffect(() => {
     if (viewport === null) return undefined;
 
@@ -151,6 +164,7 @@ export function useMarkerRegistration(args: UseMarkerRegistrationArgs): void {
       MARKER_HTML_TYPE,
       createMarkerPainter({
         onMarkerDataIssue: issue => onMarkerDataIssueRef.current?.(issue),
+        resolveMarkerStatus: ref => markerStatusesRef.current.get(ref),
       })
     );
     const disposeActivation =
