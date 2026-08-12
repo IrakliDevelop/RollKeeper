@@ -58,6 +58,7 @@ import {
 } from './focusSync';
 import { DmMarkerTool, type PlaceMarkerRequest } from './DmMarkerTool';
 import { applyMarkerAudienceToggle } from './markerAudienceToggle';
+import { MARKER_MIXED_AUDIENCE_MESSAGE } from './markerAudienceCopy';
 import { buildPublicMarkerDetails } from './markerPublication';
 import { markerRefForElement } from './markerWrites';
 import { MARKER_DEFAULT_COLOR_KEY } from './markerPainter';
@@ -220,6 +221,8 @@ export interface DmLocationEditorState {
   markerAudienceNotice: string | null;
   markerPanelOpen: boolean;
   markerPanelState: MarkerPanelState;
+  markerPanelIsDmOnly: boolean;
+  handleSetMarkerAudience: (dmOnly: boolean) => void;
   handleCloseMarkerPanel: () => void;
   handleSaveMarkerDetail: (patch: {
     title: string;
@@ -297,6 +300,9 @@ export function useDmLocationEditor(
   const locationStoreGetLoc = useLocationStore(s => s.getLocation);
   const locationStoreToggle = useLocationStore(s => s.toggleDmOnly);
   const locationStoreUpdate = useLocationStore(s => s.updateLocation);
+  const markerDmOnlyElements = useLocationStore(
+    state => state.locations[campaignCode]?.[location.id]?.dmOnlyElements
+  );
 
   const battleMapStoreGetBm = useBattleMapStore(s => s.getBattleMap);
   const battleMapStoreToggle = useBattleMapStore(s => s.toggleDmOnly);
@@ -510,10 +516,30 @@ export function useDmLocationEditor(
     markerPanelState.kind === 'missing-detail'
       ? markerPanelState.data.ref
       : null;
+  const markerPanelIsDmOnly =
+    activeMarkerElementId !== null &&
+    markerDmOnlyElements?.[activeMarkerElementId] === true;
 
   const handleCloseMarkerPanel = useCallback(() => {
     setActiveMarkerElementId(null);
   }, []);
+
+  const handleSetMarkerAudience = useCallback(
+    (dmOnly: boolean) => {
+      if (activeMarkerRef === null) return;
+      const transition = markerWrites.setMarkerAudienceForRef(
+        activeMarkerRef,
+        dmOnly
+      );
+      setMarkerAudienceNotice(
+        transition.status === 'refused' &&
+          transition.reason === 'mixed-audience'
+          ? MARKER_MIXED_AUDIENCE_MESSAGE
+          : null
+      );
+    },
+    [activeMarkerRef, markerWrites]
+  );
 
   // `activeMarkerElement` above is a bare render-time `getById` with no store
   // subscription — without this the panel would survive its own element.
@@ -1383,6 +1409,8 @@ export function useDmLocationEditor(
     markerAudienceNotice,
     markerPanelOpen: activeMarkerElementId !== null,
     markerPanelState,
+    markerPanelIsDmOnly,
+    handleSetMarkerAudience,
     handleCloseMarkerPanel,
     handleSaveMarkerDetail,
     handleDeleteMarker,

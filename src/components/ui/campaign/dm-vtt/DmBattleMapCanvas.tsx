@@ -53,6 +53,8 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     markerAudienceNotice,
     markerPanelOpen,
     markerPanelState,
+    markerPanelIsDmOnly,
+    handleSetMarkerAudience,
     handleCloseMarkerPanel,
     handleSaveMarkerDetail,
     handleDeleteMarker,
@@ -163,6 +165,9 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
             onClose={handleCloseMarkerPanel}
             onSave={handleSaveMarkerDetail}
             onDelete={handleDeleteMarker}
+            isDmOnly={markerPanelIsDmOnly}
+            onAudienceChange={handleSetMarkerAudience}
+            audienceNotice={markerAudienceNotice}
           />
         )}
         {viewport && children}

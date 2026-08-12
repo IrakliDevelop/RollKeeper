@@ -39,6 +39,7 @@ export function useBattleMapViewsControl({
   const [saveName, setSaveName] = useState('');
   const [armedDeleteId, setArmedDeleteId] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   const resetTransientState = () => {
     setRenamingId(null);
@@ -63,7 +64,12 @@ export function useBattleMapViewsControl({
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(target) &&
+        !popoverRef.current?.contains(target)
+      ) {
         closePopover();
       }
     };
@@ -132,6 +138,7 @@ export function useBattleMapViewsControl({
 
   return {
     rootRef,
+    popoverRef,
     open,
     toggleOpen,
     closePopover,

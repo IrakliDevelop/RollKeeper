@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { CameraView, FocusAudience } from '@fieldnotes/core';
 import { Check, ChevronDown, MapPin, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
@@ -51,6 +52,7 @@ export function BattleMapViewsControl({
   const [audience, setAudience] = useState<FocusAudience>('all');
   const {
     rootRef,
+    popoverRef,
     open,
     toggleOpen,
     renamingId,
@@ -76,6 +78,26 @@ export function BattleMapViewsControl({
     onRenameView,
     onDeleteView,
   });
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, right: 8 });
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const updatePosition = () => {
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setPopoverPosition({
+        top: rect.bottom + 8,
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+    };
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open, rootRef]);
 
   const handleBringToMyView = () => {
     if (!sharingEnabled) return;
@@ -95,121 +117,128 @@ export function BattleMapViewsControl({
         <ChevronDown size={14} />
       </Button>
 
-      {open && (
-        <div className="bg-surface-raised border-divider absolute top-full right-0 z-30 mt-2 w-72 rounded-xl border p-3 shadow-xl">
-          {savingView ? (
-            <div className="flex items-center gap-1">
-              <Input
-                aria-label="View name"
-                placeholder="Name this view"
-                value={saveName}
-                onChange={e => setSaveName(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') commitSave();
-                  if (e.key === 'Escape') cancelSave();
-                }}
-                className="h-11 flex-1"
-                autoFocus
-              />
+      {open &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            data-testid="battle-map-views-popover"
+            className="bg-surface-raised border-divider fixed z-50 w-72 rounded-xl border p-3 shadow-xl"
+            style={popoverPosition}
+          >
+            {savingView ? (
+              <div className="flex items-center gap-1">
+                <Input
+                  aria-label="View name"
+                  placeholder="Name this view"
+                  value={saveName}
+                  onChange={e => setSaveName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') commitSave();
+                    if (e.key === 'Escape') cancelSave();
+                  }}
+                  className="h-11 flex-1"
+                  autoFocus
+                />
+                <Button
+                  variant="ghost"
+                  aria-label="Confirm save"
+                  onClick={commitSave}
+                  className={ICON_BUTTON}
+                >
+                  <Check size={16} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  aria-label="Cancel save"
+                  onClick={cancelSave}
+                  className={ICON_BUTTON}
+                >
+                  <X size={16} />
+                </Button>
+              </div>
+            ) : (
               <Button
                 variant="ghost"
-                aria-label="Confirm save"
-                onClick={commitSave}
-                className={ICON_BUTTON}
+                onClick={startSave}
+                className="flex h-11 w-full items-center justify-start gap-2 text-sm"
               >
-                <Check size={16} />
+                <Plus size={16} />
+                Save current view
               </Button>
-              <Button
-                variant="ghost"
-                aria-label="Cancel save"
-                onClick={cancelSave}
-                className={ICON_BUTTON}
-              >
-                <X size={16} />
-              </Button>
-            </div>
-          ) : (
-            <Button
-              variant="ghost"
-              onClick={startSave}
-              className="flex h-11 w-full items-center justify-start gap-2 text-sm"
+            )}
+
+            {views.length > 0 && (
+              <>
+                <div className="border-divider my-2 border-t" />
+                <ul className="flex flex-col gap-1">
+                  {views.map(v => (
+                    <ViewRow
+                      key={v.id}
+                      view={v}
+                      sharingEnabled={sharingEnabled}
+                      renaming={renamingId === v.id}
+                      renameValue={renameValue}
+                      onRenameValueChange={setRenameValue}
+                      onStartRename={() => startRename(v.id, v.name)}
+                      onCommitRename={commitRename}
+                      onCancelRename={cancelRename}
+                      deleteArmed={armedDeleteId === v.id}
+                      onDeleteClick={() => handleDeleteClick(v.id)}
+                      onCancelDelete={cancelDelete}
+                      onGoToView={() => onGoToView(v.view)}
+                      onSend={() => sharingEnabled && onSend(v.view, audience)}
+                    />
+                  ))}
+                </ul>
+              </>
+            )}
+
+            <div className="border-divider my-2 border-t" />
+
+            <Switch
+              checked={sharingEnabled}
+              onCheckedChange={onSharingChange}
+              aria-label="Move players' cameras"
+              label="Move players' cameras"
+              description="Off by default — turn on to move other people's cameras."
+            />
+
+            <RadioGroupField
+              label="Send to"
+              value={audience}
+              onValueChange={value => setAudience(value as FocusAudience)}
+              disabled={!sharingEnabled}
+              wrapperClassName="mt-2"
             >
-              <Plus size={16} />
-              Save current view
+              <RadioGroupItem
+                value="all"
+                label="All"
+                wrapperClassName="min-h-[44px] items-center"
+              />
+              <RadioGroupItem
+                value="players"
+                label="Players"
+                wrapperClassName="min-h-[44px] items-center"
+              />
+              <RadioGroupItem
+                value="display"
+                label="Display"
+                wrapperClassName="min-h-[44px] items-center"
+              />
+            </RadioGroupField>
+
+            <Button
+              variant="primary"
+              onClick={handleBringToMyView}
+              disabled={!sharingEnabled}
+              className="mt-2 flex h-11 w-full items-center justify-center gap-2 text-sm"
+            >
+              <MapPin size={16} />
+              Bring them to my view
             </Button>
-          )}
-
-          {views.length > 0 && (
-            <>
-              <div className="border-divider my-2 border-t" />
-              <ul className="flex flex-col gap-1">
-                {views.map(v => (
-                  <ViewRow
-                    key={v.id}
-                    view={v}
-                    sharingEnabled={sharingEnabled}
-                    renaming={renamingId === v.id}
-                    renameValue={renameValue}
-                    onRenameValueChange={setRenameValue}
-                    onStartRename={() => startRename(v.id, v.name)}
-                    onCommitRename={commitRename}
-                    onCancelRename={cancelRename}
-                    deleteArmed={armedDeleteId === v.id}
-                    onDeleteClick={() => handleDeleteClick(v.id)}
-                    onCancelDelete={cancelDelete}
-                    onGoToView={() => onGoToView(v.view)}
-                    onSend={() => sharingEnabled && onSend(v.view, audience)}
-                  />
-                ))}
-              </ul>
-            </>
-          )}
-
-          <div className="border-divider my-2 border-t" />
-
-          <Switch
-            checked={sharingEnabled}
-            onCheckedChange={onSharingChange}
-            aria-label="Move players' cameras"
-            label="Move players' cameras"
-            description="Off by default — turn on to move other people's cameras."
-          />
-
-          <RadioGroupField
-            label="Send to"
-            value={audience}
-            onValueChange={value => setAudience(value as FocusAudience)}
-            disabled={!sharingEnabled}
-            wrapperClassName="mt-2"
-          >
-            <RadioGroupItem
-              value="all"
-              label="All"
-              wrapperClassName="min-h-[44px] items-center"
-            />
-            <RadioGroupItem
-              value="players"
-              label="Players"
-              wrapperClassName="min-h-[44px] items-center"
-            />
-            <RadioGroupItem
-              value="display"
-              label="Display"
-              wrapperClassName="min-h-[44px] items-center"
-            />
-          </RadioGroupField>
-
-          <Button
-            variant="primary"
-            onClick={handleBringToMyView}
-            disabled={!sharingEnabled}
-            className="mt-2 flex h-11 w-full items-center justify-center gap-2 text-sm"
-          >
-            <MapPin size={16} />
-            Bring them to my view
-          </Button>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 
 import {
   Dialog,
@@ -375,23 +376,57 @@ function renderPanelBody(
   mode: MarkerPanelMode,
   state: MarkerPanelState,
   onSave: MarkerDetailPanelProps['onSave'],
-  onDelete: MarkerDetailPanelProps['onDelete']
+  onDelete: MarkerDetailPanelProps['onDelete'],
+  isDmOnly: boolean | undefined,
+  onAudienceChange: MarkerDetailPanelProps['onAudienceChange'],
+  audienceNotice: string | null | undefined
 ) {
   if (state.kind === 'ready') {
     if (mode === 'dm') {
       return (
-        <EditForm
-          key={state.data.ref}
-          kind={state.data.kind}
-          initialTitle={state.detail.title}
-          initialBody={state.detail.body}
-          initialDmNotes={state.detail.dmNotes}
-          initialStatus={state.detail.status}
-          initialDiscovery={state.detail.discovery}
-          initialTrap={state.detail.trap}
-          onSave={onSave}
-          onDelete={onDelete}
-        />
+        <>
+          {(state.data.kind === 'trap' || state.data.kind === 'secret') &&
+            isDmOnly !== undefined && (
+              <div className="border-divider bg-surface-secondary mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
+                <div>
+                  <p className="text-heading text-sm font-semibold">
+                    {isDmOnly ? 'Hidden from players' : 'Discovered'}
+                  </p>
+                  <p className="text-muted text-xs">
+                    Visibility applies to every pin linked to this marker.
+                  </p>
+                </div>
+                <Button
+                  variant={isDmOnly ? 'primary' : 'warning'}
+                  onClick={() => onAudienceChange?.(!isDmOnly)}
+                  leftIcon={isDmOnly ? <Eye size={16} /> : <EyeOff size={16} />}
+                  className={MARKER_PANEL_TOUCH_TARGET_CLASS}
+                >
+                  {isDmOnly ? 'Reveal to players' : 'Hide from players'}
+                </Button>
+                {audienceNotice && (
+                  <p
+                    role="alert"
+                    className="text-accent-amber-text w-full text-xs"
+                  >
+                    {audienceNotice}
+                  </p>
+                )}
+              </div>
+            )}
+          <EditForm
+            key={state.data.ref}
+            kind={state.data.kind}
+            initialTitle={state.detail.title}
+            initialBody={state.detail.body}
+            initialDmNotes={state.detail.dmNotes}
+            initialStatus={state.detail.status}
+            initialDiscovery={state.detail.discovery}
+            initialTrap={state.detail.trap}
+            onSave={onSave}
+            onDelete={onDelete}
+          />
+        </>
       );
     }
     return (
@@ -486,6 +521,9 @@ export default function MarkerDetailPanel({
   onClose,
   onSave,
   onDelete,
+  isDmOnly,
+  onAudienceChange,
+  audienceNotice,
 }: MarkerDetailPanelProps): React.JSX.Element {
   const handleOpenChange = (next: boolean) => {
     if (!next) onClose();
@@ -512,7 +550,15 @@ export default function MarkerDetailPanel({
           </DialogDescription>
         </DialogHeader>
         <DialogBody>
-          {renderPanelBody(mode, state, onSave, onDelete)}
+          {renderPanelBody(
+            mode,
+            state,
+            onSave,
+            onDelete,
+            isDmOnly,
+            onAudienceChange,
+            audienceNotice
+          )}
         </DialogBody>
         {!isEditing && (
           <DialogFooter>

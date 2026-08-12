@@ -120,22 +120,40 @@ function drawKindGlyph(
       return;
     }
     case 'trap': {
+      // Canvas adaptation of Lucide TriangleAlert.
       ctx.beginPath();
       ctx.moveTo(cx, cy - radius * 0.5);
       ctx.lineTo(cx + radius * 0.5, cy + radius * 0.4);
       ctx.lineTo(cx - radius * 0.5, cy + radius * 0.4);
       ctx.closePath();
       ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - radius * 0.18);
+      ctx.lineTo(cx, cy + radius * 0.1);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(cx, cy + radius * 0.25, radius * 0.045, 0, Math.PI * 2);
+      ctx.fill();
       return;
     }
     case 'loot': {
+      // Canvas adaptation of Lucide Gem, including its facet lines.
       ctx.beginPath();
-      ctx.moveTo(cx, cy - radius * 0.5);
-      ctx.lineTo(cx + radius * 0.4, cy);
+      ctx.moveTo(cx - radius * 0.48, cy - radius * 0.12);
+      ctx.lineTo(cx - radius * 0.28, cy - radius * 0.48);
+      ctx.lineTo(cx + radius * 0.28, cy - radius * 0.48);
+      ctx.lineTo(cx + radius * 0.48, cy - radius * 0.12);
       ctx.lineTo(cx, cy + radius * 0.5);
-      ctx.lineTo(cx - radius * 0.4, cy);
       ctx.closePath();
-      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - radius * 0.48, cy - radius * 0.12);
+      ctx.lineTo(cx + radius * 0.48, cy - radius * 0.12);
+      ctx.moveTo(cx - radius * 0.18, cy - radius * 0.48);
+      ctx.lineTo(cx, cy + radius * 0.5);
+      ctx.moveTo(cx + radius * 0.18, cy - radius * 0.48);
+      ctx.lineTo(cx, cy + radius * 0.5);
+      ctx.stroke();
       return;
     }
     case 'npc': {
@@ -148,26 +166,37 @@ function drawKindGlyph(
       return;
     }
     case 'secret': {
+      // Canvas adaptation of Lucide KeyRound.
       ctx.beginPath();
-      ctx.arc(cx, cy - radius * 0.15, radius * 0.2, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.arc(
+        cx + radius * 0.22,
+        cy - radius * 0.22,
+        radius * 0.24,
+        0,
+        Math.PI * 2
+      );
+      ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(cx - radius * 0.08, cy);
-      ctx.lineTo(cx + radius * 0.08, cy);
-      ctx.lineTo(cx + radius * 0.14, cy + radius * 0.4);
-      ctx.lineTo(cx - radius * 0.14, cy + radius * 0.4);
-      ctx.closePath();
-      ctx.fill();
+      ctx.moveTo(cx + radius * 0.05, cy - radius * 0.05);
+      ctx.lineTo(cx - radius * 0.42, cy + radius * 0.42);
+      ctx.lineTo(cx - radius * 0.42, cy + radius * 0.18);
+      ctx.moveTo(cx - radius * 0.2, cy + radius * 0.2);
+      ctx.lineTo(cx - radius * 0.05, cy + radius * 0.35);
+      ctx.stroke();
       return;
     }
     case 'note': {
+      // Canvas adaptation of Lucide StickyNote with folded corner.
       ctx.beginPath();
-      ctx.moveTo(cx - radius * 0.35, cy - radius * 0.25);
-      ctx.lineTo(cx + radius * 0.35, cy - radius * 0.25);
-      ctx.moveTo(cx - radius * 0.35, cy);
-      ctx.lineTo(cx + radius * 0.35, cy);
-      ctx.moveTo(cx - radius * 0.35, cy + radius * 0.25);
-      ctx.lineTo(cx + radius * 0.35, cy + radius * 0.25);
+      ctx.moveTo(cx - radius * 0.42, cy - radius * 0.48);
+      ctx.lineTo(cx + radius * 0.42, cy - radius * 0.48);
+      ctx.lineTo(cx + radius * 0.42, cy + radius * 0.16);
+      ctx.lineTo(cx + radius * 0.1, cy + radius * 0.48);
+      ctx.lineTo(cx - radius * 0.42, cy + radius * 0.48);
+      ctx.closePath();
+      ctx.moveTo(cx + radius * 0.1, cy + radius * 0.48);
+      ctx.lineTo(cx + radius * 0.1, cy + radius * 0.16);
+      ctx.lineTo(cx + radius * 0.42, cy + radius * 0.16);
       ctx.stroke();
       return;
     }

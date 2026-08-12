@@ -62,6 +62,7 @@ import {
   type PlaceMarkerRequest,
 } from '@/components/ui/campaign/location-map/DmMarkerTool';
 import { applyMarkerAudienceToggle } from '@/components/ui/campaign/location-map/markerAudienceToggle';
+import { MARKER_MIXED_AUDIENCE_MESSAGE } from '@/components/ui/campaign/location-map/markerAudienceCopy';
 import { markerRefForElement } from '@/components/ui/campaign/location-map/markerWrites';
 import type { MarkerDataIssue } from '@/components/ui/campaign/location-map/markerPainter';
 import { MARKER_DEFAULT_COLOR_KEY } from '@/components/ui/campaign/location-map/markerPainter';
@@ -135,6 +136,8 @@ export interface DmBattleMapCanvasState {
   markerAudienceNotice: string | null;
   markerPanelOpen: boolean;
   markerPanelState: MarkerPanelState;
+  markerPanelIsDmOnly: boolean;
+  handleSetMarkerAudience: (dmOnly: boolean) => void;
   handleCloseMarkerPanel: () => void;
   handleSaveMarkerDetail: (patch: {
     title: string;
@@ -331,10 +334,30 @@ export function useDmBattleMapCanvas({
     markerPanelState.kind === 'missing-detail'
       ? markerPanelState.data.ref
       : null;
+  const markerPanelIsDmOnly =
+    activeMarkerElementId !== null &&
+    battleMap?.dmOnlyElements[activeMarkerElementId] === true;
 
   const handleCloseMarkerPanel = useCallback(() => {
     setActiveMarkerElementId(null);
   }, []);
+
+  const handleSetMarkerAudience = useCallback(
+    (dmOnly: boolean) => {
+      if (activeMarkerRef === null) return;
+      const transition = markerWrites.setMarkerAudienceForRef(
+        activeMarkerRef,
+        dmOnly
+      );
+      setMarkerAudienceNotice(
+        transition.status === 'refused' &&
+          transition.reason === 'mixed-audience'
+          ? MARKER_MIXED_AUDIENCE_MESSAGE
+          : null
+      );
+    },
+    [activeMarkerRef, markerWrites]
+  );
 
   // `activeMarkerElement` above is a bare render-time `getById` with no store
   // subscription, so without this the panel would keep showing a pin deleted
@@ -779,6 +802,8 @@ export function useDmBattleMapCanvas({
     markerAudienceNotice,
     markerPanelOpen: activeMarkerElementId !== null,
     markerPanelState,
+    markerPanelIsDmOnly,
+    handleSetMarkerAudience,
     handleCloseMarkerPanel,
     handleSaveMarkerDetail,
     handleDeleteMarker,
