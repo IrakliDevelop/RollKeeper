@@ -15,9 +15,17 @@ import { useNPCStore } from '@/store/npcStore';
 import type { InventoryItem, MagicItem } from '@/types/character';
 import type { MarkerLootEntry } from '@/types/battlemap';
 import type { CampaignPlayerData } from '@/types/campaign';
+import type { CampaignNPC } from '@/types/encounter';
+import type { CustomMagicItem } from '@/types/magicItemLibrary';
 import { convertProcessedItemToFormData } from '@/utils/itemConversion';
 import { convertProcessedMagicItemToFormData } from '@/utils/magicItemConversion';
 import { deliverMarkerLoot } from '../markerLootDelivery';
+
+// Zustand selectors must return a stable snapshot while the selected store
+// data is unchanged. An inline `?? []` creates a new array on every read and
+// causes React 19's external-store subscription to rerender indefinitely.
+const EMPTY_CUSTOM_ITEMS: CustomMagicItem[] = [];
+const EMPTY_NPCS: CampaignNPC[] = [];
 
 function now(): string {
   return new Date().toISOString();
@@ -89,9 +97,11 @@ export function LootEditor({
   const mundane = useItemsData();
   const magic = useMagicItemsData();
   const custom = useMagicItemLibraryStore(
-    state => state.itemsByCampaign[campaignCode] ?? []
+    state => state.itemsByCampaign[campaignCode] ?? EMPTY_CUSTOM_ITEMS
   );
-  const npcs = useNPCStore(state => state.npcsByCampaign[campaignCode] ?? []);
+  const npcs = useNPCStore(
+    state => state.npcsByCampaign[campaignCode] ?? EMPTY_NPCS
+  );
   const updateNPC = useNPCStore(state => state.updateNPC);
   const [manualName, setManualName] = useState('');
   const [players, setPlayers] = useState<CampaignPlayerData[]>([]);

@@ -44,7 +44,10 @@ vi.mock('@/components/ui/forms/CompactRichTextEditor', () => ({
   ),
 }));
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 /** Raw Tailwind colour classes banned everywhere except the shared Dialog
  * overlay scrim, which is intentionally outside this component's authored
@@ -201,6 +204,33 @@ describe('resolveMarkerPanelState', () => {
 });
 
 describe('MarkerDetailPanel', () => {
+  it('opens a loot editor before campaign item and NPC collections exist', () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ players: [] }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        campaignCode="NEW-CAMPAIGN"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'loot', ref: 'ref-1' }),
+          detail: detail({ loot: [] }),
+        }}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Loot contents' })
+    ).toBeVisible();
+    expect(screen.getByText('No loot added yet.')).toBeVisible();
+  });
+
   it('DM edit saves title, body and dmNotes with exactly the typed values', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
