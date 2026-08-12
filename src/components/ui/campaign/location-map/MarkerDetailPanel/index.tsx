@@ -289,8 +289,8 @@ function EditForm({
           }}
         />
       )}
-      <label className="text-heading space-y-1.5 text-sm font-medium">
-        <span>Title</span>
+      <div className="text-heading space-y-1.5 text-sm font-medium">
+        <p>Title</p>
         <CompactRichTextEditor
           content={title}
           onChange={setTitle}
@@ -298,25 +298,25 @@ function EditForm({
           minHeight="44px"
           ariaLabel="Title"
         />
-      </label>
-      <label className="text-heading space-y-1.5 text-sm font-medium">
-        <span>Body</span>
+      </div>
+      <div className="text-heading space-y-1.5 text-sm font-medium">
+        <p>Body</p>
         <CompactRichTextEditor
           content={body}
           onChange={setBody}
           placeholder="What players can learn…"
           ariaLabel="Body"
         />
-      </label>
-      <label className="text-heading space-y-1.5 text-sm font-medium">
-        <span>DM notes — never shown to players</span>
+      </div>
+      <div className="text-heading space-y-1.5 text-sm font-medium">
+        <p>DM notes — never shown to players</p>
         <CompactRichTextEditor
           content={dmNotes}
           onChange={setDmNotes}
           placeholder="Private notes…"
           ariaLabel="DM notes — never shown to players"
         />
-      </label>
+      </div>
       <DialogFooter>
         <Button
           variant="danger"

@@ -215,7 +215,7 @@ describe('DmBattleMapCanvas wiring', () => {
     // dmNotes field.
     expect(
       screen.getByLabelText(/DM notes — never shown to players/)
-    ).toHaveValue('DC 15');
+    ).toHaveTextContent('DC 15');
   });
 
   it('does not reach the toolbar before a viewport exists (viewport gate)', () => {
