@@ -10,7 +10,7 @@ A comprehensive web-based D&D 5e companion application for players and Dungeon M
 - Create and manage multiple characters with a full roster system
 - Tabbed character sheet with auto-calculating stats, modifiers, and proficiency bonuses
 - Auto-save with debounce, manual save (Ctrl+S), and save-on-tab-switch
-- Character import/export (JSON) with bulk import support
+- Character import/export (JSON), including DM-side recovery exports, with bulk import support
 - Character duplication and archiving
 - QR code character sharing
 - S3-backed avatar uploads
@@ -39,7 +39,7 @@ A comprehensive web-based D&D 5e companion application for players and Dungeon M
 - Equipped weapons with damage types, properties, and proficiency tracking
 - Magic items with rarity, attunement status, and charges
 - Armor with AC contribution and shield bonus toggling
-- Currency tracking (GP/SP/CP) with total value calculation
+- Currency tracking (PP/GP/EP/SP/CP) with total value calculation
 - Weight tracking and encumbrance calculation
 - Import items from the compendium database
 - Receive item transfers from the DM
@@ -91,6 +91,7 @@ A comprehensive web-based D&D 5e companion application for players and Dungeon M
 
 **NPC Management**
 - Create NPCs manually or import from the bestiary
+- Duplicate existing NPCs as a starting point for variants
 - Full NPC stat blocks with ability scores, HP, AC, speed, proficiency bonus
 - NPC organization with groups/tags, drag-and-drop reordering, and search filtering
 - Collapsible groups with persistent state
@@ -98,6 +99,7 @@ A comprehensive web-based D&D 5e companion application for players and Dungeon M
   - **Stat Block** — Full monster stat block display with traits, actions, reactions, legendary actions, lair actions
   - **Spells** — Spell slot tracking, free casts (at-will/innate), concentration tracking, spell casting with level selection
   - **Inventory** — Equipment and items with rarity, weight, value; send items to players
+  - **Currency** — Compact tracking for all five coin denominations
   - **Lore** — Rich text NPC backstory and notes
 - NPC stat block export (copy as image, download PNG)
 - NPC HP, death saves, and hit dice persistence across sessions
@@ -117,11 +119,12 @@ A comprehensive web-based D&D 5e companion application for players and Dungeon M
   - Long rest / short rest for NPCs
 - Hide/show player HP toggle for screen sharing
 - View NPC spell details and cast spells directly from the encounter
+- Edit monster stat blocks before or during combat
 - Player summon entities auto-sync into encounters
 
 **Location Maps**
 - Create location maps with image uploads
-- Canvas-based annotation via TlDraw
+- Fieldnotes canvas with pan/zoom, drawing tools, grid snapping, and a collapsible minimap
 - Configurable grid overlay (square or hex, cell size, color, opacity)
 - DM-only elements that are hidden from player view
 - Render player-safe PNG snapshots
@@ -130,9 +133,11 @@ A comprehensive web-based D&D 5e companion application for players and Dungeon M
 **Battle Maps**
 - Dedicated battle map system separate from location maps
 - Link battle maps to encounters
-- Canvas annotation with grid overlay
+- Live Fieldnotes canvas with square/hex grids, tokens, drawing tools, and spell templates
 - DM-only fog of war and annotations
-- Player-safe state sharing
+- Responsive DM play mode with initiative, roster, selected-token controls, and a minimap
+- Separate player and display views synchronized through the battle-map relay
+- Rich door, trap, loot, NPC, secret, and note markers with DM/public visibility
 
 **Campaign Calendar**
 - Fully customizable calendar system:
@@ -185,7 +190,7 @@ A comprehensive web-based D&D 5e companion application for players and Dungeon M
 | **Rich Text** | TipTap 3 |
 | **Forms** | React Hook Form 7 + Zod 4 |
 | **Dice** | @3d-dice/dice-box |
-| **Canvas/Maps** | TlDraw 4 |
+| **Canvas/Maps** | Fieldnotes (`@fieldnotes/core`, `@fieldnotes/react`, `@fieldnotes/sync`) |
 | **Node Graphs** | React Flow |
 | **Icons** | Lucide React |
 | **Animations** | Framer Motion |
@@ -200,15 +205,15 @@ A comprehensive web-based D&D 5e companion application for players and Dungeon M
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20 LTS or newer
 - npm
-- Docker (required for campaign sync — runs local Redis)
+- Docker (optional; needed for local campaign sync and relay persistence)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/AbandonedLand/RollKeeper.git
+git clone https://github.com/IrakliDevelop/RollKeeper.git
 cd RollKeeper
 
 # Install dependencies
@@ -250,7 +255,21 @@ Data persists in a Docker volume (`redis-data`) across restarts. To wipe it:
 docker-compose down -v
 ```
 
-> **Note:** Redis is only needed for campaign sync features (DM dashboard, multiplayer). Character sheets work fully offline with localStorage — you can skip Docker if you only need single-player functionality.
+> **Note:** Redis is only needed for campaign sync features (DM dashboard, multiplayer). Character sheets work locally with browser storage, so Docker can be skipped for single-player development.
+
+### Live Battle Map Relay
+
+Live battle maps use the WebSocket relay in [`relay/`](relay/README.md). Run it in a second terminal when working on synchronized DM, player, or display views:
+
+```bash
+cd relay
+npm install
+BATTLEMAP_RELAY_SECRET=dev-secret-change-me \
+  REDIS_URL=redis://localhost:6379 \
+  npm run dev
+```
+
+The matching app-side defaults are already present in `.env.example`. The main app still runs without the relay, but live multi-client canvas synchronization will be unavailable.
 
 ### Environment Variables
 
@@ -262,18 +281,20 @@ docker-compose down -v
 | `AWS_SECRET_ACCESS_KEY` | No | — | S3 avatar/banner uploads |
 | `AWS_S3_REGION` | No | `eu-central-1` | S3 bucket region |
 | `AWS_S3_BUCKET_NAME` | No | `rollkeeper-images` | S3 bucket name |
-| `NEXT_PUBLIC_TLDRAW_LICENSE_KEY` | No | — | TlDraw license for maps |
+| `NEXT_PUBLIC_TLDRAW_LICENSE_KEY` | No | — | License used by legacy TlDraw prototypes |
+| `BATTLEMAP_RELAY_SECRET` | For live maps | `dev-secret-change-me` | Shared secret used to issue relay access tokens |
+| `NEXT_PUBLIC_BATTLEMAP_RELAY_URL` | For live maps | `ws://localhost:8787` | Browser-facing WebSocket relay URL |
 
 > The app works without AWS credentials — avatar and banner uploads will be disabled.
 
 ### Run the App
 
 ```bash
-# Development server (Turbopack, port 3001)
+# Development server (Turbopack, Next.js default port 3000)
 npm run dev
 ```
 
-Open [http://localhost:3001](http://localhost:3001) in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser. To use another port locally, pass it explicitly, for example `npm run dev -- --port 3001`.
 
 ### Production Build
 
@@ -286,7 +307,7 @@ npm run start    # Start production server
 
 ```bash
 # Development
-npm run dev              # Dev server with Turbopack (port 3001)
+npm run dev              # Dev server with Turbopack (port 3000 by default)
 npm run build            # Production build
 npm run start            # Production server
 
@@ -302,6 +323,9 @@ npm run type-check       # TypeScript type checking (no emit)
 # Testing
 npm run test             # Run unit tests (Vitest)
 npm run test:watch       # Run unit tests in watch mode
+npm run test:e2e         # Run Playwright end-to-end tests
+npm run test:visual      # Run Storybook browser tests
+npm run test:all         # Run every configured Vitest project
 npm run storybook        # Storybook dev server (port 6006)
 npm run build-storybook  # Build static Storybook
 ```
@@ -311,7 +335,8 @@ npm run build-storybook  # Build static Storybook
 ### Data Flow
 
 - **Character data** is stored in the browser's localStorage via Zustand persist middleware. No server-side database is needed for single-player use.
-- **Campaign sync** uses Upstash Redis via Next.js API routes. Players push character snapshots; the DM dashboard polls on a 10–15 second interval.
+- **Campaign sync** uses Upstash Redis through Next.js API routes. Activity-aware polling keeps character, party, encounter, calendar, and location state synchronized.
+- **Live battle maps** use the separate Fieldnotes WebSocket relay for low-latency canvas operations and presence, with polling as a fallback for product state.
 - **Game reference data** (monsters, spells, items, classes) lives in `/json` as static JSON files, served and filtered through API routes under `/api`.
 
 ### Project Structure
@@ -342,7 +367,7 @@ src/
     dmStore.ts            # DM identity & campaign list
     encounterStore.ts     # Encounter & combat tracking
     npcStore.ts           # NPC management
-    battleMapStore.ts     # Battle map state
+    battleMapStore.ts     # Battle map metadata and persisted state
     calendarStore.ts      # Campaign calendar
     locationStore.ts      # Campaign locations
     combatLogStore.ts     # Combat action log
@@ -360,7 +385,7 @@ json/                     # Static game data (monsters, spells, items, etc.)
 | `playerStore` | Multi-character roster, player settings, avatars | `rollkeeper-player-data` |
 | `dmStore` | DM identity and campaign list | `rollkeeper-dm-data` |
 | `encounterStore` | Encounter entities, initiative, turn tracking | `rollkeeper-encounter-data` |
-| `npcStore` | NPC stat blocks (global, not campaign-scoped) | `rollkeeper-npc-data` |
+| `npcStore` | Campaign-scoped NPC stat blocks, inventory, currency, and spell state | `rollkeeper-npc-data` |
 | `battleMapStore` | Battle map annotations and state | `rollkeeper-battlemap-data` |
 | `calendarStore` | Campaign calendar configuration and events | `rollkeeper-calendar-data` |
 | `locationStore` | Campaign locations and map data | `rollkeeper-location-data` |
