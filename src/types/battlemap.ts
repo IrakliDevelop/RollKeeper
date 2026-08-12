@@ -54,6 +54,19 @@ export interface PublicMarkerLootEntry {
   rarity?: string;
 }
 
+/** Authenticated DM-to-server seed for an authoritative loot container. */
+export interface MarkerLootLedgerEntry extends MarkerLootEntry {
+  markerId: string;
+}
+
+export interface MarkerLootClaimResult {
+  requestId: string;
+  markerId: string;
+  entryId: string;
+  remainingQuantity: number;
+  transferId: string;
+}
+
 export type MarkerDiscoverySkill = 'perception' | 'investigation';
 
 export interface MarkerDiscovery {

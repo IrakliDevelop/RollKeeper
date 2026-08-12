@@ -112,6 +112,8 @@ interface PlayerBattleMapCanvasProps {
   markers?: PublicMarkerDetail[];
 }
 
+const EMPTY_PUBLIC_MARKERS: PublicMarkerDetail[] = [];
+
 const PLAYER_TOOLS: {
   name: string;
   label: string;
@@ -259,8 +261,10 @@ export function PlayerBattleMapCanvas({
   hideBackButton = false,
   tokenInfoToggle,
   onExportError,
-  markers = [],
+  markers: suppliedMarkers = EMPTY_PUBLIC_MARKERS,
 }: PlayerBattleMapCanvasProps) {
+  const [publishedMarkers, setPublishedMarkers] =
+    useState<PublicMarkerDetail[]>(suppliedMarkers);
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const [hasSelection, setHasSelection] = useState(false);
@@ -281,6 +285,20 @@ export function PlayerBattleMapCanvas({
   // Read at placement time by the (single, canvas-retained) token tool.
   const characterIdRef = useRef<string | null>(characterId);
   characterIdRef.current = characterId;
+
+  const refreshMarkers = useCallback(async () => {
+    const response = await fetch(
+      `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`
+    );
+    if (!response.ok) return;
+    const data = (await response.json()) as { markers?: PublicMarkerDetail[] };
+    setPublishedMarkers(data.markers ?? []);
+  }, [battleMapId, campaignCode]);
+
+  useEffect(() => {
+    setPublishedMarkers(suppliedMarkers);
+    void refreshMarkers();
+  }, [refreshMarkers, suppliedMarkers]);
 
   useEffect(() => {
     const avatar = tokenAvatarUrl(characterAvatar);
@@ -325,9 +343,13 @@ export function PlayerBattleMapCanvas({
     ];
   }, [characterId, spellTemplateConfigRef]);
 
-  const handleMarkerActivate = useCallback((event: ElementActivationEvent) => {
-    setActiveMarkerElementId(event.element.id);
-  }, []);
+  const handleMarkerActivate = useCallback(
+    (event: ElementActivationEvent) => {
+      setActiveMarkerElementId(event.element.id);
+      void refreshMarkers();
+    },
+    [refreshMarkers]
+  );
 
   // OUTSIDE the `if (relayUrl)` guard in `handleReady`, and NOT part of
   // `laserCleanupRef` or any other connection-scoped cleanup: painter
@@ -337,7 +359,7 @@ export function PlayerBattleMapCanvas({
   useMarkerRegistration({
     viewport,
     gesture: 'single',
-    markerDetails: markers,
+    markerDetails: publishedMarkers,
     onActivateMarker: handleMarkerActivate,
   });
 
@@ -347,12 +369,45 @@ export function PlayerBattleMapCanvas({
       : null;
   const markerPanelState = resolveMarkerPanelState(
     activeMarkerElement,
-    markers,
+    publishedMarkers,
     'player'
   );
   const handleCloseMarkerPanel = useCallback(() => {
     setActiveMarkerElementId(null);
   }, []);
+
+  const handleClaimLoot = useCallback(
+    async (entryId: string) => {
+      if (markerPanelState.kind !== 'ready')
+        throw new Error('This loot container is no longer available.');
+      const response = await fetch(
+        `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            playerId: characterId,
+            markerId: markerPanelState.detail.id,
+            entryId,
+            requestId: crypto.randomUUID(),
+          }),
+        }
+      );
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        markers?: PublicMarkerDetail[];
+      };
+      if (!response.ok) {
+        throw new Error(
+          data.error === 'depleted'
+            ? 'Someone else claimed the last one.'
+            : 'Could not claim that item.'
+        );
+      }
+      setPublishedMarkers(data.markers ?? []);
+    },
+    [battleMapId, campaignCode, characterId, markerPanelState]
+  );
 
   // `activeMarkerElement` above is a bare render-time `getById` with no store
   // subscription. When the DM hides a marker the relay sends the player a
@@ -418,7 +473,10 @@ export function PlayerBattleMapCanvas({
         onStatusProp?.(s);
         if (s === 'live') requestAnimationFrame(() => vp.fitToContent(60));
       },
-      onPoke: feature => onPokeRef.current?.(feature),
+      onPoke: feature => {
+        if (feature === 'markers') void refreshMarkers();
+        onPokeRef.current?.(feature);
+      },
     });
     connectionRef.current = connection;
     // Teach the room this player's own layer (the relay only accepts a
@@ -519,6 +577,7 @@ export function PlayerBattleMapCanvas({
             mode="player"
             state={markerPanelState}
             onClose={handleCloseMarkerPanel}
+            onClaimLoot={handleClaimLoot}
           />
         )}
         {viewport && children}

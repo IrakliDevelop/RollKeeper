@@ -101,6 +101,19 @@ export function campaignBattleMapKey(
   return `campaign:${code}:battlemap:${battleMapId}`;
 }
 
+export function campaignMarkerLootKey(code: string, mapId: string): string {
+  return `campaign:${code}:marker-loot:${mapId}`;
+}
+
+export function campaignMarkerClaimKey(
+  code: string,
+  mapId: string,
+  playerId: string,
+  requestId: string
+): string {
+  return `campaign:${code}:marker-claim:${mapId}:${playerId}:${requestId}`;
+}
+
 export function campaignDisplayKeyKey(code: string): string {
   return `campaign:${code}:displaykey`;
 }

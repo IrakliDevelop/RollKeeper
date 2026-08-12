@@ -56,4 +56,6 @@ export interface MarkerDetailPanelProps {
   /** DM mode only. Applies to every sibling pin sharing this marker ref. */
   onAudienceChange?: (dmOnly: boolean) => void;
   audienceNotice?: string | null;
+  /** Player mode only. Claims one unit from an authoritative server ledger. */
+  onClaimLoot?: (entryId: string) => Promise<void>;
 }

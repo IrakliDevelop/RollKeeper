@@ -63,6 +63,8 @@ import {
 } from '@/components/ui/campaign/location-map/DmMarkerTool';
 import { applyMarkerAudienceToggle } from '@/components/ui/campaign/location-map/markerAudienceToggle';
 import { MARKER_MIXED_AUDIENCE_MESSAGE } from '@/components/ui/campaign/location-map/markerAudienceCopy';
+import { buildPublicMarkerDetails } from '@/components/ui/campaign/location-map/markerPublication';
+import { buildMarkerLootLedger } from '@/components/ui/campaign/location-map/markerLootPublication';
 import { markerRefForElement } from '@/components/ui/campaign/location-map/markerWrites';
 import type { MarkerDataIssue } from '@/components/ui/campaign/location-map/markerPainter';
 import { MARKER_DEFAULT_COLOR_KEY } from '@/components/ui/campaign/location-map/markerPainter';
@@ -218,6 +220,7 @@ export function useDmBattleMapCanvas({
   // is already established. Read the latest value via a ref instead.
   const onPokeRef = useRef(onPoke);
   onPokeRef.current = onPoke;
+  const refreshMarkerClaimsRef = useRef<() => Promise<void>>(async () => {});
 
   // ─── Markers ──────────────────────────────────────────────────
   // Deliberately connection-independent: nothing below reads the relay URL or
@@ -253,6 +256,39 @@ export function useDmBattleMapCanvas({
     mapId: battleMapId,
     getViewport: getMarkerViewport,
   });
+  refreshMarkerClaimsRef.current = async () => {
+    const response = await fetch(
+      `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`
+    );
+    if (!response.ok) return;
+    const data = (await response.json()) as {
+      markers?: import('@/types/battlemap').PublicMarkerDetail[];
+    };
+    for (const publicMarker of data.markers ?? []) {
+      const local = markerWrites.markers.find(
+        marker => marker.id === publicMarker.id
+      );
+      if (!local?.loot || !publicMarker.loot) continue;
+      const remaining = new Map(
+        publicMarker.loot.map(entry => [entry.id, entry.remainingQuantity])
+      );
+      const loot = local.loot.map(entry => ({
+        ...entry,
+        claimedQuantity: Math.max(
+          entry.claimedQuantity,
+          entry.quantity - (remaining.get(entry.id) ?? entry.quantity)
+        ),
+      }));
+      if (
+        loot.some(
+          (entry, index) =>
+            entry.claimedQuantity !== local.loot?.[index]?.claimedQuantity
+        )
+      ) {
+        markerWrites.editMarkerDetail(local.id, { loot });
+      }
+    }
+  };
   const handlePlaceMarkerRef = useRef<(request: PlaceMarkerRequest) => void>(
     () => {}
   );
@@ -338,6 +374,39 @@ export function useDmBattleMapCanvas({
   const markerPanelIsDmOnly =
     activeMarkerElementId !== null &&
     battleMap?.dmOnlyElements[activeMarkerElementId] === true;
+
+  // The relay transports canvas elements, not product-state marker details.
+  // Publish the explicit player projection separately, together with the
+  // private server-only definitions needed for authoritative loot claims.
+  useEffect(() => {
+    if (!viewport || !battleMap) return;
+    const timeout = window.setTimeout(() => {
+      const markers = buildPublicMarkerDetails({
+        canvasState: viewport.exportJSON() || battleMap.canvasState,
+        markers: markerWrites.markers,
+        dmOnlyElements: battleMap.dmOnlyElements,
+      });
+      const loot = buildMarkerLootLedger(markerWrites.markers, markers);
+      void fetch(
+        `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dmId, markers, loot }),
+        }
+      ).catch(error => {
+        console.warn('Failed to publish marker details:', error);
+      });
+    }, 200);
+    return () => window.clearTimeout(timeout);
+  }, [
+    battleMap,
+    battleMapId,
+    campaignCode,
+    dmId,
+    markerWrites.markers,
+    viewport,
+  ]);
 
   const handleCloseMarkerPanel = useCallback(() => {
     setActiveMarkerElementId(null);
@@ -600,7 +669,10 @@ export function useDmBattleMapCanvas({
             setStatus(s);
             onStatusProp?.(s);
           },
-          onPoke: feature => onPokeRef.current?.(feature),
+          onPoke: feature => {
+            if (feature === 'markers') void refreshMarkerClaimsRef.current();
+            onPokeRef.current?.(feature);
+          },
         });
         connectionRef.current = connection;
         // Teach peers and late joiners the custom layers persisted in this

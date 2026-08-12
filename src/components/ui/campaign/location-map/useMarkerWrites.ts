@@ -74,6 +74,7 @@ export interface MarkerWrites {
       status?: MarkerDetail['status'];
       discovery?: MarkerDetail['discovery'];
       trap?: MarkerDetail['trap'];
+      loot?: MarkerDetail['loot'];
     }
   ): boolean;
   setMarkerAudienceForRef(
@@ -327,6 +328,7 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
         status?: MarkerDetail['status'];
         discovery?: MarkerDetail['discovery'];
         trap?: MarkerDetail['trap'];
+        loot?: MarkerDetail['loot'];
       }
     ): boolean => editMarkerDetailWrite(depsFor(null), ref, patch),
     [depsFor]
