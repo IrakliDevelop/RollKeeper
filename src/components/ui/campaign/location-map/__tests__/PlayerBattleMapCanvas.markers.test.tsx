@@ -141,12 +141,30 @@ function renderPlayer(
 describe('PlayerBattleMapCanvas: no marker placement, no edit affordance, no kind picker', () => {
   beforeEach(() => {
     mockActiveTool = 'hand';
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new TypeError('marker endpoint unavailable')
+    );
   });
 
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
     vi.clearAllMocks();
+  });
+
+  it('contains a failed background marker refresh instead of leaking an unhandled rejection', async () => {
+    stubCanvas();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { unmount } = renderPlayer();
+
+    await vi.waitFor(() => {
+      expect(warn).toHaveBeenCalledWith(
+        'Failed to refresh marker details:',
+        expect.any(TypeError)
+      );
+    });
+
+    unmount();
   });
 
   it('has no marker tool: the functional tool list omits MARKER_TOOL_NAME (select is present, ruling out an empty list), and the toolbar button list is exhaustively the seven non-marker tools', () => {

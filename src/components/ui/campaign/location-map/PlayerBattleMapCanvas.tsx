@@ -287,12 +287,21 @@ export function PlayerBattleMapCanvas({
   characterIdRef.current = characterId;
 
   const refreshMarkers = useCallback(async () => {
-    const response = await fetch(
-      `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`
-    );
-    if (!response.ok) return;
-    const data = (await response.json()) as { markers?: PublicMarkerDetail[] };
-    setPublishedMarkers(data.markers ?? []);
+    try {
+      const response = await fetch(
+        `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`
+      );
+      if (!response.ok) return;
+      const data = (await response.json()) as {
+        markers?: PublicMarkerDetail[];
+      };
+      setPublishedMarkers(data.markers ?? []);
+    } catch (error) {
+      // Marker details are a best-effort companion to the live canvas relay.
+      // Keep the last projection when the endpoint is unavailable; activation
+      // can retry, and a marker poke will refresh connected clients later.
+      console.warn('Failed to refresh marker details:', error);
+    }
   }, [battleMapId, campaignCode]);
 
   useEffect(() => {
