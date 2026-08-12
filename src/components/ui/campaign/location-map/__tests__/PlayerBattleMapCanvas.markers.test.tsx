@@ -269,7 +269,9 @@ describe('PlayerBattleMapCanvas: no marker placement, no edit affordance, no kin
     expect(
       within(dmDialog).getByRole('button', { name: 'Delete' })
     ).toBeInTheDocument();
-    expect(dmDialog.querySelectorAll('textarea').length).toBe(2);
+    expect(dmDialog.querySelectorAll('[contenteditable="true"]').length).toBe(
+      3
+    );
     expect(dmDialog.textContent).toContain('DM notes');
   });
 
