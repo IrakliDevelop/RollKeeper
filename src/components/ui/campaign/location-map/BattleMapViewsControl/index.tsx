@@ -200,7 +200,7 @@ export function BattleMapViewsControl({
               onCheckedChange={onSharingChange}
               aria-label="Move players' cameras"
               label="Move players' cameras"
-              description="Off by default — turn on to move other people's cameras."
+              description="Turn this on when you want to move other players' cameras. It's off by default."
             />
 
             <RadioGroupField

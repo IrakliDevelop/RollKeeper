@@ -557,6 +557,7 @@ export function useDmLocationEditor(
       status?: import('@/types/battlemap').MarkerStatus;
       discovery?: import('@/types/battlemap').MarkerDiscovery;
       trap?: import('@/types/battlemap').MarkerTrapMechanics;
+      loot?: import('@/types/battlemap').MarkerLootEntry[];
     }) => {
       if (activeMarkerRef === null) return;
       markerWrites.editMarkerDetail(activeMarkerRef, patch);

@@ -1,4 +1,5 @@
 import type { CameraView } from '@fieldnotes/core';
+import type { InventoryItem, MagicItem } from './character';
 
 import type { GridSettings } from './location';
 
@@ -30,7 +31,27 @@ export interface MarkerDetail {
   discovery?: MarkerDiscovery;
   /** Private trap mechanics. Never included in PublicMarkerDetail. */
   trap?: MarkerTrapMechanics;
+  /** Copied loot definitions. Library edits never rewrite prepared markers. */
+  loot?: MarkerLootEntry[];
   deletedAt?: string;
+}
+
+export interface MarkerLootEntry {
+  id: string;
+  itemKind: 'inventory' | 'magic';
+  item: InventoryItem | MagicItem;
+  quantity: number;
+  claimedQuantity: number;
+}
+
+export interface PublicMarkerLootEntry {
+  id: string;
+  name: string;
+  itemKind: 'inventory' | 'magic';
+  quantity: number;
+  remainingQuantity: number;
+  description?: string;
+  rarity?: string;
 }
 
 export type MarkerDiscoverySkill = 'perception' | 'investigation';
@@ -84,6 +105,7 @@ export interface PublicMarkerDetail {
   title: string;
   body: string;
   status?: MarkerStatus;
+  loot?: PublicMarkerLootEntry[];
   /**
    * Structural refusal, not documentation. Without it a `MarkerDetail` is
    * assignable to `PublicMarkerDetail` (extra properties survive anything but

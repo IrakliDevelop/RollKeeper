@@ -6,7 +6,6 @@ import { Eye, EyeOff } from 'lucide-react';
 import {
   Dialog,
   DialogBody,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -16,6 +15,7 @@ import {
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Textarea } from '@/components/ui/forms/textarea';
+import { CompactRichTextEditor } from '@/components/ui/forms/CompactRichTextEditor';
 import { cn } from '@/utils/cn';
 
 import {
@@ -29,12 +29,16 @@ import type {
 } from './MarkerDetailPanel.types';
 import type { MarkerKind } from '../markerData';
 import { MARKER_KIND_ICONS } from '../markerIcons';
+import { LootEditor } from './LootEditor';
+import { MarkerRichText } from './MarkerRichText';
 import type {
   MarkerDiscovery,
   MarkerDiscoverySkill,
   MarkerDisarmMethod,
   MarkerStatus,
   MarkerTrapMechanics,
+  MarkerLootEntry,
+  PublicMarkerLootEntry,
 } from '@/types/battlemap';
 
 const STATUS_OPTIONS: Record<
@@ -85,6 +89,9 @@ interface EditFormProps {
   initialStatus?: MarkerStatus;
   initialDiscovery?: MarkerDiscovery;
   initialTrap?: MarkerTrapMechanics;
+  initialLoot?: MarkerLootEntry[];
+  campaignCode?: string;
+  dmId?: string;
   onSave?: (patch: {
     title: string;
     body: string;
@@ -92,7 +99,9 @@ interface EditFormProps {
     status: MarkerStatus;
     discovery?: MarkerDiscovery;
     trap?: MarkerTrapMechanics;
+    loot?: MarkerLootEntry[];
   }) => void;
+  onPersist?: EditFormProps['onSave'];
   onDelete?: () => void;
 }
 
@@ -110,7 +119,11 @@ function EditForm({
   initialStatus,
   initialDiscovery,
   initialTrap,
+  initialLoot,
+  campaignCode,
+  dmId,
   onSave,
+  onPersist,
   onDelete,
 }: EditFormProps) {
   const [title, setTitle] = useState(initialTitle);
@@ -134,6 +147,7 @@ function EditForm({
   const [trigger, setTrigger] = useState(initialTrap?.trigger ?? '');
   const [effect, setEffect] = useState(initialTrap?.effect ?? '');
   const [damage, setDamage] = useState(initialTrap?.damage ?? '');
+  const [loot, setLoot] = useState<MarkerLootEntry[]>(initialLoot ?? []);
 
   const parseDc = (value: string): number | undefined => {
     if (value.trim() === '') return undefined;
@@ -142,32 +156,34 @@ function EditForm({
     return Math.min(40, Math.max(0, Math.round(parsed)));
   };
 
-  const handleSave = () =>
-    onSave?.({
-      title,
-      body,
-      dmNotes,
-      status,
-      ...(kind === 'trap' || kind === 'secret'
-        ? {
-            discovery: {
-              dc: parseDc(discoveryDc),
-              skill: discoverySkill,
-            },
-          }
-        : {}),
-      ...(kind === 'trap'
-        ? {
-            trap: {
-              disarmDc: parseDc(disarmDc),
-              disarmMethod,
-              trigger,
-              effect,
-              damage,
-            },
-          }
-        : {}),
-    });
+  const buildPatch = (lootValue: MarkerLootEntry[] = loot) => ({
+    title,
+    body,
+    dmNotes,
+    status,
+    ...(kind === 'trap' || kind === 'secret'
+      ? {
+          discovery: {
+            dc: parseDc(discoveryDc),
+            skill: discoverySkill,
+          },
+        }
+      : {}),
+    ...(kind === 'trap'
+      ? {
+          trap: {
+            disarmDc: parseDc(disarmDc),
+            disarmMethod,
+            trigger,
+            effect,
+            damage,
+          },
+        }
+      : {}),
+    ...(kind === 'loot' ? { loot: lootValue } : {}),
+  });
+
+  const handleSave = () => onSave?.(buildPatch());
 
   return (
     <div className="flex flex-col gap-4">
@@ -261,24 +277,46 @@ function EditForm({
           </div>
         </div>
       )}
-      <Input
-        id="marker-panel-title"
-        label="Title"
-        value={title}
-        onChange={e => setTitle(e.target.value)}
-      />
-      <Textarea
-        id="marker-panel-body-field"
-        label="Body"
-        value={body}
-        onChange={e => setBody(e.target.value)}
-      />
-      <Textarea
-        id="marker-panel-dm-notes"
-        label="DM notes — never shown to players"
-        value={dmNotes}
-        onChange={e => setDmNotes(e.target.value)}
-      />
+      {kind === 'loot' && campaignCode && (
+        <LootEditor
+          campaignCode={campaignCode}
+          dmId={dmId}
+          value={loot}
+          onChange={setLoot}
+          onDelivered={next => {
+            setLoot(next);
+            onPersist?.(buildPatch(next));
+          }}
+        />
+      )}
+      <label className="text-heading space-y-1.5 text-sm font-medium">
+        <span>Title</span>
+        <CompactRichTextEditor
+          content={title}
+          onChange={setTitle}
+          placeholder="Marker title…"
+          minHeight="44px"
+          ariaLabel="Title"
+        />
+      </label>
+      <label className="text-heading space-y-1.5 text-sm font-medium">
+        <span>Body</span>
+        <CompactRichTextEditor
+          content={body}
+          onChange={setBody}
+          placeholder="What players can learn…"
+          ariaLabel="Body"
+        />
+      </label>
+      <label className="text-heading space-y-1.5 text-sm font-medium">
+        <span>DM notes — never shown to players</span>
+        <CompactRichTextEditor
+          content={dmNotes}
+          onChange={setDmNotes}
+          placeholder="Private notes…"
+          ariaLabel="DM notes — never shown to players"
+        />
+      </label>
       <DialogFooter>
         <Button
           variant="danger"
@@ -287,14 +325,6 @@ function EditForm({
         >
           Delete
         </Button>
-        <DialogClose asChild>
-          <Button
-            variant="secondary"
-            className={MARKER_PANEL_TOUCH_TARGET_CLASS}
-          >
-            Close
-          </Button>
-        </DialogClose>
         <Button
           variant="primary"
           onClick={handleSave}
@@ -316,21 +346,23 @@ function ReadOnlyView({
   title,
   body,
   status,
+  loot,
 }: {
   title: string;
   body: string;
   status?: MarkerStatus;
+  loot?: PublicMarkerLootEntry[];
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <h3
+      <div
         className={cn(
           'text-heading text-lg font-semibold',
           MARKER_PANEL_CONTAINMENT_CLASS
         )}
       >
-        {title}
-      </h3>
+        <MarkerRichText content={title} />
+      </div>
       {status && (
         <p className="text-accent-blue-text text-sm font-semibold">
           Status: {statusLabel(status)}
@@ -340,8 +372,23 @@ function ReadOnlyView({
         data-testid="marker-panel-body"
         className={cn('text-body text-sm', MARKER_PANEL_CONTAINMENT_CLASS)}
       >
-        {body}
+        <MarkerRichText content={body} />
       </div>
+      {loot && loot.length > 0 && (
+        <ul className="border-divider divide-divider divide-y rounded-md border">
+          {loot.map(entry => (
+            <li
+              key={entry.id}
+              className="flex items-center justify-between gap-3 p-3 text-sm"
+            >
+              <span className="text-heading font-medium">{entry.name}</span>
+              <span className="text-muted">
+                {entry.remainingQuantity} available
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -376,10 +423,13 @@ function renderPanelBody(
   mode: MarkerPanelMode,
   state: MarkerPanelState,
   onSave: MarkerDetailPanelProps['onSave'],
+  onPersist: MarkerDetailPanelProps['onPersist'],
   onDelete: MarkerDetailPanelProps['onDelete'],
   isDmOnly: boolean | undefined,
   onAudienceChange: MarkerDetailPanelProps['onAudienceChange'],
-  audienceNotice: string | null | undefined
+  audienceNotice: string | null | undefined,
+  campaignCode: string | undefined,
+  dmId: string | undefined
 ) {
   if (state.kind === 'ready') {
     if (mode === 'dm') {
@@ -419,11 +469,23 @@ function renderPanelBody(
             kind={state.data.kind}
             initialTitle={state.detail.title}
             initialBody={state.detail.body}
-            initialDmNotes={state.detail.dmNotes}
+            initialDmNotes={state.detail.dmNotes ?? ''}
             initialStatus={state.detail.status}
-            initialDiscovery={state.detail.discovery}
-            initialTrap={state.detail.trap}
+            initialDiscovery={
+              'discovery' in state.detail ? state.detail.discovery : undefined
+            }
+            initialTrap={'trap' in state.detail ? state.detail.trap : undefined}
+            initialLoot={
+              'loot' in state.detail &&
+              state.detail.loot?.[0] &&
+              'item' in state.detail.loot[0]
+                ? (state.detail.loot as MarkerLootEntry[])
+                : undefined
+            }
+            campaignCode={campaignCode}
+            dmId={dmId}
             onSave={onSave}
+            onPersist={onPersist}
             onDelete={onDelete}
           />
         </>
@@ -434,6 +496,11 @@ function renderPanelBody(
         title={state.detail.title}
         body={state.detail.body}
         status={state.detail.status}
+        loot={
+          state.detail.loot?.[0] && 'remainingQuantity' in state.detail.loot[0]
+            ? (state.detail.loot as PublicMarkerLootEntry[])
+            : undefined
+        }
       />
     );
   }
@@ -466,7 +533,10 @@ function renderPanelBody(
           initialTitle=""
           initialBody=""
           initialDmNotes=""
+          campaignCode={campaignCode}
+          dmId={dmId}
           onSave={onSave}
+          onPersist={onPersist}
           onDelete={onDelete}
         />
       </div>
@@ -520,24 +590,24 @@ export default function MarkerDetailPanel({
   state,
   onClose,
   onSave,
+  onPersist,
   onDelete,
   isDmOnly,
   onAudienceChange,
   audienceNotice,
+  campaignCode,
+  dmId,
 }: MarkerDetailPanelProps): React.JSX.Element {
   const handleOpenChange = (next: boolean) => {
     if (!next) onClose();
   };
 
-  const isEditing =
-    mode === 'dm' &&
-    (state.kind === 'ready' || state.kind === 'missing-detail');
   const kind = panelKind(state);
   const KindIcon = kind === undefined ? undefined : MARKER_KIND_ICONS[kind];
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent size="md" showCloseButton={false}>
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>
             <span className="inline-flex items-center gap-2 capitalize">
@@ -554,24 +624,15 @@ export default function MarkerDetailPanel({
             mode,
             state,
             onSave,
+            onPersist,
             onDelete,
             isDmOnly,
             onAudienceChange,
-            audienceNotice
+            audienceNotice,
+            campaignCode,
+            dmId
           )}
         </DialogBody>
-        {!isEditing && (
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button
-                variant="ghost"
-                className={MARKER_PANEL_TOUCH_TARGET_CLASS}
-              >
-                Close
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        )}
       </DialogContent>
     </Dialog>
   );

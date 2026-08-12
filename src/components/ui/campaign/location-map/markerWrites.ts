@@ -145,6 +145,46 @@ function sanitizeTrap(
   };
 }
 
+const MARKER_LOOT_MAX_QUANTITY = 9999;
+
+function boundedLootQuantity(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(MARKER_LOOT_MAX_QUANTITY, Math.max(1, Math.floor(value)));
+}
+
+function sanitizeLoot(
+  loot: NonNullable<MarkerDetail['loot']>
+): NonNullable<MarkerDetail['loot']> {
+  const seen = new Set<string>();
+  return loot.flatMap(entry => {
+    if (
+      !entry ||
+      typeof entry.id !== 'string' ||
+      entry.id.trim() === '' ||
+      seen.has(entry.id) ||
+      (entry.itemKind !== 'inventory' && entry.itemKind !== 'magic') ||
+      !entry.item ||
+      typeof entry.item !== 'object' ||
+      typeof entry.item.name !== 'string' ||
+      entry.item.name.trim() === ''
+    ) {
+      return [];
+    }
+    seen.add(entry.id);
+    const quantity = boundedLootQuantity(entry.quantity);
+    const claimedQuantity = Math.min(
+      quantity,
+      Math.max(
+        0,
+        Math.floor(
+          Number.isFinite(entry.claimedQuantity) ? entry.claimedQuantity : 0
+        )
+      )
+    );
+    return [{ ...entry, quantity, claimedQuantity }];
+  });
+}
+
 /** Builds a detail record with every field capped at persist time (§6.2). */
 function buildDetail(input: {
   id: string;
@@ -318,6 +358,7 @@ export function editMarkerDetail(
     status?: MarkerDetail['status'];
     discovery?: MarkerDetail['discovery'];
     trap?: MarkerDetail['trap'];
+    loot?: MarkerDetail['loot'];
   }
 ): boolean {
   const markers = deps.getMarkers();
@@ -344,6 +385,7 @@ export function editMarkerDetail(
       updated.discovery = sanitizeDiscovery(patch.discovery);
     }
     if (patch.trap !== undefined) updated.trap = sanitizeTrap(patch.trap);
+    if (patch.loot !== undefined) updated.loot = sanitizeLoot(patch.loot);
     return updated;
   });
 

@@ -151,6 +151,28 @@ export function buildPublicMarkerDetails(
       title: detail.title,
       body: detail.body,
       ...(detail.status === undefined ? {} : { status: detail.status }),
+      ...(detail.loot === undefined
+        ? {}
+        : {
+            loot: detail.loot.map(entry => ({
+              id: entry.id,
+              name: entry.item.name,
+              itemKind: entry.itemKind,
+              quantity: entry.quantity,
+              remainingQuantity: Math.max(
+                0,
+                entry.quantity - entry.claimedQuantity
+              ),
+              ...('description' in entry.item &&
+              typeof entry.item.description === 'string'
+                ? { description: entry.item.description }
+                : {}),
+              ...('rarity' in entry.item &&
+              typeof entry.item.rarity === 'string'
+                ? { rarity: entry.item.rarity }
+                : {}),
+            })),
+          }),
     });
   }
 

@@ -17,6 +17,7 @@ interface CompactRichTextEditorProps {
   onChange: (content: string) => void;
   placeholder?: string;
   minHeight?: string;
+  ariaLabel?: string;
 }
 
 export function CompactRichTextEditor({
@@ -24,6 +25,7 @@ export function CompactRichTextEditor({
   onChange,
   placeholder = 'Description...',
   minHeight = '80px',
+  ariaLabel,
 }: CompactRichTextEditorProps) {
   const [isMounted, setIsMounted] = useState(false);
 
@@ -38,6 +40,7 @@ export function CompactRichTextEditor({
         codeBlock: false,
         blockquote: false,
         horizontalRule: false,
+        underline: false,
       }),
       Underline,
     ],
@@ -50,6 +53,7 @@ export function CompactRichTextEditor({
       attributes: {
         class: 'focus:outline-none',
         style: `min-height: ${minHeight}; padding: 8px 10px;`,
+        ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
       },
     },
   });
@@ -185,7 +189,7 @@ function ToolbarButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded p-1 transition-colors ${
+      className={`min-h-[44px] min-w-[44px] rounded p-1 transition-colors ${
         active
           ? 'bg-accent-blue-bg-strong text-accent-blue-text'
           : 'text-muted hover:text-body hover:bg-surface'

@@ -9,7 +9,7 @@
  */
 import type { CanvasElement } from '@fieldnotes/core';
 
-import type { MarkerDetail } from '@/types/battlemap';
+import type { MarkerDetail, PublicMarkerDetail } from '@/types/battlemap';
 
 import { MARKER_HTML_TYPE, parseMarkerData } from '../markerData';
 
@@ -48,7 +48,7 @@ export const MARKER_PANEL_TOUCH_TARGET_CLASS = 'min-h-[44px] min-w-[44px]';
  */
 export function resolveMarkerPanelState(
   element: Readonly<CanvasElement> | null,
-  markers: readonly MarkerDetail[],
+  markers: readonly (MarkerDetail | PublicMarkerDetail)[],
   mode: MarkerPanelMode
 ): MarkerPanelState {
   if (element === null) {
@@ -75,9 +75,10 @@ export function resolveMarkerPanelState(
     return { kind: 'unsupported-version', version: result.version };
   }
 
-  const detail = markers.find(
-    marker => marker.id === result.data.ref && !marker.deletedAt
-  );
+  const detail = markers.find(marker => {
+    const deleted = 'deletedAt' in marker && Boolean(marker.deletedAt);
+    return marker.id === result.data.ref && !deleted;
+  });
   if (detail) {
     return { kind: 'ready', data: result.data, detail };
   }

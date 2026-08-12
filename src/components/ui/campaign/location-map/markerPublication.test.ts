@@ -86,6 +86,49 @@ function detail(
 }
 
 describe('buildPublicMarkerDetails — publishes', () => {
+  it('publishes safe loot fields without transferable item definitions', () => {
+    const result = buildPublicMarkerDetails({
+      canvasState: canvas([pin({ ref: 'loot-1', kind: 'loot' })]),
+      markers: [
+        detail('loot-1', {
+          loot: [
+            {
+              id: 'entry-1',
+              itemKind: 'inventory',
+              item: {
+                id: 'private-item-id',
+                name: 'Ruby',
+                category: 'treasure',
+                quantity: 1,
+                description: 'A bright red gem',
+                tags: ['SECRET-TAG'],
+                createdAt: '2026-01-01T00:00:00.000Z',
+                updatedAt: '2026-01-01T00:00:00.000Z',
+              },
+              quantity: 3,
+              claimedQuantity: 1,
+            },
+          ],
+        }),
+      ],
+      dmOnlyElements: {},
+    });
+
+    expect(result[0].loot).toEqual([
+      {
+        id: 'entry-1',
+        name: 'Ruby',
+        itemKind: 'inventory',
+        quantity: 3,
+        remainingQuantity: 2,
+        description: 'A bright red gem',
+      },
+    ]);
+    expect(JSON.stringify(result)).not.toContain('private-item-id');
+    expect(JSON.stringify(result)).not.toContain('SECRET-TAG');
+    expect('item' in (result[0].loot?.[0] ?? {})).toBe(false);
+  });
+
   it('publishes operational status through the explicit safe projection', () => {
     const result = buildPublicMarkerDetails({
       canvasState: canvas([pin({ ref: 'ref-1' })]),
