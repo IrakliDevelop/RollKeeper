@@ -79,6 +79,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     markerAudienceNotice,
     markerPanelOpen,
     markerPanelState,
+    markerPanelIsDmOnly,
+    handleSetMarkerAudience,
     handleCloseMarkerPanel,
     handleSaveMarkerDetail,
     handleDeleteMarker,
@@ -207,6 +209,9 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             onClose={handleCloseMarkerPanel}
             onSave={handleSaveMarkerDetail}
             onDelete={handleDeleteMarker}
+            isDmOnly={markerPanelIsDmOnly}
+            onAudienceChange={handleSetMarkerAudience}
+            audienceNotice={markerAudienceNotice}
           />
         )}
 

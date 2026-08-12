@@ -338,6 +338,91 @@ describe('MarkerDetailPanel', () => {
     expect(screen.queryByText('10d10')).toBeNull();
   });
 
+  it.each(['trap', 'secret'] as const)(
+    'reveals and hides a %s through the marker audience control',
+    async kind => {
+      const user = userEvent.setup();
+      const onAudienceChange = vi.fn();
+      const state: MarkerPanelState = {
+        kind: 'ready',
+        data: buildMarkerData({ kind, ref: 'ref-1' }),
+        detail: detail(),
+      };
+      const { rerender } = render(
+        <MarkerDetailPanel
+          open
+          mode="dm"
+          state={state}
+          isDmOnly
+          onAudienceChange={onAudienceChange}
+          onClose={() => {}}
+        />
+      );
+
+      expect(screen.getByText('Hidden from players')).toBeTruthy();
+      await user.click(
+        screen.getByRole('button', { name: 'Reveal to players' })
+      );
+      expect(onAudienceChange).toHaveBeenLastCalledWith(false);
+
+      rerender(
+        <MarkerDetailPanel
+          open
+          mode="dm"
+          state={state}
+          isDmOnly={false}
+          onAudienceChange={onAudienceChange}
+          onClose={() => {}}
+        />
+      );
+      expect(screen.getByText('Discovered')).toBeTruthy();
+      await user.click(
+        screen.getByRole('button', { name: 'Hide from players' })
+      );
+      expect(onAudienceChange).toHaveBeenLastCalledWith(true);
+    }
+  );
+
+  it('does not show discovery audience actions for an ordinary note', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'note', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        isDmOnly
+        onAudienceChange={() => {}}
+        onClose={() => {}}
+      />
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Reveal to players' })
+    ).toBeNull();
+  });
+
+  it('surfaces a refused mixed-audience transition in the panel', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'trap', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        isDmOnly
+        audienceNotice="The linked pins do not agree."
+        onClose={() => {}}
+      />
+    );
+    expect(screen.getByRole('alert').textContent).toContain(
+      'linked pins do not agree'
+    );
+  });
+
   it('prefills each DM edit field from its own source field (guards against a body/dmNotes field swap)', () => {
     const state: MarkerPanelState = {
       kind: 'ready',

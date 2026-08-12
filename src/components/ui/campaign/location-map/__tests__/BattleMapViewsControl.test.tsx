@@ -36,6 +36,39 @@ async function openSaveInput() {
 afterEach(() => cleanup());
 
 describe('BattleMapViewsControl', () => {
+  it('portals the popover outside a cramped overflow toolbar and anchors it to the trigger', async () => {
+    const { container } = render(
+      <div data-testid="cramped-toolbar" className="overflow-hidden">
+        <BattleMapViewsControl {...baseProps} />
+      </div>
+    );
+    const trigger = screen.getByRole('button', { name: /views/i });
+    const anchor = trigger.parentElement;
+    if (!anchor) throw new Error('Views trigger has no anchor element');
+    vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+      x: 900,
+      y: 10,
+      top: 10,
+      right: 980,
+      bottom: 54,
+      left: 900,
+      width: 80,
+      height: 44,
+      toJSON: () => ({}),
+    });
+
+    await userEvent.click(trigger);
+    const popover = screen.getByTestId('battle-map-views-popover');
+    expect(document.body.contains(popover)).toBe(true);
+    expect(container.contains(popover)).toBe(false);
+    expect(popover).toHaveStyle({ top: '62px' });
+
+    await userEvent.click(
+      within(popover).getByRole('button', { name: /save current view/i })
+    );
+    expect(popover).toBeInTheDocument();
+  });
+
   it('opens the popover on trigger click and closes on outside click', async () => {
     render(<BattleMapViewsControl {...baseProps} />);
     expect(

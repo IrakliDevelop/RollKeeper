@@ -218,7 +218,7 @@ describe('DmMarkerTool placement', () => {
     expect(removeSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('never calls ctx.switchTool — proven live against the same spy', () => {
+  it('switches to select after a successful placement', () => {
     const { ctx, switchTool } = realCtx();
     const onPlaceMarker = vi.fn<(request: PlaceMarkerRequest) => void>();
     const tool = new DmMarkerTool(
@@ -229,12 +229,21 @@ describe('DmMarkerTool placement', () => {
     tool.onPointerDown(down(10, 10), ctx);
     tool.onPointerUp(down(10, 10), ctx);
 
-    expect(switchTool).toHaveBeenCalledTimes(0);
-
-    // Positive control: the same spy DOES record a call when invoked
-    // directly, so the zero-calls assertion above isn't vacuous.
-    ctx.switchTool?.('select');
     expect(switchTool).toHaveBeenCalledTimes(1);
+    expect(switchTool).toHaveBeenCalledWith('select');
+  });
+
+  it('does not switch tools when a drag places nothing', () => {
+    const { ctx, switchTool } = realCtx();
+    const tool = new DmMarkerTool(
+      { current: 'trap' },
+      { current: 'red' },
+      vi.fn()
+    );
+    tool.onPointerDown(down(10, 10), ctx);
+    tool.onPointerMove(down(10 + MARKER_TOOL_SLOP_PX + 1, 10));
+    tool.onPointerUp(down(10, 10), ctx);
+    expect(switchTool).not.toHaveBeenCalled();
   });
 
   it('reads kind and color from the refs at placement time, not at construction time', () => {

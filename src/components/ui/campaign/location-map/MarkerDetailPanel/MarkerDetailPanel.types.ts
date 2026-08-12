@@ -40,4 +40,9 @@ export interface MarkerDetailPanelProps {
   }) => void;
   /** DM mode only. */
   onDelete?: () => void;
+  /** DM mode only. The value is the current audience of the active pin. */
+  isDmOnly?: boolean;
+  /** DM mode only. Applies to every sibling pin sharing this marker ref. */
+  onAudienceChange?: (dmOnly: boolean) => void;
+  audienceNotice?: string | null;
 }

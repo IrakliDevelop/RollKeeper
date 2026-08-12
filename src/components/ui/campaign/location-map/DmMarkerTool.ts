@@ -34,9 +34,8 @@ export interface PlaceMarkerRequest {
  * `PlayerTokenTool.ts:154-161`), so a value captured in the constructor
  * would go stale the moment the DM changes the kind/color picker.
  *
- * Unlike `PlayerTokenTool`, this tool does NOT call `ctx.switchTool` after
- * placing — a DM dropping several markers in a row should stay on the
- * marker tool between placements.
+ * After a successful placement request it switches to select mode so the DM
+ * can immediately click the new marker, open its workflow, or move it.
  *
  * No grid snapping: markers are annotations pinned to where the DM clicked,
  * not tokens that need to align to a cell. Do not "fix" this to snap.
@@ -94,5 +93,6 @@ export class DmMarkerTool implements Tool {
       kind: this.kindRef.current,
       color: this.colorRef.current,
     });
+    ctx.switchTool?.('select');
   }
 }
