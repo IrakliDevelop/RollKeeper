@@ -10,6 +10,7 @@ import {
   createStandaloneMarkerRegistry,
   MARKER_COLOR_CSS,
   MARKER_NEUTRAL_CSS,
+  MARKER_STATE_COLORS,
   type MarkerDataIssue,
 } from './markerPainter';
 import {
@@ -164,6 +165,66 @@ function rawElement(
 }
 
 describe('createMarkerPainter', () => {
+  it.each(['armed', 'triggered', 'disarmed'] as const)(
+    'draws the expected trap badge colour for %s',
+    status => {
+      const painter = createMarkerPainter({
+        resolveMarkerStatus: ref => (ref === 'ref-1' ? status : undefined),
+      });
+      const element = markerElement('trap');
+      const rec = createFakeCtx();
+
+      painter({ ctx: rec.ctx, element, size: element.size, zoom: 1 });
+
+      expect(propAssignments(rec.calls, 'fillStyle')).toContain(
+        MARKER_STATE_COLORS[status]
+      );
+    }
+  );
+
+  it('uses a distinct badge shape for each trap state', () => {
+    const element = markerElement('trap');
+    const traces = (['armed', 'triggered', 'disarmed'] as const).map(status => {
+      const rec = createFakeCtx();
+      createMarkerPainter({ resolveMarkerStatus: () => status })({
+        ctx: rec.ctx,
+        element,
+        size: element.size,
+        zoom: 1,
+      });
+      return rec.calls.join('|');
+    });
+
+    expect(new Set(traces)).toHaveLength(3);
+  });
+
+  it('does not decorate an unstated trap or apply trap state to another marker kind', () => {
+    const unstated = createFakeCtx();
+    const unstatedElement = markerElement('trap');
+    createMarkerPainter()({
+      ctx: unstated.ctx,
+      element: unstatedElement,
+      size: unstatedElement.size,
+      zoom: 1,
+    });
+
+    const wrongKind = createFakeCtx();
+    const doorElement = markerElement('door');
+    createMarkerPainter({ resolveMarkerStatus: () => 'triggered' })({
+      ctx: wrongKind.ctx,
+      element: doorElement,
+      size: doorElement.size,
+      zoom: 1,
+    });
+
+    expect(propAssignments(unstated.calls, 'fillStyle')).not.toContain(
+      MARKER_STATE_COLORS.triggered
+    );
+    expect(propAssignments(wrongKind.calls, 'fillStyle')).not.toContain(
+      MARKER_STATE_COLORS.triggered
+    );
+  });
+
   it('draws a pairwise-distinguishable glyph trace for each of the six kinds, and none match the neutral trace', () => {
     const painter = createMarkerPainter();
 

@@ -491,6 +491,7 @@ export function useDmLocationEditor(
   useMarkerRegistration({
     viewport,
     gesture: 'double',
+    markerDetails: markerWrites.markers,
     onActivateMarker: handleMarkerActivate,
     onMarkerDataIssue: handleMarkerDataIssue,
     isCameraBusy: () => localAnimatorRef.current?.animating ?? false,

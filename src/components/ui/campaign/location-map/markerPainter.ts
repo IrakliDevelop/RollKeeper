@@ -23,6 +23,7 @@ import {
   type MarkerElementDataV1,
   type MarkerKind,
 } from './markerData';
+import type { MarkerStatus } from '@/types/battlemap';
 
 /** Icon disc diameter as a fraction of min(w, h). */
 export const MARKER_ICON_SCALE = 0.62;
@@ -64,7 +65,15 @@ export interface MarkerDataIssue {
 
 export interface MarkerPainterOptions {
   onMarkerDataIssue?: (issue: MarkerDataIssue) => void;
+  /** Resolves product-state workflow data without copying it into the canvas. */
+  resolveMarkerStatus?: (ref: string) => MarkerStatus | undefined;
 }
+
+export const MARKER_STATE_COLORS = {
+  armed: '#f59e0b',
+  triggered: '#ef4444',
+  disarmed: '#10b981',
+} as const;
 
 /**
  * Draws the disc backdrop, shared by every status. The `min(w, h)` radius rule
@@ -203,6 +212,51 @@ function drawKindGlyph(
   }
 }
 
+/** A small badge in the disc's top-right corner. Trap badges deliberately use
+ * shapes as well as colour so their meaning survives colour-vision variance. */
+function drawTrapStateDecoration(
+  ctx: CanvasRenderingContext2D,
+  status: MarkerStatus | undefined,
+  cx: number,
+  cy: number,
+  radius: number
+): void {
+  if (status !== 'armed' && status !== 'triggered' && status !== 'disarmed') {
+    return;
+  }
+
+  const badgeX = cx + radius * 0.68;
+  const badgeY = cy - radius * 0.68;
+  const badgeRadius = radius * 0.34;
+  ctx.fillStyle = MARKER_STATE_COLORS[status];
+  ctx.strokeStyle = MARKER_GLYPH_CSS;
+  ctx.lineWidth = Math.max(1, radius * 0.1);
+  ctx.beginPath();
+  ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.strokeStyle = MARKER_GLYPH_CSS;
+  ctx.lineWidth = Math.max(1, radius * 0.12);
+  ctx.beginPath();
+  if (status === 'armed') {
+    ctx.arc(badgeX, badgeY, badgeRadius * 0.22, 0, Math.PI * 2);
+    ctx.fillStyle = MARKER_GLYPH_CSS;
+    ctx.fill();
+  } else if (status === 'triggered') {
+    ctx.moveTo(badgeX - badgeRadius * 0.4, badgeY - badgeRadius * 0.4);
+    ctx.lineTo(badgeX + badgeRadius * 0.4, badgeY + badgeRadius * 0.4);
+    ctx.moveTo(badgeX + badgeRadius * 0.4, badgeY - badgeRadius * 0.4);
+    ctx.lineTo(badgeX - badgeRadius * 0.4, badgeY + badgeRadius * 0.4);
+    ctx.stroke();
+  } else {
+    ctx.moveTo(badgeX - badgeRadius * 0.45, badgeY);
+    ctx.lineTo(badgeX - badgeRadius * 0.1, badgeY + badgeRadius * 0.35);
+    ctx.lineTo(badgeX + badgeRadius * 0.5, badgeY - badgeRadius * 0.4);
+    ctx.stroke();
+  }
+}
+
 /** Draws the label, centred at `w / 2`, beneath the disc — only when legible. */
 function drawLabel(
   ctx: CanvasRenderingContext2D,
@@ -288,7 +342,8 @@ function paintValid(
   ctx: CanvasRenderingContext2D,
   size: Readonly<{ w: number; h: number }>,
   zoom: number,
-  data: MarkerElementDataV1
+  data: MarkerElementDataV1,
+  status?: MarkerStatus
 ): void {
   const { minDim, radius, cx, cy } = discGeometry(size);
 
@@ -300,6 +355,9 @@ function paintValid(
     MARKER_COLOR_CSS[data.color ?? MARKER_DEFAULT_COLOR_KEY]
   );
   drawKindGlyph(ctx, data.kind, cx, cy, radius);
+  if (data.kind === 'trap') {
+    drawTrapStateDecoration(ctx, status, cx, cy, radius);
+  }
 
   if (data.label !== undefined) {
     const fontWorld = minDim * MARKER_LABEL_FONT_RATIO;
@@ -332,7 +390,13 @@ export function createMarkerPainter(
     const result = parseMarkerData(element.data);
 
     if (result.status === 'valid') {
-      paintValid(ctx, size, zoom, result.data);
+      paintValid(
+        ctx,
+        size,
+        zoom,
+        result.data,
+        opts.resolveMarkerStatus?.(result.data.ref)
+      );
       return;
     }
 

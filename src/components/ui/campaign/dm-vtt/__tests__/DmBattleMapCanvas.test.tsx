@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, cleanup, screen } from '@testing-library/react';
+import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import type { Viewport, CameraView, FocusAudience } from '@fieldnotes/core';
 
@@ -216,6 +216,22 @@ describe('DmBattleMapCanvas wiring', () => {
     expect(
       screen.getByLabelText(/DM notes — never shown to players/)
     ).toHaveTextContent('DC 15');
+  });
+
+  it('saves a marker, confirms success, and requests that the modal close', () => {
+    mockHookState.markerPanelOpen = true;
+    mockHookState.markerPanelState = {
+      kind: 'ready',
+      data: { v: 1, kind: 'trap', ref: 'ref-1' },
+      detail: { id: 'ref-1', title: 'Pit', body: 'Deep.', dmNotes: 'DC 15' },
+    };
+    renderCanvas();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(mockHookState.handleSaveMarkerDetail).toHaveBeenCalledTimes(1);
+    expect(mockHookState.handleCloseMarkerPanel).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Marker saved')).toBeInTheDocument();
   });
 
   it('does not reach the toolbar before a viewport exists (viewport gate)', () => {

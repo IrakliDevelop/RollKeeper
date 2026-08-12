@@ -17,7 +17,8 @@ import {
   type MarkerRegistrationViewport,
 } from './useMarkerRegistration';
 import { MARKER_HTML_TYPE, buildMarkerData } from './markerData';
-import type { MarkerDataIssue } from './markerPainter';
+import { MARKER_STATE_COLORS, type MarkerDataIssue } from './markerPainter';
+import type { MarkerDetail } from '@/types/battlemap';
 
 afterEach(() => {
   cleanup();
@@ -45,6 +46,7 @@ function createViewportDouble() {
   const offActivateSpies: ReturnType<typeof vi.fn>[] = [];
   const activationOptionsCalls: (ActivationOptions | null)[] = [];
   const activateListeners = new Set<(event: ElementActivationEvent) => void>();
+  const requestRender = vi.fn();
 
   const viewport: MarkerRegistrationViewport = {
     expectCanvasHtmlTypes(htmlTypes: Iterable<string>) {
@@ -80,6 +82,7 @@ function createViewportDouble() {
       offActivateSpies.push(spy);
       return spy;
     },
+    requestRender,
   };
 
   return {
@@ -93,6 +96,7 @@ function createViewportDouble() {
     offActivateSpies,
     activationOptionsCalls,
     activateListeners,
+    requestRender,
   };
 }
 
@@ -199,6 +203,50 @@ function createFakeCtx(): {
 }
 
 describe('useMarkerRegistration', () => {
+  it('reads updated marker status without re-registering and requests a repaint', () => {
+    const d = createViewportDouble();
+    const armed: MarkerDetail[] = [
+      { id: 'ref-1', title: '', body: '', dmNotes: '', status: 'armed' },
+    ];
+    const disarmed: MarkerDetail[] = [
+      { id: 'ref-1', title: '', body: '', dmNotes: '', status: 'disarmed' },
+    ];
+    const { rerender } = renderHook(
+      ({ markerDetails }: { markerDetails: MarkerDetail[] }) =>
+        useMarkerRegistration({
+          viewport: d.viewport,
+          gesture: 'single',
+          markerDetails,
+        }),
+      { initialProps: { markerDetails: armed } }
+    );
+    const painter = d.registry.getActivePainter(MARKER_HTML_TYPE);
+    if (!painter) throw new Error('expected marker painter');
+    const trap = createHtmlElement({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      htmlType: MARKER_HTML_TYPE,
+      data: { ...buildMarkerData({ kind: 'trap', ref: 'ref-1' }) },
+    });
+
+    const before = createFakeCtx();
+    painter({ ctx: before.ctx, element: trap, size: trap.size, zoom: 1 });
+    expect(before.calls).toContain(
+      `set:fillStyle=${MARKER_STATE_COLORS.armed}`
+    );
+
+    rerender({ markerDetails: disarmed });
+    const after = createFakeCtx();
+    painter({ ctx: after.ctx, element: trap, size: trap.size, zoom: 1 });
+    expect(after.calls).toContain(
+      `set:fillStyle=${MARKER_STATE_COLORS.disarmed}`
+    );
+    expect(d.calls.filter(call => call === 'registerHtmlPainter')).toHaveLength(
+      1
+    );
+    expect(d.requestRender).toHaveBeenCalledTimes(2);
+  });
+
   it('declares MARKER_HTML_TYPES before registering the painter: call order', () => {
     const d = createViewportDouble();
 
