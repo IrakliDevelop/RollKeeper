@@ -5,9 +5,11 @@
  */
 import type {
   MarkerDetail,
+  PublicMarkerDetail,
   MarkerDiscovery,
   MarkerStatus,
   MarkerTrapMechanics,
+  MarkerLootEntry,
 } from '@/types/battlemap';
 
 import type { MarkerElementDataV1 } from '../markerData';
@@ -15,7 +17,11 @@ import type { MarkerElementDataV1 } from '../markerData';
 export type MarkerPanelMode = 'dm' | 'player';
 
 export type MarkerPanelState =
-  | { kind: 'ready'; data: MarkerElementDataV1; detail: MarkerDetail }
+  | {
+      kind: 'ready';
+      data: MarkerElementDataV1;
+      detail: MarkerDetail | PublicMarkerDetail;
+    }
   /** DM only: the pin is valid but its detail record is gone (an orphan pin). */
   | { kind: 'missing-detail'; data: MarkerElementDataV1 }
   /** Player only: the marker is shared but the DM has not pushed details yet
@@ -28,6 +34,8 @@ export interface MarkerDetailPanelProps {
   open: boolean;
   mode: MarkerPanelMode;
   state: MarkerPanelState;
+  campaignCode?: string;
+  dmId?: string;
   onClose: () => void;
   /** DM mode only. */
   onSave?: (patch: {
@@ -37,7 +45,10 @@ export interface MarkerDetailPanelProps {
     status: MarkerStatus;
     discovery?: MarkerDiscovery;
     trap?: MarkerTrapMechanics;
+    loot?: MarkerLootEntry[];
   }) => void;
+  /** DM mode only. Background persistence that must not close the dialog. */
+  onPersist?: MarkerDetailPanelProps['onSave'];
   /** DM mode only. */
   onDelete?: () => void;
   /** DM mode only. The value is the current audience of the active pin. */

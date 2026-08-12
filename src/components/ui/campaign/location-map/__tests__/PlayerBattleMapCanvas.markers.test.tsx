@@ -249,7 +249,13 @@ describe('PlayerBattleMapCanvas: no marker placement, no edit affordance, no kin
         state={{
           kind: 'ready',
           data,
-          detail: { ...detail, dmNotes: 'Key is under the mat.' },
+          detail: {
+            id: detail.id,
+            title: detail.title,
+            body: detail.body,
+            status: detail.status,
+            dmNotes: 'Key is under the mat.',
+          },
         }}
         onClose={() => {}}
         onSave={() => {}}

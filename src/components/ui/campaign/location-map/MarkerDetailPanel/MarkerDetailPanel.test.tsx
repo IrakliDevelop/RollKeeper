@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createHtmlElement, createNote } from '@fieldnotes/core';
 import type { CanvasElement } from '@fieldnotes/core';
@@ -23,6 +23,26 @@ import {
 } from '../markerData';
 
 import type { MarkerDetail } from '@/types/battlemap';
+
+vi.mock('@/components/ui/forms/CompactRichTextEditor', () => ({
+  CompactRichTextEditor: ({
+    content,
+    onChange,
+    ariaLabel,
+  }: {
+    content: string;
+    onChange: (value: string) => void;
+    ariaLabel?: string;
+  }) => (
+    <textarea
+      aria-label={ariaLabel}
+      value={content.replace(/^<p>|<\/p>$/g, '')}
+      onChange={event =>
+        onChange(event.target.value ? `<p>${event.target.value}</p>` : '')
+      }
+    />
+  ),
+}));
 
 afterEach(() => cleanup());
 
@@ -209,9 +229,9 @@ describe('MarkerDetailPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(onSave).toHaveBeenCalledWith({
-      title: 'Cellar Door',
-      body: 'Locked, needs a key.',
-      dmNotes: 'Key is under the mat.',
+      title: '<p>Cellar Door</p>',
+      body: '<p>Locked, needs a key.</p>',
+      dmNotes: '<p>Key is under the mat.</p>',
       status: 'closed',
     });
   });
@@ -445,19 +465,11 @@ describe('MarkerDetailPanel', () => {
       />
     );
 
-    expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe(
-      'Distinct Title Value'
-    );
-    expect((screen.getByLabelText('Body') as HTMLTextAreaElement).value).toBe(
-      'Distinct Body Value'
-    );
+    expect(screen.getByLabelText('Title')).toHaveValue('Distinct Title Value');
+    expect(screen.getByLabelText('Body')).toHaveValue('Distinct Body Value');
     expect(
-      (
-        screen.getByLabelText(
-          'DM notes — never shown to players'
-        ) as HTMLTextAreaElement
-      ).value
-    ).toBe('Distinct DM Notes Value');
+      screen.getByLabelText('DM notes — never shown to players')
+    ).toHaveValue('Distinct DM Notes Value');
   });
 
   it('renders player title and body as text nodes, never parsed as markup', () => {
@@ -519,7 +531,9 @@ describe('MarkerDetailPanel', () => {
     // found the string had player mode also rendered it. Symmetric with the
     // negative assertion above (`getByDisplayValue` + `innerHTML`, matching
     // `queryByText` + `innerHTML`).
-    expect(dm.getByDisplayValue(dmNotesValue)).toBeInTheDocument();
+    expect(dm.getByLabelText('DM notes — never shown to players')).toHaveValue(
+      dmNotesValue
+    );
     expect(dm.baseElement.innerHTML).toContain(dmNotesValue);
   });
 
@@ -556,7 +570,7 @@ describe('MarkerDetailPanel', () => {
         onDelete={() => {}}
       />
     );
-    expect(dm.baseElement.querySelectorAll('textarea').length).toBe(2);
+    expect(dm.baseElement.querySelectorAll('textarea').length).toBe(3);
     expect(dm.getByRole('button', { name: 'Save' })).toBeInTheDocument();
     expect(dm.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
     expect(dm.baseElement.innerHTML).toContain('DM notes');
@@ -645,7 +659,8 @@ describe('MarkerDetailPanel', () => {
     }
   });
 
-  it('resets the form when the panel opens on a different marker', () => {
+  it('resets the form when the panel opens on a different marker', async () => {
+    const user = userEvent.setup();
     const stateA: MarkerPanelState = {
       kind: 'ready',
       data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
@@ -668,12 +683,9 @@ describe('MarkerDetailPanel', () => {
       />
     );
 
-    fireEvent.change(getByLabelText('Title'), {
-      target: { value: 'typed but never saved' },
-    });
-    expect((getByLabelText('Title') as HTMLInputElement).value).toBe(
-      'typed but never saved'
-    );
+    await user.clear(getByLabelText('Title'));
+    await user.type(getByLabelText('Title'), 'typed but never saved');
+    expect(getByLabelText('Title')).toHaveValue('typed but never saved');
 
     rerender(
       <MarkerDetailPanel
@@ -686,9 +698,7 @@ describe('MarkerDetailPanel', () => {
       />
     );
 
-    expect((getByLabelText('Title') as HTMLInputElement).value).toBe(
-      'Original B'
-    );
+    expect(getByLabelText('Title')).toHaveValue('Original B');
   });
 
   /**

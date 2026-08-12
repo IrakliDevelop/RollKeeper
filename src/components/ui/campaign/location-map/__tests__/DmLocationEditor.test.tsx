@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { Viewport } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 
@@ -37,6 +38,16 @@ vi.mock('../DmLocationToolbar', () => ({
 
 vi.mock('../DmLocationToolOptions', () => ({
   default: vi.fn(() => null),
+}));
+
+vi.mock('@/components/ui/forms/CompactRichTextEditor', () => ({
+  CompactRichTextEditor: ({
+    content,
+    ariaLabel,
+  }: {
+    content: string;
+    ariaLabel?: string;
+  }) => <textarea aria-label={ariaLabel} value={content} readOnly />,
 }));
 
 import DmLocationToolOptions from '../DmLocationToolOptions';
@@ -206,5 +217,43 @@ describe('DmLocationEditor wiring', () => {
     expect(
       screen.getByLabelText(/DM notes — never shown to players/)
     ).toHaveValue('DC 15');
+  });
+
+  it('saves, closes, and confirms a marker edit', async () => {
+    const user = userEvent.setup();
+    const handleSaveMarkerDetail = vi.fn();
+    const handleCloseMarkerPanel = vi.fn();
+    vi.mocked(useDmLocationEditor).mockReturnValue(
+      makeHookState({
+        markerPanelOpen: true,
+        markerPanelState: {
+          kind: 'ready',
+          data: { v: 1, kind: 'note', ref: 'ref-1' },
+          detail: {
+            id: 'ref-1',
+            title: 'Clue',
+            body: 'Writing on the wall',
+            dmNotes: 'Private context',
+          },
+        },
+        handleSaveMarkerDetail,
+        handleCloseMarkerPanel,
+      })
+    );
+
+    render(
+      <DmLocationEditor
+        location={baseLocation}
+        campaignCode="TEST01"
+        dmId="dm-1"
+        onSave={vi.fn()}
+        onSyncToPlayers={vi.fn()}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(handleSaveMarkerDetail).toHaveBeenCalledOnce();
+    expect(handleCloseMarkerPanel).toHaveBeenCalledOnce();
+    expect(screen.getByText('Marker saved')).toBeInTheDocument();
   });
 });

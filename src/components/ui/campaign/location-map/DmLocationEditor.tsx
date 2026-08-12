@@ -205,9 +205,20 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
           <MarkerDetailPanel
             open
             mode="dm"
+            campaignCode={props.campaignCode}
+            dmId={props.dmId}
             state={markerPanelState}
             onClose={handleCloseMarkerPanel}
-            onSave={handleSaveMarkerDetail}
+            onSave={patch => {
+              handleSaveMarkerDetail(patch);
+              addToast({
+                type: 'success',
+                title: 'Marker saved',
+                message: 'Marker details were updated.',
+              });
+              handleCloseMarkerPanel();
+            }}
+            onPersist={handleSaveMarkerDetail}
             onDelete={handleDeleteMarker}
             isDmOnly={markerPanelIsDmOnly}
             onAudienceChange={handleSetMarkerAudience}
