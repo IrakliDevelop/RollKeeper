@@ -686,7 +686,7 @@ describe('marker activation and the active tool, over one live Viewport', () => 
     }
   }
 
-  it('with the marker tool active a double-tap places pins and opens NO panel; with `select` active the identical gesture opens it', () => {
+  it('with the marker tool active the first tap places one pin, switches to select, and opens NO panel; with `select` active a double-tap opens it', () => {
     stubCanvas();
     const viewport = mountViewport();
     const wrapper = viewport.domLayer.parentElement;
@@ -738,9 +738,10 @@ describe('marker activation and the active tool, over one live Viewport', () => 
 
     // No SECOND panel: activation stayed inert for the whole gesture...
     expect(activated).toEqual([pin.id]);
-    // ...while the very same two taps did reach the canvas and place two
-    // pins, which is what proves the gesture was delivered rather than
-    // swallowed by the harness.
-    expect(placements).toHaveLength(2);
+    // ...while the first tap did reach the canvas and place one pin. Marker
+    // placement then switches to select, so the second tap cannot place a
+    // duplicate pin from the same gesture.
+    expect(placements).toHaveLength(1);
+    expect(viewport.toolManager.activeTool?.name).toBe('select');
   });
 });
