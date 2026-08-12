@@ -347,12 +347,34 @@ function ReadOnlyView({
   body,
   status,
   loot,
+  onClaimLoot,
 }: {
   title: string;
   body: string;
   status?: MarkerStatus;
   loot?: PublicMarkerLootEntry[];
+  onClaimLoot?: (entryId: string) => Promise<void>;
 }) {
+  const [claimingEntryId, setClaimingEntryId] = useState<string | null>(null);
+  const [claimMessage, setClaimMessage] = useState<string | null>(null);
+
+  const handleClaim = async (entryId: string) => {
+    if (!onClaimLoot || claimingEntryId) return;
+    setClaimingEntryId(entryId);
+    setClaimMessage(null);
+    try {
+      await onClaimLoot(entryId);
+      setClaimMessage(
+        'Claimed. The item will appear on your character shortly.'
+      );
+    } catch (error) {
+      setClaimMessage(
+        error instanceof Error ? error.message : 'Could not claim that item.'
+      );
+    } finally {
+      setClaimingEntryId(null);
+    }
+  };
   return (
     <div className="flex flex-col gap-3">
       <div
@@ -382,12 +404,31 @@ function ReadOnlyView({
               className="flex items-center justify-between gap-3 p-3 text-sm"
             >
               <span className="text-heading font-medium">{entry.name}</span>
-              <span className="text-muted">
-                {entry.remainingQuantity} available
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-muted">
+                  {entry.remainingQuantity} available
+                </span>
+                {onClaimLoot && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={
+                      entry.remainingQuantity <= 0 || claimingEntryId !== null
+                    }
+                    onClick={() => void handleClaim(entry.id)}
+                  >
+                    {claimingEntryId === entry.id ? 'Claiming…' : 'Claim'}
+                  </Button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
+      )}
+      {claimMessage && (
+        <p role="status" className="text-body text-sm">
+          {claimMessage}
+        </p>
       )}
     </div>
   );
@@ -429,7 +470,8 @@ function renderPanelBody(
   onAudienceChange: MarkerDetailPanelProps['onAudienceChange'],
   audienceNotice: string | null | undefined,
   campaignCode: string | undefined,
-  dmId: string | undefined
+  dmId: string | undefined,
+  onClaimLoot: MarkerDetailPanelProps['onClaimLoot']
 ) {
   if (state.kind === 'ready') {
     if (mode === 'dm') {
@@ -501,6 +543,7 @@ function renderPanelBody(
             ? (state.detail.loot as PublicMarkerLootEntry[])
             : undefined
         }
+        onClaimLoot={onClaimLoot}
       />
     );
   }
@@ -597,6 +640,7 @@ export default function MarkerDetailPanel({
   audienceNotice,
   campaignCode,
   dmId,
+  onClaimLoot,
 }: MarkerDetailPanelProps): React.JSX.Element {
   const handleOpenChange = (next: boolean) => {
     if (!next) onClose();
@@ -630,7 +674,8 @@ export default function MarkerDetailPanel({
             onAudienceChange,
             audienceNotice,
             campaignCode,
-            dmId
+            dmId,
+            onClaimLoot
           )}
         </DialogBody>
       </DialogContent>

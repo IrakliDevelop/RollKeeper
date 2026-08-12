@@ -287,6 +287,51 @@ describe('MarkerDetailPanel', () => {
     expect(screen.queryByLabelText('Status')).toBeNull();
   });
 
+  it('lets a player claim available loot and disables depleted entries', async () => {
+    const user = userEvent.setup();
+    const onClaimLoot = vi.fn().mockResolvedValue(undefined);
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'loot', ref: 'ref-1' }),
+          detail: {
+            id: 'ref-1',
+            title: 'Chest',
+            body: 'Choose one.',
+            loot: [
+              {
+                id: 'potion',
+                name: 'Potion',
+                itemKind: 'inventory',
+                quantity: 1,
+                remainingQuantity: 1,
+              },
+              {
+                id: 'sword',
+                name: 'Sword',
+                itemKind: 'inventory',
+                quantity: 1,
+                remainingQuantity: 0,
+              },
+            ],
+          },
+        }}
+        onClose={() => {}}
+        onClaimLoot={onClaimLoot}
+      />
+    );
+
+    const buttons = screen.getAllByRole('button', { name: 'Claim' });
+    expect(buttons[0]).toBeEnabled();
+    expect(buttons[1]).toBeDisabled();
+    await user.click(buttons[0]);
+    expect(onClaimLoot).toHaveBeenCalledWith('potion');
+    expect(screen.getByRole('status')).toHaveTextContent('Claimed');
+  });
+
   it('saves private discovery and disarm mechanics for a trap', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();

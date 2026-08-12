@@ -17,7 +17,7 @@ interface RedisReader {
   get<T = unknown>(key: string): Promise<T | null>;
 }
 
-export type BattleMapPokeFeature = 'initiative' | 'players';
+export type BattleMapPokeFeature = 'initiative' | 'players' | 'markers';
 
 /**
  * Best-effort WS poke after a write: tells clients in the active battle-map
