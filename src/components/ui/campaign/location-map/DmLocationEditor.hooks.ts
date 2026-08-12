@@ -225,6 +225,9 @@ export interface DmLocationEditorState {
     title: string;
     body: string;
     dmNotes: string;
+    status?: import('@/types/battlemap').MarkerStatus;
+    discovery?: import('@/types/battlemap').MarkerDiscovery;
+    trap?: import('@/types/battlemap').MarkerTrapMechanics;
   }) => void;
   handleDeleteMarker: () => void;
 
@@ -521,7 +524,14 @@ export function useDmLocationEditor(
   );
 
   const handleSaveMarkerDetail = useCallback(
-    (patch: { title: string; body: string; dmNotes: string }) => {
+    (patch: {
+      title: string;
+      body: string;
+      dmNotes: string;
+      status?: import('@/types/battlemap').MarkerStatus;
+      discovery?: import('@/types/battlemap').MarkerDiscovery;
+      trap?: import('@/types/battlemap').MarkerTrapMechanics;
+    }) => {
       if (activeMarkerRef === null) return;
       markerWrites.editMarkerDetail(activeMarkerRef, patch);
     },

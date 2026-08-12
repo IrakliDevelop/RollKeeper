@@ -25,14 +25,57 @@ export interface MarkerDetail {
   title: string;
   body: string;
   dmNotes: string;
+  status?: MarkerStatus;
+  /** Private discovery mechanics. Never included in PublicMarkerDetail. */
+  discovery?: MarkerDiscovery;
+  /** Private trap mechanics. Never included in PublicMarkerDetail. */
+  trap?: MarkerTrapMechanics;
   deletedAt?: string;
 }
+
+export type MarkerDiscoverySkill = 'perception' | 'investigation';
+
+export interface MarkerDiscovery {
+  dc?: number;
+  skill: MarkerDiscoverySkill;
+}
+
+export type MarkerDisarmMethod =
+  | 'thieves-tools'
+  | 'sleight-of-hand'
+  | 'arcana'
+  | 'other';
+
+export interface MarkerTrapMechanics {
+  disarmDc?: number;
+  disarmMethod: MarkerDisarmMethod;
+  trigger: string;
+  effect: string;
+  damage: string;
+}
+
+/** Operational state shown in the marker panel. Applicable choices are
+ * narrowed by marker kind (a trap cannot be "claimed", for example). */
+export type MarkerStatus =
+  | 'closed'
+  | 'open'
+  | 'locked'
+  | 'armed'
+  | 'triggered'
+  | 'disarmed'
+  | 'available'
+  | 'claimed'
+  | 'active'
+  | 'defeated'
+  | 'hidden'
+  | 'revealed'
+  | 'resolved';
 
 /**
  * The PUBLIC projection of a `MarkerDetail` — the only marker shape that ever
  * leaves the DM (spec §6.4). It is deliberately a separate interface rather
  * than an `Omit<MarkerDetail, 'dmNotes' | 'deletedAt'>`: the projection is
- * built by an explicit three-field pick in
+ * built by an explicit safe-field pick in
  * `location-map/markerPublication.ts`, so a field added to `MarkerDetail`
  * later is structurally unable to ride through to players.
  */
@@ -40,6 +83,7 @@ export interface PublicMarkerDetail {
   id: string;
   title: string;
   body: string;
+  status?: MarkerStatus;
   /**
    * Structural refusal, not documentation. Without it a `MarkerDetail` is
    * assignable to `PublicMarkerDetail` (extra properties survive anything but

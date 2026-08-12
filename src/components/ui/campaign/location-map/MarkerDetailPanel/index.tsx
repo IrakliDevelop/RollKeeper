@@ -26,12 +26,72 @@ import type {
   MarkerPanelMode,
   MarkerPanelState,
 } from './MarkerDetailPanel.types';
+import type { MarkerKind } from '../markerData';
+import { MARKER_KIND_ICONS } from '../markerIcons';
+import type {
+  MarkerDiscovery,
+  MarkerDiscoverySkill,
+  MarkerDisarmMethod,
+  MarkerStatus,
+  MarkerTrapMechanics,
+} from '@/types/battlemap';
+
+const STATUS_OPTIONS: Record<
+  MarkerKind,
+  readonly { value: MarkerStatus; label: string }[]
+> = {
+  door: [
+    { value: 'closed', label: 'Closed' },
+    { value: 'open', label: 'Open' },
+    { value: 'locked', label: 'Locked' },
+  ],
+  trap: [
+    { value: 'armed', label: 'Armed' },
+    { value: 'triggered', label: 'Triggered' },
+    { value: 'disarmed', label: 'Disarmed' },
+  ],
+  loot: [
+    { value: 'available', label: 'Available' },
+    { value: 'claimed', label: 'Claimed' },
+  ],
+  npc: [
+    { value: 'active', label: 'Active' },
+    { value: 'defeated', label: 'Defeated / gone' },
+  ],
+  secret: [
+    { value: 'hidden', label: 'Hidden' },
+    { value: 'revealed', label: 'Revealed' },
+  ],
+  note: [
+    { value: 'active', label: 'Active' },
+    { value: 'resolved', label: 'Resolved' },
+  ],
+};
+
+function defaultStatus(kind: MarkerKind): MarkerStatus {
+  return STATUS_OPTIONS[kind][0].value;
+}
+
+function statusLabel(status: MarkerStatus): string {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
 
 interface EditFormProps {
+  kind: MarkerKind;
   initialTitle: string;
   initialBody: string;
   initialDmNotes: string;
-  onSave?: (patch: { title: string; body: string; dmNotes: string }) => void;
+  initialStatus?: MarkerStatus;
+  initialDiscovery?: MarkerDiscovery;
+  initialTrap?: MarkerTrapMechanics;
+  onSave?: (patch: {
+    title: string;
+    body: string;
+    dmNotes: string;
+    status: MarkerStatus;
+    discovery?: MarkerDiscovery;
+    trap?: MarkerTrapMechanics;
+  }) => void;
   onDelete?: () => void;
 }
 
@@ -42,20 +102,164 @@ interface EditFormProps {
  * entire reset mechanism, deliberately not a `useEffect`.
  */
 function EditForm({
+  kind,
   initialTitle,
   initialBody,
   initialDmNotes,
+  initialStatus,
+  initialDiscovery,
+  initialTrap,
   onSave,
   onDelete,
 }: EditFormProps) {
   const [title, setTitle] = useState(initialTitle);
   const [body, setBody] = useState(initialBody);
   const [dmNotes, setDmNotes] = useState(initialDmNotes);
+  const [status, setStatus] = useState<MarkerStatus>(
+    initialStatus ?? defaultStatus(kind)
+  );
+  const [discoveryDc, setDiscoveryDc] = useState(
+    initialDiscovery?.dc?.toString() ?? ''
+  );
+  const [discoverySkill, setDiscoverySkill] = useState<MarkerDiscoverySkill>(
+    initialDiscovery?.skill ?? 'perception'
+  );
+  const [disarmDc, setDisarmDc] = useState(
+    initialTrap?.disarmDc?.toString() ?? ''
+  );
+  const [disarmMethod, setDisarmMethod] = useState<MarkerDisarmMethod>(
+    initialTrap?.disarmMethod ?? 'thieves-tools'
+  );
+  const [trigger, setTrigger] = useState(initialTrap?.trigger ?? '');
+  const [effect, setEffect] = useState(initialTrap?.effect ?? '');
+  const [damage, setDamage] = useState(initialTrap?.damage ?? '');
 
-  const handleSave = () => onSave?.({ title, body, dmNotes });
+  const parseDc = (value: string): number | undefined => {
+    if (value.trim() === '') return undefined;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return undefined;
+    return Math.min(40, Math.max(0, Math.round(parsed)));
+  };
+
+  const handleSave = () =>
+    onSave?.({
+      title,
+      body,
+      dmNotes,
+      status,
+      ...(kind === 'trap' || kind === 'secret'
+        ? {
+            discovery: {
+              dc: parseDc(discoveryDc),
+              skill: discoverySkill,
+            },
+          }
+        : {}),
+      ...(kind === 'trap'
+        ? {
+            trap: {
+              disarmDc: parseDc(disarmDc),
+              disarmMethod,
+              trigger,
+              effect,
+              damage,
+            },
+          }
+        : {}),
+    });
 
   return (
     <div className="flex flex-col gap-4">
+      <label className="text-body flex flex-col gap-1 text-sm font-medium">
+        Status
+        <select
+          value={status}
+          onChange={event => setStatus(event.target.value as MarkerStatus)}
+          className="border-divider bg-surface text-body min-h-10 rounded-md border px-3"
+        >
+          {STATUS_OPTIONS[kind].map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {(kind === 'trap' || kind === 'secret') && (
+        <div className="border-divider bg-surface-secondary grid gap-3 rounded-md border p-3 sm:grid-cols-2">
+          <Input
+            id="marker-discovery-dc"
+            label="Discovery DC"
+            type="number"
+            min={0}
+            max={40}
+            value={discoveryDc}
+            onChange={event => setDiscoveryDc(event.target.value)}
+          />
+          <label className="text-body flex flex-col gap-1 text-sm font-medium">
+            Discovery skill
+            <select
+              value={discoverySkill}
+              onChange={event =>
+                setDiscoverySkill(event.target.value as MarkerDiscoverySkill)
+              }
+              className="border-divider bg-surface text-body min-h-10 rounded-md border px-3"
+            >
+              <option value="perception">Perception</option>
+              <option value="investigation">Investigation</option>
+            </select>
+          </label>
+        </div>
+      )}
+      {kind === 'trap' && (
+        <div className="border-divider bg-surface-secondary grid gap-3 rounded-md border p-3 sm:grid-cols-2">
+          <Input
+            id="marker-disarm-dc"
+            label="Disarm DC"
+            type="number"
+            min={0}
+            max={40}
+            value={disarmDc}
+            onChange={event => setDisarmDc(event.target.value)}
+          />
+          <label className="text-body flex flex-col gap-1 text-sm font-medium">
+            Disarm method
+            <select
+              value={disarmMethod}
+              onChange={event =>
+                setDisarmMethod(event.target.value as MarkerDisarmMethod)
+              }
+              className="border-divider bg-surface text-body min-h-10 rounded-md border px-3"
+            >
+              <option value="thieves-tools">Thieves&apos; Tools</option>
+              <option value="sleight-of-hand">Sleight of Hand</option>
+              <option value="arcana">Arcana</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <Input
+            id="marker-trigger"
+            label="Trigger"
+            value={trigger}
+            onChange={event => setTrigger(event.target.value)}
+            placeholder="Opening the chest"
+          />
+          <Input
+            id="marker-damage"
+            label="Damage"
+            value={damage}
+            onChange={event => setDamage(event.target.value)}
+            placeholder="2d10 poison"
+          />
+          <div className="sm:col-span-2">
+            <Textarea
+              id="marker-trap-effect"
+              label="Trap effect"
+              value={effect}
+              onChange={event => setEffect(event.target.value)}
+            />
+          </div>
+        </div>
+      )}
       <Input
         id="marker-panel-title"
         label="Title"
@@ -102,12 +306,20 @@ function EditForm({
   );
 }
 
-/** Player read-only view. Title and body ride as plain JSX children — React
+/** Player read-only view. Title, status and body ride as plain JSX children — React
  * renders string children as text nodes, never parsed markup — so this must
  * never be swapped for `dangerouslySetInnerHTML`. This component's prop type
  * only accepts `title` and `body` strings — `dmNotes` is intentionally never
  * passed to this component at all, and cannot be reached from inside it. */
-function ReadOnlyView({ title, body }: { title: string; body: string }) {
+function ReadOnlyView({
+  title,
+  body,
+  status,
+}: {
+  title: string;
+  body: string;
+  status?: MarkerStatus;
+}) {
   return (
     <div className="flex flex-col gap-3">
       <h3
@@ -118,6 +330,11 @@ function ReadOnlyView({ title, body }: { title: string; body: string }) {
       >
         {title}
       </h3>
+      {status && (
+        <p className="text-accent-blue-text text-sm font-semibold">
+          Status: {statusLabel(status)}
+        </p>
+      )}
       <div
         data-testid="marker-panel-body"
         className={cn('text-body text-sm', MARKER_PANEL_CONTAINMENT_CLASS)}
@@ -143,6 +360,17 @@ function panelTitle(state: MarkerPanelState): string {
   return 'Marker';
 }
 
+function panelKind(state: MarkerPanelState): MarkerKind | undefined {
+  if (
+    state.kind === 'ready' ||
+    state.kind === 'missing-detail' ||
+    state.kind === 'unpublished'
+  ) {
+    return state.data.kind;
+  }
+  return undefined;
+}
+
 function renderPanelBody(
   mode: MarkerPanelMode,
   state: MarkerPanelState,
@@ -154,15 +382,25 @@ function renderPanelBody(
       return (
         <EditForm
           key={state.data.ref}
+          kind={state.data.kind}
           initialTitle={state.detail.title}
           initialBody={state.detail.body}
           initialDmNotes={state.detail.dmNotes}
+          initialStatus={state.detail.status}
+          initialDiscovery={state.detail.discovery}
+          initialTrap={state.detail.trap}
           onSave={onSave}
           onDelete={onDelete}
         />
       );
     }
-    return <ReadOnlyView title={state.detail.title} body={state.detail.body} />;
+    return (
+      <ReadOnlyView
+        title={state.detail.title}
+        body={state.detail.body}
+        status={state.detail.status}
+      />
+    );
   }
 
   if (state.kind === 'missing-detail') {
@@ -189,6 +427,7 @@ function renderPanelBody(
         </p>
         <EditForm
           key={state.data.ref}
+          kind={state.data.kind}
           initialTitle=""
           initialBody=""
           initialDmNotes=""
@@ -255,12 +494,19 @@ export default function MarkerDetailPanel({
   const isEditing =
     mode === 'dm' &&
     (state.kind === 'ready' || state.kind === 'missing-detail');
+  const kind = panelKind(state);
+  const KindIcon = kind === undefined ? undefined : MARKER_KIND_ICONS[kind];
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent size="md" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>{panelTitle(state)}</DialogTitle>
+          <DialogTitle>
+            <span className="inline-flex items-center gap-2 capitalize">
+              {KindIcon && <KindIcon aria-hidden="true" size={20} />}
+              {panelTitle(state)}
+            </span>
+          </DialogTitle>
           <DialogDescription className="sr-only">
             Map marker details
           </DialogDescription>

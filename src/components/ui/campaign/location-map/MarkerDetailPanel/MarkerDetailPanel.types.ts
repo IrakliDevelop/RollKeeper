@@ -3,7 +3,12 @@
  * component's props. See `MarkerDetailPanel.utils.ts` for the resolver and
  * `index.tsx` for the component that renders these states.
  */
-import type { MarkerDetail } from '@/types/battlemap';
+import type {
+  MarkerDetail,
+  MarkerDiscovery,
+  MarkerStatus,
+  MarkerTrapMechanics,
+} from '@/types/battlemap';
 
 import type { MarkerElementDataV1 } from '../markerData';
 
@@ -25,7 +30,14 @@ export interface MarkerDetailPanelProps {
   state: MarkerPanelState;
   onClose: () => void;
   /** DM mode only. */
-  onSave?: (patch: { title: string; body: string; dmNotes: string }) => void;
+  onSave?: (patch: {
+    title: string;
+    body: string;
+    dmNotes: string;
+    status: MarkerStatus;
+    discovery?: MarkerDiscovery;
+    trap?: MarkerTrapMechanics;
+  }) => void;
   /** DM mode only. */
   onDelete?: () => void;
 }

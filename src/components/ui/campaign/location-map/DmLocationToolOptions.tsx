@@ -24,6 +24,7 @@ import { Switch } from '@/components/ui/forms/switch';
 import DmSelectionOptions from './DmSelectionOptions';
 import { MARKER_TOOL_NAME } from './DmMarkerTool';
 import { MARKER_COLOR_KEYS, MARKER_KINDS } from './markerData';
+import { MARKER_KIND_ICONS } from './markerIcons';
 import type { MarkerColorKey, MarkerKind } from './markerData';
 import { MARKER_COLOR_CSS } from './markerPainter';
 import type { EditorMode } from './DmLocationEditor.types';
@@ -232,19 +233,23 @@ export default function DmLocationToolOptions({
         >
           <span className="text-muted text-xs font-medium">Marker</span>
           <div className="border-divider bg-surface flex flex-wrap items-center gap-0.5 rounded-md border p-0.5">
-            {MARKER_KINDS.map(kind => (
-              <Button
-                key={kind}
-                variant={markerControls.kind === kind ? 'primary' : 'ghost'}
-                onClick={() => markerControls.onKindChange(kind)}
-                title={`Marker kind: ${kind}`}
-                aria-label={`Marker kind: ${kind}`}
-                aria-pressed={markerControls.kind === kind}
-                className="min-h-[44px] min-w-[44px] px-2 text-xs capitalize"
-              >
-                {kind}
-              </Button>
-            ))}
+            {MARKER_KINDS.map(kind => {
+              const KindIcon = MARKER_KIND_ICONS[kind];
+              return (
+                <Button
+                  key={kind}
+                  variant={markerControls.kind === kind ? 'primary' : 'ghost'}
+                  onClick={() => markerControls.onKindChange(kind)}
+                  title={`Marker kind: ${kind}`}
+                  aria-label={`Marker kind: ${kind}`}
+                  aria-pressed={markerControls.kind === kind}
+                  className="min-h-[44px] min-w-[44px] gap-1.5 px-2 text-xs capitalize"
+                >
+                  <KindIcon aria-hidden="true" size={16} />
+                  {kind}
+                </Button>
+              );
+            })}
           </div>
           <div className="bg-divider h-6 w-px" />
           <span className="text-muted text-xs font-medium">Pin colour</span>

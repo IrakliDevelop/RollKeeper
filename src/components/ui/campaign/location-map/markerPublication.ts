@@ -146,7 +146,12 @@ export function buildPublicMarkerDetails(
     if (detail.deletedAt) continue;
     if (!publicRefs.has(detail.id)) continue;
     // Explicit field pick. Never `{ ...detail }`, never `detail` itself.
-    published.push({ id: detail.id, title: detail.title, body: detail.body });
+    published.push({
+      id: detail.id,
+      title: detail.title,
+      body: detail.body,
+      ...(detail.status === undefined ? {} : { status: detail.status }),
+    });
   }
 
   return published;

@@ -67,7 +67,14 @@ export interface MarkerWrites {
   deleteMarker(elementId: string): void;
   editMarkerDetail(
     ref: string,
-    patch: { title?: string; body?: string; dmNotes?: string }
+    patch: {
+      title?: string;
+      body?: string;
+      dmNotes?: string;
+      status?: MarkerDetail['status'];
+      discovery?: MarkerDetail['discovery'];
+      trap?: MarkerDetail['trap'];
+    }
   ): boolean;
   setMarkerAudienceForRef(
     ref: string,
@@ -313,7 +320,14 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
   const editMarkerDetail = useCallback(
     (
       ref: string,
-      patch: { title?: string; body?: string; dmNotes?: string }
+      patch: {
+        title?: string;
+        body?: string;
+        dmNotes?: string;
+        status?: MarkerDetail['status'];
+        discovery?: MarkerDetail['discovery'];
+        trap?: MarkerDetail['trap'];
+      }
     ): boolean => editMarkerDetailWrite(depsFor(null), ref, patch),
     [depsFor]
   );
