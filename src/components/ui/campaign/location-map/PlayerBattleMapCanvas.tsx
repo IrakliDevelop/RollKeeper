@@ -362,7 +362,13 @@ export function PlayerBattleMapCanvas({
   // marker-shaped value is built from another object.
   const markerPanelState = resolveMarkerPanelState(
     activeMarkerElement,
-    markers.map(m => ({ id: m.id, title: m.title, body: m.body, dmNotes: '' })),
+    markers.map(m => ({
+      id: m.id,
+      title: m.title,
+      body: m.body,
+      dmNotes: '',
+      status: m.status,
+    })),
     'player'
   );
   const handleCloseMarkerPanel = useCallback(() => {

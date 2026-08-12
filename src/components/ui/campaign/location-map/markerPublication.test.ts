@@ -86,7 +86,22 @@ function detail(
 }
 
 describe('buildPublicMarkerDetails — publishes', () => {
-  it('publishes exactly one { id, title, body } for a single valid shared marker', () => {
+  it('publishes operational status through the explicit safe projection', () => {
+    const result = buildPublicMarkerDetails({
+      canvasState: canvas([pin({ ref: 'ref-1' })]),
+      markers: [detail('ref-1', { status: 'triggered' })],
+      dmOnlyElements: {},
+    });
+    expect(result).toEqual([
+      {
+        id: 'ref-1',
+        title: 'title-ref-1',
+        body: 'body-ref-1',
+        status: 'triggered',
+      },
+    ]);
+  });
+  it('publishes exactly one safe detail for a single valid shared marker', () => {
     const el = pin({ ref: 'ref-1' });
 
     const result = buildPublicMarkerDetails({

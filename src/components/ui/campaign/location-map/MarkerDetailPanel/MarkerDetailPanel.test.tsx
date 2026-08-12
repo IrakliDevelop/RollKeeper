@@ -212,7 +212,130 @@ describe('MarkerDetailPanel', () => {
       title: 'Cellar Door',
       body: 'Locked, needs a key.',
       dmNotes: 'Key is under the mat.',
+      status: 'closed',
     });
+  });
+
+  it.each([
+    ['door', 'Locked', 'locked'],
+    ['trap', 'Disarmed', 'disarmed'],
+    ['loot', 'Claimed', 'claimed'],
+    ['npc', 'Defeated / gone', 'defeated'],
+    ['secret', 'Revealed', 'revealed'],
+    ['note', 'Resolved', 'resolved'],
+  ] as const)(
+    'gives a %s marker useful kind-specific state',
+    async (kind, label, status) => {
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+      render(
+        <MarkerDetailPanel
+          open
+          mode="dm"
+          state={{
+            kind: 'ready',
+            data: buildMarkerData({ kind, ref: 'ref-1' }),
+            detail: detail(),
+          }}
+          onClose={() => {}}
+          onSave={onSave}
+        />
+      );
+
+      await user.selectOptions(screen.getByLabelText('Status'), status);
+      expect(screen.getByRole('option', { name: label })).toBeTruthy();
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+      expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ status }));
+      cleanup();
+    }
+  );
+
+  it('shows a shared marker status to a player without edit controls', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'trap', ref: 'ref-1' }),
+          detail: detail({ status: 'triggered' }),
+        }}
+        onClose={() => {}}
+      />
+    );
+    expect(screen.getByText('Status: Triggered')).toBeTruthy();
+    expect(screen.queryByLabelText('Status')).toBeNull();
+  });
+
+  it('saves private discovery and disarm mechanics for a trap', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'trap', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        onClose={() => {}}
+        onSave={onSave}
+      />
+    );
+
+    await user.type(screen.getByLabelText('Discovery DC'), '15');
+    await user.selectOptions(
+      screen.getByLabelText('Discovery skill'),
+      'investigation'
+    );
+    await user.type(screen.getByLabelText('Disarm DC'), '17');
+    await user.selectOptions(screen.getByLabelText('Disarm method'), 'arcana');
+    await user.type(screen.getByLabelText('Trigger'), 'Touching the idol');
+    await user.type(screen.getByLabelText('Damage'), '4d6 fire');
+    await user.type(screen.getByLabelText('Trap effect'), 'The room ignites.');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        discovery: { dc: 15, skill: 'investigation' },
+        trap: {
+          disarmDc: 17,
+          disarmMethod: 'arcana',
+          trigger: 'Touching the idol',
+          damage: '4d6 fire',
+          effect: 'The room ignites.',
+        },
+      })
+    );
+  });
+
+  it('keeps discovery and trap mechanics out of the player panel', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'trap', ref: 'ref-1' }),
+          detail: detail({
+            discovery: { dc: 19, skill: 'perception' },
+            trap: {
+              disarmDc: 21,
+              disarmMethod: 'thieves-tools',
+              trigger: 'Secret trigger',
+              effect: 'Secret effect',
+              damage: '10d10',
+            },
+          }),
+        }}
+        onClose={() => {}}
+      />
+    );
+
+    expect(screen.queryByLabelText('Discovery DC')).toBeNull();
+    expect(screen.queryByText('Secret trigger')).toBeNull();
+    expect(screen.queryByText('10d10')).toBeNull();
   });
 
   it('prefills each DM edit field from its own source field (guards against a body/dmNotes field swap)', () => {

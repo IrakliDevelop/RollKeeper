@@ -111,6 +111,40 @@ function timestamp(deps: MarkerWriteDeps): string {
   return deps.now ? deps.now() : new Date().toISOString();
 }
 
+function boundedDc(value: number | undefined): number | undefined {
+  if (value === undefined || !Number.isFinite(value)) return undefined;
+  return Math.min(40, Math.max(0, Math.round(value)));
+}
+
+function sanitizeDiscovery(
+  discovery: NonNullable<MarkerDetail['discovery']>
+): NonNullable<MarkerDetail['discovery']> {
+  return {
+    dc: boundedDc(discovery.dc),
+    skill: discovery.skill === 'investigation' ? 'investigation' : 'perception',
+  };
+}
+
+function sanitizeTrap(
+  trap: NonNullable<MarkerDetail['trap']>
+): NonNullable<MarkerDetail['trap']> {
+  const allowedMethods = new Set([
+    'thieves-tools',
+    'sleight-of-hand',
+    'arcana',
+    'other',
+  ]);
+  return {
+    disarmDc: boundedDc(trap.disarmDc),
+    disarmMethod: allowedMethods.has(trap.disarmMethod)
+      ? trap.disarmMethod
+      : 'other',
+    trigger: capCodePoints(trap.trigger, MARKER_BODY_MAX_CODE_POINTS),
+    effect: capCodePoints(trap.effect, MARKER_BODY_MAX_CODE_POINTS),
+    damage: capCodePoints(trap.damage, MARKER_TITLE_MAX_CODE_POINTS),
+  };
+}
+
 /** Builds a detail record with every field capped at persist time (§6.2). */
 function buildDetail(input: {
   id: string;
@@ -277,7 +311,14 @@ export function deleteMarker(deps: MarkerWriteDeps, elementId: string): void {
 export function editMarkerDetail(
   deps: MarkerWriteDeps,
   ref: string,
-  patch: { title?: string; body?: string; dmNotes?: string }
+  patch: {
+    title?: string;
+    body?: string;
+    dmNotes?: string;
+    status?: MarkerDetail['status'];
+    discovery?: MarkerDetail['discovery'];
+    trap?: MarkerDetail['trap'];
+  }
 ): boolean {
   const markers = deps.getMarkers();
   let found = false;
@@ -298,6 +339,11 @@ export function editMarkerDetail(
         MARKER_DM_NOTES_MAX_CODE_POINTS
       );
     }
+    if (patch.status !== undefined) updated.status = patch.status;
+    if (patch.discovery !== undefined) {
+      updated.discovery = sanitizeDiscovery(patch.discovery);
+    }
+    if (patch.trap !== undefined) updated.trap = sanitizeTrap(patch.trap);
     return updated;
   });
 
