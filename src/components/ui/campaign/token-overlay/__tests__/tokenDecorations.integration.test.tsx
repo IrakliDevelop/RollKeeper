@@ -21,8 +21,11 @@ import type { TokenDecoration } from '@/components/ui/campaign/token-overlay';
 /**
  * jsdom has no canvas 2D context: stub `getContext` on any canvas the
  * Viewport creates so construction and its render loop don't throw. Copied
- * verbatim from `location-map/__tests__/selectionEvents.integration.test.tsx`
- * — stub the browser API, never an @fieldnotes module.
+ * from `location-map/__tests__/selectionEvents.integration.test.tsx` — stub
+ * the browser API, never an @fieldnotes module. Extended with a `canvas`
+ * back-reference plus `rotate`/`strokeRect`/`globalCompositeOperation` (see
+ * comment below) since this suite flushes real rAF frames and the source
+ * file's stub never needed to survive an actual paint tick.
  */
 function stubCanvas(): void {
   const origCreate = document.createElement.bind(document);
@@ -193,6 +196,11 @@ describe('token decorations against the real SDK pipeline', () => {
     // `REMOTE_ORIGIN === 'remote'`. Driving `viewport.store.update` with the
     // same call shape here IS that seam, confirmed by reading the SDK's own
     // application code rather than assumed.
+    // Note: `origin: 'remote'` matters for seam fidelity (it's what the sync
+    // client actually stamps, and it's what keeps this off the undo stack —
+    // see ElementChangeMeta.origin), not for the assertion below: the rect
+    // move is driven by the store mutation itself, which the tracker reacts
+    // to regardless of `meta.origin`.
     await act(async () => {
       viewport.store.update(
         token.id,
@@ -332,15 +340,33 @@ describe('token decorations against the real SDK pipeline', () => {
   it('renders nothing for a token whose decoration is absent', async () => {
     const viewport = mountViewport();
     const layerId = viewport.layerManager.activeLayerId;
-    addCombatantToken(viewport.store, { entityId: 'ent-1', layerId });
+    // ent-1 has no entry in `decorations` below (the case under test).
+    // ent-2 is a positive control on the SAME render: it DOES have an entry,
+    // proving the layer is actually mounted, tracking tokens, and capable of
+    // rendering a decoration — so ent-1's absence can't be a dead fixture
+    // (mode='off', empty rects, etc.) passing vacuously.
+    addCombatantToken(viewport.store, {
+      entityId: 'ent-1',
+      layerId,
+      position: { x: 100, y: 200 },
+    });
+    addCombatantToken(viewport.store, {
+      entityId: 'ent-2',
+      layerId,
+      position: { x: 300, y: 200 },
+    });
 
     render(
       <ViewportContext.Provider value={viewport}>
-        <TokenDecorationLayer decorations={new Map()} mode="full" />
+        <TokenDecorationLayer
+          decorations={decorationsFor('ent-2')}
+          mode="full"
+        />
       </ViewportContext.Provider>
     );
     await flushFrame();
 
+    expect(screen.getByTestId('token-decoration-ent-2')).toBeTruthy();
     expect(screen.queryByTestId('token-decoration-ent-1')).toBeNull();
   });
 
@@ -366,6 +392,12 @@ describe('token decorations against the real SDK pipeline', () => {
     await flushFrame();
     expect(screen.getByTestId('token-decoration-ent-1')).toBeTruthy();
 
+    // Spy AFTER mount so setup mutations (the token add, the layer create)
+    // don't count — the claim is that hiding a layer never touches the
+    // element store, only layer visibility.
+    const updateSpy = vi.spyOn(viewport.store, 'update');
+    const addSpy = vi.spyOn(viewport.store, 'add');
+
     await act(async () => {
       expect(viewport.layerManager.setLayerVisible(tokenLayer.id, false)).toBe(
         true
@@ -374,6 +406,8 @@ describe('token decorations against the real SDK pipeline', () => {
     });
 
     expect(screen.queryByTestId('token-decoration-ent-1')).toBeNull();
+    expect(updateSpy).not.toHaveBeenCalled();
+    expect(addSpy).not.toHaveBeenCalled();
   });
 
   it('does not re-run setMatch when the camera pans (real layer component)', async () => {
