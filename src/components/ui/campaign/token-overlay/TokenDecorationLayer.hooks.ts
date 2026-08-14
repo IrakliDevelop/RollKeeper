@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { useCamera, useElementRects } from '@fieldnotes/react';
+import { useElementRects, useViewport } from '@fieldnotes/react';
 
 import { COMBATANT_TOKEN_KIND } from '@/components/ui/campaign/dm-vtt/combatantToken';
 import { PLAYER_TOKEN_KIND } from '@/components/ui/campaign/location-map/PlayerTokenTool';
@@ -79,26 +79,6 @@ export function useDecoratedTokenRects(
   return useElementRects(match);
 }
 
-function hitTestRects(
-  rects: DecoratedTokenRect[],
-  worldX: number,
-  worldY: number
-): string | null {
-  // Later elements render on top, so the LAST match wins.
-  let hitId: string | null = null;
-  for (const rect of rects) {
-    if (
-      worldX >= rect.x &&
-      worldX <= rect.x + rect.w &&
-      worldY >= rect.y &&
-      worldY <= rect.y + rect.h
-    ) {
-      hitId = rect.id;
-    }
-  }
-  return hitId;
-}
-
 export interface UseCompactRevealResult {
   containerRef: RefObject<HTMLDivElement | null>;
   activeId: string | null;
@@ -115,19 +95,19 @@ export interface UseCompactRevealResult {
  */
 export function useCompactReveal(
   mode: TokenInfoMode,
-  rects: DecoratedTokenRect[]
+  isLayerVisible: LayerVisibility
 ): UseCompactRevealResult {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [revealedId, setRevealedId] = useState<string | null>(null);
-  const camera = useCamera();
+  const viewport = useViewport();
 
   // Kept fresh via refs so the pointer listeners (added once per mode change)
-  // always read current rects/camera without needing to re-subscribe.
-  const rectsRef = useRef(rects);
-  rectsRef.current = rects;
-  const cameraRef = useRef(camera);
-  cameraRef.current = camera;
+  // always read the current viewport/match without needing to re-subscribe.
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
+  const matchRef = useRef(isDecoratedToken(isLayerVisible));
+  matchRef.current = isDecoratedToken(isLayerVisible);
 
   useEffect(() => {
     if (mode !== 'compact') {
@@ -136,15 +116,20 @@ export function useCompactReveal(
       return;
     }
 
-    function toWorldPoint(clientX: number, clientY: number) {
+    function resolveId(clientX: number, clientY: number): string | null {
       const containerRect = containerRef.current?.getBoundingClientRect();
-      const screenX = clientX - (containerRect?.left ?? 0);
-      const screenY = clientY - (containerRect?.top ?? 0);
-      const cam = cameraRef.current;
-      return {
-        x: (screenX - cam.x) / cam.zoom,
-        y: (screenY - cam.y) / cam.zoom,
-      };
+      const world = viewportRef.current.camera.screenToWorld({
+        x: clientX - (containerRect?.left ?? 0),
+        y: clientY - (containerRect?.top ?? 0),
+      });
+      return (
+        viewportRef.current.getElementAt(world, {
+          // The player token layer is locked/mirrored; without this the
+          // selection-semantics default would find nothing there.
+          respectLayerLock: false,
+          match: matchRef.current,
+        })?.id ?? null
+      );
     }
 
     let frameId: number | null = null;
@@ -153,14 +138,12 @@ export function useCompactReveal(
       if (frameId !== null) return;
       frameId = requestAnimationFrame(() => {
         frameId = null;
-        const world = toWorldPoint(e.clientX, e.clientY);
-        setHoveredId(hitTestRects(rectsRef.current, world.x, world.y));
+        setHoveredId(resolveId(e.clientX, e.clientY));
       });
     }
 
     function handlePointerDown(e: PointerEvent) {
-      const world = toWorldPoint(e.clientX, e.clientY);
-      setRevealedId(hitTestRects(rectsRef.current, world.x, world.y));
+      setRevealedId(resolveId(e.clientX, e.clientY));
     }
 
     window.addEventListener('pointermove', handlePointerMove);
