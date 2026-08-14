@@ -9,12 +9,64 @@ import type { TokenDecoration } from '@/components/ui/campaign/token-overlay';
 
 let mockElements: CanvasElement[] = [];
 let mockCamera = { x: 0, y: 0, zoom: 1 };
+const mockLayers = [
+  { id: 'l1', name: 'Layer 1', visible: true, locked: false },
+];
 
 vi.mock('@fieldnotes/react', () => ({
   useCamera: () => mockCamera,
-  useViewport: () => ({ toolContext: { gridSize: 40, gridType: 'square' } }),
+  useViewport: () => ({
+    toolContext: { gridSize: 40, gridType: 'square' },
+    camera: {
+      // MUST apply the camera transform. The existing test "accounts for camera
+      // pan/zoom when hit-testing pointerdown" (TokenDecorationLayer.test.tsx:503)
+      // sets mockCamera {x:50, y:0, zoom:2} and fires screen (290, 440),
+      // expecting world (120, 220) inside the token at (100,200)+40x40. An
+      // identity stub puts that point outside and fails the test — while
+      // silently passing every other case, which is the worst outcome.
+      screenToWorld: ({ x, y }: { x: number; y: number }) => ({
+        x: (x - mockCamera.x) / mockCamera.zoom,
+        y: (y - mockCamera.y) / mockCamera.zoom,
+      }),
+    },
+    // Mirrors the real contract: topmost-first, and `match` participates in the
+    // walk rather than filtering the winner.
+    getElementAt: (
+      world: { x: number; y: number },
+      options?: { match?: (el: CanvasElement) => boolean }
+    ) =>
+      [...mockElements].reverse().find(el => {
+        const size = (el as { size?: { w: number; h: number } }).size;
+        if (!size) return false;
+        if (options?.match && !options.match(el)) return false;
+        return (
+          world.x >= el.position.x &&
+          world.x <= el.position.x + size.w &&
+          world.y >= el.position.y &&
+          world.y <= el.position.y + size.h
+        );
+      }) ?? null,
+  }),
   useElements: (selector: (els: CanvasElement[]) => unknown) =>
     selector(mockElements),
+  useLayers: () => ({ layers: mockLayers }),
+  useElementRects: (match: (el: CanvasElement) => string | null) =>
+    mockElements
+      .map(el => {
+        const key = match(el);
+        const size = (el as { size?: { w: number; h: number } }).size;
+        if (key === null || !size) return null;
+        return {
+          id: el.id,
+          key,
+          x: el.position.x,
+          y: el.position.y,
+          w: size.w,
+          h: size.h,
+          rotation: el.rotation ?? 0,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null),
 }));
 
 function tokenEl(overrides: Record<string, unknown> = {}): CanvasElement {

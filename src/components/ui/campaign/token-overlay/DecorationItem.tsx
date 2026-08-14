@@ -1,5 +1,7 @@
 'use client';
 
+import { memo } from 'react';
+
 import { getHpTierBarColor } from '@/utils/hpColor';
 
 import { ChipRow } from './ChipRow';
@@ -71,7 +73,7 @@ function InTokenBar({
  * compact modes. Dead entities keep skull precedence: no strip, no ring, no
  * piece glyph, no reaction badge.
  */
-export function DecorationItem({
+export const DecorationItem = memo(function DecorationItem({
   rect,
   deco,
   mode,
@@ -86,7 +88,10 @@ export function DecorationItem({
   const conditions = deco.isDead ? undefined : deco.conditions;
   const hasConditions = conditions !== undefined && conditions.length > 0;
   return (
-    <div style={{ opacity: deco.isDead ? 0.75 : 1 }}>
+    <div
+      data-testid={`token-decoration-${rect.key}`}
+      style={{ opacity: deco.isDead ? 0.75 : 1 }}
+    >
       {!deco.isDead && deco.isConcentrating && (
         <ConcentrationRing rect={rect} />
       )}
@@ -119,4 +124,4 @@ export function DecorationItem({
       )}
     </div>
   );
-}
+});
