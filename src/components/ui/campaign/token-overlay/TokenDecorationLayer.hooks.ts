@@ -1,26 +1,20 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { useCamera, useElements } from '@fieldnotes/react';
+import { useCamera, useElementRects } from '@fieldnotes/react';
 
 import { COMBATANT_TOKEN_KIND } from '@/components/ui/campaign/dm-vtt/combatantToken';
 import { PLAYER_TOKEN_KIND } from '@/components/ui/campaign/location-map/PlayerTokenTool';
 
-import type { CanvasElement } from '@fieldnotes/core';
+import type { CanvasElement, ElementRect } from '@fieldnotes/core';
 import type { RefObject } from 'react';
 import type { TokenInfoMode } from './TokenDecorationLayer.types';
 
-/** World-space rect of a decorated token plus its decoration lookup key. */
-export interface DecoratedTokenRect {
-  id: string;
-  /** entityId (combatant tokens) or characterId (player self-tokens). */
-  key: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
+/** Retained for the sibling decoration components; ElementRect is a superset. */
+export type DecoratedTokenRect = ElementRect;
+
+export type LayerVisibility = (layerId: string) => boolean;
 
 /** The decoration-map key a store element resolves to, if it is a token. */
 export function decorationKey(el: CanvasElement): string | null {
@@ -44,55 +38,45 @@ export function decorationKey(el: CanvasElement): string | null {
   return null;
 }
 
-function selectRects(elements: CanvasElement[]): DecoratedTokenRect[] {
-  const rects: DecoratedTokenRect[] = [];
-  for (const el of elements) {
+/**
+ * SDK matcher: an opaque key for tracked tokens, `null` otherwise. Layer
+ * visibility is part of the match so rendering and hit-testing share ONE
+ * policy — hiding the token layer hides its decorations too.
+ */
+export function decoratedTokenKey(isLayerVisible: LayerVisibility) {
+  return (el: CanvasElement): string | null => {
+    if (!isLayerVisible(el.layerId)) return null;
     const key = decorationKey(el);
-    if (!key) continue;
-    // Tokens are image/shape elements — both carry size; skip anything without.
-    const size = (el as { size?: { w: number; h: number } }).size;
-    if (!size) continue;
-    rects.push({
-      id: el.id,
-      key,
-      x: el.position.x,
-      y: el.position.y,
-      w: size.w,
-      h: size.h,
-    });
-  }
-  return rects;
+    // Preserve the old `if (!key) continue` behavior: an empty identity is not
+    // a usable decoration-map key.
+    return key === '' ? null : key;
+  };
 }
 
-// useElements' default isEqual is one-level shallow: the selector returns
-// fresh objects each run, so a custom per-field comparator is required or
-// the layer re-renders on EVERY store mutation.
-function rectsEqual(a: DecoratedTokenRect[], b: DecoratedTokenRect[]): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    const p = a[i];
-    const q = b[i];
-    if (
-      p.id !== q.id ||
-      p.key !== q.key ||
-      p.x !== q.x ||
-      p.y !== q.y ||
-      p.w !== q.w ||
-      p.h !== q.h
-    ) {
-      return false;
-    }
-  }
-  return true;
+/** Boolean projection of the same rule, for `getElementAt`'s filter. */
+export function isDecoratedToken(isLayerVisible: LayerVisibility) {
+  const key = decoratedTokenKey(isLayerVisible);
+  return (el: CanvasElement): boolean => key(el) !== null;
 }
 
 /**
- * Live rects of every decorated token. Re-renders on position/size changes
- * from BOTH local drags and remote sync (unlike useCombatantTokens, which
- * deliberately skips update events — do not reuse it here).
+ * Live world rects of every decorated token, keyed by entityId/characterId.
+ * Re-renders on position/size/key changes from local drags AND remote sync,
+ * and never on camera motion.
  */
-export function useDecoratedTokenRects(): DecoratedTokenRect[] {
-  return useElements(selectRects, rectsEqual);
+export function useDecoratedTokenRects(
+  isLayerVisible: LayerVisibility
+): readonly ElementRect[] {
+  // MEMOIZED DELIBERATELY. TokenDecorationLayer calls useCamera(), so it
+  // re-renders on every camera event. A matcher built fresh each render would
+  // change identity every time, and useElementRects calls setMatch on identity
+  // change — turning every pan into an O(n) rescan and defeating the whole
+  // point of a camera-independent tracker.
+  const match = useMemo(
+    () => decoratedTokenKey(isLayerVisible),
+    [isLayerVisible]
+  );
+  return useElementRects(match);
 }
 
 function hitTestRects(
