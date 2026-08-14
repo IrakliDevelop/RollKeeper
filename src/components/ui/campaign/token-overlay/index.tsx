@@ -1,6 +1,8 @@
 'use client';
 
-import { useCamera, useViewport } from '@fieldnotes/react';
+import { useCallback } from 'react';
+
+import { useCamera, useLayers, useViewport } from '@fieldnotes/react';
 
 import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
 
@@ -42,8 +44,16 @@ export function TokenDecorationLayer({
 }: TokenDecorationLayerProps) {
   const camera = useCamera();
   const viewport = useViewport();
-  const rects = useDecoratedTokenRects();
-  const { containerRef, activeId } = useCompactReveal(mode ?? 'off', rects);
+  const { layers } = useLayers();
+  const isLayerVisible = useCallback(
+    (layerId: string) => layers.find(l => l.id === layerId)?.visible !== false,
+    [layers]
+  );
+  const rects = useDecoratedTokenRects(isLayerVisible);
+  const { containerRef, activeId } = useCompactReveal(
+    mode ?? 'off',
+    isLayerVisible
+  );
   if (mode === null || mode === 'off') return null;
   const cell = cellUnit(viewport.toolContext);
   return (
