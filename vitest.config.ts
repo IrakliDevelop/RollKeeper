@@ -23,6 +23,9 @@ export default defineConfig({
         test: {
           name: 'unit',
           environment: 'jsdom',
+          // Node 26's experimental global localStorage shadows jsdom's Storage
+          // implementation unless it is disabled for the test workers.
+          execArgv: ['--no-experimental-webstorage'],
           include: ['src/**/*.test.{ts,tsx}'],
           setupFiles: ['src/test/setup.ts'],
         },

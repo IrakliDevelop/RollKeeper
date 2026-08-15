@@ -38,14 +38,17 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
 
   useEffect(() => {
     // Animate in
-    setTimeout(() => setIsVisible(true), 50);
+    const visibilityTimer = setTimeout(() => setIsVisible(true), 50);
 
     // Auto dismiss
     const timer = setTimeout(() => {
       handleDismiss();
     }, toast.duration || 5000);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(visibilityTimer);
+      clearTimeout(timer);
+    };
   }, [toast.duration, handleDismiss]);
 
   const getToastStyles = () => {
