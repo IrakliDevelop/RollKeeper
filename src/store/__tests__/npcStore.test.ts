@@ -947,6 +947,15 @@ describe('npcStore — entry id enforcement', () => {
     useNPCStore.setState({ npcsByCampaign: {} });
   });
 
+  it('returns a migrated copy instead of mutating persisted NPC state', () => {
+    const persisted = { npcsByCampaign: { [CAMPAIGN]: [] } };
+
+    const out = migrateNpcPersistedState(persisted, 3);
+
+    expect(out).not.toBe(persisted);
+    expect(out.npcsByCampaign).not.toBe(persisted.npcsByCampaign);
+  });
+
   it('migration v4 backfills missing ids and is idempotent', () => {
     const legacy = {
       npcsByCampaign: {

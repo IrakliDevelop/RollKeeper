@@ -158,10 +158,12 @@ export function migrateNpcPersistedState(
   persisted: unknown,
   version: number
 ): NPCStoreState {
+  const migrationInput =
+    persisted == null ? persisted : structuredClone(persisted);
   let state: { npcsByCampaign: Record<string, CampaignNPC[]> };
 
   if (version < 2) {
-    const old = persisted as { npcs?: CampaignNPC[] } | null;
+    const old = migrationInput as { npcs?: CampaignNPC[] } | null;
     const legacyNpcs = old?.npcs ?? [];
     const npcsByCampaign: Record<string, CampaignNPC[]> = {};
 
@@ -176,7 +178,7 @@ export function migrateNpcPersistedState(
     state = { npcsByCampaign };
   } else {
     // Harden against a null persisted value (the old code blind-cast it)
-    state = (persisted ?? { npcsByCampaign: {} }) as {
+    state = (migrationInput ?? { npcsByCampaign: {} }) as {
       npcsByCampaign: Record<string, CampaignNPC[]>;
     };
   }

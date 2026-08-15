@@ -31,6 +31,12 @@ export interface PlayerCharacter {
   lastSyncedAt?: string;
 }
 
+export interface CharacterDeletionTombstone {
+  id: string;
+  deletedAt: number;
+  beforeImage: PlayerCharacter;
+}
+
 export interface PlayerSettings {
   enableDeathAnimation: boolean;
   enableLevelUpAnimation: boolean;
@@ -47,6 +53,7 @@ const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
 interface PlayerStoreState {
   // Core data
   characters: PlayerCharacter[];
+  characterTombstones: Record<string, CharacterDeletionTombstone>;
   activeCharacterId: string | null;
 
   // Player settings
@@ -160,7 +167,11 @@ const migrateOldCharacterData = (): PlayerCharacter | null => {
     // Handle different data structures
     let characterState: CharacterState;
 
-    if (parsedData.state) {
+    if (parsedData.state?.character) {
+      // Current Zustand character-store envelope.
+      characterState = parsedData.state.character as CharacterState;
+      console.log('Using Zustand character envelope format');
+    } else if (parsedData.state) {
       // Zustand persist format
       characterState = parsedData.state as CharacterState;
       console.log('Using Zustand persist format');
@@ -206,6 +217,7 @@ export const usePlayerStore = create<PlayerStoreState>()(
     (set, get) => ({
       // Initial state
       characters: [],
+      characterTombstones: {},
       activeCharacterId: null,
       settings: { ...DEFAULT_PLAYER_SETTINGS },
       lastSelectedCharacterId: null,
@@ -318,6 +330,16 @@ export const usePlayerStore = create<PlayerStoreState>()(
         }
         set(state => ({
           characters: state.characters.filter(c => c.id !== characterId),
+          characterTombstones: character
+            ? {
+                ...state.characterTombstones,
+                [characterId]: {
+                  id: characterId,
+                  deletedAt: Date.now(),
+                  beforeImage: structuredClone(character),
+                },
+              }
+            : state.characterTombstones,
           activeCharacterId:
             state.activeCharacterId === characterId
               ? null
@@ -399,14 +421,6 @@ export const usePlayerStore = create<PlayerStoreState>()(
           activeCharacterId: migratedCharacter.id,
           lastSelectedCharacterId: migratedCharacter.id,
         }));
-
-        // Clean up old storage after successful migration
-        try {
-          localStorage.removeItem(STORAGE_KEY);
-          console.log('Cleaned up old character storage');
-        } catch (error) {
-          console.warn('Failed to clean up old storage:', error);
-        }
 
         return true;
       },

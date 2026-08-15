@@ -2,6 +2,7 @@ import type { StateStorage } from 'zustand/middleware';
 
 import { characterWriterLock } from '@/lib/characterWriterLock';
 import { isStrictlyFresher } from '@/lib/characterFreshness';
+import { createSafeStorage } from '@/lib/safeStorage';
 import { CHARACTER_ENVELOPE_KEY_PREFIX, STORAGE_KEY } from '@/utils/constants';
 import type { CharacterState } from '@/types/character';
 
@@ -128,7 +129,10 @@ export function createPerCharacterStorage(): StateStorage {
       }
       if (!id || id !== armedCharacterId) return;
       if (!characterWriterLock.isLeader(id)) return;
-      window.localStorage.setItem(characterEnvelopeKey(id), value);
+      createSafeStorage(window.localStorage).setItem(
+        characterEnvelopeKey(id),
+        value
+      );
     },
     removeItem: () => {},
   };

@@ -112,6 +112,32 @@ describe('useCharacterRosterSync', () => {
     );
   });
 
+  it('does not cancel the hydration guard timer when callback identities change', () => {
+    const rosterData = makeCharacter({ id: 'char-1' });
+    const updateCharacterData = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      character: rosterData,
+      updateCharacterData,
+    });
+    const { rerender } = renderHook(p => useCharacterRosterSync(p), {
+      initialProps: props,
+    });
+
+    rerender({ ...props, loadCharacterState: vi.fn() });
+    act(() => vi.advanceTimersByTime(60));
+    rerender({
+      ...props,
+      loadCharacterState: vi.fn(),
+      character: {
+        ...rosterData,
+        hitPoints: { ...rosterData.hitPoints, current: 30 },
+      },
+    });
+
+    expect(updateCharacterData).toHaveBeenCalledTimes(1);
+  });
+
   it('skips redundant writes when the character has not actually changed', () => {
     const rosterData = makeCharacter({ id: 'char-1' });
     const updateCharacterData = vi.fn();

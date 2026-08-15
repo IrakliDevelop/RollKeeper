@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetRedis, getRedisStore } from '@/test/mocks/redis';
+import { resetRedis, getRedisStore, mockRedis } from '@/test/mocks/redis';
 import {
   createNextRequest,
   createRouteParams,
@@ -36,6 +36,17 @@ function storedCharacter() {
 describe('POST /api/campaign/[code]/sync — revision gating', () => {
   beforeEach(() => {
     resetRedis();
+    mockRedis.get.mockClear();
+    mockRedis.eval.mockClear();
+  });
+
+  it('performs the revision comparison and write in one Redis script', async () => {
+    await push({ ...createMockCharacterState(), revision: 1 });
+
+    expect(mockRedis.eval).toHaveBeenCalledTimes(1);
+    expect(mockRedis.get).not.toHaveBeenCalledWith(
+      'campaign:ABC123:player:player-1'
+    );
   });
 
   it('rejects a stale full-blob push with 409 and keeps the newer state', async () => {
@@ -69,7 +80,7 @@ describe('POST /api/campaign/[code]/sync — revision gating', () => {
     expect(storedCharacter().hitPoints.current).toBe(30);
   });
 
-  it('accepts an equal-revision re-push (idempotent retry)', async () => {
+  it('rejects an equal revision with a different payload', async () => {
     const base = createMockCharacterState();
     await push({ ...base, revision: 3 });
     const res = await push({
@@ -77,8 +88,17 @@ describe('POST /api/campaign/[code]/sync — revision gating', () => {
       revision: 3,
       hitPoints: { ...base.hitPoints, current: 20, max: 44 },
     });
+    expect(res.status).toBe(409);
+    expect(storedCharacter().hitPoints.current).toBe(base.hitPoints.current);
+  });
+
+  it('accepts an identical equal-revision retry', async () => {
+    const payload = { ...createMockCharacterState(), revision: 3 };
+    await push(payload);
+
+    const res = await push(payload);
+
     expect(res.status).toBe(200);
-    expect(storedCharacter().hitPoints.current).toBe(20);
   });
 
   it('accepts a payload with no revision when nothing is stored', async () => {

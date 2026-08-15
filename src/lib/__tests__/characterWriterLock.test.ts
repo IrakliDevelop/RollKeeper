@@ -10,6 +10,7 @@ interface HeldLock {
 
 /** Minimal fake of navigator.locks: exclusive queue per name. */
 function installFakeLocks() {
+  vi.stubGlobal('BroadcastChannel', vi.fn());
   const queues = new Map<
     string,
     Array<{
@@ -60,6 +61,17 @@ beforeEach(() => {
 });
 
 describe('CharacterWriterLock', () => {
+  it('falls back to local leadership when Web Locks exist without BroadcastChannel', () => {
+    const { request } = installFakeLocks();
+    vi.stubGlobal('BroadcastChannel', undefined);
+    const lock = new CharacterWriterLock();
+
+    lock.switchTo('a', { onPromoted: vi.fn() });
+
+    expect(lock.isLeader('a')).toBe(true);
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it('without navigator.locks every tab reports leader (fallback)', () => {
     vi.stubGlobal('navigator', {});
     const lock = new CharacterWriterLock();

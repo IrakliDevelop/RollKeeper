@@ -64,6 +64,7 @@ function syncNPCEntityToStore(
 
 interface EncounterStoreState {
   encounters: Encounter[];
+  encounterTombstones: Record<string, EncounterDeletionTombstone>;
   activeEncounterId: string | null;
 
   // Global combat settings (shared across encounters)
@@ -198,6 +199,12 @@ interface EncounterStoreState {
 
   // Queries
   getEncountersByCampaign: (campaignCode: string) => Encounter[];
+}
+
+export interface EncounterDeletionTombstone {
+  id: string;
+  deletedAt: string;
+  beforeImage: Encounter;
 }
 
 // Helper to update an entity within an encounter
@@ -337,16 +344,20 @@ function resolveLinkedNpc(
 interface PersistedEncounterState {
   encounters: Encounter[];
   activeEncounterId: string | null;
+  encounterTombstones?: Record<string, EncounterDeletionTombstone>;
 }
 
 export function migrateEncounterPersistedState(
   persisted: unknown,
   version: number
 ): PersistedEncounterState {
-  const state = (persisted ?? {
-    encounters: [],
-    activeEncounterId: null,
-  }) as PersistedEncounterState;
+  const state = structuredClone(
+    persisted ?? {
+      encounters: [],
+      activeEncounterId: null,
+    }
+  ) as PersistedEncounterState;
+  state.encounterTombstones ??= {};
 
   if (version < 2) {
     for (const enc of state.encounters ?? []) {
@@ -388,6 +399,7 @@ export const useEncounterStore = create<EncounterStoreState>()(
   persist(
     (set, get) => ({
       encounters: [],
+      encounterTombstones: {},
       activeEncounterId: null,
       combatConfig: DEFAULT_COMBAT_CONFIG,
 
@@ -419,11 +431,24 @@ export const useEncounterStore = create<EncounterStoreState>()(
       },
 
       deleteEncounter: id => {
-        set(state => ({
-          encounters: state.encounters.filter(e => e.id !== id),
-          activeEncounterId:
-            state.activeEncounterId === id ? null : state.activeEncounterId,
-        }));
+        set(state => {
+          const encounter = state.encounters.find(e => e.id === id);
+          return {
+            encounters: state.encounters.filter(e => e.id !== id),
+            encounterTombstones: encounter
+              ? {
+                  ...state.encounterTombstones,
+                  [id]: {
+                    id,
+                    deletedAt: new Date().toISOString(),
+                    beforeImage: structuredClone(encounter),
+                  },
+                }
+              : state.encounterTombstones,
+            activeEncounterId:
+              state.activeEncounterId === id ? null : state.activeEncounterId,
+          };
+        });
       },
 
       updateEncounter: (id, updates) => {

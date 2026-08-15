@@ -87,6 +87,25 @@ describe('characterStore — persistence actions', () => {
     });
   });
 
+  describe('loadCharacterState migration', () => {
+    it('does not mutate the caller-owned persisted character', () => {
+      const persisted = Object.freeze(
+        makeCharacter({
+          id: 'immutable-legacy',
+          stackableInspiration: undefined,
+        })
+      );
+
+      expect(() =>
+        useCharacterStore.getState().loadCharacterState(persisted)
+      ).not.toThrow();
+      expect(persisted.stackableInspiration).toBeUndefined();
+      expect(useCharacterStore.getState().character.stackableInspiration).toBe(
+        false
+      );
+    });
+  });
+
   describe('resetCharacter', () => {
     it('generates a new unique ID', () => {
       const oldId = useCharacterStore.getState().character.id;

@@ -9,6 +9,7 @@ import type { NpcResource, MonsterStatBlock } from '@/types/encounter';
 function resetStore() {
   useEncounterStore.setState({
     encounters: [],
+    encounterTombstones: {},
     activeEncounterId: null,
   });
 }
@@ -48,6 +49,12 @@ describe('encounterStore', () => {
       const id = useEncounterStore.getState().createEncounter('Temp');
       useEncounterStore.getState().deleteEncounter(id);
       expect(useEncounterStore.getState().encounters).toHaveLength(0);
+      expect(useEncounterStore.getState().encounterTombstones[id]).toEqual(
+        expect.objectContaining({
+          id,
+          beforeImage: expect.objectContaining({ id, name: 'Temp' }),
+        })
+      );
     });
 
     it('clears activeEncounterId if deleted', () => {
@@ -2251,6 +2258,21 @@ describe('encounterStore', () => {
   });
 
   describe('encounterStore — persisted legacy migration (v1→v2)', () => {
+    it('returns a migrated copy instead of mutating the persisted state', async () => {
+      const { migrateEncounterPersistedState } = await import(
+        '@/store/encounterStore'
+      );
+      const persisted = {
+        activeEncounterId: null,
+        encounters: [{ entities: [] }],
+      };
+
+      const out = migrateEncounterPersistedState(persisted, 1);
+
+      expect(out).not.toBe(persisted);
+      expect(out.encounters[0]).not.toBe(persisted.encounters[0]);
+    });
+
     it('re-keys legacy abilities to entry ids, preserves unambiguous usedUses, stamps entity source', async () => {
       const { migrateEncounterPersistedState } = await import(
         '@/store/encounterStore'

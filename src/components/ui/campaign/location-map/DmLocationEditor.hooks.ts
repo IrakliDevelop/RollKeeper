@@ -624,8 +624,6 @@ export function useDmLocationEditor(
           const migrated = migrateCanvasToContract(vp, 'dm');
           pinGridToMapLayer(vp);
           _fitCameraToMap(vp, location.mapImageSize);
-          // Clear stale localStorage data after successful load
-          await autoSave.clear();
           if (migrated) {
             onSave(vp.exportJSON());
             setHasUnsyncedChanges(true);

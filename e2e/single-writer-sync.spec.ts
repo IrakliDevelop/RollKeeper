@@ -286,3 +286,37 @@ test('7: different characters in different tabs stay isolated', async ({
   await waitForCharacterLoaded(tab2, idB);
   expect((await storeHp(tab2)).current).toBe(hpB.max - 5);
 });
+
+test('Slice 1: interleaved character switches across tabs preserve both characters', async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  const tab1 = await context.newPage();
+  const urlA = await createCharacter(tab1, 'InterleaveA');
+  const idA = characterIdFromUrl(urlA);
+  const urlB = await createCharacter(tab1, 'InterleaveB');
+  const idB = characterIdFromUrl(urlB);
+
+  const tab2 = await openSecondTab(context, urlA, idA);
+  const hpA = await storeHp(tab2);
+  const hpB = await storeHp(tab1);
+
+  await Promise.all([damageCharacter(tab2, 3), damageCharacter(tab1, 4)]);
+
+  await Promise.all([
+    tab1.goto(urlA, { waitUntil: 'networkidle' }),
+    tab2.goto(urlB, { waitUntil: 'networkidle' }),
+  ]);
+  await Promise.all([
+    waitForCharacterLoaded(tab1, idA),
+    waitForCharacterLoaded(tab2, idB),
+  ]);
+  await Promise.all([damageCharacter(tab1, 2), damageCharacter(tab2, 1)]);
+
+  await expect
+    .poll(() => envelopeHp(tab1, idA), { timeout: 10_000 })
+    .toBe(hpA.max - 5);
+  await expect
+    .poll(() => envelopeHp(tab2, idB), { timeout: 10_000 })
+    .toBe(hpB.max - 5);
+});
