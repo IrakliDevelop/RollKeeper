@@ -370,7 +370,7 @@ describe('token decorations against the real SDK pipeline', () => {
     expect(screen.queryByTestId('token-decoration-ent-1')).toBeNull();
   });
 
-  it('drops decorations when the token layer is hidden, with no store mutation', async () => {
+  it('drops decorations when the token layer is hidden, with no store mutation, and hover reveals nothing', async () => {
     const viewport = mountViewport();
     // Fixture note: the token sits on a NEW, non-active layer. LayerManager
     // refuses to hide the active layer when no fallback exists
@@ -381,20 +381,44 @@ describe('token decorations against the real SDK pipeline', () => {
     addCombatantToken(viewport.store, {
       entityId: 'ent-1',
       layerId: tokenLayer.id,
+      position: { x: 100, y: 200 },
     });
 
+    // mode="compact" (not "full"): the chip row only appears on hover/reveal
+    // in compact mode, which is what makes the positive control below able
+    // to discriminate "no chip row" from "chip row always renders anyway".
     const stableDecorations = decorationsFor('ent-1');
     render(
       <ViewportContext.Provider value={viewport}>
-        <TokenDecorationLayer decorations={stableDecorations} mode="full" />
+        <TokenDecorationLayer decorations={stableDecorations} mode="compact" />
       </ViewportContext.Provider>
     );
     await flushFrame();
     expect(screen.getByTestId('token-decoration-ent-1')).toBeTruthy();
+    expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
 
-    // Spy AFTER mount so setup mutations (the token add, the layer create)
-    // don't count — the claim is that hiding a layer never touches the
-    // element store, only layer visibility.
+    // POSITIVE CONTROL: prove the hover-reveal path is actually live before
+    // hiding anything — dispatch a pointerdown at the token's screen
+    // position (camera is identity here, so screen === world; the container
+    // rect in jsdom is all-zero, so there's no offset to account for). Same
+    // event idiom as TokenDecorationLayer.hooks.test.tsx's `useCompactReveal`
+    // pointerdown case. Token is at (100,200)+40x40, so (120,220) is inside.
+    await act(async () => {
+      window.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          clientX: 120,
+          clientY: 220,
+          bubbles: true,
+        })
+      );
+      await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
+    });
+    expect(screen.getByText('Ogre')).toBeInTheDocument();
+
+    // Spy AFTER mount AND after the positive-control pointerdown, so setup
+    // mutations (the token add, the layer create) and the reveal click
+    // itself don't count — the claim is that hiding a layer never touches
+    // the element store, only layer visibility.
     const updateSpy = vi.spyOn(viewport.store, 'update');
     const addSpy = vi.spyOn(viewport.store, 'add');
 
@@ -406,8 +430,28 @@ describe('token decorations against the real SDK pipeline', () => {
     });
 
     expect(screen.queryByTestId('token-decoration-ent-1')).toBeNull();
+    expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
     expect(updateSpy).not.toHaveBeenCalled();
     expect(addSpy).not.toHaveBeenCalled();
+
+    // Hover half: dispatch the identical pointerdown again now that the
+    // layer is hidden, and flush the hook's rAF-throttled hit-test path.
+    // No chip row must appear — spec §10 requires hover-reveals-nothing be
+    // asserted here, not just render-drops. (The reveal state from the
+    // positive control above was also already cleared by the hide, since
+    // the wrapper unmounted along with the rect.)
+    await act(async () => {
+      window.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          clientX: 120,
+          clientY: 220,
+          bubbles: true,
+        })
+      );
+      await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
+    });
+    expect(screen.queryByTestId('token-decoration-ent-1')).toBeNull();
+    expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
   });
 
   it('does not re-run setMatch when the camera pans (real layer component)', async () => {

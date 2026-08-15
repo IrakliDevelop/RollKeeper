@@ -138,9 +138,11 @@ function createTestViewportWithLockedTokenLayer(): Viewport {
   document.body.appendChild(container);
   const vp = new Viewport(container);
 
-  // LayerManager refuses to lock the active layer when no fallback layer
-  // exists, so the token lives on a second, non-active layer that CAN be
-  // locked (mirrors packages/core's viewport-hit-test.test.ts fixture).
+  // The newly created layer is never the active layer, so
+  // `setLayerLocked` takes the trivial (non-active) branch here rather
+  // than LayerManager's active-layer refusal path; the `.toBe(true)`
+  // assertions below guard against a silent no-op either way (mirrors
+  // packages/core's viewport-hit-test.test.ts fixture).
   const layerId = vp.layerManager.createLayer('tokens').id;
   expect(vp.layerManager.setLayerLocked(layerId, true)).toBe(true);
   expect(vp.layerManager.isLayerLocked(layerId)).toBe(true);

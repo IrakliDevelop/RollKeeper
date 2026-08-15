@@ -31,6 +31,9 @@ vi.mock('@fieldnotes/react', () => ({
     },
     // Mirrors the real contract: topmost-first, and `match` participates in the
     // walk rather than filtering the winner.
+    // Contract fidelity for respectLayerLock/visibility is owned by the
+    // zero-mock suites: TokenDecorationLayer.hooks.test.tsx (locked layer)
+    // and tokenDecorations.integration.test.tsx (visibility).
     getElementAt: (
       world: { x: number; y: number },
       options?: { match?: (el: CanvasElement) => boolean }
@@ -47,8 +50,6 @@ vi.mock('@fieldnotes/react', () => ({
         );
       }) ?? null,
   }),
-  useElements: (selector: (els: CanvasElement[]) => unknown) =>
-    selector(mockElements),
   useLayers: () => ({ layers: mockLayers }),
   useElementRects: (match: (el: CanvasElement) => string | null) =>
     mockElements
