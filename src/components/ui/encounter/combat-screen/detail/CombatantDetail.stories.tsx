@@ -286,10 +286,20 @@ export const EditStatBlockActions: Story = {
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
-      canvas.getByRole('button', { name: /edit actions & traits/i })
+      canvas.getByRole('button', { name: /edit stat block/i })
     );
-    const nameInputs = canvas.getAllByLabelText(/entry name/i);
+    const body = within(canvasElement.ownerDocument.body);
+    const dialog = within(
+      await body.findByRole('dialog', { name: /edit ancient red dragon/i })
+    );
+    await userEvent.click(
+      dialog.getByRole('button', { name: /actions & traits/i })
+    );
+    const nameInputs = dialog.getAllByLabelText(/entry name/i);
     await userEvent.type(nameInputs[0], '!');
+    await userEvent.click(
+      dialog.getByRole('button', { name: /save stat block/i })
+    );
     await expect(args.actions.onUpdate).toHaveBeenCalled();
     const [entityId, updates] = (args.actions.onUpdate as ReturnType<typeof fn>)
       .mock.lastCall!;
