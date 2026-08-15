@@ -2,12 +2,16 @@ name: CI
 
 on:
   push:
-    branches: [master, 'feat/**']
+    branches: [master, 'feat/**', 'slice-*', 'slice-*/**']
   pull_request:
     branches: [master]
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  quality:
+    name: Quality and unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,16 +23,91 @@ jobs:
 
       - run: npm ci
 
+      - name: Format ratchet
+        run: npm run format:ci
+
+      - name: Lint warning ratchet
+        run: npm run lint:ci
+
       - name: Type check
         run: npm run type-check
 
-      - name: Lint
-        run: npm run lint
+      - name: CI tooling tests
+        run: npm run test:ci-tools
 
       - name: Unit tests
         run: npm run test
 
-  e2e:
+  production-build:
+    name: Production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+  storybook:
+    name: Storybook interaction and accessibility tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - run: npm run test:visual
+
+  relay:
+    name: Relay type-check, test, and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: relay/package-lock.json
+
+      - run: npm ci --prefix relay
+
+      - run: npm run type-check --prefix relay
+
+      - run: npm test --prefix relay
+
+      - run: npm run build --prefix relay
+
+  local-supabase:
+    name: Local Supabase database suite (Slice 3 placeholder)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Confirm database harness is not silently skipped
+        shell: bash
+        run: |
+          if [[ -f supabase/config.toml ]]; then
+            echo "::error::Supabase harness detected; replace this placeholder with migration, lint, pgTAP, and integration steps."
+            exit 1
+          fi
+          echo "Deferred by roadmap until Slice 3; no remote database is contacted."
+
+  integration:
+    name: Chromium integration tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,12 +126,15 @@ jobs:
       # refuses to reuse a stale one on CI (reuseExistingServer: !CI).
       # The e2e specs are relay/Redis-free — no service env needed.
       - name: E2E tests
-        run: npx playwright test
+        run: npm run test:e2e
 
-      - name: Upload Playwright report
+      - name: Upload Playwright failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
+          name: playwright-failure-artifacts
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
