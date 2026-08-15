@@ -106,8 +106,12 @@ export function useCompactReveal(
   // always read the current viewport/match without needing to re-subscribe.
   const viewportRef = useRef(viewport);
   viewportRef.current = viewport;
-  const matchRef = useRef(isDecoratedToken(isLayerVisible));
-  matchRef.current = isDecoratedToken(isLayerVisible);
+  const match = useMemo(
+    () => isDecoratedToken(isLayerVisible),
+    [isLayerVisible]
+  );
+  const matchRef = useRef(match);
+  matchRef.current = match;
 
   useEffect(() => {
     if (mode !== 'compact') {
