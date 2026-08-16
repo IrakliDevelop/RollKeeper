@@ -7,6 +7,7 @@ const child = spawn('npm', ['run', 'dev'], {
   env: {
     ...process.env,
     NEXT_PUBLIC_SUPABASE_AUTH_ENABLED: 'true',
+    NEXT_PUBLIC_SUPABASE_CHARACTER_BACKUP_ENABLED: 'true',
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.publishableKey,
     NEXT_PUBLIC_SUPABASE_URL: config.apiUrl,
   },
