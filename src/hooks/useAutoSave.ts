@@ -1,6 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useCharacterStore } from '@/store/characterStore';
 import { AUTOSAVE_DELAY } from '@/utils/constants';
+import { isBrowserCharacterCutoverParticipant } from '@/lib/indexeddb/characterCutoverSelection';
+import { awaitCharacterPersistence } from '@/lib/indexeddb/characterPersistenceRuntime';
 
 interface UseAutoSaveOptions {
   delay?: number;
@@ -38,6 +40,19 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
     saveTimeoutRef.current = setTimeout(() => {
       try {
         saveCharacter();
+        if (isBrowserCharacterCutoverParticipant()) {
+          void awaitCharacterPersistence().then(saved => {
+            if (saved) {
+              setSaveStatus('saved');
+              markSaved();
+              onAfterSaveRef.current?.();
+            } else {
+              useCharacterStore.setState({ hasUnsavedChanges: true });
+              setSaveStatus('error');
+            }
+          });
+          return;
+        }
         setSaveStatus('saved');
         markSaved();
         onAfterSaveRef.current?.();
@@ -68,6 +83,19 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
 
     try {
       saveCharacter();
+      if (isBrowserCharacterCutoverParticipant()) {
+        void awaitCharacterPersistence().then(saved => {
+          if (saved) {
+            setSaveStatus('saved');
+            markSaved();
+            onAfterSaveRef.current?.();
+          } else {
+            useCharacterStore.setState({ hasUnsavedChanges: true });
+            setSaveStatus('error');
+          }
+        });
+        return;
+      }
       setSaveStatus('saved');
       markSaved();
       onAfterSaveRef.current?.();
@@ -155,7 +183,17 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
 
         try {
           saveCharacter();
-          markSaved();
+          if (isBrowserCharacterCutoverParticipant()) {
+            void awaitCharacterPersistence().then(saved => {
+              if (saved) markSaved();
+              else {
+                useCharacterStore.setState({ hasUnsavedChanges: true });
+                useCharacterStore.getState().setSaveStatus('error');
+              }
+            });
+          } else {
+            markSaved();
+          }
         } catch (error) {
           console.error('Failed to save on visibility change:', error);
         }

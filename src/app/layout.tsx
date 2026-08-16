@@ -74,6 +74,22 @@ const themeScript = `
 })();
 `;
 
+const characterPersistenceScript =
+  process.env.NEXT_PUBLIC_CHARACTER_INDEXEDDB_CUTOVER_ENABLED === 'true'
+    ? `
+(function() {
+  try {
+    var raw = localStorage.getItem('rollkeeper:indexeddb-selection:guest:character');
+    var selection = raw ? JSON.parse(raw) : null;
+    if (selection && typeof selection.activatedEpoch === 'number' && typeof selection.activatedGeneration === 'string') {
+      document.documentElement.setAttribute('data-character-persistence-pending', 'true');
+      document.documentElement.style.visibility = 'hidden';
+    }
+  } catch (e) {}
+})();
+`
+    : '';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -83,6 +99,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script
+          dangerouslySetInnerHTML={{ __html: characterPersistenceScript }}
+        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${cinzelDecorative.variable} ${bricolage.variable} ${hanken.variable} antialiased`}

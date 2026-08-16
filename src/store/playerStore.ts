@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { createSafeStorage } from '@/lib/safeStorage';
+import { isBrowserCharacterCutoverParticipant } from '@/lib/indexeddb/characterCutoverSelection';
+import { createCharacterFamilyStateStorage } from '@/lib/indexeddb/characterPersistenceRuntime';
 import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
 import { initCrossTabRosterSync } from '@/lib/crossTabRosterSync';
 import { CharacterState, CharacterExport } from '@/types/character';
@@ -505,8 +506,16 @@ export const usePlayerStore = create<PlayerStoreState>()(
     }),
     {
       name: PLAYER_STORAGE_KEY,
-      skipHydration: isIndexedDbMigrationEnabled(),
-      storage: createJSONStorage(() => createSafeStorage()),
+      skipHydration: isBrowserCharacterCutoverParticipant(),
+      storage: createJSONStorage(() =>
+        typeof localStorage !== 'undefined' &&
+        isBrowserCharacterCutoverParticipant()
+          ? createCharacterFamilyStateStorage({
+              backing: localStorage,
+              participant: true,
+            })
+          : createSafeStorage()
+      ),
       version: 1,
       merge: (persistedState, currentState) => ({
         ...currentState,

@@ -3,7 +3,7 @@ import {
   requestResult,
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
-import { IndexedDbShadowJournalRepository } from '@/lib/indexeddb/shadowJournal';
+import type { StorageNamespace } from '@/lib/indexeddb/shadowJournal';
 
 interface MigrationStateRecord {
   state?: string;
@@ -12,29 +12,35 @@ interface MigrationStateRecord {
 
 export async function recordAuthoritativeShadowWrite(
   key: string,
-  rawValue: string
+  rawValue: string,
+  scope: { namespace: StorageNamespace; family?: string } = {
+    namespace: 'guest',
+  }
 ): Promise<void> {
   if (typeof indexedDB === 'undefined') return;
   let database: IDBDatabase | undefined;
   try {
     database = await openRollkeeperDatabase();
-    const stateTransaction = database.transaction('meta', 'readonly');
+    const stateKey = `migration-state:${scope.namespace}${scope.family ? `:${scope.family}` : ''}`;
+    const stateTransaction = database.transaction(
+      ['meta', 'journal'],
+      'readwrite'
+    );
     const state = (await requestResult(
-      stateTransaction.objectStore('meta').get('migration-state:guest')
+      stateTransaction.objectStore('meta').get(stateKey)
     )) as MigrationStateRecord | undefined;
-    await transactionComplete(stateTransaction);
     if (
       !state?.runId ||
       (state.state !== 'SHADOWING' && state.state !== 'CUTOVER_READY')
     ) {
+      await transactionComplete(stateTransaction);
       return;
     }
 
     const journalId = crypto.randomUUID();
-    const repository = new IndexedDbShadowJournalRepository(database);
     const entry = {
       journalId,
-      namespace: 'guest' as const,
+      namespace: scope.namespace,
       generation: state.runId,
       key,
       rawValue,
@@ -43,19 +49,33 @@ export async function recordAuthoritativeShadowWrite(
       attempts: 1,
       updatedAt: new Date().toISOString(),
     };
-    await repository.put(entry);
+    stateTransaction.objectStore('journal').put(entry);
+    await transactionComplete(stateTransaction);
     try {
-      const transaction = database.transaction('kvGenerations', 'readwrite');
+      const transaction = database.transaction(
+        ['meta', 'kvGenerations', 'journal'],
+        'readwrite'
+      );
+      const current = (await requestResult(
+        transaction.objectStore('meta').get(stateKey)
+      )) as MigrationStateRecord | undefined;
+      if (
+        current?.runId !== state.runId ||
+        (current.state !== 'SHADOWING' && current.state !== 'CUTOVER_READY')
+      ) {
+        await transactionComplete(transaction);
+        return;
+      }
       transaction.objectStore('kvGenerations').put({
-        namespace: 'guest',
+        namespace: scope.namespace,
         generation: state.runId,
         key,
         presence: true,
         rawValue,
         shadowedAt: entry.updatedAt,
       });
+      transaction.objectStore('journal').delete(journalId);
       await transactionComplete(transaction);
-      await repository.delete(journalId);
     } catch {
       // The durable journal is intentionally retained for the next bootstrap.
     }
