@@ -31,6 +31,7 @@ intended missing behavior; no deliberately failing test is retained.
 | Recovery-required UI exposes current and immutable-capture downloads | `npm test -- src/components/ui/feedback/__tests__/CharacterRecoveryExportControls.test.tsx` | Vite could not resolve the not-yet-created recovery export controls. |
 | Activation metadata retains the immutable capture generation needed after a blocked reload | `npm test -- src/lib/indexeddb/__tests__/characterCutoverSelection.test.ts` | The selection retained the epoch but omitted `activatedGeneration`, leaving the raw-capture export unable to locate its IndexedDB manifest. |
 | Real Chromium post-cutover edit, mirror, IndexedDB commit, and authoritative reload | `npm run test:indexeddb:e2e -- --grep "downloads recovery"` | The new edit reached the active IndexedDB row but the first reload initially mounted an empty roster before authoritative hydration; the activated-profile pre-hydration barrier fixed the race. |
+| Existing all-IndexedDB per-file coverage contract after family-scoped shadow routing | GitHub CI `IndexedDB migration coverage contract` | The first PR run failed `browserShadowWriter.ts` at 87.5% statements because the authority-change-before-shadow-commit rejection branch was not exercised. |
 
 The final focused coverage gate is `npm run test:slice8:coverage`. It enforces
 per-file minimums of 90% statements, 90% functions, and 85% branches for the
