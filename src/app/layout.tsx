@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
+import { AccountIndicator } from '@/components/auth/AccountIndicator';
 import { ThemeProviderWrapper } from './ThemeProviderWrapper';
 
 const geistSans = localFont({
@@ -87,7 +88,10 @@ export default function RootLayout({
         suppressHydrationWarning={true}
       >
         <ThemeProviderWrapper>
-          <ErrorBoundary>{children}</ErrorBoundary>
+          <ErrorBoundary>
+            {children}
+            <AccountIndicator />
+          </ErrorBoundary>
         </ThemeProviderWrapper>
       </body>
     </html>

@@ -32,10 +32,11 @@ function makeBus(overrides: Partial<IntentBusDeps> = {}) {
   const deps: IntentBusDeps = {
     isLeader: () => false,
     getLoadedCharacterId: () => 'char-1',
-    getWatermark: tabId => watermarks.get(tabId) ?? 0,
+    getWatermark: (characterId, tabId) =>
+      watermarks.get(`${characterId}\u0000${tabId}`) ?? 0,
     applyIntent: intent => {
       applied.push(intent);
-      watermarks.set(intent.tabId, intent.seq);
+      watermarks.set(`${intent.characterId}\u0000${intent.tabId}`, intent.seq);
     },
     ...overrides,
   };
@@ -96,6 +97,51 @@ describe('follower side', () => {
 });
 
 describe('leader side', () => {
+  it('tracks sender sequence gaps independently for each character', () => {
+    let loadedCharacterId = 'char-1';
+    const { channel, applied } = makeBus({
+      isLeader: () => true,
+      getLoadedCharacterId: () => loadedCharacterId,
+    });
+
+    channel.receive({
+      type: 'intent',
+      opId: 'char-1-op-2',
+      tabId: 'sender',
+      seq: 2,
+      characterId: 'char-1',
+      actionName: 'char-1-second',
+      args: [],
+    });
+    loadedCharacterId = 'char-2';
+    channel.receive({
+      type: 'intent',
+      opId: 'char-2-op-1',
+      tabId: 'sender',
+      seq: 1,
+      characterId: 'char-2',
+      actionName: 'char-2-first',
+      args: [],
+    });
+    expect(applied.map(intent => intent.actionName)).toEqual(['char-2-first']);
+
+    loadedCharacterId = 'char-1';
+    channel.receive({
+      type: 'intent',
+      opId: 'char-1-op-1',
+      tabId: 'sender',
+      seq: 1,
+      characterId: 'char-1',
+      actionName: 'char-1-first',
+      args: [],
+    });
+    expect(applied.map(intent => intent.actionName)).toEqual([
+      'char-2-first',
+      'char-1-first',
+      'char-1-second',
+    ]);
+  });
+
   it('applies in-order intents, acks, and dedups duplicates by watermark', () => {
     const { channel, applied } = makeBus({ isLeader: () => true });
     const intent = {
@@ -169,7 +215,7 @@ describe('promotion', () => {
     // recognized as a duplicate rather than re-applied.
     const { bus, applied, watermarks } = makeBus({ isLeader: () => true });
     bus.send('char-1', 'a', []); // seq 1, queued — never acked
-    watermarks.set(TAB_ID, 1); // envelope-hydrated watermark says seq 1 landed
+    watermarks.set(`char-1\u0000${TAB_ID}`, 1); // envelope-hydrated watermark says seq 1 landed
 
     bus.reconcileOwnPending('char-1');
 

@@ -7,6 +7,7 @@ import { usePlayerStore } from '@/store/playerStore';
 function resetStore() {
   usePlayerStore.setState({
     characters: [],
+    characterTombstones: {},
     activeCharacterId: null,
     settings: {
       enableDeathAnimation: false,
@@ -18,7 +19,44 @@ function resetStore() {
 }
 
 describe('playerStore', () => {
-  beforeEach(resetStore);
+  beforeEach(() => {
+    resetStore();
+    window.localStorage.clear();
+  });
+
+  describe('migrateFromOldStorage', () => {
+    it('reads a Zustand legacy character from state.character', () => {
+      const legacy = makeCharacter({
+        id: 'legacy-char',
+        name: 'Legacy Hero',
+        race: 'Elf',
+      });
+      window.localStorage.setItem(
+        'rollkeeper-character',
+        JSON.stringify({ state: { character: legacy }, version: 0 })
+      );
+
+      expect(usePlayerStore.getState().migrateFromOldStorage()).toBe(true);
+      expect(usePlayerStore.getState().characters[0]).toEqual(
+        expect.objectContaining({
+          name: 'Legacy Hero',
+          race: 'Elf',
+          characterData: expect.objectContaining({ name: 'Legacy Hero' }),
+        })
+      );
+    });
+
+    it('preserves the exact legacy value after a successful migration', () => {
+      const raw = JSON.stringify({
+        state: { character: makeCharacter({ id: 'legacy-char' }) },
+        version: 0,
+      });
+      window.localStorage.setItem('rollkeeper-character', raw);
+
+      expect(usePlayerStore.getState().migrateFromOldStorage()).toBe(true);
+      expect(window.localStorage.getItem('rollkeeper-character')).toBe(raw);
+    });
+  });
 
   describe('createCharacter', () => {
     it('creates a character and returns its ID', () => {
@@ -64,6 +102,12 @@ describe('playerStore', () => {
       const id = usePlayerStore.getState().createCharacter('ToDelete');
       usePlayerStore.getState().deleteCharacter(id);
       expect(usePlayerStore.getState().characters).toHaveLength(0);
+      expect(usePlayerStore.getState().characterTombstones[id]).toEqual(
+        expect.objectContaining({
+          id,
+          beforeImage: expect.objectContaining({ id, name: 'ToDelete' }),
+        })
+      );
     });
 
     it('clears activeCharacterId if deleted', () => {

@@ -5,6 +5,7 @@ import { initCrossTabEncounterSync } from '@/lib/crossTabEncounterSync';
 import { ENCOUNTER_STORAGE_KEY } from '@/utils/constants';
 
 import type { Encounter } from '@/types/encounter';
+import type { EncounterDeletionTombstone } from '@/store/encounterStore';
 
 function makeEncounter(overrides: Partial<Encounter>): Encounter {
   return {
@@ -21,13 +22,22 @@ function makeEncounter(overrides: Partial<Encounter>): Encounter {
   } as Encounter;
 }
 
-function makeStore(encounters: Encounter[]) {
-  const state = { encounters };
+function makeStore(
+  encounters: Encounter[],
+  encounterTombstones: Record<string, EncounterDeletionTombstone> = {}
+) {
+  const state = { encounters, encounterTombstones };
   return {
     getState: vi.fn(() => state),
-    setState: vi.fn((partial: { encounters: Encounter[] }) => {
-      state.encounters = partial.encounters;
-    }),
+    setState: vi.fn(
+      (partial: {
+        encounters: Encounter[];
+        encounterTombstones: Record<string, EncounterDeletionTombstone>;
+      }) => {
+        state.encounters = partial.encounters;
+        state.encounterTombstones = partial.encounterTombstones;
+      }
+    ),
   };
 }
 
@@ -45,6 +55,24 @@ afterEach(() => {
 });
 
 describe('initCrossTabEncounterSync', () => {
+  it('does not resurrect a locally tombstoned encounter from a stale tab', () => {
+    const deleted = makeEncounter({ id: 'enc-deleted' });
+    const store = makeStore([], {
+      'enc-deleted': {
+        id: 'enc-deleted',
+        deletedAt: '2026-07-03T00:00:00.000Z',
+        beforeImage: deleted,
+      },
+    });
+    cleanup = initCrossTabEncounterSync(
+      store as unknown as Parameters<typeof initCrossTabEncounterSync>[0]
+    );
+
+    fireStorage(ENCOUNTER_STORAGE_KEY, wrap([deleted]));
+
+    expect(store.getState().encounters).toEqual([]);
+  });
+
   it('adopts an incoming encounter with a strictly newer updatedAt', () => {
     const local = makeEncounter({ updatedAt: '2026-07-01T00:00:00.000Z' });
     const incoming = makeEncounter({

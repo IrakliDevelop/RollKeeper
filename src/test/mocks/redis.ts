@@ -161,9 +161,35 @@ export const mockRedis = {
 
   llen: vi.fn(async (key: string) => (lists.get(key) ?? []).length),
 
-  // Emulates the ONE Lua script in src/lib/xpAwardQueue.ts (atomic capped
-  // enqueue). Extend the branch if another script is ever added.
+  // Emulates the production Lua scripts atomically against the in-memory maps.
   eval: vi.fn(async (script: string, keys: string[], args: string[]) => {
+    if (script.includes('campaign-player-cas-v1')) {
+      const [playerKey, playersKey, removedKey] = keys;
+      const [
+        incomingRevisionRaw,
+        incomingCharacterRaw,
+        playerDataRaw,
+        playerId,
+      ] = args;
+      if (store.has(removedKey)) return ['removed', ''];
+      const existingRaw = store.get(playerKey);
+      if (existingRaw) {
+        const existing = JSON.parse(existingRaw);
+        const storedRevision = existing.characterData?.revision ?? 0;
+        const incomingRevision = Number(incomingRevisionRaw);
+        if (incomingRevision < storedRevision) return ['stale', existingRaw];
+        if (incomingRevision === storedRevision) {
+          if (JSON.stringify(existing.characterData) === incomingCharacterRaw) {
+            return ['identical', existingRaw];
+          }
+          return ['conflict', existingRaw];
+        }
+      }
+      store.set(playerKey, playerDataRaw);
+      if (!sets.has(playersKey)) sets.set(playersKey, new Set());
+      sets.get(playersKey)!.add(playerId);
+      return ['written', playerDataRaw];
+    }
     if (script.includes('RPUSH') && script.includes('LLEN')) {
       const [key] = keys;
       const [value, cap] = args;

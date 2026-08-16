@@ -52,7 +52,19 @@ export function useCharacterRosterSync({
 }: UseCharacterRosterSyncOptions) {
   const lastLoadedCharacterRef = useRef<string | null>(null);
   const lastSyncedCharacterRef = useRef<CharacterState | null>(null);
+  const initialLoadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  useEffect(
+    () => () => {
+      if (initialLoadTimerRef.current) {
+        clearTimeout(initialLoadTimerRef.current);
+      }
+    },
+    []
+  );
 
   // Latest-value ref for `character` — read (not reactively depended on) by
   // the load effect below. `character` is expected to change on nearly every
@@ -106,11 +118,13 @@ export function useCharacterRosterSync({
         lastSyncedCharacterRef.current = candidate;
 
         // Mark initial load as complete after state has been set
-        const timer = setTimeout(() => {
+        if (initialLoadTimerRef.current) {
+          clearTimeout(initialLoadTimerRef.current);
+        }
+        initialLoadTimerRef.current = setTimeout(() => {
           setIsInitialLoad(false);
+          initialLoadTimerRef.current = null;
         }, 50);
-
-        return () => clearTimeout(timer);
       }
     }
   }, [playerCharacter, hasHydrated, loadCharacterState, onLoad]);

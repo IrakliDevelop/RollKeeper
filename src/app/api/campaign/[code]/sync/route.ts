@@ -9,6 +9,7 @@ import {
 } from '@/lib/redis';
 import { CampaignPlayerData } from '@/types/campaign';
 import { sendBattleMapPoke } from '@/lib/relayPoke';
+import { compareAndSetCampaignPlayer } from '@/lib/campaignPlayerCas';
 
 export async function POST(
   request: NextRequest,
@@ -29,28 +30,6 @@ export async function POST(
 
     const redis = getRedis();
 
-    const removed = await redis.exists(campaignRemovedKey(code, playerId));
-    if (removed) {
-      return NextResponse.json({ error: 'removed' }, { status: 410 });
-    }
-
-    // Revision gate: a stale tab must not clobber a newer snapshot.
-    const existingRaw = await redis.get<string>(
-      campaignPlayerKey(code, playerId)
-    );
-    if (existingRaw) {
-      const existing: CampaignPlayerData =
-        typeof existingRaw === 'string' ? JSON.parse(existingRaw) : existingRaw;
-      const storedRevision = existing.characterData?.revision ?? 0;
-      const incomingRevision = characterData.revision ?? 0;
-      if (incomingRevision < storedRevision) {
-        return NextResponse.json(
-          { error: 'stale', current: existing },
-          { status: 409 }
-        );
-      }
-    }
-
     const playerData: CampaignPlayerData = {
       playerId,
       playerName: playerName || 'Unknown Player',
@@ -60,14 +39,26 @@ export async function POST(
       lastSynced: new Date().toISOString(),
     };
 
-    await Promise.all([
-      redis.sadd(campaignPlayersKey(code), playerId),
-      redis.expire(campaignPlayersKey(code), SLIDING_TTL_SECONDS),
-      redis.set(campaignPlayerKey(code, playerId), JSON.stringify(playerData), {
-        ex: SLIDING_TTL_SECONDS,
-      }),
-      refreshCampaignTTL(redis, code),
-    ]);
+    const cas = await compareAndSetCampaignPlayer(
+      redis,
+      {
+        player: campaignPlayerKey(code, playerId),
+        players: campaignPlayersKey(code),
+        removed: campaignRemovedKey(code, playerId),
+      },
+      playerData,
+      SLIDING_TTL_SECONDS
+    );
+    if (cas.status === 'removed') {
+      return NextResponse.json({ error: 'removed' }, { status: 410 });
+    }
+    if (cas.status === 'stale' || cas.status === 'conflict') {
+      return NextResponse.json(
+        { error: cas.status, current: cas.current },
+        { status: 409 }
+      );
+    }
+    await refreshCampaignTTL(redis, code);
 
     // Latency shave: nudge battle-map clients (other players' VTTs, the DM
     // VTT) to refetch player data now. Best-effort; polling is the fallback.
@@ -75,7 +66,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      lastSynced: playerData.lastSynced,
+      lastSynced: cas.current?.lastSynced ?? playerData.lastSynced,
     });
   } catch (error) {
     console.error('Error syncing player data:', error);

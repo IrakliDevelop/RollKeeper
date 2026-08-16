@@ -29,6 +29,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { JoinCampaignDialog } from '@/components/ui/campaign/JoinCampaignDialog';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import { DataSafetyBanner } from '@/components/ui/feedback/DataSafetyBanner';
+import { DeviceRecoveryControls } from '@/components/ui/feedback/DeviceRecoveryControls';
 import { AppIcon } from '@/components/ui/icons';
 import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
 import {
@@ -472,6 +473,17 @@ export default function PlayerDashboardPage() {
         {characters.length > 0 && (
           <DataSafetyBanner onExport={handleExportAll} />
         )}
+
+        <section className="border-divider bg-surface-secondary mb-6 rounded-lg border p-4">
+          <h2 className="text-heading text-sm font-semibold">
+            Full device recovery
+          </h2>
+          <p className="text-muted mb-3 text-sm">
+            Back up all RollKeeper browser data or stage a recovery file for
+            review without replacing active values.
+          </p>
+          <DeviceRecoveryControls />
+        </section>
 
         {/* Stats Cards */}
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">

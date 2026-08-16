@@ -127,11 +127,11 @@ function migrateCharacterData(character: unknown): CharacterState {
     };
   }
 
-  const characterObj = character as Record<string, unknown>;
+  const characterObj = structuredClone(character) as Record<string, unknown>;
 
   // If it's already a new character with class object, return as-is
   if (characterObj.class && typeof characterObj.class === 'object') {
-    const result = character as CharacterState;
+    const result = characterObj as unknown as CharacterState;
     // Ensure spellSlots exist
     if (!result.spellSlots) {
       result.spellSlots = DEFAULT_CHARACTER_STATE.spellSlots;
@@ -5449,7 +5449,7 @@ function applyForwardedIntent(intent: CharacterIntent): void {
 export const characterIntentBus = new CharacterIntentBus({
   isLeader: characterId => characterWriterLock.isLeader(characterId),
   getLoadedCharacterId: () => useCharacterStore.getState().character.id,
-  getWatermark: tabId =>
+  getWatermark: (_characterId, tabId) =>
     useCharacterStore.getState().intentWatermarks[tabId]?.seq ?? 0,
   applyIntent: applyForwardedIntent,
 });

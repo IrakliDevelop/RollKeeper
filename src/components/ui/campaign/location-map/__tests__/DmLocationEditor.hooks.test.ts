@@ -13,6 +13,8 @@ import { MARKER_HTML_TYPE, buildMarkerData } from '../markerData';
 import { useLocationStore } from '@/store/locationStore';
 import type { LocationMap } from '@/types/location';
 
+const autoSaveClear = vi.hoisted(() => vi.fn(async () => {}));
+
 // AutoSave touches storage adapters / timers we don't need here — stub it,
 // keep the rest of @fieldnotes/core real (tools, types).
 vi.mock('@fieldnotes/core', async importOriginal => {
@@ -22,7 +24,7 @@ vi.mock('@fieldnotes/core', async importOriginal => {
     AutoSave: class {
       start = vi.fn();
       stop = vi.fn();
-      clear = vi.fn(async () => {});
+      clear = autoSaveClear;
     },
   };
 });
@@ -135,12 +137,15 @@ const baseLocation: LocationMap = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
-async function setup(mode: 'location' | 'battlemap') {
+async function setup(
+  mode: 'location' | 'battlemap',
+  location: LocationMap = baseLocation
+) {
   const { vp, store, elementId } = makeStubViewport();
   const onSave = vi.fn();
   const { result } = renderHook(() =>
     useDmLocationEditor({
-      location: baseLocation,
+      location,
       campaignCode: 'TEST01',
       dmId: 'dm-1',
       mode,
@@ -166,6 +171,16 @@ describe('useDmLocationEditor — handleToggleDmOnly mode gating', () => {
   beforeEach(() => {
     // Ensure handleReady never starts a live sync connection in tests.
     delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+    autoSaveClear.mockClear();
+  });
+
+  it('preserves Fieldnotes autosave recovery after canonical canvas load', async () => {
+    await setup('location', {
+      ...baseLocation,
+      canvasState: JSON.stringify({ elements: [], camera: {} }),
+    });
+
+    expect(autoSaveClear).not.toHaveBeenCalled();
   });
 
   afterEach(() => {

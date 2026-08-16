@@ -6,6 +6,7 @@ const LOCK_PREFIX = 'rk-character-writer-';
 
 const locksSupported = (): boolean =>
   typeof navigator !== 'undefined' &&
+  typeof BroadcastChannel !== 'undefined' &&
   'locks' in navigator &&
   typeof navigator.locks?.request === 'function';
 

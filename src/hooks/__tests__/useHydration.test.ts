@@ -1,102 +1,64 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
+
 import { useHydration } from '@/hooks/useHydration';
 import { useCharacterStore } from '@/store/characterStore';
+import { usePlayerStore } from '@/store/playerStore';
 
 describe('useHydration', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    // Reset store to un-hydrated state before each test
     useCharacterStore.setState({ hasHydrated: false });
   });
 
   afterEach(() => {
     cleanup();
-    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
-  it('returns false initially when the store has not yet hydrated', () => {
-    useCharacterStore.setState({ hasHydrated: false });
-
+  it('waits for persisted roster hydration instead of a zero-delay timer', () => {
+    let finishHydration: (() => void) | undefined;
+    vi.spyOn(usePlayerStore.persist, 'hasHydrated').mockReturnValue(false);
+    vi.spyOn(usePlayerStore.persist, 'onFinishHydration').mockImplementation(
+      listener => {
+        finishHydration = () => listener(usePlayerStore.getState());
+        return () => {};
+      }
+    );
     const { result } = renderHook(() => useHydration());
 
-    // Before the setTimeout fires, hasHydrated is still false
     expect(result.current).toBe(false);
+    act(() => finishHydration?.());
+    expect(result.current).toBe(true);
   });
 
-  it('returns true after the setTimeout callback fires', () => {
-    useCharacterStore.setState({ hasHydrated: false });
+  it('marks ready immediately when roster persistence already hydrated', () => {
+    vi.spyOn(usePlayerStore.persist, 'hasHydrated').mockReturnValue(true);
 
     const { result } = renderHook(() => useHydration());
-
-    expect(result.current).toBe(false);
-
-    act(() => {
-      vi.runAllTimers();
-    });
 
     expect(result.current).toBe(true);
   });
 
-  it('returns true immediately when the store is already hydrated', () => {
+  it('keeps an existing hydrated state without subscribing again', () => {
     useCharacterStore.setState({ hasHydrated: true });
+    const subscribe = vi.spyOn(usePlayerStore.persist, 'onFinishHydration');
 
     const { result } = renderHook(() => useHydration());
 
-    // No timer needed — store already hydrated
     expect(result.current).toBe(true);
+    expect(subscribe).not.toHaveBeenCalled();
   });
 
-  it('does not schedule another setTimeout when already hydrated', () => {
-    useCharacterStore.setState({ hasHydrated: true });
-    const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
-
-    renderHook(() => useHydration());
-
-    // The effect runs but should bail out before calling setTimeout
-    expect(setTimeoutSpy).not.toHaveBeenCalled();
-  });
-
-  it('reflects store update when persist middleware onRehydrateStorage sets hasHydrated', () => {
-    useCharacterStore.setState({ hasHydrated: false });
-
-    const { result } = renderHook(() => useHydration());
-
-    expect(result.current).toBe(false);
-
-    // Simulate what onRehydrateStorage does — sets hasHydrated directly on the store
-    act(() => {
-      useCharacterStore.setState({ hasHydrated: true });
-    });
-
-    expect(result.current).toBe(true);
-  });
-
-  it('clears the pending timer on unmount when not yet hydrated', () => {
-    useCharacterStore.setState({ hasHydrated: false });
-    const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+  it('unsubscribes from the persistence lifecycle on unmount', () => {
+    const unsubscribe = vi.fn();
+    vi.spyOn(usePlayerStore.persist, 'hasHydrated').mockReturnValue(false);
+    vi.spyOn(usePlayerStore.persist, 'onFinishHydration').mockReturnValue(
+      unsubscribe
+    );
 
     const { unmount } = renderHook(() => useHydration());
-
     unmount();
 
-    expect(clearTimeoutSpy).toHaveBeenCalled();
-  });
-
-  it('does not update hasHydrated after unmount', () => {
-    useCharacterStore.setState({ hasHydrated: false });
-
-    const { unmount } = renderHook(() => useHydration());
-
-    unmount();
-
-    // Advance timers after unmount — the clearTimeout in cleanup should have
-    // prevented the setState call from ever running
-    act(() => {
-      vi.runAllTimers();
-    });
-
-    expect(useCharacterStore.getState().hasHydrated).toBe(false);
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 });

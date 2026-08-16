@@ -9,10 +9,13 @@ const entry = (id: string, revision: number, lastMutatedAt?: number) => ({
   characterData: { id, revision, lastMutatedAt },
 });
 
-function makeStore(initial: ReturnType<typeof entry>[]) {
+function makeStore(
+  initial: ReturnType<typeof entry>[],
+  characterTombstones: Record<string, unknown> = {}
+) {
   let characters = initial;
   return {
-    getState: () => ({ characters }),
+    getState: () => ({ characters, characterTombstones }),
     setState: vi.fn((partial: { characters: typeof characters }) => {
       characters = partial.characters;
     }),
@@ -30,6 +33,21 @@ const fire = (characters: unknown[]) =>
   );
 
 describe('cross-tab roster ordering', () => {
+  it('does not resurrect a locally tombstoned character from a stale tab', () => {
+    const deleted = entry('a', 3, 300);
+    const store = makeStore([], {
+      a: { id: 'a', deletedAt: 400, beforeImage: deleted },
+    });
+    const stop = initCrossTabRosterSync(
+      store as unknown as Parameters<typeof initCrossTabRosterSync>[0]
+    );
+
+    fire([entry('a', 2, 200)]);
+
+    expect(store.read()).toEqual([]);
+    stop();
+  });
+
   it('equal revision with fresher stamp wins (the old code ignored this)', () => {
     const store = makeStore([entry('a', 3, 100)]);
     const stop = initCrossTabRosterSync(

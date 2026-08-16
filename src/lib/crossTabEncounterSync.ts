@@ -1,10 +1,17 @@
 import { ENCOUNTER_STORAGE_KEY } from '@/utils/constants';
 
 import type { Encounter } from '@/types/encounter';
+import type { EncounterDeletionTombstone } from '@/store/encounterStore';
 
 interface EncounterStoreLike {
-  getState: () => { encounters: Encounter[] };
-  setState: (partial: { encounters: Encounter[] }) => void;
+  getState: () => {
+    encounters: Encounter[];
+    encounterTombstones: Record<string, EncounterDeletionTombstone>;
+  };
+  setState: (partial: {
+    encounters: Encounter[];
+    encounterTombstones: Record<string, EncounterDeletionTombstone>;
+  }) => void;
 }
 
 /**
@@ -27,36 +34,61 @@ export function initCrossTabEncounterSync(
   const onStorage = (event: StorageEvent) => {
     if (event.key !== ENCOUNTER_STORAGE_KEY || !event.newValue) return;
     let incoming: Encounter[] | undefined;
+    let incomingTombstones: Record<string, EncounterDeletionTombstone> = {};
     try {
       const parsed: unknown = JSON.parse(event.newValue);
-      incoming = (parsed as { state?: { encounters?: Encounter[] } } | null)
-        ?.state?.encounters;
+      const incomingState = (
+        parsed as {
+          state?: {
+            encounters?: Encounter[];
+            encounterTombstones?: Record<string, EncounterDeletionTombstone>;
+          };
+        } | null
+      )?.state;
+      incoming = incomingState?.encounters;
+      incomingTombstones = incomingState?.encounterTombstones ?? {};
     } catch {
       return;
     }
     if (!Array.isArray(incoming)) return;
 
+    const current = store.getState();
+    const encounterTombstones = { ...current.encounterTombstones };
+    let changed = false;
+    for (const [id, tombstone] of Object.entries(incomingTombstones)) {
+      const local = encounterTombstones[id];
+      if (!local || tombstone.deletedAt > local.deletedAt) {
+        encounterTombstones[id] = tombstone;
+        changed = true;
+      }
+    }
     const incomingById = new Map(
       incoming
         .filter(entry => entry && typeof entry.id === 'string')
+        .filter(entry => !encounterTombstones[entry.id])
         .map(entry => [entry.id, entry])
     );
-    let changed = false;
-    const merged = store.getState().encounters.map(entry => {
-      const candidate = incomingById.get(entry.id);
-      incomingById.delete(entry.id);
-      if (!candidate) return entry;
-      if ((candidate.updatedAt ?? '') > (entry.updatedAt ?? '')) {
-        changed = true;
-        return candidate;
-      }
-      return entry;
-    });
+    const merged = current.encounters
+      .filter(entry => {
+        const keep = !encounterTombstones[entry.id];
+        if (!keep) changed = true;
+        return keep;
+      })
+      .map(entry => {
+        const candidate = incomingById.get(entry.id);
+        incomingById.delete(entry.id);
+        if (!candidate) return entry;
+        if ((candidate.updatedAt ?? '') > (entry.updatedAt ?? '')) {
+          changed = true;
+          return candidate;
+        }
+        return entry;
+      });
     for (const adopted of incomingById.values()) {
       merged.push(adopted);
       changed = true;
     }
-    if (changed) store.setState({ encounters: merged });
+    if (changed) store.setState({ encounters: merged, encounterTombstones });
   };
 
   window.addEventListener('storage', onStorage);

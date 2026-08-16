@@ -9,6 +9,7 @@ import {
   mergeWatermarks,
 } from '@/lib/characterCanonicalStorage';
 import { characterWriterLock } from '@/lib/characterWriterLock';
+import { STORAGE_QUOTA_EVENT } from '@/lib/safeStorage';
 import { STORAGE_KEY } from '@/utils/constants';
 import type { CharacterState } from '@/types/character';
 
@@ -97,6 +98,22 @@ describe('createPerCharacterStorage', () => {
     storage.setItem('n', persistJson(char('b', 7)));
     expect(readCharacterEnvelope('a')?.character.revision).toBe(1);
     expect(readCharacterEnvelope('b')?.character.revision).toBe(7);
+  });
+
+  it('surfaces canonical quota failures without throwing from the domain mutation', () => {
+    const onQuota = vi.fn();
+    window.addEventListener(STORAGE_QUOTA_EVENT, onQuota);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError');
+    });
+    const storage = createPerCharacterStorage();
+    armCanonicalPersistence('a');
+
+    expect(() => storage.setItem('n', persistJson(char('a', 1)))).not.toThrow();
+    expect(onQuota).toHaveBeenCalledTimes(1);
+
+    window.removeEventListener(STORAGE_QUOTA_EVENT, onQuota);
+    vi.restoreAllMocks();
   });
 
   describe('leadership gate (I1)', () => {
