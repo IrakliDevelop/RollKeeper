@@ -92,19 +92,43 @@ jobs:
       - run: npm run build --prefix relay
 
   local-supabase:
-    name: Local Supabase database suite (Slice 3 placeholder)
+    name: Local Supabase database suite
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
-      - name: Confirm database harness is not silently skipped
-        shell: bash
-        run: |
-          if [[ -f supabase/config.toml ]]; then
-            echo "::error::Supabase harness detected; replace this placeholder with migration, lint, pgTAP, and integration steps."
-            exit 1
-          fi
-          echo "Deferred by roadmap until Slice 3; no remote database is contacted."
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Start clean local Supabase stack
+        run: npm run db:start >/dev/null
+
+      - name: Reset and replay migrations from zero
+        run: npm run db:reset
+
+      - name: Lint SQL schema
+        run: npm run db:lint
+
+      - name: Run pgTAP tests
+        run: npm run db:test
+
+      - name: Run JWT-scoped database integration tests
+        run: npm run test:db:integration
+
+      - name: Verify deterministic reset and replay
+        run: npm run test:db:replay
+
+      - name: Verify generated database types
+        run: npm run db:types:check
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: npx supabase stop --no-backup
 
   integration:
     name: Chromium integration tests
