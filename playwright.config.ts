@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: '**/auth/**',
   outputDir: 'test-results',
   timeout: 60_000,
   retries: 0,
@@ -16,7 +17,7 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: 'npm run dev',
+    command: 'env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false npm run dev',
     url: 'http://localhost:3000/player',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

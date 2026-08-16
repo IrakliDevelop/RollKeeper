@@ -28,18 +28,39 @@ enabled = false
 enabled = false
 
 [local_smtp]
-enabled = false
+enabled = true
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
 
 [storage]
 enabled = false
 
 [auth]
 enabled = true
-site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = ["http://127.0.0.1:3000"]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://127.0.0.1:3000/**", "http://localhost:3000/**"]
 jwt_expiry = 3600
-enable_signup = false
+enable_signup = true
 enable_anonymous_sign_ins = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+otp_length = 6
+otp_expiry = 600
+
+[auth.email.template.confirmation]
+subject = "Your RollKeeper sign-in code"
+content_path = "./supabase/templates/otp.html"
+
+[auth.email.template.magic_link]
+subject = "Your RollKeeper sign-in code"
+content_path = "./supabase/templates/otp.html"
+
+[auth.rate_limit]
+email_sent = 30
 
 [analytics]
 enabled = false

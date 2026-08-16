@@ -162,3 +162,44 @@ jobs:
             test-results/
           if-no-files-found: warn
           retention-days: 14
+
+  auth-integration:
+    name: Local OTP and Chromium auth tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Start local Supabase Auth and Mailpit
+        run: npm run db:start >/dev/null
+
+      - name: Test local OTP lifecycle
+        run: npm run test:auth:integration
+
+      - name: Test auth shell in Chromium
+        run: npm run test:auth:e2e
+
+      - name: Upload auth Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-playwright-failure-artifacts
+          path: |
+            playwright-report/auth/
+            test-results/auth/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: npx supabase stop --no-backup

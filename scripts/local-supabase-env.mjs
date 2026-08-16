@@ -25,10 +25,41 @@ export function getLocalSupabaseTestConfig() {
   const status = JSON.parse(output.slice(jsonStart));
 
   return {
+    apiUrl: requireString(status.API_URL, 'API_URL'),
     anonKey: requireString(status.ANON_KEY, 'ANON_KEY'),
     jwtSecret: requireString(status.JWT_SECRET, 'JWT_SECRET'),
+    mailpitUrl: requireString(
+      status.MAILPIT_URL ?? status.INBUCKET_URL,
+      'MAILPIT_URL'
+    ),
+    publishableKey: requireString(
+      status.PUBLISHABLE_KEY ?? status.ANON_KEY,
+      'PUBLISHABLE_KEY'
+    ),
     restUrl: requireString(status.REST_URL, 'REST_URL'),
   };
+}
+
+export function expireLocalEmailOtp(email) {
+  if (!/^[^@\s]+@[^@\s]+$/u.test(email)) {
+    throw new Error('Invalid local Auth fixture email');
+  }
+
+  execFileSync(
+    'docker',
+    [
+      'exec',
+      DATABASE_CONTAINER,
+      'psql',
+      '--username=postgres',
+      '--dbname=postgres',
+      '--command',
+      `update auth.users
+       set confirmation_sent_at = now() - interval '11 minutes'
+       where email = '${email.replaceAll("'", "''")}';`,
+    ],
+    { stdio: 'pipe' }
+  );
 }
 
 export function setLocalCharacterTombstone(characterId, deletedAt) {
