@@ -27,6 +27,7 @@
     "test": "vitest run --project unit",
     "test:e2e": "playwright test",
     "test:indexeddb:e2e": "playwright test --config playwright.indexeddb.config.ts",
+    "test:slice8:coverage": "vitest run --config vitest.slice8.config.ts",
     "test:auth:e2e": "playwright test --config playwright.auth.config.ts",
     "test:watch": "vitest --project unit",
     "test:visual": "vitest run --project storybook",

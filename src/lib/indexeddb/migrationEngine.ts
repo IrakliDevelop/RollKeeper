@@ -62,6 +62,9 @@ export interface RunIndexedDbMigrationOptions {
   recoveryGate: RecoveryGate;
   afterCheckpoint?: (state: MigrationState) => void | Promise<void>;
   testHooks?: { abortPreflightTransaction?: boolean };
+  migrationFamily?: string;
+  includeKey?: (key: string) => boolean;
+  requiredRecoveryManifestHash?: string;
 }
 
 export interface MigrationRunResult {
@@ -81,12 +84,18 @@ interface StateRecord {
 
 const encoder = new TextEncoder();
 
-function migrationStateKey(namespace: StorageNamespace): string {
-  return `migration-state:${namespace}`;
+function migrationStateKey(
+  namespace: StorageNamespace,
+  family?: string
+): string {
+  return `migration-state:${namespace}${family ? `:${family}` : ''}`;
 }
 
-function estimatedSourceBytes(storage: Storage): number {
-  const keys = currentLegacyKeys(storage);
+function estimatedSourceBytes(
+  storage: Storage,
+  includeKey?: (key: string) => boolean
+): number {
+  const keys = currentLegacyKeys(storage, includeKey);
   let bytes = 0;
   for (const key of keys) {
     const raw = storage.getItem(key);
@@ -95,7 +104,10 @@ function estimatedSourceBytes(storage: Storage): number {
   return bytes;
 }
 
-function currentLegacyKeys(storage: Storage): Set<string> {
+function currentLegacyKeys(
+  storage: Storage,
+  includeKey: (key: string) => boolean = () => true
+): Set<string> {
   const keys = new Set<string>(LEGACY_EXACT_KEYS);
   for (let index = 0; index < storage.length; index += 1) {
     const key = storage.key(index);
@@ -108,22 +120,23 @@ function currentLegacyKeys(storage: Storage): Set<string> {
       keys.add(key);
     }
   }
-  return keys;
+  return new Set([...keys].filter(includeKey));
 }
 
 async function readState(
   database: IDBDatabase,
   namespace: StorageNamespace,
-  fallbackRunId: string
+  fallbackRunId: string,
+  family?: string
 ): Promise<StateRecord> {
   const transaction = database.transaction('meta', 'readonly');
   const record = (await requestResult(
-    transaction.objectStore('meta').get(migrationStateKey(namespace))
+    transaction.objectStore('meta').get(migrationStateKey(namespace, family))
   )) as StateRecord | undefined;
   await transactionComplete(transaction);
   return (
     record ?? {
-      key: migrationStateKey(namespace),
+      key: migrationStateKey(namespace, family),
       state: 'LEGACY_PRIMARY',
       runId: fallbackRunId,
       checkpointAt: '',
@@ -306,7 +319,7 @@ async function shadowGate(
   const manifestKeys = new Set(manifest.entries.map(entry => entry.key));
   const keys = new Set([
     ...manifestKeys,
-    ...currentLegacyKeys(options.storage),
+    ...currentLegacyKeys(options.storage, options.includeKey),
   ]);
   for (const key of keys) {
     const current = options.storage.getItem(key);
@@ -362,7 +375,8 @@ function result(
 export async function runIndexedDbMigration(
   options: RunIndexedDbMigrationOptions
 ): Promise<MigrationRunResult> {
-  const requestedBytes = estimatedSourceBytes(options.storage) * 3;
+  const requestedBytes =
+    estimatedSourceBytes(options.storage, options.includeKey) * 3;
   let database: IDBDatabase;
   try {
     database = await openRollkeeperDatabase({ factory: options.factory });
@@ -374,7 +388,12 @@ export async function runIndexedDbMigration(
     return await withMigrationLock(
       database,
       async () => {
-        let state = await readState(database, options.namespace, options.runId);
+        let state = await readState(
+          database,
+          options.namespace,
+          options.runId,
+          options.migrationFamily
+        );
         let manifest: SourceManifest | undefined;
         try {
           if (state.state === 'CUTOVER_READY') {
@@ -398,6 +417,7 @@ export async function runIndexedDbMigration(
               storage: options.storage,
               runId: state.runId,
               now: options.now,
+              includeKey: options.includeKey,
             });
             state = await checkpoint(database, state, 'CAPTURED', options);
           }
@@ -407,7 +427,8 @@ export async function runIndexedDbMigration(
           });
           if (
             !(await options.recoveryGate.hasDownloadReceipt(
-              manifest.recoveryManifestHash
+              options.requiredRecoveryManifestHash ??
+                manifest.recoveryManifestHash
             ))
           ) {
             state = await checkpoint(
@@ -469,7 +490,12 @@ export async function runIndexedDbMigration(
     );
   } catch (cause) {
     if (cause instanceof MigrationInterruptedError) throw cause;
-    const state = await readState(database, options.namespace, options.runId);
+    const state = await readState(
+      database,
+      options.namespace,
+      options.runId,
+      options.migrationFamily
+    );
     return result(state.state, requestedBytes, 0, cause);
   } finally {
     database.close();

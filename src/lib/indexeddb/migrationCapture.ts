@@ -43,6 +43,7 @@ export interface CaptureLegacySourcesOptions {
   now: () => string;
   afterRead?: (key: string, captureNumber: number) => void | Promise<void>;
   maxCapturesPerKey?: number;
+  includeKey?: (key: string) => boolean;
 }
 
 const encoder = new TextEncoder();
@@ -54,7 +55,10 @@ export async function sha256Bytes(value: string): Promise<string> {
     .join('');
 }
 
-function storageKeys(storage: Storage): string[] {
+function storageKeys(
+  storage: Storage,
+  includeKey: (key: string) => boolean = () => true
+): string[] {
   const discovered: string[] = [];
   for (let index = 0; index < storage.length; index += 1) {
     const key = storage.key(index);
@@ -67,7 +71,9 @@ function storageKeys(storage: Storage): string[] {
       discovered.push(key);
     }
   }
-  return [...new Set([...LEGACY_EXACT_KEYS, ...discovered])].sort();
+  return [...new Set([...LEGACY_EXACT_KEYS, ...discovered])]
+    .filter(includeKey)
+    .sort();
 }
 
 async function createSnapshot(
@@ -132,7 +138,7 @@ export async function captureLegacySources(
   const previous = await existingSnapshots(options.database, options.runId);
   const finalEntries: LegacySnapshot[] = [];
 
-  for (const key of storageKeys(options.storage)) {
+  for (const key of storageKeys(options.storage, options.includeKey)) {
     const keySnapshots = previous
       .filter(snapshot => snapshot.key === key)
       .sort((left, right) => left.captureNumber - right.captureNumber);

@@ -30,6 +30,9 @@ const LEGAL_TRANSITIONS: ReadonlySet<string> = new Set([
   'CUTOVER_READY>SHADOWING',
   'CUTOVER_READY>ROLLBACK_PENDING',
   'CUTOVER_READY>BLOCKED',
+  'CUTOVER_READY>IDB_PRIMARY',
+  'IDB_PRIMARY>ROLLBACK_PENDING',
+  'IDB_PRIMARY>RECOVERY_REQUIRED',
   'BLOCKED>PREFLIGHT',
   'BLOCKED>RECOVERY_REQUIRED',
   'ROLLBACK_PENDING>ROLLED_BACK',
@@ -39,7 +42,7 @@ const LEGAL_TRANSITIONS: ReadonlySet<string> = new Set([
 ]);
 
 describe('IndexedDB migration state machine', () => {
-  it('contains exactly the Slice 7 states and no authority-switch state', () => {
+  it('contains the Slice 8 authority state and its explicit rollback paths', () => {
     expect(MIGRATION_STATES).toEqual([
       'LEGACY_PRIMARY',
       'PREFLIGHT',
@@ -49,12 +52,13 @@ describe('IndexedDB migration state machine', () => {
       'VALIDATED',
       'SHADOWING',
       'CUTOVER_READY',
+      'IDB_PRIMARY',
       'BLOCKED',
       'ROLLBACK_PENDING',
       'ROLLED_BACK',
       'RECOVERY_REQUIRED',
     ]);
-    expect(MIGRATION_STATES).not.toContain('IDB_PRIMARY');
+    expect(MIGRATION_STATES).toContain('IDB_PRIMARY');
   });
 
   it('covers every legal and illegal state-pair branch', () => {

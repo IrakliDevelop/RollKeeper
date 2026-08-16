@@ -1,6 +1,6 @@
 import { create, StateCreator } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
+import { isBrowserCharacterCutoverParticipant } from '@/lib/indexeddb/characterCutoverSelection';
 import { TAB_ID } from '@/lib/tabIdentity';
 import {
   armCanonicalPersistence,
@@ -5412,7 +5412,7 @@ export const useCharacterStore = create<CharacterStore>()(
     ),
     {
       name: STORAGE_KEY,
-      skipHydration: isIndexedDbMigrationEnabled(),
+      skipHydration: isBrowserCharacterCutoverParticipant(),
       storage: createJSONStorage(() => createPerCharacterStorage()),
       partialize: state => ({
         character: state.character,

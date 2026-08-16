@@ -3,6 +3,8 @@ import type { StateStorage } from 'zustand/middleware';
 import { characterWriterLock } from '@/lib/characterWriterLock';
 import { isStrictlyFresher } from '@/lib/characterFreshness';
 import { createSafeStorage } from '@/lib/safeStorage';
+import { isBrowserCharacterCutoverParticipant } from '@/lib/indexeddb/characterCutoverSelection';
+import { createCharacterFamilyStateStorage } from '@/lib/indexeddb/characterPersistenceRuntime';
 import { CHARACTER_ENVELOPE_KEY_PREFIX, STORAGE_KEY } from '@/utils/constants';
 import type { CharacterState } from '@/types/character';
 
@@ -117,6 +119,14 @@ export function pickFresherCharacter(
  * Web Locks support, isLeader() reports every tab as leader — the reduced
  * no-locks guarantee is unchanged. */
 export function createPerCharacterStorage(): StateStorage {
+  const participant = isBrowserCharacterCutoverParticipant();
+  const routed =
+    participant && typeof window !== 'undefined'
+      ? createCharacterFamilyStateStorage({
+          backing: window.localStorage,
+          participant: true,
+        })
+      : null;
   return {
     getItem: () => null,
     setItem: (_name, value) => {
@@ -129,10 +139,9 @@ export function createPerCharacterStorage(): StateStorage {
       }
       if (!id || id !== armedCharacterId) return;
       if (!characterWriterLock.isLeader(id)) return;
-      createSafeStorage(window.localStorage).setItem(
-        characterEnvelopeKey(id),
-        value
-      );
+      const key = characterEnvelopeKey(id);
+      if (routed) return routed.setItem(key, value);
+      return createSafeStorage(window.localStorage).setItem(key, value);
     },
     removeItem: () => {},
   };

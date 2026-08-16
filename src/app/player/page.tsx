@@ -30,6 +30,7 @@ import { JoinCampaignDialog } from '@/components/ui/campaign/JoinCampaignDialog'
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import { DataSafetyBanner } from '@/components/ui/feedback/DataSafetyBanner';
 import { DeviceRecoveryControls } from '@/components/ui/feedback/DeviceRecoveryControls';
+import { CharacterStorageMigrationControls } from '@/components/ui/feedback/CharacterStorageMigrationControls';
 import { CharacterCloudBackupControls } from '@/components/ui/character/CharacterCloudBackupControls';
 import { AppIcon } from '@/components/ui/icons';
 import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
@@ -485,6 +486,7 @@ export default function PlayerDashboardPage() {
             review without replacing active values.
           </p>
           <DeviceRecoveryControls />
+          <CharacterStorageMigrationControls />
         </section>
 
         <CharacterCloudBackupControls
