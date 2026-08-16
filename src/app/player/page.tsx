@@ -30,6 +30,7 @@ import { JoinCampaignDialog } from '@/components/ui/campaign/JoinCampaignDialog'
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import { DataSafetyBanner } from '@/components/ui/feedback/DataSafetyBanner';
 import { DeviceRecoveryControls } from '@/components/ui/feedback/DeviceRecoveryControls';
+import { CharacterCloudBackupControls } from '@/components/ui/character/CharacterCloudBackupControls';
 import { AppIcon } from '@/components/ui/icons';
 import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
 import {
@@ -47,6 +48,7 @@ export default function PlayerDashboardPage() {
     restoreCharacter,
     deleteCharacter,
     duplicateCharacter,
+    addCloudRecoveredCharacter,
     migrateFromOldStorage,
     importCharacter,
     updateCharacter,
@@ -484,6 +486,13 @@ export default function PlayerDashboardPage() {
           </p>
           <DeviceRecoveryControls />
         </section>
+
+        <CharacterCloudBackupControls
+          characters={characters}
+          onAddCharacter={character =>
+            addCloudRecoveredCharacter(character as PlayerCharacter)
+          }
+        />
 
         {/* Stats Cards */}
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">

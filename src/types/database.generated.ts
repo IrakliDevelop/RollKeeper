@@ -7,11 +7,6 @@ export type Json =
   | Json[];
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: '13.0.5';
-  };
   public: {
     Tables: {
       characters: {
@@ -109,6 +104,22 @@ export type Database = {
           p_name: string;
           p_payload: Json;
           p_schema_version: number;
+        };
+        Returns: Json;
+      };
+      restore_character: {
+        Args: {
+          p_character_id: string;
+          p_expected_server_version: number;
+          p_mutation_id: string;
+        };
+        Returns: Json;
+      };
+      soft_delete_character: {
+        Args: {
+          p_character_id: string;
+          p_expected_server_version: number;
+          p_mutation_id: string;
         };
         Returns: Json;
       };

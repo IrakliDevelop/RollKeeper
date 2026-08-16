@@ -188,4 +188,68 @@ test('local JWT clients enforce RLS, CAS receipts, and tombstones', async () => 
   assert.equal(tombstonedRead.body.length, 1);
   assert.equal(tombstonedRead.body[0].deleted_at, '2026-08-16T01:00:00+00:00');
   assert.deepEqual(tombstonedRead.body[0].payload, { responseLoss: true });
+
+  const restoreBody = {
+    p_character_id: CHARACTER_ID,
+    p_expected_server_version: 3,
+    p_mutation_id: '40000000-0000-4000-8000-000000000005',
+  };
+  const restored = await request(config, '/rpc/restore_character', {
+    body: restoreBody,
+    method: 'POST',
+    token: userAToken,
+  });
+  assert.deepEqual(restored.body, {
+    characterId: CHARACTER_ID,
+    serverVersion: 4,
+    status: 'success',
+  });
+
+  const archiveBody = {
+    p_character_id: CHARACTER_ID,
+    p_expected_server_version: 4,
+    p_mutation_id: '40000000-0000-4000-8000-000000000006',
+  };
+  const archived = await request(config, '/rpc/soft_delete_character', {
+    body: archiveBody,
+    method: 'POST',
+    token: userAToken,
+  });
+  assert.deepEqual(archived.body, {
+    characterId: CHARACTER_ID,
+    serverVersion: 5,
+    status: 'success',
+  });
+
+  const archiveResponseLossRetry = await request(
+    config,
+    '/rpc/soft_delete_character',
+    { body: archiveBody, method: 'POST', token: userAToken }
+  );
+  assert.deepEqual(archiveResponseLossRetry.body, archived.body);
+
+  const crossAccountArchive = await request(
+    config,
+    '/rpc/soft_delete_character',
+    {
+      body: {
+        ...archiveBody,
+        p_expected_server_version: 5,
+        p_mutation_id: '40000000-0000-4000-8000-000000000007',
+      },
+      method: 'POST',
+      token: userBToken,
+    }
+  );
+  assert.equal(crossAccountArchive.response.status, 200);
+  assert.equal(crossAccountArchive.body.status, 'conflict');
+
+  const archivedRead = await request(
+    config,
+    `${characterPath}&select=deleted_at,payload,server_version`,
+    { token: userAToken }
+  );
+  assert.equal(archivedRead.body[0].server_version, 5);
+  assert.notEqual(archivedRead.body[0].deleted_at, null);
+  assert.deepEqual(archivedRead.body[0].payload, { responseLoss: true });
 });

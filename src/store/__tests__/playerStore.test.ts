@@ -227,6 +227,58 @@ describe('playerStore', () => {
     });
   });
 
+  describe('addCloudRecoveredCharacter', () => {
+    it('restores the original ID without stripping unknown fields or nulls', () => {
+      const recovered = {
+        id: 'cloud-recovered',
+        name: 'Recovered Hero',
+        race: 'Elf',
+        class: 'Wizard',
+        level: 5,
+        createdAt: new Date('2024-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2024-01-02T00:00:00.000Z'),
+        lastPlayed: new Date('2024-01-03T00:00:00.000Z'),
+        characterData: makeCharacter({
+          id: 'cloud-recovered',
+          name: 'Recovered Hero',
+        }),
+        tags: ['cloud-recovery'],
+        isArchived: false,
+        unknownTopLevel: null,
+      };
+
+      expect(
+        usePlayerStore.getState().addCloudRecoveredCharacter(recovered)
+      ).toBe(true);
+      expect(usePlayerStore.getState().characters[0]).toEqual(recovered);
+      expect(usePlayerStore.getState().characters[0]).toHaveProperty(
+        'unknownTopLevel',
+        null
+      );
+    });
+
+    it('refuses to overwrite a colliding local ID and preserves recovery data', () => {
+      const localId = usePlayerStore.getState().createCharacter('Local Hero');
+      localStorage.setItem('rollkeeper-character', '{"legacy":true}');
+      localStorage.setItem('rollkeeper-recovery-marker', 'keep-me');
+
+      const accepted = usePlayerStore.getState().addCloudRecoveredCharacter({
+        ...usePlayerStore.getState().characters[0],
+        id: localId,
+        name: 'Cloud Hero',
+      });
+
+      expect(accepted).toBe(false);
+      expect(usePlayerStore.getState().characters[0].name).toBe('Local Hero');
+      expect(localStorage.getItem('rollkeeper-character')).toBe(
+        '{"legacy":true}'
+      );
+      expect(localStorage.getItem('rollkeeper-recovery-marker')).toBe(
+        'keep-me'
+      );
+    });
+  });
+
   describe('setActiveCharacter', () => {
     it('sets the active character ID', () => {
       const id = usePlayerStore.getState().createCharacter('Hero');
