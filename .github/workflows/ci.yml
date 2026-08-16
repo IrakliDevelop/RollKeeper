@@ -41,6 +41,13 @@ jobs:
   production-build:
     name: Production build
     runs-on: ubuntu-latest
+    # The S3 utility validates these at module evaluation during `next build`.
+    # CI never contacts AWS, so use inert values instead of production secrets.
+    env:
+      AWS_S3_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ci-build-placeholder
+      AWS_SECRET_ACCESS_KEY: ci-build-placeholder
+      AWS_S3_BUCKET_NAME: ci-build-placeholder
     steps:
       - uses: actions/checkout@v4
 
