@@ -1,5 +1,6 @@
 import { create, StateCreator } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { TAB_ID } from '@/lib/tabIdentity';
 import {
   armCanonicalPersistence,
@@ -5411,6 +5412,7 @@ export const useCharacterStore = create<CharacterStore>()(
     ),
     {
       name: STORAGE_KEY,
+      skipHydration: isIndexedDbMigrationEnabled(),
       storage: createJSONStorage(() => createPerCharacterStorage()),
       partialize: state => ({
         character: state.character,

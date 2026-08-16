@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { createSafeStorage } from '@/lib/safeStorage';
 import type { BattleMap } from '@/types/battlemap';
 
@@ -198,6 +199,7 @@ export const useBattleMapStore = create<BattleMapStoreState>()(
     }),
     {
       name: BATTLEMAP_STORAGE_KEY,
+      skipHydration: isIndexedDbMigrationEnabled(),
       storage: createJSONStorage(() => createSafeStorage()),
     }
   )

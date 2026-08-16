@@ -4,6 +4,7 @@ import './globals.css';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { AccountIndicator } from '@/components/auth/AccountIndicator';
 import { ThemeProviderWrapper } from './ThemeProviderWrapper';
+import { PersistenceBootstrap } from '@/components/PersistenceBootstrap';
 
 const geistSans = localFont({
   src: './fonts/geist-latin.woff2',
@@ -88,10 +89,12 @@ export default function RootLayout({
         suppressHydrationWarning={true}
       >
         <ThemeProviderWrapper>
-          <ErrorBoundary>
-            {children}
-            <AccountIndicator />
-          </ErrorBoundary>
+          <PersistenceBootstrap>
+            <ErrorBoundary>
+              {children}
+              <AccountIndicator />
+            </ErrorBoundary>
+          </PersistenceBootstrap>
         </ThemeProviderWrapper>
       </body>
     </html>
