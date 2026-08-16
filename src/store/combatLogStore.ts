@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { createSafeStorage } from '@/lib/safeStorage';
 import {
   CombatLogEvent,
@@ -237,6 +238,7 @@ export const useCombatLogStore = create<CombatLogStoreState>()(
     }),
     {
       name: COMBAT_LOG_STORAGE_KEY,
+      skipHydration: isIndexedDbMigrationEnabled(),
       storage: createJSONStorage(() => createSafeStorage()),
       version: 1,
     }

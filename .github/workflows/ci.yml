@@ -38,6 +38,18 @@ jobs:
       - name: Unit tests
         run: npm run test
 
+      - name: IndexedDB migration coverage contract
+        run: >-
+          npm test -- src/lib/indexeddb
+          --coverage.enabled=true
+          --coverage.provider=v8
+          --coverage.reporter=text
+          --coverage.include='src/lib/indexeddb/*.ts'
+          --coverage.thresholds.perFile=true
+          --coverage.thresholds.statements=90
+          --coverage.thresholds.functions=90
+          --coverage.thresholds.branches=85
+
   production-build:
     name: Production build
     runs-on: ubuntu-latest
@@ -158,6 +170,9 @@ jobs:
       # The e2e specs are relay/Redis-free — no service env needed.
       - name: E2E tests
         run: npm run test:e2e
+
+      - name: IndexedDB migration durability tests
+        run: npm run test:indexeddb:e2e
 
       - name: Upload Playwright failure artifacts
         if: failure()

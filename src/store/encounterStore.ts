@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { createSafeStorage } from '@/lib/safeStorage';
 import {
   Encounter,
@@ -1528,6 +1529,7 @@ export const useEncounterStore = create<EncounterStoreState>()(
     }),
     {
       name: ENCOUNTER_STORAGE_KEY,
+      skipHydration: isIndexedDbMigrationEnabled(),
       storage: createJSONStorage(() => createSafeStorage()),
       version: 2,
       migrate: migrateEncounterPersistedState,

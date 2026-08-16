@@ -1,4 +1,5 @@
 import type { StateStorage } from 'zustand/middleware';
+import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 
 /** Window event fired when a localStorage write fails because the quota is full. */
 export const STORAGE_QUOTA_EVENT = 'rollkeeper:storage-quota-exceeded';
@@ -31,6 +32,13 @@ export function createSafeStorage(backing?: Storage): StateStorage {
       if (!store) return;
       try {
         store.setItem(key, value);
+        if (isIndexedDbMigrationEnabled()) {
+          void import('@/lib/indexeddb/browserShadowWriter')
+            .then(({ recordAuthoritativeShadowWrite }) =>
+              recordAuthoritativeShadowWrite(key, value)
+            )
+            .catch(() => undefined);
+        }
       } catch (e) {
         if (isQuotaExceeded(e)) {
           console.error(

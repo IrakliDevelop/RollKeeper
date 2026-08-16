@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { createSafeStorage } from '@/lib/safeStorage';
 import { CampaignInfo } from '@/types/campaign';
 
@@ -150,6 +151,7 @@ export const useDmStore = create<DmStoreState>()(
     }),
     {
       name: DM_STORAGE_KEY,
+      skipHydration: isIndexedDbMigrationEnabled(),
       storage: createJSONStorage(() => createSafeStorage()),
       version: 1,
     }

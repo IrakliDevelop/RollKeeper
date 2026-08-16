@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { createSafeStorage } from '@/lib/safeStorage';
 import type { CustomMagicItem } from '@/types/magicItemLibrary';
 
@@ -102,6 +103,7 @@ export const useMagicItemLibraryStore = create<MagicItemLibraryState>()(
     }),
     {
       name: 'rollkeeper-dm-magic-item-library',
+      skipHydration: isIndexedDbMigrationEnabled(),
       storage: createJSONStorage(() => createSafeStorage()),
       version: 1,
     }

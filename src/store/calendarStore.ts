@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { createSafeStorage } from '@/lib/safeStorage';
 import type {
   CalendarConfig,
@@ -178,6 +179,7 @@ export const useCalendarStore = create<CalendarStoreState>()(
     }),
     {
       name: CALENDAR_STORAGE_KEY,
+      skipHydration: isIndexedDbMigrationEnabled(),
       storage: createJSONStorage(() => createSafeStorage()),
       version: 3,
       migrate: (persisted: unknown, version: number) => {

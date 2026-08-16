@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { createSafeStorage } from '@/lib/safeStorage';
 import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
 import { initCrossTabRosterSync } from '@/lib/crossTabRosterSync';
@@ -504,6 +505,7 @@ export const usePlayerStore = create<PlayerStoreState>()(
     }),
     {
       name: PLAYER_STORAGE_KEY,
+      skipHydration: isIndexedDbMigrationEnabled(),
       storage: createJSONStorage(() => createSafeStorage()),
       version: 1,
       merge: (persistedState, currentState) => ({
