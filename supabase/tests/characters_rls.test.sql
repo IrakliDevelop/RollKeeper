@@ -1,6 +1,23 @@
 begin;
 
-select plan(6);
+select plan(9);
+
+select ok(
+  not has_table_privilege('authenticated', 'public.characters', 'DELETE'),
+  'authenticated clients cannot delete characters directly'
+);
+select ok(
+  not has_table_privilege('authenticated', 'public.characters', 'TRUNCATE'),
+  'authenticated clients cannot truncate characters'
+);
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.guard_character_identity_and_tombstone()',
+    'EXECUTE'
+  ),
+  'anonymous clients cannot execute the character guard function'
+);
 
 set local role anon;
 select throws_ok(

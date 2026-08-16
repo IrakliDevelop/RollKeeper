@@ -44,9 +44,14 @@ if (formattedResult.status !== 0) {
 }
 
 const committedTypes = fs.readFileSync(generatedTypesPath, 'utf8');
+const withoutRemotePostgrestMetadata = value =>
+  value.replace(
+    /  \/\/ Allows to automatically instantiate createClient with right options\n  \/\/ instead of createClient<Database, \{ PostgrestVersion: 'XX' \}>\(URL, KEY\)\n  __InternalSupabase: \{\n    PostgrestVersion: '[^']+';\n  \};\n/,
+    ''
+  );
 assert.equal(
-  committedTypes,
-  formattedResult.stdout,
+  withoutRemotePostgrestMetadata(committedTypes),
+  withoutRemotePostgrestMetadata(formattedResult.stdout),
   'database.generated.ts is stale; run npm run db:types against a reset local stack'
 );
 
