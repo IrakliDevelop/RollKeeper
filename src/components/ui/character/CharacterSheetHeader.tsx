@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/layout/badge';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
+import type { SaveStatus } from '@/types/character';
 import { exportCharacterToFile } from '@/utils/fileOperations';
 import { useState, useEffect } from 'react';
 import { Button, Input } from '@/components/ui/forms';
@@ -30,7 +31,7 @@ interface CharacterSheetHeaderProps {
   characterLevel: number;
   characterAlignment: string;
   characterCreatureType: string;
-  saveStatus: 'saving' | 'saved' | 'error';
+  saveStatus: SaveStatus;
   lastSaved: Date | string | null;
   hasUnsavedChanges: boolean;
   onManualSave: () => void;

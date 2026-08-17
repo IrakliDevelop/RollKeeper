@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useCharacterStore } from '@/store/characterStore';
 import { AUTOSAVE_DELAY } from '@/utils/constants';
 import { isBrowserCharacterCutoverParticipant } from '@/lib/indexeddb/characterCutoverSelection';
-import { awaitCharacterPersistence } from '@/lib/indexeddb/characterPersistenceRuntime';
+import { awaitCharacterPersistenceResult } from '@/lib/indexeddb/characterPersistenceRuntime';
 
 interface UseAutoSaveOptions {
   delay?: number;
@@ -41,10 +41,14 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
       try {
         saveCharacter();
         if (isBrowserCharacterCutoverParticipant()) {
-          void awaitCharacterPersistence().then(saved => {
-            if (saved) {
-              setSaveStatus('saved');
+          void awaitCharacterPersistenceResult().then(result => {
+            if (result.saved) {
               markSaved();
+              setSaveStatus(
+                result.mirrorPending
+                  ? 'saved-local-mirror-pending'
+                  : 'saved-local'
+              );
               onAfterSaveRef.current?.();
             } else {
               useCharacterStore.setState({ hasUnsavedChanges: true });
@@ -84,10 +88,14 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
     try {
       saveCharacter();
       if (isBrowserCharacterCutoverParticipant()) {
-        void awaitCharacterPersistence().then(saved => {
-          if (saved) {
-            setSaveStatus('saved');
+        void awaitCharacterPersistenceResult().then(result => {
+          if (result.saved) {
             markSaved();
+            setSaveStatus(
+              result.mirrorPending
+                ? 'saved-local-mirror-pending'
+                : 'saved-local'
+            );
             onAfterSaveRef.current?.();
           } else {
             useCharacterStore.setState({ hasUnsavedChanges: true });
@@ -184,9 +192,17 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
         try {
           saveCharacter();
           if (isBrowserCharacterCutoverParticipant()) {
-            void awaitCharacterPersistence().then(saved => {
-              if (saved) markSaved();
-              else {
+            void awaitCharacterPersistenceResult().then(result => {
+              if (result.saved) {
+                markSaved();
+                useCharacterStore
+                  .getState()
+                  .setSaveStatus(
+                    result.mirrorPending
+                      ? 'saved-local-mirror-pending'
+                      : 'saved-local'
+                  );
+              } else {
                 useCharacterStore.setState({ hasUnsavedChanges: true });
                 useCharacterStore.getState().setSaveStatus('error');
               }

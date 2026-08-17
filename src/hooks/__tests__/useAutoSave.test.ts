@@ -3,6 +3,16 @@ import { renderHook, act, cleanup } from '@testing-library/react';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useCharacterStore } from '@/store/characterStore';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
+import { isBrowserCharacterCutoverParticipant } from '@/lib/indexeddb/characterCutoverSelection';
+import { awaitCharacterPersistenceResult } from '@/lib/indexeddb/characterPersistenceRuntime';
+
+vi.mock('@/lib/indexeddb/characterCutoverSelection', () => ({
+  isBrowserCharacterCutoverParticipant: vi.fn(),
+}));
+
+vi.mock('@/lib/indexeddb/characterPersistenceRuntime', () => ({
+  awaitCharacterPersistenceResult: vi.fn(),
+}));
 
 /**
  * Inject mock action functions into the store so the hook's closures pick them
@@ -44,6 +54,13 @@ function setupStore(overrides: Record<string, unknown> = {}) {
 describe('useAutoSave', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.mocked(isBrowserCharacterCutoverParticipant).mockReturnValue(false);
+    vi.mocked(awaitCharacterPersistenceResult).mockResolvedValue({
+      saved: true,
+      idbAck: true,
+      mirrorAck: true,
+      mirrorPending: false,
+    });
     // Always start each test with a clean store state so nothing leaks
     setupStore();
   });
@@ -140,6 +157,43 @@ describe('useAutoSave', () => {
 
     expect(mockSetSaveStatus).toHaveBeenCalledWith('saving');
     expect(mockSetSaveStatus).toHaveBeenCalledWith('saved');
+  });
+
+  it('reports an acknowledged active IndexedDB save as local saved', async () => {
+    vi.mocked(isBrowserCharacterCutoverParticipant).mockReturnValue(true);
+    const { mockSetSaveStatus } = setupStore({ hasUnsavedChanges: true });
+    const { result } = renderHook(() => useAutoSave({ delay: 500 }));
+
+    await act(async () => {
+      result.current.manualSave();
+      await Promise.resolve();
+    });
+
+    expect(mockSetSaveStatus).toHaveBeenLastCalledWith('saved-local');
+  });
+
+  it('surfaces a committed IndexedDB save whose compatibility mirror is pending', async () => {
+    vi.mocked(isBrowserCharacterCutoverParticipant).mockReturnValue(true);
+    vi.mocked(awaitCharacterPersistenceResult).mockResolvedValue({
+      saved: true,
+      idbAck: true,
+      mirrorAck: false,
+      mirrorPending: true,
+    });
+    const { mockSetSaveStatus, mockMarkSaved } = setupStore({
+      hasUnsavedChanges: true,
+    });
+    const { result } = renderHook(() => useAutoSave({ delay: 500 }));
+
+    await act(async () => {
+      result.current.manualSave();
+      await Promise.resolve();
+    });
+
+    expect(mockMarkSaved).toHaveBeenCalledOnce();
+    expect(mockSetSaveStatus).toHaveBeenLastCalledWith(
+      'saved-local-mirror-pending'
+    );
   });
 
   it('does not save when enabled: false', () => {

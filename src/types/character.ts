@@ -734,7 +734,12 @@ export interface CharacterExport {
 }
 
 // Save state type
-export type SaveStatus = 'saving' | 'saved' | 'error';
+export type SaveStatus =
+  | 'saving'
+  | 'saved'
+  | 'saved-local'
+  | 'saved-local-mirror-pending'
+  | 'error';
 
 // Exhaustion variants (2014 vs 2024)
 export type ExhaustionVariant = '2014' | '2024';
