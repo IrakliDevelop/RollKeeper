@@ -7,7 +7,6 @@ import {
   Crown,
   Users,
   ArrowLeft,
-  Copy,
   Check,
   Trash2,
   Clock,
@@ -18,6 +17,7 @@ import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { CreateCampaignDialog } from '@/components/ui/campaign/CreateCampaignDialog';
+import { DmCloudWorkspaceControls } from '@/components/ui/campaign/DmCloudWorkspaceControls';
 import { BannerUpload } from '@/components/ui/campaign/BannerUpload';
 import { useHydration } from '@/hooks/useHydration';
 import { CampaignInfo } from '@/types/campaign';
@@ -226,6 +226,8 @@ export default function DmDashboardPage() {
             </div>
           </div>
         </div>
+
+        <DmCloudWorkspaceControls campaigns={campaigns} dmId={dmId} />
 
         {/* Campaign Grid */}
         {campaigns.length === 0 ? (

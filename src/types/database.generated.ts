@@ -9,6 +9,124 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      campaign_authority_records: {
+        Row: {
+          authority: string;
+          axis: string;
+          campaign_id: string;
+          created_at: string;
+          epoch: number;
+          family: string;
+          updated_at: string;
+        };
+        Insert: {
+          authority: string;
+          axis: string;
+          campaign_id: string;
+          created_at?: string;
+          epoch: number;
+          family: string;
+          updated_at?: string;
+        };
+        Update: {
+          authority?: string;
+          axis?: string;
+          campaign_id?: string;
+          created_at?: string;
+          epoch?: number;
+          family?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'campaign_authority_records_campaign_id_fkey';
+            columns: ['campaign_id'];
+            isOneToOne: false;
+            referencedRelation: 'campaigns';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      campaign_workspace_claim_provenance: {
+        Row: {
+          authorization_id: string | null;
+          campaign_id: string;
+          claim_kind: string;
+          claimant_id: string;
+          claimed_at: string;
+          proof_method: string;
+          source_fingerprint: string | null;
+        };
+        Insert: {
+          authorization_id?: string | null;
+          campaign_id: string;
+          claim_kind: string;
+          claimant_id: string;
+          claimed_at?: string;
+          proof_method: string;
+          source_fingerprint?: string | null;
+        };
+        Update: {
+          authorization_id?: string | null;
+          campaign_id?: string;
+          claim_kind?: string;
+          claimant_id?: string;
+          claimed_at?: string;
+          proof_method?: string;
+          source_fingerprint?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'campaign_workspace_claim_provenance_campaign_id_fkey';
+            columns: ['campaign_id'];
+            isOneToOne: true;
+            referencedRelation: 'campaigns';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      campaigns: {
+        Row: {
+          created_at: string;
+          deleted_at: string | null;
+          display_code: string;
+          id: string;
+          membership_authority: string;
+          membership_cutover_epoch: number;
+          name: string;
+          owner_id: string;
+          ownership_state: string;
+          server_version: number;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          deleted_at?: string | null;
+          display_code: string;
+          id: string;
+          membership_authority?: string;
+          membership_cutover_epoch?: number;
+          name: string;
+          owner_id: string;
+          ownership_state?: string;
+          server_version?: number;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          deleted_at?: string | null;
+          display_code?: string;
+          id?: string;
+          membership_authority?: string;
+          membership_cutover_epoch?: number;
+          name?: string;
+          owner_id?: string;
+          ownership_state?: string;
+          server_version?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       characters: {
         Row: {
           client_revision: number;
@@ -94,6 +212,24 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      claim_campaign_workspace: {
+        Args: {
+          p_authorization_token: string;
+          p_legacy_source_fingerprint: string;
+          p_mutation_id: string;
+          p_name: string;
+        };
+        Returns: Json;
+      };
+      create_campaign_workspace: {
+        Args: {
+          p_creation_kind: string;
+          p_mutation_id: string;
+          p_name: string;
+          p_source_fingerprint: string;
+        };
+        Returns: Json;
+      };
       put_character: {
         Args: {
           p_character_id: string;

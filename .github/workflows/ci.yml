@@ -41,6 +41,9 @@ jobs:
       - name: Automatic character sync coverage contract
         run: npm run test:slice9:coverage
 
+      - name: DM workspace identity coverage contract
+        run: npm run test:slice10a1:coverage
+
       - name: IndexedDB migration coverage contract
         run: >-
           npm test -- src/lib/indexeddb

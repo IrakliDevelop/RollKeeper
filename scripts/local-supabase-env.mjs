@@ -88,3 +88,40 @@ export function setLocalCharacterTombstone(characterId, deletedAt) {
     { stdio: 'pipe' }
   );
 }
+
+export function provisionLocalWorkspaceClaim({
+  authorizationId,
+  claimantId,
+  sourceFingerprint,
+  token,
+}) {
+  const uuidPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu;
+  if (!uuidPattern.test(authorizationId) || !uuidPattern.test(claimantId)) {
+    throw new Error('Invalid local workspace claim fixture ID');
+  }
+  if (!/^[a-f0-9]{64}$/u.test(sourceFingerprint) || token.length < 16) {
+    throw new Error('Invalid local workspace claim fixture proof');
+  }
+
+  execFileSync(
+    'docker',
+    [
+      'exec',
+      DATABASE_CONTAINER,
+      'psql',
+      '--username=postgres',
+      '--dbname=postgres',
+      '--command',
+      `insert into private.workspace_claim_authorizations (
+         id, claimant_id, legacy_source_fingerprint, token_hash, expires_at
+       ) values (
+         '${authorizationId}'::uuid,
+         '${claimantId}'::uuid,
+         '${sourceFingerprint}',
+         extensions.digest('${token.replaceAll("'", "''")}', 'sha256'),
+         statement_timestamp() + interval '1 hour'
+       );`,
+    ],
+    { stdio: 'pipe' }
+  );
+}
