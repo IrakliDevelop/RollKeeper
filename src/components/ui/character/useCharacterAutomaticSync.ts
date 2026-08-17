@@ -19,6 +19,7 @@ import { isAutomaticCharacterSyncEnabled } from '@/lib/supabase/automaticCharact
 import { awaitCharacterPersistenceResult } from '@/lib/indexeddb/characterPersistenceRuntime';
 import { createBrowserAutomaticCharacterSync } from '@/lib/supabase/browserAutomaticCharacterSync';
 import { subscribeBrowserAutomaticCharacterAccountChanges } from '@/lib/supabase/browserAutomaticCharacterSync';
+import { AUTOMATIC_SYNC_STATUS_CHANGED_EVENT } from '@/lib/supabase/automaticCharacterSyncCoordinator';
 import {
   clearAutomaticCharacterSyncRuntime,
   configureAutomaticCharacterSyncRuntime,
@@ -101,16 +102,17 @@ function useCharacterAutomaticSyncController(
     const context = contextRef.current;
     if (!context) return;
     for (const document of await context.documents()) {
-      if (document.baseServerVersion <= 0) continue;
       const appliedKey = `${document.namespace}:${document.legacyId}`;
+      const store = usePlayerStore.getState();
+      const existing = store.getCharacterById(document.legacyId);
+      if (document.baseServerVersion <= 0 && existing) continue;
+      const appliedVersion = appliedVersions.current.get(appliedKey);
       if (
-        (appliedVersions.current.get(appliedKey) ?? 0) >=
-        document.baseServerVersion
+        appliedVersion !== undefined &&
+        appliedVersion >= document.baseServerVersion
       ) {
         continue;
       }
-      const store = usePlayerStore.getState();
-      const existing = store.getCharacterById(document.legacyId);
       if (document.deletedAt) {
         if (existing) {
           usePlayerStore.setState(state => ({
@@ -134,11 +136,10 @@ function useCharacterAutomaticSyncController(
         'characterData' in document.payload
       ) {
         if (existing) {
-          store.updateCharacter(
-            document.legacyId,
+          store.replaceCloudRecoveredCharacter(
             document.payload as unknown as Parameters<
-              typeof store.updateCharacter
-            >[1]
+              typeof store.replaceCloudRecoveredCharacter
+            >[0]
           );
         } else {
           store.addCloudRecoveredCharacter(
@@ -158,6 +159,40 @@ function useCharacterAutomaticSyncController(
     await context.coordinator.manualRefresh();
     await applyCloudDocuments();
     setStatuses(await context.statuses(charactersRef.current));
+  }, [applyCloudDocuments]);
+
+  useEffect(() => {
+    if (!isAutomaticCharacterSyncEnabled()) return;
+    let active = true;
+    const updateFromDurableState = () => {
+      const context = contextRef.current;
+      if (!context) return;
+      void (async () => {
+        await applyCloudDocuments();
+        if (active) {
+          setStatuses(await context.statuses(charactersRef.current));
+        }
+      })().catch(cause => {
+        if (active) {
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : 'Automatic sync status could not be refreshed'
+          );
+        }
+      });
+    };
+    window.addEventListener(
+      AUTOMATIC_SYNC_STATUS_CHANGED_EVENT,
+      updateFromDurableState
+    );
+    return () => {
+      active = false;
+      window.removeEventListener(
+        AUTOMATIC_SYNC_STATUS_CHANGED_EVENT,
+        updateFromDurableState
+      );
+    };
   }, [applyCloudDocuments]);
 
   useEffect(() => {
@@ -184,6 +219,9 @@ function useCharacterAutomaticSyncController(
           wake: () => context.coordinator.wake(),
           stop: () => context.coordinator.stop(),
         });
+        await context.repository.resumeAfterAuthentication(
+          `user:${context.accountId}`
+        );
         await context.coordinator.start();
         await applyCloudDocuments();
         if (active) setStatuses(await context.statuses(charactersRef.current));

@@ -59,9 +59,18 @@ function throwForError(error: SupabaseErrorShape | null): void {
   if (!error) return;
   const authExpired =
     error.code === 'PGRST301' || /jwt|auth|session/i.test(error.message);
+  const offline =
+    !authExpired &&
+    /failed to fetch|network(?:error| request failed)|load failed/i.test(
+      error.message
+    );
   throw new CharacterCloudGatewayError(
-    authExpired ? 'Your session expired. Sign in and retry.' : error.message,
-    authExpired ? 'auth-required' : 'failed'
+    authExpired
+      ? 'Your session expired. Sign in and retry.'
+      : offline
+        ? 'Network unavailable'
+        : error.message,
+    authExpired ? 'auth-required' : offline ? 'offline' : 'failed'
   );
 }
 

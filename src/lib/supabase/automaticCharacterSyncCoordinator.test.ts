@@ -53,6 +53,23 @@ describe('AutomaticCharacterSyncCoordinator', () => {
     );
   });
 
+  it('invalidates the browser status view after a background cycle settles', async () => {
+    const events = new EventTarget();
+    const statusChanged = vi.fn();
+    events.addEventListener('automatic-sync-status-changed', statusChanged);
+    const coordinator = new AutomaticCharacterSyncCoordinator({
+      featureEnabled: true,
+      hasParticipants: async () => true,
+      runOnce: vi.fn().mockResolvedValue('idle'),
+      pull: vi.fn(),
+      events,
+    });
+
+    await coordinator.start();
+
+    expect(statusChanged).toHaveBeenCalledOnce();
+  });
+
   it('discovers durable work without BroadcastChannel and retries after writer failover', async () => {
     const runOnce = vi
       .fn()

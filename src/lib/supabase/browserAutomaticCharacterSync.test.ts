@@ -157,6 +157,86 @@ describe('browser automatic character sync authority routing', () => {
     expect(createSupabaseCharacterCloudGateway).not.toHaveBeenCalled();
   });
 
+  it('restores the isolated account runtime from the stored session when getUser is offline', async () => {
+    localStorage.setItem(
+      characterCutoverSelectionKey('guest'),
+      JSON.stringify(selection)
+    );
+    vi.mocked(createSupabaseBrowserClient).mockReturnValue({
+      auth: {
+        getUser: vi.fn(async () => ({
+          data: { user: null },
+          error: new TypeError('Failed to fetch'),
+        })),
+        getSession: vi.fn(async () => ({
+          data: {
+            session: {
+              user: { id: 'account-a', email: 'synthetic@localhost' },
+            },
+          },
+          error: null,
+        })),
+      },
+    } as never);
+
+    await expect(createBrowserAutomaticCharacterSync()).resolves.toMatchObject({
+      accountId: 'account-a',
+      accountLabel: 'synthetic@localhost',
+      indexedDbPrimary: true,
+    });
+  });
+
+  it('keeps the automatic runtime disabled when the offline session cannot be read', async () => {
+    localStorage.setItem(
+      characterCutoverSelectionKey('guest'),
+      JSON.stringify(selection)
+    );
+    vi.mocked(createSupabaseBrowserClient).mockReturnValue({
+      auth: {
+        getUser: vi.fn(async () => ({
+          data: { user: null },
+          error: new TypeError('Failed to fetch'),
+        })),
+        getSession: vi.fn(async () => {
+          throw new Error('Session storage unavailable');
+        }),
+      },
+    } as never);
+
+    await expect(createBrowserAutomaticCharacterSync()).resolves.toBeNull();
+    expect(readCharacterAuthority).not.toHaveBeenCalled();
+    expect(createSupabaseCharacterCloudGateway).not.toHaveBeenCalled();
+  });
+
+  it('restores from an object-shaped offline error without requiring BroadcastChannel', async () => {
+    localStorage.setItem(
+      characterCutoverSelectionKey('guest'),
+      JSON.stringify(selection)
+    );
+    vi.stubGlobal('BroadcastChannel', undefined);
+    vi.mocked(createSupabaseBrowserClient).mockReturnValue({
+      auth: {
+        getUser: vi.fn(async () => ({
+          data: { user: null },
+          error: { message: 'Network request failed' },
+        })),
+        getSession: vi.fn(async () => ({
+          data: {
+            session: { user: { id: 'account-a', email: null } },
+          },
+          error: null,
+        })),
+      },
+    } as never);
+
+    const context = await createBrowserAutomaticCharacterSync();
+    expect(context).toMatchObject({
+      accountId: 'account-a',
+      accountLabel: 'Signed-in account',
+    });
+    context!.close();
+  });
+
   it('reports every durable status without making status reads a cloud operation', async () => {
     localStorage.setItem(
       characterCutoverSelectionKey('guest'),

@@ -225,6 +225,30 @@ describe('useAutoSave', () => {
     );
   });
 
+  it('queues the character snapshot that was just saved instead of the prior roster value', async () => {
+    vi.mocked(isBrowserCharacterCutoverParticipant).mockReturnValue(true);
+    const current = makeCharacter();
+    current.name = 'Just-saved character';
+    setupStore({ character: current, hasUnsavedChanges: true });
+    const { result } = renderHook(() => useAutoSave({ delay: 500 }));
+
+    await act(async () => {
+      result.current.manualSave();
+      for (let index = 0; index < 8; index += 1) {
+        await Promise.resolve();
+      }
+    });
+
+    expect(recordAutomaticCharacterEdit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Just-saved character',
+        characterData: expect.objectContaining({
+          name: 'Just-saved character',
+        }),
+      })
+    );
+  });
+
   it('does not acknowledge Local saved when the opted-in document/outbox transaction fails', async () => {
     vi.mocked(isBrowserCharacterCutoverParticipant).mockReturnValue(true);
     vi.mocked(recordAutomaticCharacterEdit).mockRejectedValue(

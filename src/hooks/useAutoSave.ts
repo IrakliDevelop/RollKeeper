@@ -39,12 +39,36 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
         setSaveStatus('error');
         return;
       }
+      const playerStore = usePlayerStore.getState();
+      const liveCharacter = structuredClone(
+        useCharacterStore.getState().character
+      );
+      const activeBeforeRosterCommit = playerStore.getActiveCharacter();
+      let rosterResult = result;
+      if (
+        activeBeforeRosterCommit &&
+        activeBeforeRosterCommit.id === liveCharacter.id
+      ) {
+        playerStore.updateCharacterData(
+          activeBeforeRosterCommit.id,
+          liveCharacter
+        );
+        rosterResult = await awaitCharacterPersistenceResult();
+        if (!rosterResult.saved) {
+          localPersistenceFailureRef.current = true;
+          useCharacterStore.setState({ hasUnsavedChanges: true });
+          setSaveStatus('error');
+          return;
+        }
+      }
       const activeCharacter = usePlayerStore.getState().getActiveCharacter();
       if (activeCharacter) await recordAutomaticCharacterEdit(activeCharacter);
       localPersistenceFailureRef.current = false;
       markSaved();
       setSaveStatus(
-        result.mirrorPending ? 'saved-local-mirror-pending' : 'saved-local'
+        result.mirrorPending || rosterResult.mirrorPending
+          ? 'saved-local-mirror-pending'
+          : 'saved-local'
       );
       onAfterSaveRef.current?.();
     },

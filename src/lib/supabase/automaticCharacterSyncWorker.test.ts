@@ -293,6 +293,37 @@ describe('AutomaticCharacterSyncWorker', () => {
     });
   });
 
+  it('preserves a resolvable canonical identity for a first-upload conflict on another device', async () => {
+    const cloud = gateway();
+    vi.mocked(cloud.put).mockResolvedValue({
+      status: 'conflict',
+      characterId: 'canonical-cloud-id',
+      serverVersion: 2,
+    });
+    vi.mocked(cloud.fetch).mockResolvedValue({
+      ...row('same-character', 2),
+      id: 'canonical-cloud-id',
+      payload: {
+        id: 'same-character',
+        name: 'remote candidate',
+        fingerprint: 'remote-fp',
+      },
+    });
+    await repository.commit(
+      mutation('same-character', { cloudId: 'provisional-device-id' })
+    );
+
+    await expect(worker(cloud).runOnce()).resolves.toBe('conflict');
+    await expect(repository.listConflicts(NAMESPACE)).resolves.toEqual([
+      expect.objectContaining({
+        localCandidate: expect.objectContaining({
+          cloudId: 'canonical-cloud-id',
+          baseServerVersion: 0,
+        }),
+      }),
+    ]);
+  });
+
   it('never runs automatic cloud work in the guest namespace', async () => {
     const cloud = gateway();
     const guestWorker = new AutomaticCharacterSyncWorker({

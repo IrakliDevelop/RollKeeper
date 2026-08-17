@@ -92,4 +92,20 @@ describe('Supabase character cloud gateway', () => {
       })
     ).rejects.toMatchObject({ category: 'auth-required' });
   });
+
+  it('classifies the browser fetch failure produced by genuine offline mode', async () => {
+    const client = rpcClient({
+      data: null,
+      error: { code: '', message: 'TypeError: Failed to fetch' },
+    });
+    const gateway = createSupabaseCharacterCloudGateway(client);
+
+    await expect(
+      gateway.archive({
+        mutationId: 'mutation-a',
+        cloudId: 'cloud-a',
+        expectedServerVersion: 1,
+      })
+    ).rejects.toMatchObject({ category: 'offline' });
+  });
 });

@@ -69,6 +69,21 @@ function createWakeChannel(): BroadcastChannel | null {
   }
 }
 
+function isOfflineAuthenticationError(error: unknown): boolean {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' &&
+          error !== null &&
+          'message' in error &&
+          typeof error.message === 'string'
+        ? error.message
+        : '';
+  return /failed to fetch|network(?:error| request failed)|load failed/i.test(
+    message
+  );
+}
+
 export async function createBrowserAutomaticCharacterSync(): Promise<BrowserAutomaticCharacterSyncContext | null> {
   if (
     !isBrowserCharacterCutoverParticipant() ||
@@ -79,12 +94,21 @@ export async function createBrowserAutomaticCharacterSync(): Promise<BrowserAuto
   const client = createSupabaseBrowserClient();
   if (!client) return null;
   const { data, error } = await client.auth.getUser();
-  if (error || !data.user) return null;
+  let account = data.user;
+  if (!account && error && isOfflineAuthenticationError(error)) {
+    try {
+      const session = await client.auth.getSession();
+      account = session.data.session?.user ?? null;
+    } catch {
+      return null;
+    }
+  }
+  if (!account) return null;
 
   const database = await openRollkeeperDatabase();
   const authority = await readCharacterAuthority(database, 'guest');
   const indexedDbPrimary = authority.authority === 'indexedDB';
-  const accountId = data.user.id;
+  const accountId = account.id;
   const namespace = `user:${accountId}` as const;
   const repository = new IndexedDbAutomaticCharacterSyncRepository(database);
   const preferences = new AutomaticCharacterSyncPreferences(database);
@@ -123,7 +147,7 @@ export async function createBrowserAutomaticCharacterSync(): Promise<BrowserAuto
 
   return {
     accountId,
-    accountLabel: data.user.email ?? 'Signed-in account',
+    accountLabel: account.email ?? 'Signed-in account',
     indexedDbPrimary,
     repository,
     preferences,

@@ -1,5 +1,8 @@
 import type { AutomaticSyncRunResult } from './automaticCharacterSyncWorker';
 
+export const AUTOMATIC_SYNC_STATUS_CHANGED_EVENT =
+  'automatic-sync-status-changed';
+
 export type AutomaticSyncPullReason =
   | 'startup'
   | 'focus'
@@ -100,9 +103,16 @@ export class AutomaticCharacterSyncCoordinator {
   }
 
   private schedule(operation: () => Promise<void>): Promise<void> {
-    this.pending = this.pending.then(operation, operation).catch(() => {
-      // Durable work remains in IndexedDB and is rediscovered by the next wake.
-    });
+    this.pending = this.pending
+      .then(operation, operation)
+      .catch(() => {
+        // Durable work remains in IndexedDB and is rediscovered by the next wake.
+      })
+      .finally(() => {
+        this.options.events.dispatchEvent(
+          new Event(AUTOMATIC_SYNC_STATUS_CHANGED_EVENT)
+        );
+      });
     return this.pending;
   }
 
