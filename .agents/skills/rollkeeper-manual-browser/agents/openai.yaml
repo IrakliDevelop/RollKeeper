@@ -1,0 +1,4 @@
+interface:
+  display_name: 'RollKeeper Manual Browser'
+  short_description: 'Run isolated manual browser acceptance checks'
+  default_prompt: 'Use $rollkeeper-manual-browser to perform the final interactive acceptance check for this PR.'

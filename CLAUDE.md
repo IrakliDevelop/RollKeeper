@@ -68,6 +68,20 @@ Game reference data (spells, monsters, items, etc.) lives in `/json` as large JS
 
 Tests are Storybook component tests run via Vitest + Playwright in headless Chromium. There is no separate Jest config for unit tests despite the `"test": "jest"` script — the actual test runner is `vitest`.
 
+### Final manual browser acceptance
+
+For PRs that affect browser-visible UI, navigation, authentication, local
+persistence, IndexedDB, offline behavior, downloads, network failures, or
+cloud-sync controls, follow
+`.agents/skills/rollkeeper-manual-browser/SKILL.md` after automated checks pass.
+
+Use the Codex desktop in-app Browser and the skill's isolated local origins and
+synthetic seed data. If the agent is not running in the desktop app, ask the
+user to switch to desktop and reopen the task. If Browser access is disabled,
+ask the user to enable it and reopen or restart as required. Do not substitute
+standalone Playwright and call it manual verification. Server-only and
+documentation-only PRs may mark the gate not applicable with a reason.
+
 ## Character sheet layout
 
 The character page (`/player/characters/[characterId]`) uses `TabbedCharacterSheet` → `BookmarkTabs` (persisted via `localStorage` key `tabbed-layout-active-tab`). The tab structure lives in `src/components/ui/character/tabbedSheetConfig.tsx`.
