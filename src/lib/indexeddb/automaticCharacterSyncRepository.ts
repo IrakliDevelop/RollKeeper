@@ -468,13 +468,24 @@ export class IndexedDbAutomaticCharacterSyncRepository {
         .objectStore('documents')
         .get([entry.namespace, 'character', entry.legacyId])
     )) as AutomaticCharacterDocument | undefined;
+    const resolvableLocalCandidate =
+      localCandidate &&
+      entry.baseServerVersion === 0 &&
+      localCandidate.baseServerVersion === 0
+        ? { ...localCandidate, cloudId: entry.cloudId }
+        : localCandidate;
+    if (resolvableLocalCandidate !== localCandidate) {
+      transaction.objectStore('documents').put(resolvableLocalCandidate);
+    }
     transaction.objectStore('conflicts').put({
       conflictId: `automatic-sync:${entry.mutationId}`,
       namespace: entry.namespace,
       family: 'character',
       legacyId: entry.legacyId,
       mutationId: entry.mutationId,
-      localCandidate: localCandidate ? structuredClone(localCandidate) : null,
+      localCandidate: resolvableLocalCandidate
+        ? structuredClone(resolvableLocalCandidate)
+        : null,
       cloudCandidate: structuredClone(cloudCandidate),
       detectedAt,
       resolutionState: 'unresolved',

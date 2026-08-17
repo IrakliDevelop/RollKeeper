@@ -88,6 +88,7 @@ interface PlayerStoreState {
   restoreCharacter: (characterId: string) => void;
   duplicateCharacter: (characterId: string, newName: string) => string;
   addCloudRecoveredCharacter: (character: PlayerCharacter) => boolean;
+  replaceCloudRecoveredCharacter: (character: PlayerCharacter) => boolean;
 
   // Character selection
   setActiveCharacter: (characterId: string | null) => void;
@@ -408,6 +409,21 @@ export const usePlayerStore = create<PlayerStoreState>()(
         const recovered = structuredClone(character);
         set(state => ({
           characters: [...state.characters, recovered],
+        }));
+        return true;
+      },
+
+      replaceCloudRecoveredCharacter: character => {
+        if (
+          !get().characters.some(candidate => candidate.id === character.id)
+        ) {
+          return false;
+        }
+        const recovered = structuredClone(character);
+        set(state => ({
+          characters: state.characters.map(candidate =>
+            candidate.id === recovered.id ? recovered : candidate
+          ),
         }));
         return true;
       },

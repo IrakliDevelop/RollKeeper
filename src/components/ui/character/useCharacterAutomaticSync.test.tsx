@@ -2,6 +2,8 @@ import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { recordAutomaticCharacterEdit } from '@/lib/supabase/automaticCharacterSyncRuntime';
+import type { AutomaticCharacterDocument } from '@/lib/indexeddb/automaticCharacterSyncRepository';
+import type { AutomaticCharacterCloudStatus } from '@/lib/supabase/automaticCharacterSyncService';
 import { createBrowserAutomaticCharacterSync } from '@/lib/supabase/browserAutomaticCharacterSync';
 import { subscribeBrowserAutomaticCharacterAccountChanges } from '@/lib/supabase/browserAutomaticCharacterSync';
 import { usePlayerStore } from '@/store/playerStore';
@@ -24,6 +26,9 @@ function Probe() {
   return (
     <>
       <span>{controller.accountLabel ?? 'none'}</span>
+      <span data-testid="character-a-status">
+        {controller.statuses['character-a'] ?? 'unset'}
+      </span>
       <button onClick={() => controller.retry('character-a')}>retry</button>
     </>
   );
@@ -97,6 +102,57 @@ describe('CharacterAutomaticSyncProvider', () => {
     expect(context.coordinator.wake).toHaveBeenCalled();
   });
 
+  it('resumes auth-required work before starting a rebuilt authenticated namespace', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_CHARACTER_AUTOMATIC_SYNC_ENABLED = 'true';
+    const context = automaticContext();
+    vi.mocked(createBrowserAutomaticCharacterSync).mockResolvedValue(context);
+
+    render(
+      <CharacterAutomaticSyncProvider>
+        <Probe />
+      </CharacterAutomaticSyncProvider>
+    );
+    expect(await screen.findByText('Synthetic account')).toBeVisible();
+
+    expect(context.repository.resumeAfterAuthentication).toHaveBeenCalledWith(
+      'user:account-a'
+    );
+    expect(
+      vi.mocked(context.repository.resumeAfterAuthentication).mock
+        .invocationCallOrder[0]
+    ).toBeLessThan(
+      vi.mocked(context.coordinator.start).mock.invocationCallOrder[0]
+    );
+  });
+
+  it('re-reads durable status after a background worker cycle settles', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_CHARACTER_AUTOMATIC_SYNC_ENABLED = 'true';
+    let durableStatus: AutomaticCharacterCloudStatus = 'local-only';
+    const context = automaticContext();
+    context.statuses = vi.fn(async () => ({
+      'character-a': durableStatus,
+    }));
+    vi.mocked(createBrowserAutomaticCharacterSync).mockResolvedValue(context);
+    usePlayerStore.setState({ characters: [playerCharacter()] });
+    render(
+      <CharacterAutomaticSyncProvider>
+        <Probe />
+      </CharacterAutomaticSyncProvider>
+    );
+    expect(await screen.findByTestId('character-a-status')).toHaveTextContent(
+      'local-only'
+    );
+
+    durableStatus = 'conflict';
+    act(() => window.dispatchEvent(new Event('automatic-sync-status-changed')));
+
+    await vi.waitFor(() =>
+      expect(screen.getByTestId('character-a-status')).toHaveTextContent(
+        'conflict'
+      )
+    );
+  });
+
   it('queues a newly persisted future-default character while the root provider remains mounted', async () => {
     process.env.NEXT_PUBLIC_SUPABASE_CHARACTER_AUTOMATIC_SYNC_ENABLED = 'true';
     const context = automaticContext();
@@ -120,6 +176,97 @@ describe('CharacterAutomaticSyncProvider', () => {
       )
     );
     expect(context.coordinator.wake).toHaveBeenCalled();
+  });
+
+  it('activates a validated cloud candidate without rewriting its timestamps through the local edit path', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_CHARACTER_AUTOMATIC_SYNC_ENABLED = 'true';
+    const local = playerCharacter();
+    const cloud = {
+      ...playerCharacter(),
+      name: 'Cloud exact candidate',
+      updatedAt: new Date('2001-02-03T04:05:06.000Z'),
+      lastPlayed: new Date('2001-02-04T04:05:06.000Z'),
+      characterData: {
+        ...playerCharacter().characterData,
+        name: 'Cloud exact candidate',
+      },
+    };
+    const context = automaticContext();
+    context.documents = vi.fn(
+      async (): Promise<AutomaticCharacterDocument[]> => [
+        {
+          namespace: 'user:account-a',
+          family: 'character',
+          legacyId: 'character-a',
+          operation: 'replace',
+          payload: cloud as unknown as AutomaticCharacterDocument['payload'],
+          schemaVersion: 1,
+          localRevision: 1,
+          baseServerVersion: 2,
+          contentFingerprint: 'cloud-fingerprint',
+          syncPolicy: 'on',
+          updatedAt: '2001-02-03T04:05:06.000Z',
+          deletedAt: null,
+        },
+      ]
+    );
+    vi.mocked(createBrowserAutomaticCharacterSync).mockResolvedValue(context);
+    usePlayerStore.setState({ characters: [local] });
+
+    render(
+      <CharacterAutomaticSyncProvider>
+        <Probe />
+      </CharacterAutomaticSyncProvider>
+    );
+
+    await vi.waitFor(() =>
+      expect(usePlayerStore.getState().characters[0]).toEqual(cloud)
+    );
+  });
+
+  it('discovers the off-sync local copy preserved by Keep both', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_CHARACTER_AUTOMATIC_SYNC_ENABLED = 'true';
+    const copy = {
+      ...playerCharacter(),
+      id: 'character-copy',
+      name: 'Cloud candidate copy',
+      characterData: {
+        ...playerCharacter().characterData,
+        id: 'character-copy',
+        name: 'Cloud candidate copy',
+      },
+    };
+    const context = automaticContext();
+    context.documents = vi.fn(
+      async (): Promise<AutomaticCharacterDocument[]> => [
+        {
+          namespace: 'user:account-a',
+          family: 'character',
+          legacyId: 'character-copy',
+          operation: 'create',
+          payload: copy as unknown as AutomaticCharacterDocument['payload'],
+          schemaVersion: 1,
+          localRevision: 1,
+          baseServerVersion: 0,
+          contentFingerprint: 'copy-fingerprint',
+          syncPolicy: 'off',
+          updatedAt: '2001-02-03T04:05:06.000Z',
+          deletedAt: null,
+        },
+      ]
+    );
+    vi.mocked(createBrowserAutomaticCharacterSync).mockResolvedValue(context);
+    usePlayerStore.setState({ characters: [playerCharacter()] });
+
+    render(
+      <CharacterAutomaticSyncProvider>
+        <Probe />
+      </CharacterAutomaticSyncProvider>
+    );
+
+    await vi.waitFor(() =>
+      expect(usePlayerStore.getState().characters).toContainEqual(copy)
+    );
   });
 
   it('stops the previous account and rebuilds an isolated namespace when auth changes', async () => {

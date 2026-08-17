@@ -94,8 +94,17 @@ export class AutomaticCharacterSyncWorker {
       const result = await this.push(entry);
       if (result.status !== 'success') {
         const remote = await this.fetchRequired(result.characterId);
+        if (
+          remote.id !== result.characterId ||
+          remote.legacy_client_id !== entry.legacyId ||
+          (entry.baseServerVersion > 0 && remote.id !== entry.cloudId)
+        ) {
+          throw new Error('Cloud conflict identity is invalid');
+        }
         await this.options.repository.preserveConflict(
-          entry,
+          entry.baseServerVersion === 0
+            ? { ...entry, cloudId: remote.id }
+            : entry,
           remote,
           new Date(this.now()).toISOString()
         );

@@ -163,6 +163,228 @@ tombstone, and RLS contracts are reused.
     reload and a second tab, preserves the unrelated DM seed byte-for-byte, and
     issues zero character mutation RPCs.
 
+11. Genuine browser-offline gateway classification
+
+    Red:
+
+    ```text
+    npm test -- src/lib/supabase/characterCloudGateway.test.ts
+    # 1 failed, 4 passed
+    ```
+
+    Intended failure: local Supabase's browser fetch error (`TypeError: Failed
+    to fetch`) was categorized as a generic failure, so durable work replayed
+    after reconnect but the visible state could not truthfully report `Cloud:
+    offline`.
+
+    Green:
+
+    ```text
+    npm test -- src/lib/supabase/characterCloudGateway.test.ts
+    # 5 passed
+    ```
+
+    The gateway now recognizes the bounded browser network-error forms while
+    preserving the existing authentication-expiry and ordinary-failure
+    categories.
+
+12. Exact activation of a validated cloud candidate
+
+    Red:
+
+    ```text
+    npm test -- src/components/ui/character/useCharacterAutomaticSync.test.tsx
+    # 1 failed, 4 passed
+    ```
+
+    Intended failure: the pull activation path used the ordinary local edit
+    helper, which rewrote `updatedAt` and retained a local `lastPlayed` value
+    instead of activating the preserved cloud candidate exactly.
+
+    Green:
+
+    ```text
+    npm test -- src/components/ui/character/useCharacterAutomaticSync.test.tsx
+    # 5 passed
+    ```
+
+    Existing cloud documents now use a dedicated exact-replacement store
+    action; local edit timestamp behavior remains unchanged.
+
+13. Keep-both copy discovery
+
+    Red:
+
+    ```text
+    npm test -- src/components/ui/character/useCharacterAutomaticSync.test.tsx
+    # 1 failed, 5 passed
+    ```
+
+    Intended failure: `Keep both` durably preserved its cloud candidate as a
+    new off-sync version-zero document, but the browser activation loop skipped
+    every version-zero document, leaving that preserved copy invisible.
+
+    Green:
+
+    ```text
+    npm test -- src/components/ui/character/useCharacterAutomaticSync.test.tsx
+    # 6 passed
+    ```
+
+    A missing local character can now be restored exactly from a discovered
+    off-sync document; version-zero documents never overwrite an existing
+    active local character.
+
+14. Resolvable canonical identity for a second-device first-push conflict
+
+    Red:
+
+    ```text
+    npm test -- src/lib/supabase/automaticCharacterSyncWorker.test.ts
+    # 1 failed, 13 passed
+    ```
+
+    Intended failure: the authenticated RPC and refetch returned the existing
+    owner+legacy cloud row, but the preserved local candidate retained the
+    second device's provisional cloud ID, causing every explicit conflict
+    resolution to fail the identity gate.
+
+    Green:
+
+    ```text
+    npm test -- src/lib/supabase/automaticCharacterSyncWorker.test.ts src/lib/indexeddb/__tests__/automaticCharacterSyncRepository.test.ts
+    # 2 files, 23 passed
+    ```
+
+    Only a validated base-version-zero conflict adopts the RPC-returned and
+    refetched canonical ID. Previously acknowledged identities remain strict.
+
+15. Offline reload restores the participating account namespace
+
+    Red:
+
+    ```text
+    npm test -- src/lib/supabase/browserAutomaticCharacterSync.test.ts
+    # 1 failed, 6 passed
+    ```
+
+    Intended failure: after a full offline navigation/reload, `getUser()` could
+    not reach local Supabase and the browser installed no automatic-sync
+    runtime, so later local edits had no durable account outbox destination.
+
+    Green:
+
+    ```text
+    npm test -- src/lib/supabase/browserAutomaticCharacterSync.test.ts
+    # 7 passed
+    ```
+
+    A bounded network failure now falls back to the already stored browser
+    session solely to restore the isolated local namespace and outbox. Any
+    replay still passes through authenticated Supabase RPCs; expired and absent
+    sessions remain disabled.
+
+16. Background worker status invalidation
+
+    Red:
+
+    ```text
+    npm test -- src/lib/supabase/automaticCharacterSyncCoordinator.test.ts src/components/ui/character/useCharacterAutomaticSync.test.tsx
+    # 2 failed, 14 passed
+    ```
+
+    Intended failure: reconnect and background worker cycles durably reached
+    conflict/offline/synced states without invalidating the React controller,
+    so the dashboard could display the prior status until manual refresh.
+
+    Green:
+
+    ```text
+    npm test -- src/lib/supabase/automaticCharacterSyncCoordinator.test.ts src/components/ui/character/useCharacterAutomaticSync.test.tsx
+    # 2 files, 16 passed
+    ```
+
+    Every settled coordinator cycle now emits a local invalidation. The root
+    provider responds by re-reading durable documents and statuses; the event
+    contains no payload and is not a source of truth.
+
+17. Just-saved autosave snapshot routing
+
+    Red:
+
+    ```text
+    npm test -- src/hooks/__tests__/useAutoSave.test.ts
+    # 1 failed, 15 passed
+    ```
+
+    Intended failure: the IndexedDB acknowledgement path read the active roster
+    entry before ensuring the just-saved character-store snapshot had committed
+    to that roster, so the automatic outbox could lag one edit.
+
+    Green:
+
+    ```text
+    npm test -- src/hooks/__tests__/useAutoSave.test.ts
+    # 16 passed
+    ```
+
+    Local acknowledgement now waits for the current character snapshot's roster
+    commit, then atomically records that committed snapshot and its automatic
+    outbox work. Compatibility-mirror degradation from either local commit is
+    retained in the local status.
+
+18. Auth-required work resumes before a rebuilt worker starts
+
+    Red:
+
+    ```text
+    npm test -- src/components/ui/character/useCharacterAutomaticSync.test.tsx
+    # 1 failed, 7 passed
+    ```
+
+    Intended failure: signing back into the same account rebuilt and started
+    the worker while its durable work remained `auth-required`, so no item was
+    eligible for replay without a separate manual retry.
+
+    Green:
+
+    ```text
+    npm test -- src/components/ui/character/useCharacterAutomaticSync.test.tsx
+    # 8 passed
+    ```
+
+    An authenticated namespace now durably resumes its auth-required work
+    before the rebuilt coordinator starts. The namespace remains account-bound
+    and the server still authenticates every RPC.
+
+19. Offline bootstrap fallback coverage ratchet
+
+    Red:
+
+    ```text
+    npm run test:slice9:coverage
+    # 9 files, 83 tests passed
+    # browserAutomaticCharacterSync.ts branches 83.33% (required 85%)
+    ```
+
+    Intended failure: the new offline bootstrap paths were behaviorally green,
+    but their session-storage failure, object-shaped network error, and missing
+    `BroadcastChannel` branches were not all exercised by the destructive-path
+    coverage gate.
+
+    Green:
+
+    ```text
+    npm run test:slice9:coverage
+    # 9 files, 85 tests passed
+    # statements 98.42%, branches 94.14%, functions 99.24%, lines 99.12%
+    ```
+
+    The per-file threshold remains unchanged. The tests now prove that an
+    unreadable stored session disables the runtime and that an object-shaped
+    offline failure can restore the isolated namespace without
+    `BroadcastChannel`.
+
 ## Focused coverage gate
 
 Initial red:
@@ -175,12 +397,14 @@ npm run test:slice9:coverage
 The thresholds were not lowered. Authority routing was subsequently added to
 the measured file set.
 
-Final green:
+Initial implementation green:
 
 ```text
 npm run test:slice9:coverage
 # 9 files, 80 tests passed
 # statements 98.38%, branches 94.68%, functions 99.23%, lines 99.27%
 ```
+
+The final post-acceptance focused result is recorded in item 19.
 
 No deliberately failing test is committed.
