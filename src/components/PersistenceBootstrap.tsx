@@ -22,6 +22,7 @@ import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
 import { useNPCStore } from '@/store/npcStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { CharacterRecoveryExportControls } from '@/components/ui/feedback/CharacterRecoveryExportControls';
+import { CharacterAutomaticSyncProvider } from '@/components/ui/character/useCharacterAutomaticSync';
 
 const slice7Enabled = isIndexedDbMigrationEnabled();
 
@@ -227,5 +228,7 @@ export function PersistenceBootstrap({ children }: { children: ReactNode }) {
       </main>
     );
   }
-  return ready ? children : null;
+  return ready ? (
+    <CharacterAutomaticSyncProvider>{children}</CharacterAutomaticSyncProvider>
+  ) : null;
 }

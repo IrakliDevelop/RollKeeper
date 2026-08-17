@@ -32,6 +32,9 @@ import { DataSafetyBanner } from '@/components/ui/feedback/DataSafetyBanner';
 import { DeviceRecoveryControls } from '@/components/ui/feedback/DeviceRecoveryControls';
 import { CharacterStorageMigrationControls } from '@/components/ui/feedback/CharacterStorageMigrationControls';
 import { CharacterCloudBackupControls } from '@/components/ui/character/CharacterCloudBackupControls';
+import { CharacterAutomaticSyncControls } from '@/components/ui/character/CharacterAutomaticSyncControls';
+import { awaitCharacterPersistenceResult } from '@/lib/indexeddb/characterPersistenceRuntime';
+import { recordAutomaticCharacterDelete } from '@/lib/supabase/automaticCharacterSyncRuntime';
 import { AppIcon } from '@/components/ui/icons';
 import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
 import {
@@ -121,7 +124,15 @@ export default function PlayerDashboardPage() {
         'Are you sure you want to permanently delete this character? This action cannot be undone.'
       )
     ) {
+      const beforeImage = characters.find(
+        character => character.id === characterId
+      );
       deleteCharacter(characterId);
+      if (beforeImage) {
+        void awaitCharacterPersistenceResult().then(result => {
+          if (result.saved) return recordAutomaticCharacterDelete(beforeImage);
+        });
+      }
     }
   };
 
@@ -495,6 +506,8 @@ export default function PlayerDashboardPage() {
             addCloudRecoveredCharacter(character as PlayerCharacter)
           }
         />
+
+        <CharacterAutomaticSyncControls characters={characters} />
 
         {/* Stats Cards */}
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">

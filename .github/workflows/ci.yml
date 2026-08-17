@@ -38,6 +38,9 @@ jobs:
       - name: Unit tests
         run: npm run test
 
+      - name: Automatic character sync coverage contract
+        run: npm run test:slice9:coverage
+
       - name: IndexedDB migration coverage contract
         run: >-
           npm test -- src/lib/indexeddb
@@ -173,6 +176,9 @@ jobs:
 
       - name: IndexedDB migration durability tests
         run: npm run test:indexeddb:e2e
+
+      - name: Automatic character sync gating tests
+        run: npm run test:automatic-sync:e2e
 
       - name: Upload Playwright failure artifacts
         if: failure()
