@@ -166,6 +166,7 @@ describe('IndexedDbDmWorkspaceRepository', () => {
         createdAt: '2026-08-17T00:00:00.000Z',
       })
     ).resolves.toEqual({ saved: false, reason: 'guest' });
+    await expect(repo.get(ACCOUNT_A, 'missing-workspace')).resolves.toBeNull();
     await expect(repo.list(ACCOUNT_A)).resolves.toEqual([]);
     await expect(repo.listOutbox(ACCOUNT_A)).resolves.toEqual([]);
   });
