@@ -5,6 +5,8 @@ import { useCharacterStore } from '@/store/characterStore';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 import { isBrowserCharacterCutoverParticipant } from '@/lib/indexeddb/characterCutoverSelection';
 import { awaitCharacterPersistenceResult } from '@/lib/indexeddb/characterPersistenceRuntime';
+import { recordAutomaticCharacterEdit } from '@/lib/supabase/automaticCharacterSyncRuntime';
+import { usePlayerStore, type PlayerCharacter } from '@/store/playerStore';
 
 vi.mock('@/lib/indexeddb/characterCutoverSelection', () => ({
   isBrowserCharacterCutoverParticipant: vi.fn(),
@@ -12,6 +14,10 @@ vi.mock('@/lib/indexeddb/characterCutoverSelection', () => ({
 
 vi.mock('@/lib/indexeddb/characterPersistenceRuntime', () => ({
   awaitCharacterPersistenceResult: vi.fn(),
+}));
+
+vi.mock('@/lib/supabase/automaticCharacterSyncRuntime', () => ({
+  recordAutomaticCharacterEdit: vi.fn(),
 }));
 
 /**
@@ -60,6 +66,26 @@ describe('useAutoSave', () => {
       idbAck: true,
       mirrorAck: true,
       mirrorPending: false,
+    });
+    vi.mocked(recordAutomaticCharacterEdit).mockResolvedValue('local-only');
+    const character = makeCharacter();
+    usePlayerStore.setState({
+      characters: [
+        {
+          id: character.id,
+          name: character.name,
+          race: character.race,
+          class: character.class.name,
+          level: character.level,
+          createdAt: new Date('2026-02-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-02-01T00:00:00.000Z'),
+          lastPlayed: new Date('2026-02-01T00:00:00.000Z'),
+          characterData: character,
+          tags: [],
+          isArchived: false,
+        } satisfies PlayerCharacter,
+      ],
+      activeCharacterId: character.id,
     });
     // Always start each test with a clean store state so nothing leaks
     setupStore();
@@ -194,6 +220,33 @@ describe('useAutoSave', () => {
     expect(mockSetSaveStatus).toHaveBeenLastCalledWith(
       'saved-local-mirror-pending'
     );
+    expect(recordAutomaticCharacterEdit).toHaveBeenCalledWith(
+      expect.objectContaining({ id: expect.any(String) })
+    );
+  });
+
+  it('does not acknowledge Local saved when the opted-in document/outbox transaction fails', async () => {
+    vi.mocked(isBrowserCharacterCutoverParticipant).mockReturnValue(true);
+    vi.mocked(recordAutomaticCharacterEdit).mockRejectedValue(
+      new Error('automatic sync transaction failed')
+    );
+    const { mockSetSaveStatus, mockMarkSaved } = setupStore({
+      hasUnsavedChanges: true,
+    });
+    const { result } = renderHook(() => useAutoSave({ delay: 500 }));
+
+    await act(async () => {
+      result.current.manualSave();
+      for (let index = 0; index < 8; index += 1) {
+        await Promise.resolve();
+      }
+    });
+
+    expect(awaitCharacterPersistenceResult).toHaveBeenCalled();
+    expect(recordAutomaticCharacterEdit).toHaveBeenCalled();
+    expect(mockSetSaveStatus).toHaveBeenLastCalledWith('error');
+    expect(mockMarkSaved).not.toHaveBeenCalled();
+    expect(useCharacterStore.getState().hasUnsavedChanges).toBe(true);
   });
 
   it('does not save when enabled: false', () => {
