@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   awaitCharacterPersistence,
+  awaitCharacterPersistenceResult,
   freezeCharacterPersistenceForCutover,
   createCharacterFamilyStateStorage,
   finishCharacterPersistenceBootstrap,
@@ -86,6 +87,38 @@ describe('character persistence authority router', () => {
       expect.objectContaining({ expectedEpoch: 3, rawValue: 'raw' })
     );
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('retains the committed result when the compatibility mirror needs retry', async () => {
+    const commit = vi.fn().mockResolvedValue({
+      saved: true,
+      idbAck: true,
+      mirrorAck: false,
+      mirrorPending: true,
+    });
+    setCharacterRuntimeAuthority({
+      authority: 'indexedDB',
+      namespace: 'guest',
+      family: 'character',
+      generation: 'g',
+      epoch: 3,
+      committedAt: 'now',
+    });
+    const storage = createCharacterFamilyStateStorage({
+      backing: localStorage,
+      participant: true,
+      openDatabase: vi.fn().mockResolvedValue({ close: vi.fn() }),
+      commit,
+    });
+
+    await storage.setItem('rollkeeper-player-data', 'raw');
+
+    await expect(awaitCharacterPersistenceResult()).resolves.toEqual({
+      saved: true,
+      idbAck: true,
+      mirrorAck: false,
+      mirrorPending: true,
+    });
   });
 
   it('hydrates an active profile from IndexedDB and never from a stale compatibility mirror', async () => {

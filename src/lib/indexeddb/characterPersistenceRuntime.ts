@@ -24,7 +24,12 @@ let runtimeAuthority: RuntimeAuthority = {
   epoch: 0,
 };
 let pendingWrite: Promise<void> = Promise.resolve();
-let latestWriteSaved = true;
+let latestWriteResult: CharacterWriteResult = {
+  saved: true,
+  idbAck: false,
+  mirrorAck: true,
+  mirrorPending: false,
+};
 let activeBootstrapPending = false;
 let cutoverBarrier:
   | { promise: Promise<void>; release: () => void; released: boolean }
@@ -90,7 +95,12 @@ export function finishCharacterPersistenceBootstrap(): void {
 
 export async function awaitCharacterPersistence(): Promise<boolean> {
   await pendingWrite;
-  return latestWriteSaved;
+  return latestWriteResult.saved;
+}
+
+export async function awaitCharacterPersistenceResult(): Promise<CharacterWriteResult> {
+  await pendingWrite;
+  return latestWriteResult;
 }
 
 interface RuntimeStorageOptions {
@@ -162,13 +172,23 @@ export function createCharacterFamilyStateStorage(
     setItem: (key, value) => {
       if (!isCharacterFamilyKey(key)) return;
       if (activeBootstrapPending) {
-        latestWriteSaved = false;
+        latestWriteResult = {
+          saved: false,
+          idbAck: false,
+          mirrorAck: false,
+          mirrorPending: false,
+        };
         return Promise.resolve();
       }
       if (cutoverBarrier) {
         const barrier = cutoverBarrier.promise;
         const queuedBehind = pendingWrite;
-        latestWriteSaved = false;
+        latestWriteResult = {
+          saved: false,
+          idbAck: false,
+          mirrorAck: false,
+          mirrorPending: false,
+        };
         pendingWrite = queuedBehind.then(async () => {
           await barrier;
           await createCharacterFamilyStateStorage(options).setItem(key, value);
@@ -189,7 +209,13 @@ export function createCharacterFamilyStateStorage(
             });
           });
         pendingWrite = shadow(key, value).catch(() => undefined);
-        latestWriteSaved = options.backing.getItem(key) === value;
+        const saved = options.backing.getItem(key) === value;
+        latestWriteResult = {
+          saved,
+          idbAck: false,
+          mirrorAck: saved,
+          mirrorPending: false,
+        };
         return pendingWrite;
       }
 
@@ -212,9 +238,14 @@ export function createCharacterFamilyStateStorage(
               now: options.now ?? (() => new Date().toISOString()),
             }
           );
-          latestWriteSaved = result.saved;
+          latestWriteResult = result;
         } catch {
-          latestWriteSaved = false;
+          latestWriteResult = {
+            saved: false,
+            idbAck: false,
+            mirrorAck: false,
+            mirrorPending: false,
+          };
         } finally {
           database?.close();
         }
@@ -231,7 +262,12 @@ export function createCharacterFamilyStateStorage(
 export function resetCharacterPersistenceRuntimeForTests(): void {
   runtimeAuthority = { authority: 'localStorage', epoch: 0 };
   pendingWrite = Promise.resolve();
-  latestWriteSaved = true;
+  latestWriteResult = {
+    saved: true,
+    idbAck: false,
+    mirrorAck: true,
+    mirrorPending: false,
+  };
   activeBootstrapPending = false;
   cutoverBarrier?.release();
   cutoverBarrier = undefined;

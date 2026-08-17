@@ -39,3 +39,38 @@ new Slice 8 modules. The final measured aggregate is 99.32% statements, 99.11%
 functions, 97.74% branches, and 99.63% lines. Authority routing, migration state,
 pointer commit, rollback decisions, recovery activation, and the active write
 router have complete branch coverage.
+
+## Corrective manual-acceptance cycle — 2026-08-17
+
+The interactive in-app-browser gate forced a compatibility-mirror write
+failure after an IndexedDB-authoritative character edit. IndexedDB committed
+the edit and retained durable journal retries, but the visible save indicator
+still reported `All changes saved` and exposed no mirror warning.
+
+The focused red command was:
+
+`npm test -- src/hooks/__tests__/useAutoSave.test.ts src/components/ui/feedback/SaveIndicator.test.tsx`
+
+It failed in the intended new contracts because the persistence runtime did
+not expose the committed write result, the autosave hook had no locally-saved
+or mirror-pending statuses, and the save indicator rendered both new statuses
+as `Not saved`. The minimum correction preserves the existing boolean
+durability API, adds the detailed committed result for autosave, labels a
+normal active IndexedDB acknowledgement `Local: saved`, and surfaces a durable
+mirror retry as `Local: saved · compatibility mirror retry pending` without
+misrepresenting the committed IndexedDB edit as lost.
+
+Green verification:
+
+- `npm test -- src/hooks/__tests__/useAutoSave.test.ts src/components/ui/feedback/SaveIndicator.test.tsx src/lib/indexeddb/__tests__/characterPersistenceRuntime.test.ts` — 27/27 passed.
+- `npm run test:slice8:coverage` — 77/77 passed; 99.33% statements,
+  97.74% branches, 99.12% functions, and 99.64% lines.
+- `npm run test:indexeddb:e2e` — 3/3 dedicated Chromium tests passed as
+  supplemental automated evidence.
+- `npm run type-check`, `npm run format:ci`, `npm run lint:ci`, and
+  `npm run build` — passed.
+- The affected in-app-browser path was repeated with a synthetic mirror quota
+  failure. The UI displayed the mirror-pending warning while the edit was
+  already committed to the active IndexedDB generation and durable journal;
+  restoring storage and reloading drained the journal through the supported
+  retry path.

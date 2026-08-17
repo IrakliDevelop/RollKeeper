@@ -32,6 +32,20 @@ export const SaveIndicator = ({
             ? 'text-yellow-700 dark:text-yellow-400'
             : 'text-green-700 dark:text-green-400',
         };
+      case 'saved-local':
+        return {
+          icon: <Check size={12} />,
+          text: 'Local: saved',
+          dotColor: 'bg-green-500',
+          textColor: 'text-green-700 dark:text-green-400',
+        };
+      case 'saved-local-mirror-pending':
+        return {
+          icon: <AlertCircle size={12} />,
+          text: 'Local: saved · compatibility mirror retry pending',
+          dotColor: 'bg-yellow-500',
+          textColor: 'text-yellow-700 dark:text-yellow-400',
+        };
       case 'error':
         return {
           icon: <AlertCircle size={12} />,
@@ -80,11 +94,15 @@ export const SaveIndicator = ({
         <span className={config.textColor}>{config.icon}</span>
         <span className={config.textColor}>{config.text}</span>
       </div>
-      {lastSaved && status === 'saved' && !hasUnsavedChanges && (
-        <span className="text-muted text-xs">
-          • {formatLastSaved(lastSaved)}
-        </span>
-      )}
+      {lastSaved &&
+        (status === 'saved' ||
+          status === 'saved-local' ||
+          status === 'saved-local-mirror-pending') &&
+        !hasUnsavedChanges && (
+          <span className="text-muted text-xs">
+            • {formatLastSaved(lastSaved)}
+          </span>
+        )}
     </div>
   );
 };
