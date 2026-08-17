@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { BrowserDmWorkspaceContext } from '@/lib/supabase/browserDmWorkspace';
@@ -119,6 +120,26 @@ describe('DmCloudWorkspaceControls', () => {
 
     await waitFor(() => expect(cloud.list).toHaveBeenCalledOnce());
     expect(screen.getByText('Durable Northwatch')).toBeVisible();
+    expect(screen.getByText('C1C2C3D4E5F6')).toBeVisible();
+  });
+
+  it('exposes the explicit local load action to keyboard users', async () => {
+    enableWorkspaceCloud();
+    const cloud = context();
+    const user = userEvent.setup();
+    render(
+      <DmCloudWorkspaceControls campaigns={[]} dmId="legacy-dm" cloud={cloud} />
+    );
+
+    await user.tab();
+    expect(screen.getByLabelText('Cloud workspace name')).toHaveFocus();
+    await user.tab();
+    expect(
+      screen.getByRole('button', { name: 'Load local cloud workspaces' })
+    ).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(cloud.list).toHaveBeenCalledOnce());
     expect(screen.getByText('C1C2C3D4E5F6')).toBeVisible();
   });
 
