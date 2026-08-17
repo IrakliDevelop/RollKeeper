@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import {
   getLocalSupabaseTestConfig,
+  provisionLocalWorkspaceClaim,
   setLocalCharacterTombstone,
 } from './local-supabase-env.mjs';
 
@@ -252,4 +253,97 @@ test('local JWT clients enforce RLS, CAS receipts, and tombstones', async () => 
   assert.equal(archivedRead.body[0].server_version, 5);
   assert.notEqual(archivedRead.body[0].deleted_at, null);
   assert.deepEqual(archivedRead.body[0].payload, { responseLoss: true });
+});
+
+test('DM workspace RPCs isolate accounts and serialize a one-time ownership claim race', async () => {
+  const config = getLocalSupabaseTestConfig();
+  const userAToken = createUserJwt(config.jwtSecret, USER_A_ID);
+  const userBToken = createUserJwt(config.jwtSecret, USER_B_ID);
+
+  const created = await request(config, '/rpc/create_campaign_workspace', {
+    method: 'POST',
+    token: userAToken,
+    body: {
+      p_mutation_id: '70000000-0000-4000-8000-000000000001',
+      p_name: 'Integration workspace',
+      p_creation_kind: 'new_workspace',
+      p_source_fingerprint: null,
+    },
+  });
+  assert.equal(created.response.status, 200);
+  assert.equal(created.body.membershipAuthority, 'legacy');
+  assert.equal(created.body.familyAuthorities, 'legacy');
+  assert.equal(created.body.liveRuntimeAuthority, 'redis_relay');
+
+  const userBWorkspaceRead = await request(
+    config,
+    `/campaigns?id=eq.${created.body.campaignId}`,
+    { token: userBToken }
+  );
+  assert.equal(userBWorkspaceRead.response.status, 200);
+  assert.deepEqual(userBWorkspaceRead.body, []);
+
+  const authorityRead = await request(
+    config,
+    `/campaign_authority_records?campaign_id=eq.${created.body.campaignId}`,
+    { token: userAToken }
+  );
+  assert.equal(authorityRead.response.status, 200);
+  assert.equal(authorityRead.body.length, 11);
+  assert.equal(
+    authorityRead.body.filter(
+      row => row.axis === 'durable_family' && row.authority === 'legacy'
+    ).length,
+    8
+  );
+
+  const sourceFingerprint = 'e'.repeat(64);
+  const proofToken = 'synthetic-manual-proof-token';
+  provisionLocalWorkspaceClaim({
+    authorizationId: '71000000-0000-4000-8000-000000000001',
+    claimantId: USER_A_ID,
+    sourceFingerprint,
+    token: proofToken,
+  });
+  const raceBodies = [
+    '72000000-0000-4000-8000-000000000001',
+    '72000000-0000-4000-8000-000000000002',
+  ].map(mutationId => ({
+    p_authorization_token: proofToken,
+    p_legacy_source_fingerprint: sourceFingerprint,
+    p_mutation_id: mutationId,
+    p_name: 'Manually verified workspace',
+  }));
+  const race = await Promise.all(
+    raceBodies.map(body =>
+      request(config, '/rpc/claim_campaign_workspace', {
+        method: 'POST',
+        token: userAToken,
+        body,
+      })
+    )
+  );
+  assert.deepEqual(
+    race.map(result => result.response.status).sort((a, b) => a - b),
+    [200, 403]
+  );
+  const winnerIndex = race.findIndex(result => result.response.status === 200);
+  const replay = await request(config, '/rpc/claim_campaign_workspace', {
+    method: 'POST',
+    token: userAToken,
+    body: raceBodies[winnerIndex],
+  });
+  assert.equal(replay.response.status, 200);
+  assert.deepEqual(replay.body, race[winnerIndex].body);
+
+  const losingReuse = await request(config, '/rpc/claim_campaign_workspace', {
+    method: 'POST',
+    token: userAToken,
+    body: raceBodies[1 - winnerIndex],
+  });
+  assert.equal(losingReuse.response.status, 403);
+  assert.equal(
+    losingReuse.body.message,
+    'workspace ownership proof was not accepted'
+  );
 });

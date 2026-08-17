@@ -30,6 +30,7 @@
     "test:automatic-sync:e2e": "playwright test --config playwright.automatic-sync.config.ts",
     "test:slice8:coverage": "vitest run --config vitest.slice8.config.ts",
     "test:slice9:coverage": "vitest run --config vitest.slice9.config.ts",
+    "test:slice10a1:coverage": "vitest run --config vitest.slice10a1.config.ts",
     "test:auth:e2e": "playwright test --config playwright.auth.config.ts",
     "test:watch": "vitest --project unit",
     "test:visual": "vitest run --project storybook",
