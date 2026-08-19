@@ -392,7 +392,9 @@ test('hybrid guest redemption and rotation serialize against the real database',
   );
   assert.equal(invitation.response.status, 200);
 
-  const sessionExpiry = new Date(Date.now() + 4 * 60 * 60_000).toISOString();
+  const sessionExpiry = new Date(
+    Date.now() + 60 * 24 * 60 * 60_000
+  ).toISOString();
   const redemptionBodies = [
     {
       p_mutation_id: '88000000-0000-4000-8000-000000000003',
@@ -444,7 +446,9 @@ test('hybrid guest redemption and rotation serialize against the real database',
 
   const winningToken =
     redemptionWinner === 0 ? 'integration-session-a' : 'integration-session-b';
-  const rotationExpiry = new Date(Date.now() + 4 * 60 * 60_000).toISOString();
+  const rotationExpiry = new Date(
+    Date.now() + 60 * 24 * 60 * 60_000
+  ).toISOString();
   const rotationBodies = [
     {
       p_mutation_id: '88000000-0000-4000-8000-000000000007',

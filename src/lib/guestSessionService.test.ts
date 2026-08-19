@@ -131,6 +131,7 @@ describe('GuestSessionService', () => {
     });
     expect(database.redeem).toHaveBeenCalledWith(
       expect.objectContaining({
+        sessionExpiresAt: '2026-10-18T00:00:00.000Z',
         tokenHash: hashGuestSecret('a'.repeat(64)),
         sessionTokenHash: expect.stringMatching(/^[a-f0-9]{64}$/u),
       })
@@ -239,6 +240,7 @@ describe('GuestSessionService', () => {
     expect(database.rotate).toHaveBeenCalledWith(
       expect.objectContaining({
         currentTokenHash: hashGuestSecret('a'.repeat(64)),
+        newExpiresAt: '2026-10-18T01:00:00.000Z',
       })
     );
   });

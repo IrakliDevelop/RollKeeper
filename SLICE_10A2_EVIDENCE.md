@@ -49,8 +49,8 @@ Final focused result:
 
 ## Database and remote review
 
-- Clean local reset applied both Slice 10A.2 migrations successfully.
-- pgTAP: 5 files, 110 tests passed, including all hybrid guest privilege/RLS
+- Clean local reset applied all three Slice 10A.2 migrations successfully.
+- pgTAP: 5 files, 112 tests passed, including all hybrid guest privilege/RLS
   assertions.
 - Database lint: no schema warnings.
 - Generated types match the reset local schema.
@@ -58,7 +58,8 @@ Final focused result:
   rotation serialization against the real local database.
 - Real HTTP integration: redemption used an opaque rotating cookie, excluded
   invitation/session secrets from response bodies and cookies, invalidated the
-  old cookie, cleaned rejected cookies, and enforced Origin/CSRF.
+  old cookie, cleaned rejected cookies, enforced Origin/CSRF, and emitted the
+  reviewed 60-day cookie lifetime on redemption and rotation.
 - Auth integration: 2 tests passed.
 - Reset/replay: 2 tests passed; two clean resets produced deterministic schema
   fingerprints and migration lists.
@@ -68,9 +69,12 @@ Final focused result:
 - Security-definer functions use fixed safe search paths, fully qualified
   objects, explicit actor checks, and transactional mutation receipts.
 - The exact remote project and reviewed migration list were verified before
-  applying the migrations. Post-apply guest tables were empty, RLS/grants and
-  generated types matched local review, and security/performance advisors were
-  rechecked.
+  applying the migrations. The follow-up lifetime migration replaced only the
+  two reviewed private redemption/rotation functions, changing their maximum
+  fixed session expiry from 24 hours to 60 days. Post-apply guest tables were
+  empty, both function definitions had the 60-day cap, RLS remained enabled,
+  browser-role grants remained zero, generated types matched local review, and
+  security/performance advisors were rechecked.
 - The remote review also surfaced two pre-existing Slice 10A.1 private tables
   without RLS. They are not guest authority storage, have no browser grants,
   and were recorded without expanding this gated PR's scope.
@@ -81,7 +85,7 @@ Final focused result:
 - Production Next.js build passed.
 - Type check passed.
 - ESLint ratchet: 68 warnings within the allowance of 69.
-- Prettier ratchet: 264 deviations within the allowance of 273.
+- Prettier ratchet: 255 deviations within the allowance of 273.
 - Storybook interactions: 29 files, 206 tests passed.
 - Storybook production build passed after updating the existing design-token
   docs to Storybook 10's supported `@storybook/addon-docs/blocks` entry point.
@@ -172,6 +176,21 @@ Final focused result:
   preservation is therefore evidenced by the standard, IndexedDB, auth, and
   automatic-sync E2E gates plus the already-visible local character continuity;
   it was not represented as a successful Browser network-emulation step.
+
+### Sixty-day session follow-up
+
+- After extending the fixed guest-session lifetime, a proportional desktop
+  Browser recheck redeemed a fresh deterministic invitation on a new isolated
+  `.localhost` origin. The visible expiry was 60 days from redemption, the URL
+  was scrubbed to `/guest`, `document.cookie` and localStorage were empty, and
+  IndexedDB contained only Next's debug channel.
+- Visible rotation produced another expiry 60 days from rotation and reported
+  that the prior cookie was invalid. The real HTTP integration test separately
+  proves `Max-Age=5184000`, immediate old-cookie rejection, and replacement-
+  cookie success.
+- The isolated tab was finalized, the local acceptance server was stopped, and
+  a clean local database reset removed the synthetic follow-up rows while
+  replaying all three guest migrations successfully.
 
 Downloads, recovery-bundle formats, migration selection/cancellation,
 guest-namespace activation/rollback, character-to-account linking, membership

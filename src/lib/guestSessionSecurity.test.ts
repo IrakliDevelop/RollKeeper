@@ -23,12 +23,14 @@ describe('hybrid guest server gate and request security', () => {
     expect(GUEST_SESSION_COOKIE).toBe('rk_guest_session');
     expect(guestSessionCookieOptions('production')).toMatchObject({
       httpOnly: true,
+      maxAge: 60 * 24 * 60 * 60,
       secure: true,
       sameSite: 'strict',
       path: '/api/campaign',
     });
     expect(guestSessionCookieOptions('development')).toMatchObject({
       httpOnly: true,
+      maxAge: 60 * 24 * 60 * 60,
       secure: false,
       sameSite: 'strict',
       path: '/api/campaign',

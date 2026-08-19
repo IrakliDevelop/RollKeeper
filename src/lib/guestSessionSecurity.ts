@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 export const GUEST_SESSION_COOKIE = 'rk_guest_session';
 export const GUEST_CSRF_HEADER = 'x-rollkeeper-csrf';
 export const GUEST_SESSION_COOKIE_PATH = '/api/campaign';
-export const GUEST_SESSION_MAX_AGE_SECONDS = 4 * 60 * 60;
+export const GUEST_SESSION_MAX_AGE_SECONDS = 60 * 24 * 60 * 60;
 
 export function isHybridGuestServerEnabled(): boolean {
   return process.env.SUPABASE_HYBRID_GUEST_ENABLED === 'true';

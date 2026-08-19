@@ -1,6 +1,6 @@
 begin;
 
-select plan(45);
+select plan(47);
 
 select has_table(
   'private',
@@ -27,6 +27,19 @@ select is(
   (select relrowsecurity from pg_class where oid = 'private.guest_rate_limit_windows'::regclass),
   true,
   'private guest rate windows have defense-in-depth RLS enabled'
+);
+
+select ok(
+  pg_get_functiondef(
+    'private.redeem_campaign_guest_invitation(uuid,bytea,text,uuid,bytea,timestamptz)'::regprocedure
+  ) like '%interval ''60 days''%',
+  'redemption accepts the reviewed sixty-day fixed guest lifetime'
+);
+select ok(
+  pg_get_functiondef(
+    'private.rotate_campaign_guest_session(uuid,bytea,text,bytea,timestamptz)'::regprocedure
+  ) like '%interval ''60 days''%',
+  'rotation accepts the reviewed sixty-day fixed guest lifetime'
 );
 select has_table(
   'private',

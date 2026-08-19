@@ -141,6 +141,7 @@ test('real HTTP redemption uses an opaque rotating cookie and enforces Origin/CS
   assert.match(firstSetCookie, /HttpOnly/iu);
   assert.match(firstSetCookie, /SameSite=Strict/iu);
   assert.match(firstSetCookie, /Path=\/api\/campaign/iu);
+  assert.match(firstSetCookie, /Max-Age=5184000/iu);
   assert.equal(firstSetCookie.includes(invitationToken), false);
   const firstCookie = cookiePair(firstSetCookie);
 
@@ -165,6 +166,7 @@ test('real HTTP redemption uses an opaque rotating cookie and enforces Origin/CS
   });
   assert.equal(rotation.status, 200);
   const secondSetCookie = rotation.headers.get('set-cookie');
+  assert.match(secondSetCookie, /Max-Age=5184000/iu);
   const secondCookie = cookiePair(secondSetCookie);
   assert.notEqual(secondCookie, firstCookie);
 

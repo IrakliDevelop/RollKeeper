@@ -5,6 +5,7 @@ import {
   generateGuestInvitationSecret,
   hashGuestSecret,
 } from './guestSessionCrypto';
+import { GUEST_SESSION_MAX_AGE_SECONDS } from './guestSessionSecurity';
 import type {
   GuestInvitationRecord,
   GuestSessionPrincipal,
@@ -137,7 +138,7 @@ export class GuestSessionService {
       this.options.pepper
     );
     const sessionExpiresAt = new Date(
-      this.now().valueOf() + 4 * 60 * 60_000
+      this.now().valueOf() + GUEST_SESSION_MAX_AGE_SECONDS * 1000
     ).toISOString();
     const hash = requestHash({ tokenHash, subjectId });
     try {
@@ -195,7 +196,7 @@ export class GuestSessionService {
         purpose: 'rotate',
       });
       const newExpiresAt = new Date(
-        this.now().valueOf() + 4 * 60 * 60_000
+        this.now().valueOf() + GUEST_SESSION_MAX_AGE_SECONDS * 1000
       ).toISOString();
       const currentTokenHash = hashGuestSecret(input.currentSessionToken);
       const hash = requestHash({
