@@ -5,12 +5,25 @@ import {
   refreshCampaignTTL,
 } from '@/lib/redis';
 import type { BattleMapMetadata } from '@/types/battlemap';
+import {
+  GUEST_SESSION_COOKIE,
+  isHybridGuestServerEnabled,
+} from '@/lib/guestSessionSecurity';
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
+    if (
+      isHybridGuestServerEnabled() &&
+      request.cookies.has(GUEST_SESSION_COOKIE)
+    ) {
+      return NextResponse.json(
+        { error: 'Guest battle-map access is not enabled' },
+        { status: 403 }
+      );
+    }
     const { code } = await params;
     const redis = getRedis();
     const raw = await redis.get<BattleMapMetadata[]>(

@@ -59,7 +59,10 @@ export function usePlayerSync({
       // stale entry for 60 days; local unlink proceeds regardless.
       fetch(`/api/campaign/${campaignCode}/players/${characterId}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-rollkeeper-csrf': '1',
+        },
         body: JSON.stringify({ playerId: characterId }),
       }).catch(() => {});
     }
@@ -73,7 +76,10 @@ export function usePlayerSync({
       try {
         const res = await fetch(`/api/campaign/${campaignCode}/join`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-rollkeeper-csrf': '1',
+          },
           body: JSON.stringify({
             playerId: characterId,
             playerName: characterData.playerName || characterData.name,
@@ -107,7 +113,10 @@ export function usePlayerSync({
       try {
         const res = await fetch(`/api/campaign/${campaignCode}/sync`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-rollkeeper-csrf': '1',
+          },
           body: JSON.stringify({
             playerId: characterId,
             playerName: characterData.playerName || characterData.name,

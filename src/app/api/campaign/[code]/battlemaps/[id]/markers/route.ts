@@ -23,6 +23,12 @@ import type {
   PublicMarkerDetail,
 } from '@/types/battlemap';
 import { sendBattleMapPoke } from '@/lib/relayPoke';
+import {
+  guestDeniedResponse,
+  rejectHybridGuestPrivilegeEscalation,
+  requireGuestPlayerBinding,
+} from '@/lib/guestRouteResponses';
+import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
 
 const markerDetailsKey = (code: string, mapId: string) =>
   campaignSharedKey(code, `battlemap-markers:${mapId}`);
@@ -132,11 +138,13 @@ function applyCanonicalRemaining(
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string; id: string }> }
 ) {
   const { code, id } = await params;
   try {
+    const guest = await authorizeHybridGuestRoute(request, code, 'shared:read');
+    if (guest.mode === 'denied') return guestDeniedResponse(guest);
     const redis = getRedis();
     const [markers, ledgerRaw] = await Promise.all([
       redis.get<PublicMarkerDetail[]>(markerDetailsKey(code, id)),
@@ -163,6 +171,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ code: string; id: string }> }
 ) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
   const { code, id } = await params;
   try {
     const body = (await request.json().catch(() => null)) as Record<
@@ -233,8 +243,25 @@ export async function POST(
       );
 
     const playerId = body.playerId as string;
+    const guest = await authorizeHybridGuestRoute(
+      request,
+      code,
+      'marker:claim',
+      true
+    );
+    if (guest.mode === 'denied') return guestDeniedResponse(guest);
+    const authorizedPlayerId =
+      guest.mode === 'guest'
+        ? requireGuestPlayerBinding(guest, [playerId])
+        : playerId;
+    if (!authorizedPlayerId) {
+      return NextResponse.json(
+        { error: 'Guest player binding does not match' },
+        { status: 403 }
+      );
+    }
     const redis = getRedis();
-    if (!(await redis.sismember(campaignPlayersKey(code), playerId)))
+    if (!(await redis.sismember(campaignPlayersKey(code), authorizedPlayerId)))
       return NextResponse.json(
         { error: 'Player is not a member of this campaign' },
         { status: 403 }
@@ -245,8 +272,13 @@ export async function POST(
       getRawRedis(),
       {
         ledger: campaignMarkerLootKey(code, id),
-        transfers: campaignTransfersKey(code, playerId),
-        receipt: campaignMarkerClaimKey(code, id, playerId, requestId),
+        transfers: campaignTransfersKey(code, authorizedPlayerId),
+        receipt: campaignMarkerClaimKey(
+          code,
+          id,
+          authorizedPlayerId,
+          requestId
+        ),
       },
       {
         markerId: body.markerId as string,

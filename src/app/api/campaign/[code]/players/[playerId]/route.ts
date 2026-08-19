@@ -11,6 +11,50 @@ import {
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
 import { verifyDmAuthority } from '@/lib/dmAuth';
+import {
+  guestDeniedResponse,
+  requireGuestPlayerBinding,
+} from '@/lib/guestRouteResponses';
+import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
+import { projectGuestPlayer } from '@/lib/guestPlayerProjection';
+import type { CampaignPlayerData } from '@/types/campaign';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ code: string; playerId: string }> }
+) {
+  try {
+    const { code, playerId } = await params;
+    const guest = await authorizeHybridGuestRoute(request, code, 'player:read');
+    if (guest.mode === 'legacy') {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    if (guest.mode === 'denied') return guestDeniedResponse(guest);
+    const bound = requireGuestPlayerBinding(guest, [playerId]);
+    if (!bound) {
+      return NextResponse.json(
+        { error: 'Guest player binding does not match' },
+        { status: 403 }
+      );
+    }
+    const redis = getRedis();
+    const raw = await redis.get(campaignPlayerKey(code, bound));
+    if (!raw) {
+      return NextResponse.json({ error: 'Player not found' }, { status: 404 });
+    }
+    const player: CampaignPlayerData =
+      typeof raw === 'string' ? JSON.parse(raw) : (raw as CampaignPlayerData);
+    return NextResponse.json(
+      { player: projectGuestPlayer(player) },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
+  } catch {
+    return NextResponse.json(
+      { error: 'Failed to fetch guest player' },
+      { status: 500 }
+    );
+  }
+}
 
 export async function DELETE(
   request: NextRequest,
@@ -27,7 +71,24 @@ export async function DELETE(
     }
     const { dmId, playerId: bodyPlayerId } = body;
 
-    if (!dmId && !bodyPlayerId) {
+    const guest = await authorizeHybridGuestRoute(
+      request,
+      code,
+      'player:leave',
+      true
+    );
+    if (guest.mode === 'denied') return guestDeniedResponse(guest);
+    if (
+      guest.mode === 'guest' &&
+      !requireGuestPlayerBinding(guest, [playerId, bodyPlayerId])
+    ) {
+      return NextResponse.json(
+        { error: 'Guest player binding does not match' },
+        { status: 403 }
+      );
+    }
+
+    if (guest.mode !== 'guest' && !dmId && !bodyPlayerId) {
       return NextResponse.json(
         { error: 'dmId or playerId is required' },
         { status: 400 }
@@ -36,7 +97,15 @@ export async function DELETE(
 
     const redis = getRedis();
 
-    if (dmId) {
+    if (guest.mode === 'guest') {
+      const exists = await redis.exists(campaignKey(code));
+      if (!exists) {
+        return NextResponse.json(
+          { error: 'Campaign not found' },
+          { status: 404 }
+        );
+      }
+    } else if (dmId) {
       const auth = await verifyDmAuthority(redis, code, dmId);
       if (auth === 'missing') {
         return NextResponse.json(

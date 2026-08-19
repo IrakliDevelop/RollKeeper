@@ -200,7 +200,10 @@ export function useSharedCampaignState(
       try {
         await fetch(`/api/campaign/${campaignCode}/shared`, {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-rollkeeper-csrf': '1',
+          },
           body: JSON.stringify({ playerId, messageId }),
         });
         // Optimistically remove from local state
@@ -223,7 +226,10 @@ export function useSharedCampaignState(
     try {
       await fetch(`/api/campaign/${campaignCode}/shared`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-rollkeeper-csrf': '1',
+        },
         body: JSON.stringify({ playerId, type: 'effects' }),
       });
       setSharedState(prev => {
@@ -240,7 +246,10 @@ export function useSharedCampaignState(
     try {
       await fetch(`/api/campaign/${campaignCode}/shared`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-rollkeeper-csrf': '1',
+        },
         body: JSON.stringify({ playerId, type: 'transfers' }),
       });
       setSharedState(prev => {
@@ -259,7 +268,10 @@ export function useSharedCampaignState(
       }
       const res = await fetch(`/api/campaign/${campaignCode}/shared`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-rollkeeper-csrf': '1',
+        },
         body: JSON.stringify({ playerId, type: 'xp', receipt }),
       });
       if (!res.ok) {

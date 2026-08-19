@@ -212,6 +212,14 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      authorize_campaign_guest_session: {
+        Args: {
+          p_display_code: string;
+          p_required_scope: string;
+          p_session_token_hash: string;
+        };
+        Returns: Json;
+      };
       claim_campaign_workspace: {
         Args: {
           p_authorization_token: string;
@@ -221,6 +229,15 @@ export type Database = {
         };
         Returns: Json;
       };
+      consume_guest_rate_limit: {
+        Args: {
+          p_action: string;
+          p_key_hash: string;
+          p_limit: number;
+          p_window_seconds: number;
+        };
+        Returns: boolean;
+      };
       create_campaign_workspace: {
         Args: {
           p_creation_kind: string;
@@ -228,6 +245,21 @@ export type Database = {
           p_name: string;
           p_source_fingerprint: string;
         };
+        Returns: Json;
+      };
+      issue_campaign_guest_invitation: {
+        Args: {
+          p_campaign_id: string;
+          p_expires_at: string;
+          p_legacy_player_id: string;
+          p_max_uses: number;
+          p_mutation_id: string;
+          p_token_hash: string;
+        };
+        Returns: Json;
+      };
+      list_campaign_guest_access: {
+        Args: { p_campaign_id: string };
         Returns: Json;
       };
       put_character: {
@@ -243,11 +275,40 @@ export type Database = {
         };
         Returns: Json;
       };
+      redeem_campaign_guest_invitation: {
+        Args: {
+          p_mutation_id: string;
+          p_request_hash: string;
+          p_session_expires_at: string;
+          p_session_token_hash: string;
+          p_subject_id: string;
+          p_token_hash: string;
+        };
+        Returns: Json;
+      };
       restore_character: {
         Args: {
           p_character_id: string;
           p_expected_server_version: number;
           p_mutation_id: string;
+        };
+        Returns: Json;
+      };
+      revoke_campaign_guest_invitation: {
+        Args: { p_invitation_id: string; p_mutation_id: string };
+        Returns: Json;
+      };
+      revoke_campaign_guest_session: {
+        Args: { p_mutation_id: string; p_session_id: string };
+        Returns: Json;
+      };
+      rotate_campaign_guest_session: {
+        Args: {
+          p_current_token_hash: string;
+          p_mutation_id: string;
+          p_new_expires_at: string;
+          p_new_token_hash: string;
+          p_request_hash: string;
         };
         Returns: Json;
       };

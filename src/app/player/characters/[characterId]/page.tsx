@@ -629,7 +629,10 @@ export default function CharacterSheet() {
           `/api/campaign/${playerSync.campaignCode}/shared`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'x-rollkeeper-csrf': '1',
+            },
             body: JSON.stringify({
               feature: 'item_transfer',
               data: { transfer, playerId: target.characterId },
@@ -662,7 +665,10 @@ export default function CharacterSheet() {
           `/api/campaign/${playerSync.campaignCode}/turn-request`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'x-rollkeeper-csrf': '1',
+            },
             body: JSON.stringify({
               encounterId: init.encounterId,
               round: init.round,

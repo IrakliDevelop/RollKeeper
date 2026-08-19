@@ -10,6 +10,11 @@ import {
 import { CampaignPlayerData } from '@/types/campaign';
 import { sendBattleMapPoke } from '@/lib/relayPoke';
 import { compareAndSetCampaignPlayer } from '@/lib/campaignPlayerCas';
+import {
+  guestDeniedResponse,
+  requireGuestPlayerBinding,
+} from '@/lib/guestRouteResponses';
+import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
 
 export async function POST(
   request: NextRequest,
@@ -18,8 +23,38 @@ export async function POST(
   try {
     const { code } = await params;
     const body = await request.json();
-    const { playerId, playerName, characterId, characterName, characterData } =
-      body;
+    const {
+      playerId: assertedPlayerId,
+      playerName,
+      characterId: assertedCharacterId,
+      characterName,
+      characterData,
+    } = body;
+    let playerId = assertedPlayerId;
+    let characterId = assertedCharacterId;
+
+    const guest = await authorizeHybridGuestRoute(
+      request,
+      code,
+      'player:sync',
+      true
+    );
+    if (guest.mode === 'denied') return guestDeniedResponse(guest);
+    if (guest.mode === 'guest') {
+      const bound = requireGuestPlayerBinding(guest, [
+        playerId,
+        characterId,
+        characterData?.id,
+      ]);
+      if (!bound) {
+        return NextResponse.json(
+          { error: 'Guest player binding does not match' },
+          { status: 403 }
+        );
+      }
+      playerId = bound;
+      characterId = bound;
+    }
 
     if (!playerId || !characterData) {
       return NextResponse.json(

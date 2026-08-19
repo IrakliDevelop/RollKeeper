@@ -6,6 +6,10 @@ import {
 } from '@/lib/redis';
 import { verifyDmAuthority } from '@/lib/dmAuth';
 import { signBattleMapToken, type BattleMapRole } from '@/lib/battlemapToken';
+import {
+  GUEST_SESSION_COOKIE,
+  isHybridGuestServerEnabled,
+} from '@/lib/guestSessionSecurity';
 
 const TOKEN_TTL_MS = 5 * 60 * 1000;
 
@@ -14,6 +18,15 @@ export async function POST(
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
+    if (
+      isHybridGuestServerEnabled() &&
+      request.cookies.has(GUEST_SESSION_COOKIE)
+    ) {
+      return NextResponse.json(
+        { error: 'Guest sessions cannot mint relay authority' },
+        { status: 403 }
+      );
+    }
     const { code } = await params;
     const secret = process.env.BATTLEMAP_RELAY_SECRET;
     if (!secret) {

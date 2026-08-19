@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { rejectHybridGuestPrivilegeEscalation } from '@/lib/guestRouteResponses';
 import { randomUUID } from 'crypto';
 import {
   getRedis,
@@ -11,6 +12,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
   try {
     const { code } = await params;
     if (!process.env.BATTLEMAP_RELAY_SECRET) {

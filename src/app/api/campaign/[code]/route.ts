@@ -9,12 +9,24 @@ import {
 } from '@/lib/redis';
 import { CampaignData } from '@/types/campaign';
 
+import {
+  guestDeniedResponse,
+  rejectHybridGuestPrivilegeEscalation,
+} from '@/lib/guestRouteResponses';
+import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
     const { code } = await params;
+    const guest = await authorizeHybridGuestRoute(
+      request,
+      code,
+      'campaign:read'
+    );
+    if (guest.mode === 'denied') return guestDeniedResponse(guest);
     const redis = getRedis();
 
     const data = await redis.get<string>(campaignKey(code));
@@ -30,7 +42,16 @@ export async function GET(
 
     await refreshCampaignTTL(redis, code);
 
-    return NextResponse.json({ code, campaign });
+    return NextResponse.json({
+      code,
+      campaign:
+        guest.mode === 'guest'
+          ? {
+              campaignName: campaign.campaignName,
+              createdAt: campaign.createdAt,
+            }
+          : campaign,
+    });
   } catch (error) {
     console.error('Error fetching campaign:', error);
     return NextResponse.json(
@@ -44,6 +65,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
   try {
     const { code } = await params;
     const body = await request.json();
@@ -97,9 +120,11 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
   try {
     const { code } = await params;
     const redis = getRedis();

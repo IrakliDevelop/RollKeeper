@@ -33,6 +33,15 @@ import type {
   SharedBattleMapState,
   InitiativeRollRequest,
 } from '@/types/sharedState';
+import {
+  guestDeniedResponse,
+  requireGuestPlayerBinding,
+} from '@/lib/guestRouteResponses';
+import {
+  GUEST_SESSION_COOKIE,
+  isHybridGuestServerEnabled,
+} from '@/lib/guestSessionSecurity';
+import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
 
 export async function GET(
   request: NextRequest,
@@ -40,8 +49,14 @@ export async function GET(
 ) {
   try {
     const { code } = await params;
-    const role = request.nextUrl.searchParams.get('role') ?? 'player';
-    const playerId = request.nextUrl.searchParams.get('playerId');
+    let role = request.nextUrl.searchParams.get('role') ?? 'player';
+    let playerId = request.nextUrl.searchParams.get('playerId');
+    const guest = await authorizeHybridGuestRoute(request, code, 'shared:read');
+    if (guest.mode === 'denied') return guestDeniedResponse(guest);
+    if (guest.mode === 'guest') {
+      role = 'player';
+      playerId = guest.principal.legacyPlayerId;
+    }
     const redis = getRedis();
 
     const calendarRaw = await redis.get<string>(
@@ -186,6 +201,15 @@ export async function POST(
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
+    if (
+      isHybridGuestServerEnabled() &&
+      request.cookies.has(GUEST_SESSION_COOKIE)
+    ) {
+      return NextResponse.json(
+        { error: 'Guest sessions cannot publish shared or DM state' },
+        { status: 403 }
+      );
+    }
     const { code } = await params;
     const body = await request.json().catch(() => null);
 
@@ -412,7 +436,26 @@ export async function DELETE(
       );
     }
 
-    const { playerId, type } = body;
+    const { playerId: assertedPlayerId, type } = body;
+    let playerId = assertedPlayerId;
+
+    const guest = await authorizeHybridGuestRoute(
+      request,
+      code,
+      'shared:ack',
+      true
+    );
+    if (guest.mode === 'denied') return guestDeniedResponse(guest);
+    if (guest.mode === 'guest') {
+      const bound = requireGuestPlayerBinding(guest, [playerId]);
+      if (!bound) {
+        return NextResponse.json(
+          { error: 'Guest player binding does not match' },
+          { status: 403 }
+        );
+      }
+      playerId = bound;
+    }
 
     if (!playerId) {
       return NextResponse.json(
