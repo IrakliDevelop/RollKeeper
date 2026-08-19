@@ -6,6 +6,12 @@ import {
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
 import type { InitiativeSubmission } from '@/types/sharedState';
+import {
+  guestDeniedResponse,
+  rejectHybridGuestPrivilegeEscalation,
+  requireGuestPlayerBinding,
+} from '@/lib/guestRouteResponses';
+import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
 
 const KEY_FEATURE = 'initiativeSubmissions';
 
@@ -28,6 +34,23 @@ export async function POST(
   try {
     const { code } = await params;
     const body = (await request.json()) as InitiativeSubmission;
+    const guest = await authorizeHybridGuestRoute(
+      request,
+      code,
+      'initiative:submit',
+      true
+    );
+    if (guest.mode === 'denied') return guestDeniedResponse(guest);
+    if (guest.mode === 'guest') {
+      const bound = requireGuestPlayerBinding(guest, [body.playerId]);
+      if (!bound) {
+        return NextResponse.json(
+          { error: 'Guest player binding does not match' },
+          { status: 403 }
+        );
+      }
+      body.playerId = bound;
+    }
     if (!body.requestId || !body.playerId || typeof body.value !== 'number') {
       return NextResponse.json(
         { error: 'requestId, playerId and numeric value are required' },
@@ -60,9 +83,11 @@ export async function POST(
 
 // DM reads all pending submissions.
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
   try {
     const { code } = await params;
     const submissions = await readRecord(getRedis(), code);
@@ -81,6 +106,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
   try {
     const { code } = await params;
     const playerId = request.nextUrl.searchParams.get('playerId');

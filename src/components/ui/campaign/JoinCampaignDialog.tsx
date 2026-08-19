@@ -73,7 +73,10 @@ export function JoinCampaignDialog({
 
       const joinRes = await fetch(`/api/campaign/${trimmedCode}/join`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-rollkeeper-csrf': '1',
+        },
         body: JSON.stringify({
           playerId: character.id,
           playerName: character.characterData.playerName || character.name,

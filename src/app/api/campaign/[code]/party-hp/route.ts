@@ -9,6 +9,8 @@ import {
 import { CampaignPlayerData } from '@/types/campaign';
 import { DeathSavingThrows } from '@/types/character';
 import { calculateCharacterArmorClass } from '@/utils/calculations';
+import { guestDeniedResponse } from '@/lib/guestRouteResponses';
+import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
 
 export interface PartyMemberHP {
   characterId: string;
@@ -28,11 +30,13 @@ export interface PartyMemberHP {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
     const { code } = await params;
+    const guest = await authorizeHybridGuestRoute(request, code, 'party:read');
+    if (guest.mode === 'denied') return guestDeniedResponse(guest);
     const redis = getRedis();
 
     // Check campaign exists

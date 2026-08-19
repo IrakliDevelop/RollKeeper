@@ -393,7 +393,10 @@ export function PlayerBattleMapCanvas({
         `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-rollkeeper-csrf': '1',
+          },
           body: JSON.stringify({
             playerId: characterId,
             markerId: markerPanelState.detail.id,

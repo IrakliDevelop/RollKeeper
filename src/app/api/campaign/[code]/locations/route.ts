@@ -7,12 +7,25 @@ import {
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
 import type { LocationMetadata } from '@/types/location';
+import {
+  GUEST_SESSION_COOKIE,
+  isHybridGuestServerEnabled,
+} from '@/lib/guestSessionSecurity';
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
+    if (
+      isHybridGuestServerEnabled() &&
+      request.cookies.has(GUEST_SESSION_COOKIE)
+    ) {
+      return NextResponse.json(
+        { error: 'Guest location access is not enabled' },
+        { status: 403 }
+      );
+    }
     const { code } = await params;
     const redis = getRedis();
     const raw = await redis.get<LocationMetadata[]>(campaignLocationsKey(code));

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { rejectHybridGuestPrivilegeEscalation } from '@/lib/guestRouteResponses';
 import {
   getRedis,
   campaignKey,
@@ -17,6 +18,8 @@ function generateCampaignCode(): string {
 }
 
 export async function POST(request: NextRequest) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
   try {
     const body = await request.json();
     const { dmId, campaignName } = body;

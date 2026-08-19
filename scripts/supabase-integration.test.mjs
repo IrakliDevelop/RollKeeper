@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import test from 'node:test';
 
 import {
@@ -34,12 +34,17 @@ function createUserJwt(secret, userId) {
   return `${header}.${payload}.${signature}`;
 }
 
-async function request(config, path, { body, method = 'GET', token } = {}) {
+async function request(
+  config,
+  path,
+  { body, method = 'GET', service = false, token } = {}
+) {
+  const apiKey = service ? config.serviceRoleKey : config.anonKey;
   const response = await fetch(`${config.restUrl}${path}`, {
     method,
     headers: {
-      apikey: config.anonKey,
-      Authorization: `Bearer ${token ?? config.anonKey}`,
+      apikey: apiKey,
+      Authorization: `Bearer ${token ?? apiKey}`,
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -50,6 +55,10 @@ async function request(config, path, { body, method = 'GET', token } = {}) {
     body: text === '' ? null : JSON.parse(text),
     response,
   };
+}
+
+function sha256Bytea(value) {
+  return `\\x${createHash('sha256').update(value).digest('hex')}`;
 }
 
 function putBody(mutationId, name, payload, clientRevision, expectedVersion) {
@@ -346,4 +355,200 @@ test('DM workspace RPCs isolate accounts and serialize a one-time ownership clai
     losingReuse.body.message,
     'workspace ownership proof was not accepted'
   );
+});
+
+test('hybrid guest redemption and rotation serialize against the real database', async () => {
+  const config = getLocalSupabaseTestConfig();
+  const userAToken = createUserJwt(config.jwtSecret, USER_A_ID);
+  const userBToken = createUserJwt(config.jwtSecret, USER_B_ID);
+  const created = await request(config, '/rpc/create_campaign_workspace', {
+    method: 'POST',
+    token: userAToken,
+    body: {
+      p_mutation_id: '88000000-0000-4000-8000-000000000001',
+      p_name: 'Guest race workspace',
+      p_creation_kind: 'new_workspace',
+      p_source_fingerprint: null,
+    },
+  });
+  assert.equal(created.response.status, 200);
+
+  const invitationExpiry = new Date(Date.now() + 30 * 60_000).toISOString();
+  const invitation = await request(
+    config,
+    '/rpc/issue_campaign_guest_invitation',
+    {
+      method: 'POST',
+      token: userAToken,
+      body: {
+        p_mutation_id: '88000000-0000-4000-8000-000000000002',
+        p_campaign_id: created.body.campaignId,
+        p_token_hash: sha256Bytea('integration-invitation-token'),
+        p_expires_at: invitationExpiry,
+        p_max_uses: 1,
+        p_legacy_player_id: 'integration-bound-player',
+      },
+    }
+  );
+  assert.equal(invitation.response.status, 200);
+
+  const sessionExpiry = new Date(Date.now() + 4 * 60 * 60_000).toISOString();
+  const redemptionBodies = [
+    {
+      p_mutation_id: '88000000-0000-4000-8000-000000000003',
+      p_request_hash: 'a'.repeat(64),
+      p_subject_id: '88000000-0000-4000-8000-000000000004',
+      p_session_token_hash: sha256Bytea('integration-session-a'),
+    },
+    {
+      p_mutation_id: '88000000-0000-4000-8000-000000000005',
+      p_request_hash: 'b'.repeat(64),
+      p_subject_id: '88000000-0000-4000-8000-000000000006',
+      p_session_token_hash: sha256Bytea('integration-session-b'),
+    },
+  ].map(body => ({
+    ...body,
+    p_token_hash: sha256Bytea('integration-invitation-token'),
+    p_session_expires_at: sessionExpiry,
+  }));
+  const redemptionRace = await Promise.all(
+    redemptionBodies.map(body =>
+      request(config, '/rpc/redeem_campaign_guest_invitation', {
+        body,
+        method: 'POST',
+        service: true,
+      })
+    )
+  );
+  assert.deepEqual(
+    redemptionRace.map(result => result.response.status).sort(),
+    [200, 403]
+  );
+  const redemptionWinner = redemptionRace.findIndex(
+    result => result.response.status === 200
+  );
+  const redemptionReplay = await request(
+    config,
+    '/rpc/redeem_campaign_guest_invitation',
+    {
+      body: redemptionBodies[redemptionWinner],
+      method: 'POST',
+      service: true,
+    }
+  );
+  assert.equal(redemptionReplay.response.status, 200);
+  assert.deepEqual(
+    redemptionReplay.body,
+    redemptionRace[redemptionWinner].body
+  );
+
+  const winningToken =
+    redemptionWinner === 0 ? 'integration-session-a' : 'integration-session-b';
+  const rotationExpiry = new Date(Date.now() + 4 * 60 * 60_000).toISOString();
+  const rotationBodies = [
+    {
+      p_mutation_id: '88000000-0000-4000-8000-000000000007',
+      p_request_hash: 'c'.repeat(64),
+      p_new_token_hash: sha256Bytea('integration-rotated-a'),
+    },
+    {
+      p_mutation_id: '88000000-0000-4000-8000-000000000008',
+      p_request_hash: 'd'.repeat(64),
+      p_new_token_hash: sha256Bytea('integration-rotated-b'),
+    },
+  ].map(body => ({
+    ...body,
+    p_current_token_hash: sha256Bytea(winningToken),
+    p_new_expires_at: rotationExpiry,
+  }));
+  const rotationRace = await Promise.all(
+    rotationBodies.map(body =>
+      request(config, '/rpc/rotate_campaign_guest_session', {
+        body,
+        method: 'POST',
+        service: true,
+      })
+    )
+  );
+  assert.deepEqual(
+    rotationRace.map(result => result.response.status).sort(),
+    [200, 403]
+  );
+  const rotationWinner = rotationRace.findIndex(
+    result => result.response.status === 200
+  );
+  const rotationReplay = await request(
+    config,
+    '/rpc/rotate_campaign_guest_session',
+    {
+      body: rotationBodies[rotationWinner],
+      method: 'POST',
+      service: true,
+    }
+  );
+  assert.equal(rotationReplay.response.status, 200);
+  assert.deepEqual(rotationReplay.body, rotationRace[rotationWinner].body);
+
+  const oldAuthorization = await request(
+    config,
+    '/rpc/authorize_campaign_guest_session',
+    {
+      body: {
+        p_session_token_hash: sha256Bytea(winningToken),
+        p_display_code: created.body.displayCode,
+        p_required_scope: 'player:sync',
+      },
+      method: 'POST',
+      service: true,
+    }
+  );
+  assert.equal(oldAuthorization.response.status, 403);
+  const rotatedToken =
+    rotationWinner === 0 ? 'integration-rotated-a' : 'integration-rotated-b';
+  const newAuthorization = await request(
+    config,
+    '/rpc/authorize_campaign_guest_session',
+    {
+      body: {
+        p_session_token_hash: sha256Bytea(rotatedToken),
+        p_display_code: created.body.displayCode,
+        p_required_scope: 'player:sync',
+      },
+      method: 'POST',
+      service: true,
+    }
+  );
+  assert.equal(newAuthorization.response.status, 200);
+  assert.equal(
+    newAuthorization.body.legacyPlayerId,
+    'integration-bound-player'
+  );
+
+  const crossAccountRevoke = await request(
+    config,
+    '/rpc/revoke_campaign_guest_session',
+    {
+      body: {
+        p_mutation_id: '88000000-0000-4000-8000-000000000009',
+        p_session_id: rotationRace[rotationWinner].body.sessionId,
+      },
+      method: 'POST',
+      token: userBToken,
+    }
+  );
+  assert.equal(crossAccountRevoke.response.status, 403);
+  const afterFailedRevoke = await request(
+    config,
+    '/rpc/authorize_campaign_guest_session',
+    {
+      body: {
+        p_session_token_hash: sha256Bytea(rotatedToken),
+        p_display_code: created.body.displayCode,
+        p_required_scope: 'player:sync',
+      },
+      method: 'POST',
+      service: true,
+    }
+  );
+  assert.equal(afterFailedRevoke.response.status, 200);
 });

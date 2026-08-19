@@ -8,12 +8,26 @@ import {
 } from '@/lib/redis';
 import { verifyDmAuthority } from '@/lib/dmAuth';
 import type { LocationMetadata, SyncedLocation } from '@/types/location';
+import {
+  GUEST_SESSION_COOKIE,
+  isHybridGuestServerEnabled,
+} from '@/lib/guestSessionSecurity';
+import { rejectHybridGuestPrivilegeEscalation } from '@/lib/guestRouteResponses';
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string; id: string }> }
 ) {
   try {
+    if (
+      isHybridGuestServerEnabled() &&
+      request.cookies.has(GUEST_SESSION_COOKIE)
+    ) {
+      return NextResponse.json(
+        { error: 'Guest location access is not enabled' },
+        { status: 403 }
+      );
+    }
     const { code, id } = await params;
     const redis = getRedis();
     const raw = await redis.get<SyncedLocation>(campaignLocationKey(code, id));
@@ -61,6 +75,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ code: string; id: string }> }
 ) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
   try {
     const { code, id } = await params;
     const body = await request.json();
@@ -131,6 +147,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ code: string; id: string }> }
 ) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
   try {
     const { code, id } = await params;
     const body = await request.json();

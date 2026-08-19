@@ -58,7 +58,10 @@ export function useInitiativePrompt({
           `/api/campaign/${campaignCode}/initiative-submission`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'x-rollkeeper-csrf': '1',
+            },
             body: JSON.stringify({
               requestId: request.requestId,
               playerId: characterId,

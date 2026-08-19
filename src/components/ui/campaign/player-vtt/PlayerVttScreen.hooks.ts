@@ -128,7 +128,10 @@ export function usePlayerVttState(campaignCode: string, characterId: string) {
       try {
         const res = await fetch(`/api/campaign/${campaignCode}/turn-request`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-rollkeeper-csrf': '1',
+          },
           body: JSON.stringify({
             encounterId: init.encounterId,
             round: init.round,

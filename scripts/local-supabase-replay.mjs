@@ -27,6 +27,7 @@ export function fingerprintLocalSupabase() {
     '--username=postgres',
     '--schema-only',
     '--schema=public',
+    '--schema=private',
     '--no-owner',
     '--no-privileges',
   ])

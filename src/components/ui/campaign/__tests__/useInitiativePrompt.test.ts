@@ -129,7 +129,10 @@ describe('useInitiativePrompt', () => {
       '/api/campaign/ABC123/initiative-submission',
       expect.objectContaining({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-rollkeeper-csrf': '1',
+        },
         body: JSON.stringify({
           requestId: 'r1',
           playerId: 'char-1',

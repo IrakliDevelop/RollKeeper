@@ -37,6 +37,10 @@ export function getLocalSupabaseTestConfig() {
       'PUBLISHABLE_KEY'
     ),
     restUrl: requireString(status.REST_URL, 'REST_URL'),
+    serviceRoleKey: requireString(
+      status.SERVICE_ROLE_KEY ?? status.SECRET_KEY,
+      'SERVICE_ROLE_KEY'
+    ),
   };
 }
 

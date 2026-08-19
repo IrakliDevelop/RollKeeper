@@ -14,12 +14,25 @@ import {
   readXpAwards,
 } from '@/lib/xpAwardQueue';
 import { CampaignData, CampaignPlayerData } from '@/types/campaign';
+import {
+  GUEST_SESSION_COOKIE,
+  isHybridGuestServerEnabled,
+} from '@/lib/guestSessionSecurity';
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
+    if (
+      isHybridGuestServerEnabled() &&
+      request.cookies.has(GUEST_SESSION_COOKIE)
+    ) {
+      return NextResponse.json(
+        { error: 'Guest sessions cannot read the private roster' },
+        { status: 403 }
+      );
+    }
     const { code } = await params;
     const redis = getRedis();
 
