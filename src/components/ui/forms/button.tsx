@@ -1,6 +1,6 @@
 /**
  * Button Component
- * 
+ *
  * A versatile button component built with modern design principles.
  * Supports multiple variants, sizes, states, and icon integration.
  */
@@ -8,7 +8,7 @@
 'use client';
 
 import * as React from 'react';
-import { Slot } from '@radix-ui/react-slot';
+import { Slot, Slottable } from '@radix-ui/react-slot';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { buttonVariants, type ButtonVariants } from '../primitives/variants';
@@ -55,41 +55,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const Comp = asChild ? Slot : 'button';
     const isDisabled = disabled || loading;
 
-    // Build content array
-    const contentParts = [];
-    
-    if (loading) {
-      contentParts.push(
-        <Loader2 key="loader" className="h-4 w-4 animate-spin" aria-hidden="true" />
-      );
-    } else {
-      if (leftIcon) {
-        contentParts.push(
-          <span key="left-icon" className="inline-flex shrink-0" aria-hidden="true">
-            {leftIcon}
-          </span>
-        );
-      }
-    }
-    
-    contentParts.push(children);
-    
-    if (!loading && rightIcon) {
-      contentParts.push(
-        <span key="right-icon" className="inline-flex shrink-0" aria-hidden="true">
-          {rightIcon}
-        </span>
-      );
-    }
-
-    // When using asChild with icons, wrap all content in a single element
-    const shouldWrapContent = asChild && (loading || leftIcon || rightIcon);
-    const content = shouldWrapContent ? (
-      <span className="flex items-center gap-2">{contentParts}</span>
-    ) : (
-      contentParts
-    );
-
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, fullWidth }), className)}
@@ -97,7 +62,21 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={isDisabled}
         {...props}
       >
-        {content}
+        {loading ? (
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        ) : (
+          leftIcon && (
+            <span className="inline-flex shrink-0" aria-hidden="true">
+              {leftIcon}
+            </span>
+          )
+        )}
+        <Slottable>{children}</Slottable>
+        {!loading && rightIcon && (
+          <span className="inline-flex shrink-0" aria-hidden="true">
+            {rightIcon}
+          </span>
+        )}
       </Comp>
     );
   }
@@ -106,4 +85,3 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 Button.displayName = 'Button';
 
 export { Button, buttonVariants };
-
