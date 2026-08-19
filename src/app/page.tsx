@@ -97,9 +97,9 @@ function GradientOrb({
 const FEATURES = [
   {
     icon: FileText,
-    title: 'Smart Character Sheets',
+    title: 'Character sheets that keep up',
     description:
-      'Auto-calculating stats, spell slots, and modifiers. Manage multiple characters with tabbed, organized sheets.',
+      'Track stats, spells, inventory, health, conditions, and notes without spreading your character across a pile of tabs.',
     accent: 'text-accent-blue-text',
     accentMuted: 'text-accent-blue-text-muted',
     bg: 'bg-accent-blue-bg',
@@ -108,9 +108,9 @@ const FEATURES = [
   },
   {
     icon: Wifi,
-    title: 'Live Campaign Sync',
+    title: 'A shared campaign table',
     description:
-      'DMs see player HP, stats, and inventory in real time. Players join campaigns with a simple code.',
+      'Players join with a campaign code, while DMs can follow the party, send updates, and bring characters into encounters.',
     accent: 'text-accent-purple-text',
     accentMuted: 'text-accent-purple-text-muted',
     bg: 'bg-accent-purple-bg',
@@ -119,9 +119,9 @@ const FEATURES = [
   },
   {
     icon: BookOpen,
-    title: 'D&D Reference Library',
+    title: 'Rules references close at hand',
     description:
-      '540+ spells, full bestiary, and class compendium at your fingertips. Search, filter, and reference mid-session.',
+      'Search spells, monsters, classes, and feats without leaving the session to dig through another site.',
     accent: 'text-accent-emerald-text',
     accentMuted: 'text-accent-emerald-text-muted',
     bg: 'bg-accent-emerald-bg',
@@ -132,23 +132,23 @@ const FEATURES = [
 
 const PLAYER_FEATURES = [
   { icon: Layers, text: 'Multiple characters in one place' },
-  { icon: Zap, text: 'Auto-calculating sheets — no manual math' },
-  { icon: Dice6, text: 'Integrated 3D dice rolling' },
-  { icon: Star, text: 'Track spells, inventory, and abilities' },
+  { icon: Zap, text: 'Calculated stats and automatic saving' },
+  { icon: Dice6, text: 'Roll attacks, spells, and 3D dice' },
+  { icon: Star, text: 'Keep spells, gear, health, and notes together' },
 ] as const;
 
 const DM_FEATURES = [
-  { icon: Sword, text: 'Visual combat & initiative tracker' },
-  { icon: Users, text: 'Live player sync dashboard' },
-  { icon: Bug, text: 'Full monster bestiary with search' },
-  { icon: FileText, text: 'Session notes & campaign management' },
+  { icon: Sword, text: 'Run encounters and track initiative' },
+  { icon: Users, text: 'See the party and send campaign updates' },
+  { icon: Bug, text: 'Build NPCs or pull from the bestiary' },
+  { icon: FileText, text: 'Plan with calendars, locations, and battle maps' },
 ] as const;
 
 const REFERENCE_TOOLS = [
   {
     href: '/spellbook',
     title: 'Spellbook',
-    stat: '540+ spells',
+    stat: 'Search by class, level, and more',
     icon: BookOpen,
     accent: 'text-accent-indigo-text',
     bg: 'bg-accent-indigo-bg',
@@ -158,7 +158,7 @@ const REFERENCE_TOOLS = [
   {
     href: '/bestiary',
     title: 'Bestiary',
-    stat: 'Full monster database',
+    stat: 'Search and filter stat blocks',
     icon: Bug,
     accent: 'text-accent-red-text',
     bg: 'bg-accent-red-bg',
@@ -168,7 +168,7 @@ const REFERENCE_TOOLS = [
   {
     href: '/classes',
     title: 'Class Compendium',
-    stat: 'All classes & subclasses',
+    stat: 'Features and level progression',
     icon: Shield,
     accent: 'text-accent-emerald-text',
     bg: 'bg-accent-emerald-bg',
@@ -349,7 +349,7 @@ export default function LandingPage() {
             >
               <span className="bg-accent-purple-bg text-accent-purple-text border-accent-purple-border inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium shadow-sm">
                 <Sparkles size={14} className="animate-icon-bob" />
-                Free & open — no account required
+                Start locally. No account required.
               </span>
             </motion.div>
 
@@ -359,9 +359,9 @@ export default function LandingPage() {
               transition={{ duration: 0.7, delay: 0.2 }}
               className="text-heading mb-6 text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-7xl"
             >
-              Your Tabletop,{' '}
+              Keep the game moving,{' '}
               <span className="animate-shimmer bg-linear-to-r from-blue-500 via-purple-500 to-indigo-500 bg-clip-text text-transparent">
-                Supercharged
+                not the paperwork
               </span>
             </motion.h1>
 
@@ -371,9 +371,9 @@ export default function LandingPage() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="text-body mx-auto mb-10 max-w-2xl text-lg leading-relaxed sm:text-xl"
             >
-              The all-in-one D&D 5e companion for players and dungeon masters.
-              Smart character sheets, live campaign sync, and a complete
-              reference library — all in your browser.
+              RollKeeper puts character sheets, campaign tools, encounter
+              tracking, maps, and rules references in one browser app for D&D 5e
+              players and dungeon masters.
             </motion.p>
 
             <motion.div
@@ -420,11 +420,11 @@ export default function LandingPage() {
             >
               <span className="flex items-center gap-1.5">
                 <Lock size={14} />
-                Data stays on your device
+                Characters work without an account
               </span>
               <span className="flex items-center gap-1.5">
                 <Zap size={14} />
-                Works offline
+                Local-first character storage
               </span>
               <span className="flex items-center gap-1.5">
                 <Dice6 size={14} />
@@ -488,11 +488,11 @@ export default function LandingPage() {
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <AnimatedSection className="mb-16 text-center">
             <h2 className="text-heading mb-4 text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-              Everything you need at the table
+              Less bookkeeping, more playing
             </h2>
             <p className="text-body mx-auto max-w-2xl text-lg">
-              Whether you&apos;re a first-time player or a veteran DM,
-              RollKeeper has the tools to make your sessions smoother.
+              Keep the details you reach for during a session in one place, from
+              hit points and spell slots to encounters and maps.
             </p>
           </AnimatedSection>
 
@@ -563,11 +563,11 @@ export default function LandingPage() {
         <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <AnimatedSection className="mb-16 text-center">
             <h2 className="text-heading mb-4 text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-              Built for both sides of the screen
+              One place for players and DMs
             </h2>
             <p className="text-body mx-auto max-w-2xl text-lg">
-              Dedicated dashboards for players and dungeon masters, each packed
-              with the right tools.
+              Players get a focused character workspace. DMs get the tools to
+              organize a campaign and run the table.
             </p>
           </AnimatedSection>
 
@@ -596,7 +596,7 @@ export default function LandingPage() {
                         For Players
                       </h3>
                       <p className="text-body text-sm">
-                        Your characters, always ready
+                        Everything your character needs
                       </p>
                     </div>
                   </div>
@@ -663,7 +663,7 @@ export default function LandingPage() {
                         For Dungeon Masters
                       </h3>
                       <p className="text-body text-sm">
-                        Run your campaign like a pro
+                        Prep less. Keep the session moving.
                       </p>
                     </div>
                   </div>
@@ -815,8 +815,8 @@ export default function LandingPage() {
               Ready to roll?
             </h2>
             <p className="text-body mb-10 text-lg sm:text-xl">
-              Jump in and start building your character or setting up your
-              campaign. No sign-up, no setup — just open and play.
+              Build a character locally without signing up, or open the DM tools
+              and start putting a campaign together.
             </p>
 
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -857,7 +857,7 @@ export default function LandingPage() {
               className="text-muted mt-8 flex items-center justify-center gap-2 text-sm"
             >
               <Lock size={14} />
-              Your data stays on your device. No account needed.
+              Local character play does not require an account.
             </motion.p>
           </AnimatedSection>
         </div>
@@ -896,7 +896,7 @@ export default function LandingPage() {
             </nav>
 
             <p className="text-faint text-xs">
-              Built by D&D players, for D&D players.
+              Made for the practical side of running and playing D&D.
             </p>
           </div>
         </div>
