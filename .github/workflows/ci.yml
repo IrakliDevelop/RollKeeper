@@ -44,6 +44,9 @@ jobs:
       - name: DM workspace identity coverage contract
         run: npm run test:slice10a1:coverage
 
+      - name: Campaign membership cutover coverage contract
+        run: npm run test:slice10b:coverage
+
       - name: IndexedDB migration coverage contract
         run: >-
           npm test -- src/lib/indexeddb
@@ -144,6 +147,12 @@ jobs:
 
       - name: Run JWT-scoped database integration tests
         run: npm run test:db:integration
+
+      - name: Run membership cutover concurrency integration tests
+        run: npm run test:membership:integration
+
+      - name: Run membership session-cookie and CSRF integration tests
+        run: npm run test:membership:http
 
       - name: Verify deterministic reset and replay
         run: npm run test:db:replay

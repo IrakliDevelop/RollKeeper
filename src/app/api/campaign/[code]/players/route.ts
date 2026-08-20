@@ -18,13 +18,33 @@ import {
   GUEST_SESSION_COOKIE,
   isHybridGuestServerEnabled,
 } from '@/lib/guestSessionSecurity';
+import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
+    const { code } = await params;
+    const membership = await authorizeCampaignMembershipRoute(code, false);
+    if (membership.mode === 'denied') {
+      return NextResponse.json(
+        { error: 'Account membership is required' },
+        { status: membership.status }
+      );
+    }
     if (
+      membership.mode === 'account' &&
+      membership.principal.role !== 'owner' &&
+      membership.principal.role !== 'dm'
+    ) {
+      return NextResponse.json(
+        { error: 'Private roster access is denied' },
+        { status: 403 }
+      );
+    }
+    if (
+      membership.mode === 'legacy' &&
       isHybridGuestServerEnabled() &&
       request.cookies.has(GUEST_SESSION_COOKIE)
     ) {
@@ -33,7 +53,6 @@ export async function GET(
         { status: 403 }
       );
     }
-    const { code } = await params;
     const redis = getRedis();
 
     const campaignRaw = await redis.get<string>(campaignKey(code));

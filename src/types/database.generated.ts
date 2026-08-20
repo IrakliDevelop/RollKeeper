@@ -47,6 +47,110 @@ export type Database = {
           },
         ];
       };
+      campaign_character_links: {
+        Row: {
+          campaign_id: string;
+          character_id: string;
+          guest_subject_id: string | null;
+          legacy_character_id: string | null;
+          legacy_player_id: string | null;
+          linked_at: string;
+          member_id: string;
+          status: string;
+          unlinked_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          campaign_id: string;
+          character_id: string;
+          guest_subject_id?: string | null;
+          legacy_character_id?: string | null;
+          legacy_player_id?: string | null;
+          linked_at?: string;
+          member_id: string;
+          status: string;
+          unlinked_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          campaign_id?: string;
+          character_id?: string;
+          guest_subject_id?: string | null;
+          legacy_character_id?: string | null;
+          legacy_player_id?: string | null;
+          linked_at?: string;
+          member_id?: string;
+          status?: string;
+          unlinked_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'campaign_character_links_campaign_id_member_id_fkey';
+            columns: ['campaign_id', 'member_id'];
+            isOneToOne: false;
+            referencedRelation: 'campaign_members';
+            referencedColumns: ['campaign_id', 'user_id'];
+          },
+          {
+            foreignKeyName: 'campaign_character_links_character_id_fkey';
+            columns: ['character_id'];
+            isOneToOne: false;
+            referencedRelation: 'characters';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      campaign_members: {
+        Row: {
+          campaign_id: string;
+          created_at: string;
+          joined_at: string;
+          left_at: string | null;
+          membership_epoch: number;
+          removed_at: string | null;
+          removed_by: string | null;
+          role: string;
+          status: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          campaign_id: string;
+          created_at?: string;
+          joined_at?: string;
+          left_at?: string | null;
+          membership_epoch?: number;
+          removed_at?: string | null;
+          removed_by?: string | null;
+          role: string;
+          status: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          campaign_id?: string;
+          created_at?: string;
+          joined_at?: string;
+          left_at?: string | null;
+          membership_epoch?: number;
+          removed_at?: string | null;
+          removed_by?: string | null;
+          role?: string;
+          status?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'campaign_members_campaign_id_fkey';
+            columns: ['campaign_id'];
+            isOneToOne: false;
+            referencedRelation: 'campaigns';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       campaign_workspace_claim_provenance: {
         Row: {
           authorization_id: string | null;
@@ -212,6 +316,14 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      accept_campaign_membership_invitation: {
+        Args: {
+          p_decision: string;
+          p_mutation_id: string;
+          p_token_hash: string;
+        };
+        Returns: Json;
+      };
       authorize_campaign_guest_session: {
         Args: {
           p_display_code: string;
@@ -220,12 +332,48 @@ export type Database = {
         };
         Returns: Json;
       };
+      authorize_campaign_membership: {
+        Args: { p_campaign_id: string; p_expected_epoch: number };
+        Returns: Json;
+      };
+      begin_campaign_membership_freeze: {
+        Args: {
+          p_campaign_id: string;
+          p_manifest_fingerprint: string;
+          p_manifest_version: number;
+          p_mutation_id: string;
+        };
+        Returns: Json;
+      };
+      cancel_campaign_membership_freeze: {
+        Args: { p_campaign_id: string; p_mutation_id: string };
+        Returns: Json;
+      };
       claim_campaign_workspace: {
         Args: {
           p_authorization_token: string;
           p_legacy_source_fingerprint: string;
           p_mutation_id: string;
           p_name: string;
+        };
+        Returns: Json;
+      };
+      classify_campaign_membership_shadow: {
+        Args: {
+          p_campaign_id: string;
+          p_classification: string;
+          p_entry_kind: string;
+          p_mutation_id: string;
+          p_source_id: string;
+        };
+        Returns: Json;
+      };
+      confirm_campaign_membership_cutover: {
+        Args: {
+          p_campaign_id: string;
+          p_manifest_fingerprint: string;
+          p_manifest_version: number;
+          p_mutation_id: string;
         };
         Returns: Json;
       };
@@ -258,8 +406,38 @@ export type Database = {
         };
         Returns: Json;
       };
+      issue_campaign_membership_invitation: {
+        Args: {
+          p_campaign_id: string;
+          p_expires_at: string;
+          p_guest_subject_id: string;
+          p_invited_account_id: string;
+          p_legacy_player_id: string;
+          p_max_uses: number;
+          p_mutation_id: string;
+          p_role: string;
+          p_token_hash: string;
+        };
+        Returns: Json;
+      };
+      link_campaign_character: {
+        Args: {
+          p_campaign_id: string;
+          p_character_id: string;
+          p_guest_subject_id: string;
+          p_legacy_character_id: string;
+          p_legacy_player_id: string;
+          p_mutation_id: string;
+        };
+        Returns: Json;
+      };
       list_campaign_guest_access: {
         Args: { p_campaign_id: string };
+        Returns: Json;
+      };
+      list_my_campaign_memberships: { Args: never; Returns: Json };
+      prepare_campaign_membership_manifest: {
+        Args: { p_campaign_id: string; p_mutation_id: string };
         Returns: Json;
       };
       put_character: {
@@ -286,6 +464,38 @@ export type Database = {
         };
         Returns: Json;
       };
+      remove_campaign_member: {
+        Args: {
+          p_campaign_id: string;
+          p_expected_epoch: number;
+          p_expected_legacy_player_id: string;
+          p_member_id: string;
+          p_mutation_id: string;
+        };
+        Returns: Json;
+      };
+      replace_campaign_membership_shadow: {
+        Args: {
+          p_campaign_id: string;
+          p_entries: Json;
+          p_mutation_id: string;
+          p_owner_id: string;
+        };
+        Returns: Json;
+      };
+      replay_campaign_membership_cutover: {
+        Args: {
+          p_campaign_id: string;
+          p_manifest_fingerprint: string;
+          p_manifest_version: number;
+          p_mutation_id: string;
+        };
+        Returns: Json;
+      };
+      resolve_campaign_membership_authority: {
+        Args: { p_display_code: string };
+        Returns: Json;
+      };
       restore_character: {
         Args: {
           p_character_id: string;
@@ -302,6 +512,20 @@ export type Database = {
         Args: { p_mutation_id: string; p_session_id: string };
         Returns: Json;
       };
+      revoke_campaign_membership_invitation: {
+        Args: { p_invitation_id: string; p_mutation_id: string };
+        Returns: Json;
+      };
+      rollback_campaign_membership: {
+        Args: {
+          p_campaign_id: string;
+          p_expected_epoch: number;
+          p_generation: Json;
+          p_generation_fingerprint: string;
+          p_mutation_id: string;
+        };
+        Returns: Json;
+      };
       rotate_campaign_guest_session: {
         Args: {
           p_current_token_hash: string;
@@ -316,6 +540,14 @@ export type Database = {
         Args: {
           p_character_id: string;
           p_expected_server_version: number;
+          p_mutation_id: string;
+        };
+        Returns: Json;
+      };
+      unlink_campaign_character: {
+        Args: {
+          p_campaign_id: string;
+          p_character_id: string;
           p_mutation_id: string;
         };
         Returns: Json;

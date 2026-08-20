@@ -18,6 +18,10 @@ import {
 import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
 import { projectGuestPlayer } from '@/lib/guestPlayerProjection';
 import type { CampaignPlayerData } from '@/types/campaign';
+import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
+import { createCampaignMembershipContextForRequest } from '@/lib/supabase/campaignMembershipServer';
+import type { CampaignMembershipRpcClient } from '@/lib/supabase/campaignMembershipGateway';
+import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecurity';
 
 export async function GET(
   request: NextRequest,
@@ -25,7 +29,40 @@ export async function GET(
 ) {
   try {
     const { code, playerId } = await params;
-    const guest = await authorizeHybridGuestRoute(request, code, 'player:read');
+    const membership = await authorizeCampaignMembershipRoute(code, false);
+    if (membership.mode === 'denied') {
+      return NextResponse.json(
+        { error: 'Account membership is required' },
+        { status: membership.status }
+      );
+    }
+    if (
+      membership.mode === 'account' &&
+      membership.principal.role !== 'owner' &&
+      membership.principal.role !== 'dm' &&
+      membership.principal.legacyPlayerId !== playerId
+    ) {
+      return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
+    }
+    const guest =
+      membership.mode === 'legacy'
+        ? await authorizeHybridGuestRoute(request, code, 'player:read')
+        : ({ mode: 'legacy' } as const);
+    if (membership.mode === 'account') {
+      const redis = getRedis();
+      const raw = await redis.get(campaignPlayerKey(code, playerId));
+      if (!raw)
+        return NextResponse.json(
+          { error: 'Player not found' },
+          { status: 404 }
+        );
+      const player: CampaignPlayerData =
+        typeof raw === 'string' ? JSON.parse(raw) : (raw as CampaignPlayerData);
+      return NextResponse.json(
+        { player: projectGuestPlayer(player) },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
     if (guest.mode === 'legacy') {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
@@ -63,7 +100,12 @@ export async function DELETE(
   try {
     const { code, playerId } = await params;
 
-    let body: { dmId?: string; playerId?: string } = {};
+    let body: {
+      dmId?: string;
+      playerId?: string;
+      memberAccountId?: string;
+      mutationId?: string;
+    } = {};
     try {
       body = await request.json();
     } catch {
@@ -71,12 +113,65 @@ export async function DELETE(
     }
     const { dmId, playerId: bodyPlayerId } = body;
 
-    const guest = await authorizeHybridGuestRoute(
-      request,
-      code,
-      'player:leave',
-      true
-    );
+    const membership = await authorizeCampaignMembershipRoute(code, true);
+    if (membership.mode === 'denied') {
+      return NextResponse.json(
+        {
+          error:
+            membership.status === 409
+              ? 'Membership changes are temporarily frozen'
+              : 'Account membership is required',
+        },
+        { status: membership.status }
+      );
+    }
+    if (membership.mode === 'account') {
+      const security = validateCampaignMembershipMutation(request);
+      if (!security.ok) {
+        return NextResponse.json(
+          { error: security.error },
+          { status: security.status }
+        );
+      }
+      if (
+        (membership.principal.role !== 'owner' &&
+          membership.principal.role !== 'dm') ||
+        !body.memberAccountId ||
+        !body.mutationId
+      ) {
+        return NextResponse.json(
+          { error: 'Owner removal confirmation is required' },
+          { status: 403 }
+        );
+      }
+      const context = await createCampaignMembershipContextForRequest();
+      if (!context?.userClient) {
+        return NextResponse.json(
+          { error: 'Account membership is required' },
+          { status: 401 }
+        );
+      }
+      const { error } = await (
+        context.userClient as unknown as CampaignMembershipRpcClient
+      ).rpc('remove_campaign_member', {
+        p_mutation_id: body.mutationId,
+        p_campaign_id: membership.principal.campaignId,
+        p_member_id: body.memberAccountId,
+        p_expected_legacy_player_id: playerId,
+        p_expected_epoch: membership.principal.epoch,
+      });
+      if (error) {
+        return NextResponse.json(
+          { error: 'Member removal was denied' },
+          { status: 403 }
+        );
+      }
+    }
+
+    const guest =
+      membership.mode === 'legacy'
+        ? await authorizeHybridGuestRoute(request, code, 'player:leave', true)
+        : ({ mode: 'legacy' } as const);
     if (guest.mode === 'denied') return guestDeniedResponse(guest);
     if (
       guest.mode === 'guest' &&
@@ -88,7 +183,12 @@ export async function DELETE(
       );
     }
 
-    if (guest.mode !== 'guest' && !dmId && !bodyPlayerId) {
+    if (
+      membership.mode === 'legacy' &&
+      guest.mode !== 'guest' &&
+      !dmId &&
+      !bodyPlayerId
+    ) {
       return NextResponse.json(
         { error: 'dmId or playerId is required' },
         { status: 400 }
@@ -97,7 +197,15 @@ export async function DELETE(
 
     const redis = getRedis();
 
-    if (guest.mode === 'guest') {
+    if (membership.mode === 'account') {
+      const exists = await redis.exists(campaignKey(code));
+      if (!exists) {
+        return NextResponse.json(
+          { error: 'Campaign not found' },
+          { status: 404 }
+        );
+      }
+    } else if (guest.mode === 'guest') {
       const exists = await redis.exists(campaignKey(code));
       if (!exists) {
         return NextResponse.json(

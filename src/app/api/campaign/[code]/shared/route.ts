@@ -42,6 +42,9 @@ import {
   isHybridGuestServerEnabled,
 } from '@/lib/guestSessionSecurity';
 import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
+import { accountMembershipMatchesLegacyIds } from '@/lib/campaignMembershipAuthority';
+import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecurity';
+import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
 
 export async function GET(
   request: NextRequest,
@@ -51,7 +54,31 @@ export async function GET(
     const { code } = await params;
     let role = request.nextUrl.searchParams.get('role') ?? 'player';
     let playerId = request.nextUrl.searchParams.get('playerId');
-    const guest = await authorizeHybridGuestRoute(request, code, 'shared:read');
+    const membership = await authorizeCampaignMembershipRoute(code, false);
+    if (membership.mode === 'denied') {
+      return NextResponse.json(
+        { error: 'Account membership is required' },
+        { status: membership.status }
+      );
+    }
+    if (membership.mode === 'account') {
+      if (membership.principal.role === 'player') {
+        if (
+          !accountMembershipMatchesLegacyIds(membership.principal, [playerId])
+        ) {
+          return NextResponse.json(
+            { error: 'Private DM document access is denied' },
+            { status: 403 }
+          );
+        }
+        role = 'player';
+        playerId = playerId ?? membership.principal.legacyPlayerId;
+      }
+    }
+    const guest =
+      membership.mode === 'legacy'
+        ? await authorizeHybridGuestRoute(request, code, 'shared:read')
+        : ({ mode: 'legacy' } as const);
     if (guest.mode === 'denied') return guestDeniedResponse(guest);
     if (guest.mode === 'guest') {
       role = 'player';
@@ -201,15 +228,6 @@ export async function POST(
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
-    if (
-      isHybridGuestServerEnabled() &&
-      request.cookies.has(GUEST_SESSION_COOKIE)
-    ) {
-      return NextResponse.json(
-        { error: 'Guest sessions cannot publish shared or DM state' },
-        { status: 403 }
-      );
-    }
     const { code } = await params;
     const body = await request.json().catch(() => null);
 
@@ -221,6 +239,42 @@ export async function POST(
     }
 
     const { feature, data, dmId } = body;
+    const membership = await authorizeCampaignMembershipRoute(code, true);
+    if (membership.mode === 'denied') {
+      return NextResponse.json(
+        { error: 'Account membership is required' },
+        { status: membership.status }
+      );
+    }
+    if (
+      membership.mode === 'legacy' &&
+      isHybridGuestServerEnabled() &&
+      request.cookies.has(GUEST_SESSION_COOKIE)
+    ) {
+      return NextResponse.json(
+        { error: 'Guest sessions cannot publish shared or DM state' },
+        { status: 403 }
+      );
+    }
+    if (membership.mode === 'account') {
+      const security = validateCampaignMembershipMutation(request);
+      if (!security.ok) {
+        return NextResponse.json(
+          { error: security.error },
+          { status: security.status }
+        );
+      }
+      if (
+        feature !== 'item_transfer' &&
+        membership.principal.role !== 'owner' &&
+        membership.principal.role !== 'dm'
+      ) {
+        return NextResponse.json(
+          { error: 'Private DM document mutation is denied' },
+          { status: 403 }
+        );
+      }
+    }
 
     // null is a valid payload ONLY for initiativeRequest (it means "clear the
     // request"); every other feature requires a real object — a null would crash
@@ -439,12 +493,37 @@ export async function DELETE(
     const { playerId: assertedPlayerId, type } = body;
     let playerId = assertedPlayerId;
 
-    const guest = await authorizeHybridGuestRoute(
-      request,
-      code,
-      'shared:ack',
-      true
-    );
+    const membership = await authorizeCampaignMembershipRoute(code, true);
+    if (membership.mode === 'denied') {
+      return NextResponse.json(
+        { error: 'Account membership is required' },
+        { status: membership.status }
+      );
+    }
+    if (membership.mode === 'account') {
+      const security = validateCampaignMembershipMutation(request);
+      if (!security.ok) {
+        return NextResponse.json(
+          { error: security.error },
+          { status: security.status }
+        );
+      }
+      if (
+        membership.principal.role === 'player' &&
+        !accountMembershipMatchesLegacyIds(membership.principal, [playerId])
+      ) {
+        return NextResponse.json(
+          { error: 'Explicit account character link is required' },
+          { status: 403 }
+        );
+      }
+      playerId = playerId ?? membership.principal.legacyPlayerId;
+    }
+
+    const guest =
+      membership.mode === 'legacy'
+        ? await authorizeHybridGuestRoute(request, code, 'shared:ack', true)
+        : ({ mode: 'legacy' } as const);
     if (guest.mode === 'denied') return guestDeniedResponse(guest);
     if (guest.mode === 'guest') {
       const bound = requireGuestPlayerBinding(guest, [playerId]);
