@@ -14,6 +14,39 @@ import {
   rejectHybridGuestPrivilegeEscalation,
 } from '@/lib/guestRouteResponses';
 import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
+import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
+import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecurity';
+
+async function authorizeCampaignCoreMutation(
+  request: NextRequest,
+  code: string
+): Promise<NextResponse | null> {
+  const membership = await authorizeCampaignMembershipRoute(code, true);
+  if (membership.mode === 'denied') {
+    return NextResponse.json(
+      { error: 'Account membership is required' },
+      { status: membership.status }
+    );
+  }
+  if (membership.mode !== 'account') return null;
+  const security = validateCampaignMembershipMutation(request);
+  if (!security.ok) {
+    return NextResponse.json(
+      { error: security.error },
+      { status: security.status }
+    );
+  }
+  if (
+    membership.principal.role !== 'owner' &&
+    membership.principal.role !== 'dm'
+  ) {
+    return NextResponse.json(
+      { error: 'Campaign owner authorization is required' },
+      { status: 403 }
+    );
+  }
+  return null;
+}
 
 export async function GET(
   request: NextRequest,
@@ -21,11 +54,17 @@ export async function GET(
 ) {
   try {
     const { code } = await params;
-    const guest = await authorizeHybridGuestRoute(
-      request,
-      code,
-      'campaign:read'
-    );
+    const membership = await authorizeCampaignMembershipRoute(code, false);
+    if (membership.mode === 'denied') {
+      return NextResponse.json(
+        { error: 'Account membership is required' },
+        { status: membership.status }
+      );
+    }
+    const guest =
+      membership.mode === 'legacy'
+        ? await authorizeHybridGuestRoute(request, code, 'campaign:read')
+        : ({ mode: 'legacy' } as const);
     if (guest.mode === 'denied') return guestDeniedResponse(guest);
     const redis = getRedis();
 
@@ -45,7 +84,7 @@ export async function GET(
     return NextResponse.json({
       code,
       campaign:
-        guest.mode === 'guest'
+        guest.mode === 'guest' || membership.mode === 'account'
           ? {
               campaignName: campaign.campaignName,
               createdAt: campaign.createdAt,
@@ -69,6 +108,8 @@ export async function PUT(
   if (guestDenied) return guestDenied;
   try {
     const { code } = await params;
+    const membershipDenied = await authorizeCampaignCoreMutation(request, code);
+    if (membershipDenied) return membershipDenied;
     const body = await request.json();
     const { dmId, campaignName, createdAt } = body;
 
@@ -127,6 +168,8 @@ export async function DELETE(
   if (guestDenied) return guestDenied;
   try {
     const { code } = await params;
+    const membershipDenied = await authorizeCampaignCoreMutation(request, code);
+    if (membershipDenied) return membershipDenied;
     const redis = getRedis();
 
     const exists = await redis.exists(campaignKey(code));

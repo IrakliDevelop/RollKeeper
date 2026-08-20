@@ -1,0 +1,148 @@
+import { NextRequest } from 'next/server';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { resetRedis, seedRedis, seedRedisSet } from '@/test/mocks/redis';
+
+const { authorizeCampaignMembershipRoute } = vi.hoisted(() => ({
+  authorizeCampaignMembershipRoute: vi.fn(),
+}));
+vi.mock('@/lib/supabase/campaignMembershipServer', () => ({
+  authorizeCampaignMembershipRoute,
+}));
+
+import { POST } from './route';
+
+const CODE = 'A1B2C3D4E5F6';
+
+function request(body: Record<string, unknown>, secure = false) {
+  return new NextRequest(
+    `http://localhost/api/campaign/${CODE}/battlemap-token`,
+    {
+      method: 'POST',
+      headers: secure
+        ? {
+            Origin: 'http://localhost',
+            'Content-Type': 'application/json',
+            'x-rollkeeper-csrf': '1',
+          }
+        : { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+}
+
+const params = { params: Promise.resolve({ code: CODE }) };
+
+describe('membership-aware relay authority minting', () => {
+  beforeEach(() => {
+    resetRedis();
+    vi.clearAllMocks();
+    process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
+    authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
+    seedRedis(`campaign:${CODE}`, { dmId: 'dm-a', campaignName: 'Synthetic' });
+    seedRedisSet(`campaign:${CODE}:players`, ['legacy-a', 'stale-a']);
+  });
+
+  it('keeps untouched campaigns on byte-compatible Redis membership', async () => {
+    const response = await POST(
+      request({ role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' }),
+      params
+    );
+    expect(response.status).toBe(200);
+    expect(authorizeCampaignMembershipRoute).toHaveBeenCalledWith(CODE, false);
+  });
+
+  it('denies stale Redis players and request-body IDs after Postgres cutover', async () => {
+    authorizeCampaignMembershipRoute.mockResolvedValue({
+      mode: 'account',
+      principal: {
+        campaignId: 'campaign-a',
+        accountId: 'account-a',
+        role: 'player',
+        status: 'active',
+        epoch: 1,
+        legacyPlayerId: 'legacy-a',
+        legacyCharacterId: 'character-a',
+        characterId: 'cloud-a',
+      },
+    });
+    const stale = await POST(
+      request(
+        { role: 'player', battleMapId: 'map-a', playerId: 'stale-a' },
+        true
+      ),
+      params
+    );
+    expect(stale.status).toBe(403);
+    const explicit = await POST(
+      request(
+        { role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' },
+        true
+      ),
+      params
+    );
+    expect(explicit.status).toBe(200);
+  });
+
+  it('requires CSRF and owner/DM account authority for DM relay tokens', async () => {
+    authorizeCampaignMembershipRoute.mockResolvedValue({
+      mode: 'account',
+      principal: {
+        campaignId: 'campaign-a',
+        accountId: 'owner-a',
+        role: 'owner',
+        status: 'active',
+        epoch: 1,
+        legacyPlayerId: null,
+        legacyCharacterId: null,
+        characterId: null,
+      },
+    });
+    expect(
+      (
+        await POST(
+          request({ role: 'dm', battleMapId: 'map-a', dmId: 'dm-a' }),
+          params
+        )
+      ).status
+    ).toBe(403);
+    expect(
+      (
+        await POST(
+          request({ role: 'dm', battleMapId: 'map-a', dmId: 'dm-a' }, true),
+          params
+        )
+      ).status
+    ).toBe(200);
+  });
+
+  it('fails closed when membership authority is stale or unavailable', async () => {
+    authorizeCampaignMembershipRoute.mockResolvedValue({
+      mode: 'denied',
+      status: 503,
+    });
+    const response = await POST(
+      request(
+        { role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' },
+        true
+      ),
+      params
+    );
+    expect(response.status).toBe(503);
+  });
+
+  it('leaves display-only live-runtime authority on the isolated display key path', async () => {
+    authorizeCampaignMembershipRoute.mockClear();
+    seedRedis(`campaign:${CODE}:displaykey`, 'display-a');
+    const response = await POST(
+      request({
+        role: 'display',
+        battleMapId: 'map-a',
+        displayKey: 'display-a',
+      }),
+      params
+    );
+    expect(response.status).toBe(200);
+    expect(authorizeCampaignMembershipRoute).not.toHaveBeenCalled();
+  });
+});

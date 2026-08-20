@@ -25,6 +25,7 @@ import {
 } from '@/lib/supabase/dmWorkspaceService';
 import type { CampaignInfo } from '@/types/campaign';
 import { DmGuestInvitationControls } from './DmGuestInvitationControls';
+import { DmCampaignMembershipControls } from './DmCampaignMembershipControls';
 
 interface DmCloudWorkspaceControlsProps {
   campaigns: CampaignInfo[];
@@ -260,6 +261,7 @@ export function DmCloudWorkspaceControls({
         </CardContent>
       </Card>
       <DmGuestInvitationControls workspaces={workspaces} />
+      <DmCampaignMembershipControls workspaces={workspaces} />
     </>
   );
 }

@@ -10,6 +10,8 @@ import {
   GUEST_SESSION_COOKIE,
   isHybridGuestServerEnabled,
 } from '@/lib/guestSessionSecurity';
+import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecurity';
+import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
 
 const TOKEN_TTL_MS = 5 * 60 * 1000;
 
@@ -18,15 +20,6 @@ export async function POST(
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
-    if (
-      isHybridGuestServerEnabled() &&
-      request.cookies.has(GUEST_SESSION_COOKIE)
-    ) {
-      return NextResponse.json(
-        { error: 'Guest sessions cannot mint relay authority' },
-        { status: 403 }
-      );
-    }
     const { code } = await params;
     const secret = process.env.BATTLEMAP_RELAY_SECRET;
     if (!secret) {
@@ -53,6 +46,35 @@ export async function POST(
 
     const redis = getRedis();
     let userId: string;
+    const membership =
+      role === 'display'
+        ? ({ mode: 'legacy' } as const)
+        : await authorizeCampaignMembershipRoute(code, false);
+    if (membership.mode === 'denied') {
+      return NextResponse.json(
+        { error: 'Account membership is required to mint relay authority' },
+        { status: membership.status }
+      );
+    }
+    if (
+      membership.mode === 'legacy' &&
+      isHybridGuestServerEnabled() &&
+      request.cookies.has(GUEST_SESSION_COOKIE)
+    ) {
+      return NextResponse.json(
+        { error: 'Guest sessions cannot mint relay authority' },
+        { status: 403 }
+      );
+    }
+    if (membership.mode === 'account') {
+      const security = validateCampaignMembershipMutation(request);
+      if (!security.ok) {
+        return NextResponse.json(
+          { error: security.error },
+          { status: security.status }
+        );
+      }
+    }
 
     if (role === 'dm') {
       if (!dmId) {
@@ -62,7 +84,12 @@ export async function POST(
         );
       }
       const dmAuth = await verifyDmAuthority(redis, code, dmId);
-      if (dmAuth !== 'ok') {
+      if (
+        dmAuth !== 'ok' ||
+        (membership.mode === 'account' &&
+          membership.principal.role !== 'owner' &&
+          membership.principal.role !== 'dm')
+      ) {
         return NextResponse.json(
           { error: 'Not the campaign DM' },
           { status: 403 }
@@ -76,10 +103,11 @@ export async function POST(
           { status: 400 }
         );
       }
-      const isMember = await redis.sismember(
-        campaignPlayersKey(code),
-        playerId
-      );
+      const isMember =
+        membership.mode === 'account'
+          ? membership.principal.role === 'player' &&
+            membership.principal.legacyPlayerId === playerId
+          : await redis.sismember(campaignPlayersKey(code), playerId);
       if (!isMember) {
         return NextResponse.json(
           { error: 'Player is not in this campaign' },

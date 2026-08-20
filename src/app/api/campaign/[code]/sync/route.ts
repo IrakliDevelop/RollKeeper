@@ -15,6 +15,9 @@ import {
   requireGuestPlayerBinding,
 } from '@/lib/guestRouteResponses';
 import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
+import { accountMembershipMatchesLegacyIds } from '@/lib/campaignMembershipAuthority';
+import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecurity';
+import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
 
 export async function POST(
   request: NextRequest,
@@ -33,12 +36,49 @@ export async function POST(
     let playerId = assertedPlayerId;
     let characterId = assertedCharacterId;
 
-    const guest = await authorizeHybridGuestRoute(
-      request,
-      code,
-      'player:sync',
-      true
-    );
+    const membership = await authorizeCampaignMembershipRoute(code, true);
+    if (membership.mode === 'denied') {
+      return NextResponse.json(
+        {
+          error:
+            membership.status === 409
+              ? 'Membership changes are temporarily frozen'
+              : 'Account membership is required',
+        },
+        { status: membership.status }
+      );
+    }
+    if (membership.mode === 'account') {
+      const security = validateCampaignMembershipMutation(request);
+      if (!security.ok) {
+        return NextResponse.json(
+          { error: security.error },
+          { status: security.status }
+        );
+      }
+      if (
+        !accountMembershipMatchesLegacyIds(membership.principal, [
+          playerId,
+          characterId,
+          characterData?.id,
+        ]) ||
+        !membership.principal.legacyPlayerId ||
+        !membership.principal.legacyCharacterId ||
+        !membership.principal.characterId
+      ) {
+        return NextResponse.json(
+          { error: 'Explicit account character link is required' },
+          { status: 403 }
+        );
+      }
+      playerId = membership.principal.legacyPlayerId;
+      characterId = membership.principal.legacyCharacterId;
+    }
+
+    const guest =
+      membership.mode === 'legacy'
+        ? await authorizeHybridGuestRoute(request, code, 'player:sync', true)
+        : ({ mode: 'legacy' } as const);
     if (guest.mode === 'denied') return guestDeniedResponse(guest);
     if (guest.mode === 'guest') {
       const bound = requireGuestPlayerBinding(guest, [
