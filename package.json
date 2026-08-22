@@ -49,6 +49,7 @@
     "test:campaign-settings:redis": "node --test scripts/campaign-settings-redis.integration.test.mjs",
     "test:calendar:integration": "node --test scripts/calendar-documents.integration.test.mjs",
     "test:calendar:redis": "node --test scripts/calendar-redis.integration.test.mjs",
+    "test:magic-item:integration": "node --test scripts/magic-item-documents.integration.test.mjs",
     "test:auth:integration": "node --test scripts/supabase-auth.integration.test.mjs",
     "test:db:replay": "node --test scripts/supabase-reset-replay.test.mjs",
     "db:start": "supabase start",
