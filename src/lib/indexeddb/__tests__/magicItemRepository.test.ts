@@ -230,6 +230,79 @@ describe('IndexedDbMagicItemRepository', () => {
     ]);
   });
 
+  it('supersedes a paused entry when the same item is committed again', async () => {
+    const repo = repository();
+    const first = await repo.commit(mutation({ legacyId: 'AAA111' }));
+    const sibling = await repo.commit(
+      mutation({ legacyId: 'BBB222', contentFingerprint: 'b'.repeat(64) })
+    );
+    if (!first.saved || !sibling.saved) throw new Error('expected local saves');
+    // Every IndexedDB-authority commit pauses the outbox until cloud
+    // activation, so the next edit of the same item must still supersede it.
+    await repo.pause(NAMESPACE, 'campaign-a');
+    const replacement = await repo.commit(
+      mutation({
+        legacyId: 'AAA111',
+        localRevision: 2,
+        contentFingerprint: 'c'.repeat(64),
+        payload: payload({ name: 'Ring of Warmth' }),
+      })
+    );
+    if (!replacement.saved) throw new Error('expected local save');
+
+    const outbox = await repo.listOutbox(NAMESPACE, 'campaign-a');
+    expect(outbox.map(entry => [entry.mutationId, entry.state]).sort()).toEqual(
+      [
+        [first.mutationId, 'superseded'],
+        [sibling.mutationId, 'paused'],
+        [replacement.mutationId, 'queued'],
+      ]
+    );
+  });
+
+  it('never rewinds a newer document when an older acknowledgement arrives', async () => {
+    const repo = repository();
+    const older = await repo.commit(mutation({ legacyId: 'AAA111' }));
+    const newer = await repo.commit(
+      mutation({
+        legacyId: 'AAA111',
+        localRevision: 2,
+        contentFingerprint: 'c'.repeat(64),
+        payload: payload({ name: 'Ring of Warmth' }),
+      })
+    );
+    if (!older.saved || !newer.saved) throw new Error('expected local saves');
+
+    await repo.acknowledge(older.mutationId, {
+      serverVersion: 7,
+      cutoverEpoch: 9,
+      payloadFingerprint: 'b'.repeat(64),
+    });
+
+    await expect(repo.getDocument(NAMESPACE, 'AAA111')).resolves.toMatchObject({
+      contentFingerprint: 'c'.repeat(64),
+      baseServerVersion: 1,
+      cutoverEpoch: 1,
+      localRevision: 2,
+    });
+    expect(
+      (await repo.listOutbox(NAMESPACE, 'campaign-a')).find(
+        entry => entry.mutationId === older.mutationId
+      )
+    ).toMatchObject({ state: 'acknowledged', lastError: null });
+
+    await repo.acknowledge(newer.mutationId, {
+      serverVersion: 8,
+      cutoverEpoch: 9,
+      payloadFingerprint: 'f'.repeat(64),
+    });
+    await expect(repo.getDocument(NAMESPACE, 'AAA111')).resolves.toMatchObject({
+      contentFingerprint: 'f'.repeat(64),
+      baseServerVersion: 8,
+      cutoverEpoch: 9,
+    });
+  });
+
   it('hides an exact removed account namespace while preserving every durable row', async () => {
     const repo = repository();
     await repo.commit(mutation());

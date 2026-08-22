@@ -249,6 +249,16 @@ export async function rollbackMagicItemLocalAuthority(
   return rolledBack;
 }
 
+/** Newest wins by local revision, then by the later local timestamp. */
+function isNewerMagicItemEntry(
+  candidate: MagicItemOutboxEntry,
+  held: MagicItemOutboxEntry
+) {
+  return candidate.localRevision === held.localRevision
+    ? candidate.updatedAt > held.updatedAt
+    : candidate.localRevision > held.localRevision;
+}
+
 export async function markMagicItemCloudAuthority(
   database: IDBDatabase,
   options: {
@@ -310,14 +320,32 @@ export async function markMagicItemCloudAuthority(
     const entries = (await requestResult(
       outbox.getAll()
     )) as MagicItemOutboxEntry[];
-    for (const entry of entries) {
-      if (
+    const unresolved = entries.filter(
+      entry =>
         entry.namespace === options.namespace &&
         entry.campaignId === options.campaignId &&
         entry.family === 'magic_item' &&
         entry.state !== 'acknowledged' &&
         entry.state !== 'superseded'
-      ) {
+    );
+    // Paused entries never supersede each other while cloud sync is inactive,
+    // so one item can hold several stale edits. Only the newest may survive:
+    // rebasing an older one would block every later cloud hydration.
+    const newest = new Map<string, MagicItemOutboxEntry>();
+    for (const entry of unresolved) {
+      const held = newest.get(entry.legacyId);
+      if (!held || isNewerMagicItemEntry(entry, held))
+        newest.set(entry.legacyId, entry);
+    }
+    for (const entry of unresolved) {
+      if (newest.get(entry.legacyId)?.mutationId !== entry.mutationId) {
+        outbox.put({
+          ...entry,
+          state: 'superseded',
+          inflightAt: null,
+          lastError: null,
+        });
+      } else {
         const match = accepted.get(entry.legacyId);
         if (entry.contentFingerprint === match?.payloadFingerprint) {
           outbox.put({

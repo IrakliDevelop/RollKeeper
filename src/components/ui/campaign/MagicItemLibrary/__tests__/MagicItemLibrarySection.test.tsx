@@ -11,7 +11,10 @@ vi.mock('../MagicItemLibraryDialog', () => ({
 }));
 
 describe('MagicItemLibrarySection', () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+  });
 
   beforeEach(() => {
     useMagicItemLibraryStore.setState({ itemsByCampaign: {} });
@@ -50,9 +53,44 @@ describe('MagicItemLibrarySection', () => {
       />
     );
 
+    // The campaign exists, so the missing card is attributable to the flag.
+    expect(useDmStore.getState().getCampaign('empty-campaign')).toBeDefined();
     expect(screen.queryByText('Magic item library cloud sync')).toBeNull();
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
+  });
+
+  it('mounts the cloud sync card while the section is collapsed', () => {
+    vi.stubEnv('NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE', 'true');
+    useDmStore.setState({
+      campaigns: [
+        {
+          code: 'empty-campaign',
+          name: 'Empty campaign',
+          createdAt: '2026-08-08T00:00:00.000Z',
+          dmDashboardUi: { magicItemLibrarySectionOpen: false },
+        },
+      ],
+    });
+    render(
+      <MagicItemLibrarySection
+        campaignCode="empty-campaign"
+        players={[]}
+        onGiveToPlayer={async () => {}}
+      />
+    );
+
+    // Edits made from the always-visible header must still reach the sync
+    // effect, so the controls cannot live inside the collapsible block.
+    expect(
+      screen.queryByText(/No custom magic items yet/)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Create Magic Item' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Magic item library cloud sync')
+    ).toBeInTheDocument();
   });
 
   it('collapses independently while keeping creation available', async () => {

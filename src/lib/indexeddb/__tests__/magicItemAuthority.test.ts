@@ -573,6 +573,149 @@ describe('magic item local authority', () => {
     database.close();
   });
 
+  it('keeps only the newest unresolved entry per item at cloud activation', async () => {
+    const database = await openRollkeeperDatabase();
+    await seedReady(database);
+    await commitMagicItemLocalCutover(database, {
+      namespace: NAMESPACE,
+      campaignId: CAMPAIGN,
+      generation: GENERATION,
+      confirmed: true,
+      gates,
+      now: () => 'local',
+      initialDocuments: [
+        document({ legacyId: 'item-a', contentFingerprint: 'a'.repeat(64) }),
+        document({ legacyId: 'item-b', contentFingerprint: 'b'.repeat(64) }),
+      ],
+    });
+    const seed = database.transaction('outbox', 'readwrite');
+    const outbox = seed.objectStore('outbox');
+    // Three paused edits of item-a: only the highest local revision survives.
+    outbox.put({
+      ...document({
+        legacyId: 'item-a',
+        localRevision: 2,
+        contentFingerprint: 'c'.repeat(64),
+        updatedAt: '2026-08-20T00:00:00.000Z',
+      }),
+      mutationId: 'stale-a',
+      state: 'paused',
+      pausedFromState: 'queued',
+      attemptCount: 0,
+      nextAttemptAt: 0,
+      inflightAt: null,
+      lastError: null,
+    });
+    outbox.put({
+      ...document({
+        legacyId: 'item-a',
+        localRevision: 3,
+        contentFingerprint: 'd'.repeat(64),
+        updatedAt: '2026-08-20T00:00:00.000Z',
+      }),
+      mutationId: 'older-tie-a',
+      state: 'paused',
+      pausedFromState: 'queued',
+      attemptCount: 0,
+      nextAttemptAt: 0,
+      inflightAt: null,
+      lastError: null,
+    });
+    outbox.put({
+      ...document({
+        legacyId: 'item-a',
+        localRevision: 3,
+        contentFingerprint: 'e'.repeat(64),
+        updatedAt: '2026-08-21T00:00:00.000Z',
+      }),
+      mutationId: 'newest-a',
+      state: 'paused',
+      pausedFromState: 'queued',
+      attemptCount: 0,
+      nextAttemptAt: 0,
+      inflightAt: null,
+      lastError: null,
+    });
+    // item-b: the newest of two paused edits already matches the cloud
+    // fingerprint, so it is superseded rather than rebased.
+    outbox.put({
+      ...document({
+        legacyId: 'item-b',
+        localRevision: 2,
+        contentFingerprint: 'f'.repeat(64),
+        updatedAt: '2026-08-20T00:00:00.000Z',
+      }),
+      mutationId: 'stale-b',
+      state: 'paused',
+      pausedFromState: 'queued',
+      attemptCount: 0,
+      nextAttemptAt: 0,
+      inflightAt: null,
+      lastError: null,
+    });
+    outbox.put({
+      ...document({
+        legacyId: 'item-b',
+        localRevision: 3,
+        contentFingerprint: 'b'.repeat(64),
+        updatedAt: '2026-08-21T00:00:00.000Z',
+      }),
+      mutationId: 'newest-b',
+      state: 'paused',
+      pausedFromState: 'queued',
+      attemptCount: 0,
+      nextAttemptAt: 0,
+      inflightAt: null,
+      lastError: null,
+    });
+    await transactionComplete(seed);
+
+    await markMagicItemCloudAuthority(database, {
+      namespace: NAMESPACE,
+      campaignId: CAMPAIGN,
+      expectedLocalEpoch: 1,
+      cloudEpoch: 2,
+      now: () => 'cloud',
+      acceptedVersions: [
+        {
+          legacyId: 'item-a',
+          serverVersion: 1,
+          payloadFingerprint: 'a'.repeat(64),
+        },
+        {
+          legacyId: 'item-b',
+          serverVersion: 1,
+          payloadFingerprint: 'b'.repeat(64),
+        },
+      ],
+    });
+
+    const read = database.transaction('outbox', 'readonly');
+    const entries = read.objectStore('outbox');
+    expect(await requestResult(entries.get('stale-a'))).toMatchObject({
+      state: 'superseded',
+      inflightAt: null,
+      lastError: null,
+    });
+    expect(await requestResult(entries.get('older-tie-a'))).toMatchObject({
+      state: 'superseded',
+    });
+    expect(await requestResult(entries.get('newest-a'))).toMatchObject({
+      state: 'queued',
+      baseServerVersion: 1,
+      cutoverEpoch: 2,
+      contentFingerprint: 'e'.repeat(64),
+    });
+    expect(await requestResult(entries.get('stale-b'))).toMatchObject({
+      state: 'superseded',
+    });
+    expect(await requestResult(entries.get('newest-b'))).toMatchObject({
+      state: 'superseded',
+    });
+    await transactionComplete(read);
+    database.close();
+  });
+
   it('un-pauses a paused entry without a recorded prior state', async () => {
     const database = await openRollkeeperDatabase();
     await seedReady(database);
