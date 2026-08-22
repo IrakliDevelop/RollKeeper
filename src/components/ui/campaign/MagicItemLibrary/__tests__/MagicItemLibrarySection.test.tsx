@@ -40,6 +40,21 @@ describe('MagicItemLibrarySection', () => {
     expect(screen.getByText(/No custom magic items yet/)).toBeInTheDocument();
   });
 
+  it('keeps the default-off cloud sync card and its network work out of the section', () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    render(
+      <MagicItemLibrarySection
+        campaignCode="empty-campaign"
+        players={[]}
+        onGiveToPlayer={async () => {}}
+      />
+    );
+
+    expect(screen.queryByText('Magic item library cloud sync')).toBeNull();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
   it('collapses independently while keeping creation available', async () => {
     const user = userEvent.setup();
     render(
