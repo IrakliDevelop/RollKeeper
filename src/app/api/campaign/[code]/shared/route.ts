@@ -45,6 +45,7 @@ import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
 import { accountMembershipMatchesLegacyIds } from '@/lib/campaignMembershipAuthority';
 import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecurity';
 import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
+import { campaignSettingsProjectionWriteAllowed } from '@/lib/supabase/campaignSettingsServer';
 
 export async function GET(
   request: NextRequest,
@@ -289,6 +290,19 @@ export async function POST(
 
     if (feature !== 'item_transfer' && !dmId) {
       return NextResponse.json({ error: 'dmId is required' }, { status: 400 });
+    }
+
+    if (
+      (feature === 'settings' || feature === 'counters') &&
+      !(await campaignSettingsProjectionWriteAllowed(code))
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'Campaign settings compatibility projection is server controlled',
+        },
+        { status: 409 }
+      );
     }
 
     const redis = getRedis();

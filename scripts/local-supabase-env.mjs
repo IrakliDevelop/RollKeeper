@@ -129,3 +129,26 @@ export function provisionLocalWorkspaceClaim({
     { stdio: 'pipe' }
   );
 }
+
+export function corruptLocalCampaignSettingsCurrentForTest(campaignId) {
+  if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/iu.test(campaignId)) {
+    throw new Error('Invalid local campaign fixture ID');
+  }
+  execFileSync(
+    'docker',
+    [
+      'exec',
+      DATABASE_CONTAINER,
+      'psql',
+      '--username=postgres',
+      '--dbname=postgres',
+      '--command',
+      `update public.campaign_documents
+       set payload = jsonb_build_object('stackableInspiration', false),
+           updated_at = statement_timestamp()
+       where campaign_id = '${campaignId}'::uuid
+         and family = 'campaign_settings';`,
+    ],
+    { stdio: 'pipe' }
+  );
+}

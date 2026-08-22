@@ -42,6 +42,7 @@ import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog'
 import { SendMessageDialog } from '@/components/ui/campaign/SendMessageDialog';
 import { AwardXpDialog } from '@/components/ui/campaign/AwardXpDialog';
 import { NPCSection } from '@/components/ui/campaign/NPCSection';
+import { CampaignSettingsSyncControls } from '@/components/ui/campaign/CampaignSettingsSyncControls';
 import { useCampaignSync } from '@/hooks/useCampaignSync';
 import { useDmCounterSync } from '@/hooks/useDmCounterSync';
 import { useDmSettingsSync } from '@/hooks/useDmSettingsSync';
@@ -319,8 +320,8 @@ export default function CampaignViewPage() {
     <div className="bg-surface min-h-screen">
       <header className="border-divider bg-surface-secondary border-b shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
+          <div className="flex h-16 min-w-0 items-center gap-3">
+            <div className="flex min-w-0 shrink-0 items-center">
               <Link href="/dm">
                 <Button
                   variant="ghost"
@@ -330,7 +331,7 @@ export default function CampaignViewPage() {
                   Back to Dashboard
                 </Button>
               </Link>
-              <div className="ml-6 flex items-center gap-3">
+              <div className="ml-6 hidden min-w-0 items-center gap-3 sm:flex">
                 <Crown className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                 <h1 className="text-heading text-xl font-bold">
                   {displayName}
@@ -351,7 +352,7 @@ export default function CampaignViewPage() {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="ml-auto flex min-w-0 flex-1 items-center gap-3 overflow-x-auto">
               <Link
                 href={`/dm/campaign/${code}/locations`}
                 className="lg:hidden"
@@ -497,6 +498,9 @@ export default function CampaignViewPage() {
       </div>
 
       <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+        {localCampaign && (
+          <CampaignSettingsSyncControls campaign={localCampaign} />
+        )}
         {/* House Rules */}
         {!loading && !error && (
           <div>

@@ -101,6 +101,59 @@ export type Database = {
           },
         ];
       };
+      campaign_documents: {
+        Row: {
+          campaign_id: string;
+          created_at: string;
+          family: string;
+          id: string;
+          last_mutation_id: string;
+          legacy_id: string;
+          payload: Json | null;
+          payload_fingerprint: string;
+          schema_version: number;
+          server_version: number;
+          tombstoned: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          campaign_id: string;
+          created_at?: string;
+          family: string;
+          id?: string;
+          last_mutation_id: string;
+          legacy_id: string;
+          payload?: Json | null;
+          payload_fingerprint: string;
+          schema_version: number;
+          server_version: number;
+          tombstoned?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          campaign_id?: string;
+          created_at?: string;
+          family?: string;
+          id?: string;
+          last_mutation_id?: string;
+          legacy_id?: string;
+          payload?: Json | null;
+          payload_fingerprint?: string;
+          schema_version?: number;
+          server_version?: number;
+          tombstoned?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'campaign_documents_campaign_id_fkey';
+            columns: ['campaign_id'];
+            isOneToOne: false;
+            referencedRelation: 'campaigns';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       campaign_members: {
         Row: {
           campaign_id: string;
@@ -324,6 +377,14 @@ export type Database = {
         };
         Returns: Json;
       };
+      ack_campaign_document_projection_event: {
+        Args: {
+          p_event_id: string;
+          p_projection_fingerprint: string;
+          p_worker_id: string;
+        };
+        Returns: undefined;
+      };
       authorize_campaign_guest_session: {
         Args: {
           p_display_code: string;
@@ -345,9 +406,41 @@ export type Database = {
         };
         Returns: Json;
       };
+      begin_campaign_settings_staging: {
+        Args: {
+          p_campaign_id: string;
+          p_device_id: string;
+          p_expected_epoch: number;
+          p_manifest_fingerprint: string;
+          p_mutation_id: string;
+          p_record_count: number;
+          p_recovery_manifest_hash: string;
+          p_recovery_receipt_hash: string;
+          p_total_bytes: number;
+        };
+        Returns: Json;
+      };
+      campaign_document_projection_status: {
+        Args: { p_campaign_id: string; p_family: string };
+        Returns: Json;
+      };
       cancel_campaign_membership_freeze: {
         Args: { p_campaign_id: string; p_mutation_id: string };
         Returns: Json;
+      };
+      claim_campaign_document_projection_events: {
+        Args: { p_lease_seconds: number; p_limit: number; p_worker_id: string };
+        Returns: {
+          campaign_code: string;
+          campaign_id: string;
+          cutover_epoch: number;
+          event_id: string;
+          legacy_id: string;
+          payload: Json;
+          server_version: number;
+          source_fingerprint: string;
+          tombstoned: boolean;
+        }[];
       };
       claim_campaign_workspace: {
         Args: {
@@ -368,12 +461,31 @@ export type Database = {
         };
         Returns: Json;
       };
+      compare_campaign_document_versions: {
+        Args: {
+          p_campaign_id: string;
+          p_family: string;
+          p_left: number;
+          p_legacy_id: string;
+          p_right: number;
+        };
+        Returns: Json;
+      };
       confirm_campaign_membership_cutover: {
         Args: {
           p_campaign_id: string;
           p_manifest_fingerprint: string;
           p_manifest_version: number;
           p_mutation_id: string;
+        };
+        Returns: Json;
+      };
+      confirm_campaign_settings_cutover: {
+        Args: {
+          p_expected_epoch: number;
+          p_manifest_fingerprint: string;
+          p_mutation_id: string;
+          p_run_id: string;
         };
         Returns: Json;
       };
@@ -394,6 +506,35 @@ export type Database = {
           p_source_fingerprint: string;
         };
         Returns: Json;
+      };
+      enroll_campaign_settings_device: {
+        Args: {
+          p_campaign_id: string;
+          p_device_id: string;
+          p_expected_epoch: number;
+          p_legacy_candidate_fingerprint: string;
+          p_mutation_id: string;
+          p_preview_fingerprint: string;
+        };
+        Returns: Json;
+      };
+      export_campaign_document_version: {
+        Args: {
+          p_campaign_id: string;
+          p_family: string;
+          p_legacy_id: string;
+          p_server_version: number;
+        };
+        Returns: Json;
+      };
+      fail_campaign_document_projection_event: {
+        Args: {
+          p_error_code: string;
+          p_event_id: string;
+          p_incident_kind: string;
+          p_worker_id: string;
+        };
+        Returns: undefined;
       };
       issue_campaign_guest_invitation: {
         Args: {
@@ -431,6 +572,14 @@ export type Database = {
         };
         Returns: Json;
       };
+      list_campaign_document_projection_incidents: {
+        Args: { p_campaign_id: string; p_family: string };
+        Returns: Json;
+      };
+      list_campaign_document_versions: {
+        Args: { p_campaign_id: string; p_family: string; p_legacy_id: string };
+        Returns: Json;
+      };
       list_campaign_guest_access: {
         Args: { p_campaign_id: string };
         Returns: Json;
@@ -438,6 +587,26 @@ export type Database = {
       list_my_campaign_memberships: { Args: never; Returns: Json };
       prepare_campaign_membership_manifest: {
         Args: { p_campaign_id: string; p_mutation_id: string };
+        Returns: Json;
+      };
+      preview_campaign_settings_device_enrollment: {
+        Args: { p_campaign_id: string };
+        Returns: Json;
+      };
+      put_campaign_document: {
+        Args: {
+          p_campaign_id: string;
+          p_expected_epoch: number;
+          p_expected_server_version: number;
+          p_family: string;
+          p_legacy_id: string;
+          p_mutation_id: string;
+          p_operation: string;
+          p_payload: Json;
+          p_payload_fingerprint: string;
+          p_restore_source_version?: number;
+          p_schema_version: number;
+        };
         Returns: Json;
       };
       put_character: {
@@ -474,12 +643,42 @@ export type Database = {
         };
         Returns: Json;
       };
+      remove_campaign_settings_device: {
+        Args: {
+          p_campaign_id: string;
+          p_device_id: string;
+          p_expected_epoch: number;
+          p_mutation_id: string;
+        };
+        Returns: Json;
+      };
+      repair_campaign_document_current_from_history: {
+        Args: {
+          p_campaign_id: string;
+          p_expected_epoch: number;
+          p_expected_latest_fingerprint: string;
+          p_expected_latest_version: number;
+          p_family: string;
+          p_legacy_id: string;
+          p_mutation_id: string;
+        };
+        Returns: Json;
+      };
       replace_campaign_membership_shadow: {
         Args: {
           p_campaign_id: string;
           p_entries: Json;
           p_mutation_id: string;
           p_owner_id: string;
+        };
+        Returns: Json;
+      };
+      replay_campaign_document_projection_event: {
+        Args: {
+          p_campaign_id: string;
+          p_event_id: string;
+          p_expected_epoch: number;
+          p_mutation_id: string;
         };
         Returns: Json;
       };
@@ -494,6 +693,22 @@ export type Database = {
       };
       resolve_campaign_membership_authority: {
         Args: { p_display_code: string };
+        Returns: Json;
+      };
+      resolve_campaign_settings_projection_authority: {
+        Args: { p_campaign_code: string };
+        Returns: Json;
+      };
+      restore_campaign_document_version: {
+        Args: {
+          p_campaign_id: string;
+          p_expected_epoch: number;
+          p_expected_server_version: number;
+          p_family: string;
+          p_legacy_id: string;
+          p_mutation_id: string;
+          p_source_version: number;
+        };
         Returns: Json;
       };
       restore_character: {
@@ -526,6 +741,17 @@ export type Database = {
         };
         Returns: Json;
       };
+      rollback_campaign_settings_family: {
+        Args: {
+          p_campaign_id: string;
+          p_current_generation: Json;
+          p_expected_epoch: number;
+          p_manifest_fingerprint: string;
+          p_mutation_id: string;
+          p_projection_journal_reconciled: boolean;
+        };
+        Returns: Json;
+      };
       rotate_campaign_guest_session: {
         Args: {
           p_current_token_hash: string;
@@ -542,6 +768,10 @@ export type Database = {
           p_expected_server_version: number;
           p_mutation_id: string;
         };
+        Returns: Json;
+      };
+      stage_campaign_settings_items: {
+        Args: { p_items: Json; p_mutation_id: string; p_run_id: string };
         Returns: Json;
       };
       unlink_campaign_character: {

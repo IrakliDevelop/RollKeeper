@@ -20,6 +20,8 @@ export interface BrowserDmWorkspaceContext {
   accountId: string;
   accountLabel: string;
   list(): Promise<DmWorkspaceDocument[]>;
+  discover(): Promise<DmWorkspaceDocument[]>;
+  remember(workspace: DmWorkspaceDocument): Promise<void>;
   create(name: string): Promise<DmWorkspaceCreateResult>;
   forkLegacy(
     campaign: CampaignInfo,
@@ -50,13 +52,14 @@ export async function createBrowserDmWorkspace(): Promise<BrowserDmWorkspaceCont
 
   const database = await openRollkeeperDatabase();
   const repository = new IndexedDbDmWorkspaceRepository(database);
+  const gateway = createSupabaseDmWorkspaceGateway(
+    client as unknown as SupabaseDmWorkspaceClient
+  );
   const service = new DmWorkspaceService({
     enabled: true,
     accountId: data.user.id,
     repository,
-    gateway: createSupabaseDmWorkspaceGateway(
-      client as unknown as SupabaseDmWorkspaceClient
-    ),
+    gateway,
   });
 
   return {
@@ -64,6 +67,29 @@ export async function createBrowserDmWorkspace(): Promise<BrowserDmWorkspaceCont
     accountLabel: data.user.email ?? 'Signed-in account',
     list() {
       return repository.list(`user:${data.user.id}`);
+    },
+    async discover() {
+      return (await gateway.discover()).map(remote => ({
+        namespace: `user:${data.user.id}` as const,
+        localId: `cloud:${remote.campaignId}`,
+        legacyId: `cloud:${remote.campaignId}`,
+        name: remote.name,
+        creationKind: remote.creationKind,
+        sourceFingerprint: remote.sourceFingerprint,
+        createdAt: remote.createdAt,
+        family: 'workspace_identity' as const,
+        cloudId: remote.campaignId,
+        displayCode: remote.displayCode,
+        membershipAuthority: remote.membershipAuthority,
+        familyAuthorities: remote.familyAuthorities,
+        liveRuntimeAuthority: remote.liveRuntimeAuthority,
+        acknowledgedAt: remote.createdAt,
+      }));
+    },
+    remember(workspace) {
+      if (workspace.namespace !== `user:${data.user.id}`)
+        return Promise.reject(new Error('Workspace namespace mismatch'));
+      return repository.rememberDiscovered(workspace);
     },
     create(name) {
       return service.create({ localId: crypto.randomUUID(), name });
@@ -74,7 +100,7 @@ export async function createBrowserDmWorkspace(): Promise<BrowserDmWorkspaceCont
         dmId,
       });
       return service.fork({
-        localId: crypto.randomUUID(),
+        localId: `legacy:${campaign.code}`,
         name: campaign.name,
         sourceFingerprint,
       });

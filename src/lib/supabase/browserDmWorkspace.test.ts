@@ -4,11 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { deleteRollkeeperDatabaseForTests } from '@/lib/indexeddb/localDatabase';
 
-const { createClient, createGateway, cloudCreate } = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  createGateway: vi.fn(),
-  cloudCreate: vi.fn(),
-}));
+const { createClient, createGateway, cloudCreate, cloudDiscover } = vi.hoisted(
+  () => ({
+    createClient: vi.fn(),
+    createGateway: vi.fn(),
+    cloudCreate: vi.fn(),
+    cloudDiscover: vi.fn(),
+  })
+);
 
 vi.mock('./browser', () => ({
   createSupabaseBrowserClient: createClient,
@@ -34,6 +37,7 @@ describe('legacy campaign fork provenance', () => {
     createClient.mockReset();
     createGateway.mockReset();
     cloudCreate.mockReset();
+    cloudDiscover.mockReset();
   });
 
   afterEach(async () => {
@@ -169,5 +173,48 @@ describe('legacy campaign fork provenance', () => {
     const context = await createBrowserDmWorkspace();
     expect(context?.accountLabel).toBe('Signed-in account');
     context?.close();
+  });
+
+  it('discovers owner workspaces read-only on a new device without persisting a local authority record', async () => {
+    enabledEnvironment();
+    createClient.mockReturnValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'account-a' } },
+          error: null,
+        }),
+      },
+    });
+    cloudDiscover.mockResolvedValue([
+      {
+        campaignId: 'cloud-a',
+        displayCode: 'A1B2C3D4E5F6',
+        name: 'Northwatch',
+        creationKind: 'import_fork',
+        sourceFingerprint: 'a'.repeat(64),
+        createdAt: 'created',
+        membershipAuthority: 'legacy',
+        familyAuthorities: 'legacy',
+        liveRuntimeAuthority: 'redis_relay',
+      },
+    ]);
+    createGateway.mockReturnValue({
+      create: cloudCreate,
+      discover: cloudDiscover,
+    });
+
+    const context = await createBrowserDmWorkspace();
+    const [discovered] = await context!.discover();
+    expect(discovered).toEqual(
+      expect.objectContaining({
+        namespace: 'user:account-a',
+        cloudId: 'cloud-a',
+        family: 'workspace_identity',
+      })
+    );
+    await expect(context!.list()).resolves.toEqual([]);
+    await context!.remember(discovered);
+    await expect(context!.list()).resolves.toEqual([discovered]);
+    context!.close();
   });
 });

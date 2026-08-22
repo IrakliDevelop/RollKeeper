@@ -7,6 +7,53 @@ function client(result: { data: unknown; error: unknown }) {
 }
 
 describe('Supabase DM workspace gateway', () => {
+  it('discovers only validated owner workspaces without changing authority', async () => {
+    const rpc = vi.fn();
+    const from = vi.fn((table: string) => ({
+      select: vi.fn().mockResolvedValue(
+        table === 'campaigns'
+          ? {
+              data: [
+                {
+                  id: 'campaign-a',
+                  display_code: 'A1B2C3D4E5F6',
+                  name: 'Northwatch',
+                  membership_authority: 'legacy',
+                  created_at: 'created',
+                },
+              ],
+              error: null,
+            }
+          : {
+              data: [
+                {
+                  campaign_id: 'campaign-a',
+                  claim_kind: 'import_fork',
+                  source_fingerprint: 'a'.repeat(64),
+                },
+              ],
+              error: null,
+            }
+      ),
+    }));
+    const gateway = createSupabaseDmWorkspaceGateway({ rpc, from });
+
+    await expect(gateway.discover()).resolves.toEqual([
+      {
+        campaignId: 'campaign-a',
+        displayCode: 'A1B2C3D4E5F6',
+        name: 'Northwatch',
+        creationKind: 'import_fork',
+        sourceFingerprint: 'a'.repeat(64),
+        createdAt: 'created',
+        membershipAuthority: 'legacy',
+        familyAuthorities: 'legacy',
+        liveRuntimeAuthority: 'redis_relay',
+      },
+    ]);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
   it('creates a new workspace through the idempotent authenticated RPC', async () => {
     const supabase = client({
       data: {

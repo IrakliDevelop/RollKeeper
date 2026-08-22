@@ -20,6 +20,21 @@ export interface SupabaseDmWorkspaceClient {
     name: 'create_campaign_workspace',
     args: Record<string, Json | undefined>
   ): Promise<SupabaseResult>;
+  from?(table: 'campaigns' | 'campaign_workspace_claim_provenance'): {
+    select(columns: string): Promise<SupabaseResult>;
+  };
+}
+
+export interface DiscoveredDmWorkspace {
+  campaignId: string;
+  displayCode: string;
+  name: string;
+  creationKind: 'new_workspace' | 'import_fork';
+  sourceFingerprint: string | null;
+  createdAt: string;
+  membershipAuthority: 'legacy';
+  familyAuthorities: 'legacy';
+  liveRuntimeAuthority: 'redis_relay';
 }
 
 export class DmWorkspaceGatewayError extends Error {
@@ -83,7 +98,7 @@ function validateResponse(data: unknown) {
 
 export function createSupabaseDmWorkspaceGateway(
   client: SupabaseDmWorkspaceClient
-): DmWorkspaceGateway {
+): DmWorkspaceGateway & { discover(): Promise<DiscoveredDmWorkspace[]> } {
   return {
     async create(request: DmWorkspaceCreateRequest) {
       const { data, error } = await client.rpc('create_campaign_workspace', {
@@ -94,6 +109,79 @@ export function createSupabaseDmWorkspaceGateway(
       });
       throwForError(error);
       return validateResponse(data);
+    },
+    async discover() {
+      if (!client.from)
+        throw new DmWorkspaceGatewayError(
+          'Owner workspace discovery is unavailable',
+          'failed'
+        );
+      const [campaigns, provenance] = await Promise.all([
+        client
+          .from('campaigns')
+          .select('id,display_code,name,membership_authority,created_at'),
+        client
+          .from('campaign_workspace_claim_provenance')
+          .select('campaign_id,claim_kind,source_fingerprint'),
+      ]);
+      throwForError(campaigns.error);
+      throwForError(provenance.error);
+      if (!Array.isArray(campaigns.data) || !Array.isArray(provenance.data)) {
+        throw new DmWorkspaceGatewayError(
+          'Owner workspace discovery returned an invalid response',
+          'failed'
+        );
+      }
+      const claims = new Map(
+        provenance.data.flatMap(value => {
+          if (typeof value !== 'object' || value === null) return [];
+          const row = value as Record<string, unknown>;
+          if (
+            typeof row.campaign_id !== 'string' ||
+            !['new_workspace', 'import_fork'].includes(
+              String(row.claim_kind)
+            ) ||
+            (row.source_fingerprint !== null &&
+              (typeof row.source_fingerprint !== 'string' ||
+                !/^[a-f0-9]{64}$/u.test(row.source_fingerprint)))
+          )
+            return [];
+          return [[row.campaign_id, row] as const];
+        })
+      );
+      return campaigns.data
+        .flatMap(value => {
+          if (typeof value !== 'object' || value === null) return [];
+          const row = value as Record<string, unknown>;
+          const claim =
+            typeof row.id === 'string' ? claims.get(row.id) : undefined;
+          if (
+            typeof row.id !== 'string' ||
+            typeof row.display_code !== 'string' ||
+            !/^[A-F0-9]{12}$/u.test(row.display_code) ||
+            typeof row.name !== 'string' ||
+            row.name.length < 1 ||
+            row.name.length > 255 ||
+            row.membership_authority !== 'legacy' ||
+            typeof row.created_at !== 'string' ||
+            !claim
+          )
+            return [];
+          return [
+            {
+              campaignId: row.id,
+              displayCode: row.display_code,
+              name: row.name,
+              creationKind: claim.claim_kind as 'new_workspace' | 'import_fork',
+              sourceFingerprint: claim.source_fingerprint as string | null,
+              createdAt: row.created_at,
+              membershipAuthority: 'legacy' as const,
+              familyAuthorities: 'legacy' as const,
+              liveRuntimeAuthority: 'redis_relay' as const,
+            },
+          ];
+        })
+        .sort((left, right) => left.campaignId.localeCompare(right.campaignId));
     },
   };
 }
