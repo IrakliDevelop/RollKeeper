@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useDmStore } from '@/store/dmStore';
 import type { SharedCustomCounter } from '@/types/sharedState';
+import { legacyCampaignSettingsProjectionAllowed } from '@/lib/durableDm/campaignSettingsLegacyProjection';
 
 const DEBOUNCE_MS = 500;
 
@@ -11,6 +12,8 @@ export function useDmCounterSync(campaignCode: string, dmId: string) {
 
   const pushCounters = useCallback(
     async (label: string, counters: Record<string, number>) => {
+      if (!legacyCampaignSettingsProjectionAllowed(localStorage, campaignCode))
+        return;
       const data: SharedCustomCounter = {
         label,
         counters,
@@ -31,6 +34,8 @@ export function useDmCounterSync(campaignCode: string, dmId: string) {
   );
 
   useEffect(() => {
+    if (!legacyCampaignSettingsProjectionAllowed(localStorage, campaignCode))
+      return;
     const label = campaign?.customCounterLabel;
     const counters = campaign?.playerCounters;
 
@@ -49,5 +54,10 @@ export function useDmCounterSync(campaignCode: string, dmId: string) {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [campaign?.customCounterLabel, campaign?.playerCounters, pushCounters]);
+  }, [
+    campaign?.customCounterLabel,
+    campaign?.playerCounters,
+    campaignCode,
+    pushCounters,
+  ]);
 }

@@ -24,6 +24,8 @@ function context(): BrowserDmWorkspaceContext {
     accountId: 'account-a',
     accountLabel: 'owner@example.test',
     close: vi.fn(),
+    discover: vi.fn().mockResolvedValue([]),
+    remember: vi.fn().mockResolvedValue(undefined),
     list: vi.fn().mockResolvedValue([
       {
         namespace: 'user:account-a',

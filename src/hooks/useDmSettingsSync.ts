@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useDmStore } from '@/store/dmStore';
+import { legacyCampaignSettingsProjectionAllowed } from '@/lib/durableDm/campaignSettingsLegacyProjection';
 
 const DEBOUNCE_MS = 500;
 
@@ -11,6 +12,8 @@ export function useDmSettingsSync(campaignCode: string, dmId: string) {
 
   const pushSettings = useCallback(
     async (stackableInspiration: boolean) => {
+      if (!legacyCampaignSettingsProjectionAllowed(localStorage, campaignCode))
+        return true;
       try {
         const res = await fetch(`/api/campaign/${campaignCode}/shared`, {
           method: 'POST',
@@ -32,6 +35,8 @@ export function useDmSettingsSync(campaignCode: string, dmId: string) {
 
   useEffect(() => {
     if (!campaign) return;
+    if (!legacyCampaignSettingsProjectionAllowed(localStorage, campaignCode))
+      return;
 
     const stackableInspiration = campaign.stackableInspiration ?? false;
     const fingerprint = JSON.stringify({ stackableInspiration });
@@ -53,5 +58,5 @@ export function useDmSettingsSync(campaignCode: string, dmId: string) {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [campaign, pushSettings]);
+  }, [campaign, campaignCode, pushSettings]);
 }

@@ -186,6 +186,14 @@ export class IndexedDbDmWorkspaceRepository {
     );
   }
 
+  async rememberDiscovered(workspace: DmWorkspaceDocument): Promise<void> {
+    if (workspace.namespace === 'guest' || !workspace.cloudId)
+      throw new Error('An owner-verified workspace is required');
+    const transaction = this.database.transaction('documents', 'readwrite');
+    transaction.objectStore('documents').put(structuredClone(workspace));
+    await transactionComplete(transaction);
+  }
+
   async listOutbox(
     namespace: StorageNamespace
   ): Promise<DmWorkspaceOutboxEntry[]> {
