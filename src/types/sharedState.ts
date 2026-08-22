@@ -1,4 +1,8 @@
-import type { CalendarConfig, WeatherType } from './calendar';
+import type {
+  CalendarConfig,
+  CalendarEventVisibility,
+  WeatherType,
+} from './calendar';
 import type { InventoryItem, MagicItem } from './character';
 import type {
   ChessPiece,
@@ -17,11 +21,23 @@ export interface SharedCalendar {
 
 // What players receive (moons stripped from config)
 export interface SharedCalendarPlayer {
+  codecVersion?: 1;
   config: CalendarConfig; // config.moons will be []
   currentTime: number;
   startTime: number;
   weather?: WeatherType;
-  updatedAt: string;
+  updatedAt?: string;
+  events?: Array<{
+    id: string;
+    title: string;
+    description: string;
+    year: number;
+    month: number;
+    day: number;
+    visibility: Exclude<CalendarEventVisibility, 'private'>;
+    color?: string;
+    emoji?: string;
+  }>;
 }
 
 // DM-to-player message stored in Redis

@@ -397,6 +397,20 @@ export type Database = {
         Args: { p_campaign_id: string; p_expected_epoch: number };
         Returns: Json;
       };
+      begin_calendar_staging: {
+        Args: {
+          p_campaign_id: string;
+          p_device_id: string;
+          p_expected_epoch: number;
+          p_manifest_fingerprint: string;
+          p_mutation_id: string;
+          p_record_count: number;
+          p_recovery_manifest_hash: string;
+          p_recovery_receipt_hash: string;
+          p_total_bytes: number;
+        };
+        Returns: Json;
+      };
       begin_campaign_membership_freeze: {
         Args: {
           p_campaign_id: string;
@@ -420,6 +434,10 @@ export type Database = {
         };
         Returns: Json;
       };
+      calendar_projection_status: {
+        Args: { p_campaign_id: string };
+        Returns: Json;
+      };
       campaign_document_projection_status: {
         Args: { p_campaign_id: string; p_family: string };
         Returns: Json;
@@ -427,6 +445,20 @@ export type Database = {
       cancel_campaign_membership_freeze: {
         Args: { p_campaign_id: string; p_mutation_id: string };
         Returns: Json;
+      };
+      claim_calendar_projection_events: {
+        Args: { p_lease_seconds: number; p_limit: number; p_worker_id: string };
+        Returns: {
+          campaign_code: string;
+          campaign_id: string;
+          cutover_epoch: number;
+          event_id: string;
+          legacy_id: string;
+          payload: Json;
+          server_version: number;
+          source_fingerprint: string;
+          tombstoned: boolean;
+        }[];
       };
       claim_campaign_document_projection_events: {
         Args: { p_lease_seconds: number; p_limit: number; p_worker_id: string };
@@ -461,6 +493,15 @@ export type Database = {
         };
         Returns: Json;
       };
+      compare_calendar_document_versions: {
+        Args: {
+          p_campaign_id: string;
+          p_left: number;
+          p_legacy_id: string;
+          p_right: number;
+        };
+        Returns: Json;
+      };
       compare_campaign_document_versions: {
         Args: {
           p_campaign_id: string;
@@ -468,6 +509,15 @@ export type Database = {
           p_left: number;
           p_legacy_id: string;
           p_right: number;
+        };
+        Returns: Json;
+      };
+      confirm_calendar_cutover: {
+        Args: {
+          p_expected_epoch: number;
+          p_manifest_fingerprint: string;
+          p_mutation_id: string;
+          p_run_id: string;
         };
         Returns: Json;
       };
@@ -507,6 +557,17 @@ export type Database = {
         };
         Returns: Json;
       };
+      enroll_calendar_device: {
+        Args: {
+          p_campaign_id: string;
+          p_device_id: string;
+          p_expected_epoch: number;
+          p_legacy_candidate_fingerprint: string;
+          p_mutation_id: string;
+          p_preview_fingerprint: string;
+        };
+        Returns: Json;
+      };
       enroll_campaign_settings_device: {
         Args: {
           p_campaign_id: string;
@@ -518,6 +579,14 @@ export type Database = {
         };
         Returns: Json;
       };
+      export_calendar_document_version: {
+        Args: {
+          p_campaign_id: string;
+          p_legacy_id: string;
+          p_server_version: number;
+        };
+        Returns: Json;
+      };
       export_campaign_document_version: {
         Args: {
           p_campaign_id: string;
@@ -526,6 +595,15 @@ export type Database = {
           p_server_version: number;
         };
         Returns: Json;
+      };
+      fail_calendar_projection_event: {
+        Args: {
+          p_error_code: string;
+          p_event_id: string;
+          p_incident_kind: string;
+          p_worker_id: string;
+        };
+        Returns: undefined;
       };
       fail_campaign_document_projection_event: {
         Args: {
@@ -572,6 +650,14 @@ export type Database = {
         };
         Returns: Json;
       };
+      list_calendar_document_versions: {
+        Args: { p_campaign_id: string; p_legacy_id: string };
+        Returns: Json;
+      };
+      list_calendar_projection_incidents: {
+        Args: { p_campaign_id: string };
+        Returns: Json;
+      };
       list_campaign_document_projection_incidents: {
         Args: { p_campaign_id: string; p_family: string };
         Returns: Json;
@@ -589,8 +675,27 @@ export type Database = {
         Args: { p_campaign_id: string; p_mutation_id: string };
         Returns: Json;
       };
+      preview_calendar_device_enrollment: {
+        Args: { p_campaign_id: string };
+        Returns: Json;
+      };
       preview_campaign_settings_device_enrollment: {
         Args: { p_campaign_id: string };
+        Returns: Json;
+      };
+      put_calendar_document: {
+        Args: {
+          p_campaign_id: string;
+          p_expected_epoch: number;
+          p_expected_server_version: number;
+          p_legacy_id: string;
+          p_mutation_id: string;
+          p_operation: string;
+          p_payload: Json;
+          p_payload_fingerprint: string;
+          p_restore_source_version?: number;
+          p_schema_version: number;
+        };
         Returns: Json;
       };
       put_campaign_document: {
@@ -630,6 +735,15 @@ export type Database = {
           p_session_token_hash: string;
           p_subject_id: string;
           p_token_hash: string;
+        };
+        Returns: Json;
+      };
+      remove_calendar_device: {
+        Args: {
+          p_campaign_id: string;
+          p_device_id: string;
+          p_expected_epoch: number;
+          p_mutation_id: string;
         };
         Returns: Json;
       };
@@ -673,6 +787,15 @@ export type Database = {
         };
         Returns: Json;
       };
+      replay_calendar_projection_event: {
+        Args: {
+          p_campaign_id: string;
+          p_event_id: string;
+          p_expected_epoch: number;
+          p_mutation_id: string;
+        };
+        Returns: Json;
+      };
       replay_campaign_document_projection_event: {
         Args: {
           p_campaign_id: string;
@@ -691,12 +814,27 @@ export type Database = {
         };
         Returns: Json;
       };
+      resolve_calendar_projection_authority: {
+        Args: { p_campaign_code: string };
+        Returns: Json;
+      };
       resolve_campaign_membership_authority: {
         Args: { p_display_code: string };
         Returns: Json;
       };
       resolve_campaign_settings_projection_authority: {
         Args: { p_campaign_code: string };
+        Returns: Json;
+      };
+      restore_calendar_document_version: {
+        Args: {
+          p_campaign_id: string;
+          p_expected_epoch: number;
+          p_expected_server_version: number;
+          p_legacy_id: string;
+          p_mutation_id: string;
+          p_source_version: number;
+        };
         Returns: Json;
       };
       restore_campaign_document_version: {
@@ -729,6 +867,17 @@ export type Database = {
       };
       revoke_campaign_membership_invitation: {
         Args: { p_invitation_id: string; p_mutation_id: string };
+        Returns: Json;
+      };
+      rollback_calendar_family: {
+        Args: {
+          p_campaign_id: string;
+          p_current_generation: Json;
+          p_expected_epoch: number;
+          p_manifest_fingerprint: string;
+          p_mutation_id: string;
+          p_projection_journal_reconciled: boolean;
+        };
         Returns: Json;
       };
       rollback_campaign_membership: {
@@ -768,6 +917,10 @@ export type Database = {
           p_expected_server_version: number;
           p_mutation_id: string;
         };
+        Returns: Json;
+      };
+      stage_calendar_items: {
+        Args: { p_items: Json; p_mutation_id: string; p_run_id: string };
         Returns: Json;
       };
       stage_campaign_settings_items: {

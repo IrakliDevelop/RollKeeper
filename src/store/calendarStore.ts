@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { createSafeStorage } from '@/lib/safeStorage';
+import { createCalendarAwareStorage } from '@/lib/durableDm/calendarAwareStorage';
 import type {
   CalendarConfig,
   CalendarEvent,
@@ -12,9 +13,7 @@ import type {
 const CALENDAR_STORAGE_KEY = 'rollkeeper-calendar-data';
 
 function generateEventId(): string {
-  return (
-    'evt-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9)
-  );
+  return `evt-${crypto.randomUUID()}`;
 }
 
 interface CalendarStoreState {
@@ -180,7 +179,11 @@ export const useCalendarStore = create<CalendarStoreState>()(
     {
       name: CALENDAR_STORAGE_KEY,
       skipHydration: isIndexedDbMigrationEnabled(),
-      storage: createJSONStorage(() => createSafeStorage()),
+      storage: createJSONStorage(() =>
+        typeof localStorage === 'undefined'
+          ? createSafeStorage()
+          : createCalendarAwareStorage(localStorage)
+      ),
       version: 3,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as CalendarStoreState;

@@ -46,6 +46,7 @@ import { accountMembershipMatchesLegacyIds } from '@/lib/campaignMembershipAutho
 import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecurity';
 import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
 import { campaignSettingsProjectionWriteAllowed } from '@/lib/supabase/campaignSettingsServer';
+import { calendarProjectionWriteAllowed } from '@/lib/supabase/calendarServer';
 
 export async function GET(
   request: NextRequest,
@@ -135,10 +136,14 @@ export async function GET(
     let calendar: SharedCalendarPlayer | null = null;
 
     if (calendarRaw) {
-      const parsed: SharedCalendar =
+      const parsed: SharedCalendar & Partial<SharedCalendarPlayer> =
         typeof calendarRaw === 'string' ? JSON.parse(calendarRaw) : calendarRaw;
 
-      if (role === 'dm') {
+      if (parsed.codecVersion === 1) {
+        // Postgres-primary values are already produced by the server-side
+        // allowlist codec. Never add fields from a private document here.
+        calendar = parsed as SharedCalendarPlayer;
+      } else if (role === 'dm') {
         calendar = parsed;
       } else {
         // Strip moons for player view
@@ -301,6 +306,15 @@ export async function POST(
           error:
             'Campaign settings compatibility projection is server controlled',
         },
+        { status: 409 }
+      );
+    }
+    if (
+      feature === 'calendar' &&
+      !(await calendarProjectionWriteAllowed(code))
+    ) {
+      return NextResponse.json(
+        { error: 'Calendar compatibility projection is server controlled' },
         { status: 409 }
       );
     }

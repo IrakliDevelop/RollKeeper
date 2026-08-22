@@ -234,7 +234,9 @@ export function PlayerCalendarView({
   }
 
   // Active state
-  const events = isSynced ? [] : (calendar?.events ?? []);
+  const events = isSynced
+    ? (sharedCalendar.events ?? []).map(event => ({ ...event, createdAt: 0 }))
+    : (calendar?.events ?? []);
   const displayYear = browseYear ?? date.year;
   const displayMonth = browseMonth ?? date.month;
   const isBrowsing = browseYear !== null || browseMonth !== null;
