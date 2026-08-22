@@ -35,6 +35,7 @@
     "test:slice10b:coverage": "vitest run --config vitest.slice10b.config.ts",
     "test:slice11a:coverage": "vitest run --config vitest.slice11a.config.ts",
     "test:slice11b:coverage": "vitest run --config vitest.slice11b.config.ts",
+    "test:slice11c:coverage": "vitest run --config vitest.slice11c.config.ts",
     "test:auth:e2e": "playwright test --config playwright.auth.config.ts",
     "test:watch": "vitest --project unit",
     "test:visual": "vitest run --project storybook",
