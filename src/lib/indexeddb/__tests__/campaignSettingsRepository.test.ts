@@ -207,4 +207,82 @@ describe('IndexedDbCampaignSettingsRepository', () => {
       payload: { stackableInspiration: false },
     });
   });
+
+  it('covers runnable ordering, acknowledgements, conflicts, and guest denial directly', async () => {
+    const repo = repository();
+    await expect(
+      repo.commit(mutation({ namespace: 'guest' }))
+    ).resolves.toEqual({ saved: false, reason: 'guest' });
+    const first = await repo.commit(mutation());
+    const second = await repo.commit(
+      mutation({ legacyId: 'BBB222', contentFingerprint: 'b'.repeat(64) })
+    );
+    if (!first.saved || !second.saved) throw new Error('expected local saves');
+
+    await repo.updateWork(first.mutationId, {
+      state: 'retry',
+      nextAttemptAt: 20,
+    });
+    await repo.updateWork(second.mutationId, {
+      state: 'retry',
+      nextAttemptAt: 10,
+    });
+    await repo.updateWork('missing', { state: 'retry' });
+    await expect(
+      repo.nextRunnable(NAMESPACE, 'campaign-a', 20)
+    ).resolves.toMatchObject({ mutationId: second.mutationId });
+
+    await repo.acknowledge('missing', {
+      serverVersion: 2,
+      cutoverEpoch: 1,
+      payloadFingerprint: 'c'.repeat(64),
+    });
+    await repo.acknowledge(second.mutationId, {
+      serverVersion: 2,
+      cutoverEpoch: 1,
+      payloadFingerprint: 'c'.repeat(64),
+    });
+    await expect(repo.getDocument(NAMESPACE, 'BBB222')).resolves.toMatchObject({
+      baseServerVersion: 2,
+      contentFingerprint: 'c'.repeat(64),
+    });
+
+    const removedDocument = await repo.commit(
+      mutation({ legacyId: 'CCC333', contentFingerprint: 'd'.repeat(64) })
+    );
+    if (!removedDocument.saved) throw new Error('expected local save');
+    const remove = database.transaction('documents', 'readwrite');
+    remove
+      .objectStore('documents')
+      .delete([NAMESPACE, 'campaign_settings', 'CCC333']);
+    await transactionComplete(remove);
+    await expect(
+      repo.acknowledge(removedDocument.mutationId, {
+        serverVersion: 2,
+        cutoverEpoch: 1,
+        payloadFingerprint: 'd'.repeat(64),
+      })
+    ).resolves.toBeUndefined();
+
+    const [conflicting] = (
+      await repo.listOutbox(NAMESPACE, 'campaign-a')
+    ).filter(entry => entry.mutationId === first.mutationId);
+    await repo.preserveCloudConflict(conflicting, { serverVersion: 3 });
+    expect(
+      await requestResult(
+        database
+          .transaction('conflicts', 'readonly')
+          .objectStore('conflicts')
+          .getAll()
+      )
+    ).toHaveLength(1);
+    await expect(
+      repo.listOutbox(NAMESPACE, 'campaign-a')
+    ).resolves.toContainEqual(
+      expect.objectContaining({
+        mutationId: first.mutationId,
+        state: 'conflict',
+      })
+    );
+  });
 });

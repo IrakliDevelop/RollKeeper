@@ -144,6 +144,18 @@ describe('campaign_settings local authority', () => {
       epoch: 2,
       rollbackGeneration: GENERATION,
     });
+    await expect(
+      rollbackCampaignSettingsLocalAuthority(database, {
+        namespace: NAMESPACE,
+        campaignId: CAMPAIGN,
+        expectedEpoch: 1,
+        generation: GENERATION,
+        confirmed: true,
+        currentGenerationVerified: true,
+        projectionJournalReconciled: true,
+        now: () => 'stale',
+      })
+    ).rejects.toThrow(/stale/i);
     database.close();
   });
 

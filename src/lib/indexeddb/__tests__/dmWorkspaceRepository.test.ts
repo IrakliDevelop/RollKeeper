@@ -170,4 +170,34 @@ describe('IndexedDbDmWorkspaceRepository', () => {
     await expect(repo.list(ACCOUNT_A)).resolves.toEqual([]);
     await expect(repo.listOutbox(ACCOUNT_A)).resolves.toEqual([]);
   });
+
+  it('remembers only an explicitly selected owner-verified cloud workspace', async () => {
+    const repo = repository();
+    const workspace = {
+      namespace: ACCOUNT_A,
+      localId: 'cloud:workspace-a',
+      name: 'Northwatch',
+      creationKind: 'import_fork' as const,
+      sourceFingerprint: 'a'.repeat(64),
+      createdAt: 'created',
+      family: 'workspace_identity' as const,
+      legacyId: 'cloud:workspace-a',
+      cloudId: 'workspace-a',
+      displayCode: 'A1B2C3D4E5F6',
+      membershipAuthority: 'legacy' as const,
+      familyAuthorities: 'legacy' as const,
+      liveRuntimeAuthority: 'redis_relay' as const,
+      acknowledgedAt: 'acknowledged',
+    };
+    await expect(
+      repo.rememberDiscovered({ ...workspace, namespace: 'guest' })
+    ).rejects.toThrow(/owner-verified/i);
+    await expect(
+      repo.rememberDiscovered({ ...workspace, cloudId: null })
+    ).rejects.toThrow(/owner-verified/i);
+    await repo.rememberDiscovered(workspace);
+    await expect(repo.get(ACCOUNT_A, workspace.localId)).resolves.toEqual(
+      workspace
+    );
+  });
 });
