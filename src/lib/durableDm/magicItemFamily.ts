@@ -130,37 +130,9 @@ const encoder = new TextEncoder();
 const MAGIC_ITEM_FIELDS = new Set<string>(
   MAGIC_ITEM_FAMILY_INVENTORY.documentFields
 );
-const MAGIC_ITEM_CATEGORIES = new Set<string>([
-  'wondrous',
-  'armor',
-  'shield',
-  'ring',
-  'staff',
-  'wand',
-  'rod',
-  'scroll',
-  'potion',
-  'artifact',
-  'other',
-]);
-const MAGIC_ITEM_RARITIES = new Set<string>([
-  'common',
-  'uncommon',
-  'rare',
-  'very rare',
-  'legendary',
-  'artifact',
-]);
-const CHARGE_REST_TYPES = new Set<string>(['short', 'long', 'dawn']);
-const CHARGE_POOL_RECHARGE_TYPES = new Set<string>([
-  'short',
-  'long',
-  'dawn',
-  'dusk',
-  'midnight',
-  'special',
-]);
 const MAX_ID_LENGTH = 255;
+const MAX_NAME_LENGTH = 1_000;
+const MAX_LABEL_LENGTH = 100;
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -195,24 +167,8 @@ function isStableId(value: unknown): value is string {
   );
 }
 
-function isFiniteNumber(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
-function isOptionalFiniteNumber(value: unknown) {
-  return value === undefined || isFiniteNumber(value);
-}
-
-function isOptionalString(value: unknown) {
-  return value === undefined || typeof value === 'string';
-}
-
-function isOptionalBoolean(value: unknown) {
-  return value === undefined || typeof value === 'boolean';
-}
-
-function isNullableString(value: unknown) {
-  return value === undefined || value === null || typeof value === 'string';
+function isBoundedString(value: unknown, maxLength: number): value is string {
+  return typeof value === 'string' && value.length <= maxLength;
 }
 
 function isStringArray(value: unknown) {
@@ -221,116 +177,62 @@ function isStringArray(value: unknown) {
   );
 }
 
-function validateCharges(value: unknown): MagicItemPayloadRejection | null {
+/** Optional payload fields may be absent or explicitly null. */
+function isAbsent(value: unknown) {
+  return value === undefined || value === null;
+}
+
+function isNullableBoolean(value: unknown) {
+  return isAbsent(value) || typeof value === 'boolean';
+}
+
+function isNullableString(value: unknown) {
+  return isAbsent(value) || typeof value === 'string';
+}
+
+function isNullableNumber(value: unknown) {
+  return (
+    isAbsent(value) || (typeof value === 'number' && Number.isFinite(value))
+  );
+}
+
+function isNullableObject(value: unknown) {
+  return isAbsent(value) || record(value);
+}
+
+/**
+ * Every child collection carries the same contract: an array of objects, each
+ * with a stable string ID of 1-255 characters that is unique within the array.
+ */
+function validateChildIds(
+  path: string,
+  value: unknown,
+  optional: boolean
+): MagicItemPayloadRejection | null {
+  if (optional && isAbsent(value)) return null;
   if (!Array.isArray(value))
-    return reject('invalid-item', 'Magic item charges must be an array');
+    return reject('invalid-item', `${path} must be an array of objects`);
   const seen = new Set<string>();
-  for (const [index, charge] of value.entries()) {
-    if (!record(charge) || !isStableId(charge.id))
+  for (const [index, entry] of value.entries()) {
+    if (!record(entry))
+      return reject('invalid-item', `${path}[${index}] must be an object`);
+    if (!isStableId(entry.id))
       return reject(
         'invalid-child-id',
-        `charges[${index}] requires a stable ID of 1-${MAX_ID_LENGTH} characters`
+        `${path}[${index}] requires a stable ID of 1-${MAX_ID_LENGTH} characters`
       );
-    if (seen.has(charge.id))
-      return reject('duplicate-child-id', `Duplicate charge ID ${charge.id}`);
-    seen.add(charge.id);
-    if (typeof charge.name !== 'string' || charge.name.length === 0)
-      return reject('invalid-item', `charges[${index}] requires a name`);
-    if (
-      !isFiniteNumber(charge.maxCharges) ||
-      !isFiniteNumber(charge.usedCharges)
-    )
-      return reject(
-        'invalid-item',
-        `charges[${index}] requires numeric charge counts`
-      );
-    if (
-      typeof charge.restType !== 'string' ||
-      !CHARGE_REST_TYPES.has(charge.restType)
-    )
-      return reject(
-        'invalid-item',
-        `charges[${index}] has an unsupported rest type`
-      );
-    if (
-      !isOptionalString(charge.description) ||
-      !isOptionalBoolean(charge.scaleWithProficiency) ||
-      !isOptionalFiniteNumber(charge.proficiencyMultiplier)
-    )
-      return reject(
-        'invalid-item',
-        `charges[${index}] has an invalid optional field`
-      );
+    if (seen.has(entry.id))
+      return reject('duplicate-child-id', `Duplicate ${path} ID ${entry.id}`);
+    seen.add(entry.id);
   }
   return null;
 }
 
 function validateChargePool(value: unknown): MagicItemPayloadRejection | null {
+  if (isAbsent(value)) return null;
   if (!record(value))
-    return reject('invalid-item', 'Magic item chargePool must be an object');
-  if (!isFiniteNumber(value.maxCharges) || !isFiniteNumber(value.usedCharges))
-    return reject('invalid-item', 'chargePool requires numeric charge counts');
-  if (
-    typeof value.rechargeType !== 'string' ||
-    !CHARGE_POOL_RECHARGE_TYPES.has(value.rechargeType)
-  )
-    return reject(
-      'invalid-item',
-      'chargePool has an unsupported recharge type'
-    );
-  if (!isOptionalString(value.rechargeAmount))
-    return reject('invalid-item', 'chargePool rechargeAmount must be a string');
-  if (!Array.isArray(value.abilities))
-    return reject('invalid-item', 'chargePool abilities must be an array');
-  const seen = new Set<string>();
-  for (const [index, ability] of value.abilities.entries()) {
-    if (!record(ability) || !isStableId(ability.id))
-      return reject(
-        'invalid-child-id',
-        `chargePool.abilities[${index}] requires a stable ID of 1-${MAX_ID_LENGTH} characters`
-      );
-    if (seen.has(ability.id))
-      return reject(
-        'duplicate-child-id',
-        `Duplicate charge pool ability ID ${ability.id}`
-      );
-    seen.add(ability.id);
-    if (typeof ability.name !== 'string' || ability.name.length === 0)
-      return reject(
-        'invalid-item',
-        `chargePool.abilities[${index}] requires a name`
-      );
-    if (!isFiniteNumber(ability.cost))
-      return reject(
-        'invalid-item',
-        `chargePool.abilities[${index}] requires a numeric cost`
-      );
-    if (
-      !isOptionalString(ability.description) ||
-      !isOptionalBoolean(ability.isSpell) ||
-      !isOptionalFiniteNumber(ability.spellLevel)
-    )
-      return reject(
-        'invalid-item',
-        `chargePool.abilities[${index}] has an invalid optional field`
-      );
-  }
-  return null;
-}
-
-function validateLegacyCharges(
-  value: unknown
-): MagicItemPayloadRejection | null {
-  if (!record(value))
-    return reject('invalid-item', 'Magic item legacyCharges must be an object');
-  if (!isFiniteNumber(value.current) || !isFiniteNumber(value.max))
-    return reject('invalid-item', 'legacyCharges requires numeric counts');
-  if (!isOptionalString(value.rechargeRule))
-    return reject(
-      'invalid-item',
-      'legacyCharges rechargeRule must be a string'
-    );
-  return null;
+    return reject('invalid-item', 'chargePool must be an object');
+  return validateChildIds('chargePool.abilities', value.abilities, false);
 }
 
 export function validateMagicItemPayload(
@@ -345,18 +247,22 @@ export function validateMagicItemPayload(
         `Magic item field ${field} is not classified in Slice 11C`
       );
   }
-  if (typeof value.name !== 'string' || value.name.trim().length === 0)
-    return reject('invalid-item', 'A magic item requires a non-empty name');
-  if (
-    typeof value.category !== 'string' ||
-    !MAGIC_ITEM_CATEGORIES.has(value.category)
-  )
-    return reject('invalid-item', 'Magic item category is not supported');
-  if (
-    typeof value.rarity !== 'string' ||
-    !MAGIC_ITEM_RARITIES.has(value.rarity)
-  )
-    return reject('invalid-item', 'Magic item rarity is not supported');
+  const name = value.name;
+  if (!isBoundedString(name, MAX_NAME_LENGTH) || name.length === 0)
+    return reject(
+      'invalid-item',
+      `A magic item requires a name of 1-${MAX_NAME_LENGTH} characters`
+    );
+  if (!isBoundedString(value.category, MAX_LABEL_LENGTH))
+    return reject(
+      'invalid-item',
+      `Magic item category must be a string of at most ${MAX_LABEL_LENGTH} characters`
+    );
+  if (!isBoundedString(value.rarity, MAX_LABEL_LENGTH))
+    return reject(
+      'invalid-item',
+      `Magic item rarity must be a string of at most ${MAX_LABEL_LENGTH} characters`
+    );
   if (typeof value.description !== 'string')
     return reject('invalid-item', 'Magic item description must be a string');
   if (!isStringArray(value.properties))
@@ -364,45 +270,50 @@ export function validateMagicItemPayload(
       'invalid-item',
       'Magic item properties must be an array of strings'
     );
-  if (
-    typeof value.requiresAttunement !== 'boolean' ||
-    typeof value.isAttuned !== 'boolean'
-  )
-    return reject(
-      'invalid-item',
-      'Magic item attunement flags must be booleans'
-    );
-  if (!isOptionalBoolean(value.isEquipped))
-    return reject('invalid-item', 'Magic item isEquipped must be a boolean');
-  if (
-    !isOptionalFiniteNumber(value.bonusSpellAttack) ||
-    !isOptionalFiniteNumber(value.bonusSpellSaveDc)
-  )
-    return reject('invalid-item', 'Magic item spell bonuses must be numbers');
-  if (typeof value.createdAt !== 'string' || value.createdAt.length === 0)
-    return reject('invalid-item', 'Magic item requires a createdAt timestamp');
-  if (typeof value.updatedAt !== 'string' || value.updatedAt.length === 0)
-    return reject('invalid-item', 'Magic item requires an updatedAt timestamp');
   if (!isStringArray(value.tags))
     return reject(
       'invalid-item',
       'Magic item tags must be an array of strings'
     );
-  if (!isNullableString(value.group))
-    return reject('invalid-item', 'Magic item group must be a string or null');
-  if (!isNullableString(value.sourceItemId))
+  if (typeof value.requiresAttunement !== 'boolean')
     return reject(
       'invalid-item',
-      'Magic item sourceItemId must be a string or null'
+      'Magic item requiresAttunement must be a boolean'
     );
+  if (
+    typeof value.createdAt !== 'string' ||
+    typeof value.updatedAt !== 'string'
+  )
+    return reject(
+      'invalid-item',
+      'Magic item requires createdAt and updatedAt strings'
+    );
+  if (
+    !isNullableBoolean(value.isAttuned) ||
+    !isNullableBoolean(value.isEquipped)
+  )
+    return reject(
+      'invalid-item',
+      'Magic item attunement flags must be booleans when present'
+    );
+  if (!isNullableString(value.group) || !isNullableString(value.sourceItemId))
+    return reject(
+      'invalid-item',
+      'Magic item group and sourceItemId must be strings when present'
+    );
+  if (
+    !isNullableNumber(value.bonusSpellAttack) ||
+    !isNullableNumber(value.bonusSpellSaveDc)
+  )
+    return reject(
+      'invalid-item',
+      'Magic item spell bonuses must be numbers when present'
+    );
+  if (!isNullableObject(value.legacyCharges))
+    return reject('invalid-item', 'Magic item legacyCharges must be an object');
   const childRejection =
-    (value.charges === undefined ? null : validateCharges(value.charges)) ??
-    (value.chargePool === undefined
-      ? null
-      : validateChargePool(value.chargePool)) ??
-    (value.legacyCharges === undefined
-      ? null
-      : validateLegacyCharges(value.legacyCharges));
+    validateChildIds('charges', value.charges, true) ??
+    validateChargePool(value.chargePool);
   if (childRejection) return childRejection;
   return { ok: true, payload: structuredClone(value) as MagicItemPayload };
 }
