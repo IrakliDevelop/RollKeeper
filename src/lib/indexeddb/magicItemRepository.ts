@@ -66,6 +66,15 @@ function namespaceVisibilityKey(namespace: StorageNamespace): string {
   return `account-namespace-visibility:${namespace}`;
 }
 
+const TERMINAL_STATES = new Set<MagicItemWorkState>([
+  'acknowledged',
+  'superseded',
+]);
+
+function isTerminal(state: MagicItemWorkState): boolean {
+  return TERMINAL_STATES.has(state);
+}
+
 function matches(
   entry: Pick<MagicItemOutboxEntry, 'namespace' | 'campaignId' | 'family'>,
   namespace: StorageNamespace,
@@ -132,12 +141,16 @@ export class IndexedDbMagicItemRepository {
           entry.legacyId === mutation.legacyId &&
           entry.family === 'magic_item'
         ) {
-          outbox.put({
+          // Superseding is terminal, so any pause bookkeeping left on the
+          // predecessor is dropped rather than carried forward.
+          const superseded: MagicItemOutboxEntry = {
             ...entry,
             state: 'superseded',
             lastError: null,
             inflightAt: null,
-          });
+          };
+          delete superseded.pausedFromState;
+          outbox.put(superseded);
         }
       }
       const document: MagicItemDocument = {
@@ -251,10 +264,14 @@ export class IndexedDbMagicItemRepository {
     for (const entry of values.filter(value =>
       matches(value, namespace, campaignId)
     )) {
-      if (paused && entry.state !== 'paused') {
+      // Terminal work is finished: pausing must never resurrect an
+      // acknowledged or superseded entry as pending outbox work.
+      if (paused && entry.state !== 'paused' && !isTerminal(entry.state)) {
         store.put({ ...entry, state: 'paused', pausedFromState: entry.state });
       } else if (!paused && entry.state === 'paused') {
         const { pausedFromState, ...rest } = entry;
+        // A legacy row paused from a terminal state restores to it, not to
+        // the queue.
         store.put({ ...rest, state: pausedFromState ?? 'queued' });
       }
     }
