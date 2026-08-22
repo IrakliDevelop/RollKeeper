@@ -196,14 +196,38 @@ describe('magic item authority-aware Zustand storage', () => {
     expect(localStorage.getItem(KEY)).toBe(previous);
   });
 
+  it('drops routed campaigns from the first envelope write on a fresh device', () => {
+    vi.stubEnv('NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE', 'true');
+    writeMagicItemAuthorityMarker(localStorage, 'ABC123', marker('postgres'));
+
+    createMagicItemAwareStorage(localStorage).setItem(
+      KEY,
+      envelope({
+        ABC123: [item('ABC123', 'lantern')],
+        DEF456: [item('DEF456', 'orb')],
+      })
+    );
+
+    const persisted = JSON.parse(localStorage.getItem(KEY)!);
+    expect(Object.keys(persisted.state.itemsByCampaign)).toEqual(['DEF456']);
+    expect(persisted.state.itemsByCampaign.DEF456).toHaveLength(1);
+  });
+
+  it('writes the first envelope byte-identically when no campaign is routed', () => {
+    vi.stubEnv('NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE', 'true');
+    writeMagicItemAuthorityMarker(localStorage, 'ABC123', marker('postgres'));
+    const next = envelope({ DEF456: [item('DEF456', 'orb')] });
+
+    createMagicItemAwareStorage(localStorage).setItem(KEY, next);
+
+    expect(localStorage.getItem(KEY)).toBe(next);
+  });
+
   it('writes the next envelope as-is when the previous value cannot be routed', () => {
     vi.stubEnv('NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE', 'true');
     writeMagicItemAuthorityMarker(localStorage, 'ABC123', marker('postgres'));
     const aware = createMagicItemAwareStorage(localStorage);
     const next = envelope({ ABC123: [item('ABC123', 'lantern')] });
-
-    aware.setItem(KEY, next);
-    expect(localStorage.getItem(KEY)).toBe(next);
 
     localStorage.setItem(KEY, '{bad');
     aware.setItem(KEY, next);
