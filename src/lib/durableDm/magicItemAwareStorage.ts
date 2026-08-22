@@ -36,11 +36,15 @@ export function createMagicItemAwareStorage(backing?: Storage): StateStorage {
       if (key !== MAGIC_ITEM_STORAGE_KEY || !storage)
         return safe.setItem(key, nextRaw);
       const previousRaw = storage.getItem(key);
-      if (!previousRaw) return safe.setItem(key, nextRaw);
       try {
         const next = JSON.parse(nextRaw) as unknown;
-        const previousItems = itemsByCampaign(JSON.parse(previousRaw));
         const nextItems = itemsByCampaign(next);
+        // A freshly enrolled device can already carry an authority marker while
+        // the legacy key has never been written. Treating that as an empty
+        // previous envelope keeps cloud-hydrated items out of legacy storage.
+        const previousItems = previousRaw
+          ? itemsByCampaign(JSON.parse(previousRaw))
+          : {};
         if (!previousItems || !nextItems) return safe.setItem(key, nextRaw);
         let routed = false;
         const codes = new Set([
