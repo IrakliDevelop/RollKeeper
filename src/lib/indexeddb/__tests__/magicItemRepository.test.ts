@@ -260,6 +260,66 @@ describe('IndexedDbMagicItemRepository', () => {
     );
   });
 
+  it('pause leaves superseded and acknowledged entries terminal', async () => {
+    const repo = repository();
+    const first = await repo.commit(mutation({ legacyId: 'AAA111' }));
+    const settled = await repo.commit(
+      mutation({ legacyId: 'BBB222', contentFingerprint: 'b'.repeat(64) })
+    );
+    if (!first.saved || !settled.saved) throw new Error('expected local saves');
+    await repo.acknowledge(settled.mutationId, {
+      serverVersion: 2,
+      cutoverEpoch: 1,
+      payloadFingerprint: 'd'.repeat(64),
+    });
+    await repo.pause(NAMESPACE, 'campaign-a');
+    const replacement = await repo.commit(
+      mutation({
+        legacyId: 'AAA111',
+        localRevision: 2,
+        contentFingerprint: 'c'.repeat(64),
+        payload: payload({ name: 'Ring of Warmth' }),
+      })
+    );
+    if (!replacement.saved) throw new Error('expected local save');
+
+    const byId = async () =>
+      Object.fromEntries(
+        (await repo.listOutbox(NAMESPACE, 'campaign-a')).map(entry => [
+          entry.mutationId,
+          entry,
+        ])
+      );
+    expect(await byId()).toMatchObject({
+      [first.mutationId]: { state: 'superseded' },
+      [settled.mutationId]: { state: 'acknowledged' },
+      [replacement.mutationId]: { state: 'queued' },
+    });
+
+    // Pausing again must never resurrect terminal work as pending.
+    await repo.pause(NAMESPACE, 'campaign-a');
+    const paused = await byId();
+    expect(paused[first.mutationId]).toMatchObject({ state: 'superseded' });
+    expect(paused[first.mutationId].pausedFromState).toBeUndefined();
+    expect(paused[settled.mutationId]).toMatchObject({
+      state: 'acknowledged',
+    });
+    expect(paused[settled.mutationId].pausedFromState).toBeUndefined();
+    expect(paused[replacement.mutationId]).toMatchObject({
+      state: 'paused',
+      pausedFromState: 'queued',
+    });
+
+    await repo.resume(NAMESPACE, 'campaign-a');
+    const resumed = await byId();
+    expect(resumed[first.mutationId]).toMatchObject({ state: 'superseded' });
+    expect(resumed[settled.mutationId]).toMatchObject({
+      state: 'acknowledged',
+    });
+    expect(resumed[replacement.mutationId]).toMatchObject({ state: 'queued' });
+    expect(resumed[replacement.mutationId].pausedFromState).toBeUndefined();
+  });
+
   it('never rewinds a newer document when an older acknowledgement arrives', async () => {
     const repo = repository();
     const older = await repo.commit(mutation({ legacyId: 'AAA111' }));
