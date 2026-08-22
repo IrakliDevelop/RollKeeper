@@ -124,7 +124,9 @@ export class IndexedDbMagicItemRepository {
       this.options.beforeCommit?.();
       for (const entry of pending) {
         if (
-          entry.state === 'queued' &&
+          // Under IndexedDB authority every commit pauses the outbox, so a
+          // paused predecessor must be superseded exactly like a queued one.
+          (entry.state === 'queued' || entry.state === 'paused') &&
           entry.namespace === mutation.namespace &&
           entry.campaignId === mutation.campaignId &&
           entry.legacyId === mutation.legacyId &&
@@ -329,7 +331,9 @@ export class IndexedDbMagicItemRepository {
     const document = (await requestResult(documents.get(key))) as
       | MagicItemDocument
       | undefined;
-    if (document) {
+    // A late acknowledgement of an older mutation must never rewind a document
+    // that a newer commit already replaced.
+    if (document && document.contentFingerprint === entry.contentFingerprint) {
       documents.put({
         ...document,
         baseServerVersion: acknowledgement.serverVersion,

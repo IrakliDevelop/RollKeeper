@@ -350,7 +350,7 @@ begin
   if found then if v_existing.operation<>'rollback_family' or v_existing.request_hash<>v_hash then raise exception using errcode='22023',message='mutation ID reuse mismatch'; end if; return v_existing.result; end if;
   v_preview:=public.preview_magic_item_device_enrollment(p_campaign_id);
   if v_preview->>'previewFingerprint'<>p_preview_fingerprint
-    or p_current_generation->'documents'<>private.magic_item_generation(p_campaign_id)
+    or p_current_generation->'documents' is distinct from private.magic_item_generation(p_campaign_id)
     or (p_current_generation->>'recordCount')::integer<>(v_preview->>'recordCount')::integer
   then raise exception using errcode='40001',message='verified magic item generation changed'; end if;
   if exists(select 1 from private.campaign_document_projection_outbox where campaign_id=p_campaign_id and family='magic_item' and state in ('queued','leased','retry')) then raise exception using errcode='55000',message='magic item projection journal incomplete'; end if;

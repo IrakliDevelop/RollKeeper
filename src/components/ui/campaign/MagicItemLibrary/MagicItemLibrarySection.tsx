@@ -319,10 +319,16 @@ export function MagicItemLibrarySection({
               ))}
             </div>
           )}
-
-          {campaign && <MagicItemSyncControls campaign={campaign} />}
         </div>
       )}
+
+      {/*
+        The sync controls own the autosave effect, and "Create Magic Item" stays
+        in the always-visible header, so they must mount even while the
+        persisted collapse preference hides the list. The card renders nothing
+        while the client flag is off.
+      */}
+      {campaign && <MagicItemSyncControls campaign={campaign} />}
 
       <MagicItemLibraryDialog
         open={editorOpen}

@@ -288,6 +288,9 @@ export function MagicItemSyncControls({ campaign }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const lastFingerprints = useRef<Map<string, string> | null>(null);
+  // Autosave runs are serialized: two overlapping runs could interleave their
+  // acknowledgements and rewind a document fingerprint to an older value.
+  const autosaveChain = useRef<Promise<void>>(Promise.resolve());
   const rollbackMutationId = useRef<string | null>(null);
   const recoveryInput = useRef<HTMLInputElement | null>(null);
 
@@ -423,7 +426,8 @@ export function MagicItemSyncControls({ campaign }: Props) {
     if (busy || !authority || authority.authority === 'localStorage' || !scope)
       return;
     let cancelled = false;
-    void (async () => {
+    const run = async () => {
+      if (cancelled) return;
       const byId = new Map<string, CustomMagicItem>();
       const current = new Map<string, string>();
       for (const item of items ?? []) {
@@ -529,7 +533,10 @@ export function MagicItemSyncControls({ campaign }: Props) {
       } finally {
         database.close();
       }
-    })();
+    };
+    autosaveChain.current = autosaveChain.current
+      .then(run)
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -985,71 +992,81 @@ export function MagicItemSyncControls({ campaign }: Props) {
       enrollmentPreview.epoch === undefined
     )
       return;
-    const local = await buildMagicItemManifest({
-      campaignCode: campaign.code,
-      rawEnvelope: currentRawEnvelope(),
-    });
-    if (
-      !window.confirm(
-        `Enroll this device from exact cloud preview ${enrollmentPreview.previewFingerprint.slice(0, 12)}? The local candidate is preserved and is never uploaded automatically.`
-      )
-    )
-      return;
-    const namespace = `user:${context.accountId}` as const;
-    const campaignId = workspace.cloudId;
-    const deviceKey = `rollkeeper:magic-item-device:${context.accountId}:${campaignId}`;
-    const deviceId = localStorage.getItem(deviceKey) ?? crypto.randomUUID();
-    localStorage.setItem(deviceKey, deviceId);
-    await magicItemApi({
-      action: 'enroll-device',
-      mutationId: crypto.randomUUID(),
-      campaignId,
-      deviceId,
-      expectedEpoch: enrollmentPreview.epoch,
-      previewFingerprint: enrollmentPreview.previewFingerprint,
-      legacyCandidateFingerprint: local.rawCandidates[0]?.fingerprint ?? null,
-    });
-    const database = await openRollkeeperDatabase();
+    setBusy(true);
+    setError(null);
     try {
-      const next = await enrollMagicItemCloudDevice(database, {
-        namespace,
-        campaignId,
+      const local = await buildMagicItemManifest({
         campaignCode: campaign.code,
-        deviceId,
-        epoch: enrollmentPreview.epoch,
-        confirmed: true,
-        previewFingerprint: enrollmentPreview.previewFingerprint,
-        documents: enrollmentPreview.documents.map(document => ({
-          legacyId: document.legacyId,
-          payload: document.payload ?? null,
-          payloadFingerprint: document.payloadFingerprint,
-          tombstoned: document.tombstoned === true,
-          schemaVersion: document.schemaVersion,
-          serverVersion: document.serverVersion,
-        })),
-        localCandidate: local.rawCandidates[0]
-          ? {
-              rawValue: local.rawCandidates[0].rawValue,
-              fingerprint: local.rawCandidates[0].fingerprint,
-            }
-          : null,
-        preserveDivergentCandidate: true,
-        now: () => new Date().toISOString(),
+        rawEnvelope: currentRawEnvelope(),
       });
-      setAuthority(next);
-      await context.remember(workspace);
-      writeMagicItemAuthorityMarker(localStorage, campaign.code, {
-        version: 1,
-        authority: 'postgres',
-        epoch: next.epoch,
+      if (
+        !window.confirm(
+          `Enroll this device from exact cloud preview ${enrollmentPreview.previewFingerprint.slice(0, 12)}? The local candidate is preserved and is never uploaded automatically.`
+        )
+      )
+        return;
+      const namespace = `user:${context.accountId}` as const;
+      const campaignId = workspace.cloudId;
+      const deviceKey = `rollkeeper:magic-item-device:${context.accountId}:${campaignId}`;
+      const deviceId = localStorage.getItem(deviceKey) ?? crypto.randomUUID();
+      localStorage.setItem(deviceKey, deviceId);
+      await magicItemApi({
+        action: 'enroll-device',
+        mutationId: crypto.randomUUID(),
         campaignId,
-        namespace,
+        deviceId,
+        expectedEpoch: enrollmentPreview.epoch,
+        previewFingerprint: enrollmentPreview.previewFingerprint,
+        legacyCandidateFingerprint: local.rawCandidates[0]?.fingerprint ?? null,
       });
-      setStatus(
-        'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      const database = await openRollkeeperDatabase();
+      try {
+        const next = await enrollMagicItemCloudDevice(database, {
+          namespace,
+          campaignId,
+          campaignCode: campaign.code,
+          deviceId,
+          epoch: enrollmentPreview.epoch,
+          confirmed: true,
+          previewFingerprint: enrollmentPreview.previewFingerprint,
+          documents: enrollmentPreview.documents.map(document => ({
+            legacyId: document.legacyId,
+            payload: document.payload ?? null,
+            payloadFingerprint: document.payloadFingerprint,
+            tombstoned: document.tombstoned === true,
+            schemaVersion: document.schemaVersion,
+            serverVersion: document.serverVersion,
+          })),
+          localCandidate: local.rawCandidates[0]
+            ? {
+                rawValue: local.rawCandidates[0].rawValue,
+                fingerprint: local.rawCandidates[0].fingerprint,
+              }
+            : null,
+          preserveDivergentCandidate: true,
+          now: () => new Date().toISOString(),
+        });
+        setAuthority(next);
+        await context.remember(workspace);
+        writeMagicItemAuthorityMarker(localStorage, campaign.code, {
+          version: 1,
+          authority: 'postgres',
+          epoch: next.epoch,
+          campaignId,
+          namespace,
+        });
+        setStatus(
+          'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+        );
+      } finally {
+        database.close();
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Device enrollment failed'
       );
     } finally {
-      database.close();
+      setBusy(false);
     }
   };
 
@@ -1128,39 +1145,61 @@ export function MagicItemSyncControls({ campaign }: Props) {
 
   const loadHistory = async () => {
     if (!workspace?.cloudId || !historyLegacyId) return;
-    const result = await magicItemApi<{ versions: VersionMetadata[] }>({
-      action: 'history',
-      campaignId: workspace.cloudId,
-      legacyId: historyLegacyId,
-    });
-    setVersions(result.versions);
+    setError(null);
+    try {
+      const result = await magicItemApi<{ versions: VersionMetadata[] }>({
+        action: 'history',
+        campaignId: workspace.cloudId,
+        legacyId: historyLegacyId,
+      });
+      setVersions(result.versions);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'History load failed');
+    }
   };
 
   const exportVersion = async (serverVersion: number) => {
     if (!workspace?.cloudId || !historyLegacyId) return;
-    const value = await magicItemApi({
-      action: 'export-version',
-      campaignId: workspace.cloudId,
-      legacyId: historyLegacyId,
-      serverVersion,
-    });
-    downloadJson(`magic-item-${historyLegacyId}-v${serverVersion}.json`, value);
+    setError(null);
+    try {
+      const value = await magicItemApi({
+        action: 'export-version',
+        campaignId: workspace.cloudId,
+        legacyId: historyLegacyId,
+        serverVersion,
+      });
+      downloadJson(
+        `magic-item-${historyLegacyId}-v${serverVersion}.json`,
+        value
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Version export failed'
+      );
+    }
   };
 
   const compareLatestVersions = async () => {
     if (!workspace?.cloudId || !historyLegacyId || versions.length < 2) return;
-    const result = await magicItemApi<{ identical: boolean }>({
-      action: 'compare-versions',
-      campaignId: workspace.cloudId,
-      legacyId: historyLegacyId,
-      leftVersion: versions[1].serverVersion,
-      rightVersion: versions[0].serverVersion,
-    });
-    setComparison(
-      result.identical
-        ? 'The selected versions are byte-identical.'
-        : 'The selected versions differ. Export each exact version to inspect payloads.'
-    );
+    setError(null);
+    try {
+      const result = await magicItemApi<{ identical: boolean }>({
+        action: 'compare-versions',
+        campaignId: workspace.cloudId,
+        legacyId: historyLegacyId,
+        leftVersion: versions[1].serverVersion,
+        rightVersion: versions[0].serverVersion,
+      });
+      setComparison(
+        result.identical
+          ? 'The selected versions are byte-identical.'
+          : 'The selected versions differ. Export each exact version to inspect payloads.'
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Version comparison failed'
+      );
+    }
   };
 
   const restoreVersion = async (sourceVersion: number) => {
@@ -1178,59 +1217,69 @@ export function MagicItemSyncControls({ campaign }: Props) {
       )
     )
       return;
-    const namespace = `user:${context.accountId}` as const;
-    const campaignId = workspace.cloudId;
-    const restored = await magicItemApi<{
-      serverVersion: number;
-      cutoverEpoch: number;
-      payloadFingerprint: string;
-    }>({
-      action: 'restore-version',
-      mutationId: crypto.randomUUID(),
-      campaignId,
-      expectedEpoch: authority.epoch,
-      legacyId: historyLegacyId,
-      sourceVersion,
-      expectedServerVersion: versions[0].serverVersion,
-    });
-    const exact = await magicItemApi<VersionExport>({
-      action: 'export-version',
-      campaignId,
-      legacyId: historyLegacyId,
-      serverVersion: restored.serverVersion,
-    });
-    const database = await openRollkeeperDatabase();
+    setBusy(true);
+    setError(null);
     try {
-      const repository = new IndexedDbMagicItemRepository(database);
-      await repository.applyAcceptedCloudVersion({
-        namespace,
+      const namespace = `user:${context.accountId}` as const;
+      const campaignId = workspace.cloudId;
+      const restored = await magicItemApi<{
+        serverVersion: number;
+        cutoverEpoch: number;
+        payloadFingerprint: string;
+      }>({
+        action: 'restore-version',
+        mutationId: crypto.randomUUID(),
+        campaignId,
+        expectedEpoch: authority.epoch,
+        legacyId: historyLegacyId,
+        sourceVersion,
+        expectedServerVersion: versions[0].serverVersion,
+      });
+      const exact = await magicItemApi<VersionExport>({
+        action: 'export-version',
         campaignId,
         legacyId: historyLegacyId,
-        cutoverEpoch: restored.cutoverEpoch,
-        serverVersion: exact.serverVersion,
-        schemaVersion: exact.schemaVersion,
-        payload: exact.payload,
-        payloadFingerprint: exact.payloadFingerprint,
-        tombstoned: exact.tombstoned,
-        acceptedAt: new Date().toISOString(),
+        serverVersion: restored.serverVersion,
       });
-      const documents = await repository.listDocuments(namespace, campaignId);
-      applyMagicItemDocuments(
-        campaign.code,
-        storeDocumentsFromLocal(documents)
+      const database = await openRollkeeperDatabase();
+      try {
+        const repository = new IndexedDbMagicItemRepository(database);
+        await repository.applyAcceptedCloudVersion({
+          namespace,
+          campaignId,
+          legacyId: historyLegacyId,
+          cutoverEpoch: restored.cutoverEpoch,
+          serverVersion: exact.serverVersion,
+          schemaVersion: exact.schemaVersion,
+          payload: exact.payload,
+          payloadFingerprint: exact.payloadFingerprint,
+          tombstoned: exact.tombstoned,
+          acceptedAt: new Date().toISOString(),
+        });
+        const documents = await repository.listDocuments(namespace, campaignId);
+        applyMagicItemDocuments(
+          campaign.code,
+          storeDocumentsFromLocal(documents)
+        );
+        lastFingerprints.current = new Map(
+          documents
+            .filter(document => document.operation !== 'delete')
+            .map(document => [document.legacyId, document.contentFingerprint])
+        );
+      } finally {
+        database.close();
+      }
+      setStatus(
+        `Cloud: saved as version ${restored.serverVersion} · Player view: not applicable`
       );
-      lastFingerprints.current = new Map(
-        documents
-          .filter(document => document.operation !== 'delete')
-          .map(document => [document.legacyId, document.contentFingerprint])
+      await loadHistory();
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Version restore failed'
       );
     } finally {
-      database.close();
+      setBusy(false);
     }
-    setStatus(
-      `Cloud: saved as version ${restored.serverVersion} · Player view: not applicable`
-    );
-    await loadHistory();
   };
 
   const rollback = async () => {
@@ -1332,48 +1381,61 @@ export function MagicItemSyncControls({ campaign }: Props) {
       )
     )
       return;
-    const namespace = `user:${context.accountId}` as const;
-    const database = await openRollkeeperDatabase();
+    setBusy(true);
+    setError(null);
     try {
-      const repository = new IndexedDbMagicItemRepository(database);
-      const unresolved = (
-        await repository.listOutbox(namespace, workspace.cloudId)
-      ).some(
-        entry => entry.state !== 'acknowledged' && entry.state !== 'superseded'
-      );
-      const lossConfirmed =
-        !unresolved ||
-        window.confirm(
-          'Unresolved device-only work will become inaccessible on this device. Confirm the described loss risk?'
+      const namespace = `user:${context.accountId}` as const;
+      const database = await openRollkeeperDatabase();
+      try {
+        const repository = new IndexedDbMagicItemRepository(database);
+        const unresolved = (
+          await repository.listOutbox(namespace, workspace.cloudId)
+        ).some(
+          entry =>
+            entry.state !== 'acknowledged' && entry.state !== 'superseded'
         );
-      if (!lossConfirmed) return;
-      if (authority.authority === 'postgres') {
-        const deviceId = localStorage.getItem(
-          `rollkeeper:magic-item-device:${context.accountId}:${workspace.cloudId}`
-        );
-        if (!deviceId)
-          throw new Error('The exact enrolled device identity is unavailable.');
-        await magicItemApi({
-          action: 'remove-device',
-          mutationId: crypto.randomUUID(),
-          campaignId: workspace.cloudId,
-          deviceId,
-          expectedEpoch: authority.epoch,
+        const lossConfirmed =
+          !unresolved ||
+          window.confirm(
+            'Unresolved device-only work will become inaccessible on this device. Confirm the described loss risk?'
+          );
+        if (!lossConfirmed) return;
+        if (authority.authority === 'postgres') {
+          const deviceId = localStorage.getItem(
+            `rollkeeper:magic-item-device:${context.accountId}:${workspace.cloudId}`
+          );
+          if (!deviceId)
+            throw new Error(
+              'The exact enrolled device identity is unavailable.'
+            );
+          await magicItemApi({
+            action: 'remove-device',
+            mutationId: crypto.randomUUID(),
+            campaignId: workspace.cloudId,
+            deviceId,
+            expectedEpoch: authority.epoch,
+          });
+        }
+        await repository.removeAccountFromDevice(namespace, {
+          confirmed: true,
+          lossConfirmed,
         });
+        hideMagicItems(campaign.code);
+        lastFingerprints.current = null;
+        setScope(null);
+        setAuthority(null);
+        setStatus(
+          'Only the selected account namespace was hidden; cloud, history, legacy, conflicts, and outboxes were preserved.'
+        );
+      } finally {
+        database.close();
       }
-      await repository.removeAccountFromDevice(namespace, {
-        confirmed: true,
-        lossConfirmed,
-      });
-      hideMagicItems(campaign.code);
-      lastFingerprints.current = null;
-      setScope(null);
-      setAuthority(null);
-      setStatus(
-        'Only the selected account namespace was hidden; cloud, history, legacy, conflicts, and outboxes were preserved.'
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Account removal failed'
       );
     } finally {
-      database.close();
+      setBusy(false);
     }
   };
 

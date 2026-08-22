@@ -1,6 +1,6 @@
 begin;
 
-select plan(35);
+select plan(42);
 
 select ok(has_function_privilege('authenticated','public.begin_magic_item_staging(uuid,uuid,uuid,bigint,text,text,text,integer,bigint)','EXECUTE'),'owner can begin magic item staging');
 select ok(not has_function_privilege('anon','public.begin_magic_item_staging(uuid,uuid,uuid,bigint,text,text,text,integer,bigint)','EXECUTE'),'anon cannot stage magic items');
@@ -167,6 +167,78 @@ select is((select count(*) from public.campaign_documents where family='magic_it
 reset role;
 select is((select authority from public.campaign_authority_records where campaign_id=(select (result->>'campaignId')::uuid from magic_workspace) and axis='durable_family' and family='calendar'),'legacy','magic item mutations never move calendar authority');
 select is((select authority from public.campaign_authority_records where campaign_id=(select (result->>'campaignId')::uuid from magic_workspace) and axis='durable_family' and family='campaign_settings'),'legacy','magic item mutations never move settings authority');
+
+-- A local deletion made between local cutover and cloud activation must reach
+-- the cloud as an explicit version-1 tombstone during the very first staging.
+reset role;
+create temporary table magic_tombstone_stage as
+select 'magic-ghost'::text as legacy_id,
+  private.campaign_document_hash(pg_catalog.jsonb_build_object('legacyId','magic-ghost','tombstoned',true)) as fingerprint,
+  pg_catalog.octet_length(pg_catalog.convert_to(private.canonical_campaign_document_json(pg_catalog.jsonb_build_object('legacyId','magic-ghost','tombstoned',true)),'UTF8')) as bytes;
+grant select on magic_tombstone_stage to authenticated;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
+create temporary table magic_tombstone_workspace as
+select public.create_campaign_workspace(
+  'c1000000-0000-4000-8000-000000000002','Magic tombstone staging','new_workspace',null
+) as result;
+grant select on magic_tombstone_workspace to authenticated;
+create temporary table magic_tombstone_run as
+select public.begin_magic_item_staging(
+  'c2000000-0000-4000-8000-000000000020',(select (result->>'campaignId')::uuid from magic_tombstone_workspace),
+  'c3000000-0000-4000-8000-000000000002',0,repeat('c',64),repeat('d',64),repeat('d',64),1,(select bytes from magic_tombstone_stage)
+) as result;
+grant select on magic_tombstone_run to authenticated;
+select is(
+  public.stage_magic_item_items(
+    'c2000000-0000-4000-8000-000000000021',(select (result->>'runId')::uuid from magic_tombstone_run),
+    pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object(
+      'legacyId',(select legacy_id from magic_tombstone_stage),'schemaVersion',1,'payload',null,
+      'payloadFingerprint',(select fingerprint from magic_tombstone_stage),'tombstoned',true
+    ))
+  )->>'state','validated','a staged tombstone validates against its tombstone fingerprint'
+);
+select is(
+  public.confirm_magic_item_cutover('c2000000-0000-4000-8000-000000000022',(select (result->>'runId')::uuid from magic_tombstone_run),repeat('c',64),0)->>'recordCount',
+  '1','a tombstone-only manifest confirms its whole staged generation'
+);
+
+reset role;
+select is(
+  (select tombstoned from public.campaign_documents where family='magic_item' and legacy_id='magic-ghost' and campaign_id=(select (result->>'campaignId')::uuid from magic_tombstone_workspace)),
+  true,'the staged tombstone reaches the cloud as a tombstoned current row'
+);
+select is(
+  (select server_version from private.campaign_document_versions where family='magic_item' and legacy_id='magic-ghost' and campaign_id=(select (result->>'campaignId')::uuid from magic_tombstone_workspace)),
+  1::bigint,'the staged tombstone is durable as an immutable version 1'
+);
+
+-- An owner whose library is empty must still be able to activate the family.
+set local role authenticated;
+select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
+create temporary table magic_empty_workspace as
+select public.create_campaign_workspace(
+  'c1000000-0000-4000-8000-000000000003','Magic empty staging','new_workspace',null
+) as result;
+grant select on magic_empty_workspace to authenticated;
+create temporary table magic_empty_run as
+select public.begin_magic_item_staging(
+  'c2000000-0000-4000-8000-000000000030',(select (result->>'campaignId')::uuid from magic_empty_workspace),
+  'c3000000-0000-4000-8000-000000000003',0,repeat('e',64),repeat('f',64),repeat('f',64),0,0
+) as result;
+grant select on magic_empty_run to authenticated;
+select is(
+  public.stage_magic_item_items('c2000000-0000-4000-8000-000000000031',(select (result->>'runId')::uuid from magic_empty_run),'[]'::jsonb)->>'state',
+  'validated','an empty magic item library stages as a complete zero-record generation'
+);
+create temporary table magic_empty_cutover as
+select public.confirm_magic_item_cutover('c2000000-0000-4000-8000-000000000032',(select (result->>'runId')::uuid from magic_empty_run),repeat('e',64),0) as result;
+grant select on magic_empty_cutover to authenticated;
+select is(result->>'recordCount','0','a zero-record run confirms without any staged document') from magic_empty_cutover;
+select is(result->>'authority','postgres','a zero-record cutover still activates only magic item authority') from magic_empty_cutover;
+
+reset role;
 
 select * from finish();
 rollback;
