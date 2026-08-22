@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { createMagicItemAwareStorage } from '@/lib/durableDm/magicItemAwareStorage';
 import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { createSafeStorage } from '@/lib/safeStorage';
 import type { CustomMagicItem } from '@/types/magicItemLibrary';
@@ -23,8 +24,8 @@ interface MagicItemLibraryState {
   duplicateItem: (campaignCode: string, id: string) => void;
 }
 
-const makeId = () =>
-  `magic-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+/** A cross-device stable identity, so cloud documents keep one legacy ID. */
+const makeId = () => `magic-${crypto.randomUUID()}`;
 
 export const useMagicItemLibraryStore = create<MagicItemLibraryState>()(
   persist(
@@ -104,7 +105,11 @@ export const useMagicItemLibraryStore = create<MagicItemLibraryState>()(
     {
       name: 'rollkeeper-dm-magic-item-library',
       skipHydration: isIndexedDbMigrationEnabled(),
-      storage: createJSONStorage(() => createSafeStorage()),
+      storage: createJSONStorage(() =>
+        typeof localStorage === 'undefined'
+          ? createSafeStorage()
+          : createMagicItemAwareStorage(localStorage)
+      ),
       version: 1,
     }
   )

@@ -15,6 +15,7 @@ const ITEM = {
 
 describe('magicItemLibraryStore', () => {
   beforeEach(() => {
+    localStorage.clear();
     useMagicItemLibraryStore.setState({ itemsByCampaign: {} });
   });
 
@@ -42,5 +43,22 @@ describe('magicItemLibraryStore', () => {
     expect(useMagicItemLibraryStore.getState().getItems('AAA111')).toHaveLength(
       1
     );
+  });
+
+  it('mints cross-device stable ids and persists the versioned envelope', () => {
+    const id = useMagicItemLibraryStore.getState().createItem('AAA111', ITEM);
+    expect(id).toMatch(/^magic-[0-9a-f-]{36}$/);
+
+    const persisted = JSON.parse(
+      localStorage.getItem('rollkeeper-dm-magic-item-library')!
+    );
+    expect(persisted.version).toBe(1);
+    expect(Object.keys(persisted.state)).toEqual(['itemsByCampaign']);
+    expect(persisted.state.itemsByCampaign.AAA111).toHaveLength(1);
+    expect(persisted.state.itemsByCampaign.AAA111[0]).toMatchObject({
+      id,
+      campaignCode: 'AAA111',
+      name: ITEM.name,
+    });
   });
 });
