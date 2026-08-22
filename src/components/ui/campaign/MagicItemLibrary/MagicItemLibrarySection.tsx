@@ -42,6 +42,7 @@ import type { CampaignNPC } from '@/types/encounter';
 import type { CustomMagicItem } from '@/types/magicItemLibrary';
 import type { SendItemTarget } from '../SendItemDialog';
 import { MagicItemLibraryDialog } from './MagicItemLibraryDialog';
+import { MagicItemSyncControls } from './MagicItemSyncControls';
 
 const EMPTY_MAGIC_ITEMS: CustomMagicItem[] = [];
 const EMPTY_NPCS: CampaignNPC[] = [];
@@ -318,6 +319,8 @@ export function MagicItemLibrarySection({
               ))}
             </div>
           )}
+
+          {campaign && <MagicItemSyncControls campaign={campaign} />}
         </div>
       )}
 
