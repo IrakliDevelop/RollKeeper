@@ -44,8 +44,8 @@ async function persistManifest(
         legacyId: options.campaignCode,
         kind: 'candidate-blocker',
         blockers: structuredClone(manifest.blockers),
-        rawValue: manifest.rawCandidates[0]?.rawValue ?? '',
-        rawFingerprint: manifest.rawCandidates[0]?.fingerprint ?? null,
+        rawValue: manifest.rawCandidates[0].rawValue,
+        rawFingerprint: manifest.rawCandidates[0].fingerprint,
         resolutionState: 'unresolved',
         detectedAt: options.now(),
       });

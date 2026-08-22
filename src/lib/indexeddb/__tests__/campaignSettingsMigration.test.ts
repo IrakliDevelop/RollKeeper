@@ -155,4 +155,25 @@ describe('campaign_settings Slice 7 preparation', () => {
     await transactionComplete(transaction);
     database.close();
   });
+
+  it('blocks a missing legacy envelope without manufacturing defaults', async () => {
+    const result = await runCampaignSettingsIndexedDbMigration({
+      factory: indexedDB,
+      storage: localStorage,
+      namespace: 'user:account-a',
+      campaignId: 'campaign-a',
+      campaignCode: 'AAA111',
+      runId: 'missing-envelope',
+      ownerId: 'tab-a',
+      now: () => 'now',
+      nowMs: () => 1,
+      recoveryGate: { hasDownloadReceipt: vi.fn().mockResolvedValue(true) },
+    });
+
+    expect(result).toMatchObject({
+      state: 'BLOCKED',
+      authority: 'localStorage',
+    });
+    expect(localStorage.getItem('rollkeeper-dm-data')).toBeNull();
+  });
 });
