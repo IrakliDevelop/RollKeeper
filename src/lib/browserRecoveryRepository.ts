@@ -74,6 +74,43 @@ export class BrowserRecoveryRepository {
     }
   }
 
+  async verifyDownloadReceipt(receipt: {
+    runId: string;
+    manifestHash: string;
+    verifiedAt: string;
+  }): Promise<void> {
+    const database = await openDatabase();
+    try {
+      const transaction = database.transaction(RECEIPTS_STORE, 'readwrite');
+      const store = transaction.objectStore(RECEIPTS_STORE);
+      const initiated = await requestResult<
+        RecoveryDownloadReceipt | undefined
+      >(store.get(receipt.manifestHash));
+      if (!initiated || initiated.runId !== receipt.runId) {
+        transaction.abort();
+        throw new Error('A matching initiated recovery download is required');
+      }
+      store.put({ ...initiated, verifiedAt: receipt.verifiedAt });
+      await transactionComplete(transaction);
+    } finally {
+      database.close();
+    }
+  }
+
+  async hasVerifiedDownloadReceipt(manifestHash: string): Promise<boolean> {
+    const database = await openDatabase();
+    try {
+      const transaction = database.transaction(RECEIPTS_STORE, 'readonly');
+      const receipt = await requestResult<RecoveryDownloadReceipt | undefined>(
+        transaction.objectStore(RECEIPTS_STORE).get(manifestHash)
+      );
+      await transactionComplete(transaction);
+      return typeof receipt?.verifiedAt === 'string';
+    } finally {
+      database.close();
+    }
+  }
+
   async stageGeneration(generation: StagedRecoveryGeneration): Promise<void> {
     const database = await openDatabase();
     try {

@@ -8,6 +8,7 @@ import {
   History,
   RotateCcw,
   ShieldCheck,
+  Upload,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
@@ -39,6 +40,7 @@ import {
   captureDeviceBackup,
   initiateDeviceBackupDownload,
   type DeviceBackupV1,
+  verifyDownloadedDeviceBackup,
 } from '@/lib/deviceRecovery';
 import {
   commitCalendarLocalCutover,
@@ -52,6 +54,7 @@ import { runCalendarIndexedDbMigration } from '@/lib/indexeddb/calendarMigration
 import { IndexedDbCalendarRepository } from '@/lib/indexeddb/calendarRepository';
 import {
   hasCalendarSelection,
+  readCalendarSelection,
   selectCalendar,
 } from '@/lib/indexeddb/calendarSelection';
 import { openRollkeeperDatabase } from '@/lib/indexeddb/localDatabase';
@@ -165,6 +168,8 @@ export function CalendarSyncControls({ campaign }: Props) {
   const [workspace, setWorkspace] = useState<DmWorkspaceDocument | null>(null);
   const [manifest, setManifest] = useState<CalendarManifest | null>(null);
   const [recovery, setRecovery] = useState<DeviceBackupV1 | null>(null);
+  const [recoveryVerified, setRecoveryVerified] = useState(false);
+  const [calendarSelected, setCalendarSelected] = useState(false);
   const [preparedGeneration, setPreparedGeneration] = useState<string | null>(
     null
   );
@@ -183,6 +188,7 @@ export function CalendarSyncControls({ campaign }: Props) {
   const [busy, setBusy] = useState(false);
   const lastFingerprint = useRef<string | null>(null);
   const rollbackMutationId = useRef<string | null>(null);
+  const recoveryInput = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const marker = readCalendarProjectionAuthority(localStorage, campaign.code);
@@ -444,6 +450,9 @@ export function CalendarSyncControls({ campaign }: Props) {
       });
       setManifest(nextManifest);
       setRecovery(nextRecovery);
+      setRecoveryVerified(false);
+      setCalendarSelected(false);
+      setPreparedGeneration(null);
       setStatus(
         'Exact preview created. No authority or storage pointer changed.'
       );
@@ -454,29 +463,72 @@ export function CalendarSyncControls({ campaign }: Props) {
     }
   };
 
-  const downloadAndSelect = async () => {
-    if (!context || !workspace?.cloudId || !recovery || !manifest) return;
-    await initiateDeviceBackupDownload(recovery, browserRecoveryRepository);
-    if (
-      !window.confirm(
-        `Recovery download initiated. Select only calendar for ${campaign.name}? This does not cut over local or cloud authority.`
-      )
-    ) {
-      setStatus('Recovery downloaded; family selection was cancelled.');
-      return;
+  const downloadRecovery = async () => {
+    if (!recovery) return;
+    setError(null);
+    try {
+      await initiateDeviceBackupDownload(recovery, browserRecoveryRepository);
+      setRecoveryVerified(false);
+      setCalendarSelected(false);
+      setStatus(
+        'Recovery download initiated. Reopen that file here before selection.'
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : 'Recovery download failed'
+      );
     }
-    selectCalendar(localStorage, {
-      namespace: `user:${context.accountId}`,
-      campaignId: workspace.cloudId,
-      confirmed: true,
-      recovery: {
-        runId: recovery.runId,
-        manifestHash: recovery.manifestHash,
-        createdAt: recovery.createdAt,
-      },
-      now: () => new Date().toISOString(),
-    });
-    setStatus('calendar selected. LocalStorage remains authoritative.');
+  };
+
+  const verifyRecoveryAndSelect = async (file: File) => {
+    if (!context || !workspace?.cloudId || !recovery || !manifest) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await verifyDownloadedDeviceBackup(
+        await file.text(),
+        recovery,
+        browserRecoveryRepository
+      );
+      setRecoveryVerified(true);
+      if (
+        !window.confirm(
+          `Recovery file verified. Select only calendar for ${campaign.name}? This does not cut over local or cloud authority.`
+        )
+      ) {
+        setCalendarSelected(false);
+        setStatus(
+          'Recovery file verified; family selection was cancelled and cutover remains blocked.'
+        );
+        return;
+      }
+      selectCalendar(localStorage, {
+        namespace: `user:${context.accountId}`,
+        campaignId: workspace.cloudId,
+        confirmed: true,
+        recovery: {
+          runId: recovery.runId,
+          manifestHash: recovery.manifestHash,
+          createdAt: recovery.createdAt,
+        },
+        now: () => new Date().toISOString(),
+      });
+      setCalendarSelected(true);
+      setStatus(
+        'Recovery file verified and calendar selected. LocalStorage remains authoritative.'
+      );
+    } catch (cause) {
+      setRecoveryVerified(false);
+      setCalendarSelected(false);
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Recovery file verification failed'
+      );
+    } finally {
+      setBusy(false);
+      if (recoveryInput.current) recoveryInput.current.value = '';
+    }
   };
 
   const prepare = async () => {
@@ -491,7 +543,22 @@ export function CalendarSyncControls({ campaign }: Props) {
         )
       ) {
         throw new Error(
-          'Download recovery and explicitly select the family first.'
+          'Verify the downloaded recovery and explicitly select the family first.'
+        );
+      }
+      const selection = readCalendarSelection(
+        localStorage,
+        `user:${context.accountId}`,
+        workspace.cloudId
+      );
+      if (
+        !recoveryVerified ||
+        !selection ||
+        selection.recovery.runId !== recovery.runId ||
+        selection.recovery.manifestHash !== recovery.manifestHash
+      ) {
+        throw new Error(
+          'The current preview requires its exact downloaded recovery file to be verified.'
         );
       }
       const runId = `calendar-${crypto.randomUUID()}`;
@@ -506,7 +573,10 @@ export function CalendarSyncControls({ campaign }: Props) {
         now: () => new Date().toISOString(),
         nowMs: () => Date.now(),
         requiredRecoveryManifestHash: recovery.manifestHash,
-        recoveryGate: browserRecoveryRepository,
+        recoveryGate: {
+          hasDownloadReceipt: manifestHash =>
+            browserRecoveryRepository.hasVerifiedDownloadReceipt(manifestHash),
+        },
       });
       setManifest(result.manifest);
       if (result.state !== 'CUTOVER_READY') {
@@ -1222,13 +1292,41 @@ export function CalendarSyncControls({ campaign }: Props) {
               <Button
                 variant="warning"
                 leftIcon={<Download size={16} />}
-                onClick={downloadAndSelect}
+                onClick={downloadRecovery}
               >
-                Download recovery and select
+                Download recovery file
               </Button>
             )}
+            {manifest && recovery && (
+              <>
+                <Button
+                  variant="outline"
+                  leftIcon={<Upload size={16} />}
+                  onClick={() => recoveryInput.current?.click()}
+                  disabled={busy}
+                >
+                  Verify recovery file and select
+                </Button>
+                <input
+                  ref={recoveryInput}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  aria-label="Downloaded calendar recovery file"
+                  onChange={event => {
+                    const file = event.target.files?.[0];
+                    if (file) void verifyRecoveryAndSelect(file);
+                  }}
+                />
+              </>
+            )}
             {recovery && (
-              <Button variant="outline" onClick={prepare} loading={busy}>
+              <Button
+                variant="outline"
+                onClick={prepare}
+                loading={busy}
+                disabled={!recoveryVerified || !calendarSelected}
+              >
                 Prepare IndexedDB
               </Button>
             )}

@@ -92,5 +92,58 @@ describe('CalendarSyncControls gates', () => {
       ).toBeVisible()
     );
     expect(open).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Preview exact manifest' })
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Download recovery file' })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Verify recovery file and select' })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Prepare IndexedDB' })
+    ).toBeDisabled();
+
+    const createObjectURL = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:calendar-recovery');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
+      () => undefined
+    );
+    vi.spyOn(window, 'confirm')
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Download recovery file' })
+    );
+    await screen.findByText(/Reopen that file here before selection/);
+    const downloadedBlob = createObjectURL.mock.calls[0]![0] as Blob;
+    const recoveryFile = new File(
+      [await downloadedBlob.text()],
+      'calendar-backup.json',
+      { type: 'application/json' }
+    );
+    fireEvent.change(
+      screen.getByLabelText('Downloaded calendar recovery file'),
+      {
+        target: { files: [recoveryFile] },
+      }
+    );
+    await screen.findByText(/family selection was cancelled/);
+    expect(
+      screen.getByRole('button', { name: 'Prepare IndexedDB' })
+    ).toBeDisabled();
+    fireEvent.change(
+      screen.getByLabelText('Downloaded calendar recovery file'),
+      { target: { files: [recoveryFile] } }
+    );
+    await screen.findByText(
+      'Recovery file verified and calendar selected. LocalStorage remains authoritative.'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Prepare IndexedDB' })
+    ).toBeEnabled();
   });
 });
