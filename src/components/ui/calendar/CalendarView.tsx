@@ -162,7 +162,7 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
       {/* Time display + controls */}
       <Card>
         <CardContent className="space-y-4 p-6">
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <TimeDisplay
               date={date}
               config={config}
@@ -177,8 +177,8 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
                 setCalendarTime(campaignCode, newTime);
               }}
             />
-            <div className="flex flex-col items-end gap-2">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col items-start gap-2 sm:items-end">
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 <Button
                   variant="ghost"
                   size="sm"

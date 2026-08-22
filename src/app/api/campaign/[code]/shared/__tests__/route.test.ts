@@ -1,4 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const { calendarWriteAllowed } = vi.hoisted(() => ({
+  calendarWriteAllowed: vi.fn().mockResolvedValue(true),
+}));
+vi.mock('@/lib/supabase/calendarServer', () => ({
+  calendarProjectionWriteAllowed: calendarWriteAllowed,
+}));
 import { resetRedis, seedRedis, getRedisStore } from '@/test/mocks/redis';
 import {
   createNextRequest,
@@ -28,6 +35,11 @@ const campaignEffectsKey = (code: string, playerId: string) =>
 const campaignTransfersKey = (code: string, playerId: string) =>
   `campaign:${code}:transfers:${playerId}`;
 const campaignKey = (code: string) => `campaign:${code}`;
+
+beforeEach(() => {
+  calendarWriteAllowed.mockReset();
+  calendarWriteAllowed.mockResolvedValue(true);
+});
 
 // ---------------------------------------------------------------------------
 // Fixture builders
@@ -147,6 +159,38 @@ describe('GET /api/campaign/[code]/shared', () => {
 
     expect(data.calendar).not.toBeNull();
     expect(data.calendar!.config.moons).toEqual([]);
+  });
+
+  it('returns only the server-allowlisted calendar projection to players and guests', async () => {
+    seedRedis(campaignSharedKey('TEST', 'calendar'), {
+      ...makeCalendar(1),
+      codecVersion: 1,
+      events: [
+        {
+          id: 'public',
+          title: 'Festival',
+          description: 'Known',
+          year: 1,
+          month: 0,
+          day: 1,
+          visibility: 'public',
+        },
+      ],
+    });
+
+    const req = new NextRequest(
+      'http://localhost/api/campaign/TEST/shared?role=player&playerId=player-1'
+    );
+    const res = await GET(req, createRouteParams({ code: 'TEST' }));
+    const data: SharedCampaignState = await res.json();
+
+    expect(data.calendar?.codecVersion).toBe(1);
+    expect(data.calendar?.config.moons).toHaveLength(1);
+    expect(data.calendar?.events).toEqual([
+      expect.objectContaining({ id: 'public', visibility: 'public' }),
+    ]);
+    expect(JSON.stringify(data.calendar)).not.toContain('createdAt');
+    expect(JSON.stringify(data.calendar)).not.toContain('private');
   });
 
   it('returns full calendar (with moons) for DM role', async () => {
@@ -352,6 +396,29 @@ describe('POST /api/campaign/[code]/shared', () => {
     expect(stored).toBeDefined();
     const parsed = JSON.parse(stored!);
     expect(parsed.config.moons).toHaveLength(1);
+  });
+
+  it('rejects browser calendar projection writes after cloud authority activation', async () => {
+    seedRedis(campaignKey('TEST'), createMockCampaignData());
+    calendarWriteAllowed.mockResolvedValueOnce(false);
+    const req = createNextRequest('/api/campaign/TEST/shared', {
+      method: 'POST',
+      body: {
+        feature: 'calendar',
+        data: makeCalendar(),
+        dmId: 'dm-test-123',
+      },
+    });
+
+    const res = await POST(
+      req as NextRequest,
+      createRouteParams({ code: 'TEST' })
+    );
+
+    expect(res.status).toBe(409);
+    expect(getRedisStore().has(campaignSharedKey('TEST', 'calendar'))).toBe(
+      false
+    );
   });
 
   it('sends a DM message to multiple players', async () => {

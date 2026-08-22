@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useCalendarStore } from '@/store/calendarStore';
 import type { SharedCalendar } from '@/types/sharedState';
+import { legacyCalendarProjectionAllowed } from '@/lib/durableDm/calendarLegacyProjection';
 
 const DEBOUNCE_MS = 2000;
 
@@ -72,6 +73,12 @@ export function useDmCalendarSync(
   );
 
   useEffect(() => {
+    if (
+      typeof localStorage !== 'undefined' &&
+      !legacyCalendarProjectionAllowed(localStorage, campaignCode)
+    ) {
+      return;
+    }
     const debouncedPush = (calendar: {
       config: SharedCalendar['config'];
       currentTime: number;

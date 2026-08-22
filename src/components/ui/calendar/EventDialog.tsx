@@ -52,6 +52,9 @@ export function EventDialog({
   const [markerMode, setMarkerMode] = useState<MarkerMode>('dot');
   const [markerColor, setMarkerColor] = useState(DEFAULT_EVENT_COLOR);
   const [markerEmoji, setMarkerEmoji] = useState<string | null>(null);
+  const [visibility, setVisibility] = useState<
+    'private' | 'public' | 'discovered'
+  >('private');
 
   const isEdit = !!event;
 
@@ -71,6 +74,7 @@ export function EventDialog({
         setDay(defaultDate.day);
       }
       setConfirmDelete(false);
+      setVisibility(event?.visibility ?? 'private');
 
       if (event?.emoji) {
         setMarkerMode('emoji');
@@ -106,6 +110,7 @@ export function EventDialog({
       year,
       month,
       day,
+      visibility,
       ...(markerMode === 'emoji'
         ? { emoji: markerEmoji ?? undefined, color: undefined }
         : { color: markerColor, emoji: undefined }),
@@ -177,6 +182,18 @@ export function EventDialog({
             onColorChange={setMarkerColor}
             onEmojiChange={setMarkerEmoji}
           />
+
+          <SelectField
+            label="Player visibility"
+            value={visibility}
+            onValueChange={value =>
+              setVisibility(value as 'private' | 'public' | 'discovered')
+            }
+          >
+            <SelectItem value="private">Private (DM only)</SelectItem>
+            <SelectItem value="public">Public</SelectItem>
+            <SelectItem value="discovered">Discovered</SelectItem>
+          </SelectField>
 
           <div>
             <label className="text-body mb-1 block text-sm font-medium">

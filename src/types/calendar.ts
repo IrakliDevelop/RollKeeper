@@ -72,6 +72,15 @@ export interface CalendarEvent {
   createdAt: number; // timestamp for ordering
   color?: string; // hex '#rrggbb' dot marker color
   emoji?: string; // emoji marker; takes precedence over color
+  visibility?: CalendarEventVisibility; // legacy absence is private
+  references?: CalendarEventReference[];
+}
+
+export type CalendarEventVisibility = 'private' | 'public' | 'discovered';
+
+export interface CalendarEventReference {
+  family: 'location' | 'encounter_definition';
+  legacyId: string;
 }
 
 // Shared save payload for event create/update dialogs
