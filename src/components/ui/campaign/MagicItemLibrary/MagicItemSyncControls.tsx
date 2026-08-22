@@ -74,6 +74,7 @@ import {
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 import type { CampaignInfo } from '@/types/campaign';
+import type { CustomMagicItem } from '@/types/magicItemLibrary';
 import { APP_VERSION } from '@/utils/constants';
 import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
 
@@ -129,6 +130,76 @@ const CLOUD_OUTCOME_SEVERITY = {
 } as const;
 
 type CloudOutcome = keyof typeof CLOUD_OUTCOME_SEVERITY;
+
+export interface MagicItemMutationPlan {
+  upserts: string[];
+  deletes: string[];
+}
+
+export type MagicItemCommitOutcome =
+  | { saved: true; cloud: CloudOutcome | null }
+  | { saved: false; error: string };
+
+/** Diffs the last acknowledged baseline against the live library fingerprints. */
+export function planMagicItemMutations(
+  last: ReadonlyMap<string, string>,
+  current: ReadonlyMap<string, string>
+): MagicItemMutationPlan {
+  const upserts: string[] = [];
+  const deletes: string[] = [];
+  for (const [legacyId, fingerprint] of current) {
+    if (last.get(legacyId) !== fingerprint) upserts.push(legacyId);
+  }
+  for (const legacyId of last.keys()) {
+    if (!current.has(legacyId)) deletes.push(legacyId);
+  }
+  return { upserts, deletes };
+}
+
+/**
+ * Commits a plan one document at a time. The baseline advances only for a
+ * mutation that is durably local (IndexedDB document plus outbox entry), so a
+ * failure leaves its item pending and stops the run for the next effect pass.
+ */
+export async function runMagicItemMutationPlan(input: {
+  plan: MagicItemMutationPlan;
+  baseline: Map<string, string>;
+  current: ReadonlyMap<string, string>;
+  commit: (
+    legacyId: string,
+    operation: 'upsert' | 'delete'
+  ) => Promise<MagicItemCommitOutcome>;
+}): Promise<{
+  outcome: CloudOutcome;
+  committed: number;
+  error: string | null;
+}> {
+  let outcome: CloudOutcome = 'cloud-saved';
+  let committed = 0;
+  for (const operation of ['upsert', 'delete'] as const) {
+    const legacyIds =
+      operation === 'upsert' ? input.plan.upserts : input.plan.deletes;
+    for (const legacyId of legacyIds) {
+      const result = await input.commit(legacyId, operation);
+      if (!result.saved) return { outcome, committed, error: result.error };
+      if (
+        result.cloud &&
+        CLOUD_OUTCOME_SEVERITY[result.cloud] > CLOUD_OUTCOME_SEVERITY[outcome]
+      )
+        outcome = result.cloud;
+      if (operation === 'delete') input.baseline.delete(legacyId);
+      else input.baseline.set(legacyId, input.current.get(legacyId)!);
+      committed += 1;
+    }
+  }
+  return { outcome, committed, error: null };
+}
+
+function commitFailureMessage(reason: 'guest' | 'failed' | 'tombstoned') {
+  return reason === 'tombstoned'
+    ? 'This item was deleted in the cloud; restore it from version history instead.'
+    : 'Local IndexedDB transaction failed';
+}
 
 function currentRawEnvelope() {
   return localStorage.getItem(MAGIC_ITEM_STORAGE_KEY) ?? '';
@@ -353,8 +424,10 @@ export function MagicItemSyncControls({ campaign }: Props) {
       return;
     let cancelled = false;
     void (async () => {
+      const byId = new Map<string, CustomMagicItem>();
       const current = new Map<string, string>();
       for (const item of items ?? []) {
+        byId.set(item.id, item);
         current.set(
           item.id,
           await fingerprintMagicItemPayload(
@@ -363,103 +436,90 @@ export function MagicItemSyncControls({ campaign }: Props) {
         );
       }
       if (cancelled) return;
-      const last = lastFingerprints.current;
-      if (last === null) {
+      const baseline = lastFingerprints.current;
+      if (baseline === null) {
         lastFingerprints.current = current;
         return;
       }
+      const plan = planMagicItemMutations(baseline, current);
+      if (plan.upserts.length === 0 && plan.deletes.length === 0) return;
       const namespace = `user:${scope.accountId}` as const;
       const database = await openRollkeeperDatabase();
       try {
         const repository = new IndexedDbMagicItemRepository(database);
+        const service =
+          authority.authority === 'postgres'
+            ? new MagicItemSyncService({
+                enabled: true,
+                repository,
+                gateway: new MagicItemHttpGateway(),
+              })
+            : null;
         const updatedAt = new Date().toISOString();
-        const mutations: MagicItemMutation[] = [];
-        for (const [legacyId, fingerprint] of current) {
-          if (last.get(legacyId) === fingerprint) continue;
-          const item = (items ?? []).find(entry => entry.id === legacyId);
-          if (!item) continue;
-          const document = await repository.getDocument(namespace, legacyId);
-          const replaceable =
-            Boolean(document) && document!.operation !== 'delete';
-          mutations.push({
-            namespace,
-            campaignId: scope.campaignId,
-            legacyId,
-            cutoverEpoch: authority.epoch,
-            operation: replaceable ? 'replace' : 'create',
-            payload: magicItemPayloadFromCustomItem(item),
-            schemaVersion: 1,
-            localRevision: (document?.localRevision ?? 0) + 1,
-            baseServerVersion: replaceable ? document!.baseServerVersion : 0,
-            contentFingerprint: fingerprint,
-            updatedAt,
-          });
-        }
-        for (const legacyId of last.keys()) {
-          if (current.has(legacyId)) continue;
-          const document = await repository.getDocument(namespace, legacyId);
-          mutations.push({
-            namespace,
-            campaignId: scope.campaignId,
-            legacyId,
-            cutoverEpoch: authority.epoch,
-            operation: 'delete',
-            payload: null,
-            schemaVersion: 1,
-            localRevision: (document?.localRevision ?? 0) + 1,
-            baseServerVersion: document?.baseServerVersion ?? 0,
-            contentFingerprint: await fingerprintMagicItemTombstone(legacyId),
-            updatedAt,
-          });
-        }
-        if (mutations.length === 0) return;
-        if (authority.authority === 'indexedDB') {
-          for (const mutation of mutations) {
-            const result = await repository.commit(mutation);
-            if (!result.saved) {
-              if (result.reason === 'tombstoned') {
-                setError(
-                  'This item was deleted in the cloud; restore it from version history instead.'
-                );
-                return;
-              }
-              throw new Error('Local IndexedDB transaction failed');
+        const result = await runMagicItemMutationPlan({
+          plan,
+          baseline,
+          current,
+          commit: async (legacyId, operation) => {
+            const document = await repository.getDocument(namespace, legacyId);
+            const replaceable =
+              Boolean(document) && document!.operation !== 'delete';
+            const removing = operation === 'delete';
+            const mutation: MagicItemMutation = {
+              namespace,
+              campaignId: scope.campaignId,
+              legacyId,
+              cutoverEpoch: authority.epoch,
+              operation: removing
+                ? 'delete'
+                : replaceable
+                  ? 'replace'
+                  : 'create',
+              payload: removing
+                ? null
+                : magicItemPayloadFromCustomItem(byId.get(legacyId)!),
+              schemaVersion: 1,
+              localRevision: (document?.localRevision ?? 0) + 1,
+              baseServerVersion: removing
+                ? (document?.baseServerVersion ?? 0)
+                : replaceable
+                  ? document!.baseServerVersion
+                  : 0,
+              contentFingerprint: removing
+                ? await fingerprintMagicItemTombstone(legacyId)
+                : current.get(legacyId)!,
+              updatedAt,
+            };
+            if (!service) {
+              const local = await repository.commit(mutation);
+              if (!local.saved)
+                return {
+                  saved: false,
+                  error: commitFailureMessage(local.reason),
+                };
+              await repository.pause(mutation.namespace, mutation.campaignId);
+              return { saved: true, cloud: null };
             }
-            await repository.pause(mutation.namespace, mutation.campaignId);
-          }
-          setStatus(
-            'Local: saved · Cloud: not active · Player view: not applicable'
-          );
-          return;
-        }
-        const service = new MagicItemSyncService({
-          enabled: true,
-          repository,
-          gateway: new MagicItemHttpGateway(),
+            const cloud = await service.commit(mutation);
+            if (cloud.status === 'local-failed')
+              return {
+                saved: false,
+                error: commitFailureMessage(cloud.reason),
+              };
+            return { saved: true, cloud: cloud.status as CloudOutcome };
+          },
         });
-        let outcome: CloudOutcome = 'cloud-saved';
-        for (const mutation of mutations) {
-          const result = await service.commit(mutation);
-          if (result.status === 'local-failed') {
-            if (result.reason === 'tombstoned') {
-              setError(
-                'This item was deleted in the cloud; restore it from version history instead.'
-              );
-              return;
-            }
-            throw new Error('Local IndexedDB transaction failed');
-          }
-          const next = result.status as CloudOutcome;
-          if (CLOUD_OUTCOME_SEVERITY[next] > CLOUD_OUTCOME_SEVERITY[outcome])
-            outcome = next;
-        }
-        setStatus(
-          outcome === 'cloud-saved'
-            ? 'Local: saved · Cloud: saved · Player view: not applicable'
-            : outcome === 'conflict'
-              ? 'Local: saved · Cloud: conflict · Player view: not applicable'
-              : 'Local: saved · Cloud: queued · Player view: not applicable'
-        );
+        if (result.committed > 0)
+          setStatus(
+            !service
+              ? 'Local: saved · Cloud: not active · Player view: not applicable'
+              : result.outcome === 'cloud-saved'
+                ? 'Local: saved · Cloud: saved · Player view: not applicable'
+                : result.outcome === 'conflict'
+                  ? 'Local: saved · Cloud: conflict · Player view: not applicable'
+                  : 'Local: saved · Cloud: queued · Player view: not applicable'
+          );
+        if (result.error) setError(result.error);
       } catch (cause) {
         setError(
           cause instanceof Error
@@ -467,7 +527,6 @@ export function MagicItemSyncControls({ campaign }: Props) {
             : 'Magic item library save failed'
         );
       } finally {
-        lastFingerprints.current = current;
         database.close();
       }
     })();
@@ -1183,72 +1242,80 @@ export function MagicItemSyncControls({ campaign }: Props) {
       )
     )
       return;
-    const namespace = `user:${context.accountId}` as const;
-    const campaignId = workspace.cloudId;
-    const current = await magicItemApi<EnrollmentPreview>({
-      action: 'preview-enrollment',
-      campaignId,
-    });
-    if (
-      current.authority !== 'postgres' ||
-      !current.previewFingerprint ||
-      !current.documents ||
-      current.recordCount === undefined
-    )
-      throw new Error(
-        'Rollback requires the exact current Postgres generation of this library.'
-      );
-    rollbackMutationId.current ??= crypto.randomUUID();
-    const result = await magicItemApi<{
-      epoch: number;
-      currentGeneration: EnrollmentPreview;
-    }>({
-      action: 'rollback',
-      mutationId: rollbackMutationId.current,
-      campaignId,
-      expectedEpoch: authority.epoch,
-      previewFingerprint: current.previewFingerprint,
-      currentGeneration: {
-        recordCount: current.recordCount,
-        documents: current.documents.map(document => ({
-          legacyId: document.legacyId,
-          serverVersion: document.serverVersion,
-          schemaVersion: document.schemaVersion,
-          payloadFingerprint: document.payloadFingerprint,
-          tombstoned: document.tombstoned,
-        })),
-      },
-    });
-    const database = await openRollkeeperDatabase();
+    setBusy(true);
+    setError(null);
     try {
-      const local = await rollbackMagicItemLocalAuthority(database, {
-        namespace,
+      const namespace = `user:${context.accountId}` as const;
+      const campaignId = workspace.cloudId;
+      const current = await magicItemApi<EnrollmentPreview>({
+        action: 'preview-enrollment',
+        campaignId,
+      });
+      if (
+        current.authority !== 'postgres' ||
+        !current.previewFingerprint ||
+        !current.documents ||
+        current.recordCount === undefined
+      )
+        throw new Error(
+          'Rollback requires the exact current Postgres generation of this library.'
+        );
+      rollbackMutationId.current ??= crypto.randomUUID();
+      const result = await magicItemApi<{
+        epoch: number;
+        currentGeneration: EnrollmentPreview;
+      }>({
+        action: 'rollback',
+        mutationId: rollbackMutationId.current,
         campaignId,
         expectedEpoch: authority.epoch,
-        generation: authority.generation,
-        confirmed: true,
-        currentGenerationVerified: true,
-        now: () => new Date().toISOString(),
+        previewFingerprint: current.previewFingerprint,
+        currentGeneration: {
+          recordCount: current.recordCount,
+          documents: current.documents.map(document => ({
+            legacyId: document.legacyId,
+            serverVersion: document.serverVersion,
+            schemaVersion: document.schemaVersion,
+            payloadFingerprint: document.payloadFingerprint,
+            tombstoned: document.tombstoned,
+          })),
+        },
       });
-      setAuthority(local);
+      const database = await openRollkeeperDatabase();
+      try {
+        const local = await rollbackMagicItemLocalAuthority(database, {
+          namespace,
+          campaignId,
+          expectedEpoch: authority.epoch,
+          generation: authority.generation,
+          confirmed: true,
+          currentGenerationVerified: true,
+          now: () => new Date().toISOString(),
+        });
+        setAuthority(local);
+      } finally {
+        database.close();
+      }
+      writeMagicItemAuthorityMarker(localStorage, campaign.code, {
+        version: 1,
+        authority: 'legacy_restored',
+        epoch: result.epoch,
+        campaignId,
+        namespace,
+      });
+      applyMagicItemDocuments(
+        campaign.code,
+        result.currentGeneration.documents ?? []
+      );
+      rollbackMutationId.current = null;
+      setStatus(
+        'Rollback accepted through a new epoch; sources were preserved. Reload to use the verified legacy generation.'
+      );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Rollback failed');
     } finally {
-      database.close();
+      setBusy(false);
     }
-    writeMagicItemAuthorityMarker(localStorage, campaign.code, {
-      version: 1,
-      authority: 'legacy_restored',
-      epoch: result.epoch,
-      campaignId,
-      namespace,
-    });
-    applyMagicItemDocuments(
-      campaign.code,
-      result.currentGeneration.documents ?? []
-    );
-    rollbackMutationId.current = null;
-    setStatus(
-      'Rollback accepted through a new epoch; sources were preserved. Reload to use the verified legacy generation.'
-    );
   };
 
   const removeAccountFromDevice = async () => {
@@ -1422,6 +1489,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
               </Button>
             )}
             {manifest &&
+              preparedGeneration &&
               manifest.blockers.length === 0 &&
               authority?.authority === 'localStorage' && (
                 <Button

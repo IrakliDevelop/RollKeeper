@@ -13,7 +13,11 @@ import * as localDatabase from '@/lib/indexeddb/localDatabase';
 import * as browserDmWorkspace from '@/lib/supabase/browserDmWorkspace';
 import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
 
-import { MagicItemSyncControls } from './MagicItemSyncControls';
+import {
+  MagicItemSyncControls,
+  planMagicItemMutations,
+  runMagicItemMutationPlan,
+} from './MagicItemSyncControls';
 
 const campaign = { code: 'SYNTH1', name: 'Magic items', createdAt: 'now' };
 
@@ -210,5 +214,82 @@ describe('MagicItemSyncControls gates', () => {
     expect(
       screen.queryByRole('button', { name: 'Confirm local cutover' })
     ).toBeNull();
+  });
+});
+
+describe('magic item autosave planning', () => {
+  it('classifies changed, added, and removed items', () => {
+    const last = new Map([
+      ['a', '1'],
+      ['b', '2'],
+      ['c', '3'],
+    ]);
+    const current = new Map([
+      ['a', '1'],
+      ['b', '9'],
+      ['d', '4'],
+    ]);
+
+    expect(planMagicItemMutations(last, current)).toEqual({
+      upserts: ['b', 'd'],
+      deletes: ['c'],
+    });
+  });
+
+  it('advances the baseline only for acknowledged mutations and stops at the first failure', async () => {
+    const baseline = new Map([
+      ['a', '1'],
+      ['gone', '0'],
+    ]);
+    const current = new Map([
+      ['a', '2'],
+      ['b', '3'],
+    ]);
+    const attempted: string[] = [];
+
+    const result = await runMagicItemMutationPlan({
+      plan: planMagicItemMutations(baseline, current),
+      baseline,
+      current,
+      commit: async legacyId => {
+        attempted.push(legacyId);
+        return legacyId === 'b'
+          ? { saved: false, error: 'Local IndexedDB transaction failed' }
+          : { saved: true, cloud: 'queued' };
+      },
+    });
+
+    expect(attempted).toEqual(['a', 'b']);
+    expect(result).toEqual({
+      outcome: 'queued',
+      committed: 1,
+      error: 'Local IndexedDB transaction failed',
+    });
+    // The acknowledged upsert advanced; the failed one and the unreached
+    // delete stay pending so the next effect run re-emits them.
+    expect(baseline.get('a')).toBe('2');
+    expect(baseline.has('b')).toBe(false);
+    expect(baseline.has('gone')).toBe(true);
+  });
+
+  it('keeps the worst cloud outcome and drops deleted ids from the baseline', async () => {
+    const baseline = new Map([
+      ['a', '1'],
+      ['gone', '0'],
+    ]);
+    const current = new Map([['a', '2']]);
+
+    const result = await runMagicItemMutationPlan({
+      plan: planMagicItemMutations(baseline, current),
+      baseline,
+      current,
+      commit: async (_legacyId, operation) => ({
+        saved: true,
+        cloud: operation === 'delete' ? 'conflict' : 'cloud-saved',
+      }),
+    });
+
+    expect(result).toEqual({ outcome: 'conflict', committed: 2, error: null });
+    expect([...baseline]).toEqual([['a', '2']]);
   });
 });
