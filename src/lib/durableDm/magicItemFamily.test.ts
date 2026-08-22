@@ -99,6 +99,27 @@ describe('Slice 11C magic item family', () => {
       persistenceVersions: { 'rollkeeper-dm-magic-item-library': 1 },
       stableIdentity: 'itemsByCampaign[campaignCode][].id',
       stableChildIdentity: ['charges[].id', 'chargePool.abilities[].id'],
+      completeEnvelopeFields: ['itemsByCampaign'],
+      documentFields: [
+        'name',
+        'category',
+        'rarity',
+        'description',
+        'properties',
+        'requiresAttunement',
+        'isAttuned',
+        'isEquipped',
+        'charges',
+        'chargePool',
+        'bonusSpellAttack',
+        'bonusSpellSaveDc',
+        'legacyCharges',
+        'createdAt',
+        'updatedAt',
+        'tags',
+        'group',
+        'sourceItemId',
+      ],
       privateFields: ['*'],
       publicFields: [],
       discoveredFields: [],
@@ -307,7 +328,6 @@ describe('Slice 11C magic item family', () => {
       description: '',
       properties: [],
       requiresAttunement: false,
-      isAttuned: false,
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
       tags: [],
@@ -431,5 +451,128 @@ describe('Slice 11C magic item family', () => {
         ],
       })
     ).rejects.toThrow('magic-1');
+  });
+
+  const payloadWith = (overrides: Record<string, unknown>) => ({
+    ...magicItemPayloadFromCustomItem(item()),
+    ...overrides,
+  });
+
+  const invalidItemCases: Array<[string, Record<string, unknown>]> = [
+    ['a name over 1000 characters', { name: 'x'.repeat(1001) }],
+    ['a non-string name', { name: 42 }],
+    ['a category over 100 characters', { category: 'c'.repeat(101) }],
+    ['a non-string rarity', { rarity: 5 }],
+    ['a non-string description', { description: null }],
+    ['properties that are not an array', { properties: 'Extradimensional' }],
+    ['tags with a non-string entry', { tags: ['wondrous', 7] }],
+    ['a non-boolean requiresAttunement', { requiresAttunement: 'yes' }],
+    ['a non-string createdAt', { createdAt: 1_700_000_000 }],
+    ['a non-string updatedAt', { updatedAt: [] }],
+    ['a non-boolean isAttuned', { isAttuned: 'no' }],
+    ['a non-boolean isEquipped', { isEquipped: 1 }],
+    ['a non-string group', { group: 3 }],
+    ['a non-string sourceItemId', { sourceItemId: false }],
+    ['a non-numeric bonusSpellAttack', { bonusSpellAttack: '1' }],
+    ['a non-finite bonusSpellSaveDc', { bonusSpellSaveDc: Number.NaN }],
+    ['legacyCharges that are not an object', { legacyCharges: 'dawn' }],
+    ['charges that are not an array', { charges: 'none' }],
+    ['a charges entry that is not an object', { charges: [42] }],
+    ['a chargePool that is not an object', { chargePool: 'none' }],
+    [
+      'chargePool abilities that are not an array',
+      { chargePool: { abilities: 'none' } },
+    ],
+    ['chargePool abilities that are absent', { chargePool: { maxCharges: 1 } }],
+  ];
+
+  it.each(invalidItemCases)(
+    'rejects %s as an invalid item',
+    (_label, overrides) => {
+      expect(validateMagicItemPayload(payloadWith(overrides))).toMatchObject({
+        ok: false,
+        kind: 'invalid-item',
+      });
+    }
+  );
+
+  const invalidChildCases: Array<[string, Record<string, unknown>, string]> = [
+    [
+      'a charge without an id',
+      { charges: [{ name: 'Reach' }] },
+      'invalid-child-id',
+    ],
+    [
+      'a charge id over 255 characters',
+      { charges: [{ id: 'c'.repeat(256) }] },
+      'invalid-child-id',
+    ],
+    [
+      'repeated charge ids',
+      { charges: [{ id: 'charge-1' }, { id: 'charge-1' }] },
+      'duplicate-child-id',
+    ],
+    [
+      'an ability id that is not a string',
+      { chargePool: { abilities: [{ id: 9 }] } },
+      'invalid-child-id',
+    ],
+    [
+      'an ability entry that is not an object',
+      { chargePool: { abilities: [null] } },
+      'invalid-item',
+    ],
+  ];
+
+  it.each(invalidChildCases)('rejects %s', (_label, overrides, kind) => {
+    expect(validateMagicItemPayload(payloadWith(overrides))).toMatchObject({
+      ok: false,
+      kind,
+    });
+  });
+
+  const acceptedCases: Array<[string, Record<string, unknown>]> = [
+    ['null attunement flags', { isAttuned: null, isEquipped: null }],
+    ['null spell bonuses', { bonusSpellAttack: null, bonusSpellSaveDc: null }],
+    [
+      'null child collections',
+      { charges: null, chargePool: null, legacyCharges: null },
+    ],
+    [
+      'a homebrew category and rarity',
+      { category: 'homebrew relic', rarity: 'mythic' },
+    ],
+    [
+      'boundary-length labels',
+      {
+        name: 'n'.repeat(1000),
+        category: 'c'.repeat(100),
+        rarity: 'r'.repeat(100),
+      },
+    ],
+    [
+      'an empty description and no properties',
+      { description: '', properties: [] },
+    ],
+  ];
+
+  it.each(acceptedCases)('accepts %s', (_label, overrides) => {
+    expect(validateMagicItemPayload(payloadWith(overrides))).toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('sorts blockers deterministically by canonical JSON', async () => {
+    // Discovery order is unclassified-field then duplicate-id; canonical JSON
+    // sorting compares `detail` first, so the emitted order is the reverse.
+    const manifest = await build([item({ secretNotes: 'hidden' }), item()]);
+
+    expect(kinds(manifest)).toEqual(['duplicate-id', 'unclassified-field']);
+    const details = manifest.blockers.map(blocker => blocker.detail);
+    expect(details).toEqual([
+      'Duplicate magic item ID magic-1',
+      'Magic item field secretNotes is not classified in Slice 11C',
+    ]);
+    expect(details).toEqual([...details].sort());
   });
 });
