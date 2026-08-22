@@ -96,10 +96,19 @@ export interface RecoveryDownloadReceipt {
   runId: string;
   manifestHash: string;
   initiatedAt: string;
+  verifiedAt?: string;
 }
 
 export interface RecoveryReceiptStore {
   recordDownloadReceipt(receipt: RecoveryDownloadReceipt): Promise<void>;
+}
+
+export interface RecoveryVerificationStore {
+  verifyDownloadReceipt(receipt: {
+    runId: string;
+    manifestHash: string;
+    verifiedAt: string;
+  }): Promise<void>;
 }
 
 export interface StagedRecoveryGeneration {
@@ -347,6 +356,29 @@ export async function initiateDeviceBackupDownload(
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   }
+}
+
+export async function verifyDownloadedDeviceBackup(
+  serialized: string,
+  expected: DeviceBackupV1,
+  receipts: RecoveryVerificationStore,
+  options: { now?: () => string } = {}
+): Promise<DeviceBackupV1> {
+  const bundle = await validateDeviceBackupJson(serialized);
+  if (
+    bundle.runId !== expected.runId ||
+    bundle.manifestHash !== expected.manifestHash
+  ) {
+    throw new Error(
+      'The selected recovery file does not match the current preview'
+    );
+  }
+  await receipts.verifyDownloadReceipt({
+    runId: bundle.runId,
+    manifestHash: bundle.manifestHash,
+    verifiedAt: (options.now ?? (() => new Date().toISOString()))(),
+  });
+  return bundle;
 }
 
 export function downloadRawRecoveryEntries(

@@ -10,6 +10,7 @@ import {
   restoreRecoveryEntries,
   stageRecoveryBundle,
   validateDeviceBackupJson,
+  verifyDownloadedDeviceBackup,
 } from '@/lib/deviceRecovery';
 
 describe('device recovery bundle', () => {
@@ -227,6 +228,45 @@ describe('device recovery bundle', () => {
       manifestHash: bundle.manifestHash,
       initiatedAt: '2026-08-15T10:05:00.000Z',
     });
+  });
+
+  it('verifies a reselected download only when its checksums and exact identity match', async () => {
+    const bundle = await captureDeviceBackup(
+      new Map([
+        ['rollkeeper-calendar-data', '{"state":{"calendars":[]},"version":0}'],
+      ]),
+      {
+        appVersion: '1.2.3',
+        runId: 'calendar-recovery-run',
+        timestamp: '2026-08-15T10:00:00.000Z',
+      }
+    );
+    const receipts = {
+      verifyDownloadReceipt: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await expect(
+      verifyDownloadedDeviceBackup(JSON.stringify(bundle), bundle, receipts, {
+        now: () => '2026-08-15T10:10:00.000Z',
+      })
+    ).resolves.toEqual(bundle);
+    expect(receipts.verifyDownloadReceipt).toHaveBeenCalledWith({
+      runId: bundle.runId,
+      manifestHash: bundle.manifestHash,
+      verifiedAt: '2026-08-15T10:10:00.000Z',
+    });
+
+    const wrongRun = { ...bundle, runId: 'different-run' };
+    await expect(
+      verifyDownloadedDeviceBackup(JSON.stringify(wrongRun), bundle, receipts)
+    ).rejects.toThrow('does not match the current preview');
+
+    const corrupt = structuredClone(bundle);
+    corrupt.entries[0]!.rawValue += 'tampered';
+    await expect(
+      verifyDownloadedDeviceBackup(JSON.stringify(corrupt), bundle, receipts)
+    ).rejects.toThrow('checksum mismatch');
+    expect(receipts.verifyDownloadReceipt).toHaveBeenCalledOnce();
   });
 
   it('stages a validated import as an inactive generation without overwriting active data', async () => {
