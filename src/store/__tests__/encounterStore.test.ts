@@ -42,6 +42,34 @@ describe('encounterStore', () => {
       expect(state.encounters[0].round).toBe(0);
       expect(state.activeEncounterId).toBe(id);
     });
+
+    it('mints cross-device stable ids and persists the versioned envelope', () => {
+      const store = useEncounterStore.getState();
+      const id = store.createEncounter('Goblin Ambush', 'CAMP01');
+      expect(id).toMatch(/^[0-9a-f-]{36}$/);
+
+      // Child ids stay on the legacy generator — they never leave the document.
+      const entityId = store.addEntity(id, createMockEncounterEntity({}));
+      expect(entityId).not.toMatch(/^[0-9a-f-]{36}$/);
+
+      const persisted = JSON.parse(
+        localStorage.getItem('rollkeeper-encounter-data')!
+      );
+      expect(persisted.version).toBe(2);
+      expect(Object.keys(persisted.state)).toEqual([
+        'encounters',
+        'encounterTombstones',
+        'activeEncounterId',
+        'combatConfig',
+      ]);
+      expect(persisted.state.encounters).toHaveLength(1);
+      expect(persisted.state.encounters[0]).toMatchObject({
+        id,
+        campaignCode: 'CAMP01',
+        name: 'Goblin Ambush',
+      });
+      expect(persisted.state.activeEncounterId).toBe(id);
+    });
   });
 
   describe('deleteEncounter', () => {

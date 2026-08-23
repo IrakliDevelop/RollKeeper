@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { createEncounterAwareStorage } from '@/lib/durableDm/encounterAwareStorage';
 import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
-import { createSafeStorage } from '@/lib/safeStorage';
 import {
   Encounter,
   EncounterEntity,
@@ -32,6 +32,11 @@ import type { NpcResource } from '@/types/encounter';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+}
+
+/** A cross-device stable identity, so cloud documents keep one legacy ID. */
+function generateEncounterId(): string {
+  return crypto.randomUUID();
 }
 
 function rollD20(): number {
@@ -411,7 +416,7 @@ export const useEncounterStore = create<EncounterStoreState>()(
       },
 
       createEncounter: (name, campaignCode) => {
-        const id = generateId();
+        const id = generateEncounterId();
         const encounter: Encounter = {
           id,
           name,
@@ -1530,7 +1535,7 @@ export const useEncounterStore = create<EncounterStoreState>()(
     {
       name: ENCOUNTER_STORAGE_KEY,
       skipHydration: isIndexedDbMigrationEnabled(),
-      storage: createJSONStorage(() => createSafeStorage()),
+      storage: createJSONStorage(() => createEncounterAwareStorage()),
       version: 2,
       migrate: migrateEncounterPersistedState,
     }
