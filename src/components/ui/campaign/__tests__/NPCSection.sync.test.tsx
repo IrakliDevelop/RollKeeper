@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDmStore } from '@/store/dmStore';
 import { useNPCStore } from '@/store/npcStore';
 
+import { NpcSyncProvider } from '../NpcSyncControls';
 import { NPCSection } from '../NPCSection';
 
 // The NPC editor dialogs load reference compendium data on mount, so they are
@@ -53,11 +54,26 @@ describe('NPCSection cloud sync mount', () => {
         },
       ],
     });
-    render(<NPCSection campaignCode="empty-campaign" players={[]} />);
+    render(
+      <NpcSyncProvider campaignCode="empty-campaign">
+        <NPCSection campaignCode="empty-campaign" players={[]} />
+      </NpcSyncProvider>
+    );
 
     // Edits made from the always-visible header must still reach the sync
     // effect, so the controls cannot live inside the collapsible block.
     expect(screen.queryByText(/No NPCs yet/)).not.toBeInTheDocument();
     expect(screen.getByText('NPC cloud sync')).toBeInTheDocument();
+  });
+
+  it('renders no card and does not throw when the route owner is absent', () => {
+    vi.stubEnv('NEXT_PUBLIC_NPC_SYNC_VISIBLE', 'true');
+
+    // The owner lives in app/dm/campaign/[code]/layout.tsx, so a section
+    // rendered outside that group simply has no card to read.
+    expect(() =>
+      render(<NPCSection campaignCode="empty-campaign" players={[]} />)
+    ).not.toThrow();
+    expect(screen.queryByText('NPC cloud sync')).toBeNull();
   });
 });

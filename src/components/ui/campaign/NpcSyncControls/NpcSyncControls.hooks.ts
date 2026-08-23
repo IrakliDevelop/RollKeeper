@@ -1,25 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import {
-  Cloud,
-  Database,
-  Download,
-  History,
-  RotateCcw,
-  ShieldCheck,
-  Upload,
-} from 'lucide-react';
 
-import { Button } from '@/components/ui/forms/button';
-import { SelectField, SelectItem } from '@/components/ui/forms/select';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/layout/card';
 import { browserRecoveryRepository } from '@/lib/browserRecoveryRepository';
 import {
   buildNpcManifest,
@@ -116,10 +98,6 @@ interface StoreDocument {
   legacyId: string;
   payload: NpcPayload | null;
   tombstoned: boolean;
-}
-
-interface Props {
-  campaign: CampaignInfo;
 }
 
 /** The worst cloud outcome of a multi-document autosave decides the status. */
@@ -253,8 +231,21 @@ function storeDocumentsFromLocal(documents: NpcDocument[]) {
   }));
 }
 
-export function NpcSyncControls({ campaign }: Props) {
-  const npcs = useNPCStore(state => state.npcsByCampaign[campaign.code]);
+/**
+ * Owns the NPC family's hydration and autosave for one campaign. It is mounted
+ * once per `/dm/campaign/[code]/*` route group by `NpcSyncProvider`, so every
+ * route that writes the NPC store shares a single owner; the visible card only
+ * reads the returned controller.
+ */
+export function useNpcSyncController(campaign: CampaignInfo | undefined) {
+  // The route layout mounts this owner before dmStore hydrates, so `campaign`
+  // can be undefined. `campaignCode` is undefined exactly when it is, and
+  // every effect and handler below early-returns on it.
+  const campaignCode = campaign?.code;
+  const campaignName = campaign?.name ?? '';
+  const npcs = useNPCStore(state =>
+    campaignCode ? state.npcsByCampaign[campaignCode] : undefined
+  );
   const [context, setContext] = useState<BrowserDmWorkspaceContext | null>(
     null
   );
@@ -290,7 +281,11 @@ export function NpcSyncControls({ campaign }: Props) {
   const recoveryInput = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    const marker = readNpcAuthorityMarker(localStorage, campaign.code);
+    // The default-off guarantee is also enforced by
+    // readNpcAuthorityMarker (zero storage reads while the flag is off);
+    // this explicit return is belt-and-braces for the route-level owner.
+    if (!isNpcClientVisible() || !campaignCode) return;
+    const marker = readNpcAuthorityMarker(localStorage, campaignCode);
     if (!marker?.namespace || marker.authority === 'legacy_restored') return;
     let cancelled = false;
     const client = createSupabaseBrowserClient();
@@ -298,7 +293,7 @@ export function NpcSyncControls({ campaign }: Props) {
     const hide = () => {
       setScope(null);
       setAuthority(null);
-      hideNpcs(campaign.code);
+      hideNpcs(campaignCode);
     };
     const hydrate = async (accountId: string | null) => {
       if (cancelled) return;
@@ -356,7 +351,7 @@ export function NpcSyncControls({ campaign }: Props) {
             return;
           }
         }
-        applyNpcDocuments(campaign.code, storeDocumentsFromLocal(documents));
+        applyNpcDocuments(campaignCode, storeDocumentsFromLocal(documents));
         lastFingerprints.current = new Map(
           live.map(document => [document.legacyId, document.contentFingerprint])
         );
@@ -391,7 +386,7 @@ export function NpcSyncControls({ campaign }: Props) {
       cancelled = true;
       data.subscription.unsubscribe();
     };
-  }, [campaign.code]);
+  }, [campaignCode]);
 
   useEffect(
     () => () => {
@@ -409,6 +404,10 @@ export function NpcSyncControls({ campaign }: Props) {
   }, [npcs]);
 
   useEffect(() => {
+    // The default-off guarantee is also enforced by
+    // readNpcAuthorityMarker (zero storage reads while the flag is off);
+    // this explicit return is belt-and-braces for the route-level owner.
+    if (!isNpcClientVisible() || !campaignCode) return;
     if (busy || !authority || authority.authority === 'localStorage' || !scope)
       return;
     let cancelled = false;
@@ -520,11 +519,10 @@ export function NpcSyncControls({ campaign }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [authority, busy, npcs, campaign.code, scope]);
-
-  if (!isNpcClientVisible()) return null;
+  }, [authority, busy, npcs, campaignCode, scope]);
 
   const discover = async () => {
+    if (!campaignCode) return;
     setBusy(true);
     setError(null);
     try {
@@ -545,6 +543,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const choose = async (selected: DmWorkspaceDocument) => {
+    if (!campaignCode) return;
     if (!context || !selected.cloudId) return;
     setWorkspace(selected);
     setScope({ accountId: context.accountId, campaignId: selected.cloudId });
@@ -555,11 +554,12 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const preview = async () => {
+    if (!campaignCode) return;
     setBusy(true);
     setError(null);
     try {
       const sourceManifest = await buildNpcManifest({
-        campaignCode: campaign.code,
+        campaignCode,
         rawEnvelope: currentRawEnvelope(),
       });
       let nextManifest = sourceManifest;
@@ -609,6 +609,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const downloadRecovery = async () => {
+    if (!campaignCode) return;
     if (!recovery) return;
     setError(null);
     try {
@@ -626,6 +627,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const verifyRecoveryAndSelect = async (file: File) => {
+    if (!campaignCode) return;
     if (!context || !workspace?.cloudId || !recovery || !manifest) return;
     setBusy(true);
     setError(null);
@@ -638,7 +640,7 @@ export function NpcSyncControls({ campaign }: Props) {
       setRecoveryVerified(true);
       if (
         !window.confirm(
-          `Recovery file verified. Select only the NPCs for ${campaign.name}? This does not cut over local or cloud authority.`
+          `Recovery file verified. Select only the NPCs for ${campaignName}? This does not cut over local or cloud authority.`
         )
       ) {
         setNpcsSelected(false);
@@ -677,6 +679,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const prepare = async () => {
+    if (!campaignCode) return;
     if (!context || !workspace?.cloudId || !recovery) return;
     setBusy(true);
     try {
@@ -712,7 +715,7 @@ export function NpcSyncControls({ campaign }: Props) {
         storage: localStorage,
         namespace: `user:${context.accountId}`,
         campaignId: workspace.cloudId,
-        campaignCode: campaign.code,
+        campaignCode,
         runId,
         ownerId: crypto.randomUUID(),
         now: () => new Date().toISOString(),
@@ -743,6 +746,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const activateLocal = async () => {
+    if (!campaignCode) return;
     if (!context || !workspace?.cloudId || !manifest || !preparedGeneration)
       return;
     if (manifest.blockers.length > 0) return;
@@ -757,7 +761,7 @@ export function NpcSyncControls({ campaign }: Props) {
     const database = await openRollkeeperDatabase();
     try {
       const current = await buildNpcManifest({
-        campaignCode: campaign.code,
+        campaignCode,
         rawEnvelope: currentRawEnvelope(),
       });
       if (current.fingerprint !== manifest.fingerprint)
@@ -796,7 +800,7 @@ export function NpcSyncControls({ campaign }: Props) {
         })),
       });
       setAuthority(next);
-      writeNpcAuthorityMarker(localStorage, campaign.code, {
+      writeNpcAuthorityMarker(localStorage, campaignCode, {
         version: 1,
         authority: 'indexedDB',
         epoch: next.epoch,
@@ -819,6 +823,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const activateCloud = async () => {
+    if (!campaignCode) return;
     if (
       !context ||
       !workspace?.cloudId ||
@@ -917,7 +922,7 @@ export function NpcSyncControls({ campaign }: Props) {
           })),
         });
         setAuthority(next);
-        writeNpcAuthorityMarker(localStorage, campaign.code, {
+        writeNpcAuthorityMarker(localStorage, campaignCode, {
           version: 1,
           authority: 'postgres',
           epoch: next.epoch,
@@ -939,6 +944,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const previewEnrollment = async () => {
+    if (!campaignCode) return;
     if (!workspace?.cloudId) return;
     setBusy(true);
     setError(null);
@@ -963,6 +969,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const enrollDevice = async () => {
+    if (!campaignCode) return;
     if (
       !context ||
       !workspace?.cloudId ||
@@ -976,7 +983,7 @@ export function NpcSyncControls({ campaign }: Props) {
     setError(null);
     try {
       const local = await buildNpcManifest({
-        campaignCode: campaign.code,
+        campaignCode,
         rawEnvelope: currentRawEnvelope(),
       });
       if (
@@ -1004,7 +1011,7 @@ export function NpcSyncControls({ campaign }: Props) {
         const next = await enrollNpcCloudDevice(database, {
           namespace,
           campaignId,
-          campaignCode: campaign.code,
+          campaignCode,
           deviceId,
           epoch: enrollmentPreview.epoch,
           confirmed: true,
@@ -1028,7 +1035,7 @@ export function NpcSyncControls({ campaign }: Props) {
         });
         setAuthority(next);
         await context.remember(workspace);
-        writeNpcAuthorityMarker(localStorage, campaign.code, {
+        writeNpcAuthorityMarker(localStorage, campaignCode, {
           version: 1,
           authority: 'postgres',
           epoch: next.epoch,
@@ -1051,6 +1058,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const applyExactCloudVersion = async () => {
+    if (!campaignCode) return;
     if (
       !context ||
       !workspace?.cloudId ||
@@ -1104,7 +1112,7 @@ export function NpcSyncControls({ campaign }: Props) {
         });
       }
       await context.remember(workspace);
-      applyNpcDocuments(campaign.code, documents);
+      applyNpcDocuments(campaignCode, documents);
       lastFingerprints.current = new Map(
         documents
           .filter(document => !document.tombstoned)
@@ -1124,6 +1132,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const loadHistory = async () => {
+    if (!campaignCode) return;
     if (!workspace?.cloudId || !historyLegacyId) return;
     setError(null);
     try {
@@ -1139,6 +1148,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const exportVersion = async (serverVersion: number) => {
+    if (!campaignCode) return;
     if (!workspace?.cloudId || !historyLegacyId) return;
     setError(null);
     try {
@@ -1157,6 +1167,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const compareLatestVersions = async () => {
+    if (!campaignCode) return;
     if (!workspace?.cloudId || !historyLegacyId || versions.length < 2) return;
     setError(null);
     try {
@@ -1180,6 +1191,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const restoreVersion = async (sourceVersion: number) => {
+    if (!campaignCode) return;
     if (
       !context ||
       !workspace?.cloudId ||
@@ -1234,7 +1246,7 @@ export function NpcSyncControls({ campaign }: Props) {
           acceptedAt: new Date().toISOString(),
         });
         const documents = await repository.listDocuments(namespace, campaignId);
-        applyNpcDocuments(campaign.code, storeDocumentsFromLocal(documents));
+        applyNpcDocuments(campaignCode, storeDocumentsFromLocal(documents));
         lastFingerprints.current = new Map(
           documents
             .filter(document => document.operation !== 'delete')
@@ -1257,6 +1269,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const rollback = async () => {
+    if (!campaignCode) return;
     if (!context || !workspace?.cloudId || authority?.authority !== 'postgres')
       return;
     if (
@@ -1319,17 +1332,14 @@ export function NpcSyncControls({ campaign }: Props) {
       } finally {
         database.close();
       }
-      writeNpcAuthorityMarker(localStorage, campaign.code, {
+      writeNpcAuthorityMarker(localStorage, campaignCode, {
         version: 1,
         authority: 'legacy_restored',
         epoch: result.epoch,
         campaignId,
         namespace,
       });
-      applyNpcDocuments(
-        campaign.code,
-        result.currentGeneration.documents ?? []
-      );
+      applyNpcDocuments(campaignCode, result.currentGeneration.documents ?? []);
       rollbackMutationId.current = null;
       setStatus(
         'Rollback accepted through a new epoch; sources were preserved. Reload to use the verified legacy generation.'
@@ -1342,6 +1352,7 @@ export function NpcSyncControls({ campaign }: Props) {
   };
 
   const removeAccountFromDevice = async () => {
+    if (!campaignCode) return;
     if (
       !context ||
       !workspace?.cloudId ||
@@ -1394,7 +1405,7 @@ export function NpcSyncControls({ campaign }: Props) {
           confirmed: true,
           lossConfirmed,
         });
-        hideNpcs(campaign.code);
+        hideNpcs(campaignCode);
         lastFingerprints.current = null;
         setScope(null);
         setAuthority(null);
@@ -1412,253 +1423,44 @@ export function NpcSyncControls({ campaign }: Props) {
       setBusy(false);
     }
   };
-
-  return (
-    <Card padding="lg">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Cloud size={20} /> NPC cloud sync
-        </CardTitle>
-        <CardDescription>
-          Default-off owner workflow. Login, navigation, discovery, and first
-          use never enroll or change authority. NPCs are DM-private; players
-          never receive a projection.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {!context && (
-          <Button variant="outline" onClick={discover} loading={busy}>
-            Find owner workspaces
-          </Button>
-        )}
-        {context && !workspace && (
-          <div className="space-y-2">
-            <p className="text-body text-sm">
-              Explicitly choose the owner-verified workspace for this local
-              campaign.
-            </p>
-            {workspaces.map(item => (
-              <Button
-                key={item.localId}
-                variant="outline"
-                size="sm"
-                onClick={() => choose(item)}
-              >
-                Select {item.name} ({item.displayCode})
-              </Button>
-            ))}
-          </div>
-        )}
-        {workspace && (
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              leftIcon={<Database size={16} />}
-              onClick={preview}
-              loading={busy}
-            >
-              Preview exact manifest
-            </Button>
-            <Button
-              variant="outline"
-              onClick={previewEnrollment}
-              loading={busy}
-            >
-              Preview cloud enrollment
-            </Button>
-            {enrollmentPreview?.authority === 'postgres' &&
-              authority?.authority === 'localStorage' && (
-                <Button variant="warning" onClick={enrollDevice}>
-                  Enroll this device
-                </Button>
-              )}
-            {enrollmentPreview?.authority === 'postgres' &&
-              authority?.authority === 'postgres' && (
-                <Button
-                  variant="warning"
-                  onClick={applyExactCloudVersion}
-                  loading={busy}
-                >
-                  Apply exact cloud version
-                </Button>
-              )}
-            {manifest && recovery && (
-              <Button
-                variant="warning"
-                leftIcon={<Download size={16} />}
-                onClick={downloadRecovery}
-              >
-                Download recovery file
-              </Button>
-            )}
-            {manifest && recovery && (
-              <>
-                <Button
-                  variant="outline"
-                  leftIcon={<Upload size={16} />}
-                  onClick={() => recoveryInput.current?.click()}
-                  disabled={busy}
-                >
-                  Verify recovery file and select
-                </Button>
-                <input
-                  ref={recoveryInput}
-                  type="file"
-                  accept="application/json,.json"
-                  className="hidden"
-                  aria-label="Downloaded NPC recovery file"
-                  onChange={event => {
-                    const file = event.target.files?.[0];
-                    if (file) void verifyRecoveryAndSelect(file);
-                  }}
-                />
-              </>
-            )}
-            {recovery && (
-              <Button
-                variant="outline"
-                onClick={prepare}
-                loading={busy}
-                disabled={!recoveryVerified || !npcsSelected}
-              >
-                Prepare IndexedDB
-              </Button>
-            )}
-            {manifest &&
-              preparedGeneration &&
-              manifest.blockers.length === 0 &&
-              authority?.authority === 'localStorage' && (
-                <Button
-                  variant="warning"
-                  leftIcon={<ShieldCheck size={16} />}
-                  onClick={activateLocal}
-                >
-                  Confirm local cutover
-                </Button>
-              )}
-            {authority?.authority === 'indexedDB' && (
-              <Button variant="primary" onClick={activateCloud} loading={busy}>
-                Activate cloud family
-              </Button>
-            )}
-            {authority?.authority === 'postgres' && (
-              <>
-                <Button
-                  variant="outline"
-                  leftIcon={<History size={16} />}
-                  onClick={loadHistory}
-                >
-                  Version history
-                </Button>
-                <Button
-                  variant="outline"
-                  leftIcon={<RotateCcw size={16} />}
-                  onClick={rollback}
-                >
-                  Verified rollback
-                </Button>
-                <Button variant="danger" onClick={removeAccountFromDevice}>
-                  Remove this account from this device
-                </Button>
-              </>
-            )}
-          </div>
-        )}
-        {authority?.authority === 'postgres' && npcs && npcs.length > 0 && (
-          <SelectField
-            label="NPC for version history"
-            value={historyLegacyId ?? undefined}
-            onValueChange={setHistoryLegacyId}
-          >
-            {npcs.map(npc => (
-              <SelectItem key={npc.id} value={npc.id}>
-                {npc.name}
-              </SelectItem>
-            ))}
-          </SelectField>
-        )}
-        {manifest && (
-          <div className="bg-surface-secondary rounded-lg p-3 text-sm">
-            <p className="text-heading font-medium">
-              Manifest {manifest.fingerprint.slice(0, 12)}
-            </p>
-            <p className="text-body">
-              {manifest.recordCount} records · {manifest.totalBytes} bytes ·{' '}
-              {manifest.blockers.length} blockers
-            </p>
-            {manifest.blockers.map(blocker => (
-              <p
-                role="alert"
-                className="text-accent-red-text"
-                key={`${blocker.kind}:${blocker.legacyId ?? ''}:${blocker.detail}`}
-              >
-                {blocker.kind}: {blocker.detail}
-              </p>
-            ))}
-          </div>
-        )}
-        {versions.length > 0 && (
-          <div className="space-y-2">
-            {versions.length > 1 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={compareLatestVersions}
-              >
-                Compare latest versions
-              </Button>
-            )}
-            {comparison && <p className="text-body text-sm">{comparison}</p>}
-            {versions.map(version => (
-              <div
-                className="border-divider flex items-center justify-between rounded-lg border p-2"
-                key={version.serverVersion}
-              >
-                <span className="text-body text-sm">
-                  Version {version.serverVersion} · epoch {version.cutoverEpoch}{' '}
-                  ·{' '}
-                  {version.tombstoned
-                    ? 'tombstone'
-                    : version.payloadFingerprint.slice(0, 10)}
-                </span>
-                <div className="flex gap-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => exportVersion(version.serverVersion)}
-                  >
-                    Export exact version
-                  </Button>
-                  {version.serverVersion !== versions[0].serverVersion && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => restoreVersion(version.serverVersion)}
-                    >
-                      Restore as new version
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        {authority?.authority === 'postgres' && (
-          <p role="status" className="text-muted text-sm">
-            Player view: not applicable · NPCs are DM-private
-          </p>
-        )}
-        {status && (
-          <p role="status" className="text-body text-sm">
-            {status}
-          </p>
-        )}
-        {error && (
-          <p role="alert" className="text-accent-red-text text-sm">
-            {error}
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
+  return {
+    authority,
+    busy,
+    comparison,
+    context,
+    enrollmentPreview,
+    error,
+    historyLegacyId,
+    manifest,
+    npcs,
+    npcsSelected,
+    preparedGeneration,
+    recovery,
+    recoveryInput,
+    recoveryVerified,
+    status,
+    versions,
+    workspace,
+    workspaces,
+    activateCloud,
+    activateLocal,
+    applyExactCloudVersion,
+    choose,
+    compareLatestVersions,
+    discover,
+    downloadRecovery,
+    enrollDevice,
+    exportVersion,
+    loadHistory,
+    prepare,
+    preview,
+    previewEnrollment,
+    removeAccountFromDevice,
+    restoreVersion,
+    rollback,
+    setHistoryLegacyId,
+    verifyRecoveryAndSelect,
+  };
 }
+
+export type NpcSyncController = ReturnType<typeof useNpcSyncController>;
