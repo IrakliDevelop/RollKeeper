@@ -509,25 +509,42 @@ describe('NpcSyncControls gates', () => {
     await screen.findByText(
       'NPCs loaded from the verified local IndexedDB generation.'
     );
+    const openContext = vi.mocked(browserDmWorkspace.createBrowserDmWorkspace);
+    expect(openContext).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       useNPCStore.getState().updateNPC(campaign.code, 'npc-1', {
         name: 'Edited before the token refresh',
       });
-      // The refresh lands before the edit's autosave run has been scheduled,
-      // so IndexedDB still holds the pre-edit document.
       fireAuthEvent('TOKEN_REFRESHED', { user: { id: ACCOUNT_ID } });
       await new Promise(resolve => setTimeout(resolve, 20));
     });
 
+    // The guard returns before `createBrowserDmWorkspace()`, so this count is
+    // the scheduling-independent witness that no second hydration pass ran:
+    // it is 2 without the guard however the chain happened to interleave.
+    expect(openContext).toHaveBeenCalledTimes(1);
     expect(useNPCStore.getState().npcsByCampaign[campaign.code]![0]!.name).toBe(
       'Edited before the token refresh'
     );
+
+    // …and the baseline survived the auth event, so the edit still committed.
+    const database = await openRollkeeperDatabase();
+    try {
+      const document = await new IndexedDbNpcRepository(database).getDocument(
+        NAMESPACE,
+        'npc-1'
+      );
+      expect(document?.payload?.name).toBe('Edited before the token refresh');
+      expect(document?.localRevision).toBe(2);
+    } finally {
+      database.close();
+    }
   });
 
   it('does not upload the local candidate after enrollment until the cloud generation is applied', async () => {
     vi.stubEnv('NEXT_PUBLIC_NPC_SYNC_VISIBLE', 'true');
-    mockOwnerWorkspace();
+    mockOwnerWorkspaceWithMemory();
     useNPCStore.setState(oneNpcState());
     seedOneNpcEnvelope();
     const cloudPayload = { ...npcPayload(), name: 'Cloud NPC' };
