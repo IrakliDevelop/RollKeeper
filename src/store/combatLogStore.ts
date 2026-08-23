@@ -2,13 +2,13 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { createSafeStorage } from '@/lib/safeStorage';
+import { COMBAT_LOG_STORAGE_KEY } from '@/utils/constants';
 import {
   CombatLogEvent,
   CombatLogFilters,
   CombatLogState,
 } from '@/types/combatLog';
 
-const COMBAT_LOG_STORAGE_KEY = 'rollkeeper-combat-log';
 const MAX_ENCOUNTERS_STORED = 10;
 
 function generateId(): string {

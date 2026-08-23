@@ -644,6 +644,7 @@ export const STORAGE_KEY = 'rollkeeper-character';
 export const CHARACTER_ENVELOPE_KEY_PREFIX = 'rollkeeper-character:';
 export const PLAYER_STORAGE_KEY = 'rollkeeper-player-data';
 export const ENCOUNTER_STORAGE_KEY = 'rollkeeper-encounter-data';
+export const COMBAT_LOG_STORAGE_KEY = 'rollkeeper-combat-log';
 export const APP_VERSION = '1.0.0';
 
 // Avatar upload settings
