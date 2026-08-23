@@ -106,6 +106,10 @@ describe('encounter family authority marker', () => {
       JSON.stringify({ version: 1, authority: 'postgres', epoch: 4 })
     );
     expect(read()).toBeNull();
+    // A marker that cannot be parsed or validated never routes the family.
+    expect(encounterUsesIndexedDbAuthority(localStorage, 'ABC123')).toBe(false);
+    localStorage.setItem(key, '{bad');
+    expect(encounterUsesIndexedDbAuthority(localStorage, 'ABC123')).toBe(false);
   });
 
   it('round-trips a written marker and classifies which authorities own the family', () => {
@@ -220,6 +224,51 @@ describe('encounter authority-aware Zustand storage', () => {
 
     const persisted = JSON.parse(localStorage.getItem(KEY)!);
     expect(persisted.state.encounters).toEqual([encounter('enc-d', 'DEF456')]);
+  });
+
+  it('writes the first envelope byte-identically when no campaign is routed', () => {
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    writeEncounterAuthorityMarker(localStorage, 'ABC123', marker('postgres'));
+    const next = envelope([encounter('enc-d', 'DEF456')]);
+
+    createEncounterAwareStorage(localStorage).setItem(KEY, next);
+
+    expect(localStorage.getItem(KEY)).toBe(next);
+  });
+
+  it('never introduces a tombstone map on an envelope that carries none', () => {
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    const frozen = encounter('enc-a', 'ABC123');
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({
+        state: { encounters: [frozen], activeEncounterId: null },
+        version: 2,
+      })
+    );
+    writeEncounterAuthorityMarker(localStorage, 'ABC123', marker('postgres'));
+
+    createEncounterAwareStorage(localStorage).setItem(
+      KEY,
+      JSON.stringify({
+        state: {
+          encounters: [
+            encounter('enc-a', 'ABC123', { round: 3 }),
+            encounter('enc-d', 'DEF456'),
+          ],
+          activeEncounterId: 'enc-d',
+        },
+        version: 2,
+      })
+    );
+
+    const persisted = JSON.parse(localStorage.getItem(KEY)!);
+    expect('encounterTombstones' in persisted.state).toBe(false);
+    expect(persisted.state.encounters).toEqual([
+      encounter('enc-d', 'DEF456'),
+      frozen,
+    ]);
+    expect(persisted.state.activeEncounterId).toBe('enc-d');
   });
 
   it('freezes routed tombstones and drops routed tombstones absent from the previous envelope', () => {

@@ -276,6 +276,33 @@ describe('initCrossTabEncounterSync routed-campaign guard', () => {
     expect(store.getState().encounterTombstones).toEqual({});
   });
 
+  it('keeps a routed encounter alive against a pre-existing local tombstone', () => {
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    routeCampaign('ABC123');
+    const routedLocal = makeEncounter({
+      id: 'enc-routed',
+      campaignCode: 'ABC123',
+    });
+    // A legacy tab deleted this encounter before the campaign was routed, so
+    // the tombstone is already in local state; the cloud family owns the
+    // encounter now and the merge must never drop it.
+    const store = makeStore([routedLocal], {
+      [routedLocal.id]: tombstoneOf(routedLocal),
+    });
+    cleanup = initCrossTabEncounterSync(store);
+
+    fireStorage(
+      ENCOUNTER_STORAGE_KEY,
+      wrap([makeEncounter({ id: 'enc-legacy', campaignCode: 'DEF456' })])
+    );
+
+    expect(store.setState).toHaveBeenCalledTimes(1);
+    expect(store.getState().encounters.map(e => e.id)).toEqual([
+      'enc-routed',
+      'enc-legacy',
+    ]);
+  });
+
   it('still merges, adopts and tombstones campaigns that stayed on legacy', () => {
     vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
     routeCampaign('ABC123');
