@@ -28,6 +28,7 @@ import {
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
 import * as supabaseBrowser from '@/lib/supabase/browser';
+import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 import * as browserDmWorkspace from '@/lib/supabase/browserDmWorkspace';
 import { useDmStore } from '@/store/dmStore';
 import { useEncounterStore } from '@/store/encounterStore';
@@ -96,6 +97,33 @@ function mockOwnerWorkspace() {
     forkLegacy: vi.fn(),
     close: vi.fn(),
   });
+}
+
+/**
+ * Faithful stand-in for the repository-backed context: `discover` returns the
+ * cloud-side workspaces, but `list` returns only what was explicitly
+ * `remember`ed — which is what a reload's hydrate() reads.
+ */
+function mockOwnerWorkspaceWithMemory() {
+  const remembered: DmWorkspaceDocument[] = [];
+  vi.spyOn(browserDmWorkspace, 'createBrowserDmWorkspace').mockImplementation(
+    async () => ({
+      accountId: ACCOUNT_ID,
+      accountLabel: 'fake@example.test',
+      list: vi.fn().mockImplementation(async () => [...remembered]),
+      discover: vi.fn().mockResolvedValue([workspace]),
+      remember: vi
+        .fn()
+        .mockImplementation(async (item: DmWorkspaceDocument) => {
+          if (!remembered.some(known => known.cloudId === item.cloudId))
+            remembered.push(item);
+        }),
+      create: vi.fn(),
+      forkLegacy: vi.fn(),
+      close: vi.fn(),
+    })
+  );
+  return remembered;
 }
 
 function mockOwnerSession() {
@@ -724,6 +752,110 @@ describe('EncounterSyncControls gates', () => {
     await waitFor(() =>
       expect(requests.map(request => request.action)).toContain('put')
     );
+  });
+
+  it('hydrates after a reload when the workspace was only discovered, never enrolled', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    const remembered = mockOwnerWorkspaceWithMemory();
+    mockOwnerSession();
+    seedEnvelope([encounter()]);
+    useEncounterStore.setState({
+      encounters: [encounter()],
+      encounterTombstones: {},
+    });
+    const createObjectURL = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:encounter-recovery');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
+      () => undefined
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderControls();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Find owner workspaces' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Select Encounters/ })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Preview exact manifest' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Download recovery file' })
+    );
+    await screen.findByText(/Reopen that file here before selection/);
+    const downloadedBlob = createObjectURL.mock.calls[0]![0] as Blob;
+    fireEvent.change(
+      screen.getByLabelText('Downloaded encounter recovery file'),
+      {
+        target: {
+          files: [
+            new File([await downloadedBlob.text()], 'encounter-backup.json', {
+              type: 'application/json',
+            }),
+          ],
+        },
+      }
+    );
+    await screen.findByText(
+      'Recovery file verified and encounters selected. LocalStorage remains authoritative.'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare IndexedDB' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Confirm local cutover' })
+    );
+    await screen.findByText(
+      'Local: saved · IndexedDB authority epoch 1 · Cloud: inactive'
+    );
+
+    // Simulate the reload: the mount is fresh, localStorage keeps the frozen
+    // legacy copy plus the authority marker, and IndexedDB keeps the cutover
+    // generation. Cloud activation never happened.
+    cleanup();
+    useEncounterStore.setState({
+      encounters: [encounter()],
+      encounterTombstones: {},
+    });
+    renderControls();
+
+    // A locally cut-over device must hydrate on reload without ever touching
+    // the cloud; the workspace has to have been persisted for that to work.
+    expect(
+      await screen.findByText(
+        'Encounters loaded from the verified local IndexedDB generation.'
+      )
+    ).toBeVisible();
+    expect(
+      screen.queryByText(
+        'The initialized encounter namespace has no matching owner workspace on this device.'
+      )
+    ).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Activate cloud family' })
+    ).toBeVisible();
+    expect(remembered).toHaveLength(1);
+
+    // …and edits keep committing instead of dying in the frozen legacy key.
+    const commit = vi.spyOn(IndexedDbEncounterRepository.prototype, 'commit');
+    await act(async () => {
+      useEncounterStore
+        .getState()
+        .updateEncounter('enc-1', { name: 'Edited after reload' });
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+    expect(commit).toHaveBeenCalled();
+    const database = await openRollkeeperDatabase();
+    try {
+      const document = await new IndexedDbEncounterRepository(
+        database
+      ).getDocument(NAMESPACE, 'enc-1');
+      expect(document?.payload?.name).toBe('Edited after reload');
+      expect(document?.localRevision).toBe(2);
+    } finally {
+      database.close();
+    }
   });
 });
 

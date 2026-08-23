@@ -934,6 +934,14 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       });
       if (current.fingerprint !== manifest.fingerprint)
         throw new Error('Manifest changed; preview again.');
+      // Only the cloud-enrollment paths persisted the chosen workspace, so a
+      // device that merely *discovered* one had no workspace_identity document
+      // and could not hydrate after a reload: hydrate() looks the campaign up
+      // by cloudId, bailed out, and left the store on the frozen legacy key
+      // with every later edit silently uncommitted. Local cutover must stand
+      // alone, with no cloud activation. Remembering before the cutover means a
+      // failure here leaves legacy authority untouched.
+      await context.remember(workspace);
       const updatedAt = new Date().toISOString();
       const next = await commitEncounterLocalCutover(database, {
         namespace,
