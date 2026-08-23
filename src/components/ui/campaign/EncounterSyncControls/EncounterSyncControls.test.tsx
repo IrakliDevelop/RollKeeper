@@ -714,15 +714,16 @@ describe('EncounterSyncControls gates', () => {
     // The restore rewrote the store from IndexedDB, so it is a hydrating path:
     // the next edit must still reach IndexedDB and the cloud.
     const commit = vi.spyOn(IndexedDbEncounterRepository.prototype, 'commit');
-    await act(async () => {
+    act(() => {
       useEncounterStore
         .getState()
         .updateEncounter('enc-1', { name: 'Post-restore edit' });
-      await new Promise(resolve => setTimeout(resolve, 10));
     });
 
-    expect(commit).toHaveBeenCalled();
-    expect(requests.map(request => request.action)).toContain('put');
+    await waitFor(() => expect(commit).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(requests.map(request => request.action)).toContain('put')
+    );
   });
 });
 
