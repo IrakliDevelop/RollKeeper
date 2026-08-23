@@ -223,6 +223,15 @@ function applyNpcDocuments(campaignCode: string, documents: StoreDocument[]) {
   }));
 }
 
+/** Identity of the exact local generation a hydration pass consumed. */
+function authorityGeneration(
+  accountId: string,
+  campaignId: string,
+  next: NpcAuthority
+) {
+  return `${accountId}:${campaignId}:${next.authority}:${next.epoch}`;
+}
+
 function storeDocumentsFromLocal(documents: NpcDocument[]) {
   return documents.map(document => ({
     legacyId: document.legacyId,
@@ -273,7 +282,14 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Autosave is armed only once the store provably holds this device's routed
+  // generation. `authority && scope` is not enough: device enrollment sets both
+  // while the store still shows the un-uploaded local candidate.
+  const [hydrated, setHydrated] = useState(false);
   const lastFingerprints = useRef<Map<string, string> | null>(null);
+  // The exact local generation the store was hydrated from, so a repeated
+  // Supabase auth event cannot re-run hydration over newer local work.
+  const hydrationSignature = useRef<string | null>(null);
   // Autosave runs are serialized: two overlapping runs could interleave their
   // acknowledgements and rewind a document fingerprint to an older value.
   const autosaveChain = useRef<Promise<void>>(Promise.resolve());
@@ -293,6 +309,8 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
     const hide = () => {
       setScope(null);
       setAuthority(null);
+      setHydrated(false);
+      hydrationSignature.current = null;
       hideNpcs(campaignCode);
     };
     const hydrate = async (accountId: string | null) => {
@@ -315,6 +333,19 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
           hide();
           return;
         }
+        // `onAuthStateChange` fires on TOKEN_REFRESHED (hourly, and whenever a
+        // hidden tab's token expired) with the same account and the same local
+        // generation. Re-running the pass below would replace the store with
+        // the pre-edit documents and reset the baseline underneath an
+        // in-flight autosave run, losing the edit everywhere at once — the
+        // legacy key is frozen for a routed campaign. A genuine account,
+        // campaign, or authority/epoch change still changes this signature and
+        // still hydrates.
+        if (
+          hydrationSignature.current ===
+          authorityGeneration(accountId, marker.campaignId, localAuthority)
+        )
+          return;
         const restoredContext = await createBrowserDmWorkspace();
         if (cancelled) {
           restoredContext?.close();
@@ -360,14 +391,27 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
         setWorkspace(restoredWorkspace);
         setScope({ accountId, campaignId: marker.campaignId });
         setAuthority(localAuthority);
+        hydrationSignature.current = authorityGeneration(
+          accountId,
+          marker.campaignId,
+          localAuthority
+        );
+        setHydrated(true);
         setStatus('NPCs loaded from the verified local IndexedDB generation.');
       } finally {
         database.close();
       }
     };
+    // Hydration shares the autosave chain, so it can never interleave with an
+    // in-flight run that has already captured its fingerprints.
+    const queueHydrate = (accountId: string | null) => {
+      const queued = autosaveChain.current.then(() => hydrate(accountId));
+      autosaveChain.current = queued.catch(() => undefined);
+      return queued;
+    };
     void client.auth
       .getSession()
-      .then(result => hydrate(result.data.session?.user.id ?? null))
+      .then(result => queueHydrate(result.data.session?.user.id ?? null))
       .catch(cause =>
         setError(
           cause instanceof Error
@@ -376,7 +420,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
         )
       );
     const { data } = client.auth.onAuthStateChange((_event, session) => {
-      void hydrate(session?.user.id ?? null).catch(cause =>
+      void queueHydrate(session?.user.id ?? null).catch(cause =>
         setError(
           cause instanceof Error ? cause.message : 'Local hydration failed'
         )
@@ -408,7 +452,13 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
     // readNpcAuthorityMarker (zero storage reads while the flag is off);
     // this explicit return is belt-and-braces for the route-level owner.
     if (!isNpcClientVisible() || !campaignCode) return;
-    if (busy || !authority || authority.authority === 'localStorage' || !scope)
+    if (
+      busy ||
+      !hydrated ||
+      !authority ||
+      authority.authority === 'localStorage' ||
+      !scope
+    )
       return;
     let cancelled = false;
     const run = async () => {
@@ -519,7 +569,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [authority, busy, npcs, campaignCode, scope]);
+  }, [authority, busy, npcs, campaignCode, hydrated, scope]);
 
   const discover = async () => {
     if (!campaignCode) return;
@@ -766,6 +816,14 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       });
       if (current.fingerprint !== manifest.fingerprint)
         throw new Error('Manifest changed; preview again.');
+      // Only the cloud-enrollment paths persisted the chosen workspace, so a
+      // device that merely *discovered* one had no workspace_identity document
+      // and could not hydrate after a reload: hydrate() looks the campaign up
+      // by cloudId, bailed out, and left the store on the frozen legacy key
+      // with every later edit silently uncommitted. Local cutover must stand
+      // alone, with no cloud activation. Remembering before the cutover means a
+      // failure here leaves legacy authority untouched.
+      await context.remember(workspace);
       const updatedAt = new Date().toISOString();
       const next = await commitNpcLocalCutover(database, {
         namespace,
@@ -800,6 +858,13 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
         })),
       });
       setAuthority(next);
+      hydrationSignature.current = authorityGeneration(
+        context.accountId,
+        campaignId,
+        next
+      );
+      // The store already holds exactly the NPCs this cutover captured.
+      setHydrated(true);
       writeNpcAuthorityMarker(localStorage, campaignCode, {
         version: 1,
         authority: 'indexedDB',
@@ -922,6 +987,11 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
           })),
         });
         setAuthority(next);
+        hydrationSignature.current = authorityGeneration(
+          context.accountId,
+          campaignId,
+          next
+        );
         writeNpcAuthorityMarker(localStorage, campaignCode, {
           version: 1,
           authority: 'postgres',
@@ -1034,6 +1104,16 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
           now: () => new Date().toISOString(),
         });
         setAuthority(next);
+        // The enrolled device holds the cloud documents in IndexedDB while the
+        // store still shows the local candidate, so autosave stays disarmed
+        // until the DM applies the exact cloud generation. The confirm above
+        // promises that candidate is never uploaded automatically.
+        setHydrated(false);
+        hydrationSignature.current = authorityGeneration(
+          context.accountId,
+          campaignId,
+          next
+        );
         await context.remember(workspace);
         writeNpcAuthorityMarker(localStorage, campaignCode, {
           version: 1,
@@ -1113,6 +1193,8 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       }
       await context.remember(workspace);
       applyNpcDocuments(campaignCode, documents);
+      // The store now matches the enrolled generation, so autosave is armed.
+      setHydrated(true);
       lastFingerprints.current = new Map(
         documents
           .filter(document => !document.tombstoned)
@@ -1252,6 +1334,11 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
             .filter(document => document.operation !== 'delete')
             .map(document => [document.legacyId, document.contentFingerprint])
         );
+        // A restore rewrites the store from IndexedDB, so like hydrate,
+        // activateLocal, and applyExactCloudVersion it must arm autosave: on an
+        // enrolled-but-unapplied device the legacy key is frozen, so a
+        // disarmed edit would live only in memory and vanish on reload.
+        setHydrated(true);
       } finally {
         database.close();
       }
@@ -1340,6 +1427,8 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
         namespace,
       });
       applyNpcDocuments(campaignCode, result.currentGeneration.documents ?? []);
+      setHydrated(false);
+      hydrationSignature.current = null;
       rollbackMutationId.current = null;
       setStatus(
         'Rollback accepted through a new epoch; sources were preserved. Reload to use the verified legacy generation.'
@@ -1407,8 +1496,10 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
         });
         hideNpcs(campaignCode);
         lastFingerprints.current = null;
+        hydrationSignature.current = null;
         setScope(null);
         setAuthority(null);
+        setHydrated(false);
         setStatus(
           'Only the selected account namespace was hidden; cloud, history, legacy, conflicts, and outboxes were preserved.'
         );
