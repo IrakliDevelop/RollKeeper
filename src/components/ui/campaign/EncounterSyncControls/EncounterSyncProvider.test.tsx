@@ -77,7 +77,12 @@ function seedCampaign() {
   });
 }
 
+let authListener:
+  | ((event: string, session: { user: { id: string } } | null) => void)
+  | undefined;
+
 function mockOwnerAccount() {
+  authListener = undefined;
   vi.spyOn(browserDmWorkspace, 'createBrowserDmWorkspace').mockResolvedValue({
     accountId: ACCOUNT_ID,
     accountLabel: 'synthetic@example.test',
@@ -93,8 +98,9 @@ function mockOwnerAccount() {
       getSession: vi.fn().mockResolvedValue({
         data: { session: { user: { id: ACCOUNT_ID } } },
       }),
-      onAuthStateChange: vi.fn().mockReturnValue({
-        data: { subscription: { unsubscribe: vi.fn() } },
+      onAuthStateChange: vi.fn().mockImplementation(callback => {
+        authListener = callback;
+        return { data: { subscription: { unsubscribe: vi.fn() } } };
       }),
     },
   } as never);
@@ -404,5 +410,122 @@ describe('EncounterSyncProvider owner mount', () => {
         database.close();
       }
     });
+  });
+
+  it('keeps an in-flight edit when a Supabase token refresh fires mid-run', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    await seedIndexedDbGeneration(encounterPayload());
+    mockOwnerAccount();
+
+    render(
+      <EncounterSyncProvider campaignCode="SYNTH1">
+        <p>encounter route</p>
+      </EncounterSyncProvider>
+    );
+
+    await waitFor(() =>
+      expect(useEncounterStore.getState().encounters).toHaveLength(1)
+    );
+    expect(authListener).toBeDefined();
+
+    // Hold the autosave commit open so the refresh lands while the run has
+    // already captured its fingerprints but has not yet committed.
+    const commit = IndexedDbEncounterRepository.prototype.commit;
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    vi.spyOn(
+      IndexedDbEncounterRepository.prototype,
+      'commit'
+    ).mockImplementation(async function (
+      this: IndexedDbEncounterRepository,
+      mutation
+    ) {
+      await gate;
+      return commit.call(this, mutation);
+    });
+
+    await act(async () => {
+      useEncounterStore
+        .getState()
+        .updateEncounter('enc-1', { name: 'Reinforcements arrive' });
+    });
+
+    // auth-js emits this hourly, and whenever a hidden tab's token expired.
+    await act(async () => {
+      authListener!('TOKEN_REFRESHED', { user: { id: ACCOUNT_ID } });
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      release();
+      await Promise.resolve();
+    });
+
+    // The refresh must not revert the store to the pre-edit generation, and
+    // must not rewrite the baseline out from under the in-flight run.
+    await waitFor(async () => {
+      const database = await openRollkeeperDatabase();
+      try {
+        const repository = new IndexedDbEncounterRepository(database);
+        const document = await repository.getDocument(NAMESPACE, 'enc-1');
+        expect(document?.payload?.name).toBe('Reinforcements arrive');
+      } finally {
+        database.close();
+      }
+    });
+    expect(useEncounterStore.getState().encounters[0].name).toBe(
+      'Reinforcements arrive'
+    );
+  });
+
+  it('does not re-fingerprint this campaign when another campaign is edited', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    await seedIndexedDbGeneration(encounterPayload());
+    mockOwnerAccount();
+
+    render(
+      <EncounterSyncProvider campaignCode="SYNTH1">
+        <p>encounter route</p>
+      </EncounterSyncProvider>
+    );
+
+    await waitFor(() =>
+      expect(useEncounterStore.getState().encounters).toHaveLength(1)
+    );
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+
+    const digest = vi.spyOn(crypto.subtle, 'digest');
+    await act(async () => {
+      useEncounterStore.setState(state => ({
+        encounters: [...state.encounters, otherCampaignEncounter],
+      }));
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+
+    // An unrelated campaign's edit changes the global array identity; this
+    // campaign's untouched records must not be canonicalized and hashed again.
+    expect(digest).not.toHaveBeenCalled();
+
+    // Positive control: a real edit to this campaign still hashes.
+    await act(async () => {
+      useEncounterStore
+        .getState()
+        .updateEncounter('enc-1', { name: 'Second wave' });
+    });
+    await waitFor(async () => {
+      const database = await openRollkeeperDatabase();
+      try {
+        const repository = new IndexedDbEncounterRepository(database);
+        const document = await repository.getDocument(NAMESPACE, 'enc-1');
+        expect(document?.payload?.name).toBe('Second wave');
+      } finally {
+        database.close();
+      }
+    });
+    expect(digest).toHaveBeenCalled();
   });
 });

@@ -278,6 +278,39 @@ function applyEncounterDocuments(
   }));
 }
 
+/**
+ * Fingerprints keyed by encounter object identity. `updateEncounterById`
+ * (`src/store/encounterStore.ts`) rebuilds only the encounter it touches, so
+ * every untouched record is a cache hit: a damage click no longer
+ * re-canonicalizes and re-hashes the campaign's other encounters (each legal up
+ * to 262,144 canonical bytes of entity stat blocks), and an edit in a
+ * *different* campaign — which changes the global `encounters` array identity
+ * and therefore re-runs this campaign's pass — costs nothing.
+ * Deliberate divergence from the 11D NPC template, whose slice is already
+ * campaign-scoped and whose records are small; backporting it is a recorded
+ * follow-up.
+ */
+const encounterFingerprints = new WeakMap<Encounter, string>();
+
+async function fingerprintEncounter(encounter: Encounter) {
+  const cached = encounterFingerprints.get(encounter);
+  if (cached !== undefined) return cached;
+  const fingerprint = await fingerprintEncounterPayload(
+    encounterPayloadFromEncounter(encounter)
+  );
+  encounterFingerprints.set(encounter, fingerprint);
+  return fingerprint;
+}
+
+/** Identity of the exact local generation a hydration pass consumed. */
+function authorityGeneration(
+  accountId: string,
+  campaignId: string,
+  next: EncounterAuthority
+) {
+  return `${accountId}:${campaignId}:${next.authority}:${next.epoch}`;
+}
+
 function storeDocumentsFromLocal(documents: EncounterDocument[]) {
   return documents.map(document => ({
     legacyId: document.legacyId,
@@ -336,7 +369,14 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Autosave is armed only once the store provably holds this device's routed
+  // generation. `authority && scope` is not enough: device enrollment sets both
+  // while the store still shows the un-uploaded local candidate.
+  const [hydrated, setHydrated] = useState(false);
   const lastFingerprints = useRef<Map<string, string> | null>(null);
+  // The exact local generation the store was hydrated from, so a repeated
+  // Supabase auth event cannot re-run hydration over newer local work.
+  const hydrationSignature = useRef<string | null>(null);
   // Autosave runs are serialized: two overlapping runs could interleave their
   // acknowledgements and rewind a document fingerprint to an older value.
   const autosaveChain = useRef<Promise<void>>(Promise.resolve());
@@ -357,6 +397,8 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
     const hide = () => {
       setScope(null);
       setAuthority(null);
+      setHydrated(false);
+      hydrationSignature.current = null;
       hideEncounters(campaignCode);
     };
     const hydrate = async (accountId: string | null) => {
@@ -383,6 +425,20 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
           hide();
           return;
         }
+        // `onAuthStateChange` fires on TOKEN_REFRESHED (hourly, and whenever a
+        // hidden tab's token expired) with the same account and the same local
+        // generation. Re-running the pass below would replace the store with
+        // the pre-edit documents and reset the baseline underneath an
+        // in-flight autosave run, losing the edit everywhere at once — the
+        // legacy key is frozen for a routed campaign. A genuine account,
+        // campaign, or authority/epoch change still changes this signature and
+        // still hydrates. (Divergence from the 11D template; backport
+        // recorded as a follow-up.)
+        if (
+          hydrationSignature.current ===
+          authorityGeneration(accountId, marker.campaignId, localAuthority)
+        )
+          return;
         const restoredContext = await createBrowserDmWorkspace();
         if (cancelled) {
           restoredContext?.close();
@@ -431,6 +487,12 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         setWorkspace(restoredWorkspace);
         setScope({ accountId, campaignId: marker.campaignId });
         setAuthority(localAuthority);
+        hydrationSignature.current = authorityGeneration(
+          accountId,
+          marker.campaignId,
+          localAuthority
+        );
+        setHydrated(true);
         setStatus(
           'Encounters loaded from the verified local IndexedDB generation.'
         );
@@ -438,9 +500,16 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         database.close();
       }
     };
+    // Hydration shares the autosave chain, so it can never interleave with an
+    // in-flight run that has already captured its fingerprints.
+    const queueHydrate = (accountId: string | null) => {
+      const queued = autosaveChain.current.then(() => hydrate(accountId));
+      autosaveChain.current = queued.catch(() => undefined);
+      return queued;
+    };
     void client.auth
       .getSession()
-      .then(result => hydrate(result.data.session?.user.id ?? null))
+      .then(result => queueHydrate(result.data.session?.user.id ?? null))
       .catch(cause =>
         setError(
           cause instanceof Error
@@ -449,7 +518,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         )
       );
     const { data } = client.auth.onAuthStateChange((_event, session) => {
-      void hydrate(session?.user.id ?? null).catch(cause =>
+      void queueHydrate(session?.user.id ?? null).catch(cause =>
         setError(
           cause instanceof Error ? cause.message : 'Local hydration failed'
         )
@@ -481,7 +550,13 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
     // readEncounterAuthorityMarker (zero storage reads while the flag is off);
     // this explicit return is belt-and-braces for the route-level owner.
     if (!isEncounterClientVisible() || !campaignCode) return;
-    if (busy || !authority || authority.authority === 'localStorage' || !scope)
+    if (
+      busy ||
+      !hydrated ||
+      !authority ||
+      authority.authority === 'localStorage' ||
+      !scope
+    )
       return;
     let cancelled = false;
     const run = async () => {
@@ -490,14 +565,9 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       const current = new Map<string, string>();
       for (const encounter of encounters) {
         byId.set(encounter.id, encounter);
-        current.set(
-          encounter.id,
-          // Ruling 1b: an encounter in active combat is committed like any
-          // other edit; only cutover is blocked.
-          await fingerprintEncounterPayload(
-            encounterPayloadFromEncounter(encounter)
-          )
-        );
+        // Ruling 1b: an encounter in active combat is committed like any
+        // other edit; only cutover is blocked.
+        current.set(encounter.id, await fingerprintEncounter(encounter));
       }
       const tombstoned = new Set<string>();
       for (const [legacyId, tombstone] of Object.entries(allTombstones)) {
@@ -605,7 +675,15 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [authority, busy, encounters, allTombstones, campaignCode, scope]);
+  }, [
+    authority,
+    busy,
+    encounters,
+    allTombstones,
+    campaignCode,
+    hydrated,
+    scope,
+  ]);
 
   const discover = async () => {
     if (!campaignCode) return;
@@ -892,6 +970,13 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         })),
       });
       setAuthority(next);
+      hydrationSignature.current = authorityGeneration(
+        context.accountId,
+        campaignId,
+        next
+      );
+      // The store already holds exactly the encounters this cutover captured.
+      setHydrated(true);
       writeEncounterAuthorityMarker(localStorage, campaignCode, {
         version: 1,
         authority: 'indexedDB',
@@ -1014,6 +1099,11 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
           })),
         });
         setAuthority(next);
+        hydrationSignature.current = authorityGeneration(
+          context.accountId,
+          campaignId,
+          next
+        );
         writeEncounterAuthorityMarker(localStorage, campaignCode, {
           version: 1,
           authority: 'postgres',
@@ -1126,6 +1216,16 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
           now: () => new Date().toISOString(),
         });
         setAuthority(next);
+        // The enrolled device holds the cloud documents in IndexedDB while the
+        // store still shows the local candidate, so autosave stays disarmed
+        // until the DM applies the exact cloud generation. The confirm above
+        // promises that candidate is never uploaded automatically.
+        setHydrated(false);
+        hydrationSignature.current = authorityGeneration(
+          context.accountId,
+          campaignId,
+          next
+        );
         await context.remember(workspace);
         writeEncounterAuthorityMarker(localStorage, campaignCode, {
           version: 1,
@@ -1205,6 +1305,8 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       }
       await context.remember(workspace);
       applyEncounterDocuments(campaignCode, documents);
+      // The store now matches the enrolled generation, so autosave is armed.
+      setHydrated(true);
       lastFingerprints.current = new Map(
         documents
           .filter(document => !document.tombstoned)
@@ -1441,6 +1543,8 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         campaignCode,
         result.currentGeneration.documents ?? []
       );
+      setHydrated(false);
+      hydrationSignature.current = null;
       rollbackMutationId.current = null;
       setStatus(
         'Rollback accepted through a new epoch; sources were preserved. Reload to use the verified legacy generation.'
@@ -1508,8 +1612,10 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         });
         hideEncounters(campaignCode);
         lastFingerprints.current = null;
+        hydrationSignature.current = null;
         setScope(null);
         setAuthority(null);
+        setHydrated(false);
         setStatus(
           'Only the selected account namespace was hidden; cloud, history, legacy, conflicts, and outboxes were preserved.'
         );

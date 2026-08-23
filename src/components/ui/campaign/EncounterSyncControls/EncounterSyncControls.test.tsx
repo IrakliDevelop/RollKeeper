@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto';
 
+import { act } from 'react';
 import {
   cleanup,
   fireEvent,
@@ -19,6 +20,7 @@ import {
   commitEncounterLocalCutover,
   markEncounterCloudAuthority,
 } from '@/lib/indexeddb/encounterAuthority';
+import { IndexedDbEncounterRepository } from '@/lib/indexeddb/encounterRepository';
 import * as localDatabase from '@/lib/indexeddb/localDatabase';
 import {
   deleteRollkeeperDatabaseForTests,
@@ -535,6 +537,77 @@ describe('EncounterSyncControls gates', () => {
       'Rollback accepted through a new epoch; sources were preserved. Reload to use the verified legacy generation.'
     );
     expect(requests.map(request => request.action)).toContain('rollback');
+  });
+
+  it('never uploads the local candidate after device enrollment', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspace();
+    seedEnvelope([encounter()]);
+    useEncounterStore.setState({
+      encounters: [encounter()],
+      encounterTombstones: {},
+    });
+    const cloudPayload = { ...encounterPayload(), name: 'Cloud encounter' };
+    const requests: Record<string, unknown>[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        requests.push(body);
+        const respond = (value: unknown) =>
+          ({ ok: true, json: async () => value }) as Response;
+        if (body.action === 'preview-enrollment')
+          return respond({
+            authority: 'postgres',
+            epoch: 1,
+            previewFingerprint: 'preview-fingerprint',
+            recordCount: 1,
+            documents: [
+              {
+                legacyId: 'enc-cloud',
+                serverVersion: 1,
+                schemaVersion: 2,
+                payloadFingerprint: 'cloud-fingerprint',
+                tombstoned: false,
+                payload: cloudPayload,
+              },
+            ],
+          });
+        if (body.action === 'enroll-device') return respond({});
+        throw new Error(`unexpected action ${String(body.action)}`);
+      }
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderControls();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Find owner workspaces' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Select Encounters/ })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Preview cloud enrollment' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Enroll this device' })
+    );
+    await screen.findByText(
+      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+    );
+
+    // The enrollment confirm promises the local candidate "is never uploaded
+    // automatically", so autosave must stay disarmed until the DM applies the
+    // exact cloud generation.
+    const commit = vi.spyOn(IndexedDbEncounterRepository.prototype, 'commit');
+    for (const name of ['Local edit one', 'Local edit two']) {
+      await act(async () => {
+        useEncounterStore.getState().updateEncounter('enc-1', { name });
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
+    }
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(requests.map(request => request.action)).not.toContain('put');
   });
 });
 
