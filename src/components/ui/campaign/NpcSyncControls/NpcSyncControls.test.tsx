@@ -7,19 +7,30 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as localDatabase from '@/lib/indexeddb/localDatabase';
 import * as browserDmWorkspace from '@/lib/supabase/browserDmWorkspace';
+import { useDmStore } from '@/store/dmStore';
 import { useNPCStore } from '@/store/npcStore';
 
 import {
   NpcSyncControls,
+  NpcSyncProvider,
   planNpcMutations,
   runNpcMutationPlan,
-} from './NpcSyncControls';
+} from './index';
 
 const campaign = { code: 'SYNTH1', name: 'NPCs', createdAt: 'now' };
+
+/** The card only reads the route-level owner, so every case mounts both. */
+function renderControls() {
+  return render(
+    <NpcSyncProvider campaignCode={campaign.code}>
+      <NpcSyncControls />
+    </NpcSyncProvider>
+  );
+}
 
 const workspace = {
   namespace: 'user:11111111-1111-4111-8111-111111111111' as const,
@@ -79,7 +90,7 @@ function seedOneNpcEnvelope(version = 4) {
 }
 
 async function selectWorkspaceAndPreview() {
-  render(<NpcSyncControls campaign={campaign} />);
+  renderControls();
   fireEvent.click(
     screen.getByRole('button', { name: 'Find owner workspaces' })
   );
@@ -95,6 +106,10 @@ async function selectWorkspaceAndPreview() {
 }
 
 describe('NpcSyncControls gates', () => {
+  beforeEach(() => {
+    useDmStore.setState({ campaigns: [campaign] });
+  });
+
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
@@ -111,7 +126,7 @@ describe('NpcSyncControls gates', () => {
     const open = vi.spyOn(indexedDB, 'open');
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const cookieBefore = document.cookie;
-    const { container } = render(<NpcSyncControls campaign={campaign} />);
+    const { container } = renderControls();
     expect(container).toBeEmptyDOMElement();
     await Promise.resolve();
     expect(getItem).not.toHaveBeenCalled();
@@ -128,7 +143,7 @@ describe('NpcSyncControls gates', () => {
     const open = vi
       .spyOn(localDatabase, 'openRollkeeperDatabase')
       .mockRejectedValue(new Error('must not open'));
-    render(<NpcSyncControls campaign={campaign} />);
+    renderControls();
     fireEvent.click(
       screen.getByRole('button', { name: 'Find owner workspaces' })
     );

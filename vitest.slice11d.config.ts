@@ -17,7 +17,8 @@ export default defineConfig({
       'src/lib/durableDm/slice11dFlags.test.ts',
       'src/lib/indexeddb/__tests__/npc*.test.ts',
       'src/app/api/npc-sync/route.test.ts',
-      'src/components/ui/campaign/NpcSyncControls.test.tsx',
+      'src/components/ui/campaign/NpcSyncControls/*.test.tsx',
+      'src/app/dm/campaign/[code]/__tests__/layout.test.tsx',
     ],
     coverage: {
       enabled: true,

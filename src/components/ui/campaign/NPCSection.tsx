@@ -453,12 +453,15 @@ export function NPCSection({
       />
 
       {/*
-        The sync controls own the autosave effect, and "Add NPC" stays in the
-        always-visible header, so they must mount even while the persisted
-        collapse preference hides the list. The card renders nothing while the
-        client flag is off.
+        The card only reads the route-level NpcSyncProvider owner, mounted in
+        app/dm/campaign/[code]/layout.tsx, so the hydration and autosave effects
+        cover every /dm/campaign/[code]/* route that writes the NPC store
+        (encounter HP/resources/abilities, combatant NPC create/delete, marker
+        loot). "Add NPC" stays in the always-visible header, so the card must
+        still mount outside the collapsible. It renders nothing while the client
+        flag is off.
       */}
-      {campaign && <NpcSyncControls campaign={campaign} />}
+      <NpcSyncControls />
 
       {onGiveMagicItemToPlayer && (
         <MagicItemLibrarySection
