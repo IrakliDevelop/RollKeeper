@@ -29,6 +29,7 @@ import { parseAcBonus } from '@/utils/calculations';
 import { NPCFormDialog } from './NPCFormDialog';
 import { NPCDetailDialog } from './NPCDetailDialog';
 import { MagicItemLibrarySection } from './MagicItemLibrary/MagicItemLibrarySection';
+import { NpcSyncControls } from './NpcSyncControls';
 import type { SendItemTarget } from './SendItemDialog';
 import type { MagicItem } from '@/types/character';
 
@@ -450,6 +451,14 @@ export function NPCSection({
         onUpdateInventory={handleUpdateInventory}
         onSendItemToPlayer={onSendItemToPlayer}
       />
+
+      {/*
+        The sync controls own the autosave effect, and "Add NPC" stays in the
+        always-visible header, so they must mount even while the persisted
+        collapse preference hides the list. The card renders nothing while the
+        client flag is off.
+      */}
+      {campaign && <NpcSyncControls campaign={campaign} />}
 
       {onGiveMagicItemToPlayer && (
         <MagicItemLibrarySection
