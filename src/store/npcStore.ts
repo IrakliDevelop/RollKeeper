@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { createNpcAwareStorage } from '@/lib/durableDm/npcAwareStorage';
 import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { createSafeStorage } from '@/lib/safeStorage';
 import { CampaignNPC } from '@/types/encounter';
@@ -22,10 +23,9 @@ import {
 
 const NPC_STORAGE_KEY = 'rollkeeper-npc-data';
 
+/** A cross-device stable identity, so cloud documents keep one legacy ID. */
 function generateId(): string {
-  return (
-    'npc-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9)
-  );
+  return `npc-${crypto.randomUUID()}`;
 }
 
 function getDuplicateName(name: string, existingNpcs: CampaignNPC[]): string {
@@ -726,7 +726,11 @@ export const useNPCStore = create<NPCStoreState>()(
     {
       name: NPC_STORAGE_KEY,
       skipHydration: isIndexedDbMigrationEnabled(),
-      storage: createJSONStorage(() => createSafeStorage()),
+      storage: createJSONStorage(() =>
+        typeof localStorage === 'undefined'
+          ? createSafeStorage()
+          : createNpcAwareStorage(localStorage)
+      ),
       version: 4,
       migrate: migrateNpcPersistedState,
     }
