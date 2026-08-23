@@ -43,8 +43,13 @@ end; $$;
 -- (entities[].id, entities[].conditions/abilities/resources/lairActions[].id,
 -- entities[].legendaryActions.actions[].id, and the optional StatBlockEntry ids
 -- inside entities[].monsterStatBlock's five sections).
+-- Unlike valid_npc_payload this predicate is deliberately NOT security
+-- definer: it is a pure immutable function over its jsonb argument and reads
+-- no table, so it needs no elevated posture. It keeps set search_path = ''
+-- and stays revoked from public, anon and authenticated; the security definer
+-- callers that invoke it already run as the definer.
 create function private.valid_encounter_payload(p_payload jsonb) returns boolean
-language plpgsql immutable security definer set search_path = '' as $$
+language plpgsql immutable set search_path = '' as $$
 declare v_entity jsonb; v_entry jsonb; v_key text; v_pending jsonb; v_lists jsonb[]; v_list jsonb; v_section jsonb;
 begin
   if pg_catalog.jsonb_typeof(p_payload) is distinct from 'object' then return false; end if;
@@ -247,7 +252,16 @@ create function public.put_encounter_document(
 declare v_actor uuid; v_hash text; v_existing private.campaign_document_mutation_receipts%rowtype; v_doc public.campaign_documents%rowtype; v_next bigint; v_tombstone boolean; v_result jsonb;
 begin
   if p_operation not in ('create','replace','delete') or length(p_legacy_id) not between 1 and 255 or p_schema_version<>2 or p_payload_fingerprint !~ '^[a-f0-9]{64}$'
-    or (p_operation<>'delete' and (not private.valid_encounter_payload(p_payload) or pg_column_size(p_payload)>262144))
+    -- Deliberate deviation from the 11C/11D template, which measures
+    -- pg_column_size here: that is the jsonb binary datum size, ~150% of the
+    -- canonical UTF-8 form that stage_encounter_items and the TS manifest
+    -- measure. Encounters are the first family whose single record aggregates
+    -- every entity's monsterStatBlock, so a legally-sized record (canonical
+    -- ~175KB-262KB, no oversized-record blocker) could stage and cut over and
+    -- then fail every later autosave. Measuring the same canonical bytes here
+    -- guarantees that whatever can be staged can always be written.
+    or (p_operation<>'delete' and (not private.valid_encounter_payload(p_payload)
+      or pg_catalog.octet_length(pg_catalog.convert_to(private.canonical_campaign_document_json(p_payload),'UTF8'))>262144))
   then raise exception using errcode='22023',message='invalid encounter mutation'; end if;
   if p_payload_fingerprint<>private.campaign_document_hash(case when p_operation='delete' then pg_catalog.jsonb_build_object('legacyId',p_legacy_id,'tombstoned',true) else p_payload end)
   then raise exception using errcode='22023',message='encounter fingerprint mismatch'; end if;

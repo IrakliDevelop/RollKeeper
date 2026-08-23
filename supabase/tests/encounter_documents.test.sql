@@ -1,6 +1,6 @@
 begin;
 
-select plan(49);
+select plan(55);
 
 select ok(has_function_privilege('authenticated','public.begin_encounter_staging(uuid,uuid,uuid,bigint,text,text,text,integer,bigint)','EXECUTE'),'owner can begin encounter staging');
 select ok(not has_function_privilege('anon','public.begin_encounter_staging(uuid,uuid,uuid,bigint,text,text,text,integer,bigint)','EXECUTE'),'anon cannot stage encounters');
@@ -161,7 +161,9 @@ select throws_ok(
   $$insert into private.campaign_document_projection_outbox(campaign_id,campaign_document_version_id,family,legacy_id,server_version,cutover_epoch,projection_kind,source_fingerprint)
     select v.campaign_id,v.id,'encounter_definition',v.legacy_id,v.server_version,v.cutover_epoch,'calendar_v1',v.payload_fingerprint
     from private.campaign_document_versions v where v.family='encounter_definition' limit 1$$,
-  '23514',null,'the projection outbox structurally rejects the encounter family'
+  '23514',
+  'new row for relation "campaign_document_projection_outbox" violates check constraint "campaign_document_projection_outbox_family_check"',
+  'the projection outbox structurally rejects the encounter family'
 );
 select is((select count(*) from private.campaign_family_device_enrollments where family='encounter_definition' and device_id='e3000000-0000-4000-8000-000000000001'),1::bigint,'initial encounter device enrolled atomically');
 
@@ -237,9 +239,36 @@ reset role;
 create temporary table encounter_generation as
 select private.encounter_generation((select (result->>'campaignId')::uuid from encounter_workspace)) as documents;
 grant select on encounter_generation to authenticated;
+create temporary table encounter_mutated_generation as
+select pg_catalog.jsonb_set(documents,'{0,serverVersion}','99'::jsonb) as documents from encounter_generation;
+grant select on encounter_mutated_generation to authenticated;
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
+
+-- The positive rollback below hands the server back its own generation, so on
+-- its own it can never exercise the compare. These three cases do.
+select throws_ok(
+  $$select public.enroll_encounter_device('e2000000-0000-4000-8000-000000000050',(select (result->>'campaignId')::uuid from encounter_workspace),'e3000000-0000-4000-8000-000000000004',1,repeat('a',64),null)$$,
+  '40001','encounter enrollment preview changed','a stale encounter enrollment preview cannot enroll a device'
+);
+select throws_ok(
+  $$select public.rollback_encounter_family(
+    'e2000000-0000-4000-8000-000000000051',(select (result->>'campaignId')::uuid from encounter_workspace),1,
+    (select public.preview_encounter_device_enrollment((select (result->>'campaignId')::uuid from encounter_workspace))->>'previewFingerprint'),
+    pg_catalog.jsonb_build_object('recordCount',2,'documents',(select documents from encounter_mutated_generation))
+  )$$,
+  '40001','verified encounter generation changed','a mutated encounter generation cannot authorize rollback'
+);
+select throws_ok(
+  $$select public.rollback_encounter_family(
+    'e2000000-0000-4000-8000-000000000052',(select (result->>'campaignId')::uuid from encounter_workspace),1,
+    (select public.preview_encounter_device_enrollment((select (result->>'campaignId')::uuid from encounter_workspace))->>'previewFingerprint'),
+    '[]'::jsonb
+  )$$,
+  '55000','verified current encounter generation required','an empty encounter generation cannot authorize rollback'
+);
+
 create temporary table encounter_rollback as
 select public.rollback_encounter_family(
   'e2000000-0000-4000-8000-000000000012',(select (result->>'campaignId')::uuid from encounter_workspace),1,
@@ -328,6 +357,60 @@ select public.confirm_encounter_cutover('e2000000-0000-4000-8000-000000000032',(
 grant select on encounter_empty_cutover to authenticated;
 select is(result->>'recordCount','0','a zero-record run confirms without any staged document') from encounter_empty_cutover;
 select is(result->>'authority','postgres','a zero-record cutover still activates only encounter authority') from encounter_empty_cutover;
+
+-- Regression for the put/stage size-measure mismatch: an entity-heavy encounter
+-- whose canonical UTF-8 form is legally sized (<= 262,144, so the manifest
+-- raises no oversized-record blocker and staging accepts it) while its jsonb
+-- binary datum is far larger. Measuring pg_column_size in put_encounter_document
+-- would reject this payload, so a campaign could cut over and then fail every
+-- later autosave with 'invalid encounter mutation'.
+reset role;
+create temporary table encounter_gap_fixture as
+select pg_catalog.jsonb_build_object(
+  'name','Gap Regression Encounter',
+  'entities',(select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+    'id','ent-'||i,'type','monster','name','Cinder Warden '||i,
+    'initiative',i,'initiativeModifier',2,'proficiencyBonus',3,
+    'currentHp',104,'maxHp',104,'tempHp',0,'armorClass',17,'tempAc',0,
+    'conditions','[]'::jsonb,
+    'monsterStatBlock',pg_catalog.jsonb_build_object(
+      'str',18,'dex',12,'con',16,'int',10,'wis',13,'cha',9,
+      'passivePerception',13,'cr','5','size','Large','type','elemental',
+      'traits',(select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+        'id','t-'||i||'-'||j,'name','Trait '||j,'text',repeat('ash ',12),'uses',j
+      )) from generate_series(1,5) j),
+      'actions',(select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
+        'id','a-'||i||'-'||j,'name','Action '||j,'text',repeat('ember ',10),'uses',j
+      )) from generate_series(1,5) j)
+    )
+  )) from generate_series(1,175) i),
+  'currentTurn',0,'round',1,'isActive',false,'sortOrder','initiative',
+  'createdAt','2026-08-01T00:00:00.000Z','updatedAt','2026-08-02T00:00:00.000Z'
+) as payload;
+alter table encounter_gap_fixture add column fingerprint text;
+alter table encounter_gap_fixture add column canonical_bytes integer;
+update encounter_gap_fixture set
+  fingerprint=private.campaign_document_hash(payload),
+  canonical_bytes=pg_catalog.octet_length(pg_catalog.convert_to(private.canonical_campaign_document_json(payload),'UTF8'));
+grant select on encounter_gap_fixture to authenticated;
+select ok((select canonical_bytes from encounter_gap_fixture) between 175000 and 262144,'the gap fixture is a legally sized encounter record');
+-- ::text::jsonb re-parses the fixture so the measurement (and the CAS call
+-- below) sees the same freshly parsed, uncompressed datum PostgREST hands the
+-- function. Read straight out of the temp table the value arrives as a
+-- TOAST-compressed datum of about 12 KB, which would hide the defect entirely.
+select ok(pg_column_size((select payload from encounter_gap_fixture)::text::jsonb) > 262144,'the gap fixture''s wire-parsed jsonb datum exceeds the record limit');
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
+select is(
+  public.put_encounter_document(
+    'e2000000-0000-4000-8000-000000000060',(select (result->>'campaignId')::uuid from encounter_empty_workspace),1,
+    'enc-gap','create',0,2,
+    (select payload from encounter_gap_fixture)::text::jsonb,
+    (select fingerprint from encounter_gap_fixture)
+  )->>'serverVersion',
+  '1','a record that staging would accept is always writable through encounter CAS'
+);
 
 reset role;
 

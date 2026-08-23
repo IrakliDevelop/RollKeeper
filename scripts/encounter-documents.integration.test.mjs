@@ -421,6 +421,66 @@ test('real encounter database enforces multi-record staging, CAS, immutable hist
     { p_campaign_id: campaignId }
   );
   assert.equal(verified.body.recordCount, 2);
+
+  // The positive rollback below hands the server back its own generation, so
+  // on its own it can never exercise the compare. These three cases do.
+  const staleEnrollment = await rpc(config, 'enroll_encounter_device', owner, {
+    p_mutation_id: randomUUID(),
+    p_campaign_id: campaignId,
+    p_device_id: randomUUID(),
+    p_expected_epoch: 1,
+    p_preview_fingerprint: 'a'.repeat(64),
+    p_legacy_candidate_fingerprint: null,
+  });
+  assert.equal(staleEnrollment.body.code, '40001');
+  assert.equal(
+    staleEnrollment.body.message,
+    'encounter enrollment preview changed'
+  );
+
+  const verifiedDocuments = verified.body.documents.map(value => ({
+    legacyId: value.legacyId,
+    serverVersion: value.serverVersion,
+    schemaVersion: value.schemaVersion,
+    payloadFingerprint: value.payloadFingerprint,
+    tombstoned: value.tombstoned,
+  }));
+  const mutatedRollback = await rpc(
+    config,
+    'rollback_encounter_family',
+    owner,
+    {
+      p_mutation_id: randomUUID(),
+      p_campaign_id: campaignId,
+      p_expected_epoch: 1,
+      p_preview_fingerprint: verified.body.previewFingerprint,
+      p_current_generation: {
+        recordCount: verified.body.recordCount,
+        documents: verifiedDocuments.map((value, index) =>
+          index === 0 ? { ...value, serverVersion: 99 } : value
+        ),
+      },
+    }
+  );
+  assert.equal(mutatedRollback.body.code, '40001');
+  assert.equal(
+    mutatedRollback.body.message,
+    'verified encounter generation changed'
+  );
+
+  const emptyRollback = await rpc(config, 'rollback_encounter_family', owner, {
+    p_mutation_id: randomUUID(),
+    p_campaign_id: campaignId,
+    p_expected_epoch: 1,
+    p_preview_fingerprint: verified.body.previewFingerprint,
+    p_current_generation: [],
+  });
+  assert.equal(emptyRollback.body.code, '55000');
+  assert.equal(
+    emptyRollback.body.message,
+    'verified current encounter generation required'
+  );
+
   const rollback = await rpc(config, 'rollback_encounter_family', owner, {
     p_mutation_id: randomUUID(),
     p_campaign_id: campaignId,
@@ -428,13 +488,7 @@ test('real encounter database enforces multi-record staging, CAS, immutable hist
     p_preview_fingerprint: verified.body.previewFingerprint,
     p_current_generation: {
       recordCount: verified.body.recordCount,
-      documents: verified.body.documents.map(value => ({
-        legacyId: value.legacyId,
-        serverVersion: value.serverVersion,
-        schemaVersion: value.schemaVersion,
-        payloadFingerprint: value.payloadFingerprint,
-        tombstoned: value.tombstoned,
-      })),
+      documents: verifiedDocuments,
     },
   });
   assert.equal(rollback.response.status, 200);
