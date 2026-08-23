@@ -223,6 +223,25 @@ function applyNpcDocuments(campaignCode: string, documents: StoreDocument[]) {
   }));
 }
 
+/**
+ * Fingerprints keyed by NPC object identity. Every `useNPCStore` mutator
+ * rebuilds only the record it touches (`existing.map(n => n.id === id ? {...n,
+ * ...updates} : n)`), so an edit to one NPC is a cache hit for every other NPC
+ * in the campaign and no longer re-canonicalizes and re-hashes their stat
+ * blocks. Backported from the encounter family.
+ */
+const npcFingerprints = new WeakMap<CampaignNPC, string>();
+
+async function fingerprintNpc(npc: CampaignNPC) {
+  const cached = npcFingerprints.get(npc);
+  if (cached !== undefined) return cached;
+  const fingerprint = await fingerprintNpcPayload(
+    npcPayloadFromCampaignNpc(npc)
+  );
+  npcFingerprints.set(npc, fingerprint);
+  return fingerprint;
+}
+
 /** Identity of the exact local generation a hydration pass consumed. */
 function authorityGeneration(
   accountId: string,
@@ -467,10 +486,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       const current = new Map<string, string>();
       for (const npc of npcs ?? []) {
         byId.set(npc.id, npc);
-        current.set(
-          npc.id,
-          await fingerprintNpcPayload(npcPayloadFromCampaignNpc(npc))
-        );
+        current.set(npc.id, await fingerprintNpc(npc));
       }
       if (cancelled) return;
       const baseline = lastFingerprints.current;

@@ -14,6 +14,7 @@ import {
   fingerprintNpcPayload,
   type NpcPayload,
 } from '@/lib/durableDm/npcFamily';
+import * as npcFamily from '@/lib/durableDm/npcFamily';
 import { writeNpcAuthorityMarker } from '@/lib/durableDm/npcLegacyAuthority';
 import { commitNpcLocalCutover } from '@/lib/indexeddb/npcAuthority';
 import * as localDatabase from '@/lib/indexeddb/localDatabase';
@@ -194,6 +195,37 @@ function seedOneNpcEnvelope(version = 4) {
   );
 }
 
+function npcFixture2(): CampaignNPC {
+  return {
+    id: 'npc-2',
+    campaignCode: 'SYNTH1',
+    name: 'Gundren Rockseeker',
+    armorClass: '10',
+    maxHp: 9,
+    speed: '25 ft.',
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+}
+
+function npcPayload2(): NpcPayload {
+  const { id, campaignCode, ...payload } = npcFixture2();
+  void id;
+  void campaignCode;
+  return payload;
+}
+
+function twoNpcState() {
+  return { npcsByCampaign: { SYNTH1: [npcFixture(), npcFixture2()] } };
+}
+
+function seedTwoNpcEnvelope(version = 4) {
+  localStorage.setItem(
+    'rollkeeper-npc-data',
+    JSON.stringify({ version, state: twoNpcState() })
+  );
+}
+
 async function selectWorkspaceAndPreview() {
   renderControls();
   fireEvent.click(
@@ -256,6 +288,84 @@ async function seedLocalIndexedDbAuthority() {
         localRevision: 1,
         baseServerVersion: 0,
         contentFingerprint,
+        updatedAt: NOW,
+        deletedAt: null,
+      },
+    ],
+  });
+  database.close();
+  writeNpcAuthorityMarker(localStorage, campaign.code, {
+    version: 1,
+    authority: 'indexedDB',
+    epoch: 1,
+    campaignId: CAMPAIGN_ID,
+    namespace: NAMESPACE,
+  });
+}
+
+/**
+ * Same completed-local-cutover state as `seedLocalIndexedDbAuthority`, but
+ * with two NPC documents, so a test can assert that editing one NPC leaves
+ * the other's cached fingerprint alone.
+ */
+async function seedLocalIndexedDbAuthorityForTwoNpcs() {
+  const payload1 = npcPayload();
+  const payload2 = npcPayload2();
+  const fingerprint1 = await fingerprintNpcPayload(payload1);
+  const fingerprint2 = await fingerprintNpcPayload(payload2);
+  const database = await openRollkeeperDatabase();
+  const transaction = database.transaction(
+    ['meta', 'kvGenerations'],
+    'readwrite'
+  );
+  transaction.objectStore('meta').put({
+    key: `migration-state:${NAMESPACE}:npc:${CAMPAIGN_ID}`,
+    state: 'CUTOVER_READY',
+    runId: GENERATION,
+  });
+  transaction.objectStore('kvGenerations').put({
+    namespace: NAMESPACE,
+    generation: GENERATION,
+    key: 'rollkeeper-npc-data',
+    presence: true,
+    rawValue: JSON.stringify({ version: 4, state: twoNpcState() }),
+  });
+  await transactionComplete(transaction);
+  await commitNpcLocalCutover(database, {
+    namespace: NAMESPACE,
+    campaignId: CAMPAIGN_ID,
+    generation: GENERATION,
+    confirmed: true,
+    gates,
+    now: () => NOW,
+    initialDocuments: [
+      {
+        namespace: NAMESPACE,
+        campaignId: CAMPAIGN_ID,
+        legacyId: 'npc-1',
+        family: 'npc',
+        cutoverEpoch: 1,
+        operation: 'create',
+        payload: payload1,
+        schemaVersion: 4,
+        localRevision: 1,
+        baseServerVersion: 0,
+        contentFingerprint: fingerprint1,
+        updatedAt: NOW,
+        deletedAt: null,
+      },
+      {
+        namespace: NAMESPACE,
+        campaignId: CAMPAIGN_ID,
+        legacyId: 'npc-2',
+        family: 'npc',
+        cutoverEpoch: 1,
+        operation: 'create',
+        payload: payload2,
+        schemaVersion: 4,
+        localRevision: 1,
+        baseServerVersion: 0,
+        contentFingerprint: fingerprint2,
         updatedAt: NOW,
         deletedAt: null,
       },
@@ -614,6 +724,41 @@ describe('NpcSyncControls gates', () => {
 
     expect(commit).not.toHaveBeenCalled();
     expect(requests.map(request => request.action)).not.toContain('put');
+  });
+
+  it('reuses a cached fingerprint for an NPC the store left untouched', async () => {
+    vi.stubEnv('NEXT_PUBLIC_NPC_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspaceWithMemory().push(workspace);
+    mockOwnerSession();
+    await seedLocalIndexedDbAuthorityForTwoNpcs();
+    useNPCStore.setState(twoNpcState());
+    seedTwoNpcEnvelope();
+
+    renderControls();
+    await screen.findByText(
+      'NPCs loaded from the verified local IndexedDB generation.'
+    );
+    // Let the baseline-establishing autosave run (queued right after hydrate)
+    // finish hashing both NPCs before measuring, or its tail call races past
+    // the spy reset below and pollutes the count.
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 20));
+    });
+
+    const fingerprint = vi.spyOn(npcFamily, 'fingerprintNpcPayload');
+    fingerprint.mockClear();
+    await act(async () => {
+      useNPCStore.getState().updateNPC(campaign.code, 'npc-1', {
+        name: 'Only this one changed',
+      });
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+    // The untouched NPC (npc-2) keeps its object identity, so only the edited
+    // one is re-canonicalized and re-hashed. `NpcPayload` omits `id`
+    // (`Omit<CampaignNPC, 'id' | 'campaignCode'>`), so `name` — unique per
+    // fixture — is the identifying field available on the call args.
+    const hashedNames = fingerprint.mock.calls.map(call => call[0].name);
+    expect(hashedNames).toEqual(['Only this one changed']);
   });
 });
 
