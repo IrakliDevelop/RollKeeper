@@ -44,7 +44,7 @@ export function NpcSyncControls() {
   if (!sync || !isNpcClientVisible()) return null;
 
   return (
-    <Card padding="lg">
+    <Card padding="lg" className="mt-6">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Cloud size={20} /> NPC cloud sync
