@@ -113,6 +113,39 @@ function encounterPayload(): EncounterPayload {
   };
 }
 
+/**
+ * Ruling 1b: `isActive` blocks cutover only. This payload is mid-combat — a
+ * non-zero round and a `currentTurn` pointing at a real entity — so autosave
+ * has to keep committing runtime edits exactly as it does for an idle
+ * encounter; the legacy key is frozen for a routed campaign, so a skipped or
+ * deferred mutation would lose the runtime state outright.
+ */
+function activeEncounterPayload(): EncounterPayload {
+  return {
+    name: 'Goblin Ambush',
+    entities: [
+      {
+        id: 'ent-1',
+        type: 'monster',
+        name: 'Goblin',
+        initiative: 14,
+        initiativeModifier: 2,
+        currentHp: 7,
+        maxHp: 7,
+        tempHp: 0,
+        armorClass: 15,
+        conditions: [],
+      },
+    ],
+    currentTurn: 0,
+    round: 3,
+    isActive: true,
+    sortOrder: 'initiative',
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+}
+
 async function seedIndexedDbGeneration(payload: EncounterPayload) {
   const database = await openRollkeeperDatabase();
   const transaction = database.transaction(
@@ -314,6 +347,57 @@ describe('EncounterSyncProvider owner mount', () => {
         expect(
           outbox.some(
             entry => entry.operation === 'delete' && entry.state === 'paused'
+          )
+        ).toBe(true);
+      } finally {
+        database.close();
+      }
+    });
+  });
+
+  it('commits a runtime edit while combat is active', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    const contentFingerprint = await seedIndexedDbGeneration(
+      activeEncounterPayload()
+    );
+    mockOwnerAccount();
+
+    render(
+      <EncounterSyncProvider campaignCode="SYNTH1">
+        <p>encounter route</p>
+      </EncounterSyncProvider>
+    );
+
+    await waitFor(() =>
+      expect(useEncounterStore.getState().encounters).toHaveLength(1)
+    );
+    const hydrated = useEncounterStore.getState().encounters[0];
+    expect(hydrated.isActive).toBe(true);
+    expect(hydrated.round).toBe(3);
+    expect(hydrated.entities[hydrated.currentTurn].id).toBe('ent-1');
+
+    await act(async () => {
+      useEncounterStore
+        .getState()
+        .updateEntity('enc-1', 'ent-1', { currentHp: 2 });
+    });
+
+    // Identical to the inactive case: same replace operation, the payload keeps
+    // `isActive: true`, and the outbox entry lands in the same state.
+    await waitFor(async () => {
+      const database = await openRollkeeperDatabase();
+      try {
+        const repository = new IndexedDbEncounterRepository(database);
+        const document = await repository.getDocument(NAMESPACE, 'enc-1');
+        expect(document?.operation).toBe('replace');
+        expect(document?.payload?.isActive).toBe(true);
+        expect(document?.payload?.round).toBe(3);
+        expect(document?.payload?.entities[0].currentHp).toBe(2);
+        expect(document?.contentFingerprint).not.toBe(contentFingerprint);
+        const outbox = await repository.listOutbox(NAMESPACE, CAMPAIGN_ID);
+        expect(
+          outbox.some(
+            entry => entry.operation === 'replace' && entry.state === 'paused'
           )
         ).toBe(true);
       } finally {
