@@ -1,12 +1,24 @@
 begin;
 
-select plan(48);
+select plan(49);
 
 select ok(has_function_privilege('authenticated','public.begin_encounter_staging(uuid,uuid,uuid,bigint,text,text,text,integer,bigint)','EXECUTE'),'owner can begin encounter staging');
 select ok(not has_function_privilege('anon','public.begin_encounter_staging(uuid,uuid,uuid,bigint,text,text,text,integer,bigint)','EXECUTE'),'anon cannot stage encounters');
 select ok(has_function_privilege('authenticated','public.put_encounter_document(uuid,uuid,bigint,text,text,bigint,integer,jsonb,text,bigint)','EXECUTE'),'owner can use encounter CAS');
 select ok(not has_function_privilege('anon','public.put_encounter_document(uuid,uuid,bigint,text,text,bigint,integer,jsonb,text,bigint)','EXECUTE'),'anon cannot mutate encounters');
 select ok(not has_table_privilege('authenticated','private.campaign_document_versions','SELECT'),'encounter history has no direct browser grant');
+
+-- Pins 20260824500000: the shared canonicalizer must sort object keys in byte
+-- order, the way the TypeScript canonicalizer's Object.keys().sort() does.
+-- `requestId`/`requestedAt` differ only by letter case at the deciding
+-- position, so the previous default-collation sort produced a different
+-- canonical JSON and a different digest. The expected value is the SHA-256 of
+-- the TypeScript canonical form {"requestId":"r-1","requestedAt":1}.
+select is(
+  private.campaign_document_hash(pg_catalog.jsonb_build_object('requestId','r-1','requestedAt',1)),
+  '5339b0cf109718bf54ee863b72e7209b9ee3d872c13d5297049bb48a55e12b0b',
+  'case-divergent sibling keys hash identically in Postgres and the browser'
+);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);

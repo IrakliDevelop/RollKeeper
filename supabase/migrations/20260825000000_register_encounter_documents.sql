@@ -21,33 +21,6 @@ alter table private.campaign_family_cutover_generations add constraint campaign_
 alter table private.campaign_family_device_enrollments drop constraint campaign_family_device_enrollments_family_check;
 alter table private.campaign_family_device_enrollments add constraint campaign_family_device_enrollments_family_check check (family in ('campaign_settings','calendar','magic_item','npc','encounter_definition'));
 
--- The shared canonicalizer sorted object keys with `order by e.key`, i.e. under
--- the database's default collation (en_US.UTF-8 here). That is both
--- locale-dependent and different from the TypeScript canonicalizer, which uses
--- Object.keys().sort() (code-unit order). The two orders diverge whenever two
--- sibling keys differ only by letter case at the deciding position, so a real
--- encounter carrying `pendingInitiativeRequest: {requestId, requestedAt}`
--- hashed to one digest in the browser and another in Postgres and every save
--- was rejected with 'encounter fingerprint mismatch'. Sorting with the C
--- collation restores byte order, which matches JavaScript for every key the
--- families use. Byte counts are unaffected (only key order changes), and no
--- existing family payload contains a pair whose order this changes.
-create or replace function private.canonical_campaign_document_json(p_value jsonb) returns text
-language plpgsql stable strict set search_path = '' as $$
-declare v_result text;
-begin
-  case pg_catalog.jsonb_typeof(p_value)
-    when 'object' then
-      select '{'||coalesce(string_agg(pg_catalog.to_jsonb(e.key)::text||':'||private.canonical_campaign_document_json(e.value),',' order by e.key collate "C"),'')||'}'
-      into v_result from pg_catalog.jsonb_each(p_value) e;
-    when 'array' then
-      select '['||coalesce(string_agg(private.canonical_campaign_document_json(e.value),',' order by e.ordinality),'')||']'
-      into v_result from pg_catalog.jsonb_array_elements(p_value) with ordinality e(value,ordinality);
-    else v_result:=p_value::text;
-  end case;
-  return v_result;
-end; $$;
-
 create function private.require_encounter_owner(p_campaign_id uuid,p_expected_epoch bigint,p_required_authority text)
 returns uuid language plpgsql security definer set search_path = '' as $$
 declare v_actor uuid:=auth.uid(); v_authority public.campaign_authority_records%rowtype;
