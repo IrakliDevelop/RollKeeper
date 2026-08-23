@@ -367,6 +367,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
       return;
     let cancelled = false;
     const run = async () => {
+      if (cancelled) return;
       const database = await openRollkeeperDatabase();
       try {
         const repository = new IndexedDbCampaignSettingsRepository(database);
@@ -900,6 +901,9 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
       // store still shows the local candidate, so autosave stays disarmed
       // until the DM applies the exact cloud generation. The confirm above
       // promises that candidate is never uploaded automatically.
+      // The enroll control only renders on a `localStorage` authority, which
+      // no arming path leaves behind, so this disarm is belt-and-braces for a
+      // flag that is already false.
       setHydrated(false);
       hydrationSignature.current = authorityGeneration(
         context.accountId,
@@ -920,6 +924,41 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
     } finally {
       database.close();
     }
+  };
+
+  // Rewrites the store from the accepted cloud generation and arms autosave.
+  // Enrollment leaves the store on the un-uploaded local candidate, so a
+  // device whose IndexedDB already holds the previewed generation is exactly
+  // as un-hydrated as one that had to write it: both paths below run this.
+  const hydrateFromAcceptedGeneration = (
+    source: import('@/types/database.generated').Json | null | undefined,
+    fingerprint: string
+  ) => {
+    lastFingerprint.current = fingerprint;
+    const payload = (source ?? {}) as Record<string, unknown>;
+    useDmStore.getState().updateCampaign(campaign.code, {
+      bannerUrl:
+        typeof payload.bannerUrl === 'string' ? payload.bannerUrl : undefined,
+      playerColors:
+        payload.playerColors && typeof payload.playerColors === 'object'
+          ? (payload.playerColors as Record<string, string>)
+          : undefined,
+      dmDashboardUi:
+        payload.dmDashboardUi && typeof payload.dmDashboardUi === 'object'
+          ? (payload.dmDashboardUi as CampaignInfo['dmDashboardUi'])
+          : undefined,
+      stackableInspiration: payload.stackableInspiration === true,
+      customCounterLabel:
+        typeof payload.customCounterLabel === 'string'
+          ? payload.customCounterLabel
+          : undefined,
+      playerCounters:
+        payload.playerCounters && typeof payload.playerCounters === 'object'
+          ? (payload.playerCounters as Record<string, number>)
+          : undefined,
+    });
+    // The store now matches the enrolled generation, so autosave is armed.
+    setHydrated(true);
   };
 
   const applyExactCloudVersion = async () => {
@@ -957,6 +996,12 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
         current?.baseServerVersion === enrollmentPreview.serverVersion &&
         current.contentFingerprint === enrollmentPreview.payloadFingerprint
       ) {
+        // The write below would be a no-op, but the store is still showing
+        // the local candidate enrollment left behind, so skip only the write.
+        hydrateFromAcceptedGeneration(
+          current.payload,
+          current.contentFingerprint
+        );
         setStatus('This device already has the exact accepted cloud version.');
         return;
       }
@@ -973,34 +1018,10 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
         acceptedAt: new Date().toISOString(),
       });
       await context.remember(workspace);
-      lastFingerprint.current = enrollmentPreview.payloadFingerprint;
-      const payload = (enrollmentPreview.payload ?? {}) as Record<
-        string,
-        unknown
-      >;
-      useDmStore.getState().updateCampaign(campaign.code, {
-        bannerUrl:
-          typeof payload.bannerUrl === 'string' ? payload.bannerUrl : undefined,
-        playerColors:
-          payload.playerColors && typeof payload.playerColors === 'object'
-            ? (payload.playerColors as Record<string, string>)
-            : undefined,
-        dmDashboardUi:
-          payload.dmDashboardUi && typeof payload.dmDashboardUi === 'object'
-            ? (payload.dmDashboardUi as CampaignInfo['dmDashboardUi'])
-            : undefined,
-        stackableInspiration: payload.stackableInspiration === true,
-        customCounterLabel:
-          typeof payload.customCounterLabel === 'string'
-            ? payload.customCounterLabel
-            : undefined,
-        playerCounters:
-          payload.playerCounters && typeof payload.playerCounters === 'object'
-            ? (payload.playerCounters as Record<string, number>)
-            : undefined,
-      });
-      // The store now matches the enrolled generation, so autosave is armed.
-      setHydrated(true);
+      hydrateFromAcceptedGeneration(
+        enrollmentPreview.payload,
+        enrollmentPreview.payloadFingerprint
+      );
       setStatus(
         `Device hydrated from exact cloud version ${enrollmentPreview.serverVersion}.`
       );

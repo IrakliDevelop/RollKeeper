@@ -1134,6 +1134,9 @@ export function MagicItemSyncControls({ campaign }: Props) {
         // store still shows the local candidate, so autosave stays disarmed
         // until the DM applies the exact cloud generation. The confirm above
         // promises that candidate is never uploaded automatically.
+        // The enroll control only renders on a `localStorage` authority, which
+        // no arming path leaves behind, so this disarm is belt-and-braces for a
+        // flag that is already false.
         setHydrated(false);
         hydrationSignature.current = authorityGeneration(
           context.accountId,

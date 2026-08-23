@@ -583,6 +583,90 @@ describe('CalendarSyncControls gates', () => {
     expect(requests.map(request => request.action)).not.toContain('put');
   });
 
+  it('arms autosave when the applied cloud version is one the device already holds', async () => {
+    vi.stubEnv('NEXT_PUBLIC_CALENDAR_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspaceWithMemory();
+    useCalendarStore.setState(oneCalendarState());
+    seedCalendarEnvelope();
+    const cloudPayload = {
+      ...calendarPayloadFromCampaignCalendar(calendarFixture()),
+      weather: 'snow' as const,
+    };
+    const cloudFingerprint = await fingerprintCalendarPayload(cloudPayload);
+    const requests: Record<string, unknown>[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        requests.push(body);
+        const respond = (value: unknown) =>
+          ({ ok: true, json: async () => value }) as Response;
+        if (body.action === 'preview-enrollment')
+          return respond({
+            authority: 'postgres',
+            epoch: 1,
+            previewFingerprint: 'preview-fingerprint',
+            serverVersion: 1,
+            schemaVersion: 1,
+            payloadFingerprint: cloudFingerprint,
+            tombstoned: false,
+            payload: cloudPayload,
+          });
+        if (body.action === 'enroll-device') return respond({});
+        if (body.action === 'put')
+          return respond({
+            serverVersion: Number(body.expectedServerVersion) + 1,
+            cutoverEpoch: Number(body.expectedEpoch),
+            payloadFingerprint: body.payloadFingerprint,
+            cloudSaved: true,
+            playerView: 'pending',
+          });
+        throw new Error(`unexpected action ${String(body.action)}`);
+      }
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<CalendarSyncControls campaign={campaign} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Find owner workspaces' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Select Calendar/ })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Preview cloud enrollment' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Enroll this device' })
+    );
+    await screen.findByText(
+      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+    );
+
+    // Enrollment writes exactly the previewed version into IndexedDB, so the
+    // Apply button that takes the enroll button's place lands on the
+    // already-has-this-version short-circuit. The store is still on the local
+    // candidate, so that path has to hydrate too — skipping it would leave a
+    // device whose frozen legacy key swallows every later edit.
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Apply exact cloud version' })
+    );
+    await screen.findByText(
+      'This device already has the exact accepted cloud version.'
+    );
+
+    // Two edits, because a freshly armed run can only seed the baseline; the
+    // second one is the falsifiable half of this assertion.
+    const commit = vi.spyOn(IndexedDbCalendarRepository.prototype, 'commit');
+    for (const weather of ['rain', 'fog'] as const) {
+      await act(async () => {
+        useCalendarStore.getState().setWeather(campaign.code, weather);
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
+    }
+    expect(commit).toHaveBeenCalled();
+    expect(requests.map(request => request.action)).toContain('put');
+  });
+
   /**
    * Drives an enrolled-but-unapplied device: the cloud generation is in
    * IndexedDB while the store still shows the local candidate, which is the
