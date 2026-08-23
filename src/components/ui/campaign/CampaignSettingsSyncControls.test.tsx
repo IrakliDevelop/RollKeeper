@@ -666,15 +666,19 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
       useDmStore.getState().updateCampaign(CAMPAIGN_CODE, {
         customCounterLabel: 'Edited after reload',
       });
-      await new Promise(resolve => setTimeout(resolve, 10));
     });
-    expect(commit).toHaveBeenCalled();
-    const saved = await readCampaignSettingsDocument();
-    expect(
-      (saved?.payload as CampaignSettingsPayload | undefined)
-        ?.customCounterLabel
-    ).toBe('Edited after reload');
-    expect(saved?.localRevision).toBe(2);
+    await waitFor(() => expect(commit).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(
+      async () => {
+        const saved = await readCampaignSettingsDocument();
+        expect(
+          (saved?.payload as CampaignSettingsPayload | undefined)
+            ?.customCounterLabel
+        ).toBe('Edited after reload');
+        expect(saved?.localRevision).toBe(2);
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('does not re-hydrate over a newer local edit on a repeated auth event', async () => {
@@ -710,12 +714,17 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
     );
 
     // …and the baseline survived the auth event, so the edit still committed.
-    const saved = await readCampaignSettingsDocument();
-    expect(
-      (saved?.payload as CampaignSettingsPayload | undefined)
-        ?.customCounterLabel
-    ).toBe('Edited before the token refresh');
-    expect(saved?.localRevision).toBe(2);
+    await waitFor(
+      async () => {
+        const saved = await readCampaignSettingsDocument();
+        expect(
+          (saved?.payload as CampaignSettingsPayload | undefined)
+            ?.customCounterLabel
+        ).toBe('Edited before the token refresh');
+        expect(saved?.localRevision).toBe(2);
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('does not upload the local candidate after enrollment until the cloud generation is applied', async () => {
@@ -871,7 +880,10 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
     );
 
     // Two edits, because a freshly armed run can only seed the baseline; the
-    // second one is the falsifiable half of this assertion.
+    // second one is the falsifiable half of this assertion. The in-loop window
+    // paces the two autosave runs — it lets the first one seed the baseline
+    // before the second edit changes the effect's deps — while the commit the
+    // assertion is really about is waited for on its own signal below.
     const commit = vi.spyOn(
       IndexedDbCampaignSettingsRepository.prototype,
       'commit'
@@ -884,8 +896,11 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
         await new Promise(resolve => setTimeout(resolve, 10));
       });
     }
-    expect(commit).toHaveBeenCalled();
-    expect(requests.map(request => request.action)).toContain('put');
+    await waitFor(() => expect(commit).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(
+      () => expect(requests.map(request => request.action)).toContain('put'),
+      { timeout: 5000 }
+    );
   });
 
   /**
@@ -1037,10 +1052,12 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
       useDmStore.getState().updateCampaign(CAMPAIGN_CODE, {
         customCounterLabel: 'Edited after applying the cloud version',
       });
-      await new Promise(resolve => setTimeout(resolve, 10));
     });
-    expect(commit).toHaveBeenCalled();
-    expect(requests.map(request => request.action)).toContain('put');
+    await waitFor(() => expect(commit).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(
+      () => expect(requests.map(request => request.action)).toContain('put'),
+      { timeout: 5000 }
+    );
   });
 
   it('arms autosave after a version restore on an enrolled device', async () => {
@@ -1069,14 +1086,21 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
       useDmStore.getState().updateCampaign(CAMPAIGN_CODE, {
         customCounterLabel: 'Edited after the restore',
       });
-      await new Promise(resolve => setTimeout(resolve, 10));
     });
-    expect(commit).toHaveBeenCalled();
-    expect(requests.map(request => request.action)).toContain('put');
-    const saved = await readCampaignSettingsDocument();
-    expect(
-      (saved?.payload as CampaignSettingsPayload | undefined)
-        ?.customCounterLabel
-    ).toBe('Edited after the restore');
+    await waitFor(() => expect(commit).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(
+      () => expect(requests.map(request => request.action)).toContain('put'),
+      { timeout: 5000 }
+    );
+    await waitFor(
+      async () => {
+        const saved = await readCampaignSettingsDocument();
+        expect(
+          (saved?.payload as CampaignSettingsPayload | undefined)
+            ?.customCounterLabel
+        ).toBe('Edited after the restore');
+      },
+      { timeout: 5000 }
+    );
   });
 });

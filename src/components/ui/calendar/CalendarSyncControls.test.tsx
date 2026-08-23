@@ -448,19 +448,23 @@ describe('CalendarSyncControls gates', () => {
     const commit = vi.spyOn(IndexedDbCalendarRepository.prototype, 'commit');
     await act(async () => {
       useCalendarStore.getState().setWeather(campaign.code, 'rain');
-      await new Promise(resolve => setTimeout(resolve, 10));
     });
-    expect(commit).toHaveBeenCalled();
-    const database = await openRollkeeperDatabase();
-    try {
-      const document = await new IndexedDbCalendarRepository(
-        database
-      ).getDocument(NAMESPACE, campaign.code);
-      expect(document?.payload?.weather).toBe('rain');
-      expect(document?.localRevision).toBe(2);
-    } finally {
-      database.close();
-    }
+    await waitFor(() => expect(commit).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(
+      async () => {
+        const database = await openRollkeeperDatabase();
+        try {
+          const document = await new IndexedDbCalendarRepository(
+            database
+          ).getDocument(NAMESPACE, campaign.code);
+          expect(document?.payload?.weather).toBe('rain');
+          expect(document?.localRevision).toBe(2);
+        } finally {
+          database.close();
+        }
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('does not re-hydrate over a newer local edit on a repeated auth event', async () => {
@@ -497,16 +501,21 @@ describe('CalendarSyncControls gates', () => {
     ).toBe('rain');
 
     // …and the baseline survived the auth event, so the edit still committed.
-    const database = await openRollkeeperDatabase();
-    try {
-      const document = await new IndexedDbCalendarRepository(
-        database
-      ).getDocument(NAMESPACE, campaign.code);
-      expect(document?.payload?.weather).toBe('rain');
-      expect(document?.localRevision).toBe(2);
-    } finally {
-      database.close();
-    }
+    await waitFor(
+      async () => {
+        const database = await openRollkeeperDatabase();
+        try {
+          const document = await new IndexedDbCalendarRepository(
+            database
+          ).getDocument(NAMESPACE, campaign.code);
+          expect(document?.payload?.weather).toBe('rain');
+          expect(document?.localRevision).toBe(2);
+        } finally {
+          database.close();
+        }
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('does not upload the local candidate after enrollment until the cloud generation is applied', async () => {
@@ -569,8 +578,9 @@ describe('CalendarSyncControls gates', () => {
 
     // The enrollment confirm promises the local candidate "is never uploaded
     // automatically", so autosave must stay disarmed until the DM applies the
-    // exact cloud generation. The 10ms window is the same one the reload case
-    // uses as its positive control for a completed autosave run.
+    // exact cloud generation. The window stays fixed and bounded here, because
+    // a `waitFor` on a negative assertion passes instantly and proves nothing;
+    // the armed cases below wait on the commit signal instead.
     const commit = vi.spyOn(IndexedDbCalendarRepository.prototype, 'commit');
     for (const weather of ['rain', 'fog'] as const) {
       await act(async () => {
@@ -655,7 +665,10 @@ describe('CalendarSyncControls gates', () => {
     );
 
     // Two edits, because a freshly armed run can only seed the baseline; the
-    // second one is the falsifiable half of this assertion.
+    // second one is the falsifiable half of this assertion. The in-loop window
+    // paces the two autosave runs — it lets the first one seed the baseline
+    // before the second edit changes the effect's deps — while the commit the
+    // assertion is really about is waited for on its own signal below.
     const commit = vi.spyOn(IndexedDbCalendarRepository.prototype, 'commit');
     for (const weather of ['rain', 'fog'] as const) {
       await act(async () => {
@@ -663,8 +676,11 @@ describe('CalendarSyncControls gates', () => {
         await new Promise(resolve => setTimeout(resolve, 10));
       });
     }
-    expect(commit).toHaveBeenCalled();
-    expect(requests.map(request => request.action)).toContain('put');
+    await waitFor(() => expect(commit).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(
+      () => expect(requests.map(request => request.action)).toContain('put'),
+      { timeout: 5000 }
+    );
   });
 
   /**
@@ -802,10 +818,12 @@ describe('CalendarSyncControls gates', () => {
     // the next edit must still reach IndexedDB and the cloud.
     await act(async () => {
       useCalendarStore.getState().setWeather(campaign.code, 'rain');
-      await new Promise(resolve => setTimeout(resolve, 10));
     });
-    expect(commit).toHaveBeenCalled();
-    expect(requests.map(request => request.action)).toContain('put');
+    await waitFor(() => expect(commit).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(
+      () => expect(requests.map(request => request.action)).toContain('put'),
+      { timeout: 5000 }
+    );
   });
 
   it('arms autosave after a version restore on an enrolled device', async () => {
@@ -830,10 +848,12 @@ describe('CalendarSyncControls gates', () => {
     const commit = vi.spyOn(IndexedDbCalendarRepository.prototype, 'commit');
     await act(async () => {
       useCalendarStore.getState().setWeather(campaign.code, 'rain');
-      await new Promise(resolve => setTimeout(resolve, 10));
     });
-    expect(commit).toHaveBeenCalled();
-    expect(requests.map(request => request.action)).toContain('put');
+    await waitFor(() => expect(commit).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(
+      () => expect(requests.map(request => request.action)).toContain('put'),
+      { timeout: 5000 }
+    );
   });
 
   it('disarms autosave when a later hydration finds the local calendar tombstoned', async () => {

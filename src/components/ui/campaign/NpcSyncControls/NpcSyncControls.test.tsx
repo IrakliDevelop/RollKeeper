@@ -589,20 +589,23 @@ describe('NpcSyncControls gates', () => {
       useNPCStore.getState().updateNPC(campaign.code, 'npc-1', {
         name: 'Edited after reload',
       });
-      await new Promise(resolve => setTimeout(resolve, 10));
     });
-    expect(commit).toHaveBeenCalled();
-    const database = await openRollkeeperDatabase();
-    try {
-      const document = await new IndexedDbNpcRepository(database).getDocument(
-        NAMESPACE,
-        'npc-1'
-      );
-      expect(document?.payload?.name).toBe('Edited after reload');
-      expect(document?.localRevision).toBe(2);
-    } finally {
-      database.close();
-    }
+    await waitFor(() => expect(commit).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(
+      async () => {
+        const database = await openRollkeeperDatabase();
+        try {
+          const document = await new IndexedDbNpcRepository(
+            database
+          ).getDocument(NAMESPACE, 'npc-1');
+          expect(document?.payload?.name).toBe('Edited after reload');
+          expect(document?.localRevision).toBe(2);
+        } finally {
+          database.close();
+        }
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('does not re-hydrate over a newer local edit on a repeated auth event', async () => {
@@ -639,17 +642,23 @@ describe('NpcSyncControls gates', () => {
     );
 
     // …and the baseline survived the auth event, so the edit still committed.
-    const database = await openRollkeeperDatabase();
-    try {
-      const document = await new IndexedDbNpcRepository(database).getDocument(
-        NAMESPACE,
-        'npc-1'
-      );
-      expect(document?.payload?.name).toBe('Edited before the token refresh');
-      expect(document?.localRevision).toBe(2);
-    } finally {
-      database.close();
-    }
+    await waitFor(
+      async () => {
+        const database = await openRollkeeperDatabase();
+        try {
+          const document = await new IndexedDbNpcRepository(
+            database
+          ).getDocument(NAMESPACE, 'npc-1');
+          expect(document?.payload?.name).toBe(
+            'Edited before the token refresh'
+          );
+          expect(document?.localRevision).toBe(2);
+        } finally {
+          database.close();
+        }
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('does not upload the local candidate after enrollment until the cloud generation is applied', async () => {
@@ -823,9 +832,10 @@ describe('NpcSyncControls gates', () => {
     const requests: Record<string, unknown>[] = [];
     await enrollAgainstCloudGeneration(requests);
 
-    // Both phases edit and wait in the same 10ms window, so the committing
-    // phase is the disarmed phase's positive control: the window is
-    // demonstrably long enough for a commit to land in it.
+    // The disarmed phase keeps a bounded fixed window on purpose: a `waitFor`
+    // on a negative assertion passes instantly and proves nothing. The armed
+    // phase below waits on the commit signal instead, so it no longer depends
+    // on the runner finishing an open-read-fingerprint-commit cycle in 10ms.
     const commit = vi.spyOn(IndexedDbNpcRepository.prototype, 'commit');
     await act(async () => {
       useNPCStore.getState().updateNPC(campaign.code, 'npc-1', {
@@ -849,10 +859,12 @@ describe('NpcSyncControls gates', () => {
       useNPCStore.getState().updateNPC(campaign.code, 'npc-1', {
         name: 'Edited after applying the cloud generation',
       });
-      await new Promise(resolve => setTimeout(resolve, 10));
     });
-    expect(commit).toHaveBeenCalled();
-    expect(requests.map(request => request.action)).toContain('put');
+    await waitFor(() => expect(commit).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(
+      () => expect(requests.map(request => request.action)).toContain('put'),
+      { timeout: 5000 }
+    );
   });
 
   it('arms autosave after a version restore on an enrolled device', async () => {
@@ -879,20 +891,26 @@ describe('NpcSyncControls gates', () => {
       useNPCStore.getState().updateNPC(campaign.code, 'npc-1', {
         name: 'Edited after the restore',
       });
-      await new Promise(resolve => setTimeout(resolve, 10));
     });
-    expect(commit).toHaveBeenCalled();
-    expect(requests.map(request => request.action)).toContain('put');
-    const database = await openRollkeeperDatabase();
-    try {
-      const document = await new IndexedDbNpcRepository(database).getDocument(
-        NAMESPACE,
-        'npc-1'
-      );
-      expect(document?.payload?.name).toBe('Edited after the restore');
-    } finally {
-      database.close();
-    }
+    await waitFor(() => expect(commit).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(
+      () => expect(requests.map(request => request.action)).toContain('put'),
+      { timeout: 5000 }
+    );
+    await waitFor(
+      async () => {
+        const database = await openRollkeeperDatabase();
+        try {
+          const document = await new IndexedDbNpcRepository(
+            database
+          ).getDocument(NAMESPACE, 'npc-1');
+          expect(document?.payload?.name).toBe('Edited after the restore');
+        } finally {
+          database.close();
+        }
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('reuses a cached fingerprint for an NPC the store left untouched', async () => {
@@ -916,12 +934,16 @@ describe('NpcSyncControls gates', () => {
 
     const fingerprint = vi.spyOn(npcFamily, 'fingerprintNpcPayload');
     fingerprint.mockClear();
+    const commit = vi.spyOn(IndexedDbNpcRepository.prototype, 'commit');
     await act(async () => {
       useNPCStore.getState().updateNPC(campaign.code, 'npc-1', {
         name: 'Only this one changed',
       });
-      await new Promise(resolve => setTimeout(resolve, 10));
     });
+    // The autosave pass hashes every NPC it needs before it commits anything,
+    // so the commit is the end-of-pass signal: waiting for it cannot observe a
+    // half-hashed run the way a fixed window can miss a whole run.
+    await waitFor(() => expect(commit).toHaveBeenCalled(), { timeout: 5000 });
     // The untouched NPC (npc-2) keeps its object identity, so only the edited
     // one is re-canonicalized and re-hashed. `NpcPayload` omits `id`
     // (`Omit<CampaignNPC, 'id' | 'campaignCode'>`), so `name` — unique per
