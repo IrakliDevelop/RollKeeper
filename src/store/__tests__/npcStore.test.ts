@@ -6,6 +6,7 @@ const CAMPAIGN = 'test-campaign';
 
 describe('npcStore (campaign-scoped)', () => {
   beforeEach(() => {
+    localStorage.clear();
     useNPCStore.setState({ npcsByCampaign: {} });
   });
 
@@ -23,6 +24,28 @@ describe('npcStore (campaign-scoped)', () => {
       expect(npcs).toHaveLength(1);
       expect(npcs[0].name).toBe('Bartender Bob');
       expect(npcs[0].campaignCode).toBe(CAMPAIGN);
+    });
+
+    it('mints cross-device stable ids and persists the versioned envelope', () => {
+      const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+        name: 'Bartender Bob',
+        armorClass: '10',
+        maxHp: 8,
+        speed: '30 ft.',
+      });
+      expect(id).toMatch(/^npc-[0-9a-f-]{36}$/);
+
+      const persisted = JSON.parse(
+        localStorage.getItem('rollkeeper-npc-data')!
+      );
+      expect(persisted.version).toBe(4);
+      expect(Object.keys(persisted.state)).toEqual(['npcsByCampaign']);
+      expect(persisted.state.npcsByCampaign[CAMPAIGN]).toHaveLength(1);
+      expect(persisted.state.npcsByCampaign[CAMPAIGN][0]).toMatchObject({
+        id,
+        campaignCode: CAMPAIGN,
+        name: 'Bartender Bob',
+      });
     });
 
     it('sets createdAt and updatedAt timestamps', () => {
