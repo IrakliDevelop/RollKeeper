@@ -448,6 +448,20 @@ export type Database = {
         };
         Returns: Json;
       };
+      begin_npc_staging: {
+        Args: {
+          p_campaign_id: string;
+          p_device_id: string;
+          p_expected_epoch: number;
+          p_manifest_fingerprint: string;
+          p_mutation_id: string;
+          p_record_count: number;
+          p_recovery_manifest_hash: string;
+          p_recovery_receipt_hash: string;
+          p_total_bytes: number;
+        };
+        Returns: Json;
+      };
       calendar_projection_status: {
         Args: { p_campaign_id: string };
         Returns: Json;
@@ -535,6 +549,15 @@ export type Database = {
         };
         Returns: Json;
       };
+      compare_npc_document_versions: {
+        Args: {
+          p_campaign_id: string;
+          p_left: number;
+          p_legacy_id: string;
+          p_right: number;
+        };
+        Returns: Json;
+      };
       confirm_calendar_cutover: {
         Args: {
           p_expected_epoch: number;
@@ -563,6 +586,15 @@ export type Database = {
         Returns: Json;
       };
       confirm_magic_item_cutover: {
+        Args: {
+          p_expected_epoch: number;
+          p_manifest_fingerprint: string;
+          p_mutation_id: string;
+          p_run_id: string;
+        };
+        Returns: Json;
+      };
+      confirm_npc_cutover: {
         Args: {
           p_expected_epoch: number;
           p_manifest_fingerprint: string;
@@ -622,6 +654,17 @@ export type Database = {
         };
         Returns: Json;
       };
+      enroll_npc_device: {
+        Args: {
+          p_campaign_id: string;
+          p_device_id: string;
+          p_expected_epoch: number;
+          p_legacy_candidate_fingerprint: string;
+          p_mutation_id: string;
+          p_preview_fingerprint: string;
+        };
+        Returns: Json;
+      };
       export_calendar_document_version: {
         Args: {
           p_campaign_id: string;
@@ -640,6 +683,14 @@ export type Database = {
         Returns: Json;
       };
       export_magic_item_document_version: {
+        Args: {
+          p_campaign_id: string;
+          p_legacy_id: string;
+          p_server_version: number;
+        };
+        Returns: Json;
+      };
+      export_npc_document_version: {
         Args: {
           p_campaign_id: string;
           p_legacy_id: string;
@@ -726,6 +777,10 @@ export type Database = {
         Returns: Json;
       };
       list_my_campaign_memberships: { Args: never; Returns: Json };
+      list_npc_document_versions: {
+        Args: { p_campaign_id: string; p_legacy_id: string };
+        Returns: Json;
+      };
       prepare_campaign_membership_manifest: {
         Args: { p_campaign_id: string; p_mutation_id: string };
         Returns: Json;
@@ -739,6 +794,10 @@ export type Database = {
         Returns: Json;
       };
       preview_magic_item_device_enrollment: {
+        Args: { p_campaign_id: string };
+        Returns: Json;
+      };
+      preview_npc_device_enrollment: {
         Args: { p_campaign_id: string };
         Returns: Json;
       };
@@ -801,6 +860,21 @@ export type Database = {
         };
         Returns: Json;
       };
+      put_npc_document: {
+        Args: {
+          p_campaign_id: string;
+          p_expected_epoch: number;
+          p_expected_server_version: number;
+          p_legacy_id: string;
+          p_mutation_id: string;
+          p_operation: string;
+          p_payload: Json;
+          p_payload_fingerprint: string;
+          p_restore_source_version?: number;
+          p_schema_version: number;
+        };
+        Returns: Json;
+      };
       redeem_campaign_guest_invitation: {
         Args: {
           p_mutation_id: string;
@@ -841,6 +915,15 @@ export type Database = {
         Returns: Json;
       };
       remove_magic_item_device: {
+        Args: {
+          p_campaign_id: string;
+          p_device_id: string;
+          p_expected_epoch: number;
+          p_mutation_id: string;
+        };
+        Returns: Json;
+      };
+      remove_npc_device: {
         Args: {
           p_campaign_id: string;
           p_device_id: string;
@@ -951,6 +1034,17 @@ export type Database = {
         };
         Returns: Json;
       };
+      restore_npc_document_version: {
+        Args: {
+          p_campaign_id: string;
+          p_expected_epoch: number;
+          p_expected_server_version: number;
+          p_legacy_id: string;
+          p_mutation_id: string;
+          p_source_version: number;
+        };
+        Returns: Json;
+      };
       revoke_campaign_guest_invitation: {
         Args: { p_invitation_id: string; p_mutation_id: string };
         Returns: Json;
@@ -1005,6 +1099,16 @@ export type Database = {
         };
         Returns: Json;
       };
+      rollback_npc_family: {
+        Args: {
+          p_campaign_id: string;
+          p_current_generation: Json;
+          p_expected_epoch: number;
+          p_mutation_id: string;
+          p_preview_fingerprint: string;
+        };
+        Returns: Json;
+      };
       rotate_campaign_guest_session: {
         Args: {
           p_current_token_hash: string;
@@ -1032,6 +1136,10 @@ export type Database = {
         Returns: Json;
       };
       stage_magic_item_items: {
+        Args: { p_items: Json; p_mutation_id: string; p_run_id: string };
+        Returns: Json;
+      };
+      stage_npc_items: {
         Args: { p_items: Json; p_mutation_id: string; p_run_id: string };
         Returns: Json;
       };
