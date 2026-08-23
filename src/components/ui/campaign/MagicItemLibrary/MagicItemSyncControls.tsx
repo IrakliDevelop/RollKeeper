@@ -248,6 +248,24 @@ function applyMagicItemDocuments(
   }));
 }
 
+/**
+ * Fingerprints keyed by item object identity. `updateItem`
+ * (`src/store/magicItemLibraryStore.ts`) rebuilds only the item it touches, so
+ * every untouched item in the campaign is a cache hit. Backported from the
+ * encounter family.
+ */
+const magicItemFingerprints = new WeakMap<CustomMagicItem, string>();
+
+async function fingerprintMagicItem(item: CustomMagicItem) {
+  const cached = magicItemFingerprints.get(item);
+  if (cached !== undefined) return cached;
+  const fingerprint = await fingerprintMagicItemPayload(
+    magicItemPayloadFromCustomItem(item)
+  );
+  magicItemFingerprints.set(item, fingerprint);
+  return fingerprint;
+}
+
 /** Identity of the exact local generation a hydration pass consumed. */
 function authorityGeneration(
   accountId: string,
@@ -482,12 +500,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
       const current = new Map<string, string>();
       for (const item of items ?? []) {
         byId.set(item.id, item);
-        current.set(
-          item.id,
-          await fingerprintMagicItemPayload(
-            magicItemPayloadFromCustomItem(item)
-          )
-        );
+        current.set(item.id, await fingerprintMagicItem(item));
       }
       if (cancelled) return;
       const baseline = lastFingerprints.current;

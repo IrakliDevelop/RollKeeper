@@ -14,6 +14,7 @@ import {
   fingerprintMagicItemPayload,
   type MagicItemPayload,
 } from '@/lib/durableDm/magicItemFamily';
+import * as magicItemFamily from '@/lib/durableDm/magicItemFamily';
 import { writeMagicItemAuthorityMarker } from '@/lib/durableDm/magicItemLegacyAuthority';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 import * as localDatabase from '@/lib/indexeddb/localDatabase';
@@ -265,6 +266,122 @@ async function seedLocalIndexedDbAuthority() {
     namespace: NAMESPACE,
   });
 }
+
+function magicItemFixture2(): CustomMagicItem {
+  return {
+    id: 'magic-2',
+    campaignCode: 'SYNTH1',
+    name: 'Bag of Holding',
+    category: 'wondrous',
+    rarity: 'uncommon',
+    description: 'A bag with an interior space larger than its exterior.',
+    properties: [],
+    requiresAttunement: false,
+    isAttuned: false,
+    tags: ['bag'],
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+}
+
+function magicItemPayload2(): MagicItemPayload {
+  const { id, campaignCode, ...payload } = magicItemFixture2();
+  void id;
+  void campaignCode;
+  return payload;
+}
+
+function twoItemState() {
+  return {
+    itemsByCampaign: { SYNTH1: [magicItemFixture(), magicItemFixture2()] },
+  };
+}
+
+function seedTwoItemEnvelope() {
+  localStorage.setItem(
+    'rollkeeper-dm-magic-item-library',
+    JSON.stringify({ version: 1, state: twoItemState() })
+  );
+}
+
+/**
+ * Same completed-local-cutover state as `seedLocalIndexedDbAuthority`, but
+ * with two magic item documents, so a test can assert that editing one item
+ * leaves the other's cached fingerprint alone.
+ */
+async function seedLocalIndexedDbAuthorityForTwoItems() {
+  const payload1 = magicItemPayload();
+  const payload2 = magicItemPayload2();
+  const fingerprint1 = await fingerprintMagicItemPayload(payload1);
+  const fingerprint2 = await fingerprintMagicItemPayload(payload2);
+  const database = await openRollkeeperDatabase();
+  const transaction = database.transaction(
+    ['meta', 'kvGenerations'],
+    'readwrite'
+  );
+  transaction.objectStore('meta').put({
+    key: `migration-state:${NAMESPACE}:magic_item:${CAMPAIGN_ID}`,
+    state: 'CUTOVER_READY',
+    runId: GENERATION,
+  });
+  transaction.objectStore('kvGenerations').put({
+    namespace: NAMESPACE,
+    generation: GENERATION,
+    key: 'rollkeeper-dm-magic-item-library',
+    presence: true,
+    rawValue: JSON.stringify({ version: 1, state: twoItemState() }),
+  });
+  await transactionComplete(transaction);
+  await commitMagicItemLocalCutover(database, {
+    namespace: NAMESPACE,
+    campaignId: CAMPAIGN_ID,
+    generation: GENERATION,
+    confirmed: true,
+    gates,
+    now: () => NOW,
+    initialDocuments: [
+      {
+        namespace: NAMESPACE,
+        campaignId: CAMPAIGN_ID,
+        legacyId: 'magic-1',
+        family: 'magic_item',
+        cutoverEpoch: 1,
+        operation: 'create',
+        payload: payload1,
+        schemaVersion: 1,
+        localRevision: 1,
+        baseServerVersion: 0,
+        contentFingerprint: fingerprint1,
+        updatedAt: NOW,
+        deletedAt: null,
+      },
+      {
+        namespace: NAMESPACE,
+        campaignId: CAMPAIGN_ID,
+        legacyId: 'magic-2',
+        family: 'magic_item',
+        cutoverEpoch: 1,
+        operation: 'create',
+        payload: payload2,
+        schemaVersion: 1,
+        localRevision: 1,
+        baseServerVersion: 0,
+        contentFingerprint: fingerprint2,
+        updatedAt: NOW,
+        deletedAt: null,
+      },
+    ],
+  });
+  database.close();
+  writeMagicItemAuthorityMarker(localStorage, campaign.code, {
+    version: 1,
+    authority: 'indexedDB',
+    epoch: 1,
+    campaignId: CAMPAIGN_ID,
+    namespace: NAMESPACE,
+  });
+}
+
 describe('MagicItemSyncControls gates', () => {
   afterEach(async () => {
     cleanup();
@@ -600,6 +717,45 @@ describe('MagicItemSyncControls gates', () => {
 
     expect(commit).not.toHaveBeenCalled();
     expect(requests.map(request => request.action)).not.toContain('put');
+  });
+
+  it('reuses a cached fingerprint for an item the store left untouched', async () => {
+    vi.stubEnv('NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspaceWithMemory().push(workspace);
+    mockOwnerSession();
+    await seedLocalIndexedDbAuthorityForTwoItems();
+    useMagicItemLibraryStore.setState(twoItemState());
+    seedTwoItemEnvelope();
+
+    render(<MagicItemSyncControls campaign={campaign} />);
+    await screen.findByText(
+      'Magic item library loaded from the verified local IndexedDB generation.'
+    );
+    // Let the baseline-establishing autosave run (queued right after hydrate)
+    // finish hashing both items before measuring, or its tail call races past
+    // the spy reset below and pollutes the count.
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 20));
+    });
+
+    const fingerprint = vi.spyOn(
+      magicItemFamily,
+      'fingerprintMagicItemPayload'
+    );
+    fingerprint.mockClear();
+    await act(async () => {
+      useMagicItemLibraryStore.getState().updateItem(campaign.code, 'magic-1', {
+        name: 'Only this one changed',
+      });
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+    // The untouched item (magic-2) keeps its object identity, so only the
+    // edited one is re-canonicalized and re-hashed. `MagicItemPayload` omits
+    // `id` (`Omit<CustomMagicItem, 'id' | 'campaignCode'>`), so `name` —
+    // unique per fixture — is the identifying field available on the call
+    // args.
+    const hashedNames = fingerprint.mock.calls.map(call => call[0].name);
+    expect(hashedNames).toEqual(['Only this one changed']);
   });
 });
 
