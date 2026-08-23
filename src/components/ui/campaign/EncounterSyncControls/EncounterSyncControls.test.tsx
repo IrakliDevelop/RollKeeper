@@ -609,6 +609,121 @@ describe('EncounterSyncControls gates', () => {
     expect(commit).not.toHaveBeenCalled();
     expect(requests.map(request => request.action)).not.toContain('put');
   });
+
+  it('arms autosave after a version restore on an enrolled device', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspace();
+    seedEnvelope([encounter()]);
+    useEncounterStore.setState({
+      encounters: [encounter()],
+      encounterTombstones: {},
+    });
+    const cloudPayload = { ...encounterPayload(), name: 'Cloud encounter' };
+    const cloudFingerprint = await fingerprintEncounterPayload(cloudPayload);
+    const restoredPayload = { ...encounterPayload(), name: 'Restored v1' };
+    const restoredFingerprint =
+      await fingerprintEncounterPayload(restoredPayload);
+    const version = (serverVersion: number) => ({
+      serverVersion,
+      cutoverEpoch: 1,
+      schemaVersion: 2,
+      payloadFingerprint: restoredFingerprint,
+      tombstoned: false,
+      acceptedAt: NOW,
+    });
+    const requests: Record<string, unknown>[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        requests.push(body);
+        const respond = (value: unknown) =>
+          ({ ok: true, json: async () => value }) as Response;
+        if (body.action === 'preview-enrollment')
+          return respond({
+            authority: 'postgres',
+            epoch: 1,
+            previewFingerprint: 'preview-fingerprint',
+            recordCount: 1,
+            documents: [
+              {
+                legacyId: 'enc-cloud',
+                serverVersion: 1,
+                schemaVersion: 2,
+                payloadFingerprint: cloudFingerprint,
+                tombstoned: false,
+                payload: cloudPayload,
+              },
+            ],
+          });
+        if (body.action === 'enroll-device') return respond({});
+        if (body.action === 'history')
+          return respond({ versions: [version(2), version(1)] });
+        if (body.action === 'restore-version')
+          return respond({
+            serverVersion: 3,
+            cutoverEpoch: 1,
+            payloadFingerprint: restoredFingerprint,
+          });
+        if (body.action === 'export-version')
+          return respond({
+            serverVersion: 3,
+            schemaVersion: 2,
+            payloadFingerprint: restoredFingerprint,
+            tombstoned: false,
+            payload: restoredPayload,
+          });
+        if (body.action === 'put')
+          return respond({
+            serverVersion: Number(body.expectedServerVersion) + 1,
+            cutoverEpoch: Number(body.expectedEpoch),
+            payloadFingerprint: body.payloadFingerprint,
+            cloudSaved: true,
+            playerView: 'not-applicable',
+          });
+        throw new Error(`unexpected action ${String(body.action)}`);
+      }
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderControls();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Find owner workspaces' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Select Encounters/ })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Preview cloud enrollment' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Enroll this device' })
+    );
+    await screen.findByText(
+      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+    );
+
+    // Enrolled but not yet applied: autosave is deliberately disarmed here.
+    fireEvent.click(screen.getByRole('button', { name: 'Version history' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Restore as new version' })
+    );
+    await screen.findByText(
+      'Cloud: saved as version 3 · Player view: not applicable'
+    );
+
+    // The restore rewrote the store from IndexedDB, so it is a hydrating path:
+    // the next edit must still reach IndexedDB and the cloud.
+    const commit = vi.spyOn(IndexedDbEncounterRepository.prototype, 'commit');
+    await act(async () => {
+      useEncounterStore
+        .getState()
+        .updateEncounter('enc-1', { name: 'Post-restore edit' });
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+
+    expect(commit).toHaveBeenCalled();
+    expect(requests.map(request => request.action)).toContain('put');
+  });
 });
 
 describe('encounter autosave planning', () => {

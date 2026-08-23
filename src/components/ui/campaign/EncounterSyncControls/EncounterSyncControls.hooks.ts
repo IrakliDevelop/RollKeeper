@@ -1452,6 +1452,11 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
             .filter(document => document.operation !== 'delete')
             .map(document => [document.legacyId, document.contentFingerprint])
         );
+        // A restore rewrites the store from IndexedDB, so like hydrate,
+        // activateLocal, and applyExactCloudVersion it must arm autosave: on an
+        // enrolled-but-unapplied device the legacy key is frozen, so a
+        // disarmed edit would live only in memory and vanish on reload.
+        setHydrated(true);
       } finally {
         database.close();
       }
