@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -9,9 +10,24 @@ import {
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  fingerprintMagicItemPayload,
+  type MagicItemPayload,
+} from '@/lib/durableDm/magicItemFamily';
+import { writeMagicItemAuthorityMarker } from '@/lib/durableDm/magicItemLegacyAuthority';
+import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 import * as localDatabase from '@/lib/indexeddb/localDatabase';
+import {
+  deleteRollkeeperDatabaseForTests,
+  openRollkeeperDatabase,
+  transactionComplete,
+} from '@/lib/indexeddb/localDatabase';
+import { commitMagicItemLocalCutover } from '@/lib/indexeddb/magicItemAuthority';
+import { IndexedDbMagicItemRepository } from '@/lib/indexeddb/magicItemRepository';
+import * as supabaseBrowser from '@/lib/supabase/browser';
 import * as browserDmWorkspace from '@/lib/supabase/browserDmWorkspace';
 import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
+import type { CustomMagicItem } from '@/types/magicItemLibrary';
 
 import {
   MagicItemSyncControls,
@@ -19,10 +35,27 @@ import {
   runMagicItemMutationPlan,
 } from './MagicItemSyncControls';
 
+const NOW = '2026-08-22T00:00:00.000Z';
+const ACCOUNT_ID = '11111111-1111-4111-8111-111111111111';
+const CAMPAIGN_ID = '22222222-2222-4222-8222-222222222222';
+const NAMESPACE = `user:${ACCOUNT_ID}` as const;
+const GENERATION = 'magic-item-generation';
+
 const campaign = { code: 'SYNTH1', name: 'Magic items', createdAt: 'now' };
 
+const gates = {
+  recoveryReceipt: true,
+  sourceManifestUnchanged: true,
+  captureVerifiedAfterReopen: true,
+  manifestConfirmed: true,
+  noConflicts: true,
+  noQuarantine: true,
+  parity: true,
+  journalEmpty: true,
+};
+
 const workspace = {
-  namespace: 'user:11111111-1111-4111-8111-111111111111' as const,
+  namespace: NAMESPACE,
   localId: 'legacy:SYNTH1',
   legacyId: 'SYNTH1',
   name: 'Magic items',
@@ -30,7 +63,7 @@ const workspace = {
   sourceFingerprint: 'source',
   createdAt: 'created',
   family: 'workspace_identity' as const,
-  cloudId: '22222222-2222-4222-8222-222222222222',
+  cloudId: CAMPAIGN_ID,
   displayCode: 'A1B2C3D4E5F6',
   membershipAuthority: 'legacy' as const,
   familyAuthorities: 'legacy' as const,
@@ -40,7 +73,7 @@ const workspace = {
 
 function mockOwnerWorkspace() {
   vi.spyOn(browserDmWorkspace, 'createBrowserDmWorkspace').mockResolvedValue({
-    accountId: '11111111-1111-4111-8111-111111111111',
+    accountId: ACCOUNT_ID,
     accountLabel: 'fake@example.test',
     list: vi.fn().mockResolvedValue([]),
     discover: vi.fn().mockResolvedValue([workspace]),
@@ -51,32 +84,106 @@ function mockOwnerWorkspace() {
   });
 }
 
+/**
+ * Faithful stand-in for the repository-backed context: `discover` returns the
+ * cloud-side workspaces, but `list` returns only what was explicitly
+ * `remember`ed — which is what a reload's hydrate() reads.
+ */
+function mockOwnerWorkspaceWithMemory() {
+  const remembered: DmWorkspaceDocument[] = [];
+  vi.spyOn(browserDmWorkspace, 'createBrowserDmWorkspace').mockImplementation(
+    async () => ({
+      accountId: ACCOUNT_ID,
+      accountLabel: 'fake@example.test',
+      list: vi.fn().mockImplementation(async () => [...remembered]),
+      discover: vi.fn().mockResolvedValue([workspace]),
+      remember: vi
+        .fn()
+        .mockImplementation(async (item: DmWorkspaceDocument) => {
+          if (!remembered.some(known => known.cloudId === item.cloudId))
+            remembered.push(item);
+        }),
+      create: vi.fn(),
+      forkLegacy: vi.fn(),
+      close: vi.fn(),
+    })
+  );
+  return remembered;
+}
+
+function mockOwnerSession() {
+  vi.spyOn(supabaseBrowser, 'createSupabaseBrowserClient').mockReturnValue({
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { user: { id: ACCOUNT_ID } } },
+      }),
+      onAuthStateChange: vi.fn().mockReturnValue({
+        data: { subscription: { unsubscribe: vi.fn() } },
+      }),
+    },
+  } as never);
+}
+
+type AuthListener = (event: string, session: unknown) => void;
+
+/**
+ * Same owner session, but the controller's `onAuthStateChange` listener is
+ * captured so a case can replay a Supabase event (TOKEN_REFRESHED fires
+ * hourly, and whenever a hidden tab's token expired).
+ */
+function mockOwnerSessionCapturingListener() {
+  let listener: AuthListener | null = null;
+  vi.spyOn(supabaseBrowser, 'createSupabaseBrowserClient').mockReturnValue({
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { user: { id: ACCOUNT_ID } } },
+      }),
+      onAuthStateChange: vi
+        .fn()
+        .mockImplementation((callback: AuthListener) => {
+          listener = callback;
+          return { data: { subscription: { unsubscribe: vi.fn() } } };
+        }),
+    },
+  } as never);
+  return (event: string, session: unknown) => {
+    if (!listener) throw new Error('The controller never subscribed to auth');
+    listener(event, session);
+  };
+}
+
+function magicItemFixture(): CustomMagicItem {
+  return {
+    id: 'magic-1',
+    campaignCode: 'SYNTH1',
+    name: 'Cloak of Elvenkind',
+    category: 'wondrous',
+    rarity: 'uncommon',
+    description: 'A shifting grey cloak.',
+    properties: [],
+    requiresAttunement: true,
+    isAttuned: false,
+    tags: ['cloak'],
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+}
+
+function magicItemPayload(): MagicItemPayload {
+  const { id, campaignCode, ...payload } = magicItemFixture();
+  void id;
+  void campaignCode;
+  return payload;
+}
+
+function oneItemState() {
+  return { itemsByCampaign: { SYNTH1: [magicItemFixture()] } };
+}
+
 function seedOneItemEnvelope() {
-  const now = '2026-08-22T00:00:00.000Z';
   localStorage.setItem(
     'rollkeeper-dm-magic-item-library',
-    JSON.stringify({
-      version: 1,
-      state: {
-        itemsByCampaign: {
-          SYNTH1: [
-            {
-              id: 'magic-1',
-              campaignCode: 'SYNTH1',
-              name: 'Cloak of Elvenkind',
-              category: 'wondrous item',
-              rarity: 'uncommon',
-              description: 'A shifting grey cloak.',
-              properties: [],
-              requiresAttunement: true,
-              tags: ['cloak'],
-              createdAt: now,
-              updatedAt: now,
-            },
-          ],
-        },
-      },
-    })
+    JSON.stringify({ version: 1, state: oneItemState() })
   );
 }
 
@@ -98,8 +205,68 @@ async function selectWorkspaceAndPreview() {
   );
 }
 
+/**
+ * Puts this device in the state a completed local cutover leaves behind:
+ * IndexedDB holds the routed generation and the legacy key is frozen behind
+ * an `indexedDB` authority marker.
+ */
+async function seedLocalIndexedDbAuthority() {
+  const payload = magicItemPayload();
+  const contentFingerprint = await fingerprintMagicItemPayload(payload);
+  const database = await openRollkeeperDatabase();
+  const transaction = database.transaction(
+    ['meta', 'kvGenerations'],
+    'readwrite'
+  );
+  transaction.objectStore('meta').put({
+    key: `migration-state:${NAMESPACE}:magic_item:${CAMPAIGN_ID}`,
+    state: 'CUTOVER_READY',
+    runId: GENERATION,
+  });
+  transaction.objectStore('kvGenerations').put({
+    namespace: NAMESPACE,
+    generation: GENERATION,
+    key: 'rollkeeper-dm-magic-item-library',
+    presence: true,
+    rawValue: JSON.stringify({ version: 1, state: oneItemState() }),
+  });
+  await transactionComplete(transaction);
+  await commitMagicItemLocalCutover(database, {
+    namespace: NAMESPACE,
+    campaignId: CAMPAIGN_ID,
+    generation: GENERATION,
+    confirmed: true,
+    gates,
+    now: () => NOW,
+    initialDocuments: [
+      {
+        namespace: NAMESPACE,
+        campaignId: CAMPAIGN_ID,
+        legacyId: 'magic-1',
+        family: 'magic_item',
+        cutoverEpoch: 1,
+        operation: 'create',
+        payload,
+        schemaVersion: 1,
+        localRevision: 1,
+        baseServerVersion: 0,
+        contentFingerprint,
+        updatedAt: NOW,
+        deletedAt: null,
+      },
+    ],
+  });
+  database.close();
+  writeMagicItemAuthorityMarker(localStorage, campaign.code, {
+    version: 1,
+    authority: 'indexedDB',
+    epoch: 1,
+    campaignId: CAMPAIGN_ID,
+    namespace: NAMESPACE,
+  });
+}
 describe('MagicItemSyncControls gates', () => {
-  afterEach(() => {
+  afterEach(async () => {
     cleanup();
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
@@ -107,6 +274,7 @@ describe('MagicItemSyncControls gates', () => {
     // reset has to happen before the storage is cleared.
     useMagicItemLibraryStore.setState({ itemsByCampaign: {} });
     localStorage.clear();
+    await deleteRollkeeperDatabaseForTests(indexedDB);
   });
 
   it('renders nothing and performs zero storage, IndexedDB, cookie, or network work by default', async () => {
@@ -214,6 +382,224 @@ describe('MagicItemSyncControls gates', () => {
     expect(
       screen.queryByRole('button', { name: 'Confirm local cutover' })
     ).toBeNull();
+  });
+
+  it('hydrates after a reload when the workspace was only discovered, never enrolled', async () => {
+    vi.stubEnv('NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE', 'true');
+    const remembered = mockOwnerWorkspaceWithMemory();
+    mockOwnerSession();
+    useMagicItemLibraryStore.setState(oneItemState());
+    seedOneItemEnvelope();
+    const createObjectURL = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:magic-item-recovery');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
+      () => undefined
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<MagicItemSyncControls campaign={campaign} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Find owner workspaces' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Select Magic items/ })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Preview exact manifest' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Download recovery file' })
+    );
+    await screen.findByText(/Reopen that file here before selection/);
+    const downloadedBlob = createObjectURL.mock.calls[0]![0] as Blob;
+    fireEvent.change(
+      screen.getByLabelText('Downloaded magic item recovery file'),
+      {
+        target: {
+          files: [
+            new File([await downloadedBlob.text()], 'magic-item-backup.json', {
+              type: 'application/json',
+            }),
+          ],
+        },
+      }
+    );
+    await screen.findByText(
+      'Recovery file verified and magic item library selected. LocalStorage remains authoritative.'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare IndexedDB' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Confirm local cutover' })
+    );
+    await screen.findByText(
+      'Local: saved · IndexedDB authority epoch 1 · Cloud: inactive'
+    );
+
+    // The reload: fresh mount, localStorage keeps the frozen legacy copy plus
+    // the authority marker, IndexedDB keeps the cutover generation, and cloud
+    // activation never happened.
+    cleanup();
+    useMagicItemLibraryStore.setState(oneItemState());
+    render(<MagicItemSyncControls campaign={campaign} />);
+
+    expect(
+      await screen.findByText(
+        'Magic item library loaded from the verified local IndexedDB generation.'
+      )
+    ).toBeVisible();
+    expect(
+      screen.queryByText(
+        'The initialized magic item namespace has no matching owner workspace on this device.'
+      )
+    ).toBeNull();
+    expect(remembered).toHaveLength(1);
+
+    // …and edits keep committing instead of dying in the frozen legacy key.
+    const commit = vi.spyOn(IndexedDbMagicItemRepository.prototype, 'commit');
+    await act(async () => {
+      useMagicItemLibraryStore.getState().updateItem(campaign.code, 'magic-1', {
+        name: 'Edited after reload',
+      });
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+    expect(commit).toHaveBeenCalled();
+    const database = await openRollkeeperDatabase();
+    try {
+      const document = await new IndexedDbMagicItemRepository(
+        database
+      ).getDocument(NAMESPACE, 'magic-1');
+      expect(document?.payload?.name).toBe('Edited after reload');
+      expect(document?.localRevision).toBe(2);
+    } finally {
+      database.close();
+    }
+  });
+
+  it('does not re-hydrate over a newer local edit on a repeated auth event', async () => {
+    vi.stubEnv('NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE', 'true');
+    // The device already knows the workspace, so this case isolates the
+    // re-entrancy guard from the cutover-time `remember`.
+    mockOwnerWorkspaceWithMemory().push(workspace);
+    const fireAuthEvent = mockOwnerSessionCapturingListener();
+    await seedLocalIndexedDbAuthority();
+    useMagicItemLibraryStore.setState(oneItemState());
+    seedOneItemEnvelope();
+
+    render(<MagicItemSyncControls campaign={campaign} />);
+    await screen.findByText(
+      'Magic item library loaded from the verified local IndexedDB generation.'
+    );
+    const openContext = vi.mocked(browserDmWorkspace.createBrowserDmWorkspace);
+    expect(openContext).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      useMagicItemLibraryStore.getState().updateItem(campaign.code, 'magic-1', {
+        name: 'Edited before the token refresh',
+      });
+      fireAuthEvent('TOKEN_REFRESHED', { user: { id: ACCOUNT_ID } });
+      await new Promise(resolve => setTimeout(resolve, 20));
+    });
+
+    // The guard returns before `createBrowserDmWorkspace()`, so this count is
+    // the scheduling-independent witness that no second hydration pass ran:
+    // it is 2 without the guard however the chain happened to interleave.
+    expect(openContext).toHaveBeenCalledTimes(1);
+    expect(
+      useMagicItemLibraryStore.getState().itemsByCampaign[campaign.code]![0]!
+        .name
+    ).toBe('Edited before the token refresh');
+
+    // …and the baseline survived the auth event, so the edit still committed.
+    const database = await openRollkeeperDatabase();
+    try {
+      const document = await new IndexedDbMagicItemRepository(
+        database
+      ).getDocument(NAMESPACE, 'magic-1');
+      expect(document?.payload?.name).toBe('Edited before the token refresh');
+      expect(document?.localRevision).toBe(2);
+    } finally {
+      database.close();
+    }
+  });
+
+  it('does not upload the local candidate after enrollment until the cloud generation is applied', async () => {
+    vi.stubEnv('NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspaceWithMemory();
+    useMagicItemLibraryStore.setState(oneItemState());
+    seedOneItemEnvelope();
+    const cloudPayload = { ...magicItemPayload(), name: 'Cloud item' };
+    const requests: Record<string, unknown>[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        requests.push(body);
+        const respond = (value: unknown) =>
+          ({ ok: true, json: async () => value }) as Response;
+        if (body.action === 'preview-enrollment')
+          return respond({
+            authority: 'postgres',
+            epoch: 1,
+            previewFingerprint: 'preview-fingerprint',
+            recordCount: 1,
+            documents: [
+              {
+                legacyId: 'magic-cloud',
+                serverVersion: 1,
+                schemaVersion: 1,
+                payloadFingerprint: 'cloud-fingerprint',
+                tombstoned: false,
+                payload: cloudPayload,
+              },
+            ],
+          });
+        if (body.action === 'enroll-device') return respond({});
+        if (body.action === 'put')
+          return respond({
+            serverVersion: Number(body.expectedServerVersion) + 1,
+            cutoverEpoch: Number(body.expectedEpoch),
+            payloadFingerprint: body.payloadFingerprint,
+            cloudSaved: true,
+            playerView: 'not-applicable',
+          });
+        throw new Error(`unexpected action ${String(body.action)}`);
+      }
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<MagicItemSyncControls campaign={campaign} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Find owner workspaces' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Select Magic items/ })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Preview cloud enrollment' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Enroll this device' })
+    );
+    await screen.findByText(
+      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+    );
+
+    // The enrollment confirm promises the local candidate "is never uploaded
+    // automatically", so autosave must stay disarmed until the DM applies the
+    // exact cloud generation.
+    const commit = vi.spyOn(IndexedDbMagicItemRepository.prototype, 'commit');
+    for (const name of ['Local candidate edit', 'Local candidate edit again']) {
+      await act(async () => {
+        useMagicItemLibraryStore
+          .getState()
+          .updateItem(campaign.code, 'magic-1', { name });
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
+    }
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(requests.map(request => request.action)).not.toContain('put');
   });
 });
 

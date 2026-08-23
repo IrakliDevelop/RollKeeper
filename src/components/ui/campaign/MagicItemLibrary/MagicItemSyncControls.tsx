@@ -248,6 +248,15 @@ function applyMagicItemDocuments(
   }));
 }
 
+/** Identity of the exact local generation a hydration pass consumed. */
+function authorityGeneration(
+  accountId: string,
+  campaignId: string,
+  next: MagicItemAuthority
+) {
+  return `${accountId}:${campaignId}:${next.authority}:${next.epoch}`;
+}
+
 function storeDocumentsFromLocal(documents: MagicItemDocument[]) {
   return documents.map(document => ({
     legacyId: document.legacyId,
@@ -287,7 +296,14 @@ export function MagicItemSyncControls({ campaign }: Props) {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Autosave is armed only once the store provably holds this device's routed
+  // generation. `authority && scope` is not enough: device enrollment sets both
+  // while the store still shows the un-uploaded local candidate.
+  const [hydrated, setHydrated] = useState(false);
   const lastFingerprints = useRef<Map<string, string> | null>(null);
+  // The exact local generation the store was hydrated from, so a repeated
+  // Supabase auth event cannot re-run hydration over newer local work.
+  const hydrationSignature = useRef<string | null>(null);
   // Autosave runs are serialized: two overlapping runs could interleave their
   // acknowledgements and rewind a document fingerprint to an older value.
   const autosaveChain = useRef<Promise<void>>(Promise.resolve());
@@ -303,6 +319,8 @@ export function MagicItemSyncControls({ campaign }: Props) {
     const hide = () => {
       setScope(null);
       setAuthority(null);
+      setHydrated(false);
+      hydrationSignature.current = null;
       hideMagicItems(campaign.code);
     };
     const hydrate = async (accountId: string | null) => {
@@ -329,6 +347,19 @@ export function MagicItemSyncControls({ campaign }: Props) {
           hide();
           return;
         }
+        // `onAuthStateChange` fires on TOKEN_REFRESHED (hourly, and whenever a
+        // hidden tab's token expired) with the same account and the same local
+        // generation. Re-running the pass below would replace the store with
+        // the pre-edit documents and reset the baseline underneath an
+        // in-flight autosave run, losing the edit everywhere at once — the
+        // legacy key is frozen for a routed campaign. A genuine account,
+        // campaign, or authority/epoch change still changes this signature and
+        // still hydrates.
+        if (
+          hydrationSignature.current ===
+          authorityGeneration(accountId, marker.campaignId, localAuthority)
+        )
+          return;
         const restoredContext = await createBrowserDmWorkspace();
         if (cancelled) {
           restoredContext?.close();
@@ -377,6 +408,12 @@ export function MagicItemSyncControls({ campaign }: Props) {
         setWorkspace(restoredWorkspace);
         setScope({ accountId, campaignId: marker.campaignId });
         setAuthority(localAuthority);
+        hydrationSignature.current = authorityGeneration(
+          accountId,
+          marker.campaignId,
+          localAuthority
+        );
+        setHydrated(true);
         setStatus(
           'Magic item library loaded from the verified local IndexedDB generation.'
         );
@@ -384,9 +421,16 @@ export function MagicItemSyncControls({ campaign }: Props) {
         database.close();
       }
     };
+    // Hydration shares the autosave chain, so it can never interleave with an
+    // in-flight run that has already captured its fingerprints.
+    const queueHydrate = (accountId: string | null) => {
+      const queued = autosaveChain.current.then(() => hydrate(accountId));
+      autosaveChain.current = queued.catch(() => undefined);
+      return queued;
+    };
     void client.auth
       .getSession()
-      .then(result => hydrate(result.data.session?.user.id ?? null))
+      .then(result => queueHydrate(result.data.session?.user.id ?? null))
       .catch(cause =>
         setError(
           cause instanceof Error
@@ -395,7 +439,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
         )
       );
     const { data } = client.auth.onAuthStateChange((_event, session) => {
-      void hydrate(session?.user.id ?? null).catch(cause =>
+      void queueHydrate(session?.user.id ?? null).catch(cause =>
         setError(
           cause instanceof Error ? cause.message : 'Local hydration failed'
         )
@@ -423,7 +467,13 @@ export function MagicItemSyncControls({ campaign }: Props) {
   }, [items]);
 
   useEffect(() => {
-    if (busy || !authority || authority.authority === 'localStorage' || !scope)
+    if (
+      busy ||
+      !hydrated ||
+      !authority ||
+      authority.authority === 'localStorage' ||
+      !scope
+    )
       return;
     let cancelled = false;
     const run = async () => {
@@ -540,7 +590,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [authority, busy, items, campaign.code, scope]);
+  }, [authority, busy, items, campaign.code, hydrated, scope]);
 
   if (!isMagicItemClientVisible()) return null;
 
@@ -782,6 +832,14 @@ export function MagicItemSyncControls({ campaign }: Props) {
       });
       if (current.fingerprint !== manifest.fingerprint)
         throw new Error('Manifest changed; preview again.');
+      // Only the cloud-enrollment paths persisted the chosen workspace, so a
+      // device that merely *discovered* one had no workspace_identity document
+      // and could not hydrate after a reload: hydrate() looks the campaign up
+      // by cloudId, bailed out, and left the store on the frozen legacy key
+      // with every later edit silently uncommitted. Local cutover must stand
+      // alone, with no cloud activation. Remembering before the cutover means a
+      // failure here leaves legacy authority untouched.
+      await context.remember(workspace);
       const updatedAt = new Date().toISOString();
       const next = await commitMagicItemLocalCutover(database, {
         namespace,
@@ -816,6 +874,13 @@ export function MagicItemSyncControls({ campaign }: Props) {
         })),
       });
       setAuthority(next);
+      hydrationSignature.current = authorityGeneration(
+        context.accountId,
+        campaignId,
+        next
+      );
+      // The store already holds exactly the items this cutover captured.
+      setHydrated(true);
       writeMagicItemAuthorityMarker(localStorage, campaign.code, {
         version: 1,
         authority: 'indexedDB',
@@ -937,6 +1002,11 @@ export function MagicItemSyncControls({ campaign }: Props) {
           })),
         });
         setAuthority(next);
+        hydrationSignature.current = authorityGeneration(
+          context.accountId,
+          campaignId,
+          next
+        );
         writeMagicItemAuthorityMarker(localStorage, campaign.code, {
           version: 1,
           authority: 'postgres',
@@ -1047,6 +1117,16 @@ export function MagicItemSyncControls({ campaign }: Props) {
           now: () => new Date().toISOString(),
         });
         setAuthority(next);
+        // The enrolled device holds the cloud documents in IndexedDB while the
+        // store still shows the local candidate, so autosave stays disarmed
+        // until the DM applies the exact cloud generation. The confirm above
+        // promises that candidate is never uploaded automatically.
+        setHydrated(false);
+        hydrationSignature.current = authorityGeneration(
+          context.accountId,
+          campaignId,
+          next
+        );
         await context.remember(workspace);
         writeMagicItemAuthorityMarker(localStorage, campaign.code, {
           version: 1,
@@ -1125,6 +1205,8 @@ export function MagicItemSyncControls({ campaign }: Props) {
       }
       await context.remember(workspace);
       applyMagicItemDocuments(campaign.code, documents);
+      // The store now matches the enrolled generation, so autosave is armed.
+      setHydrated(true);
       lastFingerprints.current = new Map(
         documents
           .filter(document => !document.tombstoned)
@@ -1266,6 +1348,11 @@ export function MagicItemSyncControls({ campaign }: Props) {
             .filter(document => document.operation !== 'delete')
             .map(document => [document.legacyId, document.contentFingerprint])
         );
+        // A restore rewrites the store from IndexedDB, so like hydrate,
+        // activateLocal, and applyExactCloudVersion it must arm autosave: on an
+        // enrolled-but-unapplied device the legacy key is frozen, so a
+        // disarmed edit would live only in memory and vanish on reload.
+        setHydrated(true);
       } finally {
         database.close();
       }
@@ -1356,6 +1443,8 @@ export function MagicItemSyncControls({ campaign }: Props) {
         campaign.code,
         result.currentGeneration.documents ?? []
       );
+      setHydrated(false);
+      hydrationSignature.current = null;
       rollbackMutationId.current = null;
       setStatus(
         'Rollback accepted through a new epoch; sources were preserved. Reload to use the verified legacy generation.'
@@ -1422,8 +1511,10 @@ export function MagicItemSyncControls({ campaign }: Props) {
         });
         hideMagicItems(campaign.code);
         lastFingerprints.current = null;
+        hydrationSignature.current = null;
         setScope(null);
         setAuthority(null);
+        setHydrated(false);
         setStatus(
           'Only the selected account namespace was hidden; cloud, history, legacy, conflicts, and outboxes were preserved.'
         );
