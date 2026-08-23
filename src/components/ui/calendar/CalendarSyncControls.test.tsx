@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   calendarPayloadFromCampaignCalendar,
   fingerprintCalendarPayload,
+  type CalendarPayload,
 } from '@/lib/durableDm/calendarFamily';
 import { writeCalendarProjectionAuthority } from '@/lib/durableDm/calendarLegacyProjection';
 import { commitCalendarLocalCutover } from '@/lib/indexeddb/calendarAuthority';
@@ -580,5 +581,252 @@ describe('CalendarSyncControls gates', () => {
 
     expect(commit).not.toHaveBeenCalled();
     expect(requests.map(request => request.action)).not.toContain('put');
+  });
+
+  /**
+   * Drives an enrolled-but-unapplied device: the cloud generation is in
+   * IndexedDB while the store still shows the local candidate, which is the
+   * only state both hydrating paths below start from. The second
+   * preview-enrollment answers with a newer cloud version, because
+   * `applyExactCloudVersion` short-circuits on a device that already holds the
+   * previewed one.
+   */
+  async function enrollAgainstCloudGeneration(
+    requests: Record<string, unknown>[]
+  ) {
+    const base = calendarPayloadFromCampaignCalendar(calendarFixture());
+    const cloudPayload = { ...base, weather: 'snow' as const };
+    const cloudFingerprint = await fingerprintCalendarPayload(cloudPayload);
+    const appliedPayload = { ...base, weather: 'blizzard' as const };
+    const appliedFingerprint = await fingerprintCalendarPayload(appliedPayload);
+    const restoredPayload = { ...base, weather: 'cloudy' as const };
+    const restoredFingerprint =
+      await fingerprintCalendarPayload(restoredPayload);
+    let previews = 0;
+    const version = (serverVersion: number) => ({
+      serverVersion,
+      cutoverEpoch: 1,
+      schemaVersion: 1,
+      payloadFingerprint: restoredFingerprint,
+      tombstoned: false,
+      acceptedAt: NOW,
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        requests.push(body);
+        const respond = (value: unknown) =>
+          ({ ok: true, json: async () => value }) as Response;
+        if (body.action === 'preview-enrollment') {
+          previews += 1;
+          return respond({
+            authority: 'postgres',
+            epoch: 1,
+            previewFingerprint: 'preview-fingerprint',
+            serverVersion: previews === 1 ? 1 : 2,
+            schemaVersion: 1,
+            payloadFingerprint:
+              previews === 1 ? cloudFingerprint : appliedFingerprint,
+            tombstoned: false,
+            payload: previews === 1 ? cloudPayload : appliedPayload,
+          });
+        }
+        if (body.action === 'enroll-device') return respond({});
+        if (body.action === 'history')
+          return respond({ versions: [version(2), version(1)] });
+        if (body.action === 'restore-version')
+          return respond({
+            serverVersion: 3,
+            cutoverEpoch: 1,
+            payloadFingerprint: restoredFingerprint,
+          });
+        if (body.action === 'export-version')
+          return respond({
+            serverVersion: 3,
+            schemaVersion: 1,
+            payloadFingerprint: restoredFingerprint,
+            tombstoned: false,
+            payload: restoredPayload,
+          });
+        if (body.action === 'put')
+          return respond({
+            serverVersion: Number(body.expectedServerVersion) + 1,
+            cutoverEpoch: Number(body.expectedEpoch),
+            payloadFingerprint: body.payloadFingerprint,
+            cloudSaved: true,
+            playerView: 'pending',
+          });
+        throw new Error(`unexpected action ${String(body.action)}`);
+      }
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<CalendarSyncControls campaign={campaign} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Find owner workspaces' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Select Calendar/ })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Preview cloud enrollment' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Enroll this device' })
+    );
+    await screen.findByText(
+      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+    );
+  }
+
+  it('arms autosave when the exact cloud version is applied', async () => {
+    vi.stubEnv('NEXT_PUBLIC_CALENDAR_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspaceWithMemory();
+    useCalendarStore.setState(oneCalendarState());
+    seedCalendarEnvelope();
+    const requests: Record<string, unknown>[] = [];
+    await enrollAgainstCloudGeneration(requests);
+
+    // Two edits, because the first armed run only seeds the baseline: without
+    // the `hydrated` gate the second one commits inside its own 10ms window,
+    // which is what keeps this negative from passing vacuously.
+    const commit = vi.spyOn(IndexedDbCalendarRepository.prototype, 'commit');
+    for (const weather of ['rain', 'fog'] as const) {
+      await act(async () => {
+        useCalendarStore.getState().setWeather(campaign.code, weather);
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
+    }
+    expect(commit).not.toHaveBeenCalled();
+    expect(requests.map(request => request.action)).not.toContain('put');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Preview cloud enrollment' })
+    );
+    // The Apply button is already on screen from the enrollment preview, so
+    // wait for the newer preview to reach state before clicking it — applying
+    // the version this device already holds is a no-op that never arms.
+    await screen.findByText(
+      'Cloud enrollment preview loaded. This device remains unenrolled.'
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Apply exact cloud version' })
+    );
+    await screen.findByText('Device hydrated from exact cloud version 2.');
+
+    // Applying rewrote the store from IndexedDB, so it is a hydrating path:
+    // the next edit must still reach IndexedDB and the cloud.
+    await act(async () => {
+      useCalendarStore.getState().setWeather(campaign.code, 'rain');
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+    expect(commit).toHaveBeenCalled();
+    expect(requests.map(request => request.action)).toContain('put');
+  });
+
+  it('arms autosave after a version restore on an enrolled device', async () => {
+    vi.stubEnv('NEXT_PUBLIC_CALENDAR_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspaceWithMemory();
+    useCalendarStore.setState(oneCalendarState());
+    seedCalendarEnvelope();
+    const requests: Record<string, unknown>[] = [];
+    await enrollAgainstCloudGeneration(requests);
+
+    // Enrolled but never applied, so autosave is still disarmed here.
+    fireEvent.click(screen.getByRole('button', { name: 'Version history' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Restore as new version' })
+    );
+    await screen.findByText(
+      'Cloud: saved as version 3 · Player view: pending acknowledgement'
+    );
+
+    // The restore rewrote the store from IndexedDB, so it is a hydrating path
+    // too — and it is the site Slice 11E missed on its first pass.
+    const commit = vi.spyOn(IndexedDbCalendarRepository.prototype, 'commit');
+    await act(async () => {
+      useCalendarStore.getState().setWeather(campaign.code, 'rain');
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+    expect(commit).toHaveBeenCalled();
+    expect(requests.map(request => request.action)).toContain('put');
+  });
+
+  it('disarms autosave when a later hydration finds the local calendar tombstoned', async () => {
+    vi.stubEnv('NEXT_PUBLIC_CALENDAR_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspaceWithMemory().push(workspace);
+    const fireAuthEvent = mockOwnerSessionCapturingListener();
+    await seedLocalIndexedDbAuthority();
+    useCalendarStore.setState(oneCalendarState());
+    seedCalendarEnvelope();
+
+    render(<CalendarSyncControls campaign={campaign} />);
+    await screen.findByText(
+      'Calendar loaded from the verified local IndexedDB generation.'
+    );
+    // Let the baseline-establishing autosave run finish before measuring.
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 20));
+    });
+
+    // Tombstone the local document and advance the local generation, so the
+    // next auth event misses the re-entrancy signature and hydration reaches
+    // its empty-payload branch.
+    // Exactly what hydrate's verification hashes for an absent payload, so the
+    // pass reaches the empty-payload branch instead of failing the fingerprint
+    // check above it. Hashed before the transaction opens, because an await
+    // inside one deactivates it.
+    const absentPayloadFingerprint = await fingerprintCalendarPayload(
+      null as unknown as CalendarPayload
+    );
+    const database = await openRollkeeperDatabase();
+    const transaction = database.transaction(
+      ['documents', 'meta'],
+      'readwrite'
+    );
+    transaction.objectStore('documents').put({
+      namespace: NAMESPACE,
+      campaignId: CAMPAIGN_ID,
+      legacyId: campaign.code,
+      family: 'calendar',
+      cutoverEpoch: 1,
+      operation: 'delete',
+      payload: null,
+      schemaVersion: 1,
+      localRevision: 2,
+      baseServerVersion: 1,
+      contentFingerprint: absentPayloadFingerprint,
+      updatedAt: NOW,
+      deletedAt: NOW,
+    });
+    transaction.objectStore('meta').put({
+      key: `active-generation:${NAMESPACE}:calendar:${CAMPAIGN_ID}`,
+      authority: 'indexedDB',
+      namespace: NAMESPACE,
+      campaignId: CAMPAIGN_ID,
+      family: 'calendar',
+      generation: GENERATION,
+      epoch: 2,
+      committedAt: NOW,
+    });
+    await transactionComplete(transaction);
+    database.close();
+
+    const commit = vi.spyOn(IndexedDbCalendarRepository.prototype, 'commit');
+    await act(async () => {
+      fireAuthEvent('TOKEN_REFRESHED', { user: { id: ACCOUNT_ID } });
+      await new Promise(resolve => setTimeout(resolve, 20));
+    });
+
+    // The branch ran: the tombstoned campaign is out of the store.
+    expect(
+      useCalendarStore
+        .getState()
+        .calendars.some(value => value.campaignCode === campaign.code)
+    ).toBe(false);
+    // …and because that pass invalidated the store, it also disarmed. Left
+    // armed, the emptied store diverges from the stale payload baseline and
+    // autosave writes a delete this hydration never asked for.
+    expect(commit).not.toHaveBeenCalled();
   });
 });

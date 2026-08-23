@@ -719,6 +719,177 @@ describe('MagicItemSyncControls gates', () => {
     expect(requests.map(request => request.action)).not.toContain('put');
   });
 
+  /**
+   * Drives an enrolled-but-unapplied device: the cloud generation is in
+   * IndexedDB while the store still shows the local candidate, which is the
+   * only state both hydrating paths below start from.
+   */
+  async function enrollAgainstCloudGeneration(
+    requests: Record<string, unknown>[]
+  ) {
+    const cloudPayload = { ...magicItemPayload(), name: 'Cloud item' };
+    const cloudFingerprint = await fingerprintMagicItemPayload(cloudPayload);
+    const restoredPayload = { ...magicItemPayload(), name: 'Restored v1' };
+    const restoredFingerprint =
+      await fingerprintMagicItemPayload(restoredPayload);
+    const version = (serverVersion: number) => ({
+      serverVersion,
+      cutoverEpoch: 1,
+      schemaVersion: 1,
+      payloadFingerprint: restoredFingerprint,
+      tombstoned: false,
+      acceptedAt: NOW,
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        requests.push(body);
+        const respond = (value: unknown) =>
+          ({ ok: true, json: async () => value }) as Response;
+        if (body.action === 'preview-enrollment')
+          return respond({
+            authority: 'postgres',
+            epoch: 1,
+            previewFingerprint: 'preview-fingerprint',
+            recordCount: 1,
+            documents: [
+              {
+                legacyId: 'magic-1',
+                serverVersion: 1,
+                schemaVersion: 1,
+                payloadFingerprint: cloudFingerprint,
+                tombstoned: false,
+                payload: cloudPayload,
+              },
+            ],
+          });
+        if (body.action === 'enroll-device') return respond({});
+        if (body.action === 'history')
+          return respond({ versions: [version(2), version(1)] });
+        if (body.action === 'restore-version')
+          return respond({
+            serverVersion: 3,
+            cutoverEpoch: 1,
+            payloadFingerprint: restoredFingerprint,
+          });
+        if (body.action === 'export-version')
+          return respond({
+            serverVersion: 3,
+            schemaVersion: 1,
+            payloadFingerprint: restoredFingerprint,
+            tombstoned: false,
+            payload: restoredPayload,
+          });
+        if (body.action === 'put')
+          return respond({
+            serverVersion: Number(body.expectedServerVersion) + 1,
+            cutoverEpoch: Number(body.expectedEpoch),
+            payloadFingerprint: body.payloadFingerprint,
+            cloudSaved: true,
+            playerView: 'not-applicable',
+          });
+        throw new Error(`unexpected action ${String(body.action)}`);
+      }
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<MagicItemSyncControls campaign={campaign} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Find owner workspaces' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Select Magic items/ })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Preview cloud enrollment' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Enroll this device' })
+    );
+    await screen.findByText(
+      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+    );
+  }
+
+  it('arms autosave when the exact cloud generation is applied', async () => {
+    vi.stubEnv('NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspaceWithMemory();
+    useMagicItemLibraryStore.setState(oneItemState());
+    seedOneItemEnvelope();
+    const requests: Record<string, unknown>[] = [];
+    await enrollAgainstCloudGeneration(requests);
+
+    // Both phases edit and wait in the same 10ms window, so the committing
+    // phase is the disarmed phase's positive control: the window is
+    // demonstrably long enough for a commit to land in it.
+    const commit = vi.spyOn(IndexedDbMagicItemRepository.prototype, 'commit');
+    await act(async () => {
+      useMagicItemLibraryStore
+        .getState()
+        .updateItem(campaign.code, 'magic-1', { name: 'Local candidate edit' });
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+    expect(commit).not.toHaveBeenCalled();
+    expect(requests.map(request => request.action)).not.toContain('put');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Apply exact cloud version' })
+    );
+    await screen.findByText(
+      'Device hydrated from the exact cloud generation of 1 records.'
+    );
+
+    // Applying rewrote the store from IndexedDB, so it is a hydrating path:
+    // the next edit must still reach IndexedDB and the cloud.
+    await act(async () => {
+      useMagicItemLibraryStore.getState().updateItem(campaign.code, 'magic-1', {
+        name: 'Edited after applying the cloud generation',
+      });
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+    expect(commit).toHaveBeenCalled();
+    expect(requests.map(request => request.action)).toContain('put');
+  });
+
+  it('arms autosave after a version restore on an enrolled device', async () => {
+    vi.stubEnv('NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspaceWithMemory();
+    useMagicItemLibraryStore.setState(oneItemState());
+    seedOneItemEnvelope();
+    const requests: Record<string, unknown>[] = [];
+    await enrollAgainstCloudGeneration(requests);
+
+    // Enrolled but never applied, so autosave is still disarmed here.
+    fireEvent.click(screen.getByRole('button', { name: 'Version history' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Restore as new version' })
+    );
+    await screen.findByText(
+      'Cloud: saved as version 3 · Player view: not applicable'
+    );
+
+    // The restore rewrote the store from IndexedDB, so it is a hydrating path
+    // too — and it is the site Slice 11E missed on its first pass.
+    const commit = vi.spyOn(IndexedDbMagicItemRepository.prototype, 'commit');
+    await act(async () => {
+      useMagicItemLibraryStore.getState().updateItem(campaign.code, 'magic-1', {
+        name: 'Edited after the restore',
+      });
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+    expect(commit).toHaveBeenCalled();
+    expect(requests.map(request => request.action)).toContain('put');
+    const database = await openRollkeeperDatabase();
+    try {
+      const document = await new IndexedDbMagicItemRepository(
+        database
+      ).getDocument(NAMESPACE, 'magic-1');
+      expect(document?.payload?.name).toBe('Edited after the restore');
+    } finally {
+      database.close();
+    }
+  });
+
   it('reuses a cached fingerprint for an item the store left untouched', async () => {
     vi.stubEnv('NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE', 'true');
     mockOwnerWorkspaceWithMemory().push(workspace);

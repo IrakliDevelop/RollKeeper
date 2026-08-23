@@ -286,7 +286,12 @@ export function CalendarSyncControls({ campaign }: Props) {
           return;
         }
         if (!document.payload) {
+          // This pass invalidated the store without establishing a baseline
+          // for it, so it must disarm like every other invalidating path:
+          // left armed, the emptied store diverges from the stale payload
+          // fingerprint and autosave writes a delete nothing asked for.
           hideCalendar(campaign.code);
+          setHydrated(false);
           return;
         }
         applyCalendarPayload(campaign.code, document.payload);

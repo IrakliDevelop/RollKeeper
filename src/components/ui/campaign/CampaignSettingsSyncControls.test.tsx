@@ -798,4 +798,196 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
     expect(commit).not.toHaveBeenCalled();
     expect(requests.map(request => request.action)).not.toContain('put');
   });
+
+  /**
+   * Drives an enrolled-but-unapplied device: the cloud generation is in
+   * IndexedDB while the DM store still shows the local candidate, which is the
+   * only state both hydrating paths below start from. The second
+   * preview-enrollment answers with a newer cloud version, because
+   * `applyExactCloudVersion` short-circuits on a device that already holds the
+   * previewed one.
+   */
+  async function enrollAgainstCloudGeneration(
+    requests: Record<string, unknown>[]
+  ) {
+    const label = (customCounterLabel: string) => ({
+      ...campaignSettingsPayload(),
+      customCounterLabel,
+    });
+    const cloudPayload = label('Cloud label');
+    const cloudFingerprint =
+      await fingerprintCampaignSettingsPayload(cloudPayload);
+    const appliedPayload = label('Newer cloud label');
+    const appliedFingerprint =
+      await fingerprintCampaignSettingsPayload(appliedPayload);
+    const restoredPayload = label('Restored label');
+    const restoredFingerprint =
+      await fingerprintCampaignSettingsPayload(restoredPayload);
+    let previews = 0;
+    const version = (serverVersion: number) => ({
+      serverVersion,
+      cutoverEpoch: 1,
+      schemaVersion: 1,
+      payloadFingerprint: restoredFingerprint,
+      tombstoned: false,
+      acceptedAt: NOW,
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        requests.push(body);
+        const respond = (value: unknown) =>
+          ({ ok: true, json: async () => value }) as Response;
+        if (body.action === 'preview-enrollment') {
+          previews += 1;
+          return respond({
+            authority: 'postgres',
+            epoch: 1,
+            previewFingerprint: 'preview-fingerprint',
+            serverVersion: previews === 1 ? 1 : 2,
+            schemaVersion: 1,
+            payloadFingerprint:
+              previews === 1 ? cloudFingerprint : appliedFingerprint,
+            tombstoned: false,
+            payload: previews === 1 ? cloudPayload : appliedPayload,
+          });
+        }
+        if (body.action === 'enroll-device') return respond({});
+        if (body.action === 'history')
+          return respond({ versions: [version(2), version(1)] });
+        if (body.action === 'restore-version')
+          return respond({
+            serverVersion: 3,
+            cutoverEpoch: 1,
+            payloadFingerprint: restoredFingerprint,
+          });
+        if (body.action === 'export-version')
+          return respond({
+            serverVersion: 3,
+            schemaVersion: 1,
+            payloadFingerprint: restoredFingerprint,
+            tombstoned: false,
+            payload: restoredPayload,
+          });
+        if (body.action === 'put')
+          return respond({
+            serverVersion: Number(body.expectedServerVersion) + 1,
+            cutoverEpoch: Number(body.expectedEpoch),
+            payloadFingerprint: body.payloadFingerprint,
+            cloudSaved: true,
+            playerView: 'pending',
+          });
+        throw new Error(`unexpected action ${String(body.action)}`);
+      }
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<CampaignSettingsHarness />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Find owner workspaces' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Select Synthetic canary/ })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Preview cloud enrollment' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Enroll this device' })
+    );
+    await screen.findByText(
+      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+    );
+  }
+
+  it('arms autosave when the exact cloud version is applied', async () => {
+    vi.stubEnv('NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspaceWithMemory();
+    seedOneCampaign();
+    const requests: Record<string, unknown>[] = [];
+    await enrollAgainstCloudGeneration(requests);
+
+    // Two edits, because the first armed run only seeds the baseline: without
+    // the `hydrated` gate the second one commits inside its own 10ms window,
+    // which is what keeps this negative from passing vacuously.
+    const commit = vi.spyOn(
+      IndexedDbCampaignSettingsRepository.prototype,
+      'commit'
+    );
+    for (const customCounterLabel of [
+      'Local candidate edit',
+      'Local candidate edit again',
+    ]) {
+      await act(async () => {
+        useDmStore
+          .getState()
+          .updateCampaign(CAMPAIGN_CODE, { customCounterLabel });
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
+    }
+    expect(commit).not.toHaveBeenCalled();
+    expect(requests.map(request => request.action)).not.toContain('put');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Preview cloud enrollment' })
+    );
+    // The Apply button is already on screen from the enrollment preview, so
+    // wait for the newer preview to reach state before clicking it — applying
+    // the version this device already holds is a no-op that never arms.
+    await screen.findByText(
+      'Cloud enrollment preview loaded. This device remains unenrolled.'
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Apply exact cloud version' })
+    );
+    await screen.findByText('Device hydrated from exact cloud version 2.');
+
+    // Applying rewrote the DM store from IndexedDB, so it is a hydrating path:
+    // the next edit must still reach IndexedDB and the cloud.
+    await act(async () => {
+      useDmStore.getState().updateCampaign(CAMPAIGN_CODE, {
+        customCounterLabel: 'Edited after applying the cloud version',
+      });
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+    expect(commit).toHaveBeenCalled();
+    expect(requests.map(request => request.action)).toContain('put');
+  });
+
+  it('arms autosave after a version restore on an enrolled device', async () => {
+    vi.stubEnv('NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspaceWithMemory();
+    seedOneCampaign();
+    const requests: Record<string, unknown>[] = [];
+    await enrollAgainstCloudGeneration(requests);
+
+    // Enrolled but never applied, so autosave is still disarmed here.
+    fireEvent.click(screen.getByRole('button', { name: 'Version history' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Restore as new version' })
+    );
+    await screen.findByText(
+      'Cloud: saved as version 3 · Player view: pending acknowledgement'
+    );
+
+    // The restore rewrote the DM store from IndexedDB, so it is a hydrating
+    // path too — and it is the site Slice 11E missed on its first pass.
+    const commit = vi.spyOn(
+      IndexedDbCampaignSettingsRepository.prototype,
+      'commit'
+    );
+    await act(async () => {
+      useDmStore.getState().updateCampaign(CAMPAIGN_CODE, {
+        customCounterLabel: 'Edited after the restore',
+      });
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+    expect(commit).toHaveBeenCalled();
+    expect(requests.map(request => request.action)).toContain('put');
+    const saved = await readCampaignSettingsDocument();
+    expect(
+      (saved?.payload as CampaignSettingsPayload | undefined)
+        ?.customCounterLabel
+    ).toBe('Edited after the restore');
+  });
 });
