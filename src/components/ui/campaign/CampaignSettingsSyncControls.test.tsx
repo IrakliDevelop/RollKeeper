@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -10,20 +11,297 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import * as campaignSettingsFamily from '@/lib/durableDm/campaignSettingsFamily';
+import {
+  fingerprintCampaignSettingsPayload,
+  type CampaignSettingsPayload,
+} from '@/lib/durableDm/campaignSettingsFamily';
 import { writeCampaignSettingsProjectionAuthority } from '@/lib/durableDm/campaignSettingsLegacyProjection';
 import * as campaignSettingsAuthority from '@/lib/indexeddb/campaignSettingsAuthority';
+import { commitCampaignSettingsLocalCutover } from '@/lib/indexeddb/campaignSettingsAuthority';
 import { IndexedDbCampaignSettingsRepository } from '@/lib/indexeddb/campaignSettingsRepository';
+import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 import * as localDatabase from '@/lib/indexeddb/localDatabase';
+import {
+  deleteRollkeeperDatabaseForTests,
+  openRollkeeperDatabase,
+  transactionComplete,
+} from '@/lib/indexeddb/localDatabase';
 import * as browserDmWorkspace from '@/lib/supabase/browserDmWorkspace';
 import * as supabaseBrowser from '@/lib/supabase/browser';
+import { useDmStore } from '@/store/dmStore';
+import type { CampaignInfo } from '@/types/campaign';
 import { CampaignSettingsSyncControls } from './CampaignSettingsSyncControls';
 
+const NOW = '2026-08-22T00:00:00.000Z';
+const ACCOUNT_ID = '11111111-1111-4111-8111-111111111111';
+const CAMPAIGN_ID = '22222222-2222-4222-8222-222222222222';
+const NAMESPACE = `user:${ACCOUNT_ID}` as const;
+const GENERATION = 'campaign-settings-generation';
+const CAMPAIGN_CODE = 'SYNTH1';
+const DM_ID = 'dm-synthetic';
+
+const gates = {
+  recoveryReceipt: true,
+  sourceManifestUnchanged: true,
+  captureVerifiedAfterReopen: true,
+  manifestConfirmed: true,
+  noConflicts: true,
+  noQuarantine: true,
+  parity: true,
+  journalEmpty: true,
+};
+
+const ownerWorkspace = {
+  namespace: NAMESPACE,
+  localId: 'legacy:SYNTH1',
+  legacyId: CAMPAIGN_CODE,
+  name: 'Synthetic canary',
+  creationKind: 'import_fork' as const,
+  sourceFingerprint: 'source',
+  createdAt: 'created',
+  family: 'workspace_identity' as const,
+  cloudId: CAMPAIGN_ID,
+  displayCode: 'A1B2C3D4E5F6',
+  membershipAuthority: 'legacy' as const,
+  familyAuthorities: 'legacy' as const,
+  liveRuntimeAuthority: 'redis_relay' as const,
+  acknowledgedAt: 'acknowledged',
+};
+
+/**
+ * Faithful stand-in for the repository-backed context: `discover` returns the
+ * cloud-side workspaces, but `list` returns only what was explicitly
+ * `remember`ed — which is what a reload's hydrate() reads.
+ */
+function mockOwnerWorkspaceWithMemory() {
+  const remembered: DmWorkspaceDocument[] = [];
+  vi.spyOn(browserDmWorkspace, 'createBrowserDmWorkspace').mockImplementation(
+    async () => ({
+      accountId: ACCOUNT_ID,
+      accountLabel: 'synthetic@example.test',
+      list: vi.fn().mockImplementation(async () => [...remembered]),
+      discover: vi.fn().mockResolvedValue([ownerWorkspace]),
+      remember: vi
+        .fn()
+        .mockImplementation(async (item: DmWorkspaceDocument) => {
+          if (!remembered.some(known => known.cloudId === item.cloudId))
+            remembered.push(item);
+        }),
+      create: vi.fn(),
+      forkLegacy: vi.fn(),
+      close: vi.fn(),
+    })
+  );
+  return remembered;
+}
+
+function mockOwnerSession() {
+  vi.spyOn(supabaseBrowser, 'createSupabaseBrowserClient').mockReturnValue({
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { user: { id: ACCOUNT_ID } } },
+      }),
+      onAuthStateChange: vi.fn().mockReturnValue({
+        data: { subscription: { unsubscribe: vi.fn() } },
+      }),
+    },
+  } as never);
+}
+
+type AuthListener = (event: string, session: unknown) => void;
+
+/**
+ * Same owner session, but the controller's `onAuthStateChange` listener is
+ * captured so a case can replay a Supabase event (TOKEN_REFRESHED fires
+ * hourly, and whenever a hidden tab's token expired).
+ */
+function mockOwnerSessionCapturingListener() {
+  let listener: AuthListener | null = null;
+  vi.spyOn(supabaseBrowser, 'createSupabaseBrowserClient').mockReturnValue({
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { user: { id: ACCOUNT_ID } } },
+      }),
+      onAuthStateChange: vi
+        .fn()
+        .mockImplementation((callback: AuthListener) => {
+          listener = callback;
+          return { data: { subscription: { unsubscribe: vi.fn() } } };
+        }),
+    },
+  } as never);
+  return (event: string, session: unknown) => {
+    if (!listener) throw new Error('The controller never subscribed to auth');
+    listener(event, session);
+  };
+}
+
+function campaignFixture(): CampaignInfo {
+  return {
+    code: CAMPAIGN_CODE,
+    name: 'Synthetic canary',
+    createdAt: 'created',
+    stackableInspiration: false,
+    customCounterLabel: 'Favors',
+    playerCounters: { 'player-1': 2 },
+  };
+}
+
+function campaignSettingsPayload(): CampaignSettingsPayload {
+  return {
+    stackableInspiration: false,
+    customCounterLabel: 'Favors',
+    playerCounters: { 'player-1': 2 },
+  };
+}
+
+/**
+ * Seeds the DM store, whose `persist` middleware writes the legacy
+ * `rollkeeper-dm-data` envelope the manifest is built from.
+ */
+function seedOneCampaign() {
+  useDmStore.setState({ dmId: DM_ID, campaigns: [campaignFixture()] });
+}
+
+function currentDmEnvelope() {
+  return localStorage.getItem('rollkeeper-dm-data') ?? '';
+}
+
+function storedCampaign() {
+  return useDmStore
+    .getState()
+    .campaigns.find(item => item.code === CAMPAIGN_CODE);
+}
+
+/**
+ * Mirrors `src/app/dm/campaign/[code]/page.tsx`, which reads the campaign out
+ * of the DM store and passes it down, so a store edit reaches the controller
+ * exactly the way it does in the app.
+ */
+function CampaignSettingsHarness() {
+  const campaign = useDmStore(state =>
+    state.campaigns.find(item => item.code === CAMPAIGN_CODE)
+  );
+  if (!campaign) return null;
+  return <CampaignSettingsSyncControls campaign={campaign} />;
+}
+
+/**
+ * Puts this device in the state a completed local cutover leaves behind:
+ * IndexedDB holds the routed generation and the legacy key is frozen behind
+ * an `indexedDB` authority marker.
+ */
+async function seedLocalIndexedDbAuthority() {
+  const payload = campaignSettingsPayload();
+  const contentFingerprint = await fingerprintCampaignSettingsPayload(payload);
+  const database = await openRollkeeperDatabase();
+  const transaction = database.transaction(
+    ['meta', 'kvGenerations'],
+    'readwrite'
+  );
+  transaction.objectStore('meta').put({
+    key: `migration-state:${NAMESPACE}:campaign_settings:${CAMPAIGN_ID}`,
+    state: 'CUTOVER_READY',
+    runId: GENERATION,
+  });
+  transaction.objectStore('kvGenerations').put({
+    namespace: NAMESPACE,
+    generation: GENERATION,
+    key: 'rollkeeper-dm-data',
+    presence: true,
+    rawValue: currentDmEnvelope(),
+  });
+  await transactionComplete(transaction);
+  await commitCampaignSettingsLocalCutover(database, {
+    namespace: NAMESPACE,
+    campaignId: CAMPAIGN_ID,
+    generation: GENERATION,
+    confirmed: true,
+    gates,
+    now: () => NOW,
+    initialDocument: {
+      namespace: NAMESPACE,
+      campaignId: CAMPAIGN_ID,
+      legacyId: CAMPAIGN_CODE,
+      family: 'campaign_settings',
+      cutoverEpoch: 1,
+      operation: 'create',
+      payload,
+      schemaVersion: 1,
+      localRevision: 1,
+      baseServerVersion: 0,
+      contentFingerprint,
+      updatedAt: NOW,
+      deletedAt: null,
+    },
+  });
+  database.close();
+  writeCampaignSettingsProjectionAuthority(localStorage, CAMPAIGN_CODE, {
+    version: 1,
+    authority: 'indexedDB',
+    epoch: 1,
+    campaignId: CAMPAIGN_ID,
+    namespace: NAMESPACE,
+  });
+}
+
+/**
+ * Drives the discovery → preview → recovery download → prepare → cutover flow
+ * that leaves this device on its own local IndexedDB authority.
+ */
+async function completeLocalCutover() {
+  render(<CampaignSettingsHarness />);
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Find owner workspaces' })
+  );
+  fireEvent.click(
+    await screen.findByRole('button', { name: /Select Synthetic canary/ })
+  );
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Preview exact manifest' })
+  );
+  fireEvent.click(
+    await screen.findByRole('button', {
+      name: 'Download recovery and select',
+    })
+  );
+  await screen.findByText(
+    'campaign_settings selected. LocalStorage remains authoritative.'
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Prepare IndexedDB' }));
+  await screen.findByText(
+    'IndexedDB preparation validated and reopened. Final confirmation is still required.'
+  );
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Confirm local cutover' })
+  );
+  await screen.findByText(
+    'Local: saved · IndexedDB authority epoch 1 · Cloud: inactive'
+  );
+}
+
+async function readCampaignSettingsDocument() {
+  const database = await openRollkeeperDatabase();
+  try {
+    return await new IndexedDbCampaignSettingsRepository(database).getDocument(
+      NAMESPACE,
+      CAMPAIGN_CODE
+    );
+  } finally {
+    database.close();
+  }
+}
+
 describe('CampaignSettingsSyncControls default-off contract', () => {
-  afterEach(() => {
+  afterEach(async () => {
     cleanup();
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    // The persisted store rewrites its envelope on every setState, so the
+    // reset has to happen before the storage is cleared.
+    useDmStore.setState({ campaigns: [] });
     localStorage.clear();
+    await deleteRollkeeperDatabaseForTests(indexedDB);
   });
 
   it('renders nothing and performs no storage, IndexedDB, cookie, or network work', async () => {
@@ -342,5 +620,182 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
         screen.getByRole('button', { name: 'Apply exact cloud version' })
       ).toBeVisible()
     );
+  });
+
+  it('hydrates after a reload when the workspace was only discovered, never enrolled', async () => {
+    vi.stubEnv('NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE', 'true');
+    const remembered = mockOwnerWorkspaceWithMemory();
+    mockOwnerSession();
+    seedOneCampaign();
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue(
+      'blob:campaign-settings-recovery'
+    );
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
+      () => undefined
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    await completeLocalCutover();
+
+    // The reload: fresh mount, localStorage keeps the frozen legacy copy plus
+    // the authority marker, IndexedDB keeps the cutover generation, and cloud
+    // activation never happened.
+    cleanup();
+    seedOneCampaign();
+    render(<CampaignSettingsHarness />);
+
+    expect(
+      await screen.findByText(
+        'Campaign settings loaded from the verified local IndexedDB generation.'
+      )
+    ).toBeVisible();
+    expect(
+      screen.queryByText(
+        'The initialized campaign settings namespace has no matching owner workspace on this device.'
+      )
+    ).toBeNull();
+    expect(remembered).toHaveLength(1);
+
+    // …and edits keep committing instead of dying in the frozen legacy key.
+    const commit = vi.spyOn(
+      IndexedDbCampaignSettingsRepository.prototype,
+      'commit'
+    );
+    await act(async () => {
+      useDmStore.getState().updateCampaign(CAMPAIGN_CODE, {
+        customCounterLabel: 'Edited after reload',
+      });
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
+    expect(commit).toHaveBeenCalled();
+    const saved = await readCampaignSettingsDocument();
+    expect(
+      (saved?.payload as CampaignSettingsPayload | undefined)
+        ?.customCounterLabel
+    ).toBe('Edited after reload');
+    expect(saved?.localRevision).toBe(2);
+  });
+
+  it('does not re-hydrate over a newer local edit on a repeated auth event', async () => {
+    vi.stubEnv('NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE', 'true');
+    // The device already knows the workspace, so this case isolates the
+    // re-entrancy guard from the cutover-time `remember`.
+    mockOwnerWorkspaceWithMemory().push(ownerWorkspace);
+    const fireAuthEvent = mockOwnerSessionCapturingListener();
+    seedOneCampaign();
+    await seedLocalIndexedDbAuthority();
+
+    render(<CampaignSettingsHarness />);
+    await screen.findByText(
+      'Campaign settings loaded from the verified local IndexedDB generation.'
+    );
+    const openContext = vi.mocked(browserDmWorkspace.createBrowserDmWorkspace);
+    expect(openContext).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      useDmStore.getState().updateCampaign(CAMPAIGN_CODE, {
+        customCounterLabel: 'Edited before the token refresh',
+      });
+      fireAuthEvent('TOKEN_REFRESHED', { user: { id: ACCOUNT_ID } });
+      await new Promise(resolve => setTimeout(resolve, 20));
+    });
+
+    // The guard returns before `createBrowserDmWorkspace()`, so this count is
+    // the scheduling-independent witness that no second hydration pass ran:
+    // it is 2 without the guard however the chain happened to interleave.
+    expect(openContext).toHaveBeenCalledTimes(1);
+    expect(storedCampaign()?.customCounterLabel).toBe(
+      'Edited before the token refresh'
+    );
+
+    // …and the baseline survived the auth event, so the edit still committed.
+    const saved = await readCampaignSettingsDocument();
+    expect(
+      (saved?.payload as CampaignSettingsPayload | undefined)
+        ?.customCounterLabel
+    ).toBe('Edited before the token refresh');
+    expect(saved?.localRevision).toBe(2);
+  });
+
+  it('does not upload the local candidate after enrollment until the cloud generation is applied', async () => {
+    vi.stubEnv('NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspaceWithMemory();
+    seedOneCampaign();
+    const cloudPayload = {
+      ...campaignSettingsPayload(),
+      customCounterLabel: 'Cloud label',
+    };
+    const requests: Record<string, unknown>[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      async (_input, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        requests.push(body);
+        const respond = (value: unknown) =>
+          ({ ok: true, json: async () => value }) as Response;
+        if (body.action === 'preview-enrollment')
+          return respond({
+            authority: 'postgres',
+            epoch: 1,
+            previewFingerprint: 'preview-fingerprint',
+            serverVersion: 1,
+            schemaVersion: 1,
+            payloadFingerprint: 'cloud-fingerprint',
+            tombstoned: false,
+            payload: cloudPayload,
+          });
+        if (body.action === 'enroll-device') return respond({});
+        if (body.action === 'put')
+          return respond({
+            serverVersion: Number(body.expectedServerVersion) + 1,
+            cutoverEpoch: Number(body.expectedEpoch),
+            payloadFingerprint: body.payloadFingerprint,
+            cloudSaved: true,
+            playerView: 'pending',
+          });
+        throw new Error(`unexpected action ${String(body.action)}`);
+      }
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<CampaignSettingsHarness />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Find owner workspaces' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Select Synthetic canary/ })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Preview cloud enrollment' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Enroll this device' })
+    );
+    await screen.findByText(
+      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+    );
+
+    // The enrollment confirm promises the local candidate "is never uploaded
+    // automatically", so autosave must stay disarmed until the DM applies the
+    // exact cloud generation. The 10ms window is the one the RED run showed a
+    // committed autosave landing inside.
+    const commit = vi.spyOn(
+      IndexedDbCampaignSettingsRepository.prototype,
+      'commit'
+    );
+    for (const customCounterLabel of [
+      'Local candidate edit',
+      'Local candidate edit again',
+    ]) {
+      await act(async () => {
+        useDmStore
+          .getState()
+          .updateCampaign(CAMPAIGN_CODE, { customCounterLabel });
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
+    }
+
+    expect(commit).not.toHaveBeenCalled();
+    expect(requests.map(request => request.action)).not.toContain('put');
   });
 });
