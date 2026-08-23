@@ -103,7 +103,11 @@ function statBlockNpc(updatedAt, name = 'Ash the Cult Prophet') {
         },
       ],
       lairActions: [
-        { id: 'lair-1', name: 'Ash Storm', description: 'Ash chokes the room.' },
+        {
+          id: 'lair-1',
+          name: 'Ash Storm',
+          description: 'Ash chokes the room.',
+        },
       ],
     },
     bestiarySourceId: 'srd-cult-fanatic',

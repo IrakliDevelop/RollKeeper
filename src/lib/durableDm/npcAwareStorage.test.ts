@@ -233,4 +233,17 @@ describe('npc authority-aware Zustand storage', () => {
     aware.setItem(KEY, malformedNext);
     expect(localStorage.getItem(KEY)).toBe(malformedNext);
   });
+
+  it('writes the next envelope without reading storage while the flag is off', () => {
+    const aware = createNpcAwareStorage(localStorage);
+    const next = envelope({ ABC123: [npc('ABC123', 'bob')] });
+    localStorage.setItem(KEY, envelope({ ABC123: [npc('ABC123', 'ann')] }));
+    const getItem = vi.spyOn(Storage.prototype, 'getItem');
+
+    aware.setItem(KEY, next);
+
+    // Default-off must not pay for a read and a parse on every store write.
+    expect(getItem).not.toHaveBeenCalled();
+    expect(localStorage.getItem(KEY)).toBe(next);
+  });
 });

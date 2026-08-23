@@ -14,6 +14,50 @@ export const NPC_MAX_RECORD_BYTES = 262_144;
 export const NPC_MAX_ITEMS = 2_000;
 export const NPC_MAX_TOTAL_BYTES = 5_242_880;
 
+export type NpcPayload = Omit<CampaignNPC, 'id' | 'campaignCode'>;
+
+/**
+ * The 34-key document allowlist. `satisfies` makes a field that is renamed
+ * or dropped from the payload type a compile error instead of a silent
+ * `unclassified-field` rejection at runtime.
+ */
+const NPC_DOCUMENT_FIELDS = [
+  'name',
+  'description',
+  'armorClass',
+  'maxHp',
+  'currentHp',
+  'tempHp',
+  'tempAc',
+  'speed',
+  'monsterStatBlock',
+  'bestiarySourceId',
+  'loreHtml',
+  'xp',
+  'avatarUrl',
+  'group',
+  'tags',
+  'hitDice',
+  'deathSaves',
+  'initiativeModifier',
+  'proficiencyBonus',
+  'inventory',
+  'currency',
+  'spellcasting',
+  'resources',
+  'abilityUsage',
+  'collapsedSpellSections',
+  'lastDetailTab',
+  'passivePerception',
+  'passiveInsight',
+  'passiveInvestigation',
+  'abilityScores',
+  'traits',
+  'actions',
+  'createdAt',
+  'updatedAt',
+] as const satisfies readonly (keyof NpcPayload)[];
+
 export const NPC_FAMILY_INVENTORY = {
   family: 'npc',
   localStorageKeys: ['rollkeeper-npc-data'],
@@ -25,42 +69,7 @@ export const NPC_FAMILY_INVENTORY = {
     'spellcasting.spells[].id',
   ],
   completeEnvelopeFields: ['npcsByCampaign'],
-  documentFields: [
-    'name',
-    'description',
-    'armorClass',
-    'maxHp',
-    'currentHp',
-    'tempHp',
-    'tempAc',
-    'speed',
-    'monsterStatBlock',
-    'bestiarySourceId',
-    'loreHtml',
-    'xp',
-    'avatarUrl',
-    'group',
-    'tags',
-    'hitDice',
-    'deathSaves',
-    'initiativeModifier',
-    'proficiencyBonus',
-    'inventory',
-    'currency',
-    'spellcasting',
-    'resources',
-    'abilityUsage',
-    'collapsedSpellSections',
-    'lastDetailTab',
-    'passivePerception',
-    'passiveInsight',
-    'passiveInvestigation',
-    'abilityScores',
-    'traits',
-    'actions',
-    'createdAt',
-    'updatedAt',
-  ],
+  documentFields: NPC_DOCUMENT_FIELDS,
   privateFields: ['*'],
   publicFields: [],
   discoveredFields: [],
@@ -90,8 +99,6 @@ export const NPC_FAMILY_INVENTORY = {
     'relay',
   ],
 } as const;
-
-export type NpcPayload = Omit<CampaignNPC, 'id' | 'campaignCode'>;
 
 export interface NpcManifestRecord {
   legacyId: string;
