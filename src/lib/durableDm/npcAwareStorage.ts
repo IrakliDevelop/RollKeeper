@@ -4,6 +4,7 @@ import { createSafeStorage } from '@/lib/safeStorage';
 
 import { NPC_STORAGE_KEY } from './npcFamily';
 import { npcUsesIndexedDbAuthority } from './npcLegacyAuthority';
+import { isNpcClientVisible } from './slice11dFlags';
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -33,7 +34,9 @@ export function createNpcAwareStorage(backing?: Storage): StateStorage {
     getItem: safe.getItem,
     removeItem: safe.removeItem,
     setItem(key, nextRaw) {
-      if (key !== NPC_STORAGE_KEY || !storage)
+      // While the client flag is off no campaign can be routed, so the write is
+      // byte-identical to the legacy one and must not pay for a read or parse.
+      if (key !== NPC_STORAGE_KEY || !storage || !isNpcClientVisible())
         return safe.setItem(key, nextRaw);
       const previousRaw = storage.getItem(key);
       try {
