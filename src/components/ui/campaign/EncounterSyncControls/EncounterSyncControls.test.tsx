@@ -179,19 +179,17 @@ function seedEnvelope(encounters: Encounter[], version = 2) {
 
 async function selectWorkspaceAndPreview() {
   renderControls();
+  fireEvent.click(screen.getByRole('button', { name: 'Find my campaigns' }));
   fireEvent.click(
-    screen.getByRole('button', { name: 'Find owner workspaces' })
-  );
-  fireEvent.click(
-    await screen.findByRole('button', { name: /Select Encounters/ })
+    await screen.findByRole('button', { name: /Use Encounters/ })
   );
   await waitFor(() =>
     expect(
-      screen.getByRole('button', { name: 'Preview exact manifest' })
+      screen.getByRole('button', { name: 'See what will be backed up' })
     ).toBeVisible()
   );
   fireEvent.click(
-    screen.getByRole('button', { name: 'Preview exact manifest' })
+    screen.getByRole('button', { name: 'See what will be backed up' })
   );
 }
 
@@ -317,27 +315,25 @@ describe('EncounterSyncControls gates', () => {
       .spyOn(localDatabase, 'openRollkeeperDatabase')
       .mockRejectedValue(new Error('must not open'));
     renderControls();
+    fireEvent.click(screen.getByRole('button', { name: 'Find my campaigns' }));
     fireEvent.click(
-      screen.getByRole('button', { name: 'Find owner workspaces' })
-    );
-    fireEvent.click(
-      await screen.findByRole('button', { name: /Select Encounters/ })
+      await screen.findByRole('button', { name: /Use Encounters/ })
     );
     await waitFor(() =>
       expect(
-        screen.getByRole('button', { name: 'Preview exact manifest' })
+        screen.getByRole('button', { name: 'See what will be backed up' })
       ).toBeVisible()
     );
     expect(open).not.toHaveBeenCalled();
     fireEvent.click(
-      screen.getByRole('button', { name: 'Preview exact manifest' })
+      screen.getByRole('button', { name: 'See what will be backed up' })
     );
     expect(
-      await screen.findByRole('button', { name: 'Download recovery file' })
+      await screen.findByRole('button', { name: 'Download a safety copy' })
     ).toBeVisible();
-    expect(screen.getByText(/1 records · /)).toBeVisible();
+    expect(screen.getByText(/1 encounter · /)).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Prepare IndexedDB' })
+      screen.getByRole('button', { name: 'Get this device ready' })
     ).toBeDisabled();
     expect(open).not.toHaveBeenCalled();
 
@@ -352,32 +348,30 @@ describe('EncounterSyncControls gates', () => {
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(true);
     fireEvent.click(
-      screen.getByRole('button', { name: 'Download recovery file' })
+      screen.getByRole('button', { name: 'Download a safety copy' })
     );
-    await screen.findByText(/Reopen that file here before selection/);
+    await screen.findByText(/Open that file here to continue/);
     const downloadedBlob = createObjectURL.mock.calls[0]![0] as Blob;
     const recoveryFile = new File(
       [await downloadedBlob.text()],
       'encounter-backup.json',
       { type: 'application/json' }
     );
-    fireEvent.change(
-      screen.getByLabelText('Downloaded encounter recovery file'),
-      { target: { files: [recoveryFile] } }
-    );
-    await screen.findByText(/family selection was cancelled/);
+    fireEvent.change(screen.getByLabelText('Safety copy you downloaded'), {
+      target: { files: [recoveryFile] },
+    });
+    await screen.findByText('Safety copy checked. Nothing was changed.');
     expect(
-      screen.getByRole('button', { name: 'Prepare IndexedDB' })
+      screen.getByRole('button', { name: 'Get this device ready' })
     ).toBeDisabled();
-    fireEvent.change(
-      screen.getByLabelText('Downloaded encounter recovery file'),
-      { target: { files: [recoveryFile] } }
-    );
+    fireEvent.change(screen.getByLabelText('Safety copy you downloaded'), {
+      target: { files: [recoveryFile] },
+    });
     await screen.findByText(
-      'Recovery file verified and encounters selected. LocalStorage remains authoritative.'
+      'Safety copy checked. Your encounters are still stored the usual way for now.'
     );
     expect(
-      screen.getByRole('button', { name: 'Prepare IndexedDB' })
+      screen.getByRole('button', { name: 'Get this device ready' })
     ).toBeEnabled();
     expect(open).not.toHaveBeenCalled();
   });
@@ -390,11 +384,17 @@ describe('EncounterSyncControls gates', () => {
 
     expect(
       await screen.findByText(
+        'Nothing has been saved on this device yet. Open an encounter first.'
+      )
+    ).toBeVisible();
+    // The exact reason stays available as muted reference detail.
+    expect(
+      screen.getByText(
         /incomplete-envelope: rollkeeper-encounter-data has never been persisted on this device/
       )
     ).toBeVisible();
     expect(
-      screen.queryByRole('button', { name: 'Confirm local cutover' })
+      screen.queryByRole('button', { name: 'Switch this device over' })
     ).toBeNull();
   });
 
@@ -406,11 +406,16 @@ describe('EncounterSyncControls gates', () => {
 
     expect(
       await screen.findByText(
+        'The encounters on this device were saved by a different version of RollKeeper. Open them once in this version, then try again.'
+      )
+    ).toBeVisible();
+    expect(
+      screen.getByText(
         /legacy-schema: rollkeeper-encounter-data is persisted at version 1; the encounter store migration must upgrade it to version 2 before preview/
       )
     ).toBeVisible();
     expect(
-      screen.queryByRole('button', { name: 'Confirm local cutover' })
+      screen.queryByRole('button', { name: 'Switch this device over' })
     ).toBeNull();
   });
 
@@ -422,32 +427,35 @@ describe('EncounterSyncControls gates', () => {
 
     expect(
       await screen.findByText(
-        /active-encounter: Encounter "Goblin Ambush" is in active combat; end combat before cutover/
+        '"Goblin Ambush" is in combat right now. End that combat first.'
       )
     ).toBeVisible();
     expect(
       screen.getByText(
-        'End the active combat before cutting over; unresolved candidates block only the encounter family.'
+        "End the combat that's running, then try again. Nothing else is affected."
       )
     ).toBeVisible();
     expect(
-      screen.queryByRole('button', { name: 'Confirm local cutover' })
+      screen.getByText(
+        /active-encounter: Encounter "Goblin Ambush" is in active combat; end combat before cutover/
+      )
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Switch this device over' })
     ).toBeNull();
   });
 
   it('reports a failed workspace discovery through the guarded handler', async () => {
     vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
     vi.spyOn(browserDmWorkspace, 'createBrowserDmWorkspace').mockRejectedValue(
-      new Error('Sign in to the owner account first.')
+      new Error('Sign in to your account first.')
     );
     renderControls();
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Find owner workspaces' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Find my campaigns' }));
 
     expect(
-      await screen.findByText('Sign in to the owner account first.')
+      await screen.findByText('Sign in to your account first.')
     ).toBeVisible();
   });
 
@@ -534,17 +542,17 @@ describe('EncounterSyncControls gates', () => {
     renderControls();
 
     expect(
-      await screen.findByRole('button', { name: 'Version history' })
+      await screen.findByRole('button', { name: 'Earlier versions' })
     ).toBeVisible();
     expect(
-      screen.getByText(
-        'Player view: not applicable · Encounters are DM-private; live combat stays on Redis'
-      )
+      screen.getByText('Players never see these. Live combat is unaffected.')
     ).toBeVisible();
-    expect(screen.getByText('Encounter for version history')).toBeVisible();
+    expect(
+      screen.getByText('Encounter to show earlier versions for')
+    ).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Version history' }));
-    expect(await screen.findByText(/Version 2 · epoch 1/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Earlier versions' }));
+    expect(await screen.findByText(/Version 2 ·/)).toBeVisible();
 
     const downloads: string[] = [];
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:encounter-version');
@@ -555,14 +563,14 @@ describe('EncounterSyncControls gates', () => {
       downloads.push(this.download);
     });
     fireEvent.click(
-      screen.getAllByRole('button', { name: 'Export exact version' })[0]
+      screen.getAllByRole('button', { name: 'Download this version' })[0]
     );
     await waitFor(() => expect(downloads).toContain('encounter-enc-1-v2.json'));
 
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Verified rollback' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stop backing up' }));
     await screen.findByText(
-      'Rollback accepted through a new epoch; sources were preserved. Reload to use the verified legacy generation.'
+      'Backup is off and everything was kept. Reload the page to keep working on this device.'
     );
     expect(requests.map(request => request.action)).toContain('rollback');
   });
@@ -607,20 +615,20 @@ describe('EncounterSyncControls gates', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     renderControls();
+    fireEvent.click(screen.getByRole('button', { name: 'Find my campaigns' }));
     fireEvent.click(
-      screen.getByRole('button', { name: 'Find owner workspaces' })
+      await screen.findByRole('button', { name: /Use Encounters/ })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: /Select Encounters/ })
+      await screen.findByRole('button', { name: 'Check this device' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Preview cloud enrollment' })
-    );
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Enroll this device' })
+      await screen.findByRole('button', {
+        name: 'Add this device to my account',
+      })
     );
     await screen.findByText(
-      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      'This device was added to your account. Choose "Load the copy from my account" when you are ready.'
     );
 
     // The enrollment confirm promises the local candidate "is never uploaded
@@ -714,30 +722,28 @@ describe('EncounterSyncControls gates', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     renderControls();
+    fireEvent.click(screen.getByRole('button', { name: 'Find my campaigns' }));
     fireEvent.click(
-      screen.getByRole('button', { name: 'Find owner workspaces' })
+      await screen.findByRole('button', { name: /Use Encounters/ })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: /Select Encounters/ })
+      await screen.findByRole('button', { name: 'Check this device' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Preview cloud enrollment' })
-    );
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Enroll this device' })
+      await screen.findByRole('button', {
+        name: 'Add this device to my account',
+      })
     );
     await screen.findByText(
-      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      'This device was added to your account. Choose "Load the copy from my account" when you are ready.'
     );
 
     // Enrolled but not yet applied: autosave is deliberately disarmed here.
-    fireEvent.click(screen.getByRole('button', { name: 'Version history' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Earlier versions' }));
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Restore as new version' })
+      await screen.findByRole('button', { name: 'Restore this version' })
     );
-    await screen.findByText(
-      'Cloud: saved as version 3 · Player view: not applicable'
-    );
+    await screen.findByText('Restored. Saved to your account as version 3.');
 
     // The restore rewrote the store from IndexedDB, so it is a hydrating path:
     // the next edit must still reach IndexedDB and the cloud.
@@ -773,41 +779,38 @@ describe('EncounterSyncControls gates', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     renderControls();
+    fireEvent.click(screen.getByRole('button', { name: 'Find my campaigns' }));
     fireEvent.click(
-      screen.getByRole('button', { name: 'Find owner workspaces' })
+      await screen.findByRole('button', { name: /Use Encounters/ })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: /Select Encounters/ })
+      await screen.findByRole('button', { name: 'See what will be backed up' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Preview exact manifest' })
+      await screen.findByRole('button', { name: 'Download a safety copy' })
     );
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Download recovery file' })
-    );
-    await screen.findByText(/Reopen that file here before selection/);
+    await screen.findByText(/Open that file here to continue/);
     const downloadedBlob = createObjectURL.mock.calls[0]![0] as Blob;
-    fireEvent.change(
-      screen.getByLabelText('Downloaded encounter recovery file'),
-      {
-        target: {
-          files: [
-            new File([await downloadedBlob.text()], 'encounter-backup.json', {
-              type: 'application/json',
-            }),
-          ],
-        },
-      }
-    );
+    fireEvent.change(screen.getByLabelText('Safety copy you downloaded'), {
+      target: {
+        files: [
+          new File([await downloadedBlob.text()], 'encounter-backup.json', {
+            type: 'application/json',
+          }),
+        ],
+      },
+    });
     await screen.findByText(
-      'Recovery file verified and encounters selected. LocalStorage remains authoritative.'
+      'Safety copy checked. Your encounters are still stored the usual way for now.'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Prepare IndexedDB' }));
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Confirm local cutover' })
+      screen.getByRole('button', { name: 'Get this device ready' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Switch this device over' })
     );
     await screen.findByText(
-      'Local: saved · IndexedDB authority epoch 1 · Cloud: inactive'
+      'Saved on this device. Not backed up to your account yet.'
     );
 
     // Simulate the reload: the mount is fresh, localStorage keeps the frozen
@@ -823,17 +826,15 @@ describe('EncounterSyncControls gates', () => {
     // A locally cut-over device must hydrate on reload without ever touching
     // the cloud; the workspace has to have been persisted for that to work.
     expect(
-      await screen.findByText(
-        'Encounters loaded from the verified local IndexedDB generation.'
-      )
+      await screen.findByText('Your encounters are loaded from this device.')
     ).toBeVisible();
     expect(
       screen.queryByText(
-        'The initialized encounter namespace has no matching owner workspace on this device.'
+        "This device isn't set up for that account yet. Choose your campaign again."
       )
     ).toBeNull();
     expect(
-      screen.getByRole('button', { name: 'Activate cloud family' })
+      screen.getByRole('button', { name: 'Turn on backup to my account' })
     ).toBeVisible();
     expect(remembered).toHaveLength(1);
 

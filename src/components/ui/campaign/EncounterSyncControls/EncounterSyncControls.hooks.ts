@@ -108,7 +108,7 @@ interface StoreDocument {
  * combat runs, because the legacy key is frozen for a routed campaign.
  */
 export const ACTIVE_ENCOUNTER_GUIDANCE =
-  'End the active combat before cutting over; unresolved candidates block only the encounter family.';
+  "End the combat that's running, then try again. Nothing else is affected.";
 
 /** The worst cloud outcome of a multi-document autosave decides the status. */
 const CLOUD_OUTCOME_SEVERITY = {
@@ -201,8 +201,22 @@ export async function runEncounterMutationPlan(input: {
 
 function commitFailureMessage(reason: 'guest' | 'failed' | 'tombstoned') {
   return reason === 'tombstoned'
-    ? 'This encounter was deleted in the cloud; restore it from version history instead.'
-    : 'Local IndexedDB transaction failed';
+    ? 'This encounter was deleted from your account. Use Earlier versions to bring it back.'
+    : "This device couldn't save that change. Try again.";
+}
+
+/**
+ * The shared recovery helpers raise developer-facing messages. The card is for
+ * DMs, so they are translated here rather than changed at the source (they are
+ * shared with other families).
+ */
+function recoveryFailureMessage(cause: unknown) {
+  const detail = cause instanceof Error ? cause.message : '';
+  if (detail.includes('does not match the current preview'))
+    return "That's an older safety copy. Download a fresh one and try again.";
+  if (detail.includes('checksum mismatch'))
+    return "That file doesn't match the one you downloaded. Please download a fresh copy.";
+  return 'Something is wrong with that safety copy. Download a fresh one and try again.';
 }
 
 function currentRawEnvelope() {
@@ -457,7 +471,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         ) {
           restoredContext?.close();
           setError(
-            'The initialized encounter namespace has no matching owner workspace on this device.'
+            "This device isn't set up for that account yet. Choose your campaign again."
           );
           return;
         }
@@ -470,7 +484,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
             : null;
           if (fingerprint !== document.contentFingerprint) {
             setError(
-              'Local encounter documents failed fingerprint verification; use history recovery.'
+              'The encounters saved on this device look damaged. Use Earlier versions to restore one.'
             );
             return;
           }
@@ -493,9 +507,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
           localAuthority
         );
         setHydrated(true);
-        setStatus(
-          'Encounters loaded from the verified local IndexedDB generation.'
-        );
+        setStatus('Your encounters are loaded from this device.');
       } finally {
         database.close();
       }
@@ -514,13 +526,15 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         setError(
           cause instanceof Error
             ? cause.message
-            : 'Local account verification failed'
+            : "Couldn't check who is signed in. Try again."
         )
       );
     const { data } = client.auth.onAuthStateChange((_event, session) => {
       void queueHydrate(session?.user.id ?? null).catch(cause =>
         setError(
-          cause instanceof Error ? cause.message : 'Local hydration failed'
+          cause instanceof Error
+            ? cause.message
+            : "Couldn't load your encounters from this device."
         )
       );
     });
@@ -653,17 +667,17 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         if (result.committed > 0)
           setStatus(
             !service
-              ? 'Local: saved · Cloud: not active · Player view: not applicable'
+              ? 'Saved on this device. Not backed up to your account yet.'
               : result.outcome === 'cloud-saved'
-                ? 'Local: saved · Cloud: saved · Player view: not applicable'
+                ? 'Saved on this device and backed up to your account.'
                 : result.outcome === 'conflict'
-                  ? 'Local: saved · Cloud: conflict · Player view: not applicable'
-                  : 'Local: saved · Cloud: queued · Player view: not applicable'
+                  ? 'Saved on this device. Another device changed this encounter, so it was not backed up.'
+                  : 'Saved on this device. It will be backed up when you are back online.'
           );
         if (result.error) setError(result.error);
       } catch (cause) {
         setError(
-          cause instanceof Error ? cause.message : 'Encounter save failed'
+          cause instanceof Error ? cause.message : "Couldn't save that change."
         );
       } finally {
         database.close();
@@ -691,15 +705,13 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
     setError(null);
     try {
       const next = context ?? (await createBrowserDmWorkspace());
-      if (!next) throw new Error('Sign in to the owner account first.');
+      if (!next) throw new Error('Sign in to your account first.');
       setContext(next);
       setWorkspaces((await next.discover()).filter(item => item.cloudId));
-      setStatus(
-        'Owner workspaces discovered. No family was selected or changed.'
-      );
+      setStatus('Found your campaigns. Nothing has changed yet.');
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : 'Workspace discovery failed'
+        cause instanceof Error ? cause.message : "Couldn't find your campaigns."
       );
     } finally {
       setBusy(false);
@@ -712,9 +724,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
     setWorkspace(selected);
     setScope({ accountId: context.accountId, campaignId: selected.cloudId });
     setAuthority({ authority: 'localStorage', epoch: 0 });
-    setStatus(
-      'Workspace chosen. Device enrollment and authority are unchanged.'
-    );
+    setStatus('Campaign picked. Nothing has changed on this device yet.');
   };
 
   const preview = async () => {
@@ -762,11 +772,13 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       setRecoveryVerified(false);
       setEncountersSelected(false);
       setPreparedGeneration(null);
-      setStatus(
-        'Exact preview created. No authority or storage pointer changed.'
-      );
+      setStatus('Here is what would be backed up. Nothing has changed yet.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Preview failed');
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't check what would be backed up."
+      );
     } finally {
       setBusy(false);
     }
@@ -781,11 +793,13 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       setRecoveryVerified(false);
       setEncountersSelected(false);
       setStatus(
-        'Recovery download initiated. Reopen that file here before selection.'
+        'Your safety copy is downloading. Open that file here to continue.'
       );
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : 'Recovery download failed'
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't download the safety copy."
       );
     }
   };
@@ -804,13 +818,11 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       setRecoveryVerified(true);
       if (
         !window.confirm(
-          `Recovery file verified. Select only the encounters for ${campaignName}? This does not cut over local or cloud authority.`
+          `Safety copy checked. Continue with the encounters for ${campaignName}? Nothing is moved or backed up yet.`
         )
       ) {
         setEncountersSelected(false);
-        setStatus(
-          'Recovery file verified; family selection was cancelled and cutover remains blocked.'
-        );
+        setStatus('Safety copy checked. Nothing was changed.');
         return;
       }
       selectEncounterFamily(localStorage, {
@@ -826,16 +838,12 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       });
       setEncountersSelected(true);
       setStatus(
-        'Recovery file verified and encounters selected. LocalStorage remains authoritative.'
+        'Safety copy checked. Your encounters are still stored the usual way for now.'
       );
     } catch (cause) {
       setRecoveryVerified(false);
       setEncountersSelected(false);
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : 'Recovery file verification failed'
-      );
+      setError(recoveryFailureMessage(cause));
     } finally {
       setBusy(false);
       if (recoveryInput.current) recoveryInput.current.value = '';
@@ -854,9 +862,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
           workspace.cloudId
         )
       ) {
-        throw new Error(
-          'Verify the downloaded recovery and explicitly select the family first.'
-        );
+        throw new Error('Download the safety copy and open it here first.');
       }
       const selection = readEncounterSelection(
         localStorage,
@@ -870,7 +876,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         selection.recovery.manifestHash !== recovery.manifestHash
       ) {
         throw new Error(
-          'The current preview requires its exact downloaded recovery file to be verified.'
+          "That's an older safety copy. Download a fresh one and try again."
         );
       }
       const runId = `encounter-${crypto.randomUUID()}`;
@@ -898,16 +904,20 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
           )
             ? ACTIVE_ENCOUNTER_GUIDANCE
             : result.manifest.blockers.length > 0
-              ? 'Unresolved candidates block only the encounter family; legacy behavior remains active.'
-              : 'Local IndexedDB preparation did not satisfy every safety gate.'
+              ? 'Some encounters need attention first. Nothing has changed.'
+              : 'This device is not ready yet. Try again.'
         );
       }
       setPreparedGeneration(result.generation);
       setStatus(
-        'IndexedDB preparation validated and reopened. Final confirmation is still required.'
+        'This device is ready. One more confirmation and it will be switched over.'
       );
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Preparation failed');
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't get this device ready."
+      );
     } finally {
       setBusy(false);
     }
@@ -920,7 +930,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
     if (manifest.blockers.length > 0) return;
     if (
       !window.confirm(
-        `Confirm exact manifest ${manifest.fingerprint.slice(0, 12)} and cut only the encounter family to IndexedDB?`
+        `Switch this device over to the new way of storing encounters? Your safety copy is already saved. Reference: ${manifest.fingerprint.slice(0, 12)}`
       )
     )
       return;
@@ -933,7 +943,9 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         rawEnvelope: currentRawEnvelope(),
       });
       if (current.fingerprint !== manifest.fingerprint)
-        throw new Error('Manifest changed; preview again.');
+        throw new Error(
+          'Your encounters changed since the last check. Choose "See what will be backed up" again.'
+        );
       // Only the cloud-enrollment paths persisted the chosen workspace, so a
       // device that merely *discovered* one had no workspace_identity document
       // and could not hydrate after a reload: hydrate() looks the campaign up
@@ -997,11 +1009,13 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
           .filter(record => !record.tombstoned)
           .map(record => [record.legacyId, record.payloadFingerprint])
       );
-      setStatus(
-        `Local: saved · IndexedDB authority epoch ${next.epoch} · Cloud: inactive`
-      );
+      setStatus('Saved on this device. Not backed up to your account yet.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Local cutover failed');
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't switch this device over."
+      );
     } finally {
       database.close();
     }
@@ -1017,11 +1031,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       authority?.authority !== 'indexedDB'
     )
       return;
-    if (
-      !window.confirm(
-        'Stage, revalidate, and atomically activate only the encounter family in Postgres?'
-      )
-    )
+    if (!window.confirm('Turn on backup to your account for these encounters?'))
       return;
     const namespace = `user:${context.accountId}` as const;
     const campaignId = workspace.cloudId;
@@ -1047,7 +1057,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
             );
           if (changed)
             throw new Error(
-              'IndexedDB working copy changed; preview the exact manifest again.'
+              'Your encounters changed since the last check. Choose "See what will be backed up" again.'
             );
         } finally {
           database.close();
@@ -1122,11 +1132,13 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       } finally {
         database.close();
       }
-      setStatus('Local: saved · Cloud: saved · Player view: not applicable');
+      setStatus('Saved on this device and backed up to your account.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Cloud staging failed');
+      setError(
+        cause instanceof Error ? cause.message : "Couldn't turn on backup."
+      );
       setStatus(
-        'Local: saved · Cloud: staging failed · IndexedDB authority retained'
+        'Saved on this device. Backup was not turned on, so nothing changed in your account.'
       );
     } finally {
       setBusy(false);
@@ -1146,12 +1158,12 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       setEnrollmentPreview(next);
       setStatus(
         next.authority === 'postgres'
-          ? 'Cloud enrollment preview loaded. This device remains unenrolled.'
-          : 'The selected encounter family is not cloud-authoritative.'
+          ? 'Found a backup in your account. This device has not been added yet.'
+          : 'Nothing is backed up in your account for this campaign yet.'
       );
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : 'Enrollment preview failed'
+        cause instanceof Error ? cause.message : "Couldn't check your account."
       );
     } finally {
       setBusy(false);
@@ -1178,7 +1190,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       });
       if (
         !window.confirm(
-          `Enroll this device from exact cloud preview ${enrollmentPreview.previewFingerprint.slice(0, 12)}? The local candidate is preserved and is never uploaded automatically.`
+          `Add this device to your account's backup? What is on this device is kept and is never uploaded on its own. Reference: ${enrollmentPreview.previewFingerprint.slice(0, 12)}`
         )
       )
         return;
@@ -1243,14 +1255,14 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
           namespace,
         });
         setStatus(
-          'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+          'This device was added to your account. Choose "Load the copy from my account" when you are ready.'
         );
       } finally {
         database.close();
       }
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : 'Device enrollment failed'
+        cause instanceof Error ? cause.message : "Couldn't add this device."
       );
     } finally {
       setBusy(false);
@@ -1269,14 +1281,16 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
     )
       return;
     if (enrollmentPreview.epoch !== authority.epoch) {
-      setError('Cloud preview epoch does not match this device authority.');
+      setError(
+        'Your account has a newer copy. Choose "Check this device" again.'
+      );
       return;
     }
     const documents = enrollmentPreview.documents;
     const cutoverEpoch = enrollmentPreview.epoch;
     if (
       !window.confirm(
-        `Apply the exact cloud generation of ${documents.length} records to this enrolled device? Unresolved local work blocks hydration.`
+        `Load ${documents.length === 1 ? '1 encounter' : `${documents.length} encounters`} from your account onto this device? Work on this device that has not been backed up will stop this.`
       )
     )
       return;
@@ -1321,11 +1335,13 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
           .map(document => [document.legacyId, document.payloadFingerprint])
       );
       setStatus(
-        `Device hydrated from the exact cloud generation of ${documents.length} records.`
+        `Loaded ${documents.length === 1 ? '1 encounter' : `${documents.length} encounters`} from your account.`
       );
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : 'Cloud hydration failed'
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't load from your account."
       );
     } finally {
       database.close();
@@ -1345,7 +1361,11 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       });
       setVersions(result.versions);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'History load failed');
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't load earlier versions."
+      );
     }
   };
 
@@ -1366,7 +1386,9 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       );
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : 'Version export failed'
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't download that version."
       );
     }
   };
@@ -1385,12 +1407,14 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       });
       setComparison(
         result.identical
-          ? 'The selected versions are byte-identical.'
-          : 'The selected versions differ. Export each exact version to inspect payloads.'
+          ? 'These two versions are exactly the same.'
+          : 'These two versions are different. Download each one to see what changed.'
       );
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : 'Version comparison failed'
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't compare those versions."
       );
     }
   };
@@ -1407,7 +1431,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       return;
     if (
       !window.confirm(
-        `Restore version ${sourceVersion} as a new higher version? Immutable history will not be changed.`
+        `Restore version ${sourceVersion}? It is added as a new version, and every earlier version is kept.`
       )
     )
       return;
@@ -1469,12 +1493,14 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         database.close();
       }
       setStatus(
-        `Cloud: saved as version ${restored.serverVersion} · Player view: not applicable`
+        `Restored. Saved to your account as version ${restored.serverVersion}.`
       );
       await loadHistory();
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : 'Version restore failed'
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't restore that version."
       );
     } finally {
       setBusy(false);
@@ -1487,7 +1513,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       return;
     if (
       !window.confirm(
-        'Verified rollback creates a new epoch and preserves every Postgres and history source. Continue?'
+        'Stop backing these encounters up to your account? Everything already backed up is kept.'
       )
     )
       return;
@@ -1506,9 +1532,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         !current.documents ||
         current.recordCount === undefined
       )
-        throw new Error(
-          'Rollback requires the exact current Postgres generation of these encounters.'
-        );
+        throw new Error("Couldn't read the copy in your account. Try again.");
       rollbackMutationId.current ??= crypto.randomUUID();
       const result = await encounterApi<{
         epoch: number;
@@ -1560,10 +1584,12 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       hydrationSignature.current = null;
       rollbackMutationId.current = null;
       setStatus(
-        'Rollback accepted through a new epoch; sources were preserved. Reload to use the verified legacy generation.'
+        'Backup is off and everything was kept. Reload the page to keep working on this device.'
       );
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Rollback failed');
+      setError(
+        cause instanceof Error ? cause.message : "Couldn't stop the backup."
+      );
     } finally {
       setBusy(false);
     }
@@ -1580,7 +1606,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       return;
     if (
       !window.confirm(
-        `Remove only ${context.accountLabel}'s local namespace from this device? Cloud and every preserved source remain intact.`
+        `Remove ${context.accountLabel}'s encounter data from this device? Your account keeps everything.`
       )
     )
       return;
@@ -1600,7 +1626,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         const lossConfirmed =
           !unresolved ||
           window.confirm(
-            'Unresolved device-only work will become inaccessible on this device. Confirm the described loss risk?'
+            'Some changes on this device have not been backed up yet and will be lost. Continue?'
           );
         if (!lossConfirmed) return;
         if (authority.authority === 'postgres') {
@@ -1629,15 +1655,15 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
         setScope(null);
         setAuthority(null);
         setHydrated(false);
-        setStatus(
-          'Only the selected account namespace was hidden; cloud, history, legacy, conflicts, and outboxes were preserved.'
-        );
+        setStatus('Removed from this device. Your account keeps everything.');
       } finally {
         database.close();
       }
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : 'Account removal failed'
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't remove this account's data."
       );
     } finally {
       setBusy(false);

@@ -19,6 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/layout/card';
+import type { EncounterManifestBlocker } from '@/lib/durableDm/encounterFamily';
 import { isEncounterClientVisible } from '@/lib/durableDm/slice11eFlags';
 import type { CampaignInfo } from '@/types/campaign';
 
@@ -39,6 +40,51 @@ export {
   useEncounterSyncContext,
 } from './EncounterSyncProvider';
 
+/** Sizes are for a DM, not a developer: KB and MB, never raw byte counts. */
+function formatSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} bytes`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function summarize(recordCount: number, totalBytes: number, blockers: number) {
+  const encounters =
+    recordCount === 1 ? '1 encounter' : `${recordCount} encounters`;
+  const attention =
+    blockers === 0
+      ? 'nothing needs attention'
+      : blockers === 1
+        ? '1 needs attention'
+        : `${blockers} need attention`;
+  return `${encounters} · ${formatSize(totalBytes)} · ${attention}`;
+}
+
+/**
+ * Plain-language version of a manifest blocker. The original kind and detail
+ * stay on the muted reference line below, so nothing a DM might need to quote
+ * is lost.
+ */
+function blockerMessage(blocker: EncounterManifestBlocker) {
+  const named = /"([^"]+)"/.exec(blocker.detail)?.[1];
+  switch (blocker.kind) {
+    case 'active-encounter':
+      return `"${named ?? 'An encounter'}" is in combat right now. End that combat first.`;
+    case 'incomplete-envelope':
+      return 'Nothing has been saved on this device yet. Open an encounter first.';
+    case 'malformed-json':
+      return "The encounters saved on this device can't be read. Restore a safety copy first.";
+    case 'legacy-schema':
+    case 'future-schema':
+      return 'The encounters on this device were saved by a different version of RollKeeper. Open them once in this version, then try again.';
+    case 'oversized-record':
+      return `"${named ?? 'One encounter'}" is too big to back up. Remove some creatures from it and try again.`;
+    case 'oversized-family':
+      return 'These encounters are too big to back up together. Delete an encounter you no longer need and try again.';
+    default:
+      return 'One of your encounters has a problem that needs fixing first. Nothing has changed.';
+  }
+}
+
 /**
  * The visible card. Hydration and autosave are owned by the route-level
  * `EncounterSyncProvider` (mounted in `app/dm/campaign/[code]/layout.tsx`), so
@@ -58,25 +104,25 @@ export function EncounterSyncControls({
     <Card padding="lg" className="mt-6">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Cloud size={20} /> Encounter cloud sync
+          <Cloud size={20} /> Encounter backup
         </CardTitle>
         <CardDescription>
-          Default-off owner workflow. Login, navigation, discovery, and first
-          use never enroll or change authority. Encounters are DM-private; live
-          combat keeps using the existing Redis paths.
+          Keep your encounters on this device and, if you want, back them up to
+          your account so you can open them on another device. Nothing leaves
+          this device until you turn it on. Players never see your encounters,
+          and running combat is unaffected.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {!sync.context && (
           <Button variant="outline" onClick={sync.discover} loading={sync.busy}>
-            Find owner workspaces
+            Find my campaigns
           </Button>
         )}
         {sync.context && !sync.workspace && (
           <div className="space-y-2">
             <p className="text-body text-sm">
-              Explicitly choose the owner-verified workspace for this local
-              campaign.
+              Pick the campaign in your account that matches this one.
             </p>
             {sync.workspaces.map(item => (
               <Button
@@ -85,7 +131,7 @@ export function EncounterSyncControls({
                 size="sm"
                 onClick={() => sync.choose(item)}
               >
-                Select {item.name} ({item.displayCode})
+                Use {item.name} ({item.displayCode})
               </Button>
             ))}
           </div>
@@ -98,19 +144,19 @@ export function EncounterSyncControls({
               onClick={sync.preview}
               loading={sync.busy}
             >
-              Preview exact manifest
+              See what will be backed up
             </Button>
             <Button
               variant="outline"
               onClick={sync.previewEnrollment}
               loading={sync.busy}
             >
-              Preview cloud enrollment
+              Check this device
             </Button>
             {sync.enrollmentPreview?.authority === 'postgres' &&
               sync.authority?.authority === 'localStorage' && (
                 <Button variant="warning" onClick={sync.enrollDevice}>
-                  Enroll this device
+                  Add this device to my account
                 </Button>
               )}
             {sync.enrollmentPreview?.authority === 'postgres' &&
@@ -120,7 +166,7 @@ export function EncounterSyncControls({
                   onClick={sync.applyExactCloudVersion}
                   loading={sync.busy}
                 >
-                  Apply exact cloud version
+                  Load the copy from my account
                 </Button>
               )}
             {sync.manifest && sync.recovery && (
@@ -129,7 +175,7 @@ export function EncounterSyncControls({
                 leftIcon={<Download size={16} />}
                 onClick={sync.downloadRecovery}
               >
-                Download recovery file
+                Download a safety copy
               </Button>
             )}
             {sync.manifest && sync.recovery && (
@@ -140,14 +186,14 @@ export function EncounterSyncControls({
                   onClick={() => sync.recoveryInput.current?.click()}
                   disabled={sync.busy}
                 >
-                  Verify recovery file and select
+                  Open the safety copy to continue
                 </Button>
                 <input
                   ref={sync.recoveryInput}
                   type="file"
                   accept="application/json,.json"
                   className="hidden"
-                  aria-label="Downloaded encounter recovery file"
+                  aria-label="Safety copy you downloaded"
                   onChange={event => {
                     const file = event.target.files?.[0];
                     if (file) void sync.verifyRecoveryAndSelect(file);
@@ -162,7 +208,7 @@ export function EncounterSyncControls({
                 loading={sync.busy}
                 disabled={!sync.recoveryVerified || !sync.encountersSelected}
               >
-                Prepare IndexedDB
+                Get this device ready
               </Button>
             )}
             {sync.manifest &&
@@ -174,7 +220,7 @@ export function EncounterSyncControls({
                   leftIcon={<ShieldCheck size={16} />}
                   onClick={sync.activateLocal}
                 >
-                  Confirm local cutover
+                  Switch this device over
                 </Button>
               )}
             {sync.authority?.authority === 'indexedDB' && (
@@ -183,7 +229,7 @@ export function EncounterSyncControls({
                 onClick={sync.activateCloud}
                 loading={sync.busy}
               >
-                Activate cloud family
+                Turn on backup to my account
               </Button>
             )}
             {sync.authority?.authority === 'postgres' && (
@@ -193,17 +239,17 @@ export function EncounterSyncControls({
                   leftIcon={<History size={16} />}
                   onClick={sync.loadHistory}
                 >
-                  Version history
+                  Earlier versions
                 </Button>
                 <Button
                   variant="outline"
                   leftIcon={<RotateCcw size={16} />}
                   onClick={sync.rollback}
                 >
-                  Verified rollback
+                  Stop backing up
                 </Button>
                 <Button variant="danger" onClick={sync.removeAccountFromDevice}>
-                  Remove this account from this device
+                  Remove this account&apos;s data from this device
                 </Button>
               </>
             )}
@@ -212,7 +258,7 @@ export function EncounterSyncControls({
         {sync.authority?.authority === 'postgres' &&
           sync.encounters.length > 0 && (
             <SelectField
-              label="Encounter for version history"
+              label="Encounter to show earlier versions for"
               value={sync.historyLegacyId ?? undefined}
               onValueChange={sync.setHistoryLegacyId}
             >
@@ -226,11 +272,11 @@ export function EncounterSyncControls({
         {sync.manifest && (
           <div className="bg-surface-secondary rounded-lg p-3 text-sm">
             <p className="text-heading font-medium">
-              Manifest {sync.manifest.fingerprint.slice(0, 12)}
-            </p>
-            <p className="text-body">
-              {sync.manifest.recordCount} records · {sync.manifest.totalBytes}{' '}
-              bytes · {sync.manifest.blockers.length} blockers
+              {summarize(
+                sync.manifest.recordCount,
+                sync.manifest.totalBytes,
+                sync.manifest.blockers.length
+              )}
             </p>
             {sync.manifest.blockers.map(blocker => (
               <p
@@ -238,11 +284,11 @@ export function EncounterSyncControls({
                 className="text-accent-red-text"
                 key={`${blocker.kind}:${blocker.legacyId ?? ''}:${blocker.detail}`}
               >
-                {blocker.kind}: {blocker.detail}
+                {blockerMessage(blocker)}
               </p>
             ))}
-            {/* Ruling 1b: an active combat blocks only cutover; autosave keeps
-                committing every edit while it runs. */}
+            {/* Ruling 1b: an active combat blocks only the switch-over; every
+                edit keeps saving while it runs. */}
             {sync.manifest.blockers.some(
               blocker => blocker.kind === 'active-encounter'
             ) && (
@@ -250,6 +296,22 @@ export function EncounterSyncControls({
                 {ACTIVE_ENCOUNTER_GUIDANCE}
               </p>
             )}
+            {/* Reference detail: exact identifiers a DM can quote to support. */}
+            <div className="text-muted mt-2 space-y-1 text-xs">
+              <p>
+                Reference: {sync.manifest.fingerprint.slice(0, 12)}
+                {sync.authority && sync.authority.epoch > 0
+                  ? ` · step ${sync.authority.epoch}`
+                  : ''}
+              </p>
+              {sync.manifest.blockers.map(blocker => (
+                <p
+                  key={`detail:${blocker.kind}:${blocker.legacyId ?? ''}:${blocker.detail}`}
+                >
+                  {blocker.kind}: {blocker.detail}
+                </p>
+              ))}
+            </div>
           </div>
         )}
         {sync.versions.length > 0 && (
@@ -260,7 +322,7 @@ export function EncounterSyncControls({
                 variant="outline"
                 onClick={sync.compareLatestVersions}
               >
-                Compare latest versions
+                Compare the two most recent
               </Button>
             )}
             {sync.comparison && (
@@ -272,11 +334,12 @@ export function EncounterSyncControls({
                 key={version.serverVersion}
               >
                 <span className="text-body text-sm">
-                  Version {version.serverVersion} · epoch {version.cutoverEpoch}{' '}
-                  ·{' '}
-                  {version.tombstoned
-                    ? 'tombstone'
-                    : version.payloadFingerprint.slice(0, 10)}
+                  Version {version.serverVersion} ·{' '}
+                  <span className="text-muted">
+                    {version.tombstoned
+                      ? 'deleted'
+                      : version.payloadFingerprint.slice(0, 10)}
+                  </span>
                 </span>
                 <div className="flex gap-1">
                   <Button
@@ -284,7 +347,7 @@ export function EncounterSyncControls({
                     variant="ghost"
                     onClick={() => sync.exportVersion(version.serverVersion)}
                   >
-                    Export exact version
+                    Download this version
                   </Button>
                   {version.serverVersion !== sync.versions[0].serverVersion && (
                     <Button
@@ -292,7 +355,7 @@ export function EncounterSyncControls({
                       variant="ghost"
                       onClick={() => sync.restoreVersion(version.serverVersion)}
                     >
-                      Restore as new version
+                      Restore this version
                     </Button>
                   )}
                 </div>
@@ -302,8 +365,7 @@ export function EncounterSyncControls({
         )}
         {sync.authority?.authority === 'postgres' && (
           <p role="status" className="text-muted text-sm">
-            Player view: not applicable · Encounters are DM-private; live combat
-            stays on Redis
+            Players never see these. Live combat is unaffected.
           </p>
         )}
         {sync.status && (
