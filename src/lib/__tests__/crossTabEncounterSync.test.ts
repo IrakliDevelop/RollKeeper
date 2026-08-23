@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 import { initCrossTabEncounterSync } from '@/lib/crossTabEncounterSync';
+import { writeEncounterAuthorityMarker } from '@/lib/durableDm/encounterLegacyAuthority';
 import { ENCOUNTER_STORAGE_KEY } from '@/utils/constants';
 
 import type { Encounter } from '@/types/encounter';
@@ -45,13 +46,35 @@ function fireStorage(key: string | null, newValue: string | null) {
   window.dispatchEvent(new StorageEvent('storage', { key, newValue }));
 }
 
-const wrap = (encounters: Encounter[]) =>
-  JSON.stringify({ state: { encounters } });
+const wrap = (
+  encounters: Encounter[],
+  encounterTombstones: Record<string, EncounterDeletionTombstone> = {}
+) => JSON.stringify({ state: { encounters, encounterTombstones } });
+
+function routeCampaign(code: string) {
+  writeEncounterAuthorityMarker(localStorage, code, {
+    version: 1,
+    authority: 'postgres',
+    epoch: 4,
+    campaignId: `cloud-${code}`,
+  });
+}
+
+function tombstoneOf(encounter: Encounter): EncounterDeletionTombstone {
+  return {
+    id: encounter.id,
+    deletedAt: '2026-07-09T00:00:00.000Z',
+    beforeImage: encounter,
+  };
+}
 
 let cleanup: (() => void) | null = null;
 afterEach(() => {
   cleanup?.();
   cleanup = null;
+  localStorage.clear();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
 });
 
 describe('initCrossTabEncounterSync', () => {
@@ -179,5 +202,154 @@ describe('initCrossTabEncounterSync', () => {
     );
 
     expect(store.setState).not.toHaveBeenCalled();
+  });
+});
+
+describe('initCrossTabEncounterSync routed-campaign guard', () => {
+  it('reads no authority marker while the client flag is off', () => {
+    const local = makeEncounter({
+      campaignCode: 'ABC123',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    });
+    routeCampaign('ABC123');
+    const store = makeStore([local]);
+    cleanup = initCrossTabEncounterSync(store);
+    const getItem = vi.spyOn(Storage.prototype, 'getItem');
+
+    fireStorage(
+      ENCOUNTER_STORAGE_KEY,
+      wrap([
+        makeEncounter({
+          campaignCode: 'ABC123',
+          updatedAt: '2026-07-02T00:00:00.000Z',
+          isActive: true,
+        }),
+      ])
+    );
+
+    // Default-off is byte-identical to the pre-11E merge: no marker lookups.
+    expect(getItem).not.toHaveBeenCalled();
+    expect(store.setState).toHaveBeenCalledTimes(1);
+    expect(store.getState().encounters[0].isActive).toBe(true);
+  });
+
+  it('never overwrites a routed encounter with a newer legacy copy', () => {
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    routeCampaign('ABC123');
+    const local = makeEncounter({
+      campaignCode: 'ABC123',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    });
+    const store = makeStore([local]);
+    cleanup = initCrossTabEncounterSync(store);
+
+    fireStorage(
+      ENCOUNTER_STORAGE_KEY,
+      wrap([
+        makeEncounter({
+          campaignCode: 'ABC123',
+          updatedAt: '2026-07-02T00:00:00.000Z',
+          isActive: true,
+        }),
+        makeEncounter({ id: 'enc-new', campaignCode: 'ABC123' }),
+      ])
+    );
+
+    expect(store.setState).not.toHaveBeenCalled();
+    expect(store.getState().encounters).toEqual([local]);
+  });
+
+  it('never deletes a routed encounter through an incoming tombstone', () => {
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    routeCampaign('ABC123');
+    const local = makeEncounter({ campaignCode: 'ABC123' });
+    const store = makeStore([local]);
+    cleanup = initCrossTabEncounterSync(store);
+
+    fireStorage(
+      ENCOUNTER_STORAGE_KEY,
+      wrap([], { [local.id]: tombstoneOf(local) })
+    );
+
+    expect(store.setState).not.toHaveBeenCalled();
+    expect(store.getState().encounters).toEqual([local]);
+    expect(store.getState().encounterTombstones).toEqual({});
+  });
+
+  it('keeps a routed encounter alive against a pre-existing local tombstone', () => {
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    routeCampaign('ABC123');
+    const routedLocal = makeEncounter({
+      id: 'enc-routed',
+      campaignCode: 'ABC123',
+    });
+    // A legacy tab deleted this encounter before the campaign was routed, so
+    // the tombstone is already in local state; the cloud family owns the
+    // encounter now and the merge must never drop it.
+    const store = makeStore([routedLocal], {
+      [routedLocal.id]: tombstoneOf(routedLocal),
+    });
+    cleanup = initCrossTabEncounterSync(store);
+
+    fireStorage(
+      ENCOUNTER_STORAGE_KEY,
+      wrap([makeEncounter({ id: 'enc-legacy', campaignCode: 'DEF456' })])
+    );
+
+    expect(store.setState).toHaveBeenCalledTimes(1);
+    expect(store.getState().encounters.map(e => e.id)).toEqual([
+      'enc-routed',
+      'enc-legacy',
+    ]);
+  });
+
+  it('still merges, adopts and tombstones campaigns that stayed on legacy', () => {
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    routeCampaign('ABC123');
+    const routed = makeEncounter({
+      id: 'enc-routed',
+      campaignCode: 'ABC123',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    });
+    const legacy = makeEncounter({
+      id: 'enc-legacy',
+      campaignCode: 'DEF456',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    });
+    const doomed = makeEncounter({ id: 'enc-doomed', campaignCode: 'DEF456' });
+    const store = makeStore([routed, legacy, doomed]);
+    cleanup = initCrossTabEncounterSync(store);
+
+    fireStorage(
+      ENCOUNTER_STORAGE_KEY,
+      wrap(
+        [
+          makeEncounter({
+            id: 'enc-routed',
+            campaignCode: 'ABC123',
+            updatedAt: '2026-07-09T00:00:00.000Z',
+            isActive: true,
+          }),
+          makeEncounter({
+            id: 'enc-legacy',
+            campaignCode: 'DEF456',
+            updatedAt: '2026-07-09T00:00:00.000Z',
+            isActive: true,
+          }),
+          makeEncounter({ id: 'enc-adopted', campaignCode: 'DEF456' }),
+        ],
+        { 'enc-doomed': tombstoneOf(doomed) }
+      )
+    );
+
+    const state = store.getState();
+    expect(state.encounters.map(e => e.id)).toEqual([
+      'enc-routed',
+      'enc-legacy',
+      'enc-adopted',
+    ]);
+    expect(state.encounters[0].isActive).toBe(false);
+    expect(state.encounters[1].isActive).toBe(true);
+    expect(Object.keys(state.encounterTombstones)).toEqual(['enc-doomed']);
   });
 });
