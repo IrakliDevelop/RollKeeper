@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
-import { createSafeStorage } from '@/lib/safeStorage';
+import { createCombatLogArchiveAwareStorage } from '@/lib/durableDm/combatLogArchiveAwareStorage';
 import { combatLogArchiveUsesIndexedDbAuthority } from '@/lib/durableDm/combatLogArchiveLegacyAuthority';
 import {
   canonicalJson,
@@ -528,7 +528,7 @@ export const useCombatLogStore = create<CombatLogStoreState>()(
     {
       name: COMBAT_LOG_STORAGE_KEY,
       skipHydration: isIndexedDbMigrationEnabled(),
-      storage: createJSONStorage(() => createSafeStorage()),
+      storage: createJSONStorage(() => createCombatLogArchiveAwareStorage()),
       version: COMBAT_LOG_ARCHIVE_PERSIST_VERSION,
       // `lastAdmissionError` is session state and is never persisted.
       partialize: state => ({
