@@ -413,6 +413,19 @@ export function useCombatLogArchiveSyncController(
           authorityGeneration(accountId, marker.campaignId, localAuthority)
         )
           return;
+        // Everything below this line runs while the store still holds the
+        // *previous* generation. Disarming first is what makes publishing the
+        // authority early safe: a re-hydration (a newer local epoch written by
+        // another tab, an enrolment, a restore) would otherwise commit a render
+        // in which `authority` is the new generation, `hydrated` is still true
+        // from the last pass, and `archives` is still the pre-hydration store.
+        // The autosave effect would chain a run closing over those stale
+        // archives behind this pending hydrate; hydrate then resets
+        // `lastFingerprints` to the new documents, and the run — resolving on
+        // the next microtask, ahead of React's re-render, so its `cancelled`
+        // flag is still false — would diff stale current against fresh baseline
+        // and write the superseded content back over what was just hydrated.
+        setHydrated(false);
         // Which store owns this device is already decided, so it is published
         // before the workspace restore and the integrity check below: a device
         // whose hydration then stops must still describe itself honestly to the

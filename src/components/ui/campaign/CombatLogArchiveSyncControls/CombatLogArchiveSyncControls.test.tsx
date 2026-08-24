@@ -90,19 +90,23 @@ function renderControls(providerCode = campaign.code) {
   );
 }
 
+function ownerContext() {
+  return {
+    accountId: ACCOUNT_ID,
+    accountLabel: 'fake@example.test',
+    list: vi.fn().mockResolvedValue([workspace]),
+    discover: vi.fn().mockResolvedValue([workspace]),
+    remember: vi.fn().mockResolvedValue(undefined),
+    create: vi.fn(),
+    forkLegacy: vi.fn(),
+    close: vi.fn(),
+  };
+}
+
 function mockOwnerWorkspace() {
   return vi
     .spyOn(browserDmWorkspace, 'createBrowserDmWorkspace')
-    .mockResolvedValue({
-      accountId: ACCOUNT_ID,
-      accountLabel: 'fake@example.test',
-      list: vi.fn().mockResolvedValue([workspace]),
-      discover: vi.fn().mockResolvedValue([workspace]),
-      remember: vi.fn().mockResolvedValue(undefined),
-      create: vi.fn(),
-      forkLegacy: vi.fn(),
-      close: vi.fn(),
-    });
+    .mockResolvedValue(ownerContext());
 }
 
 /**
@@ -254,6 +258,25 @@ async function damageStoredDocument(legacyId: string) {
     store.get([NAMESPACE, 'combat_log_archive', legacyId])
   )) as CombatLogArchiveDocument;
   store.put({ ...document, contentFingerprint: 'f'.repeat(64) });
+  await transactionComplete(transaction);
+  database.close();
+}
+
+/**
+ * Stands in for another tab replacing this device's local generation: only the
+ * cutover epoch moves, which is what makes the next pass a re-hydration rather
+ * than a signature-matched no-op.
+ */
+async function bumpLocalEpoch(epoch: number) {
+  const database = await openRollkeeperDatabase();
+  const transaction = database.transaction('meta', 'readwrite');
+  const meta = transaction.objectStore('meta');
+  const scope = `${NAMESPACE}:combat_log_archive:${CAMPAIGN_ID}`;
+  const pointer = (await requestResult(
+    meta.get(`active-generation:${scope}`)
+  )) as Record<string, unknown>;
+  meta.put({ ...pointer, epoch });
+  meta.put({ key: `cutover-epoch:${scope}`, value: epoch });
   await transactionComplete(transaction);
   database.close();
 }
@@ -429,6 +452,126 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     expect(commit).not.toHaveBeenCalled();
   });
 
+  it('disarms autosave when a re-hydration onto a newer local generation stops', async () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    await seedIndexedDbGeneration(archivePayload());
+    mockOwnerWorkspace();
+    mockOwnerSession();
+
+    renderControls();
+    await screen.findByText('Your combat logs are loaded from this device.');
+    expect(authListener).toBeDefined();
+
+    // Another tab moved this device onto a newer local generation, and what it
+    // left behind does not survive the integrity check.
+    await damageStoredDocument('arc-1');
+    await bumpLocalEpoch(2);
+
+    const commit = vi.spyOn(
+      IndexedDbCombatLogArchiveRepository.prototype,
+      'commit'
+    );
+    await act(async () => {
+      authListener!('TOKEN_REFRESHED', { user: { id: ACCOUNT_ID } });
+      await new Promise(resolve => setTimeout(resolve, 25));
+    });
+    await screen.findByText(
+      'The combat logs saved on this device look damaged. Use Earlier versions to restore one.'
+    );
+
+    // A re-hydration publishes the new authority before it replaces the store,
+    // so autosave has to be disarmed for its whole duration: this pass was
+    // armed by the *previous* hydration and its baseline still describes the
+    // superseded generation.
+    await act(async () => {
+      useCombatLogStore.getState().logEvent('arc-1', turnEvent('Owlbear'));
+      await new Promise(resolve => setTimeout(resolve, 25));
+    });
+
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it('commits a new archive as a create and an edited one as a replace', async () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    await seedIndexedDbGeneration(archivePayload());
+    mockOwnerWorkspace();
+    mockOwnerSession();
+
+    render(
+      <CombatLogArchiveSyncProvider campaignCode={campaign.code}>
+        {null}
+      </CombatLogArchiveSyncProvider>
+    );
+    await waitFor(() =>
+      expect(Object.keys(useCombatLogStore.getState().encounters)).toHaveLength(
+        1
+      )
+    );
+
+    const commit = vi.spyOn(
+      IndexedDbCombatLogArchiveRepository.prototype,
+      'commit'
+    );
+    act(() => {
+      useCombatLogStore.getState().logEvent('arc-1', turnEvent('Goblin'));
+    });
+
+    // The hydrated document is live at localRevision 1, so an ordinary edit is
+    // a replace that keeps its acknowledged base version.
+    await waitFor(() =>
+      expect(commit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          namespace: NAMESPACE,
+          campaignId: CAMPAIGN_ID,
+          legacyId: 'arc-1',
+          operation: 'replace',
+          cutoverEpoch: 1,
+          schemaVersion: 2,
+          localRevision: 2,
+          baseServerVersion: 0,
+        })
+      )
+    );
+
+    let created: string | null = null;
+    act(() => {
+      created = useCombatLogStore
+        .getState()
+        .startArchive('enc-b', campaign.code);
+    });
+    expect(created).not.toBeNull();
+
+    // An archive this device has never committed has no document to replace.
+    await waitFor(() =>
+      expect(commit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          legacyId: created!,
+          operation: 'create',
+          localRevision: 1,
+          baseServerVersion: 0,
+        })
+      )
+    );
+
+    await waitFor(async () => {
+      const database = await openRollkeeperDatabase();
+      try {
+        const repository = new IndexedDbCombatLogArchiveRepository(database);
+        const edited = await repository.getDocument(NAMESPACE, 'arc-1');
+        expect(edited?.payload?.events).toHaveLength(1);
+        expect(edited?.operation).toBe('replace');
+        const fresh = await repository.getDocument(NAMESPACE, created!);
+        expect(fresh?.payload?.encounterId).toBe('enc-b');
+        const outbox = await repository.listOutbox(NAMESPACE, CAMPAIGN_ID);
+        expect(outbox.filter(entry => entry.state === 'paused')).toHaveLength(
+          2
+        );
+      } finally {
+        database.close();
+      }
+    });
+  });
+
   it('does not re-fingerprint this campaign when another campaign is edited', async () => {
     vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
     await seedIndexedDbGeneration(archivePayload());
@@ -446,10 +589,17 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
         1
       )
     );
-    // Let the first autosave pass populate the fingerprint cache.
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 25));
+    // Warm the fingerprint cache deterministically: an edit in this campaign
+    // runs a full autosave pass, and its commit is the signal that every live
+    // archive has been fingerprinted and cached.
+    const commit = vi.spyOn(
+      IndexedDbCombatLogArchiveRepository.prototype,
+      'commit'
+    );
+    act(() => {
+      useCombatLogStore.getState().logEvent('arc-1', turnEvent('Goblin'));
     });
+    await waitFor(() => expect(commit).toHaveBeenCalled());
 
     const digest = vi.spyOn(crypto.subtle, 'digest');
     await act(async () => {
