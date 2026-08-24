@@ -1,6 +1,6 @@
 begin;
 
-select plan(76);
+select plan(80);
 
 select ok(has_function_privilege('authenticated','public.begin_combat_log_archive_staging(uuid,uuid,uuid,bigint,text,text,text,integer,bigint)','EXECUTE'),'owner can begin combat log archive staging');
 select ok(not has_function_privilege('anon','public.begin_combat_log_archive_staging(uuid,uuid,uuid,bigint,text,text,text,integer,bigint)','EXECUTE'),'anon cannot stage combat log archives');
@@ -183,7 +183,7 @@ select is(result->>'recordCount','2','cutover reports the whole staged generatio
 reset role;
 select is((select count(*) from public.campaign_documents where family='combat_log_archive' and campaign_id=(select (result->>'campaignId')::uuid from clog_workspace)),2::bigint,'combat log archive current rows created');
 select is((select count(*) from private.campaign_document_versions where family='combat_log_archive' and campaign_id=(select (result->>'campaignId')::uuid from clog_workspace)),2::bigint,'combat log archive version 1 rows created atomically');
-select is((select count(*) from private.campaign_document_projection_outbox where family='combat_log_archive'),0::bigint,'combat log archives never queue projection work');
+select is((select count(*) from private.campaign_document_projection_outbox where family='combat_log_archive' and campaign_id=(select (result->>'campaignId')::uuid from clog_workspace)),0::bigint,'combat log archives never queue projection work');
 select throws_ok(
   $$insert into private.campaign_document_projection_outbox(campaign_id,campaign_document_version_id,family,legacy_id,server_version,cutover_epoch,projection_kind,source_fingerprint)
     select v.campaign_id,v.id,'combat_log_archive',v.legacy_id,v.server_version,v.cutover_epoch,'calendar_v1',v.payload_fingerprint
@@ -192,7 +192,7 @@ select throws_ok(
   'new row for relation "campaign_document_projection_outbox" violates check constraint "campaign_document_projection_outbox_family_check"',
   'the projection outbox structurally rejects the combat log archive family'
 );
-select is((select count(*) from private.campaign_family_device_enrollments where family='combat_log_archive' and device_id='c3000000-0000-4000-8000-000000000001'),1::bigint,'initial combat log archive device enrolled atomically');
+select is((select count(*) from private.campaign_family_device_enrollments where family='combat_log_archive' and device_id='c3000000-0000-4000-8000-000000000001' and campaign_id=(select (result->>'campaignId')::uuid from clog_workspace)),1::bigint,'initial combat log archive device enrolled atomically');
 
 create temporary table clog_v2 as
 select pg_catalog.jsonb_set(payload,'{events,3,endReason}','"dm_ended"'::jsonb) as payload
@@ -235,18 +235,42 @@ select pg_catalog.jsonb_set(payload,'{events}',pg_catalog.jsonb_build_array(
 )) as payload
 from clog_fixture where legacy_id='arc-a';
 grant select on clog_foreign_event to authenticated;
--- A non-finite number must never reach a stored archive. PostgreSQL renders
--- to_jsonb('NaN'::numeric) as the JSON *string* "NaN", so the closest a caller
--- can get to a non-finite number is caught by the number-kind rule; the
--- validator's explicit 'NaN'/'Infinity'/'-Infinity' guard backs that up.
-create temporary table clog_non_finite as
+-- PostgreSQL renders to_jsonb('NaN'::numeric) as the JSON *string* "NaN", so
+-- this fixture pins the number-kind rule (jsonb_typeof = 'number'), NOT the
+-- validator's textual 'NaN'/'Infinity'/'-Infinity' guard, which no constructible
+-- jsonb value can reach. The genuine non-finite case is clog_overflow below.
+create temporary table clog_numeric_special as
 select pg_catalog.jsonb_set(payload,'{events}',pg_catalog.jsonb_build_array(
   pg_catalog.jsonb_build_object('id','ev-1','timestamp','t','round',1,'turn',0,'encounterId','enc-ashfall','type','damage',
     'sourceId','s','sourceName','Sera Vale','targetId','t','targetName','Ash',
     'amount',pg_catalog.to_jsonb('NaN'::numeric),'damageType','radiant')
 )) as payload
 from clog_fixture where legacy_id='arc-a';
-grant select on clog_non_finite to authenticated;
+grant select on clog_numeric_special to authenticated;
+-- Important 1: jsonb stores numbers as arbitrary-precision numeric, so 1e400 is
+-- a perfectly good jsonb *number* that both jsonb_typeof and the textual
+-- NaN/Infinity guard accept. JSON.parse turns it into Infinity and
+-- isFiniteNumber rejects it, so the server must reject it too: a document the
+-- browser refuses must never become a stored document that the browser then
+-- refuses to read back.
+create temporary table clog_overflow as
+select '{"encounterId":"enc-overflow","startedAt":"2026-08-05T18:00:00.000Z","events":[
+  {"id":"ev-1","timestamp":"2026-08-05T18:00:01.000Z","round":1e400,"turn":1,
+   "encounterId":"enc-overflow","type":"turn_start","entityId":"e1","entityName":"Sera Vale"}]}'::jsonb as payload;
+alter table clog_overflow add column fingerprint text;
+update clog_overflow set fingerprint=private.campaign_document_hash(payload);
+grant select on clog_overflow to authenticated;
+-- The same overflow through the per-discriminator number field rather than the
+-- base round/turn fields: round and turn stay finite so only the number-kind
+-- branch of the field loop can reject this document.
+create temporary table clog_overflow_field as
+select '{"encounterId":"enc-overflow","startedAt":"2026-08-05T18:00:00.000Z","events":[
+  {"id":"ev-1","timestamp":"2026-08-05T18:00:01.000Z","round":1,"turn":1,
+   "encounterId":"enc-overflow","type":"damage","sourceId":"s","sourceName":"Sera Vale",
+   "targetId":"t","targetName":"Ash","amount":1e400,"damageType":"radiant"}]}'::jsonb as payload;
+alter table clog_overflow_field add column fingerprint text;
+update clog_overflow_field set fingerprint=private.campaign_document_hash(payload);
+grant select on clog_overflow_field to authenticated;
 -- The TypeScript isAbsent helper treats an explicit null as absent, and
 -- canonicalJson preserves the key, so {"endedAt":null} is a document the
 -- browser validates and hands to the server exactly as spelled.
@@ -309,8 +333,16 @@ select throws_ok(
   '22023','invalid combat log archive mutation','an event belonging to another encounter is rejected'
 );
 select throws_ok(
-  $$select public.put_combat_log_archive_document('c2000000-0000-4000-8000-000000000015',(select (result->>'campaignId')::uuid from clog_workspace),1,'arc-f','create',0,2,(select payload from clog_non_finite),repeat('a',64))$$,
+  $$select public.put_combat_log_archive_document('c2000000-0000-4000-8000-000000000015',(select (result->>'campaignId')::uuid from clog_workspace),1,'arc-f','create',0,2,(select payload from clog_numeric_special),repeat('a',64))$$,
+  '22023','invalid combat log archive mutation','a numeric special that arrives as a JSON string is rejected'
+);
+select throws_ok(
+  $$select public.put_combat_log_archive_document('c2000000-0000-4000-8000-000000000075',(select (result->>'campaignId')::uuid from clog_workspace),1,'arc-k','create',0,2,(select payload from clog_overflow),(select fingerprint from clog_overflow))$$,
   '22023','invalid combat log archive mutation','a non-finite combat log archive number is rejected'
+);
+select throws_ok(
+  $$select public.put_combat_log_archive_document('c2000000-0000-4000-8000-000000000076',(select (result->>'campaignId')::uuid from clog_workspace),1,'arc-l','create',0,2,(select payload from clog_overflow_field),(select fingerprint from clog_overflow_field))$$,
+  '22023','invalid combat log archive mutation','a non-finite combat log archive event field is rejected'
 );
 select throws_ok(
   $$select public.put_combat_log_archive_document('c2000000-0000-4000-8000-000000000072',(select (result->>'campaignId')::uuid from clog_workspace),1,'arc-i','create',0,2,(select payload from clog_foreign_field),repeat('a',64))$$,
@@ -344,6 +376,10 @@ select is(
 select is(
   public.put_combat_log_archive_document('c2000000-0000-4000-8000-000000000019',(select (result->>'campaignId')::uuid from clog_workspace),1,'arc-open','create',0,2,(select payload from clog_open_document),(select fingerprint from clog_open_document))->>'playerView',
   'not-applicable','a combat log archive write never produces a player view'
+);
+select is(
+  public.put_combat_log_archive_document('c2000000-0000-4000-8000-000000000019',(select (result->>'campaignId')::uuid from clog_workspace),1,'arc-open','create',0,2,(select payload from clog_open_document),(select fingerprint from clog_open_document))->>'cloudSaved',
+  'true','an accepted combat log archive write reports the cloud save'
 );
 -- The same record staging measures is always writable through CAS: measuring
 -- pg_column_size here instead of the canonical UTF-8 bytes would reject it.
@@ -502,6 +538,34 @@ select public.confirm_combat_log_archive_cutover('c2000000-0000-4000-8000-000000
 grant select on clog_empty_cutover to authenticated;
 select is(result->>'recordCount','0','a zero-record run confirms without any staged document') from clog_empty_cutover;
 select is(result->>'authority','postgres','a zero-record cutover still activates only combat log archive authority') from clog_empty_cutover;
+
+-- Minor 5: the canonical oversize check inside stage_combat_log_archive_items,
+-- the staging-side twin of the put_* check above. The fingerprint handed over is
+-- the payload's real hash, so only the size disjunct can raise.
+set local role authenticated;
+select set_config('request.jwt.claim.sub','10000000-0000-4000-8000-000000000001',true);
+create temporary table clog_oversize_workspace as
+select public.create_campaign_workspace(
+  'c1000000-0000-4000-8000-000000000004','Combat log archive oversize staging','new_workspace',null
+) as result;
+grant select on clog_oversize_workspace to authenticated;
+create temporary table clog_oversize_run as
+select public.begin_combat_log_archive_staging(
+  'c2000000-0000-4000-8000-000000000060',(select (result->>'campaignId')::uuid from clog_oversize_workspace),
+  'c3000000-0000-4000-8000-000000000005',0,repeat('1',64),repeat('2',64),repeat('2',64),1,(select bytes from clog_boundary where kind='over')
+) as result;
+grant select on clog_oversize_run to authenticated;
+select throws_ok(
+  $$select public.stage_combat_log_archive_items(
+    'c2000000-0000-4000-8000-000000000061',(select (result->>'runId')::uuid from clog_oversize_run),
+    pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object(
+      'legacyId','arc-over','schemaVersion',2,
+      'payload',(select payload from clog_boundary where kind='over')::text::jsonb,
+      'payloadFingerprint',(select fingerprint from clog_boundary where kind='over'),'tombstoned',false
+    ))
+  )$$,
+  '22023','invalid or oversized combat log archive document','a combat log archive one byte over the canonical limit cannot be staged'
+);
 
 reset role;
 

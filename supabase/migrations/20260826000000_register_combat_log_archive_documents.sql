@@ -55,12 +55,25 @@ end; $$;
 --   * the same per-discriminator field allowlists, transcribed from
 --     EVENT_FIELD_SPECS into v_specs below, so (for instance) a damage event
 --     may not carry spellName;
---   * every numeric is finite, matching Number.isFinite. Two rules enforce it:
---     the value must have jsonb_typeof 'number', which already excludes the
---     numeric specials because to_jsonb renders NaN and +/-Infinity as JSON
---     *strings*; and, as defence in depth should a future jsonb representation
---     admit them as numbers, the textual forms 'NaN', 'Infinity' and
---     '-Infinity' are rejected explicitly;
+--   * every numeric is finite, matching Number.isFinite. Three rules enforce
+--     it, each checked only after the one before it has established the type:
+--     (a) jsonb_typeof must be 'number', which already excludes the numeric
+--     specials because to_jsonb renders NaN and +/-Infinity as JSON *strings*;
+--     (b) the textual forms 'NaN', 'Infinity' and '-Infinity' are rejected, as
+--     defence in depth should a future jsonb representation admit them as
+--     numbers; and (c) the magnitude must not exceed the IEEE-754 double
+--     maximum 1.7976931348623157e308. (c) is the rule that matters in practice:
+--     jsonb stores numbers as arbitrary-precision `numeric`, so a literal such
+--     as 1e400 is a perfectly good jsonb *number* that (a) and (b) both accept,
+--     while JSON.parse turns it into Infinity and isFiniteNumber rejects it. A
+--     document the browser refuses must never become a stored document: on
+--     read-back the client would reject its own row, canonicalJson would render
+--     the value as null, the fingerprint would diverge, and every later
+--     autosave for that legacyId would fail permanently.
+--     Each numeric rule sits in its own IF so the ::numeric cast is reached
+--     only for a value already known to be a jsonb number: SQL does not
+--     guarantee that OR short-circuits, and casting a non-numeric text would
+--     raise 22P02 instead of returning false;
 --   * every string bound is a byte bound measured with octet_length(text),
 --     never SQL length(), which counts code points where the TypeScript
 --     TextEncoder counts UTF-8 bytes. octet_length(text) counts bytes in the
@@ -145,9 +158,12 @@ begin
       or pg_catalog.octet_length(v_event->>'timestamp') > v_max_text
     then return false; end if;
     if pg_catalog.jsonb_typeof(v_event->'round') is distinct from 'number'
-      or (v_event->>'round') in ('NaN','Infinity','-Infinity')
       or pg_catalog.jsonb_typeof(v_event->'turn') is distinct from 'number'
+    then return false; end if;
+    if (v_event->>'round') in ('NaN','Infinity','-Infinity')
       or (v_event->>'turn') in ('NaN','Infinity','-Infinity')
+      or abs((v_event->>'round')::numeric) > 1.7976931348623157e308
+      or abs((v_event->>'turn')::numeric) > 1.7976931348623157e308
     then return false; end if;
     -- Spec section 3: every event's encounterId must equal the document's.
     if (v_event->'encounterId') is distinct from (p_payload->'encounterId') then return false; end if;
@@ -163,8 +179,10 @@ begin
         v_text := v_value #>> '{}'::text[];
         if v_text = '' or pg_catalog.octet_length(v_text) > v_max_id then return false; end if;
       elsif v_kind='number' then
-        if pg_catalog.jsonb_typeof(v_value) is distinct from 'number'
-          or (v_value #>> '{}'::text[]) in ('NaN','Infinity','-Infinity')
+        if pg_catalog.jsonb_typeof(v_value) is distinct from 'number' then return false; end if;
+        v_text := v_value #>> '{}'::text[];
+        if v_text in ('NaN','Infinity','-Infinity')
+          or abs(v_text::numeric) > 1.7976931348623157e308
         then return false; end if;
       elsif v_kind='boolean' then
         if pg_catalog.jsonb_typeof(v_value) is distinct from 'boolean' then return false; end if;
