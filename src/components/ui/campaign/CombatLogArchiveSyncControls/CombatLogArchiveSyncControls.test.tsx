@@ -8,6 +8,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -16,7 +17,10 @@ import {
   type CombatLogArchivePayload,
 } from '@/lib/durableDm/combatLogArchiveFamily';
 import { writeCombatLogArchiveAuthorityMarker } from '@/lib/durableDm/combatLogArchiveLegacyAuthority';
-import { commitCombatLogArchiveLocalCutover } from '@/lib/indexeddb/combatLogArchiveAuthority';
+import {
+  commitCombatLogArchiveLocalCutover,
+  markCombatLogArchiveCloudAuthority,
+} from '@/lib/indexeddb/combatLogArchiveAuthority';
 import {
   IndexedDbCombatLogArchiveRepository,
   type CombatLogArchiveDocument,
@@ -313,9 +317,147 @@ async function downloadAndOpenSafetyCopy(createObjectURL: {
   );
 }
 
+/**
+ * Deliberately distinct from the cutover epoch, the schema version (2) and the
+ * local revision, exactly as Task 8's enrollment fixture pins them: a document
+ * written with any of those instead of the preview's own server version would
+ * make the "already has this version" comparison accidentally true or
+ * accidentally false, and this suite's Critical would stop meaning anything.
+ */
+const CLOUD_EPOCH = 3;
+const CLOUD_SERVER_VERSION = 12;
+
+let commitSpy: ReturnType<typeof vi.spyOn>;
+let fetchSpy: ReturnType<typeof vi.spyOn>;
+let requests: Record<string, unknown>[] = [];
+
+const respond = (value: unknown) =>
+  ({ ok: true, json: async () => value }) as Response;
+
+function cloudVersion(serverVersion: number, payloadFingerprint: string) {
+  return {
+    serverVersion,
+    cutoverEpoch: CLOUD_EPOCH,
+    schemaVersion: 2,
+    payloadFingerprint,
+    tombstoned: false,
+    acceptedAt: NOW,
+  };
+}
+
+/**
+ * Adds this device to a cloud generation the account already holds.
+ *
+ * `enrollCombatLogArchiveCloudDevice` writes each document with exactly the
+ * preview's `serverVersion` and `payloadFingerprint`, so the "already has this
+ * version" check inside `applyExactCloudVersion` is unconditionally true the
+ * moment this helper returns. That is the PR #267 precondition, and it is what
+ * makes the Critical test below a real guard rather than a vacuous one.
+ *
+ * The store is left showing the un-uploaded local candidate and `hydrated` is
+ * left false, which is the whole point of the enrolled-but-unapplied state.
+ */
+async function enrollAgainstCloudGeneration(
+  handle: (body: Record<string, unknown>) => unknown = () => undefined
+) {
+  vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+  mockOwnerWorkspace();
+  // The local candidate this device must never push on its own.
+  seedArchives({ 'arc-1': endedArchive({ encounterId: 'enc-local' }) });
+  const cloudPayload = archivePayload({ encounterId: 'enc-cloud' });
+  const cloudFingerprint =
+    await fingerprintCombatLogArchivePayload(cloudPayload);
+  fetchSpy = vi
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation(async (_input, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      requests.push(body);
+      const handled = handle(body);
+      if (handled !== undefined) return respond(handled);
+      if (body.action === 'preview-enrollment')
+        return respond({
+          authority: 'postgres',
+          epoch: CLOUD_EPOCH,
+          previewFingerprint: 'a'.repeat(64),
+          recordCount: 1,
+          documents: [
+            {
+              legacyId: 'arc-1',
+              serverVersion: CLOUD_SERVER_VERSION,
+              schemaVersion: 2,
+              payloadFingerprint: cloudFingerprint,
+              tombstoned: false,
+              payload: cloudPayload,
+            },
+          ],
+        });
+      if (body.action === 'enroll-device') return respond({});
+      if (body.action === 'put')
+        return respond({
+          serverVersion: Number(body.expectedServerVersion) + 1,
+          cutoverEpoch: Number(body.expectedEpoch),
+          payloadFingerprint: body.payloadFingerprint,
+          cloudSaved: true,
+          playerView: 'not-applicable',
+        });
+      throw new Error(`unexpected action ${String(body.action)}`);
+    });
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  commitSpy = vi.spyOn(IndexedDbCombatLogArchiveRepository.prototype, 'commit');
+
+  renderControls();
+  fireEvent.click(screen.getByRole('button', { name: 'Find my campaigns' }));
+  fireEvent.click(
+    await screen.findByRole('button', { name: /Use Combat logs/ })
+  );
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Check this device' })
+  );
+  fireEvent.click(
+    await screen.findByRole('button', {
+      name: 'Add this device to your account',
+    })
+  );
+  await screen.findByText(
+    'This device was added to your account. Choose "Use the copy from your account" when you are ready.'
+  );
+  return { cloudFingerprint, cloudPayload };
+}
+
+/** A device that already backs this campaign up to the account. */
+async function seedCloudAuthority(payload: CombatLogArchivePayload) {
+  const contentFingerprint = await seedIndexedDbGeneration(payload);
+  const database = await openRollkeeperDatabase();
+  await markCombatLogArchiveCloudAuthority(database, {
+    namespace: NAMESPACE,
+    campaignId: CAMPAIGN_ID,
+    expectedLocalEpoch: 1,
+    cloudEpoch: CLOUD_EPOCH,
+    now: () => NOW,
+    acceptedVersions: [
+      {
+        legacyId: 'arc-1',
+        serverVersion: CLOUD_SERVER_VERSION,
+        payloadFingerprint: contentFingerprint,
+      },
+    ],
+  });
+  database.close();
+  writeCombatLogArchiveAuthorityMarker(localStorage, {
+    version: 1,
+    campaignCode: campaign.code,
+    authority: 'postgres',
+    epoch: CLOUD_EPOCH,
+    accountId: ACCOUNT_ID,
+    campaignId: CAMPAIGN_ID,
+  });
+  return contentFingerprint;
+}
+
 describe('CombatLogArchiveSyncControls durability guards', () => {
   beforeEach(() => {
     useDmStore.setState({ campaigns: [campaign] });
+    requests = [];
   });
 
   afterEach(async () => {
@@ -617,6 +759,333 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
       useCombatLogStore.getState().startArchive('enc-a', campaign.code);
     });
     await waitFor(() => expect(digest).toHaveBeenCalled());
+  });
+
+  // The PR #267 Critical. Enrollment writes every document at exactly the
+  // preview's server version and fingerprint, so an "already has this version"
+  // short-circuit that returns from the function instead of continuing the loop
+  // is unconditionally taken here — skipping the store rewrite and, fatally,
+  // `setHydrated(true)`. The DM would see a success status while the legacy key
+  // stays frozen and every later edit is written nowhere.
+  it('arms autosave when applying the exact cloud version right after enrollment', async () => {
+    await enrollAgainstCloudGeneration(); // leaves hydrated === false by design
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /use the copy from your account/i })
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(/loaded .* from your account/i)
+      ).toBeInTheDocument()
+    );
+
+    // The real assertion: an edit made now must reach IndexedDB.
+    act(() => {
+      useCombatLogStore.getState().clearArchive('arc-1');
+    });
+
+    await waitFor(() =>
+      expect(commitSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'delete', legacyId: 'arc-1' })
+      )
+    );
+  });
+
+  it('arms autosave after a version restore on an enrolled device', async () => {
+    const restoredPayload = archivePayload({ encounterId: 'enc-restored' });
+    const restoredFingerprint =
+      await fingerprintCombatLogArchivePayload(restoredPayload);
+    await enrollAgainstCloudGeneration(body => {
+      if (body.action === 'history')
+        return {
+          versions: [
+            cloudVersion(2, restoredFingerprint),
+            cloudVersion(1, restoredFingerprint),
+          ],
+        };
+      if (body.action === 'restore-version')
+        return {
+          serverVersion: 3,
+          cutoverEpoch: CLOUD_EPOCH,
+          payloadFingerprint: restoredFingerprint,
+        };
+      if (body.action === 'export-version')
+        return {
+          serverVersion: 3,
+          schemaVersion: 2,
+          payloadFingerprint: restoredFingerprint,
+          tombstoned: false,
+          payload: restoredPayload,
+        };
+      return undefined;
+    });
+
+    // Enrolled but not yet applied: autosave is deliberately disarmed here.
+    fireEvent.click(screen.getByRole('button', { name: 'Earlier versions' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Restore this version' })
+    );
+    await screen.findByText('Restored. Saved to your account as version 3.');
+
+    // The restore rewrote the store from IndexedDB, so it is a hydrating path:
+    // the next edit must still reach IndexedDB and the account.
+    act(() => {
+      useCombatLogStore.getState().logEvent('arc-1', turnEvent('Goblin'));
+    });
+
+    await waitFor(() => expect(commitSpy).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(requests.map(request => request.action)).toContain('put')
+    );
+  });
+
+  it('never uploads the local candidate after device enrollment', async () => {
+    await enrollAgainstCloudGeneration();
+
+    await new Promise(resolve => setTimeout(resolve, 25));
+
+    expect(commitSpy).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalledWith(
+      '/api/combat-log-sync',
+      expect.objectContaining({
+        body: expect.stringContaining('"action":"put"'),
+      })
+    );
+  });
+
+  // The companion the test above needs to be a real guard: with no baseline yet
+  // recorded, the first autosave pass after enrollment only seeds
+  // `lastFingerprints` and commits nothing, so an edit is what actually forces
+  // the disarmed gate to be exercised.
+  it('never uploads the local candidate when the DM edits after enrollment', async () => {
+    await enrollAgainstCloudGeneration();
+
+    for (const entityName of ['Goblin', 'Bugbear']) {
+      await act(async () => {
+        useCombatLogStore.getState().logEvent('arc-1', turnEvent(entityName));
+        await new Promise(resolve => setTimeout(resolve, 25));
+      });
+    }
+
+    expect(commitSpy).not.toHaveBeenCalled();
+    expect(requests.map(request => request.action)).not.toContain('put');
+  });
+
+  it('wires version history, exact export, comparison, and verified rollback under cloud authority', async () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    const payload = archivePayload();
+    const contentFingerprint = await seedCloudAuthority(payload);
+    mockOwnerWorkspace();
+    mockOwnerSession();
+    fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (_input, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        requests.push(body);
+        if (body.action === 'history')
+          return respond({
+            versions: [
+              cloudVersion(CLOUD_SERVER_VERSION, contentFingerprint),
+              cloudVersion(CLOUD_SERVER_VERSION - 1, contentFingerprint),
+            ],
+          });
+        if (body.action === 'export-version')
+          return respond({
+            serverVersion: CLOUD_SERVER_VERSION,
+            schemaVersion: 2,
+            payloadFingerprint: contentFingerprint,
+            tombstoned: false,
+            payload,
+          });
+        if (body.action === 'compare-versions')
+          return respond({ identical: true });
+        if (body.action === 'preview-enrollment')
+          return respond({
+            authority: 'postgres',
+            epoch: CLOUD_EPOCH,
+            previewFingerprint: 'a'.repeat(64),
+            recordCount: 1,
+            documents: [
+              {
+                legacyId: 'arc-1',
+                serverVersion: CLOUD_SERVER_VERSION,
+                schemaVersion: 2,
+                payloadFingerprint: contentFingerprint,
+                tombstoned: false,
+                payload,
+              },
+            ],
+          });
+        if (body.action === 'rollback')
+          return respond({
+            epoch: CLOUD_EPOCH + 1,
+            currentGeneration: {
+              recordCount: 1,
+              documents: [
+                {
+                  legacyId: 'arc-1',
+                  serverVersion: CLOUD_SERVER_VERSION,
+                  schemaVersion: 2,
+                  payloadFingerprint: contentFingerprint,
+                  tombstoned: false,
+                  payload,
+                },
+              ],
+            },
+          });
+        throw new Error(`unexpected action ${String(body.action)}`);
+      });
+
+    renderControls();
+
+    expect(
+      await screen.findByRole('button', { name: 'Earlier versions' })
+    ).toBeVisible();
+    expect(
+      screen.getByText('Players never see these. Running combat is unaffected.')
+    ).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Earlier versions' }));
+    expect(
+      await screen.findByText(`Version ${CLOUD_SERVER_VERSION} ·`, {
+        exact: false,
+      })
+    ).toBeVisible();
+
+    const downloads: string[] = [];
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:combat-log-version');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement
+    ) {
+      downloads.push(this.download);
+    });
+    fireEvent.click(
+      screen.getAllByRole('button', { name: 'Download this version' })[0]
+    );
+    await waitFor(() =>
+      expect(downloads).toContain(
+        `combat-log-arc-1-v${CLOUD_SERVER_VERSION}.json`
+      )
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Compare the two most recent' })
+    );
+    await screen.findByText('These two versions are exactly the same.');
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Stop backing up' }));
+    await screen.findByText(
+      'Backup is off and everything was kept. Reload the page to keep working on this device.'
+    );
+    expect(requests.map(request => request.action)).toContain('rollback');
+  });
+
+  it('disarms autosave when this account is removed from the device', async () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    await seedCloudAuthority(archivePayload());
+    mockOwnerWorkspace();
+    mockOwnerSession();
+    fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (_input, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        requests.push(body);
+        if (body.action === 'remove-device') return respond({});
+        throw new Error(`unexpected action ${String(body.action)}`);
+      });
+    localStorage.setItem(
+      `rollkeeper:combat-log-archive-device:${ACCOUNT_ID}:${CAMPAIGN_ID}`,
+      'device-a'
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderControls();
+    await screen.findByText('Your combat logs are loaded from this device.');
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: "Remove this account's data from this device",
+      })
+    );
+    await screen.findByText(
+      'Removed from this device. Your account keeps everything.'
+    );
+
+    // The campaign's archives were hidden, so a commit now would delete every
+    // document this account holds.
+    commitSpy = vi.spyOn(
+      IndexedDbCombatLogArchiveRepository.prototype,
+      'commit'
+    );
+    // Two edits, because the first pass after a cleared baseline only reseeds
+    // `lastFingerprints`: it is the second that would commit if the family were
+    // still armed.
+    for (const encounterId of ['enc-late-a', 'enc-late-b']) {
+      await act(async () => {
+        useCombatLogStore.getState().startArchive(encounterId, campaign.code);
+        await new Promise(resolve => setTimeout(resolve, 25));
+      });
+    }
+
+    expect(commitSpy).not.toHaveBeenCalled();
+  });
+
+  it('turns on backup to the account from a device that is already local-only', async () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    const payload = archivePayload();
+    await seedIndexedDbGeneration(payload);
+    mockOwnerWorkspace();
+    mockOwnerSession();
+    seedArchives({ 'arc-1': endedArchive() });
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue(
+      'blob:combat-log-recovery'
+    );
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
+      () => undefined
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (_input, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        requests.push(body);
+        if (body.action === 'begin-staging') return respond({ runId: 'run-1' });
+        if (body.action === 'stage-items') return respond({});
+        if (body.action === 'confirm-cutover')
+          return respond({ epoch: CLOUD_EPOCH });
+        throw new Error(`unexpected action ${String(body.action)}`);
+      });
+
+    renderControls();
+    // Hydration already restored the workspace, so the picker is behind us.
+    await screen.findByText('Your combat logs are loaded from this device.');
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'See what will be backed up' })
+    );
+    await screen.findByText(/Here is what would be backed up/);
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Turn on backup to your account',
+      })
+    );
+
+    await screen.findByText(
+      'Saved on this device and backed up to your account.'
+    );
+    expect(requests.map(request => request.action)).toEqual([
+      'begin-staging',
+      'stage-items',
+      'confirm-cutover',
+    ]);
+    // The staged generation is exactly what the working copy holds.
+    expect(
+      (requests[1].items as { payloadFingerprint: string }[])[0]
+        .payloadFingerprint
+    ).toBe(await fingerprintCombatLogArchivePayload(payload));
   });
 });
 

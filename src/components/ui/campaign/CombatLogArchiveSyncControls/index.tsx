@@ -3,12 +3,15 @@
 import {
   Database,
   Download,
+  History,
+  RotateCcw,
   ScrollText,
   ShieldCheck,
   Upload,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import {
   Card,
   CardContent,
@@ -152,6 +155,29 @@ export function CombatLogArchiveSyncControls({
             >
               See what will be backed up
             </Button>
+            <Button
+              variant="outline"
+              onClick={sync.previewEnrollment}
+              loading={sync.busy}
+            >
+              Check this device
+            </Button>
+            {sync.enrollmentPreview?.authority === 'postgres' &&
+              sync.authority?.authority === 'localStorage' && (
+                <Button variant="warning" onClick={sync.enrollDevice}>
+                  Add this device to your account
+                </Button>
+              )}
+            {sync.enrollmentPreview?.authority === 'postgres' &&
+              sync.authority?.authority === 'postgres' && (
+                <Button
+                  variant="warning"
+                  onClick={sync.applyExactCloudVersion}
+                  loading={sync.busy}
+                >
+                  Use the copy from your account
+                </Button>
+              )}
             {sync.manifest && sync.recovery && (
               <Button
                 variant="warning"
@@ -206,8 +232,53 @@ export function CombatLogArchiveSyncControls({
                   Turn on for this device
                 </Button>
               )}
+            {sync.authority?.authority === 'indexedDB' && (
+              <Button
+                variant="primary"
+                onClick={sync.activateCloud}
+                loading={sync.busy}
+              >
+                Turn on backup to your account
+              </Button>
+            )}
+            {sync.authority?.authority === 'postgres' && (
+              <>
+                <Button
+                  variant="outline"
+                  leftIcon={<History size={16} />}
+                  onClick={sync.loadHistory}
+                >
+                  Earlier versions
+                </Button>
+                <Button
+                  variant="outline"
+                  leftIcon={<RotateCcw size={16} />}
+                  onClick={sync.rollback}
+                >
+                  Stop backing up
+                </Button>
+                <Button variant="danger" onClick={sync.removeAccountFromDevice}>
+                  Remove this account&apos;s data from this device
+                </Button>
+              </>
+            )}
           </div>
         )}
+        {sync.authority?.authority === 'postgres' &&
+          sync.archives.length > 0 && (
+            <SelectField
+              label="Combat log to show earlier versions for"
+              value={sync.historyLegacyId ?? undefined}
+              onValueChange={sync.setHistoryLegacyId}
+            >
+              {sync.archives.map(({ archiveId, archive }) => (
+                <SelectItem key={archiveId} value={archiveId}>
+                  {archive.encounterId} ·{' '}
+                  {archiveLabel(archive.startedAt, archive.endedAt)}
+                </SelectItem>
+              ))}
+            </SelectField>
+          )}
         {sync.manifest && (
           <div className="bg-surface-secondary rounded-lg p-3 text-sm">
             <p className="text-heading font-medium">
@@ -276,6 +347,60 @@ export function CombatLogArchiveSyncControls({
               </div>
             ))}
           </div>
+        )}
+        {sync.versions.length > 0 && (
+          <div className="space-y-2">
+            {sync.versions.length > 1 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={sync.compareLatestVersions}
+              >
+                Compare the two most recent
+              </Button>
+            )}
+            {sync.comparison && (
+              <p className="text-body text-sm">{sync.comparison}</p>
+            )}
+            {sync.versions.map(version => (
+              <div
+                className="border-divider flex items-center justify-between rounded-lg border p-2"
+                key={version.serverVersion}
+              >
+                <span className="text-body text-sm">
+                  Version {version.serverVersion} ·{' '}
+                  <span className="text-muted">
+                    {version.tombstoned
+                      ? 'deleted'
+                      : version.payloadFingerprint.slice(0, 10)}
+                  </span>
+                </span>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => sync.exportVersion(version.serverVersion)}
+                  >
+                    Download this version
+                  </Button>
+                  {version.serverVersion !== sync.versions[0].serverVersion && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => sync.restoreVersion(version.serverVersion)}
+                    >
+                      Restore this version
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {sync.authority?.authority === 'postgres' && (
+          <p role="status" className="text-muted text-sm">
+            Players never see these. Running combat is unaffected.
+          </p>
         )}
         {sync.status && (
           <p role="status" className="text-body text-sm">

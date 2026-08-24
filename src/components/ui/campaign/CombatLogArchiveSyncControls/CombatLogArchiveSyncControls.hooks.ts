@@ -14,6 +14,7 @@ import {
   type CombatLogArchiveManifest,
   type CombatLogArchivePayload,
 } from '@/lib/durableDm/combatLogArchiveFamily';
+import { combatLogArchiveApi } from '@/lib/durableDm/combatLogArchiveApi';
 import { CombatLogArchiveHttpGateway } from '@/lib/durableDm/combatLogArchiveHttpGateway';
 import { CombatLogArchiveSyncService } from '@/lib/durableDm/combatLogArchiveSyncService';
 import { isCombatLogArchiveClientVisible } from '@/lib/durableDm/slice11fFlags';
@@ -29,7 +30,10 @@ import {
 } from '@/lib/deviceRecovery';
 import {
   commitCombatLogArchiveLocalCutover,
+  enrollCombatLogArchiveCloudDevice,
+  markCombatLogArchiveCloudAuthority,
   readCombatLogArchiveAuthority,
+  rollbackCombatLogArchiveLocalAuthority,
   type CombatLogArchiveAuthority,
 } from '@/lib/indexeddb/combatLogArchiveAuthority';
 import { runCombatLogArchiveIndexedDbMigration } from '@/lib/indexeddb/combatLogArchiveMigration';
@@ -59,6 +63,40 @@ interface StoreDocument {
   legacyId: string;
   payload: CombatLogArchivePayload | null;
   tombstoned: boolean;
+}
+
+interface VersionMetadata {
+  serverVersion: number;
+  cutoverEpoch: number;
+  schemaVersion: number;
+  payloadFingerprint: string;
+  tombstoned: boolean;
+  acceptedAt: string;
+}
+
+interface VersionExport {
+  serverVersion: number;
+  schemaVersion: number;
+  payloadFingerprint: string;
+  tombstoned: boolean;
+  payload: CombatLogArchivePayload | null;
+}
+
+interface EnrollmentDocument {
+  legacyId: string;
+  serverVersion: number;
+  schemaVersion: number;
+  payloadFingerprint: string;
+  tombstoned: boolean;
+  payload: CombatLogArchivePayload | null;
+}
+
+interface EnrollmentPreview {
+  authority: 'legacy' | 'postgres';
+  epoch?: number;
+  previewFingerprint?: string;
+  recordCount?: number;
+  documents?: EnrollmentDocument[];
 }
 
 /** One campaign-scoped archive, paired with its stable `archiveId` identity. */
@@ -185,6 +223,28 @@ function recoveryFailureMessage(cause: unknown) {
 
 function currentRawEnvelope() {
   return localStorage.getItem(COMBAT_LOG_STORAGE_KEY) ?? '';
+}
+
+/** One enrolled device identity per account and campaign, kept for removal. */
+function deviceKeyFor(accountId: string, campaignId: string) {
+  return `rollkeeper:combat-log-archive-device:${accountId}:${campaignId}`;
+}
+
+function combatLogCount(count: number) {
+  return count === 1 ? '1 combat log' : `${count} combat logs`;
+}
+
+function downloadJson(filename: string, value: unknown) {
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' })
+  );
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function isCampaignTombstone(
@@ -341,6 +401,13 @@ export function useCombatLogArchiveSyncController(
   const [authority, setAuthority] = useState<CombatLogArchiveAuthority | null>(
     null
   );
+  const [historyLegacyId, setHistoryLegacyId] = useState<string | null>(
+    archives[0]?.archiveId ?? null
+  );
+  const [versions, setVersions] = useState<VersionMetadata[]>([]);
+  const [comparison, setComparison] = useState<string | null>(null);
+  const [enrollmentPreview, setEnrollmentPreview] =
+    useState<EnrollmentPreview | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -356,6 +423,10 @@ export function useCombatLogArchiveSyncController(
   // Autosave runs are serialized: two overlapping runs could interleave their
   // acknowledgements and rewind a document fingerprint to an older value.
   const autosaveChain = useRef<Promise<void>>(Promise.resolve());
+  // Rollback is retried with the same mutation id so a repeated attempt after a
+  // network failure replays the server's receipt instead of moving the epoch a
+  // second time.
+  const rollbackMutationId = useRef<string | null>(null);
   const recoveryInput = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -528,6 +599,17 @@ export function useCombatLogArchiveSyncController(
     },
     [context]
   );
+
+  // Keeps the "earlier versions" selection pointing at an archive that still
+  // exists, so a deleted or hydrated-away archive cannot leave history stuck on
+  // a legacy id this campaign no longer holds.
+  useEffect(() => {
+    setHistoryLegacyId(current =>
+      current && archives.some(entry => entry.archiveId === current)
+        ? current
+        : (archives[0]?.archiveId ?? null)
+    );
+  }, [archives]);
 
   useEffect(() => {
     // The default-off guarantee is also enforced by
@@ -987,6 +1069,722 @@ export function useCombatLogArchiveSyncController(
     }
   };
 
+  const activateCloud = async () => {
+    if (!campaignCode) return;
+    if (
+      !context ||
+      !workspace?.cloudId ||
+      !manifest ||
+      !recovery ||
+      authority?.authority !== 'indexedDB'
+    )
+      return;
+    if (
+      !window.confirm('Turn on backup to your account for these combat logs?')
+    )
+      return;
+    const namespace = `user:${context.accountId}` as const;
+    const campaignId = workspace.cloudId;
+    setBusy(true);
+    try {
+      const assertWorkingCopyUnchanged = async () => {
+        const database = await openRollkeeperDatabase();
+        try {
+          const documents = await new IndexedDbCombatLogArchiveRepository(
+            database
+          ).listDocuments(namespace, campaignId);
+          const actual = new Map(
+            documents.map(document => [
+              document.legacyId,
+              document.contentFingerprint,
+            ])
+          );
+          const changed =
+            actual.size !== manifest.records.length ||
+            manifest.records.some(
+              record =>
+                actual.get(record.legacyId) !== record.payloadFingerprint
+            );
+          if (changed)
+            throw new Error(
+              'Your combat logs changed since the last check. Choose "See what will be backed up" again.'
+            );
+        } finally {
+          database.close();
+        }
+      };
+      await assertWorkingCopyUnchanged();
+      const deviceKey = deviceKeyFor(context.accountId, campaignId);
+      let deviceId = localStorage.getItem(deviceKey);
+      if (!deviceId) {
+        deviceId = crypto.randomUUID();
+        localStorage.setItem(deviceKey, deviceId);
+      }
+      const begun = await combatLogArchiveApi<{ runId: string }>({
+        action: 'begin-staging',
+        mutationId: crypto.randomUUID(),
+        campaignId,
+        deviceId,
+        expectedEpoch: Math.max(0, authority.epoch - 1),
+        manifestFingerprint: manifest.fingerprint,
+        recoveryManifestHash: recovery.manifestHash,
+        recoveryReceiptHash: recovery.manifestHash,
+        recordCount: manifest.recordCount,
+        totalBytes: manifest.totalBytes,
+      });
+      await combatLogArchiveApi({
+        action: 'stage-items',
+        mutationId: crypto.randomUUID(),
+        runId: begun.runId,
+        items: manifest.records.map(record => ({
+          legacyId: record.legacyId,
+          schemaVersion: record.schemaVersion,
+          payload: record.payload,
+          payloadFingerprint: record.payloadFingerprint,
+          tombstoned: record.tombstoned,
+        })),
+      });
+      // Re-checked after staging: the DM may have logged another turn while the
+      // upload was in flight, and only an unchanged working copy may be cut over.
+      await assertWorkingCopyUnchanged();
+      const activated = await combatLogArchiveApi<{ epoch: number }>({
+        action: 'confirm-cutover',
+        mutationId: crypto.randomUUID(),
+        runId: begun.runId,
+        manifestFingerprint: manifest.fingerprint,
+        expectedEpoch: Math.max(0, authority.epoch - 1),
+      });
+      const database = await openRollkeeperDatabase();
+      try {
+        const next = await markCombatLogArchiveCloudAuthority(database, {
+          namespace,
+          campaignId,
+          expectedLocalEpoch: authority.epoch,
+          cloudEpoch: activated.epoch,
+          now: () => new Date().toISOString(),
+          acceptedVersions: manifest.records.map(record => ({
+            legacyId: record.legacyId,
+            serverVersion: 1,
+            payloadFingerprint: record.payloadFingerprint,
+          })),
+        });
+        setAuthority(next);
+        // The store already holds exactly this generation — cloud activation
+        // uploads the working copy rather than replacing it — so the signature
+        // moves with the authority and `hydrated` is deliberately untouched.
+        hydrationSignature.current = authorityGeneration(
+          context.accountId,
+          campaignId,
+          next
+        );
+        writeCombatLogArchiveAuthorityMarker(localStorage, {
+          version: 1,
+          campaignCode,
+          authority: 'postgres',
+          epoch: next.epoch,
+          accountId: context.accountId,
+          campaignId,
+        });
+      } finally {
+        database.close();
+      }
+      setStatus('Saved on this device and backed up to your account.');
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Couldn't turn on backup."
+      );
+      setStatus(
+        'Saved on this device. Backup was not turned on, so nothing changed in your account.'
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const previewEnrollment = async () => {
+    if (!campaignCode) return;
+    if (!workspace?.cloudId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await combatLogArchiveApi<EnrollmentPreview>({
+        action: 'preview-enrollment',
+        campaignId: workspace.cloudId,
+      });
+      setEnrollmentPreview(next);
+      setStatus(
+        next.authority === 'postgres'
+          ? 'Found a backup in your account. This device has not been added yet.'
+          : 'Nothing is backed up in your account for this campaign yet.'
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Couldn't check your account."
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const enrollDevice = async () => {
+    if (!campaignCode) return;
+    if (
+      !context ||
+      !workspace?.cloudId ||
+      enrollmentPreview?.authority !== 'postgres' ||
+      !enrollmentPreview.previewFingerprint ||
+      !enrollmentPreview.documents ||
+      enrollmentPreview.epoch === undefined
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    try {
+      const local = await buildCombatLogArchiveManifest({
+        campaignCode,
+        rawEnvelope: currentRawEnvelope(),
+      });
+      if (
+        !window.confirm(
+          `Add this device to your account's backup? What is on this device is kept and is never uploaded on its own. Reference: ${enrollmentPreview.previewFingerprint.slice(0, 12)}`
+        )
+      )
+        return;
+      const namespace = `user:${context.accountId}` as const;
+      const campaignId = workspace.cloudId;
+      const deviceKey = deviceKeyFor(context.accountId, campaignId);
+      const deviceId = localStorage.getItem(deviceKey) ?? crypto.randomUUID();
+      localStorage.setItem(deviceKey, deviceId);
+      await combatLogArchiveApi({
+        action: 'enroll-device',
+        mutationId: crypto.randomUUID(),
+        campaignId,
+        deviceId,
+        expectedEpoch: enrollmentPreview.epoch,
+        previewFingerprint: enrollmentPreview.previewFingerprint,
+        legacyCandidateFingerprint: local.rawCandidates[0]?.fingerprint ?? null,
+      });
+      const database = await openRollkeeperDatabase();
+      try {
+        const next = await enrollCombatLogArchiveCloudDevice(database, {
+          namespace,
+          campaignId,
+          campaignCode,
+          deviceId,
+          epoch: enrollmentPreview.epoch,
+          confirmed: true,
+          previewFingerprint: enrollmentPreview.previewFingerprint,
+          documents: enrollmentPreview.documents.map(document => ({
+            legacyId: document.legacyId,
+            payload: document.payload ?? null,
+            payloadFingerprint: document.payloadFingerprint,
+            tombstoned: document.tombstoned === true,
+            schemaVersion: document.schemaVersion,
+            serverVersion: document.serverVersion,
+          })),
+          localCandidate: local.rawCandidates[0]
+            ? {
+                rawValue: local.rawCandidates[0].rawValue,
+                fingerprint: local.rawCandidates[0].fingerprint,
+              }
+            : null,
+          preserveDivergentCandidate: true,
+          now: () => new Date().toISOString(),
+        });
+        setAuthority(next);
+        // Belt-and-braces: `enrollCombatLogArchiveCloudDevice` refuses to run
+        // unless this device is still on localStorage authority, and no arming
+        // path can coexist with that, so `hydrated` is already false here. The
+        // line matches the reference and states the invariant the enrollment
+        // confirm promises — the local candidate is never uploaded on its own,
+        // and the DM must apply the account's copy first.
+        setHydrated(false);
+        hydrationSignature.current = authorityGeneration(
+          context.accountId,
+          campaignId,
+          next
+        );
+        await context.remember(workspace);
+        writeCombatLogArchiveAuthorityMarker(localStorage, {
+          version: 1,
+          campaignCode,
+          authority: 'postgres',
+          epoch: next.epoch,
+          accountId: context.accountId,
+          campaignId,
+        });
+        setStatus(
+          'This device was added to your account. Choose "Use the copy from your account" when you are ready.'
+        );
+      } finally {
+        database.close();
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Couldn't add this device."
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const applyExactCloudVersion = async () => {
+    // Step 5 audit — every early exit on this hydrating path, and whether it
+    // can leave the store showing something other than what IndexedDB holds:
+    //  1. no campaign code           → nothing read or written; store untouched.
+    //  2. missing context/workspace/
+    //     authority/preview          → nothing read or written; store untouched.
+    //  3. epoch moved on             → nothing written; the DM is sent back to
+    //                                  "Check this device". Store untouched.
+    //  4. confirm declined           → nothing written; store untouched.
+    //  5. `continue` in the loop      → NOT a return. See the comment there.
+    //  6. throw → catch               → IndexedDB may hold part of the accepted
+    //                                  generation while the store still shows
+    //                                  the local candidate. Arming here would
+    //                                  upload that candidate over the account's
+    //                                  copy, so it stays disarmed; the recovery
+    //                                  is to press the button again, or reload,
+    //                                  where hydrate() rebuilds the store from
+    //                                  IndexedDB and arms.
+    // Nothing separates the store write from `setHydrated(true)` below, so
+    // there is no window in which the store is hydrated and autosave is not.
+    if (!campaignCode) return;
+    if (
+      !context ||
+      !workspace?.cloudId ||
+      authority?.authority !== 'postgres' ||
+      enrollmentPreview?.authority !== 'postgres' ||
+      !enrollmentPreview.documents ||
+      enrollmentPreview.epoch === undefined
+    )
+      return;
+    if (enrollmentPreview.epoch !== authority.epoch) {
+      setError(
+        'Your account has a newer copy. Choose "Check this device" again.'
+      );
+      return;
+    }
+    const documents = enrollmentPreview.documents;
+    const cutoverEpoch = enrollmentPreview.epoch;
+    if (
+      !window.confirm(
+        `Load ${combatLogCount(documents.length)} from your account onto this device? Work on this device that has not been backed up will stop this.`
+      )
+    )
+      return;
+    const namespace = `user:${context.accountId}` as const;
+    const campaignId = workspace.cloudId;
+    setBusy(true);
+    setError(null);
+    const database = await openRollkeeperDatabase();
+    try {
+      const repository = new IndexedDbCombatLogArchiveRepository(database);
+      const acceptedAt = new Date().toISOString();
+      for (const document of documents) {
+        const current = await repository.getDocument(
+          namespace,
+          document.legacyId
+        );
+        if (
+          current?.baseServerVersion === document.serverVersion &&
+          current.contentFingerprint === document.payloadFingerprint
+        ) {
+          // Skip the redundant write, never the hydration below. A
+          // function-level return here is the PR #267 Critical:
+          // `enrollCombatLogArchiveCloudDevice` writes every document with
+          // exactly this preview's serverVersion and payloadFingerprint, so
+          // this condition is unconditionally true immediately after
+          // enrollment — the DM would see a success status while `hydrated`
+          // stayed false, the store kept showing the local candidate, and the
+          // legacy key stayed frozen with every later edit written nowhere.
+          continue;
+        }
+        await repository.applyAcceptedCloudVersion({
+          namespace,
+          campaignId,
+          legacyId: document.legacyId,
+          cutoverEpoch,
+          serverVersion: document.serverVersion,
+          schemaVersion: document.schemaVersion,
+          payload: document.payload ?? null,
+          payloadFingerprint: document.payloadFingerprint,
+          tombstoned: document.tombstoned === true,
+          acceptedAt,
+        });
+      }
+      await context.remember(workspace);
+      applyCombatLogArchiveDocuments(campaignCode, documents);
+      lastFingerprints.current = new Map(
+        documents
+          .filter(document => !document.tombstoned)
+          .map(document => [document.legacyId, document.payloadFingerprint])
+      );
+      // The store now matches the enrolled generation, so autosave is armed.
+      // `hydrationSignature` is deliberately not written: this path does not
+      // consume a local generation, and claiming one would suppress the next
+      // genuine hydration.
+      setHydrated(true);
+      setStatus(
+        `Loaded ${combatLogCount(documents.length)} from your account.`
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't load from your account."
+      );
+    } finally {
+      database.close();
+      setBusy(false);
+    }
+  };
+
+  const loadHistory = async () => {
+    if (!campaignCode) return;
+    if (!workspace?.cloudId || !historyLegacyId) return;
+    setError(null);
+    try {
+      const result = await combatLogArchiveApi<{ versions: VersionMetadata[] }>(
+        {
+          action: 'history',
+          campaignId: workspace.cloudId,
+          legacyId: historyLegacyId,
+        }
+      );
+      setVersions(result.versions);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't load earlier versions."
+      );
+    }
+  };
+
+  const exportVersion = async (serverVersion: number) => {
+    if (!campaignCode) return;
+    if (!workspace?.cloudId || !historyLegacyId) return;
+    setError(null);
+    try {
+      const value = await combatLogArchiveApi({
+        action: 'export-version',
+        campaignId: workspace.cloudId,
+        legacyId: historyLegacyId,
+        serverVersion,
+      });
+      downloadJson(
+        `combat-log-${historyLegacyId}-v${serverVersion}.json`,
+        value
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't download that version."
+      );
+    }
+  };
+
+  const compareLatestVersions = async () => {
+    if (!campaignCode) return;
+    if (!workspace?.cloudId || !historyLegacyId || versions.length < 2) return;
+    setError(null);
+    try {
+      const result = await combatLogArchiveApi<{ identical: boolean }>({
+        action: 'compare-versions',
+        campaignId: workspace.cloudId,
+        legacyId: historyLegacyId,
+        leftVersion: versions[1].serverVersion,
+        rightVersion: versions[0].serverVersion,
+      });
+      setComparison(
+        result.identical
+          ? 'These two versions are exactly the same.'
+          : 'These two versions are different. Download each one to see what changed.'
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't compare those versions."
+      );
+    }
+  };
+
+  const restoreVersion = async (sourceVersion: number) => {
+    // Step 5 audit — every early exit on this hydrating path:
+    //  1. no campaign code            → nothing read or written.
+    //  2. missing context/workspace/
+    //     history id/authority/
+    //     versions                    → nothing read or written.
+    //  3. confirm declined            → nothing written.
+    //  4. throw → catch                → the restored version may already be in
+    //                                   IndexedDB while the store still shows
+    //                                   the previous content. Arming would push
+    //                                   that stale content back over the version
+    //                                   just restored, so it stays disarmed; a
+    //                                   retry or a reload re-hydrates and arms.
+    // The store write, the baseline reset, and `setHydrated(true)` are adjacent
+    // and synchronous, so no exit sits between them.
+    if (!campaignCode) return;
+    if (
+      !context ||
+      !workspace?.cloudId ||
+      !historyLegacyId ||
+      authority?.authority !== 'postgres' ||
+      versions.length === 0
+    )
+      return;
+    if (
+      !window.confirm(
+        `Restore version ${sourceVersion}? It is added as a new version, and every earlier version is kept.`
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    try {
+      const namespace = `user:${context.accountId}` as const;
+      const campaignId = workspace.cloudId;
+      const restored = await combatLogArchiveApi<{
+        serverVersion: number;
+        cutoverEpoch: number;
+        payloadFingerprint: string;
+      }>({
+        action: 'restore-version',
+        mutationId: crypto.randomUUID(),
+        campaignId,
+        expectedEpoch: authority.epoch,
+        legacyId: historyLegacyId,
+        sourceVersion,
+        expectedServerVersion: versions[0].serverVersion,
+      });
+      const exact = await combatLogArchiveApi<VersionExport>({
+        action: 'export-version',
+        campaignId,
+        legacyId: historyLegacyId,
+        serverVersion: restored.serverVersion,
+      });
+      const database = await openRollkeeperDatabase();
+      try {
+        const repository = new IndexedDbCombatLogArchiveRepository(database);
+        await repository.applyAcceptedCloudVersion({
+          namespace,
+          campaignId,
+          legacyId: historyLegacyId,
+          cutoverEpoch: restored.cutoverEpoch,
+          serverVersion: exact.serverVersion,
+          schemaVersion: exact.schemaVersion,
+          payload: exact.payload,
+          payloadFingerprint: exact.payloadFingerprint,
+          tombstoned: exact.tombstoned,
+          acceptedAt: new Date().toISOString(),
+        });
+        const documents = await repository.listDocuments(namespace, campaignId);
+        applyCombatLogArchiveDocuments(
+          campaignCode,
+          storeDocumentsFromLocal(documents)
+        );
+        lastFingerprints.current = new Map(
+          documents
+            .filter(document => document.operation !== 'delete')
+            .map(document => [document.legacyId, document.contentFingerprint])
+        );
+        // A restore rewrites the store from IndexedDB, so like hydrate,
+        // activateLocal and applyExactCloudVersion it must arm autosave: on an
+        // enrolled-but-unapplied device the legacy key is frozen, so a disarmed
+        // edit would live only in memory and vanish on reload.
+        setHydrated(true);
+      } finally {
+        database.close();
+      }
+      setStatus(
+        `Restored. Saved to your account as version ${restored.serverVersion}.`
+      );
+      await loadHistory();
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't restore that version."
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rollback = async () => {
+    if (!campaignCode) return;
+    if (!context || !workspace?.cloudId || authority?.authority !== 'postgres')
+      return;
+    if (
+      !window.confirm(
+        'Stop backing these combat logs up to your account? Everything already backed up is kept.'
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    try {
+      const namespace = `user:${context.accountId}` as const;
+      const campaignId = workspace.cloudId;
+      const current = await combatLogArchiveApi<EnrollmentPreview>({
+        action: 'preview-enrollment',
+        campaignId,
+      });
+      if (
+        current.authority !== 'postgres' ||
+        !current.previewFingerprint ||
+        !current.documents ||
+        current.recordCount === undefined
+      )
+        throw new Error("Couldn't read the copy in your account. Try again.");
+      rollbackMutationId.current ??= crypto.randomUUID();
+      const result = await combatLogArchiveApi<{
+        epoch: number;
+        currentGeneration: EnrollmentPreview;
+      }>({
+        action: 'rollback',
+        mutationId: rollbackMutationId.current,
+        campaignId,
+        expectedEpoch: authority.epoch,
+        previewFingerprint: current.previewFingerprint,
+        currentGeneration: {
+          recordCount: current.recordCount,
+          documents: current.documents.map(document => ({
+            legacyId: document.legacyId,
+            serverVersion: document.serverVersion,
+            schemaVersion: document.schemaVersion,
+            payloadFingerprint: document.payloadFingerprint,
+            tombstoned: document.tombstoned,
+          })),
+        },
+      });
+      const database = await openRollkeeperDatabase();
+      try {
+        const local = await rollbackCombatLogArchiveLocalAuthority(database, {
+          namespace,
+          campaignId,
+          expectedEpoch: authority.epoch,
+          generation: authority.generation,
+          confirmed: true,
+          currentGenerationVerified: true,
+          now: () => new Date().toISOString(),
+        });
+        setAuthority(local);
+      } finally {
+        database.close();
+      }
+      writeCombatLogArchiveAuthorityMarker(localStorage, {
+        version: 1,
+        campaignCode,
+        // Ruling 3: this family's marker has no `legacy_restored` value —
+        // rollback restores the legacy key, which is `localStorage` authority.
+        authority: 'localStorage',
+        epoch: result.epoch,
+        accountId: context.accountId,
+        campaignId,
+      });
+      applyCombatLogArchiveDocuments(
+        campaignCode,
+        result.currentGeneration.documents ?? []
+      );
+      // The legacy key is authoritative again but this mount has not re-read
+      // it, so nothing may be committed until the page is reloaded.
+      setHydrated(false);
+      hydrationSignature.current = null;
+      rollbackMutationId.current = null;
+      setStatus(
+        'Backup is off and everything was kept. Reload the page to keep working on this device.'
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Couldn't stop the backup."
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeAccountFromDevice = async () => {
+    if (!campaignCode) return;
+    if (
+      !context ||
+      !workspace?.cloudId ||
+      !authority ||
+      authority.authority === 'localStorage'
+    )
+      return;
+    if (
+      !window.confirm(
+        `Remove ${context.accountLabel}'s combat logs from this device? Your account keeps everything.`
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    try {
+      const namespace = `user:${context.accountId}` as const;
+      const database = await openRollkeeperDatabase();
+      try {
+        const repository = new IndexedDbCombatLogArchiveRepository(database);
+        const unresolved = (
+          await repository.listOutbox(namespace, workspace.cloudId)
+        ).some(
+          entry =>
+            entry.state !== 'acknowledged' && entry.state !== 'superseded'
+        );
+        const lossConfirmed =
+          !unresolved ||
+          window.confirm(
+            'Some changes on this device have not been backed up yet and will be lost. Continue?'
+          );
+        if (!lossConfirmed) return;
+        if (authority.authority === 'postgres') {
+          const deviceId = localStorage.getItem(
+            deviceKeyFor(context.accountId, workspace.cloudId)
+          );
+          if (!deviceId)
+            throw new Error(
+              'The exact enrolled device identity is unavailable.'
+            );
+          await combatLogArchiveApi({
+            action: 'remove-device',
+            mutationId: crypto.randomUUID(),
+            campaignId: workspace.cloudId,
+            deviceId,
+            expectedEpoch: authority.epoch,
+          });
+        }
+        await repository.removeAccountFromDevice(namespace, {
+          confirmed: true,
+          lossConfirmed,
+        });
+        hideCombatLogArchives(campaignCode);
+        lastFingerprints.current = null;
+        hydrationSignature.current = null;
+        setScope(null);
+        setAuthority(null);
+        // This campaign's archives were just removed by hideCombatLogArchives;
+        // an armed autosave would read that emptiness as a deletion and destroy
+        // every document the account still holds. `setScope(null)` alone would
+        // disarm the gate, so the three lines are one disarm rather than three.
+        setHydrated(false);
+        setStatus('Removed from this device. Your account keeps everything.');
+      } finally {
+        database.close();
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Couldn't remove this account's data."
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const deleteArchive = (archiveId: string) => {
     if (!campaignCode) return;
     if (
@@ -1005,23 +1803,38 @@ export function useCombatLogArchiveSyncController(
     busy,
     archivesSelected,
     campaignCode,
+    comparison,
     context,
+    enrollmentPreview,
     error,
+    historyLegacyId,
     manifest,
     preparedGeneration,
     recovery,
     recoveryInput,
     recoveryVerified,
     status,
+    versions,
     workspace,
     workspaces,
+    activateCloud,
     activateLocal,
+    applyExactCloudVersion,
     choose,
+    compareLatestVersions,
     deleteArchive,
     discover,
     downloadRecovery,
+    enrollDevice,
+    exportVersion,
+    loadHistory,
     prepare,
     preview,
+    previewEnrollment,
+    removeAccountFromDevice,
+    restoreVersion,
+    rollback,
+    setHistoryLegacyId,
     verifyRecoveryAndSelect,
   };
 }
