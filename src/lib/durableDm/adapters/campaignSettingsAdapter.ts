@@ -35,8 +35,11 @@ import { IndexedDbDmWorkspaceRepository } from '@/lib/indexeddb/dmWorkspaceRepos
 // the lib layer. No server importer exists today, but Task 13's adapter
 // registry is exactly the kind of module a server component could import,
 // so a static import would become a live SSR hazard the moment that
-// happens. Only the TYPE is imported statically — types erase at build
-// time and carry no runtime module graph.
+// happens. NOTHING is imported statically from `@/store/dmStore` — not
+// even a type (fix round 3, item 6a corrects the previous, inaccurate
+// claim that a type was). `CampaignInfo` below is a SEPARATE, unrelated
+// static import from `@/types/campaign`, used only to cast
+// `dmDashboardUi`'s shape in `rollback`'s restore.
 import type { CampaignInfo } from '@/types/campaign';
 import type { Json } from '@/types/database.generated';
 
@@ -270,39 +273,21 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
           campaignId: context.campaignId,
           generation: input.generation,
           confirmed: true,
-          // Fix round 2, item 7: every gate below is attested `true` with an
-          // explicit owner, never a bare attestation with nothing behind it.
-          //   - sourceManifestUnchanged: checked immediately above, in this
-          //     method (fix round 1, item 5).
-          //   - recoveryReceipt: verified by `prepareIndexedDb`'s
-          //     `recoveryGate.hasDownloadReceipt` check inside
-          //     `runCampaignSettingsIndexedDbMigration` — the generation
-          //     cannot reach `CUTOVER_READY` without it.
-          //   - captureVerifiedAfterReopen: `migrationEngine.ts`'s cutover
-          //     path independently reopens a fresh database connection and
-          //     re-verifies the persisted capture (`verifyPersistedCapture`,
-          //     called twice) before checkpointing to `CUTOVER_READY`.
-          //   - noConflicts / noQuarantine / parity: `migrationEngine.ts`'s
-          //     `shadowGate` returns `SHADOWING`, not `CUTOVER_READY`, while
-          //     `quarantineCount > 0` or `!gate.parity` — the generation
-          //     this method receives could not have reached `CUTOVER_READY`
-          //     with any of these violated.
-          //   - journalEmpty: doubly enforced — `shadowGate` above, AND
-          //     `commitCampaignSettingsLocalCutover` itself (the call below)
-          //     independently re-reads the `journal` store for this
-          //     `namespace`/`generation`/family and throws if it is not
-          //     empty, so this is re-checked at commit time, not only
-          //     attested.
-          //   - manifestConfirmed: the ONE gate with no library-level
-          //     enforcement today. It records that the DM has explicitly
-          //     confirmed the exact manifest fingerprint about to be cut
-          //     over. Spec R12 puts that confirmation in the WIZARD (the
-          //     typed-phrase dialog `confirmation()` on this adapter
-          //     supplies the copy for) — this adapter TRUSTS that its
-          //     caller invokes `commitLocalCutover` only after the DM has
-          //     confirmed. No adapter-level check exists because the
-          //     adapter has no UI layer to have obtained that confirmation
-          //     from; Task 14's wizard is the owner of this gate.
+          // Fix round 2, item 7 / fix round 3, items 2-3: every gate below
+          // is attested `true` with an explicit, VERIFIED owner — never a
+          // bare attestation, and never a fictitious one. This table is the
+          // one in the fix-round reports, kept here so a reader of the code
+          // finds it without leaving the file:
+          //
+          // | Gate                        | Owner |
+          // |------------------------------|-------|
+          // | sourceManifestUnchanged      | Checked immediately above, in this method (fix round 1, item 5) |
+          // | recoveryReceipt              | `prepareIndexedDb`'s `recoveryGate.hasDownloadReceipt` check inside `runCampaignSettingsIndexedDbMigration` — the generation cannot reach `CUTOVER_READY` without it |
+          // | captureVerifiedAfterReopen   | `migrationEngine.ts`'s cutover path reopens a fresh database connection and re-verifies the persisted capture (`verifyPersistedCapture`, called twice) before checkpointing to `CUTOVER_READY` |
+          // | noQuarantine, parity         | `migrationEngine.ts`'s `shadowGate` returns `SHADOWING`, not `CUTOVER_READY`, while `quarantineCount > 0` or `!gate.parity` — this method could not have received a `CUTOVER_READY` generation with either violated |
+          // | noConflicts                  | NO independent owner exists (fix round 3, item 2 — corrects fix round 2's fictitious claim that `shadowGate` covers it: `shadowGate` returns only `{parity, journalEmpty}`, `migrationEngine.ts:288`, with no conflict field at all). Folded honestly into `noQuarantine`'s reasoning: `campaign_settings` is a single-record family whose only "conflict" concept is the blocked-candidate path (`manifest.blockers.length > 0`), which is the SAME quarantine/blocker mechanism `noQuarantine` already covers — there is no SEPARATE conflict detector this gate could name |
+          // | journalEmpty                 | Doubly enforced — `shadowGate` above, AND `commitCampaignSettingsLocalCutover` itself (the call below) independently re-reads the `journal` store for this `namespace`/`generation`/family and throws if it is not empty, so this is re-checked at commit time, not only attested |
+          // | manifestConfirmed            | The ONE gate with no library-level enforcement today. It records that the DM has explicitly confirmed the exact manifest fingerprint about to be cut over. Spec R12 puts that confirmation in the WIZARD (the typed-phrase dialog `confirmation()` on this adapter supplies the copy for) — this adapter TRUSTS that its caller invokes `commitLocalCutover` only after the DM has confirmed. No adapter-level check exists because the adapter has no UI layer to have obtained that confirmation from; Task 14's wizard is the owner of this gate |
           gates: {
             recoveryReceipt: true,
             sourceManifestUnchanged: true,
@@ -497,8 +482,20 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
           now: () => new Date().toISOString(),
           // Singular: campaign_settings is a single-record family and its
           // option is `acceptedVersion?`, not the `acceptedVersions` array the
-          // multi-record families take.
-          acceptedVersion: result.acceptedVersions[0],
+          // multi-record families take. Built as a minimal literal — three
+          // fields, matching the card's own `activateCloud` exactly (fix
+          // round 3, item 1) — rather than passing `result.acceptedVersions[0]`
+          // through whole: that value is typed with an extra `schemaVersion`
+          // field `markCampaignSettingsCloudAuthority`'s own option type does
+          // not declare, which TypeScript's structural typing lets through
+          // silently on a non-literal assignment (no excess-property check
+          // fires), but the step-parity test caught the resulting byte-level
+          // mismatch against the card's minimal object.
+          acceptedVersion: {
+            legacyId: result.acceptedVersions[0].legacyId,
+            serverVersion: result.acceptedVersions[0].serverVersion,
+            payloadFingerprint: result.acceptedVersions[0].payloadFingerprint,
+          },
         });
         writeCampaignSettingsProjectionAuthority(
           localStorage,

@@ -3,7 +3,10 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { campaignSettingsAdapter } from '../campaignSettingsAdapter';
-import { describeAdapterConformance } from './adapterConformance';
+import {
+  describeAdapterConformance,
+  describeCardParity,
+} from './adapterConformance';
 import { createCampaignSettingsHarness } from './harnesses/campaignSettings';
 
 describe('campaignSettingsAdapter', () => {
@@ -23,6 +26,8 @@ describe('campaignSettingsAdapter', () => {
     'campaign_settings',
     createCampaignSettingsHarness
   );
+
+  describeCardParity('campaign_settings', createCampaignSettingsHarness);
 
   it('is invisible when its own client flag is off', () => {
     vi.stubEnv('NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE', 'false');

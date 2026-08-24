@@ -1,7 +1,9 @@
 import 'fake-indexeddb/auto';
 
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
 
+import { CampaignSettingsSyncControls } from '@/components/ui/campaign/CampaignSettingsSyncControls';
 import { browserRecoveryRepository } from '@/lib/browserRecoveryRepository';
 import { campaignSettingsAdapter } from '@/lib/durableDm/adapters/campaignSettingsAdapter';
 import type { MigrationRunContext } from '@/lib/durableDm/durableFamilyAdapter';
@@ -9,6 +11,8 @@ import * as campaignSettingsLegacyProjectionModule from '@/lib/durableDm/campaig
 import * as resumableCloudActivationModule from '@/lib/durableDm/resumableCloudActivation';
 import { captureDeviceBackup } from '@/lib/deviceRecovery';
 import * as campaignSettingsAuthorityModule from '@/lib/indexeddb/campaignSettingsAuthority';
+import * as browserDmWorkspaceModule from '@/lib/supabase/browserDmWorkspace';
+import * as supabaseBrowserModule from '@/lib/supabase/browser';
 import {
   IndexedDbCampaignSettingsRepository,
   type CampaignSettingsOutboxEntry,
@@ -24,7 +28,7 @@ import {
 } from '@/lib/indexeddb/localDatabase';
 import { useDmStore } from '@/store/dmStore';
 
-import type { ConformanceHarness } from '../adapterConformance';
+import type { CardParityHarness } from '../adapterConformance';
 
 const NOW = '2026-08-24T00:00:00.000Z';
 const ACCOUNT_ID = '11111111-1111-4111-8111-111111111111';
@@ -93,7 +97,7 @@ const ownerWorkspace: DmWorkspaceDocument = {
  * Ruling R3.1: extra members this family's own tests use, beyond the base
  * `ConformanceHarness` Task 7 declares.
  */
-export interface CampaignSettingsConformanceHarness extends ConformanceHarness {
+export interface CampaignSettingsConformanceHarness extends CardParityHarness {
   seedWithBlocker(): Promise<MigrationRunContext>;
   /** Fix round 1, item 2: forces the cloud `projection-status` response. */
   setProjectionStatus(status: string): void;
@@ -114,6 +118,14 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
   // Fix round 2, item 1(a): armed by `recordRollbackOrderInto`, not at
   // harness creation.
   let rollbackOrderSink: string[] | null = null;
+  // Fix round 3, item 1: last-call argument capture for the step-parity
+  // test, keyed by function name — both the card and the adapter funnel
+  // through these SAME module exports, so one spy layer sees both callers.
+  const libraryCalls: Record<string, unknown[]> = {};
+  // Fix round 3, item 1: every cloud request body, by action, including the
+  // read-only and rollback actions `requestBodies()` does not track.
+  const allRequestBodiesByAction: Record<string, Record<string, unknown>[]> =
+    {};
 
   // ---------------------------------------------------------------------
   // Fake `/api/campaign-settings` server. Mirrors the real RPC's
@@ -328,15 +340,20 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
         } as Response;
       }
 
+      const rest = Object.fromEntries(
+        Object.entries(body).filter(([field]) => field !== 'action')
+      );
+      // Fix round 3, item 1: EVERY action's body, for the step-parity test —
+      // `recorded` below stays scoped to the three staging actions the
+      // existing `requestBodies()` contract already promises.
+      (allRequestBodiesByAction[action] ??= []).push(rest);
+
       if (
         action === 'begin-staging' ||
         action === 'stage-items' ||
         action === 'confirm-cutover'
       ) {
         trace.push(action);
-        const rest = Object.fromEntries(
-          Object.entries(body).filter(([field]) => field !== 'action')
-        );
         const key =
           action === 'begin-staging'
             ? 'beginStaging'
@@ -403,6 +420,7 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
     'markCampaignSettingsCloudAuthority'
   ).mockImplementation(async (...args) => {
     trace.push('mark-cloud-authority');
+    libraryCalls.markCampaignSettingsCloudAuthority = args;
     return realMarkCampaignSettingsCloudAuthority(...args);
   });
 
@@ -413,7 +431,18 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
     'commitCampaignSettingsLocalCutover'
   ).mockImplementation(async (...args) => {
     cutoverSink?.push('cutover');
+    libraryCalls.commitCampaignSettingsLocalCutover = args;
     return realCommitCampaignSettingsLocalCutover(...args);
+  });
+
+  const realRollbackCampaignSettingsLocalAuthority =
+    campaignSettingsAuthorityModule.rollbackCampaignSettingsLocalAuthority;
+  vi.spyOn(
+    campaignSettingsAuthorityModule,
+    'rollbackCampaignSettingsLocalAuthority'
+  ).mockImplementation(async (...args) => {
+    libraryCalls.rollbackCampaignSettingsLocalAuthority = args;
+    return realRollbackCampaignSettingsLocalAuthority(...args);
   });
 
   const realWriteCampaignSettingsProjectionAuthority =
@@ -443,8 +472,24 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
     // target row to update. Seeded BEFORE the raw envelope write below: see
     // the base `ConformanceHarness`'s "PERSIST-BACKED SEEDING TRAP" doc
     // comment (fix round 2, item 5) for why the order matters here.
+    // `stackableInspiration: true` matches `envelope()`'s default content
+    // (fix round 3, item 1): the card's own autosave effect diffs the LIVE
+    // `campaign` prop it is rendered with against the manifest fingerprint,
+    // and a store campaign that disagrees with the raw envelope makes that
+    // effect fire a spurious commit the instant the card hydrates — which
+    // is exactly what happened here before this fix, and is why
+    // `runCardThroughFullChain` renders a small wrapper that reads this
+    // store live rather than a static prop, mirroring the shipped card
+    // test's own `CampaignSettingsHarness` pattern.
     useDmStore.setState({
-      campaigns: [{ code: CAMPAIGN_CODE, name: 'Canary', createdAt: NOW }],
+      campaigns: [
+        {
+          code: CAMPAIGN_CODE,
+          name: 'Canary',
+          createdAt: NOW,
+          stackableInspiration: true,
+        },
+      ],
     });
     localStorage.setItem('rollkeeper-dm-data', raw);
 
@@ -799,6 +844,11 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
      * generation is internally consistent with having actually changed.
      */
     async divergeCloudGeneration() {
+      // Fix round 3, item 5: all six restorable fields now diverge from the
+      // frozen legacy value (`{stackableInspiration: true}`, every other
+      // field absent) — previously only three did, so deleting the other
+      // three `updateCampaign` mappings (`bannerUrl`, `playerColors`,
+      // `dmDashboardUi`) survived 34/34.
       if (!serverDocument) throw new Error('No cloud generation to diverge');
       serverDocument = {
         ...serverDocument,
@@ -808,6 +858,9 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
           stackableInspiration: false,
           customCounterLabel: 'Edited on another device',
           playerCounters: { 'player-1': 3 },
+          bannerUrl: 'https://example.test/banner-edited.png',
+          playerColors: { 'player-1': '#ff00ff' },
+          dmDashboardUi: { playersSectionOpen: false },
         },
       };
     },
@@ -865,6 +918,145 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
      */
     forceIncompleteCloudPreview() {
       forcedPreviewMode = 'incomplete';
+    },
+
+    // -----------------------------------------------------------------
+    // Fix round 3, item 1: the card/adapter step-parity test support.
+    // -----------------------------------------------------------------
+
+    /**
+     * Renders the SHIPPED `CampaignSettingsSyncControls` card and drives it,
+     * by clicking its own buttons, through discovery -> select -> preview ->
+     * download+select -> prepare -> confirm local cutover -> activate cloud
+     * -> verified rollback. Every library call the card makes along the way
+     * is captured by the SAME spies `recordedLibraryCalls()` and
+     * `allCloudRequestBodies()` expose for the adapter — the card and the
+     * adapter both funnel through these exact module exports, so one spy
+     * layer sees either caller with no card-specific instrumentation.
+     *
+     * Named, expected differences from the adapter's own chain (kept out of
+     * the comparison the step-parity test makes):
+     *   - the card discovers and selects a workspace interactively; the
+     *     adapter receives an already-selected `MigrationRunContext`.
+     *   - the card's `downloadAndSelect` only ever records an INITIATED
+     *     recovery receipt (`initiateDeviceBackupDownload` ->
+     *     `recordDownloadReceipt`); its own `prepare()` gate
+     *     (`recoveryGate.hasDownloadReceipt`) only checks existence. The
+     *     adapter's `selectFamily` requires a VERIFIED receipt
+     *     (`hasVerifiedDownloadReceipt`) — deliberately stricter, because
+     *     the wizard (unlike the card) has no per-family manual
+     *     download-and-reopen step of its own; the wizard's own bundle
+     *     verification is what the adapter's guard trusts. This harness
+     *     satisfies both: `seed()` already records AND verifies the
+     *     receipt, which is a superset of what the card's own flow needs.
+     *   - the card uses `window.confirm`; the adapter has none (spec R12).
+     *   - the card has no `verifyCloud` equivalent (new per R1).
+     *   - mutation ids are random (`crypto.randomUUID()`) on the card and
+     *     deterministic (`migrationMutationId`) on the adapter — excluded
+     *     from every body comparison, like `runId` and `generation`.
+     */
+    async runCardThroughFullChain() {
+      const remembered: DmWorkspaceDocument[] = [];
+      vi.spyOn(
+        browserDmWorkspaceModule,
+        'createBrowserDmWorkspace'
+      ).mockImplementation(async () => ({
+        accountId: ACCOUNT_ID,
+        accountLabel: 'synthetic@example.test',
+        list: vi.fn().mockImplementation(async () => [...remembered]),
+        discover: vi.fn().mockResolvedValue([ownerWorkspace]),
+        remember: vi
+          .fn()
+          .mockImplementation(async (item: DmWorkspaceDocument) => {
+            if (!remembered.some(known => known.cloudId === item.cloudId))
+              remembered.push(item);
+          }),
+        create: vi.fn(),
+        forkLegacy: vi.fn(),
+        close: vi.fn(),
+      }));
+      vi.spyOn(
+        supabaseBrowserModule,
+        'createSupabaseBrowserClient'
+      ).mockReturnValue({
+        auth: {
+          getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+          onAuthStateChange: vi.fn().mockReturnValue({
+            data: { subscription: { unsubscribe: vi.fn() } },
+          }),
+        },
+      } as never);
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      vi.spyOn(URL, 'createObjectURL').mockReturnValue(
+        'blob:campaign-settings-recovery'
+      );
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
+        () => undefined
+      );
+
+      // Reads the campaign LIVE from `useDmStore`, mirroring the shipped
+      // card test's own `CampaignSettingsHarness` wrapper
+      // (`CampaignSettingsSyncControls.test.tsx`) — a STATIC prop here
+      // disagrees with the store the card's own autosave effect reads,
+      // which fires a spurious commit the instant the card hydrates and
+      // corrupts the working copy this test depends on staying untouched.
+      function CardHarness() {
+        const campaign = useDmStore(state =>
+          state.campaigns.find(item => item.code === CAMPAIGN_CODE)
+        );
+        if (!campaign) return null;
+        return <CampaignSettingsSyncControls campaign={campaign} />;
+      }
+      render(<CardHarness />);
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Find owner workspaces' })
+      );
+      fireEvent.click(
+        await screen.findByRole('button', { name: /Select Canary/ })
+      );
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Preview exact manifest' })
+      );
+      fireEvent.click(
+        await screen.findByRole('button', {
+          name: 'Download recovery and select',
+        })
+      );
+      await screen.findByText(
+        /selected\. LocalStorage remains authoritative\./i
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Prepare IndexedDB' })
+      );
+      await screen.findByText(/Final confirmation is still required\./i);
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Confirm local cutover' })
+      );
+      await screen.findByText(/IndexedDB authority epoch/i);
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Activate cloud family' })
+      );
+      await screen.findByText(/Cloud: saved/i);
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Verified rollback' })
+      );
+      await screen.findByText(/Rollback accepted/i);
+      cleanup();
+    },
+
+    /** Fix round 3, item 1: last-call argument capture, by function name. */
+    recordedLibraryCalls: () => ({ ...libraryCalls }),
+
+    /** Fix round 3, item 1: every cloud request body ever sent, by action. */
+    allCloudRequestBodies: () => ({ ...allRequestBodiesByAction }),
+
+    /** Fix round 3, item 1: the persisted marker, parsed. */
+    currentMarkerRaw() {
+      const raw = localStorage.getItem(
+        `rollkeeper:campaign-settings-projection-authority:${CAMPAIGN_CODE}`
+      );
+      return raw ? (JSON.parse(raw) as unknown) : null;
     },
   };
 }

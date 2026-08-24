@@ -94,19 +94,24 @@ export interface ConformanceHarness {
    */
   mutateLegacyEnvelope(): Promise<void>;
   /**
-   * Fix round 1, CRITICAL item 1, re-spec'd in fix round 2 item 5: the
-   * family's RESTORED legacy state, store-shaped — the DM-facing shape the
-   * card renders, never a raw IndexedDB read. Single-record families
-   * (campaign_settings, calendar) return one object (or `null` if the
-   * record does not exist in the legacy store at all). Multi-record
-   * families (npc, encounter_definition, magic_item, combat_log_archive)
-   * return an ORDERED LIST — they restore via
-   * `apply*Documents(campaignCode, result.currentGeneration.documents ?? [])`,
-   * never a single object — and each entry must say how a tombstoned
-   * document is represented (encounter/npc/combat_log_archive all carry a
-   * `tombstoned` flag on `currentGeneration.documents` entries; a
-   * family-local harness states explicitly whether a tombstoned entry is
-   * included with a marker or omitted).
+   * Fix round 1, CRITICAL item 1; re-spec'd fix round 2 item 5; corrected
+   * fix round 3 item 4: the family's FULL restored persisted slice, in
+   * whatever shape that family's `apply*Documents` actually writes — a
+   * record or a list, never a spec-mandated one. `combat_log_archive` is
+   * why "always a list" was wrong: `applyCombatLogArchiveDocuments`
+   * (`CombatLogArchiveSyncControls.hooks.ts:284-315`) writes `encounters` as
+   * a RECORD keyed by `archiveId`, not an array — an enforced list would
+   * force that family's harness to invent a sort order production does not
+   * have. Single-record families (campaign_settings, calendar) return one
+   * object (or `null` if absent). The genuinely list-shaped families (npc,
+   * encounter_definition, magic_item) return an ordered list. Whatever the
+   * shape, EVERY persisted key the restore touches is in scope — for
+   * `combat_log_archive` that is `encounters` AND the second slice
+   * `applyCombatLogArchiveDocuments` also rewrites, `combatLogTombstones`; a
+   * projection that reads only one and silently drops the other leaves half
+   * the restore unpinned. Each family-local implementation states how a
+   * tombstoned document is represented (encounter/npc/combat_log_archive
+   * all carry a `tombstoned` flag on `currentGeneration.documents` entries).
    *
    * MUST read the PERSISTED envelope (`localStorage.getItem(...)` on the
    * family's own key), never the in-memory store state (fix round 2, item
@@ -117,38 +122,68 @@ export interface ConformanceHarness {
    */
   readLegacyStorePayload(): Promise<unknown>;
   /**
-   * Fix round 1, CRITICAL item 1: mutates the fake server's OWN current
-   * generation so it differs from what is currently frozen in the local
-   * legacy store, in several fields — reproducing "edits made during the
-   * migrated period", the scenario the Critical restore exists for. Without
-   * this, a fixture whose frozen legacy value and cloud generation
-   * coincidentally agree cannot distinguish a correct restore from a
-   * dropped or hardcoded one.
+   * Fix round 1, CRITICAL item 1; re-spec'd fix round 3 item 4 for the
+   * multi-record families: mutates the fake server's OWN current generation
+   * so it differs from what is currently frozen in the local legacy store —
+   * reproducing "edits made during the migrated period", the scenario the
+   * Critical restore exists for. Without this, a fixture whose frozen
+   * legacy value and cloud generation coincidentally agree cannot
+   * distinguish a correct restore from a dropped or hardcoded one.
+   *
+   * For a single-record family (campaign_settings, calendar), change
+   * several fields of the one payload. For a multi-record family (npc,
+   * encounter_definition, magic_item, combat_log_archive), a single-field
+   * edit on a single document is NOT sufficient coverage on its own — each
+   * of the following is a DIFFERENT branch of `apply*Documents` and the
+   * family-local implementation states which of these it exercises:
+   *   - an existing document's payload changed (the update branch);
+   *   - a document present in the migrated generation but absent from the
+   *     diverged one (the added-since-migration branch);
+   *   - a document tombstoned in the diverged generation that was live in
+   *     the migrated one (the delete/tombstone branch).
+   * Diverging only one field on one document reproduces the exact weakness
+   * fix round 2 closed for the single-record case: a restore that dropped
+   * or hardcoded every other document, or every other branch, would still
+   * pass.
    */
   divergeCloudGeneration(): Promise<void>;
   /**
-   * Fix round 1, CRITICAL item 1, RENAMED and re-spec'd in fix round 2 item
-   * 5 (was `cloudCurrentGenerationPayload`): the expected value
-   * `readLegacyStorePayload()` should equal after a successful rollback,
-   * store-shaped exactly like that method's return. Only campaign_settings
-   * and calendar have a `currentGeneration.payload` to project directly;
-   * the four multi-record families have `currentGeneration.documents` (a
-   * list of `{legacyId, payload, payloadFingerprint, serverVersion,
-   * tombstoned}`) and MUST each supply their own store-shaped projection of
-   * those, matching how `apply*Documents` maps them into the legacy store.
+   * Fix round 1, CRITICAL item 1, RENAMED and re-spec'd fix round 2 item 5
+   * (was `cloudCurrentGenerationPayload`); hazard named fix round 3 item 4:
+   * the expected value `readLegacyStorePayload()` should equal after a
+   * successful rollback, store-shaped exactly like that method's return.
+   * Only campaign_settings and calendar have a `currentGeneration.payload`
+   * to project directly; the four multi-record families have
+   * `currentGeneration.documents` (a list of `{legacyId, payload,
+   * payloadFingerprint, serverVersion, tombstoned}`) and MUST each supply
+   * their own store-shaped projection of those, matching how
+   * `apply*Documents` maps them into the legacy store.
    *
-   * MUST be computed from the fake server's OWN state, never from anything
-   * the adapter wrote — that is the property the old name claimed and this
-   * rename preserves. A value derived from the adapter's output could not
-   * fail even if the adapter dropped or corrupted the restore.
+   * MUST be computed from the fake server's OWN state, and the projection
+   * logic MUST BE RESTATED IN THE HARNESS, never imported from the module
+   * the adapter itself imports to build its restore. `npcFamily.ts`'s
+   * `campaignNpcFromPayload`/`sortNpcs` and `combatLogArchiveFamily.ts`'s
+   * `combatLogArchiveFromPayload` are all exported, so it is possible to
+   * import the very function the adapter uses — which would make
+   * expectation and implementation share one oracle, the exact
+   * self-fulfilling-fake pattern ruling R8.4 rejects for `request_hash`. "A
+   * value derived from the adapter's output" (the old guard) does not name
+   * this: a SHARED PURE FUNCTION is neither the adapter's output nor
+   * independent of it.
    *
-   * `combat_log_archive` is the awkward case for a family-local
-   * implementation (per `CombatLogArchiveSyncControls.hooks.ts:1709`): its
-   * own marker dialect has no `legacy_restored` value, so the base
-   * "rollback writes the marker before restoring the legacy store" test's
-   * implicit premise (a marker write distinguishable from every other
-   * marker state) does not hold there. Task 12 states explicitly how that
-   * family's harness satisfies both this member and that test.
+   * `combat_log_archive` CAN satisfy the base "rollback writes the marker
+   * before restoring the legacy store" test despite having no
+   * `legacy_restored` marker value: within its own card's chain,
+   * `writeCombatLogArchiveAuthorityMarker` writes `indexedDB` at `:1071`,
+   * `postgres` at `:1204`/`:1332`, and `localStorage` ONLY at rollback
+   * (`:1711`) — `authority === 'localStorage'` is `combat_log_archive`'s
+   * distinguishable rollback signal, the same role `legacy_restored` plays
+   * for campaign_settings. The ordering premise holds too:
+   * `combatLogArchiveUsesIndexedDbAuthority` and `npcUsesIndexedDbAuthority`
+   * both return `authority === 'indexedDB' || authority === 'postgres'`, so
+   * `localStorage` un-routes the store write exactly as `legacy_restored`
+   * does for campaign_settings. Task 12 uses this signal directly; nothing
+   * about this member or that test is unresolved for that family.
    */
   expectedLegacyStoreAfterRollback(): unknown;
   /**
@@ -157,7 +192,10 @@ export interface ConformanceHarness {
    * legacy-store restore write is entered — both at ENTRY, mirroring
    * `recordCutoverInto`'s R10 discipline. Armed only from the moment this
    * is called (not from harness creation), so an unrelated store write made
-   * while seeding the fixture is never captured.
+   * while seeding the fixture is never captured. Every family's marker
+   * dialect has a state distinguishable as "this is the rollback write" —
+   * see `expectedLegacyStoreAfterRollback()`'s doc comment for
+   * `combat_log_archive`'s specific signal.
    */
   recordRollbackOrderInto(sink: string[]): void;
 }
@@ -282,7 +320,12 @@ export function describeAdapterConformance(
   it(`${name}: commitLocalCutover refuses when the legacy envelope changed since prepare`, async () => {
     // Fix round 1, item 5: the `sourceManifestUnchanged` gate is attested in
     // every adapter's `commitLocalCutover` call but must actually be
-    // checked, not merely asserted `true`.
+    // checked, not merely asserted `true`. Fix round 3, item 6c: tightened
+    // from a bare `.rejects.toThrow()` now that this guard's message is
+    // required to be distinct from `activateCloud`'s working-copy-drift
+    // message (fix round 2, item 6c) — `/prepared/i` names the moment THIS
+    // guard detected drift (before/at cutover), which a message about "the
+    // last check" (staging-time drift) cannot satisfy.
     const harness = createHarness();
     const context = await harness.seed();
     await harness.adapter.selectFamily(context);
@@ -293,7 +336,7 @@ export function describeAdapterConformance(
         generation: prepared.generation,
         manifest: prepared.manifest,
       })
-    ).rejects.toThrow();
+    ).rejects.toThrow(/prepared/i);
     expect(await harness.adapter.readAuthority(context)).toMatchObject({
       state: 'legacy',
     });
@@ -614,5 +657,157 @@ export function describeAdapterConformance(
     );
     expect(confirmation.requiredPhrase).toContain(context.campaignCode);
     expect(confirmation.campaignLabel).toContain(context.campaignCode);
+  });
+}
+
+/**
+ * Fix round 3, item 1: extends the base contract with the support the
+ * card/adapter step-parity test needs. Ruling R8.1 accepts the two-call-site
+ * duplication (spec:69) on the condition that this check exists — without
+ * it the adapter and the card can drift apart silently. This belongs here,
+ * not in a per-family file, so Tasks 8-12 inherit `describeCardParity` the
+ * same way they inherit `describeAdapterConformance`.
+ */
+export interface CardParityHarness extends ConformanceHarness {
+  /**
+   * Renders the family's own shipped card and drives it, by clicking its
+   * own buttons, through discovery, selection, preview, prepare, local
+   * cutover, cloud activation and rollback — the full chain
+   * `describeCardParity` compares against the adapter. Implementations
+   * document their own named, expected differences from the adapter (no
+   * enrollment path, no history/restore/export, no `window.confirm`, and
+   * any family-specific guard-strictness difference) in their own doc
+   * comment, per the brief.
+   */
+  runCardThroughFullChain(): Promise<void>;
+  /** Last-call argument capture, by function name, for both callers. */
+  recordedLibraryCalls(): Record<string, unknown[]>;
+  /** Every cloud request body ever sent, by action, for both callers. */
+  allCloudRequestBodies(): Record<string, Record<string, unknown>[]>;
+  /** The family's persisted authority marker, parsed. */
+  currentMarkerRaw(): unknown;
+}
+
+function omitKeys(
+  value: Record<string, unknown> | undefined,
+  keys: readonly string[]
+): Record<string, unknown> | undefined {
+  if (!value) return value;
+  return Object.fromEntries(
+    Object.entries(value).filter(([key]) => !keys.includes(key))
+  );
+}
+
+export function describeCardParity(
+  name: string,
+  createHarness: () => CardParityHarness
+) {
+  it(`${name}: the adapter matches the card call-for-call through local cutover, cloud activation and rollback`, async () => {
+    // Same literal device id for both runs, so `deviceId` — hashed into
+    // `begin_staging` — is one MORE field the comparison can check exactly
+    // rather than having to exclude it alongside the genuinely
+    // per-run-random `mutationId`/`runId`.
+    const DEVICE_ID = 'step-parity-device';
+
+    // --- Card run ---
+    const cardHarness = createHarness();
+    await cardHarness.seed();
+    cardHarness.seedDeviceId(DEVICE_ID);
+    await cardHarness.runCardThroughFullChain();
+    const cardCalls = cardHarness.recordedLibraryCalls();
+    const cardBodies = cardHarness.allCloudRequestBodies();
+    const cardMarker = cardHarness.currentMarkerRaw();
+
+    // --- Adapter run: independent harness, identical seed shape ---
+    const adapterHarness = createHarness();
+    const context = await adapterHarness.seed();
+    adapterHarness.seedDeviceId(DEVICE_ID);
+    await adapterHarness.runChainThroughLocalCutover(context);
+    const manifest = await adapterHarness.adapter.previewManifest(context);
+    await adapterHarness.adapter.activateCloud(context, manifest);
+    await adapterHarness.adapter.rollback(context);
+    const adapterCalls = adapterHarness.recordedLibraryCalls();
+    const adapterBodies = adapterHarness.allCloudRequestBodies();
+    const adapterMarker = adapterHarness.currentMarkerRaw();
+
+    // 1. commitLocalCutover: argument object handed to the wrapped library
+    // call, field for field, including every `gates` flag and the
+    // `initialDocument` shape — excluding `generation` (a fresh run id each
+    // side of this test generates independently) and `updatedAt` (a
+    // wall-clock timestamp).
+    const cardCutover = cardCalls.commitCampaignSettingsLocalCutover?.[1] as
+      | Record<string, unknown>
+      | undefined;
+    const adapterCutover = adapterCalls
+      .commitCampaignSettingsLocalCutover?.[1] as
+      | Record<string, unknown>
+      | undefined;
+    expect(cardCutover).toBeDefined();
+    // `initialDocument` is compared separately below (with `updatedAt`
+    // stripped, since it is a wall-clock timestamp) — excluded here so this
+    // first comparison is not tripped by that alone.
+    expect(
+      omitKeys(adapterCutover, ['generation', 'initialDocument', 'now'])
+    ).toEqual(omitKeys(cardCutover, ['generation', 'initialDocument', 'now']));
+    const cardDoc = (cardCutover?.initialDocument ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const adapterDoc = (adapterCutover?.initialDocument ?? {}) as Record<
+      string,
+      unknown
+    >;
+    expect(omitKeys(adapterDoc, ['updatedAt'])).toEqual(
+      omitKeys(cardDoc, ['updatedAt'])
+    );
+
+    // 2. The complete request body of each cloud call — action names alone
+    // would let a changed deviceId, recovery hash, count, byte total or item
+    // body through. `mutationId`/`runId` excluded: per-run-random on the
+    // card, deterministic on the adapter (spec R7's whole point).
+    for (const action of ['begin-staging', 'stage-items', 'confirm-cutover']) {
+      const cardBody = cardBodies[action]?.[0];
+      const adapterBody = adapterBodies[action]?.[0];
+      expect(cardBody, `card sent no ${action} body`).toBeDefined();
+      expect(
+        omitKeys(adapterBody, ['mutationId', 'runId']),
+        `${action} body mismatch`
+      ).toEqual(omitKeys(cardBody, ['mutationId', 'runId']));
+    }
+
+    // 3. `mark*CloudAuthority` arguments, including `expectedLocalEpoch`,
+    // `cloudEpoch` and `acceptedVersion`.
+    const cardMark = cardCalls.markCampaignSettingsCloudAuthority?.[1] as
+      | Record<string, unknown>
+      | undefined;
+    const adapterMark = adapterCalls.markCampaignSettingsCloudAuthority?.[1] as
+      | Record<string, unknown>
+      | undefined;
+    expect(cardMark).toBeDefined();
+    expect(omitKeys(adapterMark, ['now'])).toEqual(omitKeys(cardMark, ['now']));
+
+    // 4. Rollback's request body and its local-authority call arguments.
+    const cardRollbackBody = cardBodies.rollback?.[0];
+    const adapterRollbackBody = adapterBodies.rollback?.[0];
+    expect(cardRollbackBody, 'card sent no rollback body').toBeDefined();
+    expect(omitKeys(adapterRollbackBody, ['mutationId'])).toEqual(
+      omitKeys(cardRollbackBody, ['mutationId'])
+    );
+    const cardRollbackAuth = cardCalls
+      .rollbackCampaignSettingsLocalAuthority?.[1] as
+      | Record<string, unknown>
+      | undefined;
+    const adapterRollbackAuth = adapterCalls
+      .rollbackCampaignSettingsLocalAuthority?.[1] as
+      | Record<string, unknown>
+      | undefined;
+    expect(cardRollbackAuth).toBeDefined();
+    expect(omitKeys(adapterRollbackAuth, ['generation', 'now'])).toEqual(
+      omitKeys(cardRollbackAuth, ['generation', 'now'])
+    );
+
+    // 5. The localStorage marker written, compared as parsed JSON.
+    expect(cardMarker).toBeDefined();
+    expect(adapterMarker).toEqual(cardMarker);
   });
 }
