@@ -71,6 +71,28 @@ export interface ConformanceHarness {
   recordCutoverInto(sink: string[]): void;
   /** Marker/pointer states for Task 13b's repair cases. */
   pointerState(): Promise<'localStorage' | 'indexedDB' | 'postgres'>;
+  /**
+   * Fix round 1, item 5: changes the family's legacy source in a way that
+   * changes its manifest fingerprint, without re-running `prepareIndexedDb`
+   * — proves `commitLocalCutover` re-checks the source manifest rather than
+   * trusting the (possibly stale) one it was handed.
+   */
+  mutateLegacyEnvelope(): Promise<void>;
+  /**
+   * Fix round 1, CRITICAL item 1: the family's own legacy-store fields for
+   * the seeded record, read the same way its card renders them — never
+   * through IndexedDB. `null` if the record does not exist in the legacy
+   * store at all.
+   */
+  readLegacyStorePayload(): Promise<unknown>;
+  /**
+   * Fix round 1, CRITICAL item 1: the fake server's own record of what a
+   * fresh `currentGeneration.payload` holds right now, independent of
+   * anything the adapter did with it — the expected value the
+   * rollback-restores-the-legacy-store test compares `readLegacyStorePayload()`
+   * against.
+   */
+  cloudCurrentGenerationPayload(): unknown;
 }
 
 export function describeAdapterConformance(
@@ -100,6 +122,32 @@ export function describeAdapterConformance(
       state: 'legacy',
       rolledBack: false,
     });
+  });
+
+  it(`${name}: readAuthority reports legacy when the family's client flag is off, even after a local cutover`, async () => {
+    // Fix round 1, item 2: the carried-forward Task 5 contract — marker
+    // readers return `null` when the client flag is off, so `readAuthority`
+    // must short-circuit on `isVisible()` rather than calling the
+    // normalizer, or a disabled family with real IndexedDB history reports a
+    // spurious marker/pointer disagreement (`inconsistent`) instead of
+    // `legacy`. Toggled through the adapter's own `isVisible()` rather than
+    // a family-specific env var, so this stays generic across every family.
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughLocalCutover(context);
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'indexedDB',
+    });
+    const isVisible = vi
+      .spyOn(harness.adapter, 'isVisible')
+      .mockReturnValue(false);
+    try {
+      expect(await harness.adapter.readAuthority(context)).toMatchObject({
+        state: 'legacy',
+      });
+    } finally {
+      isVisible.mockRestore();
+    }
   });
 
   it(`${name}: selectFamily refuses without a verified receipt for this run`, async () => {
@@ -140,6 +188,44 @@ export function describeAdapterConformance(
       )
     ).rejects.toThrow(/workspace/i);
     expect(await harness.snapshot()).toBe(before);
+  });
+
+  it(`${name}: commitLocalCutover refuses without a prepared generation`, async () => {
+    // R15 names this explicitly; it was missing from every conformance test
+    // (fix round 1, item 3).
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.adapter.selectFamily(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    await expect(
+      harness.adapter.commitLocalCutover(context, {
+        generation: 'not-a-real-generation',
+        manifest,
+      })
+    ).rejects.toThrow();
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'legacy',
+    });
+  });
+
+  it(`${name}: commitLocalCutover refuses when the legacy envelope changed since prepare`, async () => {
+    // Fix round 1, item 5: the `sourceManifestUnchanged` gate is attested in
+    // every adapter's `commitLocalCutover` call but must actually be
+    // checked, not merely asserted `true`.
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.adapter.selectFamily(context);
+    const prepared = await harness.adapter.prepareIndexedDb(context);
+    await harness.mutateLegacyEnvelope();
+    await expect(
+      harness.adapter.commitLocalCutover(context, {
+        generation: prepared.generation,
+        manifest: prepared.manifest,
+      })
+    ).rejects.toThrow();
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'legacy',
+    });
   });
 
   it(`${name}: commitLocalCutover remembers the workspace before it cuts over`, async () => {
@@ -190,6 +276,23 @@ export function describeAdapterConformance(
     });
   });
 
+  it(`${name}: activateCloud refuses when this browser has not completed local cutover`, async () => {
+    // Fix round 1, item 2: unpinned before this. A legacy (never-migrated)
+    // context also independently fails `assertWorkingCopyUnchanged` (no
+    // IndexedDB document to find), and a re-activation after a completed
+    // cutover also independently fails `mark*CloudAuthority`'s own pointer
+    // check — both are adjacent guards that would let a bare
+    // `.rejects.toThrow()` here pass even with THIS guard deleted (the
+    // Task 6 standing instruction's trap). Asserting the specific message
+    // is what isolates this guard from both neighbors.
+    const harness = createHarness();
+    const context = await harness.seed();
+    const manifest = await harness.adapter.previewManifest(context);
+    await expect(
+      harness.adapter.activateCloud(context, manifest)
+    ).rejects.toThrow(/not ready to back this data category up yet/i);
+  });
+
   it(`${name}: activation calls the server in order and commits the local half`, async () => {
     const harness = createHarness();
     const context = await harness.seed();
@@ -221,8 +324,8 @@ export function describeAdapterConformance(
     // constraints fix the shape:
     //   - a completed activation leaves the family Postgres-authoritative, and
     //     `activateCloud` accepts only `indexedDB` (it throws
-    //     'This device is not ready to back this family up yet'), so calling it
-    //     again after success cannot work;
+    //     'This browser is not ready to back this data category up yet.'
+    //     per ruling R5.1), so calling it again after success cannot work;
     //   - losing the response AFTER `confirm-cutover` commits sends the retry
     //     down the reconcile path, which stages nothing and therefore records
     //     no request bodies to compare (Task 6 covers that path separately).
@@ -301,6 +404,37 @@ export function describeAdapterConformance(
     });
   });
 
+  it(`${name}: rollback refuses when this browser has not activated cloud authority`, async () => {
+    // Fix round 1, item 2: unpinned before this. Rollback is destructive
+    // (it moves the server epoch forward), so it must never run from a
+    // state that never activated the cloud in the first place. Asserting
+    // the specific message distinguishes this local-pointer guard from the
+    // adjacent server-side "exact current generation" precondition, which
+    // would also reject a never-activated browser with a DIFFERENT message
+    // and would let a bare `.rejects.toThrow()` pass even with THIS guard
+    // deleted (the Task 6 standing instruction's trap).
+    const harness = createHarness();
+    const context = await harness.seed();
+    await expect(harness.adapter.rollback(context)).rejects.toThrow(
+      /not ready to roll back/i
+    );
+  });
+
+  it(`${name}: rollback restores the legacy store to the server's current generation`, async () => {
+    // Fix round 1, CRITICAL item 1: the card writes the server's
+    // `currentGeneration.payload` back into the legacy store immediately
+    // after the rollback marker write. Without it, routing reverts to the
+    // FROZEN legacy envelope and every edit made during the migrated period
+    // becomes invisible to the DM, even though the IndexedDB documents
+    // themselves survive untouched (proven separately by the next test).
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    const expectedPayload = harness.cloudCurrentGenerationPayload();
+    await harness.adapter.rollback(context);
+    expect(await harness.readLegacyStorePayload()).toEqual(expectedPayload);
+  });
+
   it(`${name}: rollback returns to legacy at a new epoch and keeps every document`, async () => {
     const harness = createHarness();
     const context = await harness.seed();
@@ -355,7 +489,14 @@ export function describeAdapterConformance(
     const manifest = await harness.adapter.previewManifest(context);
     const confirmation = harness.adapter.confirmation(context, manifest);
     expect(confirmation.manifestFingerprint).toBe(manifest.fingerprint);
-    expect(confirmation.requiredPhrase.length).toBeGreaterThan(0);
+    // Fix round 1, item 4: `.length > 0` is satisfied by a degenerate
+    // single-character phrase (e.g. 'x'). The real contract is that the
+    // phrase is derived from THIS family and THIS campaign, so a phrase
+    // built for a different family or campaign cannot satisfy it.
+    expect(confirmation.requiredPhrase.toLowerCase()).toContain(
+      confirmation.familyLabel.toLowerCase()
+    );
+    expect(confirmation.requiredPhrase).toContain(context.campaignCode);
     expect(confirmation.campaignLabel).toContain(context.campaignCode);
   });
 }

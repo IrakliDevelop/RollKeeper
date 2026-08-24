@@ -29,6 +29,9 @@ import {
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
 import { IndexedDbDmWorkspaceRepository } from '@/lib/indexeddb/dmWorkspaceRepository';
+import { useDmStore } from '@/store/dmStore';
+import type { CampaignInfo } from '@/types/campaign';
+import type { Json } from '@/types/database.generated';
 
 import {
   normalizeFamilyAuthority,
@@ -52,7 +55,12 @@ interface CampaignSettingsEnrollmentPreview {
   schemaVersion?: number;
   payloadFingerprint?: string;
   tombstoned?: boolean;
+  /** Only the `rollback` action's `currentGeneration` populates this. */
+  payload?: Json | null;
 }
+
+// Ruling R9.2: name the behavioural number instead of a bare `.slice(0, 12)`.
+const FINGERPRINT_DISPLAY_LENGTH = 12;
 
 function currentRawEnvelope() {
   return localStorage.getItem('rollkeeper-dm-data') ?? '';
@@ -136,11 +144,15 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
       // Spec R12: a structured contract, never a copy of the card's prose. The
       // cards are untouched by this slice, so their literal strings can drift;
       // tests assert these four fields, never textual equality with a card.
+      // `requiredPhrase` names both the family and the campaign the DM is
+      // confirming, so a phrase built for a different family or a different
+      // campaign cannot satisfy it (fix round 1, item 4).
+      const familyLabel = 'Campaign settings';
       return {
-        familyLabel: 'Campaign settings',
+        familyLabel,
         campaignLabel: `${context.campaignCode}`,
         manifestFingerprint: manifest.fingerprint,
-        requiredPhrase: `migrate campaign settings ${manifest.fingerprint.slice(0, 12)}`,
+        requiredPhrase: `migrate ${familyLabel.toLowerCase()} ${context.campaignCode} ${manifest.fingerprint.slice(0, FINGERPRINT_DISPLAY_LENGTH)}`,
       };
     },
 
@@ -197,6 +209,23 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
 
     async commitLocalCutover(context, input) {
       const namespace = `user:${context.accountId}` as const;
+      // Spec R3's `sourceManifestUnchanged` gate, attested below in `gates`.
+      // The card re-derives the manifest from the CURRENT legacy envelope
+      // immediately before cutover and refuses if it drifted since
+      // `prepareIndexedDb` captured it
+      // (`CampaignSettingsSyncControls.tsx:626-631`). Fix round 1 item 5:
+      // this was previously attested (`sourceManifestUnchanged: true`) with
+      // no equivalent check, so a DM whose campaign settings changed between
+      // "prepare" and "confirm" would have had the STALE captured payload
+      // cut over silently.
+      const currentSourceManifest = await buildCampaignSettingsManifest({
+        campaignCode: context.campaignCode,
+        rawEnvelope: currentRawEnvelope(),
+      });
+      if (currentSourceManifest.fingerprint !== input.manifest.fingerprint)
+        throw new Error(
+          'Your campaign settings changed since the last check. Preview the migration again.'
+        );
       // Spec R10. The backport's defect 1 was this call missing on the local
       // cutover path: hydration then failed after reload, the store fell back
       // to the frozen legacy copy, and every later edit was accepted by the UI
@@ -528,8 +557,12 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
       // family's client flag is off, so this must short-circuit here and never
       // call the normalizer for a flag-off family — otherwise a disabled
       // family with real IndexedDB history reports a spurious
-      // marker/pointer disagreement and renders as "needs repair".
-      if (!isCampaignSettingsClientVisible())
+      // marker/pointer disagreement and renders as "needs repair". Routed
+      // through `this.isVisible()` (fix round 1, item 2) rather than the
+      // module-level flag function directly, so the conformance suite can
+      // pin this guard generically, per adapter, without knowing each
+      // family's env var name.
+      if (!this.isVisible())
         return {
           state: 'legacy',
           epoch: 0,
@@ -650,6 +683,41 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
           namespace,
         }
       );
+      // Fix round 1, CRITICAL item 1. `CampaignSettingsSyncControls.tsx`
+      // (`:1230-1254`) writes the server's `currentGeneration.payload` back
+      // into the legacy store immediately after the `legacy_restored` marker
+      // write — marker first, then payload, exactly mirrored here. Without
+      // this, routing reverts to the FROZEN legacy envelope after a wizard
+      // rollback and every campaign-settings edit made during the migrated
+      // period becomes invisible to the DM, even though the IndexedDB
+      // documents themselves survive untouched. `useDmStore.getState()` is
+      // the store module's own action, not a React controller — R1 forbids
+      // wrapping the controllers, not calling the store directly.
+      const payload = (result.currentGeneration.payload ?? {}) as Record<
+        string,
+        unknown
+      >;
+      useDmStore.getState().updateCampaign(context.campaignCode, {
+        bannerUrl:
+          typeof payload.bannerUrl === 'string' ? payload.bannerUrl : undefined,
+        playerColors:
+          payload.playerColors && typeof payload.playerColors === 'object'
+            ? (payload.playerColors as Record<string, string>)
+            : undefined,
+        dmDashboardUi:
+          payload.dmDashboardUi && typeof payload.dmDashboardUi === 'object'
+            ? (payload.dmDashboardUi as CampaignInfo['dmDashboardUi'])
+            : undefined,
+        stackableInspiration: payload.stackableInspiration === true,
+        customCounterLabel:
+          typeof payload.customCounterLabel === 'string'
+            ? payload.customCounterLabel
+            : undefined,
+        playerCounters:
+          payload.playerCounters && typeof payload.playerCounters === 'object'
+            ? (payload.playerCounters as Record<string, number>)
+            : undefined,
+      });
       return { epoch: result.epoch };
     },
   } satisfies DurableFamilyAdapter<CampaignSettingsManifest>;

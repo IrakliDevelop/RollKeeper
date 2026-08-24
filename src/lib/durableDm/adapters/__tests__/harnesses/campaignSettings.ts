@@ -22,6 +22,7 @@ import {
   requestResult,
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
+import { useDmStore } from '@/store/dmStore';
 
 import type { ConformanceHarness } from '../adapterConformance';
 
@@ -94,6 +95,8 @@ const ownerWorkspace: DmWorkspaceDocument = {
  */
 export interface CampaignSettingsConformanceHarness extends ConformanceHarness {
   seedWithBlocker(): Promise<MigrationRunContext>;
+  /** Fix round 1, item 2: forces the cloud `projection-status` response. */
+  setProjectionStatus(status: string): void;
 }
 
 export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarness {
@@ -116,6 +119,10 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
   // ---------------------------------------------------------------------
   let serverAuthority: 'legacy' | 'postgres' = 'legacy';
   let serverEpoch = 0;
+  // Fix round 1, item 2 (rollback's five-clause precondition): controllable
+  // so a test can force the projection-journal branch of that guard without
+  // hand-rolling a second fake server.
+  let projectionStatus = 'current';
   let serverDocument: {
     legacyId: string;
     serverVersion: number;
@@ -182,7 +189,7 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
       case 'preview-enrollment':
         return previewEnrollment();
       case 'projection-status':
-        return { status: 'current' };
+        return { status: projectionStatus };
       case 'begin-staging':
         return replay(
           body.mutationId as string,
@@ -262,6 +269,12 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
             legacyId: serverDocument?.legacyId,
             fingerprint: serverDocument?.payloadFingerprint,
             serverVersion: serverDocument?.serverVersion,
+            // Fix round 1, CRITICAL item 1: the real RPC's rollback response
+            // carries the payload the adapter must restore into the legacy
+            // store. Omitting it here would let the harness pass even if the
+            // adapter dropped the restore, since `result.currentGeneration`
+            // would never carry anything to restore in the first place.
+            payload: serverDocument?.payload,
           },
         };
       default:
@@ -390,6 +403,19 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
   async function seedWithEnvelope(raw: string): Promise<MigrationRunContext> {
     localStorage.clear();
     await deleteRollkeeperDatabaseForTests(indexedDB);
+    // Fix round 1, CRITICAL item 1: `dmStore` is a module-level singleton, so
+    // it is reset to hold exactly this run's campaign (not accumulated
+    // across tests) — this is what `rollback`'s `useDmStore.getState()
+    // .updateCampaign(...)` call needs a target row to update. Seeded BEFORE
+    // the raw envelope write below: `useDmStore` is `persist`-backed by
+    // `createCampaignSettingsAwareDmStorage`, so `setState` here writes its
+    // own (clean, blocker-free) serialization to `rollkeeper-dm-data` too —
+    // the explicit `localStorage.setItem` immediately after is what makes
+    // the test's INTENDED raw envelope (blockers, unclassified fields, and
+    // all) win.
+    useDmStore.setState({
+      campaigns: [{ code: CAMPAIGN_CODE, name: 'Canary', createdAt: NOW }],
+    });
     localStorage.setItem('rollkeeper-dm-data', raw);
 
     const recovery = await captureDeviceBackup(localStorage, {
@@ -677,6 +703,65 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
       } finally {
         database.close();
       }
+    },
+
+    // ---------------------------------------------------------------------
+    // Fix round 1 additions.
+    // ---------------------------------------------------------------------
+
+    /**
+     * Item 5: changes the legacy source in a way that changes its manifest
+     * fingerprint without re-running `prepareIndexedDb`, so a test can prove
+     * `commitLocalCutover` re-checks the source manifest instead of trusting
+     * the one it was handed.
+     */
+    async mutateLegacyEnvelope() {
+      const raw = localStorage.getItem('rollkeeper-dm-data');
+      if (!raw) throw new Error('No legacy envelope to mutate');
+      const parsed = JSON.parse(raw) as {
+        state: {
+          campaigns: { code: string; stackableInspiration?: boolean }[];
+        };
+      };
+      const campaign = parsed.state.campaigns.find(
+        entry => entry.code === CAMPAIGN_CODE
+      );
+      if (!campaign) throw new Error('Seeded campaign is missing');
+      campaign.stackableInspiration = !campaign.stackableInspiration;
+      localStorage.setItem('rollkeeper-dm-data', JSON.stringify(parsed));
+    },
+
+    /**
+     * CRITICAL item 1: reads the campaign-settings fields `rollback` is
+     * responsible for restoring into the legacy `dmStore`, the same way the
+     * card renders them (`useDmStore` selectors), never through IndexedDB.
+     */
+    async readLegacyStorePayload() {
+      const campaign = useDmStore
+        .getState()
+        .campaigns.find(entry => entry.code === CAMPAIGN_CODE);
+      if (!campaign) return null;
+      return {
+        bannerUrl: campaign.bannerUrl,
+        playerColors: campaign.playerColors,
+        dmDashboardUi: campaign.dmDashboardUi,
+        stackableInspiration: campaign.stackableInspiration,
+        customCounterLabel: campaign.customCounterLabel,
+        playerCounters: campaign.playerCounters,
+      };
+    },
+
+    /**
+     * CRITICAL item 1: the fake server's own record of what
+     * `currentGeneration.payload` holds right now, independent of anything
+     * the adapter did with it — the expected value the restore test compares
+     * `readLegacyStorePayload()` against.
+     */
+    cloudCurrentGenerationPayload: () => serverDocument?.payload ?? null,
+
+    /** Item 2: forces `rollback`'s projection-journal precondition branch. */
+    setProjectionStatus(status: string) {
+      projectionStatus = status;
     },
   };
 }
