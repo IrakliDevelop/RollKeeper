@@ -97,6 +97,10 @@ export interface CampaignSettingsConformanceHarness extends ConformanceHarness {
   seedWithBlocker(): Promise<MigrationRunContext>;
   /** Fix round 1, item 2: forces the cloud `projection-status` response. */
   setProjectionStatus(status: string): void;
+  /** Fix round 2, item 4: isolates rollback's server-authority clause. */
+  forcePreviewAuthorityMismatch(): void;
+  /** Fix round 2, item 4: isolates rollback's three preview null-checks. */
+  forceIncompleteCloudPreview(): void;
 }
 
 export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarness {
@@ -107,6 +111,9 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
 
   const trace: string[] = [];
   let cutoverSink: string[] | null = null;
+  // Fix round 2, item 1(a): armed by `recordRollbackOrderInto`, not at
+  // harness creation.
+  let rollbackOrderSink: string[] | null = null;
 
   // ---------------------------------------------------------------------
   // Fake `/api/campaign-settings` server. Mirrors the real RPC's
@@ -123,6 +130,16 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
   // so a test can force the projection-journal branch of that guard without
   // hand-rolling a second fake server.
   let projectionStatus = 'current';
+  // Fix round 2, item 4: isolates rollback's `current.authority !==
+  // 'postgres'` clause from its neighbouring null-checks. A REAL legacy
+  // response never carries fingerprint/version fields (there is nothing to
+  // report), so `serverAuthority = 'legacy'` alone cannot isolate this
+  // clause — every null-check clause fires too. 'authority-mismatch' keeps
+  // every other field populated, something only a fake can do, precisely to
+  // prove THIS clause alone is load-bearing. 'incomplete' is the mirror
+  // case for the three null-checks: reports `authority: 'postgres'` (so
+  // that clause does not fire) but omits every other field.
+  let forcedPreviewMode: 'authority-mismatch' | 'incomplete' | null = null;
   let serverDocument: {
     legacyId: string;
     serverVersion: number;
@@ -167,6 +184,19 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
   }
 
   function previewEnrollment() {
+    if (forcedPreviewMode === 'authority-mismatch') {
+      return {
+        authority: 'legacy' as const,
+        previewFingerprint: 'p'.repeat(64),
+        legacyId: serverDocument?.legacyId,
+        serverVersion: serverDocument?.serverVersion,
+        schemaVersion: serverDocument?.schemaVersion,
+        payloadFingerprint: serverDocument?.payloadFingerprint,
+      };
+    }
+    if (forcedPreviewMode === 'incomplete') {
+      return { authority: 'postgres' as const, epoch: serverEpoch };
+    }
     if (serverAuthority === 'legacy' || !serverDocument)
       return { authority: 'legacy' as const };
     return {
@@ -397,22 +427,22 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
     // happens earlier in every chained scenario and is not part of this
     // vocabulary.
     if (args[2]?.authority === 'postgres') trace.push('write-marker');
+    // Fix round 2, item 1(a): the rollback marker write, for
+    // `recordRollbackOrderInto`'s entry-time ordering trace.
+    if (args[2]?.authority === 'legacy_restored')
+      rollbackOrderSink?.push('marker');
     return realWriteCampaignSettingsProjectionAuthority(...args);
   });
 
   async function seedWithEnvelope(raw: string): Promise<MigrationRunContext> {
     localStorage.clear();
     await deleteRollkeeperDatabaseForTests(indexedDB);
-    // Fix round 1, CRITICAL item 1: `dmStore` is a module-level singleton, so
-    // it is reset to hold exactly this run's campaign (not accumulated
-    // across tests) — this is what `rollback`'s `useDmStore.getState()
-    // .updateCampaign(...)` call needs a target row to update. Seeded BEFORE
-    // the raw envelope write below: `useDmStore` is `persist`-backed by
-    // `createCampaignSettingsAwareDmStorage`, so `setState` here writes its
-    // own (clean, blocker-free) serialization to `rollkeeper-dm-data` too —
-    // the explicit `localStorage.setItem` immediately after is what makes
-    // the test's INTENDED raw envelope (blockers, unclassified fields, and
-    // all) win.
+    // `dmStore` is a module-level singleton, so it is reset to hold exactly
+    // this run's campaign (not accumulated across tests) — this is what
+    // `rollback`'s `useDmStore.getState().updateCampaign(...)` call needs a
+    // target row to update. Seeded BEFORE the raw envelope write below: see
+    // the base `ConformanceHarness`'s "PERSIST-BACKED SEEDING TRAP" doc
+    // comment (fix round 2, item 5) for why the order matters here.
     useDmStore.setState({
       campaigns: [{ code: CAMPAIGN_CODE, name: 'Canary', createdAt: NOW }],
     });
@@ -732,14 +762,24 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
     },
 
     /**
-     * CRITICAL item 1: reads the campaign-settings fields `rollback` is
-     * responsible for restoring into the legacy `dmStore`, the same way the
-     * card renders them (`useDmStore` selectors), never through IndexedDB.
+     * CRITICAL item 1, re-spec'd in fix round 2 item 5: reads the
+     * PERSISTED `rollkeeper-dm-data` envelope directly (never the in-memory
+     * `useDmStore` state, and never IndexedDB) — this is what makes the
+     * marker-before-payload write ORDER observable at all, since
+     * `createCampaignSettingsAwareDmStorage` only intercepts the persisted
+     * write, not the in-memory `set()`. campaign_settings is single-record,
+     * so this returns one object (or `null` if the campaign is absent from
+     * the persisted envelope).
      */
     async readLegacyStorePayload() {
-      const campaign = useDmStore
-        .getState()
-        .campaigns.find(entry => entry.code === CAMPAIGN_CODE);
+      const raw = localStorage.getItem('rollkeeper-dm-data');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as {
+        state?: { campaigns?: Record<string, unknown>[] };
+      };
+      const campaign = parsed.state?.campaigns?.find(
+        entry => entry.code === CAMPAIGN_CODE
+      );
       if (!campaign) return null;
       return {
         bannerUrl: campaign.bannerUrl,
@@ -752,16 +792,79 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
     },
 
     /**
-     * CRITICAL item 1: the fake server's own record of what
-     * `currentGeneration.payload` holds right now, independent of anything
-     * the adapter did with it — the expected value the restore test compares
-     * `readLegacyStorePayload()` against.
+     * CRITICAL item 1: mutates the fake server's own current generation so
+     * it differs from the frozen legacy value in several fields, simulating
+     * an edit made on another device during the migrated period. Bumps
+     * `serverVersion` and replaces `payloadFingerprint` too, so the
+     * generation is internally consistent with having actually changed.
      */
-    cloudCurrentGenerationPayload: () => serverDocument?.payload ?? null,
+    async divergeCloudGeneration() {
+      if (!serverDocument) throw new Error('No cloud generation to diverge');
+      serverDocument = {
+        ...serverDocument,
+        serverVersion: serverDocument.serverVersion + 1,
+        payloadFingerprint: 'd'.repeat(64),
+        payload: {
+          stackableInspiration: false,
+          customCounterLabel: 'Edited on another device',
+          playerCounters: { 'player-1': 3 },
+        },
+      };
+    },
+
+    /**
+     * CRITICAL item 1, RENAMED in fix round 2 item 5 (was
+     * `cloudCurrentGenerationPayload`): the fake server's OWN record of what
+     * `currentGeneration.payload` holds right now, independent of anything
+     * the adapter did with it — computed straight from `serverDocument`,
+     * never read back through the adapter or the store. The expected value
+     * the restore test compares `readLegacyStorePayload()` against.
+     */
+    expectedLegacyStoreAfterRollback: () => serverDocument?.payload ?? null,
+
+    /**
+     * Fix round 2, item 1(a): entry-time ordering trace for rollback's
+     * marker-then-store write sequence. Armed here (at call time), not at
+     * harness creation, so the seed's own unrelated `useDmStore.setState`
+     * call is never captured. The spy targets the LIVE state object
+     * `useDmStore.getState()` returns at the moment this is called — stable
+     * for the rest of the test because nothing else calls `dmStore`'s
+     * `set`/`setState` between here and `rollback()`'s own
+     * `useDmStore.getState().updateCampaign(...)` call, which resolves
+     * `getState()` to this SAME object and therefore calls this spy.
+     */
+    recordRollbackOrderInto(sink: string[]) {
+      rollbackOrderSink = sink;
+      const state = useDmStore.getState();
+      const originalUpdateCampaign = state.updateCampaign;
+      vi.spyOn(state, 'updateCampaign').mockImplementation((...args) => {
+        sink.push('store');
+        return originalUpdateCampaign(...args);
+      });
+    },
 
     /** Item 2: forces `rollback`'s projection-journal precondition branch. */
     setProjectionStatus(status: string) {
       projectionStatus = status;
+    },
+
+    /**
+     * Fix round 2, item 4: isolates `rollback`'s
+     * `current.authority !== 'postgres'` clause — see the `forcedPreviewMode`
+     * comment above for why a real legacy response cannot do this alone.
+     */
+    forcePreviewAuthorityMismatch() {
+      forcedPreviewMode = 'authority-mismatch';
+    },
+
+    /**
+     * Fix round 2, item 4: isolates the three null-check clauses
+     * (`!previewFingerprint`, `!payloadFingerprint`, `serverVersion ===
+     * undefined`) as one shared case, honest coverage for three checks that
+     * only ever guard "the preview response is incomplete".
+     */
+    forceIncompleteCloudPreview() {
+      forcedPreviewMode = 'incomplete';
     },
   };
 }

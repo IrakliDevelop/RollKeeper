@@ -9,6 +9,18 @@ import type {
  * Base conformance contract (ruling R3.1: Task 7 declares this; Tasks 8-12
  * extend it family-locally with whatever extra members their own harness
  * needs, named in their own report).
+ *
+ * PERSIST-BACKED SEEDING TRAP (fix round 2, item 5 — moved here from a
+ * campaign_settings-local comment, because every family harness will hit
+ * this identically): `dmStore`, `npcStore`, `encounterStore` and their
+ * siblings are all `persist`-backed through their own `create*AwareStorage`
+ * wrapper. Calling `use<Family>Store.setState(...)` to seed a harness's
+ * in-memory legacy-store fixture WRITES ITS OWN serialization back to that
+ * family's localStorage key via the persist middleware — silently
+ * overwriting a raw envelope the harness set up separately (stripping
+ * unclassified fields, blockers, anything the store's own type doesn't
+ * carry). Seed the store FIRST, then write the intended raw envelope with a
+ * direct `localStorage.setItem` AFTER, so the explicit raw write wins.
  */
 export interface ConformanceHarness {
   adapter: DurableFamilyAdapter;
@@ -75,24 +87,79 @@ export interface ConformanceHarness {
    * Fix round 1, item 5: changes the family's legacy source in a way that
    * changes its manifest fingerprint, without re-running `prepareIndexedDb`
    * — proves `commitLocalCutover` re-checks the source manifest rather than
-   * trusting the (possibly stale) one it was handed.
+   * trusting the (possibly stale) one it was handed. Generalises cleanly
+   * (fix round 2, item 5 survey): all six manifest builders take
+   * `rawEnvelope: string` from one localStorage key, and all six cards
+   * already do the same pre-cutover fingerprint re-check.
    */
   mutateLegacyEnvelope(): Promise<void>;
   /**
-   * Fix round 1, CRITICAL item 1: the family's own legacy-store fields for
-   * the seeded record, read the same way its card renders them — never
-   * through IndexedDB. `null` if the record does not exist in the legacy
-   * store at all.
+   * Fix round 1, CRITICAL item 1, re-spec'd in fix round 2 item 5: the
+   * family's RESTORED legacy state, store-shaped — the DM-facing shape the
+   * card renders, never a raw IndexedDB read. Single-record families
+   * (campaign_settings, calendar) return one object (or `null` if the
+   * record does not exist in the legacy store at all). Multi-record
+   * families (npc, encounter_definition, magic_item, combat_log_archive)
+   * return an ORDERED LIST — they restore via
+   * `apply*Documents(campaignCode, result.currentGeneration.documents ?? [])`,
+   * never a single object — and each entry must say how a tombstoned
+   * document is represented (encounter/npc/combat_log_archive all carry a
+   * `tombstoned` flag on `currentGeneration.documents` entries; a
+   * family-local harness states explicitly whether a tombstoned entry is
+   * included with a marker or omitted).
+   *
+   * MUST read the PERSISTED envelope (`localStorage.getItem(...)` on the
+   * family's own key), never the in-memory store state (fix round 2, item
+   * 1b): the in-memory value is correct regardless of write ORDER — only
+   * the persisted value is affected by the aware-storage interception a
+   * wrong write order triggers, so reading in-memory state makes an
+   * ordering defect invisible to this method's callers.
    */
   readLegacyStorePayload(): Promise<unknown>;
   /**
-   * Fix round 1, CRITICAL item 1: the fake server's own record of what a
-   * fresh `currentGeneration.payload` holds right now, independent of
-   * anything the adapter did with it — the expected value the
-   * rollback-restores-the-legacy-store test compares `readLegacyStorePayload()`
-   * against.
+   * Fix round 1, CRITICAL item 1: mutates the fake server's OWN current
+   * generation so it differs from what is currently frozen in the local
+   * legacy store, in several fields — reproducing "edits made during the
+   * migrated period", the scenario the Critical restore exists for. Without
+   * this, a fixture whose frozen legacy value and cloud generation
+   * coincidentally agree cannot distinguish a correct restore from a
+   * dropped or hardcoded one.
    */
-  cloudCurrentGenerationPayload(): unknown;
+  divergeCloudGeneration(): Promise<void>;
+  /**
+   * Fix round 1, CRITICAL item 1, RENAMED and re-spec'd in fix round 2 item
+   * 5 (was `cloudCurrentGenerationPayload`): the expected value
+   * `readLegacyStorePayload()` should equal after a successful rollback,
+   * store-shaped exactly like that method's return. Only campaign_settings
+   * and calendar have a `currentGeneration.payload` to project directly;
+   * the four multi-record families have `currentGeneration.documents` (a
+   * list of `{legacyId, payload, payloadFingerprint, serverVersion,
+   * tombstoned}`) and MUST each supply their own store-shaped projection of
+   * those, matching how `apply*Documents` maps them into the legacy store.
+   *
+   * MUST be computed from the fake server's OWN state, never from anything
+   * the adapter wrote — that is the property the old name claimed and this
+   * rename preserves. A value derived from the adapter's output could not
+   * fail even if the adapter dropped or corrupted the restore.
+   *
+   * `combat_log_archive` is the awkward case for a family-local
+   * implementation (per `CombatLogArchiveSyncControls.hooks.ts:1709`): its
+   * own marker dialect has no `legacy_restored` value, so the base
+   * "rollback writes the marker before restoring the legacy store" test's
+   * implicit premise (a marker write distinguishable from every other
+   * marker state) does not hold there. Task 12 states explicitly how that
+   * family's harness satisfies both this member and that test.
+   */
+  expectedLegacyStoreAfterRollback(): unknown;
+  /**
+   * Fix round 2, item 1(a): pushes `'marker'` into `sink` when the family's
+   * ROLLBACK marker write is entered, and `'store'` when the family's
+   * legacy-store restore write is entered — both at ENTRY, mirroring
+   * `recordCutoverInto`'s R10 discipline. Armed only from the moment this
+   * is called (not from harness creation), so an unrelated store write made
+   * while seeding the fixture is never captured.
+   */
+  recordRollbackOrderInto(sink: string[]): void;
 }
 
 export function describeAdapterConformance(
@@ -192,7 +259,11 @@ export function describeAdapterConformance(
 
   it(`${name}: commitLocalCutover refuses without a prepared generation`, async () => {
     // R15 names this explicitly; it was missing from every conformance test
-    // (fix round 1, item 3).
+    // (fix round 1, item 3). Fix round 2, item 2: a bare `.rejects.toThrow()`
+    // is masked by the adjacent 'Campaign settings generation is missing'
+    // guard, which fires for the same input and would let this test pass
+    // even with the CUTOVER_READY check itself removed. Asserting the
+    // specific message isolates it.
     const harness = createHarness();
     const context = await harness.seed();
     await harness.adapter.selectFamily(context);
@@ -202,7 +273,7 @@ export function describeAdapterConformance(
         generation: 'not-a-real-generation',
         manifest,
       })
-    ).rejects.toThrow();
+    ).rejects.toThrow(/CUTOVER_READY/i);
     expect(await harness.adapter.readAuthority(context)).toMatchObject({
       state: 'legacy',
     });
@@ -420,17 +491,52 @@ export function describeAdapterConformance(
     );
   });
 
-  it(`${name}: rollback restores the legacy store to the server's current generation`, async () => {
-    // Fix round 1, CRITICAL item 1: the card writes the server's
-    // `currentGeneration.payload` back into the legacy store immediately
-    // after the rollback marker write. Without it, routing reverts to the
-    // FROZEN legacy envelope and every edit made during the migrated period
-    // becomes invisible to the DM, even though the IndexedDB documents
-    // themselves survive untouched (proven separately by the next test).
+  it(`${name}: rollback writes the marker before restoring the legacy store`, async () => {
+    // Fix round 2, item 1(a): pins the ORDER directly, entry-time, the same
+    // way the R10 test pins `commitLocalCutover`'s
+    // `ensureWorkspaceRemembered`-before-cutover ordering. A behavioural
+    // assertion on the end result (the next test) proves the SAME thing
+    // indirectly, through the aware-storage side effect the wrong order
+    // triggers — this test proves it directly, and does not depend on that
+    // side effect existing.
     const harness = createHarness();
     const context = await harness.seed();
     await harness.runChainThroughCloudActivation(context);
-    const expectedPayload = harness.cloudCurrentGenerationPayload();
+    const order: string[] = [];
+    harness.recordRollbackOrderInto(order);
+    await harness.adapter.rollback(context);
+    expect(order).toEqual(['marker', 'store']);
+  });
+
+  it(`${name}: rollback restores the legacy store to the server's current generation`, async () => {
+    // Fix round 1, CRITICAL item 1: the card writes the server's
+    // `currentGeneration.payload` (or `.documents`, for multi-record
+    // families) back into the legacy store immediately after the rollback
+    // marker write. Without it, routing reverts to the FROZEN legacy
+    // envelope and every edit made during the migrated period becomes
+    // invisible to the DM, even though the IndexedDB documents themselves
+    // survive untouched (proven separately by the next test).
+    //
+    // Fix round 2, item 1: three fixes to what was previously a
+    // non-reproducing test.
+    //   (b) `readLegacyStorePayload()` now reads the PERSISTED
+    //       `rollkeeper-dm-data` envelope, not the in-memory Zustand store —
+    //       the in-memory value is correct regardless of write order (the
+    //       aware storage only intercepts the PERSISTED write), so reading
+    //       it made the ordering defect from the test above invisible here.
+    //   (c) `harness.divergeCloudGeneration()` makes the server's current
+    //       generation differ from the frozen legacy envelope in several
+    //       fields BEFORE rollback runs, reproducing "edits made during the
+    //       migrated period" — the scenario the Critical finding is about.
+    //       Previously the fixture never diverged (both were
+    //       `{stackableInspiration: true}`), so this test could not tell a
+    //       correct restore from one that dropped every field or hardcoded
+    //       the original value.
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    await harness.divergeCloudGeneration();
+    const expectedPayload = harness.expectedLegacyStoreAfterRollback();
     await harness.adapter.rollback(context);
     expect(await harness.readLegacyStorePayload()).toEqual(expectedPayload);
   });
@@ -493,8 +599,18 @@ export function describeAdapterConformance(
     // single-character phrase (e.g. 'x'). The real contract is that the
     // phrase is derived from THIS family and THIS campaign, so a phrase
     // built for a different family or campaign cannot satisfy it.
+    //
+    // Fix round 2, item 3: the family half is checked against
+    // `harness.adapter.label` — an INDEPENDENT field on the adapter, set
+    // separately from `confirmation()`'s own local label — never against
+    // `confirmation.familyLabel` itself. Checking `requiredPhrase` against
+    // `familyLabel` from the SAME `confirmation()` call is self-referential:
+    // mutating the one local variable that produces both fields (e.g.
+    // `const familyLabel = 'x'`) satisfies the assertion while genuinely
+    // mislabelling the family — exactly the copy-paste failure mode Tasks
+    // 8-12 are at risk of.
     expect(confirmation.requiredPhrase.toLowerCase()).toContain(
-      confirmation.familyLabel.toLowerCase()
+      harness.adapter.label.toLowerCase()
     );
     expect(confirmation.requiredPhrase).toContain(context.campaignCode);
     expect(confirmation.campaignLabel).toContain(context.campaignCode);

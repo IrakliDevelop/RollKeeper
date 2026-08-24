@@ -98,6 +98,16 @@ export interface FamilyVerification {
   verified: boolean;
 }
 
+/**
+ * Every method below is `this`-bound: several call other methods on the
+ * SAME adapter instance internally (e.g. `activateCloud` calls
+ * `this.readAuthority`, and `readAuthority` calls `this.isVisible`). A
+ * caller MUST invoke methods on the adapter object itself
+ * (`adapter.readAuthority(ctx)`), never through a destructured or otherwise
+ * detached reference (`const { readAuthority } = adapter; readAuthority(ctx)`
+ * throws) — the pattern a wizard passing a method as a bare callback would
+ * reach for first.
+ */
 export interface DurableFamilyAdapter<TNative = unknown> {
   family: DurableFamilyName;
   label: string;

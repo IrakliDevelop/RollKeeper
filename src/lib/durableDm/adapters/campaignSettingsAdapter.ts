@@ -29,7 +29,14 @@ import {
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
 import { IndexedDbDmWorkspaceRepository } from '@/lib/indexeddb/dmWorkspaceRepository';
-import { useDmStore } from '@/store/dmStore';
+// `useDmStore` is imported at CALL TIME inside `rollback` below, not at
+// module scope (fix round 2, item 6b): this is a client Zustand store, and a
+// module-scope import here would pull a persist-backed client store into
+// the lib layer. No server importer exists today, but Task 13's adapter
+// registry is exactly the kind of module a server component could import,
+// so a static import would become a live SSR hazard the moment that
+// happens. Only the TYPE is imported statically — types erase at build
+// time and carry no runtime module graph.
 import type { CampaignInfo } from '@/types/campaign';
 import type { Json } from '@/types/database.generated';
 
@@ -223,8 +230,15 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
         rawEnvelope: currentRawEnvelope(),
       });
       if (currentSourceManifest.fingerprint !== input.manifest.fingerprint)
+        // Fix round 2, item 6c: deliberately a DIFFERENT string from
+        // `activateCloud`'s `assertWorkingCopyUnchanged` message below —
+        // both used to read identically, which meant the shared
+        // `/changed since the last check/i` regex a caller might reach for
+        // could not tell the two apart. Nothing is masked by it today (the
+        // two live in different methods, and no test asserts across both),
+        // but the phrasing here now names WHEN the drift was detected.
         throw new Error(
-          'Your campaign settings changed since the last check. Preview the migration again.'
+          'Your campaign settings changed since you prepared this device. Preview the migration again.'
         );
       // Spec R10. The backport's defect 1 was this call missing on the local
       // cutover path: hydration then failed after reload, the store fell back
@@ -256,6 +270,39 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
           campaignId: context.campaignId,
           generation: input.generation,
           confirmed: true,
+          // Fix round 2, item 7: every gate below is attested `true` with an
+          // explicit owner, never a bare attestation with nothing behind it.
+          //   - sourceManifestUnchanged: checked immediately above, in this
+          //     method (fix round 1, item 5).
+          //   - recoveryReceipt: verified by `prepareIndexedDb`'s
+          //     `recoveryGate.hasDownloadReceipt` check inside
+          //     `runCampaignSettingsIndexedDbMigration` — the generation
+          //     cannot reach `CUTOVER_READY` without it.
+          //   - captureVerifiedAfterReopen: `migrationEngine.ts`'s cutover
+          //     path independently reopens a fresh database connection and
+          //     re-verifies the persisted capture (`verifyPersistedCapture`,
+          //     called twice) before checkpointing to `CUTOVER_READY`.
+          //   - noConflicts / noQuarantine / parity: `migrationEngine.ts`'s
+          //     `shadowGate` returns `SHADOWING`, not `CUTOVER_READY`, while
+          //     `quarantineCount > 0` or `!gate.parity` — the generation
+          //     this method receives could not have reached `CUTOVER_READY`
+          //     with any of these violated.
+          //   - journalEmpty: doubly enforced — `shadowGate` above, AND
+          //     `commitCampaignSettingsLocalCutover` itself (the call below)
+          //     independently re-reads the `journal` store for this
+          //     `namespace`/`generation`/family and throws if it is not
+          //     empty, so this is re-checked at commit time, not only
+          //     attested.
+          //   - manifestConfirmed: the ONE gate with no library-level
+          //     enforcement today. It records that the DM has explicitly
+          //     confirmed the exact manifest fingerprint about to be cut
+          //     over. Spec R12 puts that confirmation in the WIZARD (the
+          //     typed-phrase dialog `confirmation()` on this adapter
+          //     supplies the copy for) — this adapter TRUSTS that its
+          //     caller invokes `commitLocalCutover` only after the DM has
+          //     confirmed. No adapter-level check exists because the
+          //     adapter has no UI layer to have obtained that confirmation
+          //     from; Task 14's wizard is the owner of this gate.
           gates: {
             recoveryReceipt: true,
             sourceManifestUnchanged: true,
@@ -686,13 +733,22 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
       // Fix round 1, CRITICAL item 1. `CampaignSettingsSyncControls.tsx`
       // (`:1230-1254`) writes the server's `currentGeneration.payload` back
       // into the legacy store immediately after the `legacy_restored` marker
-      // write — marker first, then payload, exactly mirrored here. Without
-      // this, routing reverts to the FROZEN legacy envelope after a wizard
-      // rollback and every campaign-settings edit made during the migrated
-      // period becomes invisible to the DM, even though the IndexedDB
-      // documents themselves survive untouched. `useDmStore.getState()` is
-      // the store module's own action, not a React controller — R1 forbids
-      // wrapping the controllers, not calling the store directly.
+      // write — marker first, then payload, exactly mirrored here. ORDER IS
+      // LOAD-BEARING (fix round 2, item 1a): `createCampaignSettingsAwareDmStorage`
+      // re-freezes the routed fields onto every write while
+      // `campaignSettingsUsesIndexedDbAuthority` is still true, which it is
+      // until the marker write above lands. A payload-first write would be
+      // silently discarded from the persisted envelope by that same aware
+      // storage. Without this restore at all, routing reverts to the FROZEN
+      // legacy envelope after a wizard rollback and every campaign-settings
+      // edit made during the migrated period becomes invisible to the DM,
+      // even though the IndexedDB documents themselves survive untouched.
+      // `useDmStore.getState()` is the store module's own action, not a
+      // React controller — R1 forbids wrapping the controllers, not calling
+      // the store directly. Imported here, at call time, not at module
+      // scope (fix round 2, item 6b): see the import comment at the top of
+      // this file.
+      const { useDmStore } = await import('@/store/dmStore');
       const payload = (result.currentGeneration.payload ?? {}) as Record<
         string,
         unknown

@@ -51,15 +51,11 @@ describe('campaignSettingsAdapter', () => {
     expect(harness.trace()).not.toContain('begin-staging');
   });
 
-  // Fix round 1, item 2 (rollback's five-clause precondition): the
-  // projection-status clause is the one directly controllable through the
-  // fake server without hand-rolling a second one. `current.authority`'s own
-  // clause is exercised by the base suite's "rollback refuses when this
-  // browser has not activated cloud authority" test, and the base suite's
-  // "rollback restores the legacy store..." / "rollback returns to legacy"
-  // tests exercise the happy path where every clause of this precondition
-  // is satisfied — together they bound the guard even though this file does
-  // not isolate all five `||` clauses individually.
+  // Fix round 2, item 4: all five `||` clauses of rollback's
+  // current-generation/projection-journal precondition are now pinned, as
+  // two cases plus the projection case below (three total, matching the
+  // reviewer's count of "two more" beyond the projection-status case fix
+  // round 1 already had).
   it('rollback refuses when the projection journal is not reconciled', async () => {
     const harness = createCampaignSettingsHarness();
     const context = await harness.seed();
@@ -67,6 +63,40 @@ describe('campaignSettingsAdapter', () => {
     harness.setProjectionStatus('pending');
     await expect(harness.adapter.rollback(context)).rejects.toThrow(
       /projection journal/i
+    );
+  });
+
+  it('rollback refuses when the account is no longer cloud-authoritative', async () => {
+    // Isolates `current.authority !== 'postgres'` from its three
+    // neighbouring null-checks. A REAL "legacy" preview response carries
+    // none of the other fields either, so `setServerAuthority`-style
+    // control alone cannot tell "the authority clause caught this" from
+    // "a null-check caught this" — `forcePreviewAuthorityMismatch` reports
+    // `authority: 'legacy'` while keeping every other field populated
+    // (something only a fake can do), which only this clause can catch.
+    // This is the actual safety precondition guarding a destructive epoch
+    // advance against a campaign another device already rolled back, or
+    // one never activated server-side at all — not a null-check.
+    const harness = createCampaignSettingsHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    harness.forcePreviewAuthorityMismatch();
+    await expect(harness.adapter.rollback(context)).rejects.toThrow(
+      /exact current Postgres generation/i
+    );
+  });
+
+  it('rollback refuses when the cloud preview response is missing the current generation fingerprints', async () => {
+    // One shared case for `!previewFingerprint`, `!payloadFingerprint` and
+    // `serverVersion === undefined` — three null-checks on values only ever
+    // forwarded into the RPC body, honestly covered together rather than
+    // isolated from each other.
+    const harness = createCampaignSettingsHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    harness.forceIncompleteCloudPreview();
+    await expect(harness.adapter.rollback(context)).rejects.toThrow(
+      /exact current Postgres generation/i
     );
   });
 
