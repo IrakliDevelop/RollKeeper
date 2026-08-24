@@ -67,6 +67,16 @@ export interface ActivationManifestRecord {
  *   stage_items     {runId, items}
  *   confirm_cutover {runId, manifest, epoch}
  *
+ * `campaignId` is hashed into `begin_staging` but, like `family`, is never a
+ * per-call argument on `beginStaging` below: this module relies on the
+ * `ResumableActivationGateway` being bound to one campaign at construction,
+ * the same way it relies on the RPC being bound to one family, so it is
+ * likewise constant across every attempt a given gateway instance makes. A
+ * caller that reconstructs the gateway against a different campaign between
+ * attempts — not something any adapter does today — would change this
+ * constant and turn a legitimate retry into `22023`, exactly as a regenerated
+ * `deviceId` would.
+ *
  * Two consequences follow: `runId` must come from the replayed `begin-staging`
  * result, never a fresh one, and `deviceId` must come from the persisted
  * device key, never a new UUID.

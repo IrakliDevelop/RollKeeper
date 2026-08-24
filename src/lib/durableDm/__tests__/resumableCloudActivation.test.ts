@@ -386,6 +386,44 @@ describe('runResumableCloudActivation', () => {
     expect(cloud.confirmCutover).not.toHaveBeenCalled();
   });
 
+  // Pins the `preview.documents ?? []` fallbacks (used both inside
+  // `matchesManifest` and when building `acceptedVersions` on the reconcile
+  // path) for a family with zero records. `combat_log_archive` permits
+  // `record_count` 0-2000, so an empty manifest is reachable in production:
+  // a device with nothing to migrate still needs a well-defined outcome
+  // rather than a crash on `undefined.map`. Reconciling to an empty,
+  // zero-epoch-matching cloud generation is the intended behaviour here —
+  // this test exists so that stays a deliberate, tested choice rather than
+  // an accident of an optional-chaining fallback nobody exercised.
+  it('reconciles a zero-record activation when the cloud preview reports no documents at all', async () => {
+    const emptyPreview: CloudEnrollmentPreview = {
+      authority: 'postgres',
+      epoch: 1,
+      previewFingerprint: 'c'.repeat(64),
+      recordCount: 0,
+      // `documents` intentionally omitted, not an empty array — models a
+      // preview response that never populated the field for a zero-record
+      // family, exercising the `?? []` fallback rather than an already-empty
+      // array literal.
+    };
+    const cloud = gateway({
+      previewEnrollment: vi.fn(async () => emptyPreview),
+    });
+
+    const result = await runResumableCloudActivation({
+      ...base,
+      gateway: cloud,
+      records: [],
+      request: { ...base.request, recordCount: 0, items: [] },
+    });
+
+    expect(result).toEqual({
+      status: 'reconciled',
+      epoch: 1,
+      acceptedVersions: [],
+    });
+  });
+
   it('conflicts, and never stages, when the cloud generation has diverged', async () => {
     const diverged = postgresPreview();
     diverged.documents![1].payloadFingerprint = 'f'.repeat(64);
@@ -414,6 +452,38 @@ describe('runResumableCloudActivation', () => {
     });
     extra.recordCount = 3;
     const cloud = gateway({ previewEnrollment: vi.fn(async () => extra) });
+
+    expect(
+      await runResumableCloudActivation({ ...base, gateway: cloud })
+    ).toEqual({
+      status: 'conflict',
+      reason: 'cloud-generation-diverged',
+    });
+  });
+
+  // Isolates the `documents.length !== records.length` guard from the
+  // `recordCount !== records.length` guard above it: `recordCount` is left
+  // matching (2) while the `documents` array itself carries an extra entry,
+  // so only the length-of-the-array check can catch this. Without this test
+  // a preview whose declared `recordCount` matches but whose `documents`
+  // array is longer would pass `records.every(...)` — which only walks the
+  // device's own `records`, never the cloud's extra ones — and reconcile the
+  // local pointer onto a cloud generation containing a document this device
+  // never produced.
+  it('conflicts when the cloud holds an extra document even though recordCount still matches', async () => {
+    const extraButCountUnchanged = postgresPreview();
+    extraButCountUnchanged.documents!.push({
+      legacyId: 'three',
+      serverVersion: 1,
+      schemaVersion: 2,
+      payloadFingerprint: 'e'.repeat(64),
+      tombstoned: false,
+    });
+    // recordCount deliberately left at 2 (postgresPreview()'s default) so the
+    // recordCount guard does not fire first.
+    const cloud = gateway({
+      previewEnrollment: vi.fn(async () => extraButCountUnchanged),
+    });
 
     expect(
       await runResumableCloudActivation({ ...base, gateway: cloud })
