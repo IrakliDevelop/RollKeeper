@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Pull request writing
+
+Keep PR titles, bodies, and verification notes concise. Include only the
+outcome, essential design changes, checks run, and unresolved risks or
+blockers. Omit implementation diaries, task-by-task chronology, raw logs,
+repeated rationale, and generated-session links. Prefer short bullets and link
+to existing documentation or tests instead of restating them. Expand only when
+the user asks or a material risk needs explanation.
+
 ## Commands
 
 ```bash

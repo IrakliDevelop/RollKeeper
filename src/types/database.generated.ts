@@ -434,6 +434,20 @@ export type Database = {
         };
         Returns: Json;
       };
+      begin_combat_log_archive_staging: {
+        Args: {
+          p_campaign_id: string;
+          p_device_id: string;
+          p_expected_epoch: number;
+          p_manifest_fingerprint: string;
+          p_mutation_id: string;
+          p_record_count: number;
+          p_recovery_manifest_hash: string;
+          p_recovery_receipt_hash: string;
+          p_total_bytes: number;
+        };
+        Returns: Json;
+      };
       begin_encounter_staging: {
         Args: {
           p_campaign_id: string;
@@ -554,6 +568,15 @@ export type Database = {
         };
         Returns: Json;
       };
+      compare_combat_log_archive_document_versions: {
+        Args: {
+          p_campaign_id: string;
+          p_left: number;
+          p_legacy_id: string;
+          p_right: number;
+        };
+        Returns: Json;
+      };
       compare_encounter_document_versions: {
         Args: {
           p_campaign_id: string;
@@ -600,6 +623,15 @@ export type Database = {
         Returns: Json;
       };
       confirm_campaign_settings_cutover: {
+        Args: {
+          p_expected_epoch: number;
+          p_manifest_fingerprint: string;
+          p_mutation_id: string;
+          p_run_id: string;
+        };
+        Returns: Json;
+      };
+      confirm_combat_log_archive_cutover: {
         Args: {
           p_expected_epoch: number;
           p_manifest_fingerprint: string;
@@ -675,6 +707,17 @@ export type Database = {
         };
         Returns: Json;
       };
+      enroll_combat_log_archive_device: {
+        Args: {
+          p_campaign_id: string;
+          p_device_id: string;
+          p_expected_epoch: number;
+          p_legacy_candidate_fingerprint: string;
+          p_mutation_id: string;
+          p_preview_fingerprint: string;
+        };
+        Returns: Json;
+      };
       enroll_encounter_device: {
         Args: {
           p_campaign_id: string;
@@ -720,6 +763,14 @@ export type Database = {
         Args: {
           p_campaign_id: string;
           p_family: string;
+          p_legacy_id: string;
+          p_server_version: number;
+        };
+        Returns: Json;
+      };
+      export_combat_log_archive_document_version: {
+        Args: {
+          p_campaign_id: string;
           p_legacy_id: string;
           p_server_version: number;
         };
@@ -823,6 +874,10 @@ export type Database = {
         Args: { p_campaign_id: string };
         Returns: Json;
       };
+      list_combat_log_archive_document_versions: {
+        Args: { p_campaign_id: string; p_legacy_id: string };
+        Returns: Json;
+      };
       list_encounter_document_versions: {
         Args: { p_campaign_id: string; p_legacy_id: string };
         Returns: Json;
@@ -845,6 +900,10 @@ export type Database = {
         Returns: Json;
       };
       preview_campaign_settings_device_enrollment: {
+        Args: { p_campaign_id: string };
+        Returns: Json;
+      };
+      preview_combat_log_archive_device_enrollment: {
         Args: { p_campaign_id: string };
         Returns: Json;
       };
@@ -900,6 +959,21 @@ export type Database = {
           p_mutation_id: string;
           p_name: string;
           p_payload: Json;
+          p_schema_version: number;
+        };
+        Returns: Json;
+      };
+      put_combat_log_archive_document: {
+        Args: {
+          p_campaign_id: string;
+          p_expected_epoch: number;
+          p_expected_server_version: number;
+          p_legacy_id: string;
+          p_mutation_id: string;
+          p_operation: string;
+          p_payload: Json;
+          p_payload_fingerprint: string;
+          p_restore_source_version?: number;
           p_schema_version: number;
         };
         Returns: Json;
@@ -980,6 +1054,15 @@ export type Database = {
         Returns: Json;
       };
       remove_campaign_settings_device: {
+        Args: {
+          p_campaign_id: string;
+          p_device_id: string;
+          p_expected_epoch: number;
+          p_mutation_id: string;
+        };
+        Returns: Json;
+      };
+      remove_combat_log_archive_device: {
         Args: {
           p_campaign_id: string;
           p_device_id: string;
@@ -1106,6 +1189,17 @@ export type Database = {
         };
         Returns: Json;
       };
+      restore_combat_log_archive_document_version: {
+        Args: {
+          p_campaign_id: string;
+          p_expected_epoch: number;
+          p_expected_server_version: number;
+          p_legacy_id: string;
+          p_mutation_id: string;
+          p_source_version: number;
+        };
+        Returns: Json;
+      };
       restore_encounter_document_version: {
         Args: {
           p_campaign_id: string;
@@ -1183,6 +1277,16 @@ export type Database = {
         };
         Returns: Json;
       };
+      rollback_combat_log_archive_family: {
+        Args: {
+          p_campaign_id: string;
+          p_current_generation: Json;
+          p_expected_epoch: number;
+          p_mutation_id: string;
+          p_preview_fingerprint: string;
+        };
+        Returns: Json;
+      };
       rollback_encounter_family: {
         Args: {
           p_campaign_id: string;
@@ -1236,6 +1340,10 @@ export type Database = {
         Returns: Json;
       };
       stage_campaign_settings_items: {
+        Args: { p_items: Json; p_mutation_id: string; p_run_id: string };
+        Returns: Json;
+      };
+      stage_combat_log_archive_items: {
         Args: { p_items: Json; p_mutation_id: string; p_run_id: string };
         Returns: Json;
       };

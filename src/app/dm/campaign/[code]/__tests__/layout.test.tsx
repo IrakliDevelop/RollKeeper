@@ -3,18 +3,20 @@ import 'fake-indexeddb/auto';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { useCombatLogArchiveSyncContext } from '@/components/ui/campaign/CombatLogArchiveSyncControls';
 import { useEncounterSyncContext } from '@/components/ui/campaign/EncounterSyncControls';
 import { useNpcSyncContext } from '@/components/ui/campaign/NpcSyncControls';
 import { useDmStore } from '@/store/dmStore';
 
 import CampaignRouteLayout from '../layout';
 
-/** Reads both route-group owners from inside the layout tree. */
+/** Reads every route-group owner from inside the layout tree. */
 function OwnerProbe() {
   const npc = useNpcSyncContext();
   const encounter = useEncounterSyncContext();
+  const combatLog = useCombatLogArchiveSyncContext();
   return (
-    <p>{`npc:${npc ? 'owner' : 'none'} encounter:${encounter ? 'owner' : 'none'}`}</p>
+    <p>{`npc:${npc ? 'owner' : 'none'} encounter:${encounter ? 'owner' : 'none'} combat-log:${combatLog ? 'owner' : 'none'}`}</p>
   );
 }
 
@@ -37,7 +39,7 @@ describe('campaign route group layout', () => {
     localStorage.clear();
   });
 
-  it('mounts exactly one NPC owner and one encounter owner for the group', async () => {
+  it('mounts exactly one NPC, encounter, and combat log archive owner for the group', async () => {
     const open = vi.spyOn(indexedDB, 'open');
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
@@ -47,10 +49,14 @@ describe('campaign route group layout', () => {
       </CampaignRouteLayout>
     );
 
-    // Ruling 7: the encounter owner is nested inside the existing NPC owner,
-    // so both contexts reach every route under the group.
-    expect(screen.getByText('npc:owner encounter:owner')).toBeInTheDocument();
-    expect(container.innerHTML).toBe('<p>npc:owner encounter:owner</p>');
+    // Ruling 7: each newer owner is nested inside the previous one, so all
+    // three contexts reach every route under the group.
+    expect(
+      screen.getByText('npc:owner encounter:owner combat-log:owner')
+    ).toBeInTheDocument();
+    expect(container.innerHTML).toBe(
+      '<p>npc:owner encounter:owner combat-log:owner</p>'
+    );
     await Promise.resolve();
     expect(open).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -59,7 +65,7 @@ describe('campaign route group layout', () => {
     fetchSpy.mockRestore();
   });
 
-  it('renders the route content unchanged and does no NPC or encounter work by default', async () => {
+  it('renders the route content unchanged and does no NPC, encounter, or combat log work by default', async () => {
     const getItem = vi.spyOn(Storage.prototype, 'getItem');
     const setItem = vi.spyOn(Storage.prototype, 'setItem');
     const open = vi.spyOn(indexedDB, 'open');

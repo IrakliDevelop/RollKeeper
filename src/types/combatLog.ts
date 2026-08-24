@@ -103,7 +103,29 @@ export interface CombatLogFilters {
 }
 
 export interface CombatLogState {
+  /** Stable identity of this archive. One encounter may own several. */
+  encounterId: string;
+  /** Routed campaign, or undefined for an unscoped (orphan) archive. */
+  campaignCode?: string;
   events: CombatLogEvent[];
   startedAt: string;
   endedAt?: string;
+}
+
+export interface CombatLogTombstone {
+  legacyId: string;
+  /** Campaign is carried here only, matching encounterAwareStorage.ts:32-36. */
+  beforeImage: CombatLogState;
+  deletedAt: string;
+}
+
+export type CombatLogAdmissionReason =
+  | 'record-bytes'
+  | 'item-count'
+  | 'total-bytes';
+
+export interface CombatLogAdmissionError {
+  archiveId: string;
+  reason: CombatLogAdmissionReason;
+  at: string;
 }

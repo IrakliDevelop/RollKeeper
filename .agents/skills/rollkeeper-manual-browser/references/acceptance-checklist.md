@@ -93,6 +93,53 @@ failure path.
 - Confirm retained raw or recovery data is present using hashes and metadata,
   without reproducing its payload in the report.
 
+## Slice 11F — Combat log archive cloud sync
+
+Applies to changes touching the `combat_log_archive` durable DM family (the
+"Combat log backup" card on `/dm/campaign/[code]`). Use the seed script's
+`rollkeeper-combat-log` entry — four fixed archives for the seeded campaign,
+two of them sharing one `encounterId` (combat-log-archive-seed-001 and -002),
+plus one unscoped archive with no `campaignCode` — so the card has content
+before driving these scenarios. Each agent drives its own browser per the
+"Establish Claude's browser gate" / Codex equivalent section; the steps below
+are otherwise identical for both.
+
+1. **Local cutover without cloud activation, then delete after reload.**
+   Discover a workspace, run the card through local cutover (do **not** turn on
+   backup to the account), reload the page, and confirm the card restores
+   authority from IndexedDB rather than erroring or reverting to the
+   pre-cutover state. Confirm the two seeded archives sharing
+   `encounter-seed-001` still list as two separate combat logs (Ruling 6).
+   Then delete one archive from the card and confirm the tombstone reaches
+   IndexedDB and survives a **second** reload (not just the first).
+2. **Enrollment → apply exact cloud version → delete → reload (the path that
+   caught the PR #267 Critical).** Preview enrollment, enroll this device,
+   then apply the exact cloud version. Delete one archive from the card and
+   confirm the mutation reaches IndexedDB and survives a reload — this is the
+   exact sequence where a prior implementation left the store hydrated but
+   autosave disarmed, so a deletion looked accepted in the UI but never
+   reached IndexedDB.
+3. **Default-off control.** On a profile/build where the flag is off: the
+   "Combat log backup" card is absent from the campaign page, the family's
+   route(s) 404, no `rollkeeper-local` IndexedDB database exists, and no
+   `rollkeeper:combat-log-archive-*` / `rollkeeper:` markers exist in
+   `localStorage`.
+
+**Two traps a previous run hit — check both:**
+
+- A route returning **403** to an unauthenticated request does **not** prove
+  the flag is on. Membership validation runs before the flag check, so a 403
+  is consistent with the flag being either on or off — confirm the flag state
+  some other way (e.g. the card's presence/absence, or an authenticated
+  request).
+- The `window.confirm` override must be **reinstalled after every
+  navigation** (including a reload). Several of the card's actions
+  (`activateLocal`, `activateCloud`, `enrollDevice`, `applyExactCloudVersion`,
+  `deleteArchive`, `rollback`, `removeAccountFromDevice`, `restoreVersion`)
+  call `window.confirm`, and a navigation replaces the page's `window` object
+  — a stale override left over from before the reload silently stops
+  intercepting, and the real browser dialog blocks the run instead.
+
 ## Evidence template
 
 Use this compact structure in the PR or final report:
