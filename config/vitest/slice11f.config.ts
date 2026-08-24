@@ -23,9 +23,11 @@ import { defineConfig } from 'vitest/config';
 // red/green cycle recorded in SLICE_11F_EVIDENCE.md, never by this config.
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(dirname, '../..');
 
 export default defineConfig({
-  resolve: { alias: { '@': path.join(dirname, 'src') } },
+  root,
+  resolve: { alias: { '@': path.join(root, 'src') } },
   test: {
     name: 'slice11f-coverage',
     environment: 'jsdom',
