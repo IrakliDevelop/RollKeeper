@@ -83,20 +83,15 @@ export function toAuthorityPointerView(
   record: RawAuthorityPointerRecord
 ): AuthorityPointerView | null {
   if (record.namespace === undefined) return null;
-  // The only place in this module allowed to mint the brand. A direct
-  // `as AuthorityPointerView` on the plain `{ authority, epoch }` literal
-  // below actually compiles without the `unknown` hop: TypeScript permits a
-  // single-step cast whenever the target is assignable to the source, and a
-  // branded type — having all of the source's fields plus the brand — is a
-  // structural subtype of its unbranded base, so that direction holds. (A
-  // *raw reader record*, with its extra `namespace`/`campaignId`/etc. fields
-  // that neither type has, is a genuine insufficient-overlap case and does
-  // need the `unknown` hop — that is not what is happening here.) The
-  // `unknown` hop below is kept anyway, as defensive style: everywhere else
-  // in this module, only this function's return type is allowed to carry the
-  // brand assertion, and routing through `unknown` makes that one-time
-  // assertion visually unmistakable rather than relying on the reader
-  // noticing it is the permitted direction.
+  // The brand is minted here and nowhere else: `authorityPointerViewBrand` is
+  // a module-private unique symbol, so no other module can construct an
+  // AuthorityPointerView. That is what stops a caller passing a raw reader
+  // return — which is never null — straight into normalizeFamilyAuthority and
+  // silently killing the incomplete-rollback branch.
+  //
+  // The `unknown` hop below is defensive style, not a requirement: an
+  // explicit `as` cast would compile from either shape. It is here so the
+  // mint site is visually obvious, not because the compiler needs it.
   return {
     authority: record.authority,
     epoch: record.epoch,
