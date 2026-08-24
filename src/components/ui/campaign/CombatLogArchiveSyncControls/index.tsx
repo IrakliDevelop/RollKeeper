@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import {
   Database,
   Download,
@@ -19,9 +20,19 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/layout/card';
-import type { CombatLogArchiveManifestBlocker } from '@/lib/durableDm/combatLogArchiveFamily';
+import {
+  canonicalJson,
+  combatLogArchivePayloadFrom,
+  type CombatLogArchiveManifestBlocker,
+} from '@/lib/durableDm/combatLogArchiveFamily';
 import { isCombatLogArchiveClientVisible } from '@/lib/durableDm/slice11fFlags';
+import { useCombatLogStore } from '@/store/combatLogStore';
+import { useEncounterStore } from '@/store/encounterStore';
 import type { CampaignInfo } from '@/types/campaign';
+import type {
+  CombatLogAdmissionReason,
+  CombatLogState,
+} from '@/types/combatLog';
 
 import { ACTIVE_COMBAT_LOG_GUIDANCE } from './CombatLogArchiveSyncControls.hooks';
 import { useCombatLogArchiveSyncContext } from './CombatLogArchiveSyncProvider';
@@ -95,6 +106,57 @@ function archiveLabel(startedAt: string, endedAt: string | undefined) {
 }
 
 /**
+ * A DM names an encounter, never an archive, so the encounter's own name is the
+ * only plain-language label a combat log has. `encounterId` is a developer
+ * identifier and is deliberately not shown; a log whose encounter has since
+ * been deleted still gets words rather than a hex-looking id.
+ */
+function archiveName(names: Map<string, string>, archive: CombatLogState) {
+  return names.get(archive.encounterId) ?? 'Untitled combat';
+}
+
+function eventCountLabel(count: number) {
+  return count === 1 ? '1 event' : `${count} events`;
+}
+
+/**
+ * Same measurement the manifest and the admission bounds use — canonical UTF-8
+ * bytes of the payload — so a row can never disagree with the summary above it.
+ */
+function archiveBytes(archive: CombatLogState) {
+  return new TextEncoder().encode(
+    canonicalJson(combatLogArchivePayloadFrom(archive))
+  ).byteLength;
+}
+
+/**
+ * Plain-language version of a refused edit (ruling 5). The store rejects the
+ * change outright, so every message says so: a DM must never be left believing
+ * a combat was recorded when it was not.
+ */
+function admissionMessage(reason: CombatLogAdmissionReason) {
+  switch (reason) {
+    case 'record-bytes':
+      return 'That combat log has grown too big to save, so that change was not saved. End this combat and start a new log — everything already saved is safe.';
+    case 'item-count':
+      return 'This campaign already holds as many combat logs as it can, so that change was not saved. Delete one you no longer need, then try again.';
+    default:
+      return 'Your combat logs for this campaign take up too much space together, so that change was not saved. Delete one you no longer need, then try again.';
+  }
+}
+
+function downloadFile(filename: string, contents: string, type: string) {
+  const url = URL.createObjectURL(new Blob([contents], { type }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+/**
  * The visible card. Hydration and autosave are owned by the route-level
  * `CombatLogArchiveSyncProvider`, so this component only reads that controller
  * and renders nothing when the owner is absent, belongs to another campaign, or
@@ -106,8 +168,42 @@ export function CombatLogArchiveSyncControls({
   campaign: CampaignInfo;
 }) {
   const sync = useCombatLogArchiveSyncContext();
+  // Read before the guards below: a hook can never sit behind an early return.
+  const encounters = useEncounterStore(state => state.encounters);
+  const admissionError = useCombatLogStore(state => state.lastAdmissionError);
+  const dismissAdmissionError = useCombatLogStore(
+    state => state.dismissAdmissionError
+  );
+  const exportArchive = useCombatLogStore(state => state.exportArchive);
+  const encounterNames = useMemo(
+    () => new Map(encounters.map(encounter => [encounter.id, encounter.name])),
+    [encounters]
+  );
+  // A campaign may hold up to COMBAT_LOG_ARCHIVE_MAX_ITEMS archives of up to
+  // COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES each, so the per-row sizes are encoded
+  // once per change rather than on every render of a live-combat route.
+  const archives = sync?.archives;
+  const rows = useMemo(
+    () =>
+      (archives ?? []).map(({ archiveId, archive }) => ({
+        archiveId,
+        name: archiveName(encounterNames, archive),
+        label: archiveLabel(archive.startedAt, archive.endedAt),
+        detail: `${eventCountLabel(archive.events.length)} · ${formatSize(
+          archiveBytes(archive)
+        )}`,
+      })),
+    [archives, encounterNames]
+  );
   if (!sync || !isCombatLogArchiveClientVisible()) return null;
   if (sync.campaignCode !== campaign.code) return null;
+
+  const downloadArchive = (archiveId: string, format: 'json' | 'text') =>
+    downloadFile(
+      `combat-log-${archiveId}.${format === 'json' ? 'json' : 'txt'}`,
+      exportArchive(archiveId, format),
+      format === 'json' ? 'application/json' : 'text/plain'
+    );
 
   return (
     <Card padding="lg" className="mt-6">
@@ -123,6 +219,18 @@ export function CombatLogArchiveSyncControls({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* A refused edit is the one thing on this card that happens mid-combat
+            and needs saying first, whether or not backup is set up. */}
+        {admissionError && (
+          <div className="border-accent-red-border bg-accent-red-bg flex flex-wrap items-start justify-between gap-2 rounded-lg border p-3">
+            <p role="alert" className="text-accent-red-text text-sm">
+              {admissionMessage(admissionError.reason)}
+            </p>
+            <Button size="sm" variant="ghost" onClick={dismissAdmissionError}>
+              Dismiss
+            </Button>
+          </div>
+        )}
         {!sync.context && (
           <Button variant="outline" onClick={sync.discover} loading={sync.busy}>
             Find my campaigns
@@ -271,10 +379,9 @@ export function CombatLogArchiveSyncControls({
               value={sync.historyLegacyId ?? undefined}
               onValueChange={sync.setHistoryLegacyId}
             >
-              {sync.archives.map(({ archiveId, archive }) => (
-                <SelectItem key={archiveId} value={archiveId}>
-                  {archive.encounterId} ·{' '}
-                  {archiveLabel(archive.startedAt, archive.endedAt)}
+              {rows.map(row => (
+                <SelectItem key={row.archiveId} value={row.archiveId}>
+                  {`${row.name} · ${row.label}`}
                 </SelectItem>
               ))}
             </SelectField>
@@ -326,24 +433,45 @@ export function CombatLogArchiveSyncControls({
         )}
         {sync.archives.length > 0 && (
           <div className="space-y-2">
-            {sync.archives.map(({ archiveId, archive }) => (
+            {rows.map(({ archiveId, name, label, detail }) => (
               <div
-                className="border-divider flex items-center justify-between rounded-lg border p-2"
+                className="border-divider flex flex-wrap items-center justify-between gap-2 rounded-lg border p-2"
                 key={archiveId}
               >
-                <span className="text-body text-sm">
-                  {archive.encounterId} ·{' '}
-                  <span className="text-muted">
-                    {archiveLabel(archive.startedAt, archive.endedAt)}
-                  </span>
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => sync.deleteArchive(archiveId)}
-                >
-                  Delete this archive
-                </Button>
+                <div>
+                  <p className="text-body text-sm font-medium">{name}</p>
+                  <p className="text-muted text-xs">{`${label} · ${detail}`}</p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => downloadArchive(archiveId, 'json')}
+                  >
+                    Download as JSON
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => downloadArchive(archiveId, 'text')}
+                  >
+                    Download as text
+                  </Button>
+                  {/* Deleting is destructive and irreversible on this device,
+                      so it waits behind the same workspace choice every other
+                      action on this card waits behind: a backup card must not
+                      open on a delete button. Reading and downloading stay
+                      available from the first render. */}
+                  {sync.workspace && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => sync.deleteArchive(archiveId)}
+                    >
+                      Delete this combat log
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

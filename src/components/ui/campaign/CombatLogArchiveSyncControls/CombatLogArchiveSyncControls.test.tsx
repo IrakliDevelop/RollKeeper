@@ -12,6 +12,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  canonicalJson,
+  combatLogArchivePayloadFrom,
   fingerprintCombatLogArchivePayload,
   fingerprintCombatLogArchiveTombstone,
   type CombatLogArchivePayload,
@@ -36,6 +38,7 @@ import * as supabaseBrowser from '@/lib/supabase/browser';
 import * as browserDmWorkspace from '@/lib/supabase/browserDmWorkspace';
 import { useCombatLogStore } from '@/store/combatLogStore';
 import { useDmStore } from '@/store/dmStore';
+import { useEncounterStore } from '@/store/encounterStore';
 import type { CombatLogState, TurnEvent } from '@/types/combatLog';
 
 import {
@@ -527,7 +530,7 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
       'commit'
     );
     fireEvent.click(
-      screen.getByRole('button', { name: /delete this archive/i })
+      screen.getByRole('button', { name: /delete this combat log/i })
     );
     await waitFor(() =>
       expect(commit).toHaveBeenCalledWith(
@@ -840,6 +843,12 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     );
   });
 
+  // Not a guard on its own: with no edit, `lastFingerprints` is still null, so
+  // the first autosave pass after enrollment only seeds the baseline and would
+  // commit nothing even with the disarm removed. It pins the quiet enrolled
+  // state; the falsifiable companion directly below it — 'never uploads the
+  // local candidate when the DM edits after enrollment' — is what actually
+  // exercises the disarmed gate.
   it('never uploads the local candidate after device enrollment', async () => {
     await enrollAgainstCloudGeneration();
 
@@ -1164,5 +1173,242 @@ describe('combat log archive autosave planning', () => {
     await expect(
       fingerprintCombatLogArchiveTombstone('arc-1')
     ).resolves.toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('CombatLogArchiveSyncControls card', () => {
+  beforeEach(() => {
+    useDmStore.setState({ campaigns: [campaign] });
+    useEncounterStore.setState({ encounters: [], encounterTombstones: {} });
+    requests = [];
+  });
+
+  afterEach(async () => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    // The persisted stores rewrite their envelopes on every setState, so the
+    // resets have to happen before the storage is cleared.
+    useCombatLogStore.setState({
+      encounters: {},
+      combatLogTombstones: {},
+      activeArchiveId: null,
+      lastAdmissionError: null,
+    });
+    useEncounterStore.setState({ encounters: [], encounterTombstones: {} });
+    localStorage.clear();
+    await deleteRollkeeperDatabaseForTests(indexedDB);
+  });
+
+  it('renders nothing at all while the client flag is off', () => {
+    seedArchives({ 'arc-1': endedArchive() });
+
+    const { container } = renderControls();
+
+    expect(container.innerHTML).toBe('');
+  });
+
+  it('renders nothing when the route owner belongs to another campaign', () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    // Both campaigns are known to the DM store, so the owner really does hold
+    // OTHER1 rather than falling back to an undefined campaign code.
+    useDmStore.setState({
+      campaigns: [campaign, { code: 'OTHER1', name: 'Other', createdAt: NOW }],
+    });
+    seedArchives({ 'arc-1': endedArchive() });
+
+    const { container } = render(
+      <CombatLogArchiveSyncProvider campaignCode="OTHER1">
+        <CombatLogArchiveSyncControls campaign={campaign} />
+      </CombatLogArchiveSyncProvider>
+    );
+
+    expect(container.innerHTML).toBe('');
+
+    // Positive control: the very same flag and fixtures do render the card
+    // when the owner is this campaign's, so the emptiness above is the
+    // campaign guard and not a mis-stubbed environment.
+    cleanup();
+    renderControls();
+    expect(screen.getByText('Combat log backup')).toBeInTheDocument();
+  });
+
+  it('describes each combat log by name, start time, event count and size', () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    useEncounterStore.setState({
+      encounters: [
+        {
+          id: 'enc-a',
+          name: 'Goblin ambush',
+          campaignCode: campaign.code,
+          entities: [],
+          currentTurn: 0,
+          round: 1,
+          isActive: false,
+          sortOrder: 'manual',
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+      ],
+      encounterTombstones: {},
+    });
+    const archive = endedArchive({
+      events: [
+        { ...turnEvent('Goblin'), id: 'e1', timestamp: NOW },
+        { ...turnEvent('Bugbear'), id: 'e2', timestamp: NOW },
+      ],
+    });
+    seedArchives({ 'arc-1': archive });
+
+    renderControls();
+
+    const bytes = new TextEncoder().encode(
+      canonicalJson(combatLogArchivePayloadFrom(archive))
+    ).byteLength;
+    // The fixture is deliberately small enough to be reported in bytes; if it
+    // ever grows past a kilobyte this assertion must be updated, not deleted.
+    expect(bytes).toBeLessThan(1024);
+
+    expect(screen.getByText('Goblin ambush')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        `${new Date(NOW).toLocaleString()} · 2 events · ${bytes} bytes`
+      )
+    ).toBeInTheDocument();
+    // The raw archive identity is a developer detail and never the label.
+    expect(screen.queryByText(/enc-a/)).toBeNull();
+    // Destructive controls stay behind the same workspace gate as every other
+    // action on this card, so a backup card never opens on a delete button.
+    expect(
+      screen.queryByRole('button', { name: /delete this combat log/i })
+    ).toBeNull();
+  });
+
+  it('falls back to plain language when the encounter behind a log is gone', () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    seedArchives({ 'arc-1': endedArchive() });
+
+    renderControls();
+
+    expect(screen.getByText('Untitled combat')).toBeInTheDocument();
+  });
+
+  it('downloads one combat log as JSON and as plain text', async () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    seedArchives({
+      'arc-1': endedArchive({
+        events: [{ ...turnEvent('Goblin'), id: 'e1', timestamp: NOW }],
+      }),
+    });
+    const createObjectURL = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:combat-log-export');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const filenames: string[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement
+    ) {
+      filenames.push(this.download);
+    });
+
+    renderControls();
+    fireEvent.click(screen.getByRole('button', { name: 'Download as JSON' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download as text' }));
+
+    const [jsonBlob] = createObjectURL.mock.calls[0] as unknown as [Blob];
+    const [textBlob] = createObjectURL.mock.calls[1] as unknown as [Blob];
+    const store = useCombatLogStore.getState();
+    expect(await jsonBlob.text()).toBe(store.exportArchive('arc-1', 'json'));
+    expect(await textBlob.text()).toBe(store.exportArchive('arc-1', 'text'));
+    // The two formats really are different, so wiring both buttons to one
+    // format cannot pass.
+    expect(await jsonBlob.text()).not.toBe(await textBlob.text());
+    expect(jsonBlob.type).toBe('application/json');
+    expect(textBlob.type).toBe('text/plain');
+    expect(filenames).toEqual([
+      'combat-log-arc-1.json',
+      'combat-log-arc-1.txt',
+    ]);
+  });
+
+  it('deletes a combat log only once the DM confirms, then commits the deletion', async () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    await seedIndexedDbGeneration(archivePayload());
+    mockOwnerWorkspace();
+    mockOwnerSession();
+    seedArchives({ 'arc-1': endedArchive() });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const commit = vi.spyOn(
+      IndexedDbCombatLogArchiveRepository.prototype,
+      'commit'
+    );
+
+    renderControls();
+    await waitFor(() =>
+      expect(screen.getByText(/loaded from this device/i)).toBeInTheDocument()
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /delete this combat log/i })
+    );
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    // Bounded window: a declined confirmation must leave the store and the
+    // local generation exactly as they were.
+    await new Promise(resolve => setTimeout(resolve, 25));
+    expect(useCombatLogStore.getState().encounters['arc-1']).toBeDefined();
+    expect(commit).not.toHaveBeenCalled();
+
+    confirmSpy.mockReturnValue(true);
+    fireEvent.click(
+      screen.getByRole('button', { name: /delete this combat log/i })
+    );
+
+    await waitFor(() =>
+      expect(commit).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'delete', legacyId: 'arc-1' })
+      )
+    );
+    expect(useCombatLogStore.getState().encounters['arc-1']).toBeUndefined();
+  });
+
+  it('explains a refused combat log event in plain language and clears it on dismiss', () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    seedArchives({ 'arc-1': endedArchive() });
+
+    renderControls();
+
+    act(() => {
+      useCombatLogStore.setState({
+        lastAdmissionError: {
+          archiveId: 'arc-1',
+          reason: 'total-bytes',
+          at: NOW,
+        },
+      });
+    });
+    const together = screen.getByRole('alert').textContent ?? '';
+    expect(together).toContain('take up too much space together');
+    expect(together).toContain('was not saved');
+    expect(together).not.toContain('total-bytes');
+
+    // A different reason must produce different guidance, so a single constant
+    // string cannot pass.
+    act(() => {
+      useCombatLogStore.setState({
+        lastAdmissionError: {
+          archiveId: 'arc-1',
+          reason: 'record-bytes',
+          at: NOW,
+        },
+      });
+    });
+    const single = screen.getByRole('alert').textContent ?? '';
+    expect(single).toContain('too big to save');
+    expect(single).not.toBe(together);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+    expect(useCombatLogStore.getState().lastAdmissionError).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
