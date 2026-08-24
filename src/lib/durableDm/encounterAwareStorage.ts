@@ -36,6 +36,102 @@ function tombstoneCampaign(entry: unknown): string | undefined {
   return typeof code === 'string' ? code : undefined;
 }
 
+function entryId(entry: unknown): string | undefined {
+  if (!record(entry) || typeof entry.id !== 'string') return undefined;
+  return entry.id;
+}
+
+/**
+ * Merges a previous and next keyed record so that entries whose campaign is
+ * routed are frozen at their previous value while everything else follows
+ * the next envelope, and the result's key order matches the previous
+ * envelope's own order (new keys, if any, are appended in the next
+ * envelope's order). Rebuilding in `[unrouted, then routed]` order instead
+ * would reorder the object's keys — and therefore its serialized bytes —
+ * even when nothing routed actually changed, which is the exact defect this
+ * ordering guards against.
+ */
+function mergeRoutedRecord(
+  previous: Record<string, unknown>,
+  next: Record<string, unknown>,
+  isRouted: Set<string>,
+  campaignOf: (entry: unknown) => string | undefined
+): Record<string, unknown> {
+  const previousIds = Object.keys(previous);
+  const previousIdSet = new Set(previousIds);
+  const orderedIds = [
+    ...previousIds,
+    ...Object.keys(next).filter(id => !previousIdSet.has(id)),
+  ];
+  const merged: Record<string, unknown> = {};
+  for (const id of orderedIds) {
+    const nextEntry = next[id];
+    const previousEntry = previous[id];
+    const code = campaignOf(nextEntry) ?? campaignOf(previousEntry);
+    if (code && isRouted.has(code)) {
+      if (previousEntry !== undefined)
+        merged[id] = structuredClone(previousEntry);
+    } else if (nextEntry !== undefined) {
+      merged[id] = nextEntry;
+    }
+  }
+  return merged;
+}
+
+/**
+ * Same ordering guarantee as `mergeRoutedRecord`, for `state.encounters`,
+ * which is an array of entries carrying their own `id` field rather than a
+ * keyed record. Entries with no `id` cannot be tracked for routing or stable
+ * ordering and are passed through in the next envelope's order, appended
+ * after the ordered (keyed) entries.
+ */
+function mergeRoutedArray(
+  previous: unknown[],
+  next: unknown[],
+  isRouted: Set<string>,
+  campaignOf: (entry: unknown) => string | undefined
+): unknown[] {
+  const previousById = new Map<string, unknown>();
+  const previousOrder: string[] = [];
+  for (const entry of previous) {
+    const id = entryId(entry);
+    if (id === undefined) continue;
+    previousById.set(id, entry);
+    previousOrder.push(id);
+  }
+  const nextById = new Map<string, unknown>();
+  const nextOrder: string[] = [];
+  const nextUnkeyed: unknown[] = [];
+  for (const entry of next) {
+    const id = entryId(entry);
+    if (id === undefined) {
+      nextUnkeyed.push(entry);
+      continue;
+    }
+    nextById.set(id, entry);
+    nextOrder.push(id);
+  }
+  const previousIdSet = new Set(previousOrder);
+  const orderedIds = [
+    ...previousOrder,
+    ...nextOrder.filter(id => !previousIdSet.has(id)),
+  ];
+  const merged: unknown[] = [];
+  for (const id of orderedIds) {
+    const nextEntry = nextById.get(id);
+    const previousEntry = previousById.get(id);
+    const code = campaignOf(nextEntry) ?? campaignOf(previousEntry);
+    if (code && isRouted.has(code)) {
+      if (previousEntry !== undefined)
+        merged.push(structuredClone(previousEntry));
+    } else if (nextEntry !== undefined) {
+      merged.push(nextEntry);
+    }
+  }
+  merged.push(...nextUnkeyed);
+  return merged;
+}
+
 function encounterSlice(value: unknown): EncounterSlice | null {
   if (!record(value) || !record(value.state)) return null;
   const { state } = value;
@@ -105,35 +201,25 @@ export function createEncounterAwareStorage(backing?: Storage): StateStorage {
           const code = tombstoneCampaign(entry);
           if (code) codes.add(code);
         }
-        // Sorted so the reconstruction is a fixpoint: re-writing an already
-        // routed envelope reproduces the very same bytes.
-        const routed = [...codes]
-          .filter(code => encounterUsesIndexedDbAuthority(storage, code))
-          .sort();
+        const routed = [...codes].filter(code =>
+          encounterUsesIndexedDbAuthority(storage, code)
+        );
         if (routed.length === 0) return safe.setItem(key, nextRaw);
         const isRouted = new Set(routed);
 
-        const encounters = nextSlice.encounters.filter(entry => {
-          const code = encounterCampaign(entry);
-          return !code || !isRouted.has(code);
-        });
-        for (const code of routed) {
-          for (const entry of previousSlice.encounters) {
-            if (encounterCampaign(entry) === code)
-              encounters.push(structuredClone(entry));
-          }
-        }
+        const encounters = mergeRoutedArray(
+          previousSlice.encounters,
+          nextSlice.encounters,
+          isRouted,
+          encounterCampaign
+        );
 
-        const tombstones: Record<string, unknown> = {};
-        for (const [id, entry] of Object.entries(nextSlice.tombstones)) {
-          const code = tombstoneCampaign(entry);
-          if (!code || !isRouted.has(code)) tombstones[id] = entry;
-        }
-        for (const [id, entry] of Object.entries(previousSlice.tombstones)) {
-          const code = tombstoneCampaign(entry);
-          if (code && isRouted.has(code))
-            tombstones[id] = structuredClone(entry);
-        }
+        const tombstones = mergeRoutedRecord(
+          previousSlice.tombstones,
+          nextSlice.tombstones,
+          isRouted,
+          tombstoneCampaign
+        );
 
         nextSlice.state.encounters = encounters;
         // Never introduce the key on an envelope that does not carry it.

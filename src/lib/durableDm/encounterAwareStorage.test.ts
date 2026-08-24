@@ -200,12 +200,13 @@ describe('encounter authority-aware Zustand storage', () => {
     );
 
     const persisted = JSON.parse(localStorage.getItem(KEY)!);
-    // Non-routed entries keep next's values and order; the routed campaign is
-    // replaced by the previous envelope's entries and gains nothing new.
+    // Entries follow the previous envelope's own order — the routed campaign
+    // is replaced by the previous envelope's entry in place and gains
+    // nothing new; unrouted entries keep next's values (Slice 11G task 1).
     expect(persisted.state.encounters).toEqual([
+      frozen,
       encounter('enc-d', 'DEF456', { round: 4 }),
       encounter('enc-free', undefined, { round: 7 }),
-      frozen,
     ]);
     expect(persisted.state.activeEncounterId).toBe('enc-d');
     expect(persisted.state.combatConfig).toEqual({ enemyHpDisplay: 'bands' });
@@ -264,9 +265,11 @@ describe('encounter authority-aware Zustand storage', () => {
 
     const persisted = JSON.parse(localStorage.getItem(KEY)!);
     expect('encounterTombstones' in persisted.state).toBe(false);
+    // Order follows the previous envelope (`enc-a` first), not an
+    // unrouted-then-routed rebuild (Slice 11G task 1).
     expect(persisted.state.encounters).toEqual([
-      encounter('enc-d', 'DEF456'),
       frozen,
+      encounter('enc-d', 'DEF456'),
     ]);
     expect(persisted.state.activeEncounterId).toBe('enc-d');
   });
@@ -287,9 +290,11 @@ describe('encounter authority-aware Zustand storage', () => {
     );
 
     const persisted = JSON.parse(localStorage.getItem(KEY)!);
+    // Order follows the previous envelope (`enc-gone` first), not an
+    // unrouted-then-routed rebuild (Slice 11G task 1).
     expect(Object.keys(persisted.state.encounterTombstones)).toEqual([
-      'enc-other',
       'enc-gone',
+      'enc-other',
     ]);
     expect(persisted.state.encounterTombstones['enc-gone']).toEqual(
       frozenTombstone
