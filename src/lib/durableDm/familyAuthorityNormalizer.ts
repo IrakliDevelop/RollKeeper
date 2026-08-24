@@ -83,12 +83,20 @@ export function toAuthorityPointerView(
   record: RawAuthorityPointerRecord
 ): AuthorityPointerView | null {
   if (record.namespace === undefined) return null;
-  // The only place in this module allowed to mint the brand: the plain
-  // literal below has no `[authorityPointerViewBrand]` property, so a direct
-  // `as AuthorityPointerView` is rejected as an insufficient-overlap
-  // conversion. Routing through `unknown` is the standard, deliberate way to
-  // assert a nominal brand once — everywhere else, only this function's own
-  // return type carries the assertion.
+  // The only place in this module allowed to mint the brand. A direct
+  // `as AuthorityPointerView` on the plain `{ authority, epoch }` literal
+  // below actually compiles without the `unknown` hop: TypeScript permits a
+  // single-step cast whenever the target is assignable to the source, and a
+  // branded type — having all of the source's fields plus the brand — is a
+  // structural subtype of its unbranded base, so that direction holds. (A
+  // *raw reader record*, with its extra `namespace`/`campaignId`/etc. fields
+  // that neither type has, is a genuine insufficient-overlap case and does
+  // need the `unknown` hop — that is not what is happening here.) The
+  // `unknown` hop below is kept anyway, as defensive style: everywhere else
+  // in this module, only this function's return type is allowed to carry the
+  // brand assertion, and routing through `unknown` makes that one-time
+  // assertion visually unmistakable rather than relying on the reader
+  // noticing it is the permitted direction.
   return {
     authority: record.authority,
     epoch: record.epoch,
