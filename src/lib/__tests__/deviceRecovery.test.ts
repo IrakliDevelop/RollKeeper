@@ -11,6 +11,7 @@ import {
   stageRecoveryBundle,
   validateDeviceBackupJson,
   verifyDownloadedDeviceBackup,
+  type RecoveryDownloadReceipt,
 } from '@/lib/deviceRecovery';
 
 describe('device recovery bundle', () => {
@@ -227,7 +228,37 @@ describe('device recovery bundle', () => {
       runId: bundle.runId,
       manifestHash: bundle.manifestHash,
       initiatedAt: '2026-08-15T10:05:00.000Z',
+      entries: bundle.entries.map(({ key, byteCount, sha256 }) => ({
+        key,
+        byteCount,
+        sha256,
+      })),
     });
+  });
+
+  it('records the bundle entry vector on the download receipt', async () => {
+    const recorded: RecoveryDownloadReceipt[] = [];
+    const storage = new Map<string, string>([
+      ['rollkeeper-dm-data', '{"state":{},"version":1}'],
+      ['rollkeeper-player-data', '{"state":{"characters":[]},"version":1}'],
+    ]);
+    const bundle = await captureDeviceBackup(storage, {
+      appVersion: 'test',
+      runId: 'run-1',
+      timestamp: '2026-08-24T00:00:00.000Z',
+    });
+
+    await initiateDeviceBackupDownload(bundle, {
+      recordDownloadReceipt: async receipt => void recorded.push(receipt),
+    });
+
+    expect(recorded[0].entries).toEqual(
+      bundle.entries.map(({ key, byteCount, sha256 }) => ({
+        key,
+        byteCount,
+        sha256,
+      }))
+    );
   });
 
   it('verifies a reselected download only when its checksums and exact identity match', async () => {
