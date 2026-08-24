@@ -27,7 +27,12 @@ describe('campaignSettingsAdapter', () => {
     createCampaignSettingsHarness
   );
 
-  describeCardParity('campaign_settings', createCampaignSettingsHarness);
+  describeCardParity('campaign_settings', createCampaignSettingsHarness, {
+    runIndexedDbMigration: 'runCampaignSettingsIndexedDbMigration',
+    commitLocalCutover: 'commitCampaignSettingsLocalCutover',
+    markCloudAuthority: 'markCampaignSettingsCloudAuthority',
+    rollbackLocalAuthority: 'rollbackCampaignSettingsLocalAuthority',
+  });
 
   it('is invisible when its own client flag is off', () => {
     vi.stubEnv('NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE', 'false');
@@ -127,5 +132,33 @@ describe('campaignSettingsAdapter', () => {
         recovery: { ...context.recovery, manifestHash: 'e'.repeat(64) },
       })
     ).rejects.toThrow(/safety gate/i);
+  });
+
+  // Task 8 review, Important 3: the two clauses of
+  // `assertWorkingCopyUnchanged` distinct from the delete clause above were
+  // surviving mutants — neutering either left 30/30 green. Each pinned by
+  // its own test so a mutation to either clause reddens exactly one test.
+  it('refuses to stage a campaign whose working copy fingerprint drifted since the preview', async () => {
+    const harness = createCampaignSettingsHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughLocalCutover(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    await harness.corruptWorkingCopyFingerprint();
+    await expect(
+      harness.adapter.activateCloud(context, manifest)
+    ).rejects.toThrow(/changed since the last check/i);
+    expect(harness.trace()).not.toContain('begin-staging');
+  });
+
+  it('refuses to stage a campaign whose working copy schemaVersion drifted since the preview', async () => {
+    const harness = createCampaignSettingsHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughLocalCutover(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    await harness.corruptWorkingCopySchemaVersion();
+    await expect(
+      harness.adapter.activateCloud(context, manifest)
+    ).rejects.toThrow(/changed since the last check/i);
+    expect(harness.trace()).not.toContain('begin-staging');
   });
 });

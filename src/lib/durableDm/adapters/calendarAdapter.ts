@@ -183,7 +183,19 @@ export const calendarAdapter: DurableFamilyAdapter<CalendarManifest> = {
       now: () => new Date().toISOString(),
       nowMs: () => Date.now(),
       requiredRecoveryManifestHash: context.recovery.manifestHash,
-      recoveryGate: browserRecoveryRepository,
+      // Task 8 review, Important 5: matches `CalendarSyncControls.tsx`'s
+      // OWN `prepare()` (`:639-641`), which wraps the repository so the
+      // migration engine's `hasDownloadReceipt` gate call actually checks
+      // `hasVerifiedDownloadReceipt` — stricter than the bare
+      // `hasDownloadReceipt` `campaignSettingsAdapter.ts` passes, which is
+      // correct THERE because it matches campaign_settings' own card
+      // (`CampaignSettingsSyncControls.tsx:588`). The template's value is
+      // per-card fidelity, not uniformity across families — do not copy
+      // campaign_settings' pattern here.
+      recoveryGate: {
+        hasDownloadReceipt: manifestHash =>
+          browserRecoveryRepository.hasVerifiedDownloadReceipt(manifestHash),
+      },
     });
     if (result.state !== 'CUTOVER_READY') {
       throw new Error(
@@ -215,7 +227,7 @@ export const calendarAdapter: DurableFamilyAdapter<CalendarManifest> = {
       // `campaignSettingsAdapter.ts`'s own distinction (fix round 2, item 6c
       // there): this names WHEN the drift was detected, before/at cutover.
       throw new Error(
-        'Your campaign calendar changed since you prepared this device. Preview the migration again.'
+        'Your campaign calendar changed since you prepared this browser. Preview the migration again.'
       );
     // Spec R10. Ordered before the cutover so a failure here leaves legacy
     // authority untouched, and asserted afterwards so a caller that passes a
@@ -376,8 +388,19 @@ export const calendarAdapter: DurableFamilyAdapter<CalendarManifest> = {
       expectedEpoch: Math.max(0, localEpoch - 1),
       request: {
         // Persisted, never freshly generated — hashed into begin_staging.
+        // Task 8 review, Critical 1: the key prefix MUST be
+        // `'campaign-calendar'`, matching the shipped card's own key
+        // (`CalendarSyncControls.tsx:789`, `:916`, `:1291`:
+        // `` `rollkeeper:campaign-calendar-device:${accountId}:${campaignId}` ``),
+        // not a bare `'calendar'` — the two would otherwise mint and persist
+        // DIFFERENT device identities for the same browser and campaign,
+        // and since this value is hashed into `begin_staging`
+        // (`adapters/shared.ts`'s `deviceIdFor` doc comment), a DM who
+        // starts staging from the card and resumes from the wizard (or vice
+        // versa) would hit a `22023` mutation-id reuse rejection instead of
+        // a legitimate resume.
         deviceId: deviceIdFor(
-          'calendar',
+          'campaign-calendar',
           context.accountId,
           context.campaignId
         ),

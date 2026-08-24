@@ -3,7 +3,10 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { calendarAdapter } from '../calendarAdapter';
-import { describeAdapterConformance } from './adapterConformance';
+import {
+  describeAdapterConformance,
+  describeCardParity,
+} from './adapterConformance';
 import { createCalendarHarness } from './harnesses/calendar';
 
 describe('calendarAdapter', () => {
@@ -16,6 +19,13 @@ describe('calendarAdapter', () => {
   });
 
   describeAdapterConformance('calendar', createCalendarHarness);
+
+  describeCardParity('calendar', createCalendarHarness, {
+    runIndexedDbMigration: 'runCalendarIndexedDbMigration',
+    commitLocalCutover: 'commitCalendarLocalCutover',
+    markCloudAuthority: 'markCalendarCloudAuthority',
+    rollbackLocalAuthority: 'rollbackCalendarLocalAuthority',
+  });
 
   it('is invisible when its own client flag is off', () => {
     vi.stubEnv('NEXT_PUBLIC_CALENDAR_SYNC_VISIBLE', 'false');
@@ -210,5 +220,52 @@ describe('calendarAdapter', () => {
       state: 'legacy',
       rolledBack: true,
     });
+  });
+
+  // Task 8 review, Important 3: `assertWorkingCopyUnchanged`'s fingerprint
+  // and schemaVersion clauses were surviving mutants — neutering either
+  // left 35/35 green. Each pinned by its own test so a mutation to either
+  // clause reddens exactly one test.
+  it('refuses to stage a calendar whose working copy fingerprint drifted since the preview', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughLocalCutover(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    await harness.corruptWorkingCopyFingerprint();
+    await expect(
+      harness.adapter.activateCloud(context, manifest)
+    ).rejects.toThrow(/changed since the last check/i);
+    expect(harness.trace()).not.toContain('begin-staging');
+  });
+
+  it('refuses to stage a calendar whose working copy schemaVersion drifted since the preview', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughLocalCutover(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    await harness.corruptWorkingCopySchemaVersion();
+    await expect(
+      harness.adapter.activateCloud(context, manifest)
+    ).rejects.toThrow(/changed since the last check/i);
+    expect(harness.trace()).not.toContain('begin-staging');
+  });
+
+  // Task 8 review, Important 5: `prepareIndexedDb`'s `recoveryGate` must
+  // now require a VERIFIED receipt (matching `CalendarSyncControls.tsx`'s
+  // own `prepare()`), not merely an initiated one. Calls `prepareIndexedDb`
+  // directly, bypassing `selectFamily` (which already demands a verified
+  // receipt for the same hash) — the interface enforces no call order, so
+  // this is the only way to observe `prepareIndexedDb`'s OWN gate.
+  it('prepareIndexedDb refuses an initiated-but-unverified recovery receipt', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    const unverifiedHash = 'f'.repeat(64);
+    await harness.recordUnverifiedReceipt(unverifiedHash);
+    await expect(
+      harness.adapter.prepareIndexedDb({
+        ...context,
+        recovery: { ...context.recovery, manifestHash: unverifiedHash },
+      })
+    ).rejects.toThrow();
   });
 });

@@ -11,6 +11,7 @@ import * as campaignSettingsLegacyProjectionModule from '@/lib/durableDm/campaig
 import * as resumableCloudActivationModule from '@/lib/durableDm/resumableCloudActivation';
 import { captureDeviceBackup } from '@/lib/deviceRecovery';
 import * as campaignSettingsAuthorityModule from '@/lib/indexeddb/campaignSettingsAuthority';
+import * as campaignSettingsMigrationModule from '@/lib/indexeddb/campaignSettingsMigration';
 import * as browserDmWorkspaceModule from '@/lib/supabase/browserDmWorkspace';
 import * as supabaseBrowserModule from '@/lib/supabase/browser';
 import {
@@ -105,6 +106,25 @@ export interface CampaignSettingsConformanceHarness extends CardParityHarness {
   forcePreviewAuthorityMismatch(): void;
   /** Fix round 2, item 4: isolates rollback's three preview null-checks. */
   forceIncompleteCloudPreview(): void;
+  /**
+   * Task 8 review, Important 3: rewrites the IndexedDB working copy's
+   * `contentFingerprint` so it no longer matches its own payload, without
+   * deleting it — isolates `activateCloud`'s
+   * `assertWorkingCopyUnchanged` fingerprint clause from its neighbouring
+   * delete clause. (This mutation is also what `previewManifest`'s own
+   * fingerprint-verification guard is proven against, when called before
+   * `previewManifest` re-runs.)
+   */
+  corruptWorkingCopyFingerprint(): Promise<void>;
+  /**
+   * Task 8 review, Important 3: rewrites the working copy's
+   * `schemaVersion` alone (keeping `contentFingerprint` matching) —
+   * isolates `assertWorkingCopyUnchanged`'s schemaVersion clause, which has
+   * no counterpart check in the card
+   * (`CampaignSettingsSyncControls.tsx`'s own `assertWorkingCopyUnchanged`
+   * checks only `contentFingerprint`) — declared here as adapter-only.
+   */
+  corruptWorkingCopySchemaVersion(): Promise<void>;
 }
 
 export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarness {
@@ -453,6 +473,24 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
   ).mockImplementation(async (...args) => {
     recordLibraryCall('rollbackCampaignSettingsLocalAuthority', args);
     return realRollbackCampaignSettingsLocalAuthority(...args);
+  });
+
+  // Task 8 review, Critical 2c: the template spied only
+  // `runResumableCloudActivation` and the three authority functions, never
+  // `runCampaignSettingsIndexedDbMigration` — which is why a card/adapter
+  // divergence in ITS options (e.g. a different `recoveryGate` strictness)
+  // was invisible to the step-parity comparison. Both the card
+  // (`CampaignSettingsSyncControls.tsx`'s `prepare()`) and the adapter
+  // (`prepareIndexedDb`) call this SAME module export directly, so one spy
+  // layer sees either caller, exactly like the three spies above.
+  const realRunCampaignSettingsIndexedDbMigration =
+    campaignSettingsMigrationModule.runCampaignSettingsIndexedDbMigration;
+  vi.spyOn(
+    campaignSettingsMigrationModule,
+    'runCampaignSettingsIndexedDbMigration'
+  ).mockImplementation(async (...args) => {
+    recordLibraryCall('runCampaignSettingsIndexedDbMigration', args);
+    return realRunCampaignSettingsIndexedDbMigration(...args);
   });
 
   const realWriteCampaignSettingsProjectionAuthority =
@@ -928,6 +966,58 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
      */
     forceIncompleteCloudPreview() {
       forcedPreviewMode = 'incomplete';
+    },
+
+    // -----------------------------------------------------------------
+    // Task 8 review, Important 3.
+    // -----------------------------------------------------------------
+
+    async corruptWorkingCopyFingerprint() {
+      const database = await openRollkeeperDatabase();
+      try {
+        const repository = new IndexedDbCampaignSettingsRepository(database);
+        const current = await repository.getDocument(NAMESPACE, CAMPAIGN_CODE);
+        if (!current) throw new Error('No working copy to corrupt');
+        await repository.commit({
+          namespace: NAMESPACE,
+          campaignId: CAMPAIGN_ID,
+          legacyId: CAMPAIGN_CODE,
+          cutoverEpoch: current.cutoverEpoch,
+          operation: 'replace',
+          payload: current.payload,
+          schemaVersion: current.schemaVersion,
+          localRevision: current.localRevision + 1,
+          baseServerVersion: current.baseServerVersion,
+          contentFingerprint: 'c'.repeat(64),
+          updatedAt: NOW,
+        });
+      } finally {
+        database.close();
+      }
+    },
+
+    async corruptWorkingCopySchemaVersion() {
+      const database = await openRollkeeperDatabase();
+      try {
+        const repository = new IndexedDbCampaignSettingsRepository(database);
+        const current = await repository.getDocument(NAMESPACE, CAMPAIGN_CODE);
+        if (!current) throw new Error('No working copy to corrupt');
+        await repository.commit({
+          namespace: NAMESPACE,
+          campaignId: CAMPAIGN_ID,
+          legacyId: CAMPAIGN_CODE,
+          cutoverEpoch: current.cutoverEpoch,
+          operation: 'replace',
+          payload: current.payload,
+          schemaVersion: current.schemaVersion + 1,
+          localRevision: current.localRevision + 1,
+          baseServerVersion: current.baseServerVersion,
+          contentFingerprint: current.contentFingerprint,
+          updatedAt: NOW,
+        });
+      } finally {
+        database.close();
+      }
     },
 
     // -----------------------------------------------------------------

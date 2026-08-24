@@ -781,9 +781,27 @@ export function expectLibraryCallSequenceMatches(
   });
 }
 
+/**
+ * Fix round (Task 8 review, Critical 2a): `describeCardParity` hardcoded
+ * `campaign_settings`' own library function names despite its doc comment
+ * claiming Tasks 8-12 "inherit" it — a Task 7 residual that made it
+ * unusable, unmodified, for any other family. This map is the one thing
+ * that actually differs per family: each family's own
+ * `run<Family>IndexedDbMigration`, `commit<Family>LocalCutover`,
+ * `mark<Family>CloudAuthority` and `rollback<Family>LocalAuthority` export
+ * names, exactly as the harness's own `vi.spyOn` calls target them.
+ */
+export interface CardParityFunctionNames {
+  runIndexedDbMigration: string;
+  commitLocalCutover: string;
+  markCloudAuthority: string;
+  rollbackLocalAuthority: string;
+}
+
 export function describeCardParity(
   name: string,
-  createHarness: () => CardParityHarness
+  createHarness: () => CardParityHarness,
+  functionNames: CardParityFunctionNames
 ) {
   it(`${name}: the adapter matches the card call-for-call through local cutover, cloud activation and rollback`, async () => {
     // Same literal device id for both runs, so `deviceId` — hashed into
@@ -813,6 +831,26 @@ export function describeCardParity(
     const adapterBodies = adapterHarness.allCloudRequestBodies();
     const adapterMarker = adapterHarness.currentMarkerRaw();
 
+    // 0. `run<Family>IndexedDbMigration`'s options object — a single
+    // `(options)` argument, index 0, unlike the `(database, options)`
+    // signature every authority function below takes. Compares only the
+    // stable scoping fields (`namespace`, `campaignId`, `campaignCode`,
+    // `requiredRecoveryManifestHash`): `factory`/`storage`/`now`/`nowMs` are
+    // functions/handles with no cross-caller identity, and `runId`/`ownerId`
+    // are per-run-random on both sides. `recoveryGate` is DELIBERATELY
+    // excluded here too — it is a closure, not a comparable value — so this
+    // check does NOT by itself prove the card and the adapter apply the same
+    // verification strictness to it; that is pinned by each family's own
+    // dedicated "requires a verified receipt" test instead (Task 8 review,
+    // Important 5).
+    expectLibraryCallSequenceMatches(
+      functionNames.runIndexedDbMigration,
+      cardCalls,
+      adapterCalls,
+      0,
+      ['factory', 'storage', 'runId', 'ownerId', 'now', 'nowMs', 'recoveryGate']
+    );
+
     // 1. commitLocalCutover: the FULL call sequence (fix round 4, item 1),
     // not just the last call — argument object field for field, including
     // every `gates` flag and the `initialDocument` shape — excluding
@@ -823,7 +861,7 @@ export function describeCardParity(
     // would have one call per document, and this same check compares all
     // of them, not only the final one.
     expectLibraryCallSequenceMatches(
-      'commitCampaignSettingsLocalCutover',
+      functionNames.commitLocalCutover,
       cardCalls,
       adapterCalls,
       1,
@@ -833,9 +871,9 @@ export function describeCardParity(
       ['generation', 'initialDocument', 'now']
     );
     const cardCutoverSequence =
-      cardCalls.commitCampaignSettingsLocalCutover ?? [];
+      cardCalls[functionNames.commitLocalCutover] ?? [];
     const adapterCutoverSequence =
-      adapterCalls.commitCampaignSettingsLocalCutover ?? [];
+      adapterCalls[functionNames.commitLocalCutover] ?? [];
     cardCutoverSequence.forEach((cardArgs, index) => {
       const cardOptions = cardArgs[1] as { initialDocument?: unknown };
       const adapterOptions = adapterCutoverSequence[index][1] as {
@@ -869,8 +907,20 @@ export function describeCardParity(
     // 3. `mark*CloudAuthority` arguments, including `expectedLocalEpoch`,
     // `cloudEpoch` and `acceptedVersion` — full sequence, not just the last
     // call (fix round 4, item 1).
+    //
+    // Task 8 review, Minor item 6, DECLARED rather than silently excluded:
+    // `acceptedVersion.serverVersion` is a KNOWN card/adapter divergence in
+    // every family checked so far — the shipped card hardcodes `1`
+    // (`CampaignSettingsSyncControls.tsx:784`, `CalendarSyncControls.tsx:837`),
+    // while the adapter reads `result.acceptedVersions[0].serverVersion`
+    // (the more correct value: whatever the server actually confirmed). This
+    // `toEqual` comparison does not fail today only because every fixture in
+    // this suite is a FIRST migration, where the server's real confirmed
+    // version and the card's hardcoded literal both happen to be `1`. It is
+    // not a general proof the two agree on any later version — recorded here
+    // so a future reader does not mistake a coincidence for a contract.
     expectLibraryCallSequenceMatches(
-      'markCampaignSettingsCloudAuthority',
+      functionNames.markCloudAuthority,
       cardCalls,
       adapterCalls,
       1,
@@ -885,7 +935,7 @@ export function describeCardParity(
       omitKeys(cardRollbackBody, ['mutationId'])
     );
     expectLibraryCallSequenceMatches(
-      'rollbackCampaignSettingsLocalAuthority',
+      functionNames.rollbackLocalAuthority,
       cardCalls,
       adapterCalls,
       1,

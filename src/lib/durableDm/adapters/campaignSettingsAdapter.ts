@@ -241,7 +241,7 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
         // two live in different methods, and no test asserts across both),
         // but the phrasing here now names WHEN the drift was detected.
         throw new Error(
-          'Your campaign settings changed since you prepared this device. Preview the migration again.'
+          'Your campaign settings changed since you prepared this browser. Preview the migration again.'
         );
       // Spec R10. The backport's defect 1 was this call missing on the local
       // cutover path: hydration then failed after reload, the store fell back

@@ -1,7 +1,9 @@
 import 'fake-indexeddb/auto';
 
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
 
+import { CalendarSyncControls } from '@/components/ui/calendar/CalendarSyncControls';
 import { browserRecoveryRepository } from '@/lib/browserRecoveryRepository';
 import { calendarAdapter } from '@/lib/durableDm/adapters/calendarAdapter';
 import type { MigrationRunContext } from '@/lib/durableDm/durableFamilyAdapter';
@@ -9,6 +11,7 @@ import * as calendarLegacyProjectionModule from '@/lib/durableDm/calendarLegacyP
 import * as resumableCloudActivationModule from '@/lib/durableDm/resumableCloudActivation';
 import { captureDeviceBackup } from '@/lib/deviceRecovery';
 import * as calendarAuthorityModule from '@/lib/indexeddb/calendarAuthority';
+import * as calendarMigrationModule from '@/lib/indexeddb/calendarMigration';
 import {
   IndexedDbCalendarRepository,
   type CalendarOutboxEntry,
@@ -22,6 +25,8 @@ import {
   requestResult,
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
+import * as browserDmWorkspaceModule from '@/lib/supabase/browserDmWorkspace';
+import * as supabaseBrowserModule from '@/lib/supabase/browser';
 import { useCalendarStore } from '@/store/calendarStore';
 import type {
   CalendarConfig,
@@ -29,7 +34,7 @@ import type {
   CampaignCalendar,
 } from '@/types/calendar';
 
-import type { ConformanceHarness } from '../adapterConformance';
+import type { CardParityHarness } from '../adapterConformance';
 
 const NOW = '2026-08-24T00:00:00.000Z';
 const ACCOUNT_ID = '55555555-5555-4555-8555-555555555555';
@@ -136,11 +141,18 @@ const ownerWorkspace: DmWorkspaceDocument = {
   acknowledgedAt: NOW,
 };
 
+// The `campaign` prop `CalendarSyncControls` renders with. Calendar data
+// itself lives in `useCalendarStore`, read live by the component — unlike
+// `CampaignSettingsSyncControls`, whose settings ARE the `campaign` prop, so
+// no live-reading wrapper component is needed here: this literal is exactly
+// what `CalendarSyncControls.test.tsx`'s own fixture uses.
+const CAMPAIGN_INFO = { code: CAMPAIGN_CODE, name: 'Canary', createdAt: NOW };
+
 /**
  * Ruling R3.1: extra members this family's own tests use, beyond the base
  * `ConformanceHarness` Task 7 declares.
  */
-export interface CalendarConformanceHarness extends ConformanceHarness {
+export interface CalendarConformanceHarness extends CardParityHarness {
   /**
    * Every action string sent to `/api/calendar-sync`, live: the returned
    * function reads the CURRENT log each time it is called, not a snapshot
@@ -168,10 +180,20 @@ export interface CalendarConformanceHarness extends ConformanceHarness {
   /**
    * Rewrites the IndexedDB working copy's `contentFingerprint` so it no
    * longer matches its own payload, without deleting or removing it —
-   * isolates `previewManifest`'s fingerprint-verification guard from its
-   * neighbouring "document missing / deleted / empty" guard.
+   * isolates `previewManifest`'s fingerprint-verification guard AND
+   * `activateCloud`'s `assertWorkingCopyUnchanged` fingerprint clause from
+   * their neighbouring "document missing/deleted" and delete clauses.
    */
   corruptWorkingCopyFingerprint(): Promise<void>;
+  /**
+   * Task 8 review, Important 3: rewrites the working copy's `schemaVersion`
+   * alone (keeping `contentFingerprint` matching) — isolates
+   * `assertWorkingCopyUnchanged`'s schemaVersion clause, which has no
+   * counterpart in the card (`CalendarSyncControls.tsx`'s own
+   * `assertWorkingCopyUnchanged` checks only `contentFingerprint`,
+   * `:775-777`) — declared adapter-only, not removed.
+   */
+  corruptWorkingCopySchemaVersion(): Promise<void>;
   /**
    * Nulls the fake server's own `currentGeneration.payload` (keeping every
    * other field) so `rollback`'s response carries no payload — the calendar
@@ -179,6 +201,14 @@ export interface CalendarConformanceHarness extends ConformanceHarness {
    * legacy-store restore entirely.
    */
   nullifyCloudPayload(): void;
+  /**
+   * Task 8 review, Important 5: records a download receipt for
+   * `manifestHash` WITHOUT verifying it — `recordDownloadReceipt` only,
+   * never `verifyDownloadReceipt`. Lets a test prove `prepareIndexedDb`'s
+   * `recoveryGate` now requires the STRICTER `hasVerifiedDownloadReceipt`,
+   * matching `CalendarSyncControls.tsx`'s own `prepare()` (`:639-641`).
+   */
+  recordUnverifiedReceipt(manifestHash: string): Promise<void>;
 }
 
 export function createCalendarHarness(): CalendarConformanceHarness {
@@ -227,6 +257,18 @@ export function createCalendarHarness(): CalendarConformanceHarness {
     stageItems: Record<string, unknown>[];
     confirmCutover: Record<string, unknown>[];
   } = { beginStaging: [], stageItems: [], confirmCutover: [] };
+  // Task 8 review, Critical 2(b): every cloud request body ever sent, by
+  // action, for the step-parity test — `recorded` above stays scoped to the
+  // three staging actions `requestBodies()` already promises.
+  const allRequestBodiesByAction: Record<string, Record<string, unknown>[]> =
+    {};
+  // Task 8 review, Critical 2(a)/(c): full ordered call-argument capture,
+  // by function name, for the step-parity test — mirrors
+  // `harnesses/campaignSettings.tsx`'s `libraryCalls`.
+  const libraryCalls: Record<string, unknown[][]> = {};
+  function recordLibraryCall(name: string, args: unknown[]) {
+    (libraryCalls[name] ??= []).push(args);
+  }
 
   function replay<T>(
     mutationId: string,
@@ -390,6 +432,8 @@ export function createCalendarHarness(): CalendarConformanceHarness {
       const rest = Object.fromEntries(
         Object.entries(body).filter(([field]) => field !== 'action')
       );
+      // Every action's body, for the step-parity test.
+      (allRequestBodiesByAction[action] ??= []).push(rest);
 
       if (
         action === 'begin-staging' ||
@@ -462,6 +506,7 @@ export function createCalendarHarness(): CalendarConformanceHarness {
     'markCalendarCloudAuthority'
   ).mockImplementation(async (...args) => {
     trace.push('mark-cloud-authority');
+    recordLibraryCall('markCalendarCloudAuthority', args);
     return realMarkCalendarCloudAuthority(...args);
   });
 
@@ -472,6 +517,7 @@ export function createCalendarHarness(): CalendarConformanceHarness {
     'commitCalendarLocalCutover'
   ).mockImplementation(async (...args) => {
     cutoverSink?.push('cutover');
+    recordLibraryCall('commitCalendarLocalCutover', args);
     return realCommitCalendarLocalCutover(...args);
   });
 
@@ -481,7 +527,24 @@ export function createCalendarHarness(): CalendarConformanceHarness {
     calendarAuthorityModule,
     'rollbackCalendarLocalAuthority'
   ).mockImplementation(async (...args) => {
+    recordLibraryCall('rollbackCalendarLocalAuthority', args);
     return realRollbackCalendarLocalAuthority(...args);
+  });
+
+  // Task 8 review, Critical 2(c): the template spied only
+  // `runResumableCloudActivation` and the three authority functions, never
+  // `run<Family>IndexedDbMigration` — which is why the `recoveryGate`
+  // divergence (Important 5) was invisible to the step-parity comparison.
+  // Both the card (`CalendarSyncControls.tsx`'s `prepare()`) and the adapter
+  // (`prepareIndexedDb`) call this SAME module export directly.
+  const realRunCalendarIndexedDbMigration =
+    calendarMigrationModule.runCalendarIndexedDbMigration;
+  vi.spyOn(
+    calendarMigrationModule,
+    'runCalendarIndexedDbMigration'
+  ).mockImplementation(async (...args) => {
+    recordLibraryCall('runCalendarIndexedDbMigration', args);
+    return realRunCalendarIndexedDbMigration(...args);
   });
 
   const realWriteCalendarProjectionAuthority =
@@ -610,8 +673,12 @@ export function createCalendarHarness(): CalendarConformanceHarness {
     trace: () => [...trace],
 
     seedDeviceId(deviceId) {
+      // Task 8 review, Critical 1: must match the adapter's (now corrected)
+      // `deviceIdFor('campaign-calendar', ...)` key prefix, which is what
+      // the shipped card itself persists to
+      // (`CalendarSyncControls.tsx:789`, `:916`, `:1291`).
       localStorage.setItem(
-        `rollkeeper:calendar-device:${ACCOUNT_ID}:${CAMPAIGN_ID}`,
+        `rollkeeper:campaign-calendar-device:${ACCOUNT_ID}:${CAMPAIGN_ID}`,
         deviceId
       );
     },
@@ -967,9 +1034,188 @@ export function createCalendarHarness(): CalendarConformanceHarness {
       }
     },
 
+    async corruptWorkingCopySchemaVersion() {
+      const database = await openRollkeeperDatabase();
+      try {
+        const repository = new IndexedDbCalendarRepository(database);
+        const current = await repository.getDocument(NAMESPACE, CAMPAIGN_CODE);
+        if (!current) throw new Error('No working copy to corrupt');
+        await repository.commit({
+          namespace: NAMESPACE,
+          campaignId: CAMPAIGN_ID,
+          legacyId: CAMPAIGN_CODE,
+          cutoverEpoch: current.cutoverEpoch,
+          operation: 'replace',
+          payload: current.payload,
+          schemaVersion: current.schemaVersion + 1,
+          localRevision: current.localRevision + 1,
+          baseServerVersion: current.baseServerVersion,
+          contentFingerprint: current.contentFingerprint,
+          updatedAt: NOW,
+        });
+      } finally {
+        database.close();
+      }
+    },
+
     nullifyCloudPayload() {
       if (!serverDocument) throw new Error('No cloud generation to nullify');
       serverDocument = { ...serverDocument, payload: null };
+    },
+
+    async recordUnverifiedReceipt(manifestHash) {
+      await browserRecoveryRepository.recordDownloadReceipt({
+        runId: crypto.randomUUID(),
+        manifestHash,
+        initiatedAt: NOW,
+      });
+    },
+
+    // -----------------------------------------------------------------
+    // Task 8 review, Critical 2(b): the card/adapter step-parity test
+    // support, mirroring `harnesses/campaignSettings.tsx`'s own section.
+    // -----------------------------------------------------------------
+
+    /**
+     * Renders the SHIPPED `CalendarSyncControls` card and drives it, by
+     * clicking its own buttons, through discovery -> select -> preview ->
+     * download recovery file -> verify (via a re-uploaded File built from
+     * the downloaded Blob) and select -> prepare -> confirm local cutover
+     * -> activate cloud -> verified rollback. Every library call the card
+     * makes along the way is captured by the SAME spies
+     * `recordedLibraryCalls()` and `allCloudRequestBodies()` expose for the
+     * adapter.
+     *
+     * Named, expected differences from the adapter's own chain:
+     *   - the card discovers and selects a workspace interactively; the
+     *     adapter receives an already-selected `MigrationRunContext`.
+     *   - the card's recovery flow is TWO explicit steps — "Download
+     *     recovery file" then a file re-upload ("Verify recovery file and
+     *     select") — unlike `campaign_settings`' one-click "Download
+     *     recovery and select". Both still reach the same
+     *     recorded-and-verified-receipt-plus-selected state the adapter's
+     *     `selectFamily` requires.
+     *   - the card uses `window.confirm`; the adapter has none (spec R12).
+     *   - the card has no `verifyCloud` equivalent (new per R1).
+     *   - mutation ids are random (`crypto.randomUUID()`) on the card and
+     *     deterministic on the adapter.
+     *   - `acceptedVersion.serverVersion` is hardcoded `1` on the card
+     *     (`CalendarSyncControls.tsx:837`) vs computed from the server's
+     *     response on the adapter (`calendarAdapter.ts`) — declared
+     *     centrally in `adapterConformance.ts`'s `describeCardParity` (Task
+     *     8 review, Minor 6), not re-declared here.
+     *   - `assertWorkingCopyUnchanged`'s `schemaVersion` clause has no card
+     *     counterpart (adapter-only) — see
+     *     `corruptWorkingCopySchemaVersion`'s doc comment above.
+     *   - after Task 8 review Important 5, the card's and the adapter's
+     *     `prepareIndexedDb`/`prepare()` `recoveryGate` now agree (both
+     *     require a VERIFIED receipt) — no divergence to declare here.
+     */
+    async runCardThroughFullChain() {
+      const remembered: DmWorkspaceDocument[] = [];
+      vi.spyOn(
+        browserDmWorkspaceModule,
+        'createBrowserDmWorkspace'
+      ).mockImplementation(async () => ({
+        accountId: ACCOUNT_ID,
+        accountLabel: 'synthetic@example.test',
+        list: vi.fn().mockImplementation(async () => [...remembered]),
+        discover: vi.fn().mockResolvedValue([ownerWorkspace]),
+        remember: vi
+          .fn()
+          .mockImplementation(async (item: DmWorkspaceDocument) => {
+            if (!remembered.some(known => known.cloudId === item.cloudId))
+              remembered.push(item);
+          }),
+        create: vi.fn(),
+        forkLegacy: vi.fn(),
+        close: vi.fn(),
+      }));
+      vi.spyOn(
+        supabaseBrowserModule,
+        'createSupabaseBrowserClient'
+      ).mockReturnValue({
+        auth: {
+          getSession: vi.fn().mockResolvedValue({
+            data: { session: { user: { id: ACCOUNT_ID } } },
+          }),
+          onAuthStateChange: vi.fn().mockReturnValue({
+            data: { subscription: { unsubscribe: vi.fn() } },
+          }),
+        },
+      } as never);
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const createObjectURL = vi
+        .spyOn(URL, 'createObjectURL')
+        .mockReturnValue('blob:calendar-recovery');
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
+        () => undefined
+      );
+
+      render(<CalendarSyncControls campaign={CAMPAIGN_INFO} />);
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Find owner workspaces' })
+      );
+      fireEvent.click(
+        await screen.findByRole('button', { name: /Select Canary/ })
+      );
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Preview exact manifest' })
+      );
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Download recovery file' })
+      );
+      await screen.findByText(/Reopen that file here before selection/);
+      const downloadedBlob = createObjectURL.mock.calls[0]![0] as Blob;
+      fireEvent.change(
+        screen.getByLabelText('Downloaded calendar recovery file'),
+        {
+          target: {
+            files: [
+              new File([await downloadedBlob.text()], 'calendar-backup.json', {
+                type: 'application/json',
+              }),
+            ],
+          },
+        }
+      );
+      await screen.findByText(
+        'Recovery file verified and calendar selected. LocalStorage remains authoritative.'
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Prepare IndexedDB' })
+      );
+      await screen.findByText(
+        'IndexedDB preparation validated and reopened. Final confirmation is still required.'
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Confirm local cutover' })
+      );
+      await screen.findByText(/IndexedDB authority epoch/);
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Activate cloud family' })
+      );
+      await screen.findByText(/Cloud: saved/i);
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Verified rollback' })
+      );
+      await screen.findByText(/Rollback accepted/i);
+      cleanup();
+    },
+
+    /** Full call-sequence argument capture, by function name. */
+    recordedLibraryCalls: () => ({ ...libraryCalls }),
+
+    /** Every cloud request body ever sent, by action. */
+    allCloudRequestBodies: () => ({ ...allRequestBodiesByAction }),
+
+    /** The persisted marker, parsed. */
+    currentMarkerRaw() {
+      const raw = localStorage.getItem(
+        `rollkeeper:calendar-projection-authority:${CAMPAIGN_CODE}`
+      );
+      return raw ? (JSON.parse(raw) as unknown) : null;
     },
   };
 }
