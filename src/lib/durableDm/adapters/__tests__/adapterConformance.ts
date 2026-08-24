@@ -342,12 +342,21 @@ export function describeAdapterConformance(
     await harness.adapter.selectFamily(context);
     const prepared = await harness.adapter.prepareIndexedDb(context);
     await harness.mutateLegacyEnvelope();
-    await expect(
-      harness.adapter.commitLocalCutover(context, {
-        generation: prepared.generation,
-        manifest: prepared.manifest,
-      })
-    ).rejects.toThrow(/prepared/i);
+    const attempt = harness.adapter.commitLocalCutover(context, {
+      generation: prepared.generation,
+      manifest: prepared.manifest,
+    });
+    await expect(attempt).rejects.toThrow(/prepared/i);
+    // Task 8 review, fix round 2, Minor 2: closes the vocabulary
+    // regression risk in one line. This guard's message was fixed from
+    // "this device" to "this browser" (R17/R5.1) with no dedicated test —
+    // nothing else stops a future edit reintroducing "device" here between
+    // now and Task 18b's repo-wide DOM sweep. Asserted against the actual
+    // rejection reason, not a fresh call, so this is the SAME attempt
+    // `/prepared/i` above already matched.
+    const rejection: unknown = await attempt.catch(cause => cause);
+    expect(rejection).toBeInstanceOf(Error);
+    expect((rejection as Error).message).not.toMatch(/\bdevice\b/i);
     expect(await harness.adapter.readAuthority(context)).toMatchObject({
       state: 'legacy',
     });
@@ -758,6 +767,26 @@ export function expectLibraryCallSequenceMatches(
   optionsArgIndex: number,
   omit: readonly string[]
 ): { card: Record<string, unknown>; adapter: Record<string, unknown> }[] {
+  // Fix round 2 (Task 8 review, Important 1): `cardCalls[functionName] ?? []`
+  // on both sides made a WRONG `functionName` (a typo in a per-family
+  // `CardParityFunctionNames` map, or a harness spy that silently stopped
+  // firing) compare `0 === 0` and PASS — the entire comparison step
+  // vanishes with the suite still green and the test count merely one
+  // lower. Proven by the reviewer: typo'ing one map entry dropped the
+  // comparison with zero failures. Asserting the key was actually
+  // RECORDED (not merely defaulted via `?? []`) on both sides, before
+  // comparing lengths, makes a name that matches nothing fail loudly
+  // instead. `recordLibraryCall` only ever creates a key on its first
+  // call for that name, so an absent key means "never observed", not
+  // "observed zero times".
+  expect(
+    functionName in cardCalls,
+    `${functionName}: no calls recorded on the CARD side — this name does not match anything the harness's vi.spyOn actually wraps (check the CardParityFunctionNames map against the harness for a typo)`
+  ).toBe(true);
+  expect(
+    functionName in adapterCalls,
+    `${functionName}: no calls recorded on the ADAPTER side — this name does not match anything the harness's vi.spyOn actually wraps (check the CardParityFunctionNames map against the harness for a typo)`
+  ).toBe(true);
   const cardSequence = cardCalls[functionName] ?? [];
   const adapterSequence = adapterCalls[functionName] ?? [];
   expect(

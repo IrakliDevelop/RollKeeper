@@ -261,11 +261,18 @@ describe('calendarAdapter', () => {
     const context = await harness.seed();
     const unverifiedHash = 'f'.repeat(64);
     await harness.recordUnverifiedReceipt(unverifiedHash);
+    // Task 8 review, fix round 2, Minor 3: pinned to the same
+    // `/safety gate/i` message `campaignSettingsAdapter.test.ts`'s sibling
+    // test ("prepareIndexedDb reports the generic gate message...") already
+    // asserts. This call deliberately goes out of order (skips
+    // `selectFamily`), so several OTHER failures are reachable here too — a
+    // bare `.rejects.toThrow()` would also pass on any of them and stop
+    // discriminating the recoveryGate fix specifically.
     await expect(
       harness.adapter.prepareIndexedDb({
         ...context,
         recovery: { ...context.recovery, manifestHash: unverifiedHash },
       })
-    ).rejects.toThrow();
+    ).rejects.toThrow(/safety gate/i);
   });
 });
