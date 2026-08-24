@@ -99,7 +99,8 @@ export interface ConformanceHarness {
    * whatever shape that family's `apply*Documents` actually writes — a
    * record or a list, never a spec-mandated one. `combat_log_archive` is
    * why "always a list" was wrong: `applyCombatLogArchiveDocuments`
-   * (`CombatLogArchiveSyncControls.hooks.ts:284-315`) writes `encounters` as
+   * (`src/components/ui/campaign/CombatLogArchiveSyncControls/CombatLogArchiveSyncControls.hooks.ts:284-315`)
+   * writes `encounters` as
    * a RECORD keyed by `archiveId`, not an array — an enforced list would
    * force that family's harness to invent a sort order production does not
    * have. Single-record families (campaign_settings, calendar) return one
@@ -161,8 +162,9 @@ export interface ConformanceHarness {
    *
    * MUST be computed from the fake server's OWN state, and the projection
    * logic MUST BE RESTATED IN THE HARNESS, never imported from the module
-   * the adapter itself imports to build its restore. `npcFamily.ts`'s
-   * `campaignNpcFromPayload`/`sortNpcs` and `combatLogArchiveFamily.ts`'s
+   * the adapter itself imports to build its restore.
+   * `src/lib/durableDm/npcFamily.ts`'s `campaignNpcFromPayload`/`sortNpcs`
+   * and `src/lib/durableDm/combatLogArchiveFamily.ts`'s
    * `combatLogArchiveFromPayload` are all exported, so it is possible to
    * import the very function the adapter uses — which would make
    * expectation and implementation share one oracle, the exact
@@ -173,7 +175,8 @@ export interface ConformanceHarness {
    *
    * `combat_log_archive` CAN satisfy the base "rollback writes the marker
    * before restoring the legacy store" test despite having no
-   * `legacy_restored` marker value: within its own card's chain,
+   * `legacy_restored` marker value: within
+   * `src/components/ui/campaign/CombatLogArchiveSyncControls/CombatLogArchiveSyncControls.hooks.ts`,
    * `writeCombatLogArchiveAuthorityMarker` writes `indexedDB` at `:1071`,
    * `postgres` at `:1204`/`:1332`, and `localStorage` ONLY at rollback
    * (`:1711`) — `authority === 'localStorage'` is `combat_log_archive`'s
@@ -184,6 +187,14 @@ export interface ConformanceHarness {
    * `localStorage` un-routes the store write exactly as `legacy_restored`
    * does for campaign_settings. Task 12 uses this signal directly; nothing
    * about this member or that test is unresolved for that family.
+   *
+   * Recorded for Task 12, not acted on here: `combat_log_archive`'s
+   * rollback does not rehydrate tombstones from cloud documents — it only
+   * strips the campaign's own — so the `combatLogTombstones` half of this
+   * member's return cannot be "computed from the fake server's own state"
+   * the way the rest of this doc comment requires; it has to come from the
+   * harness's own seed instead. That is the one legitimate exception to
+   * this member's central rule, not a violation of it.
    */
   expectedLegacyStoreAfterRollback(): unknown;
   /**
@@ -680,9 +691,35 @@ export interface CardParityHarness extends ConformanceHarness {
    * comment, per the brief.
    */
   runCardThroughFullChain(): Promise<void>;
-  /** Last-call argument capture, by function name, for both callers. */
-  recordedLibraryCalls(): Record<string, unknown[]>;
-  /** Every cloud request body ever sent, by action, for both callers. */
+  /**
+   * Fix round 4, item 1: the FULL, ORDERED sequence of calls each wrapped
+   * library function received, by function name — never last-call-wins.
+   * `campaign_settings` calls every wrapped function exactly once (a
+   * single-record family), so every sequence here has length 1 and this
+   * degrades to the old last-call behaviour for THAT family alone. The
+   * multi-record families (npc, encounter_definition, magic_item,
+   * combat_log_archive) call some of these once per document, and
+   * `describeCardParity` compares the FULL sequence — length and every
+   * call's arguments, not only the final one — so a divergence on any call
+   * but the last is still caught.
+   *
+   * Fix round 4, item 3: each call's argument array is positional and
+   * ASSUMES a `(database, options)` signature — true for every
+   * campaign-settings authority function this harness wraps, and for the
+   * equivalent per-family authority modules, but an assumption a
+   * family-local implementation must confirm before reusing this shape
+   * rather than inherit unread.
+   */
+  recordedLibraryCalls(): Record<string, unknown[][]>;
+  /**
+   * Every cloud request body ever sent, by action, for both callers.
+   * Indexing a single action's array at `[0]` is safe for every action this
+   * harness's fake server issues exactly once per attempt —
+   * `resumableCloudActivation.ts:274` issues exactly one unbatched
+   * `stageItems` call per activation, and campaign_settings' single-record
+   * shape means one request per action overall. A family whose OWN protocol
+   * batches or repeats an action would need every element, not just `[0]`.
+   */
   allCloudRequestBodies(): Record<string, Record<string, unknown>[]>;
   /** The family's persisted authority marker, parsed. */
   currentMarkerRaw(): unknown;
@@ -696,6 +733,52 @@ function omitKeys(
   return Object.fromEntries(
     Object.entries(value).filter(([key]) => !keys.includes(key))
   );
+}
+
+/**
+ * Fix round 4, item 1: compares the FULL, ORDERED call sequence two
+ * `recordedLibraryCalls()` results hold for one function — length first
+ * (a card/adapter that made a different NUMBER of calls has already
+ * diverged), then every call's `options` argument (positional index
+ * `optionsArgIndex`, per each function's own `(database, options)`
+ * signature — see `CardParityHarness.recordedLibraryCalls`'s doc comment),
+ * with `omit` stripped from each side before comparing. Exported so it can
+ * be exercised directly, with constructed fixtures, independent of any
+ * family's real card or adapter — `campaign_settings` itself can only ever
+ * produce sequences of length 1 (a single-record family calls each wrapped
+ * function exactly once), so it cannot exercise a divergence on a
+ * NON-final call end-to-end; `adapterConformance.test.ts` proves this
+ * function catches one anyway, with synthetic multi-call sequences
+ * standing in for what a multi-record family's real run will look like.
+ */
+export function expectLibraryCallSequenceMatches(
+  functionName: string,
+  cardCalls: Record<string, unknown[][]>,
+  adapterCalls: Record<string, unknown[][]>,
+  optionsArgIndex: number,
+  omit: readonly string[]
+): { card: Record<string, unknown>; adapter: Record<string, unknown> }[] {
+  const cardSequence = cardCalls[functionName] ?? [];
+  const adapterSequence = adapterCalls[functionName] ?? [];
+  expect(
+    adapterSequence.length,
+    `${functionName}: called ${adapterSequence.length} time(s), card called it ${cardSequence.length} time(s)`
+  ).toBe(cardSequence.length);
+  return cardSequence.map((cardArgs, index) => {
+    const card =
+      omitKeys(cardArgs[optionsArgIndex] as Record<string, unknown>, omit) ??
+      {};
+    const adapter =
+      omitKeys(
+        adapterSequence[index][optionsArgIndex] as Record<string, unknown>,
+        omit
+      ) ?? {};
+    expect(
+      adapter,
+      `${functionName}: call #${index} argument mismatch`
+    ).toEqual(card);
+    return { card, adapter };
+  });
 }
 
 export function describeCardParity(
@@ -730,36 +813,44 @@ export function describeCardParity(
     const adapterBodies = adapterHarness.allCloudRequestBodies();
     const adapterMarker = adapterHarness.currentMarkerRaw();
 
-    // 1. commitLocalCutover: argument object handed to the wrapped library
-    // call, field for field, including every `gates` flag and the
-    // `initialDocument` shape — excluding `generation` (a fresh run id each
-    // side of this test generates independently) and `updatedAt` (a
-    // wall-clock timestamp).
-    const cardCutover = cardCalls.commitCampaignSettingsLocalCutover?.[1] as
-      | Record<string, unknown>
-      | undefined;
-    const adapterCutover = adapterCalls
-      .commitCampaignSettingsLocalCutover?.[1] as
-      | Record<string, unknown>
-      | undefined;
-    expect(cardCutover).toBeDefined();
-    // `initialDocument` is compared separately below (with `updatedAt`
-    // stripped, since it is a wall-clock timestamp) — excluded here so this
-    // first comparison is not tripped by that alone.
-    expect(
-      omitKeys(adapterCutover, ['generation', 'initialDocument', 'now'])
-    ).toEqual(omitKeys(cardCutover, ['generation', 'initialDocument', 'now']));
-    const cardDoc = (cardCutover?.initialDocument ?? {}) as Record<
-      string,
-      unknown
-    >;
-    const adapterDoc = (adapterCutover?.initialDocument ?? {}) as Record<
-      string,
-      unknown
-    >;
-    expect(omitKeys(adapterDoc, ['updatedAt'])).toEqual(
-      omitKeys(cardDoc, ['updatedAt'])
+    // 1. commitLocalCutover: the FULL call sequence (fix round 4, item 1),
+    // not just the last call — argument object field for field, including
+    // every `gates` flag and the `initialDocument` shape — excluding
+    // `generation` (a fresh run id each side of this test generates
+    // independently) and `updatedAt`/`now` (wall-clock timestamps).
+    // `campaign_settings` calls this exactly once (single-record), so this
+    // sequence always has length 1 here; a multi-record family's real run
+    // would have one call per document, and this same check compares all
+    // of them, not only the final one.
+    expectLibraryCallSequenceMatches(
+      'commitCampaignSettingsLocalCutover',
+      cardCalls,
+      adapterCalls,
+      1,
+      // `initialDocument` is compared separately below (per call, with
+      // `updatedAt` stripped — a wall-clock timestamp) — excluded here so
+      // this comparison is not tripped by `updatedAt` alone.
+      ['generation', 'initialDocument', 'now']
     );
+    const cardCutoverSequence =
+      cardCalls.commitCampaignSettingsLocalCutover ?? [];
+    const adapterCutoverSequence =
+      adapterCalls.commitCampaignSettingsLocalCutover ?? [];
+    cardCutoverSequence.forEach((cardArgs, index) => {
+      const cardOptions = cardArgs[1] as { initialDocument?: unknown };
+      const adapterOptions = adapterCutoverSequence[index][1] as {
+        initialDocument?: unknown;
+      };
+      expect(
+        omitKeys(adapterOptions.initialDocument as Record<string, unknown>, [
+          'updatedAt',
+        ])
+      ).toEqual(
+        omitKeys(cardOptions.initialDocument as Record<string, unknown>, [
+          'updatedAt',
+        ])
+      );
+    });
 
     // 2. The complete request body of each cloud call — action names alone
     // would let a changed deviceId, recovery hash, count, byte total or item
@@ -776,15 +867,15 @@ export function describeCardParity(
     }
 
     // 3. `mark*CloudAuthority` arguments, including `expectedLocalEpoch`,
-    // `cloudEpoch` and `acceptedVersion`.
-    const cardMark = cardCalls.markCampaignSettingsCloudAuthority?.[1] as
-      | Record<string, unknown>
-      | undefined;
-    const adapterMark = adapterCalls.markCampaignSettingsCloudAuthority?.[1] as
-      | Record<string, unknown>
-      | undefined;
-    expect(cardMark).toBeDefined();
-    expect(omitKeys(adapterMark, ['now'])).toEqual(omitKeys(cardMark, ['now']));
+    // `cloudEpoch` and `acceptedVersion` — full sequence, not just the last
+    // call (fix round 4, item 1).
+    expectLibraryCallSequenceMatches(
+      'markCampaignSettingsCloudAuthority',
+      cardCalls,
+      adapterCalls,
+      1,
+      ['now']
+    );
 
     // 4. Rollback's request body and its local-authority call arguments.
     const cardRollbackBody = cardBodies.rollback?.[0];
@@ -793,17 +884,12 @@ export function describeCardParity(
     expect(omitKeys(adapterRollbackBody, ['mutationId'])).toEqual(
       omitKeys(cardRollbackBody, ['mutationId'])
     );
-    const cardRollbackAuth = cardCalls
-      .rollbackCampaignSettingsLocalAuthority?.[1] as
-      | Record<string, unknown>
-      | undefined;
-    const adapterRollbackAuth = adapterCalls
-      .rollbackCampaignSettingsLocalAuthority?.[1] as
-      | Record<string, unknown>
-      | undefined;
-    expect(cardRollbackAuth).toBeDefined();
-    expect(omitKeys(adapterRollbackAuth, ['generation', 'now'])).toEqual(
-      omitKeys(cardRollbackAuth, ['generation', 'now'])
+    expectLibraryCallSequenceMatches(
+      'rollbackCampaignSettingsLocalAuthority',
+      cardCalls,
+      adapterCalls,
+      1,
+      ['generation', 'now']
     );
 
     // 5. The localStorage marker written, compared as parsed JSON.

@@ -121,7 +121,17 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
   // Fix round 3, item 1: last-call argument capture for the step-parity
   // test, keyed by function name — both the card and the adapter funnel
   // through these SAME module exports, so one spy layer sees both callers.
-  const libraryCalls: Record<string, unknown[]> = {};
+  // Fix round 4, item 1: an ARRAY of calls per function, not last-call-wins
+  // — `campaign_settings` calls each wrapped function exactly once (a
+  // single-record family), so this makes no observable difference here, but
+  // `npc`/`encounter_definition`/`magic_item`/`combat_log_archive` call some
+  // of these per document, and a last-call-wins map would silently drop
+  // every call but the final one from comparison — exactly where an adapter
+  // and its card are most likely to diverge and least likely to be caught.
+  const libraryCalls: Record<string, unknown[][]> = {};
+  function recordLibraryCall(name: string, args: unknown[]) {
+    (libraryCalls[name] ??= []).push(args);
+  }
   // Fix round 3, item 1: every cloud request body, by action, including the
   // read-only and rollback actions `requestBodies()` does not track.
   const allRequestBodiesByAction: Record<string, Record<string, unknown>[]> =
@@ -420,7 +430,7 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
     'markCampaignSettingsCloudAuthority'
   ).mockImplementation(async (...args) => {
     trace.push('mark-cloud-authority');
-    libraryCalls.markCampaignSettingsCloudAuthority = args;
+    recordLibraryCall('markCampaignSettingsCloudAuthority', args);
     return realMarkCampaignSettingsCloudAuthority(...args);
   });
 
@@ -431,7 +441,7 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
     'commitCampaignSettingsLocalCutover'
   ).mockImplementation(async (...args) => {
     cutoverSink?.push('cutover');
-    libraryCalls.commitCampaignSettingsLocalCutover = args;
+    recordLibraryCall('commitCampaignSettingsLocalCutover', args);
     return realCommitCampaignSettingsLocalCutover(...args);
   });
 
@@ -441,7 +451,7 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
     campaignSettingsAuthorityModule,
     'rollbackCampaignSettingsLocalAuthority'
   ).mockImplementation(async (...args) => {
-    libraryCalls.rollbackCampaignSettingsLocalAuthority = args;
+    recordLibraryCall('rollbackCampaignSettingsLocalAuthority', args);
     return realRollbackCampaignSettingsLocalAuthority(...args);
   });
 
@@ -1045,7 +1055,7 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
       cleanup();
     },
 
-    /** Fix round 3, item 1: last-call argument capture, by function name. */
+    /** Fix round 4, item 1: full call-sequence argument capture, by function name. */
     recordedLibraryCalls: () => ({ ...libraryCalls }),
 
     /** Fix round 3, item 1: every cloud request body ever sent, by action. */
