@@ -9,7 +9,8 @@ const CURRENT_PERSISTENCE_VERSIONS: Readonly<Record<string, number>> = {
   'rollkeeper-calendar-data': 3,
   'rollkeeper-location-data': 0,
   'rollkeeper-battlemap-data': 0,
-  'rollkeeper-combat-log': 1,
+  // Slice 11F re-keyed the combat log store to `COMBAT_LOG_ARCHIVE_PERSIST_VERSION`.
+  'rollkeeper-combat-log': 2,
   'rollkeeper-dm-magic-item-library': 1,
 };
 
