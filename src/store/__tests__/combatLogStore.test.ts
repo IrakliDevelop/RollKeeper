@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   useCombatLogStore,
+  migrateCombatLogPersistedState,
+  COMBAT_LOG_ARCHIVE_PERSIST_VERSION,
   COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES,
   COMBAT_LOG_ARCHIVE_MAX_ITEMS,
   COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES,
@@ -922,6 +924,52 @@ function seedArchivesToBytes(campaignCode: string, targetBytes: number) {
   useCombatLogStore.setState({ encounters });
 }
 
+/**
+ * Writes a routed archive of *exactly* `targetBytes` straight into state.
+ * A coarse fill gets within ~40 KB, then one final event is padded by the exact
+ * deficit — `seedEvent` ids are fixed-width, so one extra `x` costs one byte.
+ */
+function seedRoutedArchiveOfExactBytes(
+  archiveId: string,
+  campaignCode: string,
+  targetBytes: number
+): CombatLogState {
+  const archive: CombatLogState = {
+    encounterId: ENC_A,
+    campaignCode,
+    events: [],
+    startedAt: '2026-01-01T00:00:00.000Z',
+  };
+  const push = (pad: number) =>
+    archive.events.push(seedEvent(pad, archive.events.length));
+
+  for (let guard = 0; guard < 100; guard += 1) {
+    const room = targetBytes - 40_000 - recordBytes(archive);
+    if (room <= PAD_EVENT_OVERHEAD) break;
+    push(Math.min(32_768, room - PAD_EVENT_OVERHEAD));
+  }
+  push(0);
+  const deficit = targetBytes - recordBytes(archive);
+  if (deficit > 0) {
+    archive.events[archive.events.length - 1] = seedEvent(
+      deficit,
+      archive.events.length - 1
+    );
+  }
+
+  useCombatLogStore.setState(state => ({
+    encounters: { ...state.encounters, [archiveId]: archive },
+  }));
+  return archive;
+}
+
+/** Canonical bytes the campaign currently occupies across its live archives. */
+function campaignBytes(campaignCode: string): number {
+  return Object.values(useCombatLogStore.getState().encounters)
+    .filter(archive => archive.campaignCode === campaignCode)
+    .reduce((sum, archive) => sum + recordBytes(archive), 0);
+}
+
 describe('combatLogStore admission gates (Slice 11F)', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -970,17 +1018,22 @@ describe('combatLogStore admission gates (Slice 11F)', () => {
   it('rejects growth past the campaign aggregate byte limit without changing the store', () => {
     seedRouted('SYNTH1');
     seedArchivesToBytes('SYNTH1', COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES - 500);
-    const id = useCombatLogStore.getState().startArchive(ENC_A, 'SYNTH1')!;
+    const id = useCombatLogStore.getState().startArchive(ENC_A, 'SYNTH1');
+    // Without this the seeding could overshoot, `startArchive` could return
+    // null, and the `logEvent` below would be the unknown-id no-op — leaving
+    // every assertion true with the gate under test never running.
+    expect(id).toBeTruthy();
 
     const before = JSON.stringify(useCombatLogStore.getState().encounters);
-    useCombatLogStore.getState().logEvent(id, makeLargeDamagePayload());
+    useCombatLogStore.getState().logEvent(id!, makeLargeDamagePayload());
 
     expect(JSON.stringify(useCombatLogStore.getState().encounters)).toBe(
       before
     );
-    expect(useCombatLogStore.getState().lastAdmissionError?.reason).toBe(
-      'total-bytes'
-    );
+    expect(useCombatLogStore.getState().lastAdmissionError).toMatchObject({
+      archiveId: id,
+      reason: 'total-bytes',
+    });
   });
 
   it('leaves an unrouted campaign ungated', () => {
@@ -998,5 +1051,233 @@ describe('combatLogStore admission gates (Slice 11F)', () => {
     const state = useCombatLogStore.getState();
     for (const id of routed) expect(state.encounters[id]).toBeDefined();
     expect(state.combatLogTombstones).toEqual({});
+  });
+
+  it('refuses to close a routed archive sitting exactly on the per-record cap', () => {
+    seedRouted('SYNTH1');
+    const id = 'archive-at-the-cap';
+    const seeded = seedRoutedArchiveOfExactBytes(
+      id,
+      'SYNTH1',
+      COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES
+    );
+    // The gate admits a record *at* the cap, so `endedAt` is what pushes it over.
+    expect(recordBytes(seeded)).toBe(COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES);
+
+    const before = JSON.stringify(useCombatLogStore.getState().encounters);
+    useCombatLogStore.getState().endArchive(id);
+
+    const after = useCombatLogStore.getState();
+    expect(JSON.stringify(after.encounters)).toBe(before);
+    expect(after.encounters[id].endedAt).toBeUndefined();
+    expect(after.lastAdmissionError).toMatchObject({
+      archiveId: id,
+      reason: 'record-bytes',
+    });
+  });
+
+  it('refuses to close a routed archive that would push the campaign past the aggregate cap', () => {
+    seedRouted('SYNTH1');
+    const id = useCombatLogStore.getState().startArchive(ENC_A, 'SYNTH1');
+    expect(id).toBeTruthy();
+
+    // Cost of stamping `endedAt` — the only growth `endArchive` causes.
+    const archive = useCombatLogStore.getState().encounters[id!];
+    const endCost =
+      recordBytes({ ...archive, endedAt: '2026-01-01T00:00:00.000Z' }) -
+      recordBytes(archive);
+
+    // Park the campaign one byte below the point where `endedAt` overflows it,
+    // so the archive is admitted as it stands and only closing it is refused.
+    seedArchivesToBytes('SYNTH1', COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES - 100_000);
+    seedRoutedArchiveOfExactBytes(
+      'filler-exact',
+      'SYNTH1',
+      COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES - endCost + 1 - campaignBytes('SYNTH1')
+    );
+    expect(campaignBytes('SYNTH1')).toBe(
+      COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES - endCost + 1
+    );
+
+    const before = JSON.stringify(useCombatLogStore.getState().encounters);
+    useCombatLogStore.getState().endArchive(id!);
+
+    const after = useCombatLogStore.getState();
+    expect(JSON.stringify(after.encounters)).toBe(before);
+    expect(after.encounters[id!].endedAt).toBeUndefined();
+    expect(after.lastAdmissionError).toMatchObject({
+      archiveId: id,
+      reason: 'total-bytes',
+    });
+  });
+
+  it('still closes a routed archive that stays within the caps', () => {
+    seedRouted('SYNTH1');
+    const id = useCombatLogStore.getState().startArchive(ENC_A, 'SYNTH1')!;
+    useCombatLogStore.getState().endArchive(id);
+
+    const after = useCombatLogStore.getState();
+    expect(after.encounters[id].endedAt).toBeTruthy();
+    expect(after.lastAdmissionError).toBeNull();
+  });
+
+  it('closes an oversized unrouted archive, because gates apply only to routed ones', () => {
+    const id = useCombatLogStore.getState().startArchive(ENC_A, 'SYNTH1')!;
+    fillArchiveToBytes(id, COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES + 4_096);
+    useCombatLogStore.getState().endArchive(id);
+
+    const after = useCombatLogStore.getState();
+    expect(after.encounters[id].endedAt).toBeTruthy();
+    expect(after.lastAdmissionError).toBeNull();
+  });
+});
+
+// ── Slice 11F: v1 → v2 persisted-state migration ────────────────────────────
+
+/** A realistic version-1 blob: `encounters` keyed by `encounterId`. */
+function legacyPersistedState() {
+  return {
+    encounters: {
+      [ENC_A]: {
+        events: [seedEvent(0, 0), seedEvent(0, 1)],
+        startedAt: '2026-01-01T00:00:00.000Z',
+        endedAt: '2026-01-01T01:00:00.000Z',
+      },
+      [ENC_B]: {
+        events: [],
+        startedAt: '2026-01-02T00:00:00.000Z',
+      },
+    },
+    activeEncounterId: ENC_B,
+  };
+}
+
+describe('migrateCombatLogPersistedState (Slice 11F)', () => {
+  it('re-keys every archive from encounterId to a fresh archiveId', () => {
+    const migrated = migrateCombatLogPersistedState(legacyPersistedState(), 1);
+
+    const archiveIds = Object.keys(migrated.encounters);
+    expect(archiveIds).toHaveLength(2);
+    // The old encounter ids must no longer be keys...
+    expect(archiveIds).not.toContain(ENC_A);
+    expect(archiveIds).not.toContain(ENC_B);
+    // ...and each minted id must be a distinct UUID.
+    expect(new Set(archiveIds).size).toBe(2);
+    for (const id of archiveIds) {
+      expect(id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+      );
+    }
+  });
+
+  it('stamps the old key onto the record as encounterId', () => {
+    const migrated = migrateCombatLogPersistedState(legacyPersistedState(), 1);
+    const encounterIds = Object.values(migrated.encounters).map(
+      archive => archive.encounterId
+    );
+    expect(encounterIds.sort()).toEqual([ENC_A, ENC_B].sort());
+  });
+
+  it('preserves events, startedAt and endedAt on each migrated archive', () => {
+    const legacy = legacyPersistedState();
+    const migrated = migrateCombatLogPersistedState(legacy, 1);
+
+    const a = Object.values(migrated.encounters).find(
+      archive => archive.encounterId === ENC_A
+    )!;
+    expect(a.events).toEqual(legacy.encounters[ENC_A].events);
+    expect(a.startedAt).toBe('2026-01-01T00:00:00.000Z');
+    expect(a.endedAt).toBe('2026-01-01T01:00:00.000Z');
+
+    const b = Object.values(migrated.encounters).find(
+      archive => archive.encounterId === ENC_B
+    )!;
+    expect(b.events).toEqual([]);
+    expect(b.endedAt).toBeUndefined();
+  });
+
+  it('leaves campaignCode undefined — a v1 archive was never routed', () => {
+    const migrated = migrateCombatLogPersistedState(legacyPersistedState(), 1);
+    for (const archive of Object.values(migrated.encounters)) {
+      expect(archive.campaignCode).toBeUndefined();
+    }
+  });
+
+  it('remaps activeEncounterId to the archiveId its encounter was re-keyed to', () => {
+    const migrated = migrateCombatLogPersistedState(legacyPersistedState(), 1);
+
+    expect(migrated.activeArchiveId).not.toBeNull();
+    expect(migrated.activeArchiveId).not.toBe(ENC_B);
+    expect(migrated.encounters[migrated.activeArchiveId!]).toBeDefined();
+    expect(migrated.encounters[migrated.activeArchiveId!].encounterId).toBe(
+      ENC_B
+    );
+  });
+
+  it('drops an activeEncounterId that no v1 archive matches', () => {
+    const legacy = {
+      ...legacyPersistedState(),
+      activeEncounterId: 'ghost-enc',
+    };
+    expect(
+      migrateCombatLogPersistedState(legacy, 1).activeArchiveId
+    ).toBeNull();
+  });
+
+  it('maps a missing activeEncounterId to null', () => {
+    const legacy = legacyPersistedState() as Record<string, unknown>;
+    delete legacy.activeEncounterId;
+    expect(
+      migrateCombatLogPersistedState(legacy, 1).activeArchiveId
+    ).toBeNull();
+  });
+
+  it('seeds an empty tombstone map', () => {
+    expect(
+      migrateCombatLogPersistedState(legacyPersistedState(), 1)
+        .combatLogTombstones
+    ).toEqual({});
+  });
+
+  it('tolerates an empty or absent v1 payload', () => {
+    for (const payload of [undefined, null, {}, { encounters: {} }]) {
+      expect(migrateCombatLogPersistedState(payload, 1)).toEqual({
+        encounters: {},
+        combatLogTombstones: {},
+        activeArchiveId: null,
+      });
+    }
+  });
+
+  it('passes a v2 payload through without re-keying it', () => {
+    const current = {
+      encounters: {
+        'archive-uuid': {
+          encounterId: ENC_A,
+          campaignCode: 'SYNTH1',
+          events: [],
+          startedAt: '2026-01-01T00:00:00.000Z',
+        },
+      },
+      combatLogTombstones: {
+        'archive-gone': {
+          legacyId: 'archive-gone',
+          beforeImage: {
+            encounterId: ENC_B,
+            campaignCode: 'SYNTH1',
+            events: [],
+            startedAt: '2026-01-01T00:00:00.000Z',
+          },
+          deletedAt: '2026-01-03T00:00:00.000Z',
+        },
+      },
+      activeArchiveId: 'archive-uuid',
+    };
+    expect(
+      migrateCombatLogPersistedState(
+        current,
+        COMBAT_LOG_ARCHIVE_PERSIST_VERSION
+      )
+    ).toEqual(current);
   });
 });

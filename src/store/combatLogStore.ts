@@ -66,6 +66,25 @@ function archiveRecordBytes(archive: CombatLogState): number {
 }
 
 /**
+ * Resolves `isRoutedCampaign` at most once per distinct campaign code. Each
+ * miss is a `localStorage.getItem` plus a `JSON.parse`, and a prune pass can
+ * walk up to `COMBAT_LOG_ARCHIVE_MAX_ITEMS` archives that mostly share a
+ * handful of campaigns. Scoped to a single pass so authority flips are picked
+ * up on the next one.
+ */
+function createRoutedResolver(): (campaignCode?: string) => boolean {
+  const resolved = new Map<string, boolean>();
+  return campaignCode => {
+    if (!campaignCode) return false;
+    const cached = resolved.get(campaignCode);
+    if (cached !== undefined) return cached;
+    const routed = isRoutedCampaign(campaignCode);
+    resolved.set(campaignCode, routed);
+    return routed;
+  };
+}
+
+/**
  * An archive is *routed* when its campaign has handed authority to the durable
  * DM store. Only routed archives are gated, and only routed archives are exempt
  * from local pruning. Reads nothing while the client flag is off.
@@ -352,19 +371,33 @@ export const useCombatLogStore = create<CombatLogStoreState>()(
       },
 
       endArchive: archiveId => {
-        set(state => {
-          const archive = state.encounters[archiveId];
-          if (!archive) return state;
-          return {
-            encounters: {
-              ...state.encounters,
-              [archiveId]: {
-                ...archive,
-                endedAt: new Date().toISOString(),
-              },
-            },
-          };
+        const { encounters, combatLogTombstones } = get();
+        const archive = encounters[archiveId];
+        if (!archive) return;
+
+        // Stamping `endedAt` grows the record, and the record may already sit
+        // exactly on a bound — the gates admit up to and including the cap. An
+        // ungated close would leave a routed record the Postgres bound rejects
+        // and no local edit can shrink back.
+        const nextArchive: CombatLogState = {
+          ...archive,
+          endedAt: new Date().toISOString(),
+        };
+        const reason = admissionRejection(encounters, combatLogTombstones, {
+          archiveId,
+          campaignCode: archive.campaignCode,
+          nextArchive,
+          isNewDocument: false,
         });
+        if (reason) {
+          set({ lastAdmissionError: admissionError(archiveId, reason) });
+          return;
+        }
+
+        set(state => ({
+          encounters: { ...state.encounters, [archiveId]: nextArchive },
+          lastAdmissionError: null,
+        }));
       },
 
       setActiveArchive: archiveId => {
@@ -444,10 +477,11 @@ export const useCombatLogStore = create<CombatLogStoreState>()(
         set(state => {
           const entries = Object.entries(state.encounters);
           // Ruling 2: a routed archive is the cloud's to retire, never ours.
+          const isRouted = createRoutedResolver();
           const routed: typeof entries = [];
           const unrouted: typeof entries = [];
           for (const entry of entries) {
-            if (isRoutedCampaign(entry[1].campaignCode)) routed.push(entry);
+            if (isRouted(entry[1].campaignCode)) routed.push(entry);
             else unrouted.push(entry);
           }
           if (unrouted.length <= MAX_ARCHIVES_STORED) return state;
