@@ -33,6 +33,7 @@ import {
   requestResult,
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
+import * as localDatabase from '@/lib/indexeddb/localDatabase';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 import * as supabaseBrowser from '@/lib/supabase/browser';
 import * as browserDmWorkspace from '@/lib/supabase/browserDmWorkspace';
@@ -881,6 +882,92 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     expect(requests.map(request => request.action)).not.toContain('put');
   });
 
+  // The delete control is deliberately ungated in the card (the refused-edit
+  // banner tells the DM to delete a combat log), so the refusal has to live in
+  // the controller. On an enrolled-but-unapplied device the aware storage
+  // freezes the routed legacy copy and autosave is disarmed, so a deletion
+  // reaches neither localStorage nor IndexedDB nor the account: it would be
+  // back on the next reload. Reporting success for that is the lie this guards.
+  it('refuses a delete on an enrolled device that has not applied the account copy', async () => {
+    await enrollAgainstCloudGeneration(); // leaves hydrated === false by design
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Delete this combat log' })
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "This device hasn't finished loading your combat logs, so nothing was deleted. Finish setting this device up, then try again."
+        )
+      ).toBeVisible()
+    );
+    // Negative assertions: a bounded window, never a waitFor.
+    await new Promise(resolve => setTimeout(resolve, 25));
+    expect(screen.queryByText('Combat log deleted.')).not.toBeInTheDocument();
+    expect(commitSpy).not.toHaveBeenCalled();
+    expect(requests.map(request => request.action)).not.toContain('put');
+    expect(useCombatLogStore.getState().encounters['arc-1']).toBeDefined();
+    expect(
+      useCombatLogStore.getState().combatLogTombstones['arc-1']
+    ).toBeUndefined();
+  });
+
+  // `busy` is released in a `finally`, so an `openRollkeeperDatabase()` that
+  // rejects outside the `try` escapes the click handler unhandled and leaves
+  // every `loading={sync.busy}` control spinning until the DM reloads.
+  it('reports a failed database open when applying the account copy', async () => {
+    await enrollAgainstCloudGeneration();
+    vi.spyOn(localDatabase, 'openRollkeeperDatabase').mockRejectedValueOnce(
+      new Error('database unavailable')
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /use the copy from your account/i })
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText('database unavailable')).toBeVisible()
+    );
+    expect(
+      screen.getByRole('button', { name: /use the copy from your account/i })
+    ).not.toBeDisabled();
+  });
+
+  it('reports a failed database open on the local cutover', async () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspace();
+    mockOwnerSession();
+    seedArchives({ 'arc-1': endedArchive() });
+    const createObjectURL = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockReturnValue('blob:combat-log-recovery');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
+      () => undefined
+    );
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderControls();
+    await selectWorkspaceAndPreview();
+    await downloadAndOpenSafetyCopy(createObjectURL);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Get this device ready' })
+    );
+    await screen.findByRole('button', { name: /turn on for this device/i });
+    vi.spyOn(localDatabase, 'openRollkeeperDatabase').mockRejectedValueOnce(
+      new Error('database unavailable')
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /turn on for this device/i })
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText('database unavailable')).toBeVisible()
+    );
+  });
+
   it('wires version history, exact export, comparison, and verified rollback under cloud authority', async () => {
     vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
     const payload = archivePayload();
@@ -990,6 +1077,78 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
       'Backup is off and everything was kept. Reload the page to keep working on this device.'
     );
     expect(requests.map(request => request.action)).toContain('rollback');
+  });
+
+  // Version rows and the comparison line belong to exactly one archive.
+  // "Restore this version" sends the picker's current legacy id with a
+  // `sourceVersion` and `expectedServerVersion` read off whatever rows are on
+  // screen, so a stale row can restore version N of a *different* archive
+  // whenever the two happen to share version numbers.
+  it('drops the previous archive versions when the history picker moves', async () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    const payload = archivePayload();
+    const contentFingerprint = await seedCloudAuthority(payload);
+    mockOwnerWorkspace();
+    mockOwnerSession();
+    fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async (_input, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        requests.push(body);
+        if (body.action === 'history')
+          return respond({
+            versions: [
+              cloudVersion(CLOUD_SERVER_VERSION, contentFingerprint),
+              cloudVersion(CLOUD_SERVER_VERSION - 1, contentFingerprint),
+            ],
+          });
+        if (body.action === 'compare-versions')
+          return respond({ identical: true });
+        if (body.action === 'put')
+          return respond({
+            serverVersion: Number(body.expectedServerVersion) + 1,
+            cutoverEpoch: Number(body.expectedEpoch),
+            payloadFingerprint: body.payloadFingerprint,
+            cloudSaved: true,
+            playerView: 'not-applicable',
+          });
+        throw new Error(`unexpected action ${String(body.action)}`);
+      });
+
+    renderControls();
+    await screen.findByRole('button', { name: 'Earlier versions' });
+
+    // A second archive, so the picker has somewhere else to point. It is still
+    // running, which is what tells the two options apart below.
+    await act(async () => {
+      useCombatLogStore.getState().startArchive('enc-b', campaign.code);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Earlier versions' }));
+    await screen.findByText(`Version ${CLOUD_SERVER_VERSION} ·`, {
+      exact: false,
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Compare the two most recent' })
+    );
+    await screen.findByText('These two versions are exactly the same.');
+
+    await userEvent.click(screen.getByRole('combobox'));
+    await userEvent.click(
+      await screen.findByRole('option', { name: /still running/ })
+    );
+
+    // The picker moved synchronously, so the rows are gone by this render:
+    // a bounded negative assertion, never a waitFor.
+    expect(
+      screen.queryByText(`Version ${CLOUD_SERVER_VERSION} ·`, { exact: false })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('These two versions are exactly the same.')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Restore this version' })
+    ).not.toBeInTheDocument();
   });
 
   it('disarms autosave when this account is removed from the device', async () => {

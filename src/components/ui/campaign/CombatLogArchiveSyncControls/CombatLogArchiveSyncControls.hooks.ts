@@ -618,6 +618,17 @@ export function useCombatLogArchiveSyncController(
     );
   }, [archives]);
 
+  // Version rows and the comparison line belong to exactly one archive.
+  // `restoreVersion` sends the picker's *current* legacy id together with a
+  // `sourceVersion` and an `expectedServerVersion` read off whatever rows are
+  // on screen, so rows left over from the previously selected archive can
+  // restore version N of the archive now selected. The CAS usually fails that
+  // closed, but not when the two archives happen to share version numbers.
+  useEffect(() => {
+    setVersions([]);
+    setComparison(null);
+  }, [historyLegacyId]);
+
   useEffect(() => {
     // The default-off guarantee is also enforced by
     // readCombatLogArchiveAuthorityMarker (zero storage reads while the flag is
@@ -990,8 +1001,11 @@ export function useCombatLogArchiveSyncController(
       return;
     const namespace = `user:${context.accountId}` as const;
     const campaignId = workspace.cloudId;
-    const database = await openRollkeeperDatabase();
+    // Opened inside the `try`: a rejected open outside it escapes the click
+    // handler unhandled and the DM is told nothing at all.
+    let database: IDBDatabase | null = null;
     try {
+      database = await openRollkeeperDatabase();
       const current = await buildCombatLogArchiveManifest({
         campaignCode,
         rawEnvelope: currentRawEnvelope(),
@@ -1072,7 +1086,7 @@ export function useCombatLogArchiveSyncController(
           : "Couldn't switch this device over."
       );
     } finally {
-      database.close();
+      database?.close();
     }
   };
 
@@ -1383,8 +1397,12 @@ export function useCombatLogArchiveSyncController(
     const campaignId = workspace.cloudId;
     setBusy(true);
     setError(null);
-    const database = await openRollkeeperDatabase();
+    // Opened inside the `try`: a rejected open outside it escapes the click
+    // handler unhandled, so the `finally` never runs and every
+    // `loading={sync.busy}` control spins until the page is reloaded.
+    let database: IDBDatabase | null = null;
     try {
+      database = await openRollkeeperDatabase();
       const repository = new IndexedDbCombatLogArchiveRepository(database);
       const acceptedAt = new Date().toISOString();
       for (const document of documents) {
@@ -1441,7 +1459,7 @@ export function useCombatLogArchiveSyncController(
           : "Couldn't load from your account."
       );
     } finally {
-      database.close();
+      database?.close();
       setBusy(false);
     }
   };
@@ -1794,6 +1812,22 @@ export function useCombatLogArchiveSyncController(
 
   const deleteArchive = (archiveId: string) => {
     if (!campaignCode) return;
+    // A routed campaign's legacy key is frozen by the aware storage, so the
+    // only path a deletion has to durable storage is the autosave chain — and
+    // `hydrated` is what arms it. Every deliberately disarmed state (device
+    // enrolled but the account copy not applied yet, a workspace mismatch, a
+    // failed integrity check, a throw out of applyExactCloudVersion or
+    // restoreVersion) would otherwise take the archive out of memory, restore
+    // it from the frozen envelope on the next persist write, commit nothing,
+    // and still report success — the archive is back on the next reload.
+    // Refusing here rather than hiding the button keeps the control the
+    // refused-edit banner's guidance names, and says why it cannot run yet.
+    if (authority && authority.authority !== 'localStorage' && !hydrated) {
+      setError(
+        "This device hasn't finished loading your combat logs, so nothing was deleted. Finish setting this device up, then try again."
+      );
+      return;
+    }
     if (
       !window.confirm(
         'Delete this combat log? It stays in your account history if backup is on.'
@@ -1815,6 +1849,9 @@ export function useCombatLogArchiveSyncController(
     enrollmentPreview,
     error,
     historyLegacyId,
+    // Exposed so the card can tell an armed device from a disarmed one. It is
+    // read-only to consumers: only the hydrating paths in here ever set it.
+    hydrated,
     manifest,
     preparedGeneration,
     recovery,

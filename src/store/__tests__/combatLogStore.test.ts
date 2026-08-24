@@ -766,6 +766,40 @@ describe('combatLogStore', () => {
       useCombatLogStore.getState().clearArchive(id);
       expect(useCombatLogStore.getState().combatLogTombstones).toEqual({});
     });
+
+    // Ruling 5: `lastAdmissionError` is cleared on the next accepted mutation.
+    // A deletion is what the item-count and total-bytes guidance asks the DM to
+    // do, so leaving the red banner up after it succeeds tells them the fix
+    // they just applied did not take.
+    it('clears a recorded admission error once the deletion is accepted', () => {
+      const id = useCombatLogStore.getState().startArchive(ENC_A, 'SYNTH1')!;
+      useCombatLogStore.setState({
+        lastAdmissionError: {
+          archiveId: 'archive-other',
+          reason: 'item-count',
+          at: '2026-01-01T00:00:00.000Z',
+        },
+      });
+
+      useCombatLogStore.getState().clearArchive(id);
+
+      expect(useCombatLogStore.getState().lastAdmissionError).toBeNull();
+    });
+
+    // The other half of the ruling: only an *accepted* mutation clears it. A
+    // no-op deletion changed nothing, so the guidance still applies.
+    it('keeps a recorded admission error when it deletes nothing', () => {
+      const recorded = {
+        archiveId: 'archive-other',
+        reason: 'item-count' as const,
+        at: '2026-01-01T00:00:00.000Z',
+      };
+      useCombatLogStore.setState({ lastAdmissionError: recorded });
+
+      useCombatLogStore.getState().clearArchive('ghost-archive');
+
+      expect(useCombatLogStore.getState().lastAdmissionError).toEqual(recorded);
+    });
   });
 
   // ── dismissAdmissionError ─────────────────────────────────────────────────

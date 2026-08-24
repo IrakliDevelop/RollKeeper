@@ -8,14 +8,16 @@ import { defineConfig } from 'vitest/config';
 // WARNING for the next reader: src/app/dm/campaign/[code]/__tests__/layout.test.tsx
 // and src/components/ui/campaign/CombatLogArchiveSyncControls/*.test.tsx are in
 // test.include below — they run as part of this suite — but the controller
-// component (src/app/dm/campaign/[code]/_components/CombatLogArchiveSyncController*,
-// wherever it lives) is deliberately NOT in coverage.include. coverage.include
-// lists only the nine src/lib/** library modules. The percentages this config
-// reports measure those library modules only and are NEVER evidence that the
-// controller's four durability guards (mutation-ID replay, CAS/epoch
-// mismatch, oversized-record rejection, cloud-write failure fallback) are
-// covered. A prior PR conflated "coverage contract is green" with "the
-// controller is tested" — see the coverage caveat in BACKPORT_EVIDENCE.md.
+// itself (src/components/ui/campaign/CombatLogArchiveSyncControls/, whose
+// hooks module holds every guard) is deliberately NOT in coverage.include.
+// coverage.include lists only the nine src/lib/** library modules. The
+// percentages this config reports measure those library modules only and are
+// NEVER evidence that the controller's four durability guards — the
+// `await context.remember(workspace)` that precedes the local cutover, the
+// `hydrationSignature` ref, the `hydrated` flag that arms autosave, and the
+// `WeakMap` fingerprint cache (spec §7) — are covered. A prior PR conflated
+// "coverage contract is green" with "the controller is tested" — see the
+// coverage caveat in BACKPORT_EVIDENCE.md.
 // Do not repeat that mistake: guard coverage for the controller is
 // demonstrated only by the controller's own tests and by the mutation-verify
 // red/green cycle recorded in SLICE_11F_EVIDENCE.md, never by this config.

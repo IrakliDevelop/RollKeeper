@@ -88,7 +88,14 @@ function blockerMessage(blocker: CombatLogArchiveManifestBlocker) {
     case 'active-combat-log':
       return 'One of these combat logs is still running. End that combat first.';
     case 'incomplete-envelope':
-      return 'Nothing has been saved on this device yet. Run a combat first.';
+      // Nothing writes combat log events yet (spec §8 keeps `logEvent` out of
+      // combat), so this is what every DM on a real campaign sees. It must not
+      // promise an action — "run a combat first" — that cannot clear it. The
+      // kind also covers an envelope that exists but is not the expected
+      // shape, so the wording reports what the check found rather than
+      // asserting the device is empty; the exact detail is on the reference
+      // line below.
+      return 'No combat logs were found on this device, so there is nothing to back up yet.';
     case 'malformed-json':
       return "The combat logs saved on this device can't be read. Restore a safety copy first.";
     case 'legacy-schema':
@@ -471,12 +478,15 @@ export function CombatLogArchiveSyncControls({
                   >
                     Download as text
                   </Button>
-                  {/* Never gated. A refused edit is raised by the local store
-                      with no relation to enrollment, and its guidance tells the
-                      DM to delete a combat log, so this control has to exist
-                      wherever that banner can appear. It is last in the row,
-                      after both downloads, and `window.confirm` still covers
-                      the destructive step. */}
+                  {/* Never gated here. A refused edit is raised by the local
+                      store with no relation to enrollment, and its guidance
+                      tells the DM to delete a combat log, so this control has
+                      to exist wherever that banner can appear. `deleteArchive`
+                      owns the one state it cannot run in — a routed campaign
+                      whose store is not hydrated — and says so in words rather
+                      than leaving a greyed-out button the guidance points at.
+                      It is last in the row, after both downloads, and
+                      `window.confirm` still covers the destructive step. */}
                   <Button
                     size="sm"
                     variant="ghost"

@@ -503,7 +503,15 @@ export const useCombatLogStore = create<CombatLogStoreState>()(
 
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { [archiveId]: _removed, ...rest } = state.encounters;
-          const next: Partial<CombatLogStoreState> = { encounters: rest };
+          // Ruling 5: an accepted mutation clears the recorded rejection. A
+          // deletion is exactly what the item-count and total-bytes guidance
+          // asks for, so leaving the banner up after it succeeds would tell the
+          // DM the fix they just applied did not take. The `!archive` return
+          // above keeps a no-op deletion from clearing it.
+          const next: Partial<CombatLogStoreState> = {
+            encounters: rest,
+            lastAdmissionError: null,
+          };
 
           // Only a campaign-scoped archive needs a tombstone to propagate.
           if (archive.campaignCode) {
