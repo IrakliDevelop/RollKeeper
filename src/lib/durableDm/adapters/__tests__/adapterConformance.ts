@@ -882,31 +882,37 @@ export function describeCardParity(
 
     // 1. commitLocalCutover: the FULL call sequence (fix round 4, item 1),
     // not just the last call — argument object field for field, including
-    // every `gates` flag and the `initialDocument` shape — excluding
-    // `generation` (a fresh run id each side of this test generates
-    // independently) and `updatedAt`/`now` (wall-clock timestamps).
-    // `campaign_settings` calls this exactly once (single-record), so this
-    // sequence always has length 1 here; a multi-record family's real run
-    // would have one call per document, and this same check compares all
-    // of them, not only the final one.
+    // every `gates` flag and the `initialDocument`/`initialDocuments` shape
+    // — excluding `generation` (a fresh run id each side of this test
+    // generates independently) and `updatedAt`/`now` (wall-clock
+    // timestamps). `campaign_settings` calls this exactly once
+    // (single-record), so this sequence always has length 1 here; a
+    // multi-record family's real run would have one call per document, and
+    // this same check compares all of them, not only the final one.
     expectLibraryCallSequenceMatches(
       functionNames.commitLocalCutover,
       cardCalls,
       adapterCalls,
       1,
-      // `initialDocument` is compared separately below (per call, with
-      // `updatedAt` stripped — a wall-clock timestamp) — excluded here so
-      // this comparison is not tripped by `updatedAt` alone.
-      ['generation', 'initialDocument', 'now']
+      // Both `initialDocument` (single-record families: campaign_settings,
+      // calendar) and `initialDocuments` (multi-record families: magic_item
+      // and its siblings) are compared separately below, per call, with
+      // their wall-clock fields stripped — excluded here so this comparison
+      // is not tripped by a timestamp alone.
+      ['generation', 'initialDocument', 'initialDocuments', 'now']
     );
     const cardCutoverSequence =
       cardCalls[functionNames.commitLocalCutover] ?? [];
     const adapterCutoverSequence =
       adapterCalls[functionNames.commitLocalCutover] ?? [];
     cardCutoverSequence.forEach((cardArgs, index) => {
-      const cardOptions = cardArgs[1] as { initialDocument?: unknown };
+      const cardOptions = cardArgs[1] as {
+        initialDocument?: unknown;
+        initialDocuments?: unknown[];
+      };
       const adapterOptions = adapterCutoverSequence[index][1] as {
         initialDocument?: unknown;
+        initialDocuments?: unknown[];
       };
       expect(
         omitKeys(adapterOptions.initialDocument as Record<string, unknown>, [
@@ -917,6 +923,31 @@ export function describeCardParity(
           'updatedAt',
         ])
       );
+      // Multi-record families pass an ARRAY, one entry per manifest record.
+      // Length first (a card/adapter that built a different number of
+      // initial documents has already diverged), then each entry with
+      // `updatedAt` and `deletedAt` stripped — `deletedAt` is either `null`
+      // or exactly `updatedAt` (a tombstoned entry), so it carries the same
+      // wall-clock instability.
+      expect(adapterOptions.initialDocuments?.length).toBe(
+        cardOptions.initialDocuments?.length
+      );
+      (cardOptions.initialDocuments ?? []).forEach((cardDocument, docIndex) => {
+        expect(
+          omitKeys(
+            adapterOptions.initialDocuments?.[docIndex] as Record<
+              string,
+              unknown
+            >,
+            ['updatedAt', 'deletedAt']
+          )
+        ).toEqual(
+          omitKeys(cardDocument as Record<string, unknown>, [
+            'updatedAt',
+            'deletedAt',
+          ])
+        );
+      });
     });
 
     // 2. The complete request body of each cloud call — action names alone
