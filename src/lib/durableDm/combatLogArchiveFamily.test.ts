@@ -134,6 +134,70 @@ const build = (
 const kinds = (manifest: { blockers: Array<{ kind: string }> }) =>
   manifest.blockers.map(blocker => blocker.kind);
 
+/** Canonical UTF-8 bytes of a payload, exactly as the manifest measures them. */
+const payloadBytes = (payload: CombatLogArchivePayload) =>
+  new TextEncoder().encode(canonicalJson(payload)).byteLength;
+
+/** The validator's own bound on a single text field — the padding knob. */
+const PAD_MAX = 1_000;
+
+/**
+ * A payload of *exactly* `targetBytes` canonical UTF-8 bytes. Event ids are
+ * fixed-width, so one extra `x` in `weaponOrSpellName` costs exactly one byte.
+ * Coarse-fills with maximum-width pads, drops one, then lands the remainder on
+ * two tunable events — which always span it, because dropping one coarse event
+ * frees more room than two pads can hold.
+ */
+function payloadOfExactBytes(targetBytes: number): CombatLogArchivePayload {
+  const payload = archivePayload();
+  payload.events = [];
+  const padEvent = (pad: number) =>
+    damageEvent(`pad-${String(payload.events.length).padStart(6, '0')}`, {
+      weaponOrSpellName: 'x'.repeat(pad),
+    });
+  // Marginal cost of one *additional* pad event (the first also pays no comma).
+  payload.events.push(padEvent(PAD_MAX));
+  const before = payloadBytes(payload);
+  payload.events.push(padEvent(PAD_MAX));
+  const overhead = payloadBytes(payload) - before - PAD_MAX;
+
+  while (payloadBytes(payload) + overhead + PAD_MAX <= targetBytes)
+    payload.events.push(padEvent(PAD_MAX));
+  payload.events.pop();
+
+  const rest = targetBytes - payloadBytes(payload) - 2 * overhead;
+  const first = Math.min(PAD_MAX, rest);
+  payload.events.push(padEvent(first));
+  payload.events.push(padEvent(rest - first));
+
+  const actual = payloadBytes(payload);
+  if (actual !== targetBytes)
+    throw new Error(`fixture missed its target: ${actual} != ${targetBytes}`);
+  return payload;
+}
+
+const archiveOfExactBytes = (
+  archiveId: string,
+  targetBytes: number
+): SeedArchive => ({
+  archiveId,
+  campaignCode: CAMPAIGN,
+  ...payloadOfExactBytes(targetBytes),
+});
+
+/** Archives whose canonical byte counts sum to exactly `totalBytes`. */
+function archivesTotallingExactly(totalBytes: number): SeedArchive[] {
+  const chunk = 150_000;
+  const archives: SeedArchive[] = [];
+  let remaining = totalBytes;
+  while (remaining > chunk + 10_000) {
+    archives.push(archiveOfExactBytes(`arc-${archives.length}`, chunk));
+    remaining -= chunk;
+  }
+  archives.push(archiveOfExactBytes(`arc-${archives.length}`, remaining));
+  return archives;
+}
+
 const otherCampaignArchive: SeedArchive = {
   archiveId: 'arc-other',
   campaignCode: 'OTHER1',
@@ -437,6 +501,7 @@ describe('Slice 11F combat log archive family', () => {
     payload.events = [damageEvent('evt-1'), damageEvent('evt-1')];
     expect(validateCombatLogArchivePayload(payload)).toMatchObject({
       ok: false,
+      kind: 'duplicate-child-id',
     });
   });
 
@@ -445,6 +510,7 @@ describe('Slice 11F combat log archive family', () => {
     delete (payload.events[0] as { id?: string }).id;
     expect(validateCombatLogArchivePayload(payload)).toMatchObject({
       ok: false,
+      kind: 'invalid-child-id',
     });
   });
 
@@ -453,6 +519,7 @@ describe('Slice 11F combat log archive family', () => {
     (payload.events[0] as { amount: number }).amount = Number.POSITIVE_INFINITY;
     expect(validateCombatLogArchivePayload(payload)).toMatchObject({
       ok: false,
+      kind: 'invalid-archive',
     });
   });
 
@@ -463,7 +530,76 @@ describe('Slice 11F combat log archive family', () => {
       'Fireball';
     expect(validateCombatLogArchivePayload(payload)).toMatchObject({
       ok: false,
+      kind: 'unclassified-field',
     });
+  });
+
+  // ── Prototype keys must not slip past the per-event allowlist ──────────
+
+  it.each([
+    'toString',
+    'constructor',
+    'valueOf',
+    'hasOwnProperty',
+    '__proto__',
+  ])('rejects %s as an invented event discriminator', type => {
+    const payload = archivePayload();
+    payload.events = [
+      {
+        id: 'evt-1',
+        timestamp: '2026-01-01T00:00:00.000Z',
+        round: 1,
+        turn: 0,
+        encounterId: ENC_A,
+        type,
+      } as unknown as CombatLogEvent,
+    ];
+    expect(validateCombatLogArchivePayload(payload)).toMatchObject({
+      ok: false,
+      kind: 'invalid-archive',
+    });
+  });
+
+  it.each(['toString', 'constructor', 'valueOf', 'hasOwnProperty'])(
+    'rejects %s as an extra field on a legitimate event',
+    field => {
+      const payload = archivePayload();
+      payload.events = [damageEvent('evt-1', { [field]: 'smuggled' })];
+      expect(validateCombatLogArchivePayload(payload)).toMatchObject({
+        ok: false,
+        kind: 'unclassified-field',
+      });
+    }
+  );
+
+  it('quarantines the __proto__ own key that JSON.parse creates', async () => {
+    // Written as raw JSON: an object literal would set the prototype instead of
+    // creating an own key, which is exactly the case `in` fails to catch.
+    const event =
+      '{"id":"evt-1","timestamp":"2026-01-01T00:00:00.000Z","round":1,"turn":0,' +
+      '"encounterId":"enc-a","type":"damage","sourceId":"ent-1","sourceName":"Cultist",' +
+      '"targetId":"ent-2","targetName":"Aria","amount":7,"damageType":"slashing",' +
+      '"__proto__":{"polluted":true}}';
+    const rawEnvelope =
+      '{"state":{"encounters":{"arc-1":{"campaignCode":"SYNTH1",' +
+      '"encounterId":"enc-a","startedAt":"2026-01-01T00:00:00.000Z",' +
+      `"endedAt":"2026-01-01T00:10:00.000Z","events":[${event}]}},` +
+      '"combatLogTombstones":{},"activeArchiveId":null},"version":2}';
+    expect(
+      Object.hasOwn(
+        JSON.parse(rawEnvelope).state.encounters['arc-1'].events[0],
+        '__proto__'
+      )
+    ).toBe(true);
+
+    const manifest = await buildCombatLogArchiveManifest({
+      campaignCode: CAMPAIGN,
+      rawEnvelope,
+    });
+
+    expect(kinds(manifest)).toEqual(['unclassified-field']);
+    expect(manifest.blockers[0].detail).toContain('__proto__');
+    expect(manifest.records).toEqual([]);
   });
 
   it('accepts an archive with no endedAt', () => {
@@ -681,17 +817,25 @@ describe('Slice 11F combat log archive family', () => {
 
   // ── Manifest-time limits ─────────────────────────────────────────────────
 
-  it('reports oversized records above the record byte bound', async () => {
-    const events = Array.from({ length: 1_500 }, (_unused, index) =>
-      damageEvent(`evt-${index}`)
-    );
-    const manifest = await build([endedArchive({ events })]);
+  it('reports oversized-record only past the record byte bound', async () => {
+    const atBound = await build([
+      archiveOfExactBytes('arc-1', COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES),
+    ]);
+    const overBound = await build([
+      archiveOfExactBytes('arc-1', COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES + 1),
+    ]);
 
-    expect(kinds(manifest)).toEqual(['oversized-record']);
-    expect(manifest.records).toHaveLength(1);
-    expect(manifest.records[0].byteCount).toBeGreaterThan(
+    // A record *at* the cap is admitted; one byte more is not.
+    expect(atBound.records[0].byteCount).toBe(
       COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES
     );
+    expect(kinds(atBound)).toEqual([]);
+    expect(overBound.records[0].byteCount).toBe(
+      COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES + 1
+    );
+    expect(kinds(overBound)).toEqual(['oversized-record']);
+    expect(overBound.blockers[0].legacyId).toBe('arc-1');
+    expect(overBound.records).toHaveLength(1);
   });
 
   it('reports too-many-records only past the item bound', async () => {
@@ -709,21 +853,25 @@ describe('Slice 11F combat log archive family', () => {
     expect(overBound.recordCount).toBe(COMBAT_LOG_ARCHIVE_MAX_ITEMS + 1);
   });
 
-  it('reports an oversized family above the total byte bound', async () => {
-    const events = Array.from({ length: 600 }, (_unused, index) =>
-      damageEvent(`evt-${index}`)
+  it('reports oversized-family only past the total byte bound', async () => {
+    const atBound = await build(
+      archivesTotallingExactly(COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES)
     );
-    const manifest = await build(
-      Array.from({ length: 60 }, (_unused, index) =>
-        endedArchive({ archiveId: `arc-${index}`, events })
-      )
+    const overBound = await build(
+      archivesTotallingExactly(COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES + 1)
     );
 
-    expect(kinds(manifest)).toEqual(['oversized-family']);
-    expect(manifest.totalBytes).toBeGreaterThan(
-      COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES
+    // A family *at* the cap is admitted; one byte more is not.
+    expect(atBound.totalBytes).toBe(COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES);
+    expect(kinds(atBound)).toEqual([]);
+    expect(overBound.totalBytes).toBe(COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES + 1);
+    expect(kinds(overBound)).toEqual(['oversized-family']);
+    expect(overBound.blockers[0].legacyId).toBeNull();
+    // Neither the per-record nor the item bound is what fired here.
+    expect(overBound.recordCount).toBeLessThanOrEqual(
+      COMBAT_LOG_ARCHIVE_MAX_ITEMS
     );
-    for (const entry of manifest.records)
+    for (const entry of overBound.records)
       expect(entry.byteCount).toBeLessThanOrEqual(
         COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES
       );

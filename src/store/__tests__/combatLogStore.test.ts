@@ -8,6 +8,7 @@ import {
   COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES,
 } from '@/store/combatLogStore';
 import { writeCombatLogArchiveAuthorityMarker } from '@/lib/durableDm/combatLogArchiveLegacyAuthority';
+import { buildCombatLogArchiveManifest } from '@/lib/durableDm/combatLogArchiveFamily';
 import type {
   CombatLogState,
   CombatLogFilters,
@@ -39,13 +40,16 @@ function resetStore() {
 
 /**
  * Independent byte oracle for the tests. The store measures canonical JSON
- * (recursively key-sorted) UTF-8 bytes; sorting keys is a permutation of the
- * same characters, so the encoded length is identical to plain
- * `JSON.stringify`. Measuring here without importing the store's helper keeps
- * the fixtures from silently tracking a wrong implementation.
+ * (recursively key-sorted) UTF-8 bytes of the campaignCode-stripped *payload* —
+ * the same object the manifest, IndexedDB and Postgres measure. Sorting keys is
+ * a permutation of the same characters, so the encoded length is identical to
+ * plain `JSON.stringify`. Measuring here without importing the store's helper
+ * keeps the fixtures from silently tracking a wrong implementation.
  */
 function recordBytes(archive: CombatLogState): number {
-  return new TextEncoder().encode(JSON.stringify(archive)).byteLength;
+  const { campaignCode, ...payload } = archive;
+  void campaignCode;
+  return new TextEncoder().encode(JSON.stringify(payload)).byteLength;
 }
 
 /** Minimal damage event payload (no id/timestamp) */
@@ -1109,6 +1113,74 @@ describe('combatLogStore admission gates (Slice 11F)', () => {
       archiveId: id,
       reason: 'total-bytes',
     });
+  });
+
+  it('measures exactly the bytes the durable manifest measures', async () => {
+    seedRouted('SYNTH1');
+    const id = useCombatLogStore.getState().startArchive(ENC_A, 'SYNTH1')!;
+    useCombatLogStore
+      .getState()
+      .logEvent(id, makeDamagePayload({ weaponOrSpellName: 'Longsword' }));
+    useCombatLogStore.getState().endArchive(id);
+    const archive = useCombatLogStore.getState().encounters[id];
+
+    // The gates and the cutover manifest must agree on the *same object*: the
+    // campaignCode-stripped payload, canonically encoded. A store-side measure
+    // over the whole `CombatLogState` counts ~24 bytes the durable side never
+    // stores, so it would admit records the cloud bound then rejects.
+    const manifest = await buildCombatLogArchiveManifest({
+      campaignCode: 'SYNTH1',
+      rawEnvelope: JSON.stringify({
+        state: {
+          encounters: { [id]: archive },
+          combatLogTombstones: {},
+          activeArchiveId: id,
+        },
+        version: COMBAT_LOG_ARCHIVE_PERSIST_VERSION,
+      }),
+    });
+
+    expect(manifest.records).toHaveLength(1);
+    expect(manifest.records[0].byteCount).toBe(recordBytes(archive));
+  });
+
+  it('admits a new routed archive that lands exactly on the aggregate cap, and refuses one byte more', () => {
+    seedRouted('SYNTH1');
+    // `startArchive` writes {encounterId, events: [], startedAt}; the ISO
+    // timestamp is always 24 characters, so the cost is exact.
+    const newArchiveBytes = recordBytes({
+      encounterId: ENC_A,
+      events: [],
+      startedAt: new Date().toISOString(),
+    });
+
+    seedArchivesToBytes(
+      'SYNTH1',
+      COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES - newArchiveBytes - 100_000
+    );
+    seedRoutedArchiveOfExactBytes(
+      'filler-aggregate-exact',
+      'SYNTH1',
+      COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES -
+        newArchiveBytes -
+        campaignBytes('SYNTH1')
+    );
+    expect(campaignBytes('SYNTH1')).toBe(
+      COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES - newArchiveBytes
+    );
+
+    // Exactly on the cap: admitted (the gate rejects only *past* the bound).
+    const admitted = useCombatLogStore.getState().startArchive(ENC_A, 'SYNTH1');
+    expect(admitted).toBeTruthy();
+    expect(useCombatLogStore.getState().lastAdmissionError).toBeNull();
+    expect(campaignBytes('SYNTH1')).toBe(COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES);
+
+    // One more archive is one byte too many.
+    const refused = useCombatLogStore.getState().startArchive(ENC_B, 'SYNTH1');
+    expect(refused).toBeNull();
+    expect(useCombatLogStore.getState().lastAdmissionError?.reason).toBe(
+      'total-bytes'
+    );
   });
 
   it('still closes a routed archive that stays within the caps', () => {

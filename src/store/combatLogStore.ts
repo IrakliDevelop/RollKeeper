@@ -5,6 +5,7 @@ import { createSafeStorage } from '@/lib/safeStorage';
 import { combatLogArchiveUsesIndexedDbAuthority } from '@/lib/durableDm/combatLogArchiveLegacyAuthority';
 import {
   canonicalJson,
+  combatLogArchivePayloadFrom,
   COMBAT_LOG_ARCHIVE_MAX_ITEMS,
   COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES,
   COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES,
@@ -46,12 +47,19 @@ function generateArchiveId(): string {
 }
 
 /**
- * Canonical UTF-8 byte length of one archive record. Never `length`. The gates
- * share `canonicalJson` with the family module so they measure exactly the
- * bytes the manifest — and `private.canonical_campaign_document_json` — measure.
+ * Canonical UTF-8 byte length of one archive record. Never `length`.
+ *
+ * `campaignCode` is stripped first: the manifest, IndexedDB and Postgres all
+ * store and measure the campaignCode-less *payload*, so measuring the store's
+ * `CombatLogState` here would count ~24 bytes per record that the durable side
+ * never sees, and admit at a bound the cloud then applies differently. Sharing
+ * `combatLogArchivePayloadFrom` and `canonicalJson` with the family module
+ * makes both sides measure the same bytes of the same object.
  */
 function archiveRecordBytes(archive: CombatLogState): number {
-  return new TextEncoder().encode(canonicalJson(archive)).byteLength;
+  return new TextEncoder().encode(
+    canonicalJson(combatLogArchivePayloadFrom(archive))
+  ).byteLength;
 }
 
 /**

@@ -377,7 +377,10 @@ function validateEvent(
 ): CombatLogArchivePayloadRejection | null {
   const path = `events[${index}]`;
   const type = event.type;
-  if (typeof type !== 'string' || !(type in EVENT_FIELD_SPECS))
+  // `Object.hasOwn`, never `in`: `in` walks the prototype chain, so `toString`
+  // would name a "known" discriminator whose spec table is a function with no
+  // own entries — every field would then go unchecked.
+  if (typeof type !== 'string' || !Object.hasOwn(EVENT_FIELD_SPECS, type))
     return reject(
       'invalid-archive',
       `${path}.type ${JSON.stringify(type)} is not a combat log event type`
@@ -387,8 +390,10 @@ function validateEvent(
     EventFieldSpec
   >;
 
+  // Same reason, plus `__proto__`: `JSON.parse` creates it as an *own* key, so
+  // it reaches here and must be rejected rather than copied into the payload.
   for (const field of Object.keys(event))
-    if (!BASE_EVENT_FIELDS.has(field) && !(field in specs))
+    if (!BASE_EVENT_FIELDS.has(field) && !Object.hasOwn(specs, field))
       return reject(
         'unclassified-field',
         `${path} field ${field} does not belong to a ${type} event`
