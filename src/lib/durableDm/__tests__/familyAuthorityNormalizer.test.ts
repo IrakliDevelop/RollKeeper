@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
+import type { CalendarAuthority } from '@/lib/indexeddb/calendarAuthority';
+import type { CampaignSettingsAuthority } from '@/lib/indexeddb/campaignSettingsAuthority';
+import type { CombatLogArchiveAuthority } from '@/lib/indexeddb/combatLogArchiveAuthority';
+import type { EncounterAuthority } from '@/lib/indexeddb/encounterAuthority';
+import type { MagicItemAuthority } from '@/lib/indexeddb/magicItemAuthority';
+import type { NpcAuthority } from '@/lib/indexeddb/npcAuthority';
+
 import {
   normalizeFamilyAuthority,
   toAuthorityPointerView,
+  type AuthorityPointerView,
   type NormalizedAuthorityInconsistent,
+  type RawAuthorityPointerRecord,
 } from '../familyAuthorityNormalizer';
 
 const scope = { accountId: 'account-1', campaignId: 'campaign-1' };
@@ -15,6 +24,29 @@ function asInconsistent(
   if (result.state !== 'inconsistent')
     throw new Error(`expected inconsistent, got ${result.state}`);
   return result;
+}
+
+/**
+ * Builds a branded `AuthorityPointerView` the only way a caller outside this
+ * module can: through `toAuthorityPointerView`. `namespace` is always
+ * supplied so the record is treated as real, never as the synthesized "no
+ * pointer" default; that default is covered separately, directly, in the
+ * `toAuthorityPointerView` suite below.
+ */
+function pointerView(
+  authority: 'localStorage' | 'indexedDB' | 'postgres',
+  epoch: number
+): AuthorityPointerView {
+  const view = toAuthorityPointerView({
+    authority,
+    epoch,
+    namespace: 'user:account-1',
+    campaignId: 'campaign-1',
+    family: 'npc',
+    committedAt: '2026-08-24T00:00:00.000Z',
+  });
+  if (!view) throw new Error('expected a real pointer view, got null');
+  return view;
 }
 
 describe('normalizeFamilyAuthority', () => {
@@ -39,7 +71,7 @@ describe('normalizeFamilyAuthority', () => {
           campaignId: 'campaign-1',
           accountId: 'account-1',
         },
-        pointer: { authority: 'localStorage', epoch: 0 },
+        pointer: pointerView('localStorage', 0),
         ...scope,
       })
     ).toMatchObject({ state: 'legacy', rolledBack: false });
@@ -54,7 +86,7 @@ describe('normalizeFamilyAuthority', () => {
     expect(
       normalizeFamilyAuthority({
         marker: null,
-        pointer: { authority: 'localStorage', epoch: 0 },
+        pointer: pointerView('localStorage', 0),
         ...scope,
       })
     ).toEqual({
@@ -74,7 +106,7 @@ describe('normalizeFamilyAuthority', () => {
           epoch: 2,
           campaignId: 'campaign-1',
         },
-        pointer: { authority: 'localStorage', epoch: 2 },
+        pointer: pointerView('localStorage', 2),
         ...scope,
       })
     ).toMatchObject({ state: 'legacy', rolledBack: true, epoch: 2 });
@@ -91,7 +123,7 @@ describe('normalizeFamilyAuthority', () => {
           epoch: 0,
           campaignId: 'campaign-1',
         },
-        pointer: { authority: 'localStorage', epoch: 0 },
+        pointer: pointerView('localStorage', 0),
         ...scope,
       })
     ).toMatchObject({ state: 'legacy', rolledBack: true, epoch: 0 });
@@ -106,7 +138,7 @@ describe('normalizeFamilyAuthority', () => {
           campaignId: 'campaign-1',
           accountId: 'account-1',
         },
-        pointer: { authority: 'localStorage', epoch: 2 },
+        pointer: pointerView('localStorage', 2),
         ...scope,
       })
     ).toMatchObject({ state: 'legacy', rolledBack: true });
@@ -130,7 +162,7 @@ describe('normalizeFamilyAuthority', () => {
     expect(
       normalizeFamilyAuthority({
         marker: null,
-        pointer: { authority: 'localStorage', epoch: 2 },
+        pointer: pointerView('localStorage', 2),
         ...scope,
       })
     ).toMatchObject({ state: 'inconsistent', reason: 'incomplete-rollback' });
@@ -142,7 +174,7 @@ describe('normalizeFamilyAuthority', () => {
       epoch: 1,
       campaignId: 'campaign-1',
     };
-    const pointer = { authority: 'indexedDB' as const, epoch: 1 };
+    const pointer = pointerView('indexedDB', 1);
     const result = asInconsistent(
       normalizeFamilyAuthority({ marker, pointer, ...scope })
     );
@@ -153,7 +185,7 @@ describe('normalizeFamilyAuthority', () => {
     expect(
       normalizeFamilyAuthority({
         marker: { authority: 'indexedDB', epoch: 1, campaignId: 'campaign-1' },
-        pointer: { authority: 'indexedDB', epoch: 1 },
+        pointer: pointerView('indexedDB', 1),
         ...scope,
       })
     ).toEqual({
@@ -166,7 +198,7 @@ describe('normalizeFamilyAuthority', () => {
     expect(
       normalizeFamilyAuthority({
         marker: { authority: 'postgres', epoch: 1, campaignId: 'campaign-1' },
-        pointer: { authority: 'postgres', epoch: 1 },
+        pointer: pointerView('postgres', 1),
         ...scope,
       })
     ).toEqual({
@@ -182,7 +214,7 @@ describe('normalizeFamilyAuthority', () => {
     expect(
       normalizeFamilyAuthority({
         marker: { authority: 'postgres', epoch: 1, campaignId: 'campaign-1' },
-        pointer: { authority: 'indexedDB', epoch: 1 },
+        pointer: pointerView('indexedDB', 1),
         ...scope,
       })
     ).toMatchObject({
@@ -208,7 +240,7 @@ describe('normalizeFamilyAuthority', () => {
     expect(
       normalizeFamilyAuthority({
         marker: { authority: 'postgres', epoch: 2, campaignId: 'campaign-1' },
-        pointer: { authority: 'postgres', epoch: 1 },
+        pointer: pointerView('postgres', 1),
         ...scope,
       })
     ).toMatchObject({ state: 'inconsistent', reason: 'epoch-disagreement' });
@@ -223,7 +255,7 @@ describe('normalizeFamilyAuthority', () => {
           campaignId: 'campaign-1',
           accountId: 'account-2',
         },
-        pointer: { authority: 'postgres', epoch: 1 },
+        pointer: pointerView('postgres', 1),
         ...scope,
       })
     ).toMatchObject({ state: 'inconsistent', reason: 'account-mismatch' });
@@ -233,7 +265,7 @@ describe('normalizeFamilyAuthority', () => {
     expect(
       normalizeFamilyAuthority({
         marker: { authority: 'postgres', epoch: 1, campaignId: 'campaign-9' },
-        pointer: { authority: 'postgres', epoch: 1 },
+        pointer: pointerView('postgres', 1),
         ...scope,
       })
     ).toMatchObject({ state: 'inconsistent', reason: 'campaign-mismatch' });
@@ -252,7 +284,7 @@ describe('normalizeFamilyAuthority', () => {
           campaignId: 'campaign-9',
           accountId: 'account-2',
         },
-        pointer: { authority: 'postgres', epoch: 1 },
+        pointer: pointerView('postgres', 1),
         ...scope,
       })
     ).toMatchObject({ state: 'inconsistent', reason: 'account-mismatch' });
@@ -262,7 +294,7 @@ describe('normalizeFamilyAuthority', () => {
     expect(
       normalizeFamilyAuthority({
         marker: { authority: 'postgres', epoch: 5, campaignId: 'campaign-9' },
-        pointer: { authority: 'postgres', epoch: 1 },
+        pointer: pointerView('postgres', 1),
         ...scope,
       })
     ).toMatchObject({ state: 'inconsistent', reason: 'campaign-mismatch' });
@@ -293,7 +325,7 @@ describe('toAuthorityPointerView', () => {
         epoch: 1,
         committedAt: '2026-08-24T00:00:00.000Z',
       })
-    ).toEqual({ authority: 'indexedDB', epoch: 1 });
+    ).toEqual(pointerView('indexedDB', 1));
   });
 
   it('maps a real rolled-back localStorage record (not the synthesized default) to a pointer view', () => {
@@ -307,6 +339,62 @@ describe('toAuthorityPointerView', () => {
         epoch: 2,
         committedAt: '2026-08-24T00:00:00.000Z',
       })
-    ).toEqual({ authority: 'localStorage', epoch: 2 });
+    ).toEqual(pointerView('localStorage', 2));
   });
 });
+
+/**
+ * Type-level only — never called at runtime. `npm run type-check` (and
+ * `npx tsc --noEmit`) fail if either function stops compiling the way its
+ * name promises, which is the whole point: neither claim can be verified by
+ * running the suite, only by the compiler.
+ */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
+// Fix round 2, review finding 1: the brand on `AuthorityPointerView` must
+// make it a compile error to pass a raw reader's return (non-nullable,
+// structurally `{ authority, epoch, ... }`) straight through as `pointer`
+// without going through `toAuthorityPointerView` first. If this function
+// ever compiles without the `@ts-expect-error`, the brand has been weakened
+// and the bug fix round 1 closed — a synthesized default misread as a real
+// record — is reachable again.
+function typeLevelProof_rawReaderCannotBypassTheBrand(raw: NpcAuthority) {
+  normalizeFamilyAuthority({
+    marker: null,
+    // @ts-expect-error -- NpcAuthority (and its five siblings) must not be
+    // assignable to the branded AuthorityPointerView; only
+    // toAuthorityPointerView can produce one.
+    pointer: raw,
+    accountId: 'account-1',
+    campaignId: 'campaign-1',
+  });
+}
+
+// Fix round 2, review finding 2: bridges RawAuthorityPointerRecord to the six
+// real reader authority unions so a future write path that drops a field
+// toAuthorityPointerView relies on (namespace) fails to compile here, rather
+// than silently misclassifying a real record as "no record" with no test
+// catching it. Verified by inspection that all six unions
+// (campaignSettingsAuthority.ts, calendarAuthority.ts, magicItemAuthority.ts,
+// npcAuthority.ts, encounterAuthority.ts, combatLogArchiveAuthority.ts) are
+// structurally identical except for the `family` literal — this bridges all
+// six anyway, since doing so costs nothing and is stronger evidence than
+// bridging one and asserting the rest match by inspection alone.
+function typeLevelProof_realReaderUnionsBridgeToRawRecord(
+  campaignSettings: CampaignSettingsAuthority,
+  calendar: CalendarAuthority,
+  magicItem: MagicItemAuthority,
+  npc: NpcAuthority,
+  encounter: EncounterAuthority,
+  combatLogArchive: CombatLogArchiveAuthority
+): RawAuthorityPointerRecord[] {
+  return [
+    campaignSettings,
+    calendar,
+    magicItem,
+    npc,
+    encounter,
+    combatLogArchive,
+  ];
+}
+/* eslint-enable @typescript-eslint/no-unused-vars */

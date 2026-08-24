@@ -6,9 +6,31 @@ export interface AuthorityMarkerView {
   accountId?: string;
 }
 
+/**
+ * Not exported: only `toAuthorityPointerView` in this module can reference
+ * this symbol, so it is the only function able to produce a value typed
+ * `AuthorityPointerView`. See the brand field on that interface for why.
+ */
+declare const authorityPointerViewBrand: unique symbol;
+
 export interface AuthorityPointerView {
-  authority: 'localStorage' | 'indexedDB' | 'postgres';
-  epoch: number;
+  readonly authority: 'localStorage' | 'indexedDB' | 'postgres';
+  readonly epoch: number;
+  /**
+   * Nominal brand, not a real field. Without it, `AuthorityPointerView` is
+   * structurally just `{ authority, epoch }`, and every raw reader return
+   * (`CampaignSettingsAuthority`, `NpcAuthority`, and the other four —
+   * `src/lib/indexeddb/*Authority.ts`) is structurally assignable to that,
+   * because it always carries at least those two fields. That would let a
+   * call site pass a reader's return straight through as `pointer`, bypassing
+   * `toAuthorityPointerView` entirely — silently reopening exactly the bug
+   * fix round 1 closed: the reader never returns null, so a synthesized
+   * `{authority:'localStorage', epoch}` default reads as a real record and
+   * `incomplete-rollback`'s `!pointer` arm goes dead. The brand makes that
+   * bypass a compile error instead of a runtime one six different adapter
+   * implementers would each have to remember not to introduce.
+   */
+  readonly [authorityPointerViewBrand]: true;
 }
 
 /**
@@ -61,7 +83,16 @@ export function toAuthorityPointerView(
   record: RawAuthorityPointerRecord
 ): AuthorityPointerView | null {
   if (record.namespace === undefined) return null;
-  return { authority: record.authority, epoch: record.epoch };
+  // The only place in this module allowed to mint the brand: the plain
+  // literal below has no `[authorityPointerViewBrand]` property, so a direct
+  // `as AuthorityPointerView` is rejected as an insufficient-overlap
+  // conversion. Routing through `unknown` is the standard, deliberate way to
+  // assert a nominal brand once — everywhere else, only this function's own
+  // return type carries the assertion.
+  return {
+    authority: record.authority,
+    epoch: record.epoch,
+  } as unknown as AuthorityPointerView;
 }
 
 export type NormalizedAuthorityState =
