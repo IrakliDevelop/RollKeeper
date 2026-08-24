@@ -36,11 +36,6 @@ function tombstoneCampaign(entry: unknown): string | undefined {
   return typeof code === 'string' ? code : undefined;
 }
 
-function entryId(entry: unknown): string | undefined {
-  if (!record(entry) || typeof entry.id !== 'string') return undefined;
-  return entry.id;
-}
-
 /**
  * Merges a previous and next keyed record so that entries whose campaign is
  * routed are frozen at their previous value while everything else follows
@@ -80,10 +75,19 @@ function mergeRoutedRecord(
 
 /**
  * Same ordering guarantee as `mergeRoutedRecord`, for `state.encounters`,
- * which is an array of entries carrying their own `id` field rather than a
- * keyed record. Entries with no `id` cannot be tracked for routing or stable
- * ordering and are passed through in the next envelope's order, appended
- * after the ordered (keyed) entries.
+ * which is an array rather than a keyed record. This deliberately does not
+ * match entries by an `id` field — a real encounter always has one, but
+ * malformed data (no `id`, or a duplicate `id`) must still be reproduced
+ * faithfully rather than reordered or collapsed, and the routed/unrouted
+ * split never actually needs identity: a routed entry always freezes at its
+ * previous value regardless of what `next` holds, and an unrouted entry
+ * always follows `next` regardless of what `previous` held. So this walks
+ * `previous` in its own order and, at each position, either freezes the
+ * previous (routed) entry or pulls the next unconsumed unrouted entry from
+ * `next`'s own queue (in `next`'s own order) — reproducing `previous`'s
+ * exact arrangement whenever nothing routed or unrouted actually changed.
+ * Entries newly added in `next` (beyond what `previous` had unrouted slots
+ * for) are appended at the tail, in `next`'s own order.
  */
 function mergeRoutedArray(
   previous: unknown[],
@@ -91,44 +95,25 @@ function mergeRoutedArray(
   isRouted: Set<string>,
   campaignOf: (entry: unknown) => string | undefined
 ): unknown[] {
-  const previousById = new Map<string, unknown>();
-  const previousOrder: string[] = [];
-  for (const entry of previous) {
-    const id = entryId(entry);
-    if (id === undefined) continue;
-    previousById.set(id, entry);
-    previousOrder.push(id);
-  }
-  const nextById = new Map<string, unknown>();
-  const nextOrder: string[] = [];
-  const nextUnkeyed: unknown[] = [];
-  for (const entry of next) {
-    const id = entryId(entry);
-    if (id === undefined) {
-      nextUnkeyed.push(entry);
-      continue;
-    }
-    nextById.set(id, entry);
-    nextOrder.push(id);
-  }
-  const previousIdSet = new Set(previousOrder);
-  const orderedIds = [
-    ...previousOrder,
-    ...nextOrder.filter(id => !previousIdSet.has(id)),
-  ];
+  const isEntryRouted = (entry: unknown) => {
+    const code = campaignOf(entry);
+    return code !== undefined && isRouted.has(code);
+  };
+  const nextUnroutedQueue = next.filter(entry => !isEntryRouted(entry));
+
   const merged: unknown[] = [];
-  for (const id of orderedIds) {
-    const nextEntry = nextById.get(id);
-    const previousEntry = previousById.get(id);
-    const code = campaignOf(nextEntry) ?? campaignOf(previousEntry);
-    if (code && isRouted.has(code)) {
-      if (previousEntry !== undefined)
-        merged.push(structuredClone(previousEntry));
-    } else if (nextEntry !== undefined) {
-      merged.push(nextEntry);
+  let unroutedIndex = 0;
+  for (const entry of previous) {
+    if (isEntryRouted(entry)) {
+      merged.push(structuredClone(entry));
+    } else if (unroutedIndex < nextUnroutedQueue.length) {
+      merged.push(nextUnroutedQueue[unroutedIndex]);
+      unroutedIndex += 1;
     }
+    // else: this previous unrouted slot has nothing left in `next` — the
+    // entry was removed.
   }
-  merged.push(...nextUnkeyed);
+  merged.push(...nextUnroutedQueue.slice(unroutedIndex));
   return merged;
 }
 
