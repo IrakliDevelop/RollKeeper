@@ -113,5 +113,6 @@ test('resetting and replaying local migrations is deterministic and idempotent',
     '20260824000000',
     '20260824500000',
     '20260825000000',
+    '20260826000000',
   ]);
 });
