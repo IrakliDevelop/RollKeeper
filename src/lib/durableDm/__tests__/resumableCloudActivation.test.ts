@@ -493,6 +493,29 @@ describe('runResumableCloudActivation', () => {
     });
   });
 
+  // Isolates the `recordCount !== records.length` guard (line 140) from the
+  // `documents.length !== records.length` guard beneath it (line 141): the
+  // `documents` array itself is left the same length as `records` (2 == 2,
+  // so 141 does not fire), while the preview's declared `recordCount` is
+  // wrong (5 != 2), so only the recordCount check can catch this. The prior
+  // "different document set" test grows both `recordCount` and `documents`
+  // together, so it cannot tell 140 and 141 apart — deleting 140 alone left
+  // that test, and every other test in the file, green.
+  it('conflicts when the declared recordCount disagrees even though the document array length matches', async () => {
+    const wrongCount = postgresPreview();
+    wrongCount.recordCount = 5;
+    // `documents` deliberately left at its default two entries (matching
+    // `records.length`) so the `documents.length` guard does not fire first.
+    const cloud = gateway({ previewEnrollment: vi.fn(async () => wrongCount) });
+
+    expect(
+      await runResumableCloudActivation({ ...base, gateway: cloud })
+    ).toEqual({
+      status: 'conflict',
+      reason: 'cloud-generation-diverged',
+    });
+  });
+
   it('conflicts when a tombstone flag disagrees', async () => {
     const flipped = postgresPreview();
     flipped.documents![1].tombstoned = false;
