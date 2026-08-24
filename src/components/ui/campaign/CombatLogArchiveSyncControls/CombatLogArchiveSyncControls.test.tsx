@@ -796,6 +796,49 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     );
   });
 
+  it('counts only live combat logs after applying the account copy', async () => {
+    const cloudPayload = archivePayload({ encounterId: 'enc-cloud' });
+    const cloudFingerprint =
+      await fingerprintCombatLogArchivePayload(cloudPayload);
+    const tombstoneFingerprint =
+      await fingerprintCombatLogArchiveTombstone('arc-deleted');
+    await enrollAgainstCloudGeneration(body => {
+      if (body.action !== 'preview-enrollment') return undefined;
+      return {
+        authority: 'postgres',
+        epoch: CLOUD_EPOCH,
+        previewFingerprint: 'a'.repeat(64),
+        recordCount: 2,
+        documents: [
+          {
+            legacyId: 'arc-1',
+            serverVersion: CLOUD_SERVER_VERSION,
+            schemaVersion: 2,
+            payloadFingerprint: cloudFingerprint,
+            tombstoned: false,
+            payload: cloudPayload,
+          },
+          {
+            legacyId: 'arc-deleted',
+            serverVersion: CLOUD_SERVER_VERSION,
+            schemaVersion: 2,
+            payloadFingerprint: tombstoneFingerprint,
+            tombstoned: true,
+            payload: null,
+          },
+        ],
+      };
+    });
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /use the copy from your account/i })
+    );
+
+    expect(
+      await screen.findByText('Loaded 1 combat log from your account.')
+    ).toBeVisible();
+  });
+
   it('arms autosave after a version restore on an enrolled device', async () => {
     const restoredPayload = archivePayload({ encounterId: 'enc-restored' });
     const restoredFingerprint =
@@ -907,6 +950,39 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     expect(screen.queryByText('Combat log deleted.')).not.toBeInTheDocument();
     expect(commitSpy).not.toHaveBeenCalled();
     expect(requests.map(request => request.action)).not.toContain('put');
+    expect(useCombatLogStore.getState().encounters['arc-1']).toBeDefined();
+    expect(
+      useCombatLogStore.getState().combatLogTombstones['arc-1']
+    ).toBeUndefined();
+  });
+
+  it('refuses a delete when a routed marker exists before authority resolves', async () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    seedArchives({ 'arc-1': endedArchive() });
+    writeCombatLogArchiveAuthorityMarker(localStorage, {
+      version: 1,
+      campaignCode: campaign.code,
+      authority: 'postgres',
+      epoch: CLOUD_EPOCH,
+      accountId: ACCOUNT_ID,
+      campaignId: CAMPAIGN_ID,
+    });
+    vi.spyOn(supabaseBrowser, 'createSupabaseBrowserClient').mockReturnValue(
+      null
+    );
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderControls();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Delete this combat log' })
+    );
+
+    expect(
+      await screen.findByText(
+        "This device hasn't finished loading your combat logs, so nothing was deleted. Finish setting this device up, then try again."
+      )
+    ).toBeVisible();
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(useCombatLogStore.getState().encounters['arc-1']).toBeDefined();
     expect(
       useCombatLogStore.getState().combatLogTombstones['arc-1']

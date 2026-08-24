@@ -1386,10 +1386,13 @@ export function useCombatLogArchiveSyncController(
       return;
     }
     const documents = enrollmentPreview.documents;
+    const liveDocumentCount = documents.filter(
+      document => !document.tombstoned
+    ).length;
     const cutoverEpoch = enrollmentPreview.epoch;
     if (
       !window.confirm(
-        `Load ${combatLogCount(documents.length)} from your account onto this device? Work on this device that has not been backed up will stop this.`
+        `Load ${combatLogCount(liveDocumentCount)} from your account onto this device? Work on this device that has not been backed up will stop this.`
       )
     )
       return;
@@ -1450,7 +1453,7 @@ export function useCombatLogArchiveSyncController(
       // genuine hydration.
       setHydrated(true);
       setStatus(
-        `Loaded ${combatLogCount(documents.length)} from your account.`
+        `Loaded ${combatLogCount(liveDocumentCount)} from your account.`
       );
     } catch (cause) {
       setError(
@@ -1822,7 +1825,11 @@ export function useCombatLogArchiveSyncController(
     // and still report success — the archive is back on the next reload.
     // Refusing here rather than hiding the button keeps the control the
     // refused-edit banner's guidance names, and says why it cannot run yet.
-    if (authority && authority.authority !== 'localStorage' && !hydrated) {
+    const routedAuthority =
+      authority?.authority ??
+      readCombatLogArchiveAuthorityMarker(localStorage, campaignCode)
+        ?.authority;
+    if (routedAuthority && routedAuthority !== 'localStorage' && !hydrated) {
       setError(
         "This device hasn't finished loading your combat logs, so nothing was deleted. Finish setting this device up, then try again."
       );
