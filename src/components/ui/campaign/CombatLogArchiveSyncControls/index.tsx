@@ -34,7 +34,10 @@ import type {
   CombatLogState,
 } from '@/types/combatLog';
 
-import { ACTIVE_COMBAT_LOG_GUIDANCE } from './CombatLogArchiveSyncControls.hooks';
+import {
+  ACTIVE_COMBAT_LOG_GUIDANCE,
+  downloadFile,
+} from './CombatLogArchiveSyncControls.hooks';
 import { useCombatLogArchiveSyncContext } from './CombatLogArchiveSyncProvider';
 
 export {
@@ -52,7 +55,11 @@ export {
   useCombatLogArchiveSyncContext,
 } from './CombatLogArchiveSyncProvider';
 
-/** Sizes are for a DM, not a developer: KB and MB, never raw byte counts. */
+/**
+ * Sizes are for a DM, not a developer: always a rounded number with a unit,
+ * never a bare byte count. Under a kilobyte the unit *is* bytes, because
+ * "0.4 KB" reads worse than "431 bytes" for the smallest logs.
+ */
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} bytes`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -111,8 +118,8 @@ function archiveLabel(startedAt: string, endedAt: string | undefined) {
  * identifier and is deliberately not shown; a log whose encounter has since
  * been deleted still gets words rather than a hex-looking id.
  */
-function archiveName(names: Map<string, string>, archive: CombatLogState) {
-  return names.get(archive.encounterId) ?? 'Untitled combat';
+function archiveName(names: Map<string, string>, encounterId: string) {
+  return names.get(encounterId) ?? 'Untitled combat';
 }
 
 function eventCountLabel(count: number) {
@@ -140,20 +147,15 @@ function admissionMessage(reason: CombatLogAdmissionReason) {
       return 'That combat log has grown too big to save, so that change was not saved. End this combat and start a new log — everything already saved is safe.';
     case 'item-count':
       return 'This campaign already holds as many combat logs as it can, so that change was not saved. Delete one you no longer need, then try again.';
-    default:
+    case 'total-bytes':
       return 'Your combat logs for this campaign take up too much space together, so that change was not saved. Delete one you no longer need, then try again.';
+    default: {
+      // A fourth bound must get its own words rather than silently inheriting
+      // the total-bytes copy, so the compiler refuses this branch.
+      const unhandled: never = reason;
+      return unhandled;
+    }
   }
-}
-
-function downloadFile(filename: string, contents: string, type: string) {
-  const url = URL.createObjectURL(new Blob([contents], { type }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
 }
 
 /**
@@ -181,19 +183,31 @@ export function CombatLogArchiveSyncControls({
   );
   // A campaign may hold up to COMBAT_LOG_ARCHIVE_MAX_ITEMS archives of up to
   // COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES each, so the per-row sizes are encoded
-  // once per change rather than on every render of a live-combat route.
+  // only when the archives themselves change. `encounterNames` is deliberately
+  // NOT a dependency here: the encounter store uses immutable updates, so every
+  // encounter edit changes its array identity and would otherwise re-encode
+  // every archive on a route the DM keeps open during live combat.
   const archives = sync?.archives;
-  const rows = useMemo(
+  const measured = useMemo(
     () =>
       (archives ?? []).map(({ archiveId, archive }) => ({
         archiveId,
-        name: archiveName(encounterNames, archive),
+        encounterId: archive.encounterId,
         label: archiveLabel(archive.startedAt, archive.endedAt),
         detail: `${eventCountLabel(archive.events.length)} · ${formatSize(
           archiveBytes(archive)
         )}`,
       })),
-    [archives, encounterNames]
+    [archives]
+  );
+  // Joining the name back on is a map lookup per row and nothing more.
+  const rows = useMemo(
+    () =>
+      measured.map(row => ({
+        ...row,
+        name: archiveName(encounterNames, row.encounterId),
+      })),
+    [measured, encounterNames]
   );
   if (!sync || !isCombatLogArchiveClientVisible()) return null;
   if (sync.campaignCode !== campaign.code) return null;
@@ -457,20 +471,19 @@ export function CombatLogArchiveSyncControls({
                   >
                     Download as text
                   </Button>
-                  {/* Deleting is destructive and irreversible on this device,
-                      so it waits behind the same workspace choice every other
-                      action on this card waits behind: a backup card must not
-                      open on a delete button. Reading and downloading stay
-                      available from the first render. */}
-                  {sync.workspace && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => sync.deleteArchive(archiveId)}
-                    >
-                      Delete this combat log
-                    </Button>
-                  )}
+                  {/* Never gated. A refused edit is raised by the local store
+                      with no relation to enrollment, and its guidance tells the
+                      DM to delete a combat log, so this control has to exist
+                      wherever that banner can appear. It is last in the row,
+                      after both downloads, and `window.confirm` still covers
+                      the destructive step. */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => sync.deleteArchive(archiveId)}
+                  >
+                    Delete this combat log
+                  </Button>
                 </div>
               </div>
             ))}

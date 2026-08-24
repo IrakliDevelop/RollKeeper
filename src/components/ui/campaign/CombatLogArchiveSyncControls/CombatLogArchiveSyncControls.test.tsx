@@ -1277,11 +1277,17 @@ describe('CombatLogArchiveSyncControls card', () => {
     ).toBeInTheDocument();
     // The raw archive identity is a developer detail and never the label.
     expect(screen.queryByText(/enc-a/)).toBeNull();
-    // Destructive controls stay behind the same workspace gate as every other
-    // action on this card, so a backup card never opens on a delete button.
+    // The destructive control is present from the first render — a refused
+    // edit can tell the DM to delete before any workspace exists — but it is
+    // last in the row, behind both read-only downloads.
     expect(
-      screen.queryByRole('button', { name: /delete this combat log/i })
-    ).toBeNull();
+      screen.getAllByRole('button').map(button => button.textContent)
+    ).toEqual([
+      'Find my campaigns',
+      'Download as JSON',
+      'Download as text',
+      'Delete this combat log',
+    ]);
   });
 
   it('falls back to plain language when the encounter behind a log is gone', () => {
@@ -1367,6 +1373,42 @@ describe('CombatLogArchiveSyncControls card', () => {
       expect(commit).toHaveBeenCalledWith(
         expect.objectContaining({ operation: 'delete', legacyId: 'arc-1' })
       )
+    );
+    expect(useCombatLogStore.getState().encounters['arc-1']).toBeUndefined();
+  });
+
+  it('offers the delete control the refused-edit guidance names, with no workspace chosen', () => {
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    seedArchives({ 'arc-1': endedArchive() });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    renderControls();
+
+    // `lastAdmissionError` is session state the local store raises with no
+    // relation to enrollment, so this is reachable with no cloud set up at all.
+    act(() => {
+      useCombatLogStore.setState({
+        lastAdmissionError: {
+          archiveId: 'arc-1',
+          reason: 'item-count',
+          at: NOW,
+        },
+      });
+    });
+    expect(screen.getByRole('alert').textContent).toContain(
+      'Delete one you no longer need'
+    );
+
+    // …and the control that guidance names is on screen and works.
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete this combat log' })
+    );
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(useCombatLogStore.getState().encounters['arc-1']).toBeDefined();
+
+    confirmSpy.mockReturnValue(true);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Delete this combat log' })
     );
     expect(useCombatLogStore.getState().encounters['arc-1']).toBeUndefined();
   });

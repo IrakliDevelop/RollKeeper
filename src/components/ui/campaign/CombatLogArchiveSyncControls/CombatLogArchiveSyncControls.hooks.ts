@@ -234,10 +234,13 @@ function combatLogCount(count: number) {
   return count === 1 ? '1 combat log' : `${count} combat logs`;
 }
 
-function downloadJson(filename: string, value: unknown) {
-  const url = URL.createObjectURL(
-    new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' })
-  );
+/**
+ * Hands the browser one already-serialized file. Shared with the card, which
+ * downloads a single archive as JSON or as plain text, so the anchor dance
+ * exists once in this feature folder.
+ */
+export function downloadFile(filename: string, contents: string, type: string) {
+  const url = URL.createObjectURL(new Blob([contents], { type }));
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
@@ -245,6 +248,10 @@ function downloadJson(filename: string, value: unknown) {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function downloadJson(filename: string, value: unknown) {
+  downloadFile(filename, JSON.stringify(value, null, 2), 'application/json');
 }
 
 function isCampaignTombstone(
