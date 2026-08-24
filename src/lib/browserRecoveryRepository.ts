@@ -144,42 +144,44 @@ export class BrowserRecoveryRepository {
     manifestHash: string,
     entries: DeviceBackupEntry[]
   ): Promise<void> {
-    const readDatabase = await openDatabase();
-    let receipt: RecoveryDownloadReceipt | undefined;
-    try {
-      const transaction = readDatabase.transaction(RECEIPTS_STORE, 'readonly');
-      receipt = await requestResult<RecoveryDownloadReceipt | undefined>(
-        transaction.objectStore(RECEIPTS_STORE).get(manifestHash)
-      );
-      await transactionComplete(transaction);
-    } finally {
-      readDatabase.close();
-    }
-
-    if (!receipt || typeof receipt.verifiedAt !== 'string') {
-      throw new Error(
-        'A verified recovery download receipt is required before its entry vector can be enriched'
-      );
-    }
-    if (receipt.entries) {
-      throw new Error(
-        'Recovery download receipt already carries an entry vector'
-      );
-    }
+    // Computed before any transaction opens: it depends only on the caller's
+    // `entries`, not on the stored receipt, so there is nothing to gain by
+    // computing it inside the transaction, and doing so would force either
+    // holding a transaction open across an async crypto call (unreliable in
+    // real browsers) or reading twice across two transactions (a lost-update
+    // race against a concurrent writer). Everything that DOES depend on the
+    // stored receipt — the get, all three guards and the put — runs inside
+    // one transaction below, exactly as `verifyDownloadReceipt` does.
     const aggregateHash = await computeManifestHash(entries);
-    if (aggregateHash !== receipt.manifestHash) {
-      throw new Error(
-        'Recovery entry vector does not match the receipt manifest hash'
-      );
-    }
 
-    const writeDatabase = await openDatabase();
+    const database = await openDatabase();
     try {
-      const transaction = writeDatabase.transaction(
-        RECEIPTS_STORE,
-        'readwrite'
+      const transaction = database.transaction(RECEIPTS_STORE, 'readwrite');
+      const store = transaction.objectStore(RECEIPTS_STORE);
+      const receipt = await requestResult<RecoveryDownloadReceipt | undefined>(
+        store.get(manifestHash)
       );
-      transaction.objectStore(RECEIPTS_STORE).put({
+
+      if (!receipt || typeof receipt.verifiedAt !== 'string') {
+        transaction.abort();
+        throw new Error(
+          'A verified recovery download receipt is required before its entry vector can be enriched'
+        );
+      }
+      if (receipt.entries !== undefined) {
+        transaction.abort();
+        throw new Error(
+          'Recovery download receipt already carries an entry vector'
+        );
+      }
+      if (aggregateHash !== receipt.manifestHash) {
+        transaction.abort();
+        throw new Error(
+          'Recovery entry vector does not match the receipt manifest hash'
+        );
+      }
+
+      store.put({
         ...receipt,
         entries: entries.map(({ key, byteCount, sha256 }) => ({
           key,
@@ -189,7 +191,7 @@ export class BrowserRecoveryRepository {
       });
       await transactionComplete(transaction);
     } finally {
-      writeDatabase.close();
+      database.close();
     }
   }
 

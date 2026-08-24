@@ -251,6 +251,60 @@ describe('enrichVerifiedDownloadReceiptEntries', () => {
     const receipt = await repository.readVerifiedDownloadReceipt(
       bundle.manifestHash
     );
+    expect(receipt?.runId).toBe(bundle.runId);
+    expect(receipt?.initiatedAt).toBe('2026-08-24T00:00:00.000Z');
+    expect(receipt?.entries).toEqual(
+      bundle.entries.map(({ key, byteCount, sha256 }) => ({
+        key,
+        byteCount,
+        sha256,
+      }))
+    );
+  });
+
+  it('serializes concurrent enrichment attempts so only one entry vector is ever written', async () => {
+    const repository = new BrowserRecoveryRepository();
+    const bundle = await captureDeviceBackup(
+      new Map([['rollkeeper-dm-data', '{"state":{},"version":1}']]),
+      {
+        appVersion: 'test',
+        runId: 'run-1',
+        timestamp: '2026-08-24T00:00:00.000Z',
+      }
+    );
+    await repository.recordDownloadReceipt({
+      runId: bundle.runId,
+      manifestHash: bundle.manifestHash,
+      initiatedAt: '2026-08-24T00:00:00.000Z',
+    });
+    await repository.verifyDownloadReceipt({
+      runId: bundle.runId,
+      manifestHash: bundle.manifestHash,
+      verifiedAt: '2026-08-24T00:01:00.000Z',
+    });
+
+    const results = await Promise.allSettled([
+      repository.enrichVerifiedDownloadReceiptEntries(
+        bundle.manifestHash,
+        bundle.entries
+      ),
+      repository.enrichVerifiedDownloadReceiptEntries(
+        bundle.manifestHash,
+        bundle.entries
+      ),
+    ]);
+
+    const fulfilled = results.filter(result => result.status === 'fulfilled');
+    const rejected = results.filter(result => result.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason.message).toContain(
+      'already carries an entry vector'
+    );
+
+    const receipt = await repository.readVerifiedDownloadReceipt(
+      bundle.manifestHash
+    );
     expect(receipt?.entries).toEqual(
       bundle.entries.map(({ key, byteCount, sha256 }) => ({
         key,

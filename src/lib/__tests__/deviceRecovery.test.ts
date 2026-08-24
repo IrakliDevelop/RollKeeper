@@ -237,6 +237,13 @@ describe('device recovery bundle', () => {
   });
 
   it('records the bundle entry vector on the download receipt', async () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue(
+      'blob:recovery-download-entries'
+    );
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
+      () => undefined
+    );
     const recorded: RecoveryDownloadReceipt[] = [];
     const storage = new Map<string, string>([
       ['rollkeeper-dm-data', '{"state":{},"version":1}'],
