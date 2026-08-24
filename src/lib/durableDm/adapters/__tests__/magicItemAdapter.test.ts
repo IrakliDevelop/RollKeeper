@@ -60,16 +60,31 @@ describe('magicItemAdapter', () => {
     // `magic_item` has no player projection at all
     // (`MAGIC_ITEM_FAMILY_INVENTORY.projection: 'not-applicable'`), unlike
     // `campaign_settings`/`calendar`.
+    //
+    // Fix round 1, Important 5: the chain now runs all the way through
+    // `activateCloud` and `rollback` — the only two adapter methods that
+    // actually call `magicItemApi` at all — and asserts the recorded action
+    // list POSITIVELY. The previous version stopped at `commitLocalCutover`,
+    // none of whose steps touch the network, so its three `not.toContain`
+    // assertions ran against an empty array and passed vacuously
+    // (`expect(calls()).toEqual([])` inserted before them also passed).
     const harness = createMagicItemHarness();
     const context = await harness.seed();
     const calls = harness.recordedApiActions();
     await harness.adapter.previewManifest(context);
-    await harness.adapter.selectFamily(context);
-    const prepared = await harness.adapter.prepareIndexedDb(context);
-    await harness.adapter.commitLocalCutover(context, {
-      generation: prepared.generation,
-      manifest: prepared.manifest,
-    });
+    await harness.runChainThroughLocalCutover(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    await harness.adapter.activateCloud(context, manifest);
+    await harness.adapter.rollback(context);
+    expect(calls()).toEqual(
+      expect.arrayContaining([
+        'preview-enrollment',
+        'begin-staging',
+        'stage-items',
+        'confirm-cutover',
+        'rollback',
+      ])
+    );
     expect(calls()).not.toContain('projection-status');
     expect(calls()).not.toContain('replay-projection');
     expect(calls()).not.toContain('projection-incidents');
@@ -231,5 +246,78 @@ describe('magicItemAdapter', () => {
     await expect(harness.adapter.rollback(context)).rejects.toThrow(
       /exact current postgres generation/i
     );
+  });
+
+  // Fix round 1, Important 2: a fresh `prepareIndexedDb` manifest is built
+  // from the raw legacy envelope, which has no tombstone concept, so no
+  // NATURALLY produced first-cutover manifest ever carries a tombstoned
+  // record — the tombstone-derived branches in `commitLocalCutover`
+  // (`operation: record.tombstoned ? 'delete' : 'create'`) and
+  // `activateCloud` (the staged `tombstoned` field) were dead in every
+  // other test in this file. `withTombstonedRecord` constructs the one
+  // input that reaches them directly, mirroring what a genuinely tombstoned
+  // manifest record looks like without needing a whole extra
+  // delete-then-repreview round trip.
+  it('mirrors a tombstoned manifest record through commitLocalCutover and activateCloud staging', async () => {
+    const harness = createMagicItemHarness();
+    const context = await harness.seed();
+    await harness.adapter.selectFamily(context);
+    const prepared = await harness.adapter.prepareIndexedDb(context);
+    const legacyId = prepared.manifest.records[0].legacyId;
+    const tombstonedManifest = harness.withTombstonedRecord(
+      prepared.manifest,
+      legacyId
+    );
+    await harness.adapter.commitLocalCutover(context, {
+      generation: prepared.generation,
+      manifest: tombstonedManifest,
+    });
+    const stored = await harness.rawDocument(legacyId);
+    expect(stored?.operation).toBe('delete');
+    expect(stored?.deletedAt).not.toBeNull();
+
+    await harness.adapter.activateCloud(context, tombstonedManifest);
+    const staged = harness.requestBodies().stageItems[0].items as {
+      legacyId: string;
+      tombstoned?: boolean;
+    }[];
+    expect(staged.find(item => item.legacyId === legacyId)?.tombstoned).toBe(
+      true
+    );
+  });
+
+  // Fix round 1, Important 3: `assertWorkingCopyUnchanged`'s count clause
+  // (`actual.size !== manifest.records.length`) is the ONLY clause that
+  // detects a document added between preview and staging — the per-record
+  // fingerprint clause has nothing in `manifest.records` to compare an
+  // extra document against. Card-mirrored
+  // (`MagicItemSyncControls.tsx:950-951`).
+  it('refuses to stage when an extra working copy exists beyond the manifest', async () => {
+    const harness = createMagicItemHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughLocalCutover(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    await harness.addExtraWorkingCopy('item-added-locally');
+    await expect(
+      harness.adapter.activateCloud(context, manifest)
+    ).rejects.toThrow(/changed since the last check/i);
+    expect(harness.trace()).not.toContain('begin-staging');
+  });
+
+  // Fix round 1, Important 4: the discriminating case for magic_item's
+  // unconditional rollback restore (`?? []`, never gated behind
+  // `if (documents.length > 0)` the way `calendarAdapter.ts` gates its
+  // single document). With a NON-empty store already persisted from the
+  // migrated period, a conditional restore would leave it untouched when
+  // the cloud generation is empty; the card's actual unconditional restore
+  // explicitly clears it.
+  it('rollback clears the legacy store to an empty list when the cloud generation is empty', async () => {
+    const harness = createMagicItemHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    expect(await harness.readLegacyStorePayload()).not.toEqual([]);
+    harness.emptyCloudGeneration();
+    await harness.adapter.rollback(context);
+    expect(await harness.readLegacyStorePayload()).toEqual([]);
   });
 });

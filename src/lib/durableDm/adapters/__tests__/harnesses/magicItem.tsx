@@ -6,10 +6,14 @@ import { vi } from 'vitest';
 import { MagicItemSyncControls } from '@/components/ui/campaign/MagicItemLibrary/MagicItemSyncControls';
 import { browserRecoveryRepository } from '@/lib/browserRecoveryRepository';
 import { magicItemAdapter } from '@/lib/durableDm/adapters/magicItemAdapter';
-import type { MigrationRunContext } from '@/lib/durableDm/durableFamilyAdapter';
+import type {
+  FamilyManifestHandle,
+  MigrationRunContext,
+} from '@/lib/durableDm/durableFamilyAdapter';
 import {
   fingerprintMagicItemTombstone,
   MAGIC_ITEM_STORAGE_KEY,
+  type MagicItemManifest,
   type MagicItemPayload,
 } from '@/lib/durableDm/magicItemFamily';
 import * as magicItemLegacyAuthorityModule from '@/lib/durableDm/magicItemLegacyAuthority';
@@ -162,6 +166,51 @@ export interface MagicItemConformanceHarness extends CardParityHarness {
    * `MagicItemSyncControls.tsx`'s own `prepare()` (`:804-807`).
    */
   recordUnverifiedReceipt(manifestHash: string): Promise<void>;
+  /**
+   * Task 9 fix round 1, Important 2: returns a COPY of `manifest` with the
+   * given `legacyId`'s record (both the flattened `records` entry and the
+   * `native.records` entry) marked `tombstoned: true` / `payload: null` —
+   * everything else, INCLUDING the top-level `fingerprint`, is left
+   * untouched, so `commitLocalCutover`'s `sourceManifestUnchanged` guard
+   * (which compares only `fingerprint`) does not reject it. This is the
+   * only way to reach the tombstone-derived branches
+   * (`operation: record.tombstoned ? 'delete' : 'create'`, the staged
+   * `tombstoned` field, and `deletedAt`) at all: a fresh
+   * `prepareIndexedDb` manifest is built from the raw legacy envelope,
+   * which has no tombstone concept, so no NATURALLY produced first-cutover
+   * manifest ever carries one.
+   */
+  withTombstonedRecord(
+    manifest: FamilyManifestHandle,
+    legacyId: string
+  ): FamilyManifestHandle;
+  /** The full persisted IndexedDB document for `legacyId`, or `null`. */
+  rawDocument(legacyId: string): Promise<{
+    operation: string;
+    deletedAt: string | null;
+    contentFingerprint: string;
+  } | null>;
+  /**
+   * Task 9 fix round 1, Important 3: commits an EXTRA document directly
+   * into IndexedDB through the family's own commit path, without it ever
+   * appearing in a manifest — reproduces "a document was added on this
+   * browser between preview and staging", the only scenario
+   * `assertWorkingCopyUnchanged`'s `actual.size !== manifest.records.length`
+   * clause detects (the per-legacyId fingerprint clause cannot: it has
+   * nothing in `manifest.records` to compare the extra document against).
+   */
+  addExtraWorkingCopy(legacyId: string): Promise<void>;
+  /**
+   * Task 9 fix round 1, Important 4: clears the fake server's current
+   * generation to zero documents — the discriminating fixture for
+   * `rollback`'s unconditional-vs-conditional restore. With ZERO documents,
+   * a CONDITIONAL restore (`if (documents.length > 0) { ... }`) leaves
+   * whatever the store already held untouched, while the card's actual
+   * unconditional restore explicitly clears it to `[]`. Two 2-item
+   * fixtures reaching cloud authority first, so there is stale non-empty
+   * store state to fail to clear if the guard were conditional.
+   */
+  emptyCloudGeneration(): void;
 }
 
 export function createMagicItemHarness(): MagicItemConformanceHarness {
@@ -1010,6 +1059,65 @@ export function createMagicItemHarness(): MagicItemConformanceHarness {
         manifestHash,
         initiatedAt: NOW,
       });
+    },
+
+    withTombstonedRecord(manifest, legacyId) {
+      const clone = structuredClone(
+        manifest
+      ) as FamilyManifestHandle<MagicItemManifest>;
+      const record = clone.records.find(entry => entry.legacyId === legacyId);
+      if (!record) throw new Error(`No manifest record for ${legacyId}`);
+      record.tombstoned = true;
+      const nativeRecord = clone.native.records.find(
+        entry => entry.legacyId === legacyId
+      );
+      if (nativeRecord) {
+        nativeRecord.tombstoned = true;
+        nativeRecord.payload = null;
+      }
+      return clone as FamilyManifestHandle;
+    },
+
+    async rawDocument(legacyId) {
+      const database = await openRollkeeperDatabase();
+      try {
+        return await new IndexedDbMagicItemRepository(database).getDocument(
+          NAMESPACE,
+          legacyId
+        );
+      } finally {
+        database.close();
+      }
+    },
+
+    async addExtraWorkingCopy(legacyId) {
+      const database = await openRollkeeperDatabase();
+      try {
+        const repository = new IndexedDbMagicItemRepository(database);
+        await repository.commit({
+          namespace: NAMESPACE,
+          campaignId: CAMPAIGN_ID,
+          legacyId,
+          cutoverEpoch: 1,
+          operation: 'create',
+          payload: itemPayload({
+            ...itemFixture(999),
+            id: legacyId,
+            name: 'Added locally, not in the manifest',
+          }),
+          schemaVersion: 1,
+          localRevision: 1,
+          baseServerVersion: 0,
+          contentFingerprint: 'extra-working-copy-fingerprint',
+          updatedAt: NOW,
+        });
+      } finally {
+        database.close();
+      }
+    },
+
+    emptyCloudGeneration() {
+      serverDocuments.clear();
     },
 
     // -----------------------------------------------------------------

@@ -745,6 +745,26 @@ function omitKeys(
 }
 
 /**
+ * Task 9 fix round 1, Important 1: normalizes one multi-record family's
+ * `initialDocuments[]` entry for comparison — strips the wall-clock
+ * `updatedAt`, and replaces `deletedAt` with a stable `null | 'set'` marker
+ * rather than dropping it. `deletedAt` is always either `null` (a live
+ * document) or exactly `updatedAt` (a tombstoned document, set at cutover
+ * time), so the raw VALUE is as wall-clock-unstable as `updatedAt` itself —
+ * but the null-versus-set DISTINCTION is the field's entire meaning, and a
+ * bare `omitKeys(..., ['deletedAt'])` threw that distinction away entirely,
+ * letting an adapter that tombstones every live document at cutover pass
+ * parity unnoticed.
+ */
+function normalizeInitialDocumentEntry(
+  value: Record<string, unknown> | undefined
+): Record<string, unknown> | undefined {
+  const stripped = omitKeys(value, ['updatedAt', 'deletedAt']);
+  if (!stripped) return stripped;
+  return { ...stripped, deletedAt: value?.deletedAt === null ? null : 'set' };
+}
+
+/**
  * Fix round 4, item 1: compares the FULL, ORDERED call sequence two
  * `recordedLibraryCalls()` results hold for one function — length first
  * (a card/adapter that made a different NUMBER of calls has already
@@ -886,9 +906,14 @@ export function describeCardParity(
     // — excluding `generation` (a fresh run id each side of this test
     // generates independently) and `updatedAt`/`now` (wall-clock
     // timestamps). `campaign_settings` calls this exactly once
-    // (single-record), so this sequence always has length 1 here; a
-    // multi-record family's real run would have one call per document, and
-    // this same check compares all of them, not only the final one.
+    // (single-record), so this sequence always has length 1 here. A
+    // multi-record family (magic_item and its siblings) ALSO calls this
+    // exactly once per run — with an array of `initialDocuments`, one entry
+    // per manifest record — never once per document; Task 9 fix round 1,
+    // Minor 2 corrects this comment's earlier, wrong claim (the mutation
+    // output for magic_item shows a single `call #0` holding the whole
+    // array). This same check still compares the full sequence, not only
+    // the final call, for whichever shape a family sends.
     expectLibraryCallSequenceMatches(
       functionNames.commitLocalCutover,
       cardCalls,
@@ -926,26 +951,29 @@ export function describeCardParity(
       // Multi-record families pass an ARRAY, one entry per manifest record.
       // Length first (a card/adapter that built a different number of
       // initial documents has already diverged), then each entry with
-      // `updatedAt` and `deletedAt` stripped — `deletedAt` is either `null`
-      // or exactly `updatedAt` (a tombstoned entry), so it carries the same
-      // wall-clock instability.
+      // `updatedAt` stripped (wall-clock) and `deletedAt` NORMALIZED, not
+      // stripped (Task 9 fix round 1, Important 1): `deletedAt` is either
+      // `null` (a live document) or exactly `updatedAt` (set at cutover for
+      // a tombstoned document) — the TIMESTAMP is wall-clock-unstable, but
+      // the null-versus-set DISTINCTION is the field's entire meaning.
+      // Dropping the whole key let an adapter that marks every live
+      // document deleted-at-cutover pass unnoticed (confirmed: mutating
+      // `magicItemAdapter.ts`'s `deletedAt: record.tombstoned ? updatedAt :
+      // null` to an unconditional `deletedAt: updatedAt` left 36/36 green
+      // before this fix).
       expect(adapterOptions.initialDocuments?.length).toBe(
         cardOptions.initialDocuments?.length
       );
       (cardOptions.initialDocuments ?? []).forEach((cardDocument, docIndex) => {
         expect(
-          omitKeys(
+          normalizeInitialDocumentEntry(
             adapterOptions.initialDocuments?.[docIndex] as Record<
               string,
               unknown
-            >,
-            ['updatedAt', 'deletedAt']
+            >
           )
         ).toEqual(
-          omitKeys(cardDocument as Record<string, unknown>, [
-            'updatedAt',
-            'deletedAt',
-          ])
+          normalizeInitialDocumentEntry(cardDocument as Record<string, unknown>)
         );
       });
     });
