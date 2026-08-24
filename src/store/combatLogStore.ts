@@ -3,6 +3,13 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { createSafeStorage } from '@/lib/safeStorage';
 import { combatLogArchiveUsesIndexedDbAuthority } from '@/lib/durableDm/combatLogArchiveLegacyAuthority';
+import {
+  canonicalJson,
+  COMBAT_LOG_ARCHIVE_MAX_ITEMS,
+  COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES,
+  COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES,
+  COMBAT_LOG_ARCHIVE_PERSIST_VERSION,
+} from '@/lib/durableDm/combatLogArchiveFamily';
 import { COMBAT_LOG_STORAGE_KEY } from '@/utils/constants';
 import {
   CombatLogAdmissionError,
@@ -14,15 +21,16 @@ import {
 } from '@/types/combatLog';
 
 /**
- * Slice 11F admission bounds. These are declared here only until Task 4 lands
- * `src/lib/durableDm/combatLogArchiveFamily.ts`, which becomes their home; the
- * store then imports them (and `canonicalJson`) from there. The values must not
- * drift — the Postgres side enforces the same numbers.
+ * Slice 11F admission bounds. `combatLogArchiveFamily` is their canonical home
+ * — the family module and the Postgres side must enforce the same numbers —
+ * and they are re-exported here for the store's existing consumers.
  */
-export const COMBAT_LOG_ARCHIVE_PERSIST_VERSION = 2;
-export const COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES = 262_144;
-export const COMBAT_LOG_ARCHIVE_MAX_ITEMS = 2_000;
-export const COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES = 5_242_880;
+export {
+  COMBAT_LOG_ARCHIVE_PERSIST_VERSION,
+  COMBAT_LOG_ARCHIVE_MAX_RECORD_BYTES,
+  COMBAT_LOG_ARCHIVE_MAX_ITEMS,
+  COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES,
+} from '@/lib/durableDm/combatLogArchiveFamily';
 
 /** Cap on locally retained *unrouted* archives. Routed ones are never pruned. */
 const MAX_ARCHIVES_STORED = 10;
@@ -37,30 +45,11 @@ function generateArchiveId(): string {
   return crypto.randomUUID();
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (!isRecord(value)) return value;
-  return Object.fromEntries(
-    Object.keys(value)
-      .sort()
-      .map(key => [key, canonicalize(value[key])])
-  );
-}
-
 /**
- * Stand-in for Task 4's `canonicalJson` export. Recursive key sort (JavaScript
- * code-unit order) then `JSON.stringify`; array order is preserved. Byte counts
- * must be identical across that swap.
+ * Canonical UTF-8 byte length of one archive record. Never `length`. The gates
+ * share `canonicalJson` with the family module so they measure exactly the
+ * bytes the manifest — and `private.canonical_campaign_document_json` — measure.
  */
-function canonicalJson(value: unknown): string {
-  return JSON.stringify(canonicalize(value));
-}
-
-/** Canonical UTF-8 byte length of one archive record. Never `length`. */
 function archiveRecordBytes(archive: CombatLogState): number {
   return new TextEncoder().encode(canonicalJson(archive)).byteLength;
 }
