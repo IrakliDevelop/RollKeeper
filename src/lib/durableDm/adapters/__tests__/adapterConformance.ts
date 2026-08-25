@@ -246,15 +246,19 @@ export interface ConformanceHarness {
   /**
    * Changes the LOCAL working copy's document count so it disagrees with
    * the cloud's confirmed record count, isolating `documentsMatch`'s count
-   * clause. A multi-record family adds an extra LOCAL-only document (the
-   * same mechanism `addExtraWorkingCopy` already uses). A single-record
-   * family has no "extra document" to add — its own implementation's doc
-   * comment states that it instead hard-deletes its one local row, the
-   * only way a one-document store's local count can differ from the
-   * cloud's; the resulting `documentsMatch: false` comes from the SAME
-   * `if (... && document)` guard a genuine count check would also need,
-   * not a distinct comparison that family's `verifyCloud` ever contains —
-   * disclosed rather than left to look like a literal count comparison.
+   * clause. A multi-record family hard-deletes a SEEDED document's row
+   * (never adds an extra one — adding a local-only document does not reach
+   * the length comparison at all, because the per-document `cloud !==
+   * undefined` check inside `.every()` catches it first, so the fixture
+   * must instead make the LOCAL set smaller than the cloud's, which only a
+   * removal can do). A single-record family has no "extra document" to add
+   * either — its own implementation's doc comment states that it instead
+   * hard-deletes its one local row, the only way a one-document store's
+   * local count can differ from the cloud's; the resulting `documentsMatch:
+   * false` comes from the SAME `if (... && document)` guard a genuine count
+   * check would also need, not a distinct comparison that family's
+   * `verifyCloud` ever contains — disclosed rather than left to look like a
+   * literal count comparison.
    */
   divergeVerifiedRecordCount(): Promise<void>;
 }
