@@ -77,6 +77,26 @@ describe('calendarAdapter', () => {
     expect(harness.trace()).not.toContain('begin-staging');
   });
 
+  // Fix round 1 (coordinator review of Task 10): the `!document` clause is
+  // DISTINCT from the delete clause above — a soft delete never makes
+  // `getDocument` return `null` (`commit()` always upserts the same row) —
+  // and was an unpinned surviving mutant before this test (confirmed by
+  // mutation: killing it alone left every existing test green). Reached
+  // NATURALLY here, no raw-row surgery: `hideNamespace()` sets the same
+  // `account-namespace-visibility` flag `removeAccountFromDevice` sets,
+  // which `getDocument` checks before it ever looks the document up.
+  it('refuses to stage a calendar whose namespace has no working copy at all', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughLocalCutover(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    await harness.hideNamespace();
+    await expect(
+      harness.adapter.activateCloud(context, manifest)
+    ).rejects.toThrow(/changed since the last check/i);
+    expect(harness.trace()).not.toContain('begin-staging');
+  });
+
   it('makes no projection call during the whole migration chain', async () => {
     const harness = createCalendarHarness();
     const context = await harness.seed();

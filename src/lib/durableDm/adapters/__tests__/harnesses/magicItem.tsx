@@ -201,6 +201,23 @@ export interface MagicItemConformanceHarness extends CardParityHarness {
    */
   addExtraWorkingCopy(legacyId: string): Promise<void>;
   /**
+   * Fix round 1 (coordinator review of Task 10): hard-deletes one document
+   * row's underlying IndexedDB record entirely (bypassing the repository's
+   * `commit()` soft-tombstone path, which always upserts the same key even
+   * for a `'delete'` operation) and commits an unrelated extra document
+   * elsewhere, so the total document count still equals
+   * `manifest.records.length` — isolating `assertWorkingCopyUnchanged`'s
+   * `current === undefined` clause from its record-count neighbor. This
+   * clause was a silent surviving mutant here (killing it alone left all 39
+   * tests green) until this fixture and its test were added — the exact gap
+   * Task 10's `npc` harness found and closed for itself first
+   * (`harnesses/npc.tsx`'s identical `replaceWorkingCopyEntirely`).
+   */
+  replaceWorkingCopyEntirely(
+    missingLegacyId: string,
+    extraLegacyId: string
+  ): Promise<void>;
+  /**
    * Task 9 fix round 1, Important 4: clears the fake server's current
    * generation to zero documents — the discriminating fixture for
    * `rollback`'s unconditional-vs-conditional restore. With ZERO documents,
@@ -606,6 +623,36 @@ export function createMagicItemHarness(): MagicItemConformanceHarness {
       generation: prepared.generation,
       manifest: prepared.manifest,
     });
+  }
+
+  /**
+   * Shared by `addExtraWorkingCopy` and `replaceWorkingCopyEntirely` (fix
+   * round 1, coordinator review of Task 10).
+   */
+  async function commitExtraDocument(legacyId: string) {
+    const database = await openRollkeeperDatabase();
+    try {
+      const repository = new IndexedDbMagicItemRepository(database);
+      await repository.commit({
+        namespace: NAMESPACE,
+        campaignId: CAMPAIGN_ID,
+        legacyId,
+        cutoverEpoch: 1,
+        operation: 'create',
+        payload: itemPayload({
+          ...itemFixture(999),
+          id: legacyId,
+          name: 'Added locally, not in the manifest',
+        }),
+        schemaVersion: 1,
+        localRevision: 1,
+        baseServerVersion: 0,
+        contentFingerprint: 'extra-working-copy-fingerprint',
+        updatedAt: NOW,
+      });
+    } finally {
+      database.close();
+    }
   }
 
   return {
@@ -1091,29 +1138,21 @@ export function createMagicItemHarness(): MagicItemConformanceHarness {
     },
 
     async addExtraWorkingCopy(legacyId) {
+      await commitExtraDocument(legacyId);
+    },
+
+    async replaceWorkingCopyEntirely(missingLegacyId, extraLegacyId) {
       const database = await openRollkeeperDatabase();
       try {
-        const repository = new IndexedDbMagicItemRepository(database);
-        await repository.commit({
-          namespace: NAMESPACE,
-          campaignId: CAMPAIGN_ID,
-          legacyId,
-          cutoverEpoch: 1,
-          operation: 'create',
-          payload: itemPayload({
-            ...itemFixture(999),
-            id: legacyId,
-            name: 'Added locally, not in the manifest',
-          }),
-          schemaVersion: 1,
-          localRevision: 1,
-          baseServerVersion: 0,
-          contentFingerprint: 'extra-working-copy-fingerprint',
-          updatedAt: NOW,
-        });
+        const transaction = database.transaction('documents', 'readwrite');
+        transaction
+          .objectStore('documents')
+          .delete([NAMESPACE, 'magic_item', missingLegacyId]);
+        await transactionComplete(transaction);
       } finally {
         database.close();
       }
+      await commitExtraDocument(extraLegacyId);
     },
 
     emptyCloudGeneration() {

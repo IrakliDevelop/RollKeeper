@@ -45,14 +45,17 @@ describe('npcAdapter', () => {
     const harness = createNpcHarness();
     const context = await harness.seedWithCampaignSettingsAlreadyMigrated();
     const settingsBefore = await harness.campaignSettingsSnapshot();
-    const manifest = await harness.adapter.previewManifest(context);
+    // previewManifest is part of the chain under test for its side effect —
+    // proving it does not disturb campaign_settings' snapshot either. Its
+    // return value plays no further role here: `commitLocalCutover` below
+    // is driven by the manifest `prepareIndexedDb` builds and returns.
+    await harness.adapter.previewManifest(context);
     await harness.adapter.selectFamily(context);
     const prepared = await harness.adapter.prepareIndexedDb(context);
     await harness.adapter.commitLocalCutover(context, {
       generation: prepared.generation,
       manifest: prepared.manifest,
     });
-    void manifest;
     expect(await harness.campaignSettingsSnapshot()).toBe(settingsBefore);
   });
 
@@ -108,7 +111,16 @@ describe('npcAdapter', () => {
     const harness = createNpcHarness();
     const context = await harness.seedWithBlocker();
     const manifest = await harness.adapter.previewManifest(context);
-    expect(manifest.blockers.length).toBeGreaterThan(0);
+    // Compared against the EXACT blocker `seedWithBlocker()` injects (an
+    // `extraField` on `npc-1`) — `blockers.length > 0` alone would stay
+    // green even if the adapter rewrote every blocker's `kind`/`detail`.
+    expect(manifest.blockers).toEqual([
+      {
+        kind: 'unclassified-field',
+        legacyId: 'npc-1',
+        detail: 'NPC field extraField is not classified in Slice 11D',
+      },
+    ]);
   });
 
   // A lost `confirm-cutover` response actually committed server-side, so a

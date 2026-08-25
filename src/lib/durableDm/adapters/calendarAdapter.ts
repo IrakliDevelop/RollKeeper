@@ -320,13 +320,23 @@ export const calendarAdapter: DurableFamilyAdapter<CalendarManifest> = {
             database
           ).getDocument(`user:${context.accountId}`, record.legacyId);
           if (
+            // Fix round 1 (coordinator review of Task 10): corrected — this
+            // comment used to claim "a single-record family cannot detect
+            // [a delete] by absence the way the multi-record families do".
+            // False: `commit()`
+            // (`calendarRepository.ts:146`) always UPSERTS the same document key,
+            // including for `operation: 'delete'` — the row survives with a
+            // tombstone fingerprint, so a soft delete never makes
+            // `!document` true. `!document` and `operation === 'delete'`
+            // are two DISTINCT conditions: `!document` fires only when the
+            // row is genuinely absent — e.g. `getDocument` returns `null`
+            // for a HIDDEN namespace (`calendarRepository.ts:192-206`),
+            // never for a delete — while `operation === 'delete'` (the
+            // shipped guard, `CalendarSyncControls.tsx:777`) is what
+            // actually detects a soft-deleted record. Without THIS
+            // condition a calendar deleted between the preview and the
+            // upload is staged as if it were still live.
             !document ||
-            // The shipped delete guard (`CalendarSyncControls.tsx:777`):
-            // a delete leaves the row in place with `operation: 'delete'`,
-            // so a single-record family cannot detect it by absence the way
-            // the multi-record families do. Without this condition a
-            // calendar deleted between the preview and the upload is staged
-            // as if it were still live.
             document.operation === 'delete' ||
             document.contentFingerprint !== record.payloadFingerprint ||
             document.schemaVersion !== record.schemaVersion

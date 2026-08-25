@@ -209,6 +209,20 @@ export interface CalendarConformanceHarness extends CardParityHarness {
    * matching `CalendarSyncControls.tsx`'s own `prepare()` (`:639-641`).
    */
   recordUnverifiedReceipt(manifestHash: string): Promise<void>;
+  /**
+   * Fix round 1 (coordinator review of Task 10): hides this run's namespace
+   * directly in `meta` (the same `account-namespace-visibility:<namespace>`
+   * row `removeAccountFromDevice` writes, `calendarRepository.ts:453`),
+   * WITHOUT going through the full removal flow — the only way `getDocument`
+   * (`calendarRepository.ts:192-206`) returns `null` for an EXISTING
+   * document, reached NATURALLY in production whenever a namespace is
+   * hidden, unlike a raw-row delete. Isolates `assertWorkingCopyUnchanged`'s
+   * `!document` clause from its `operation === 'delete'` neighbor — a
+   * soft-deleted row is never absent (`commit()` always upserts the same
+   * key), so no delete fixture can reach this clause; see the corrected
+   * comment on `calendarAdapter.ts`'s own guard.
+   */
+  hideNamespace(): Promise<void>;
 }
 
 export function createCalendarHarness(): CalendarConformanceHarness {
@@ -1069,6 +1083,21 @@ export function createCalendarHarness(): CalendarConformanceHarness {
         manifestHash,
         initiatedAt: NOW,
       });
+    },
+
+    async hideNamespace() {
+      const database = await openRollkeeperDatabase();
+      try {
+        const transaction = database.transaction('meta', 'readwrite');
+        transaction.objectStore('meta').put({
+          key: `account-namespace-visibility:${NAMESPACE}`,
+          hidden: true,
+          removedAt: NOW,
+        });
+        await transactionComplete(transaction);
+      } finally {
+        database.close();
+      }
     },
 
     // -----------------------------------------------------------------

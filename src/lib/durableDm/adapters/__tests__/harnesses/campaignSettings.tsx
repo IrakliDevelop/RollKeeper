@@ -125,6 +125,21 @@ export interface CampaignSettingsConformanceHarness extends CardParityHarness {
    * checks only `contentFingerprint`) — declared here as adapter-only.
    */
   corruptWorkingCopySchemaVersion(): Promise<void>;
+  /**
+   * Fix round 1 (coordinator review of Task 10): hides this run's namespace
+   * directly in `meta` (the same `account-namespace-visibility:<namespace>`
+   * row `removeAccountFromDevice` writes, `campaignSettingsRepository.ts:444`),
+   * WITHOUT going through the full removal flow (its own outbox/loss-
+   * confirmation checks are irrelevant here) — the only way `getDocument`
+   * (`campaignSettingsRepository.ts:197-211`) returns `null` for an EXISTING
+   * document, reached NATURALLY in production whenever a namespace is
+   * hidden, unlike a raw-row delete. Isolates `assertWorkingCopyUnchanged`'s
+   * `!document` clause from its `operation === 'delete'` neighbor — a
+   * soft-deleted row is never absent (`commit()` always upserts the same
+   * key), so no delete fixture can reach this clause; see the corrected
+   * comment on `campaignSettingsAdapter.ts`'s own guard.
+   */
+  hideNamespace(): Promise<void>;
 }
 
 export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarness {
@@ -1015,6 +1030,21 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
           contentFingerprint: current.contentFingerprint,
           updatedAt: NOW,
         });
+      } finally {
+        database.close();
+      }
+    },
+
+    async hideNamespace() {
+      const database = await openRollkeeperDatabase();
+      try {
+        const transaction = database.transaction('meta', 'readwrite');
+        transaction.objectStore('meta').put({
+          key: `account-namespace-visibility:${NAMESPACE}`,
+          hidden: true,
+          removedAt: NOW,
+        });
+        await transactionComplete(transaction);
       } finally {
         database.close();
       }

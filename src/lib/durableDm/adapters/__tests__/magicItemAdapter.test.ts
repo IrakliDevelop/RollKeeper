@@ -224,6 +224,30 @@ describe('magicItemAdapter', () => {
     expect(harness.trace()).not.toContain('begin-staging');
   });
 
+  // Fix round 1 (coordinator review of Task 10): `current === undefined` —
+  // the missing-document clause — is DISTINCT from the delete/count clauses
+  // above and was an unpinned surviving mutant before this test (confirmed
+  // by mutation: killing it alone left all 39 existing tests green). A soft
+  // delete never reaches it (`commit()` always upserts the same row, still
+  // present with a mismatched fingerprint — caught by the fingerprint clause
+  // instead). `replaceWorkingCopyEntirely` hard-deletes one row directly and
+  // commits an unrelated extra document elsewhere, holding the total count
+  // steady so the record-count clause cannot fire either.
+  it('refuses to stage when a manifest record has no corresponding working copy at all', async () => {
+    const harness = createMagicItemHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughLocalCutover(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    await harness.replaceWorkingCopyEntirely(
+      manifest.records[0].legacyId,
+      'item-replacement-elsewhere'
+    );
+    await expect(
+      harness.adapter.activateCloud(context, manifest)
+    ).rejects.toThrow(/changed since the last check/i);
+    expect(harness.trace()).not.toContain('begin-staging');
+  });
+
   // Rollback's current-generation precondition: two independently isolated
   // clauses. `magic_item` has no projection-journal clause (unlike
   // `campaign_settings`/`calendar`) because it has no player projection at

@@ -370,13 +370,25 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
               database
             ).getDocument(`user:${context.accountId}`, record.legacyId);
             if (
+              // Fix round 1 (coordinator review of Task 10): the claim
+              // this comment used to make here — "a single-record family
+              // cannot detect [a delete] by absence the way the multi-record
+              // families do ... a delete changes `actual.size`" — was FALSE
+              // and produced an unpinned clause. `commit()`
+              // (`campaignSettingsRepository.ts:154`) always UPSERTS the same
+              // document key, including for `operation: 'delete'` — the row
+              // survives with a tombstone fingerprint, so a soft delete never
+              // makes `!document` true and `actual.size` never changes either
+              // (this family has no `actual.size`/count check at all; it is
+              // single-record). `!document` and `operation === 'delete'` are
+              // two DISTINCT conditions: `!document` fires only when the row
+              // is genuinely absent — e.g. `getDocument` returns `null` for a
+              // HIDDEN namespace (`campaignSettingsRepository.ts:197-203`),
+              // never for a delete — while `operation === 'delete'` is what
+              // actually detects a soft-deleted record.
               !document ||
               // `document.operation === 'delete'` is a SHIPPED condition of
-              // this card and must not be dropped. A delete leaves the row in
-              // place with a tombstoning operation, so a single-record family
-              // cannot detect it by absence the way the multi-record families
-              // do — they compare the document SET against the manifest, and a
-              // delete changes `actual.size`. Without this condition a
+              // this card and must not be dropped. Without this condition a
               // campaign deleted between the preview and the upload is staged
               // as if it were still live.
               document.operation === 'delete' ||
