@@ -843,6 +843,27 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
       }
     },
 
+    async hardDeleteOneDocument() {
+      const database = await openRollkeeperDatabase();
+      try {
+        const document = await new IndexedDbCampaignSettingsRepository(
+          database
+        ).getDocument(NAMESPACE, CAMPAIGN_CODE);
+        if (!document) throw new Error('No document to delete');
+        const transaction = database.transaction('documents', 'readwrite');
+        transaction
+          .objectStore('documents')
+          .delete([document.namespace, document.family, document.legacyId]);
+        await transactionComplete(transaction);
+      } finally {
+        database.close();
+      }
+    },
+
+    bumpCloudEpoch() {
+      serverEpoch += 1;
+    },
+
     async deleteAuthorityMarker() {
       localStorage.removeItem(
         campaignSettingsLegacyProjectionModule.campaignSettingsProjectionAuthorityKey(

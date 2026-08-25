@@ -374,4 +374,22 @@ describe('npcAdapter', () => {
     await harness.adapter.rollback(context);
     expect(await harness.readLegacyStorePayload()).toEqual([]);
   });
+
+  // Fix round 1, item 6: a legitimately empty family — migrated with zero
+  // records, which `previewManifest` does not block — must still be
+  // repairable after a lost marker write. `documents.length > 0` (the
+  // pre-fix check) would fail-closed here forever; the manifest-comparison
+  // fix's `sourceManifest.records.every(...)` is vacuously true on an
+  // empty source manifest, so this must succeed.
+  it('repairAuthority resolves an empty family after a lost marker write', async () => {
+    const harness = createNpcHarness();
+    const context = await harness.seedWithItems(0);
+    await harness.runChainThroughLocalCutover(context);
+    await harness.deleteAuthorityMarker();
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'inconsistent',
+    });
+    const repaired = await harness.adapter.repairAuthority(context);
+    expect(repaired).toMatchObject({ state: 'indexedDB', epoch: 1 });
+  });
 });

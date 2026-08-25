@@ -703,6 +703,24 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
                 rawPointer.generation
               );
               if (!preparedOk) return false;
+              // Fix round 1, item 1: the prepared-generation check above
+              // proves a real cutover COMMITTED; it says nothing about
+              // whether the document it committed is still there. Load the
+              // source manifest fresh (same call `previewManifest` makes)
+              // so "every manifest document is present" is a real
+              // comparison, not an assumption — an unresolved candidate
+              // means this browser's expectation is itself unverifiable, so
+              // refuse rather than guess past it.
+              const sourceManifest = await buildCampaignSettingsManifest({
+                campaignCode: context.campaignCode,
+                rawEnvelope: currentRawEnvelope(),
+              });
+              if (sourceManifest.blockers.length > 0) return false;
+              const expectedRecord = sourceManifest.records[0];
+              // Nothing was ever staged for this campaign — vacuously
+              // satisfied, mirroring `decideAuthorityRepair`'s empty-array
+              // `.every()` for multi-record families (fix round 1, item 6).
+              if (!expectedRecord) return true;
               const document = await new IndexedDbCampaignSettingsRepository(
                 evidenceDatabase
               ).getDocument(namespace, context.campaignCode);
@@ -716,6 +734,19 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
             }
           },
           async verifyPostgresParity() {
+            // No `rawPointer.authority !== 'postgres'` guard here (fix
+            // round 1, item 4 — the coordinator's correction to task-13b's
+            // original, weaker "no intervening write in tests" reasoning):
+            // it is unnecessary, not merely untested. Every transition that
+            // moves this family's authority AWAY from `postgres` also bumps
+            // its epoch — `rollbackCampaignSettingsLocalAuthority` writes
+            // `expectedEpoch + 1`, and a wiped/reset IndexedDB synthesizes
+            // `{authority: 'localStorage', epoch: 0}` (never a real cloud
+            // epoch). `verifyPostgresGenerationParity` below already
+            // requires `preview.epoch === rawPointer.epoch`, so any skew
+            // that changed the authority also changed the epoch, and the
+            // epoch check blocks it — the authority itself never needs a
+            // second look.
             const preview =
               await campaignSettingsApi<CampaignSettingsEnrollmentPreview>({
                 action: 'preview-enrollment',
@@ -755,13 +786,21 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
           `This browser's campaign settings migration record disagrees with the server and could not be safely repaired. ${decision.reason}`
         );
 
+      // Fix round 1, item 5: `decision.epoch` is `observed.pointer.epoch`
+      // from the FIRST read, inside `this.readAuthority(context)` above.
+      // `rawPointer` is a SECOND, later read of the same pointer, taken
+      // moments afterward and the one every evidence check above actually
+      // verified against. Writing `rawPointer.epoch` — not `decision.epoch`
+      // — closes that gap: a cutover landing between the two reads would
+      // otherwise verify the NEW generation but write the OLD epoch,
+      // producing an `epoch-disagreement` that row 4 then blocks forever.
       writeCampaignSettingsProjectionAuthority(
         localStorage,
         context.campaignCode,
         {
           version: 1,
           authority: decision.authority,
-          epoch: decision.epoch,
+          epoch: rawPointer.epoch,
           campaignId: context.campaignId,
           namespace,
         }

@@ -635,6 +635,17 @@ export const calendarAdapter: DurableFamilyAdapter<CalendarManifest> = {
               rawPointer.generation
             );
             if (!preparedOk) return false;
+            // Fix round 1, item 1: load the source manifest fresh (same
+            // call `previewManifest` makes) so "every manifest document is
+            // present" is a real comparison against what was staged, not
+            // an assumption that one existing row is the right one.
+            const sourceManifest = await buildCalendarManifest({
+              campaignCode: context.campaignCode,
+              rawEnvelope: currentRawEnvelope(),
+            });
+            if (sourceManifest.blockers.length > 0) return false;
+            const expectedRecord = sourceManifest.records[0];
+            if (!expectedRecord) return true;
             const document = await new IndexedDbCalendarRepository(
               evidenceDatabase
             ).getDocument(namespace, context.campaignCode);
@@ -648,6 +659,14 @@ export const calendarAdapter: DurableFamilyAdapter<CalendarManifest> = {
           }
         },
         async verifyPostgresParity() {
+          // No `rawPointer.authority !== 'postgres'` guard here (fix round
+          // 1, item 4): every transition away from `postgres` also bumps
+          // the epoch (`rollbackCalendarLocalAuthority` writes
+          // `expectedEpoch + 1`; a wiped IndexedDB synthesizes
+          // `{authority: 'localStorage', epoch: 0}`), and
+          // `verifyPostgresGenerationParity` below already requires
+          // `preview.epoch === rawPointer.epoch` — any skew that changed
+          // the authority also changed the epoch, and that check blocks it.
           const preview = await calendarApi<CalendarEnrollmentPreview>({
             action: 'preview-enrollment',
             campaignId: context.campaignId,
@@ -686,10 +705,16 @@ export const calendarAdapter: DurableFamilyAdapter<CalendarManifest> = {
         `This browser's calendar migration record disagrees with the server and could not be safely repaired. ${decision.reason}`
       );
 
+    // Fix round 1, item 5: `rawPointer.epoch` (the SECOND, later read that
+    // every evidence check above verified against), never `decision.epoch`
+    // (`observed.pointer.epoch` from the FIRST read, inside
+    // `this.readAuthority(context)`) — a cutover landing between the two
+    // reads would otherwise verify the NEW generation but write the OLD
+    // epoch, producing an `epoch-disagreement` row 4 then blocks forever.
     writeCalendarProjectionAuthority(localStorage, context.campaignCode, {
       version: 1,
       authority: decision.authority,
-      epoch: decision.epoch,
+      epoch: rawPointer.epoch,
       campaignId: context.campaignId,
       namespace,
     });

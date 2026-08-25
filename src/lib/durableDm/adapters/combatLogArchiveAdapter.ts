@@ -720,18 +720,43 @@ export const combatLogArchiveAdapter: DurableFamilyAdapter<CombatLogArchiveManif
                 rawPointer.generation
               );
               if (!preparedOk) return false;
+              // Fix round 1, item 1: `documents.length > 0` collapsed to
+              // "the store is non-empty" — `contentFingerprint` is typed
+              // non-nullable, so the `.every()` clause was vacuously true
+              // and caught nothing. Compare against the source manifest
+              // instead: every record it expects must have a corresponding
+              // document, which also fixes item 6 (an empty family's
+              // manifest has no records, so `.every()` on `[]` is
+              // vacuously true and repair is not fail-closed on
+              // legitimately-empty data).
+              const sourceManifest = await buildCombatLogArchiveManifest({
+                campaignCode: context.campaignCode,
+                rawEnvelope: currentRawEnvelope(),
+              });
+              if (sourceManifest.blockers.length > 0) return false;
               const documents = await new IndexedDbCombatLogArchiveRepository(
                 evidenceDatabase
               ).listDocuments(namespace, context.campaignId);
-              return (
-                documents.length > 0 &&
-                documents.every(document => !!document.contentFingerprint)
+              const presentLegacyIds = new Set(
+                documents.map(document => document.legacyId)
+              );
+              return sourceManifest.records.every(record =>
+                presentLegacyIds.has(record.legacyId)
               );
             } finally {
               evidenceDatabase.close();
             }
           },
           async verifyPostgresParity() {
+            // No `rawPointer.authority !== 'postgres'` guard here (fix
+            // round 1, item 4): every transition away from `postgres` also
+            // bumps the epoch (`rollbackCombatLogArchiveLocalAuthority`
+            // writes `expectedEpoch + 1`; a wiped IndexedDB synthesizes
+            // `{authority: 'localStorage', epoch: 0}`), and
+            // `verifyPostgresGenerationParity` below already requires
+            // `preview.epoch === rawPointer.epoch` — any skew that changed
+            // the authority also changed the epoch, and that check blocks
+            // it.
             const preview =
               await combatLogArchiveApi<CombatLogArchiveEnrollmentPreview>({
                 action: 'preview-enrollment',
@@ -781,11 +806,16 @@ export const combatLogArchiveAdapter: DurableFamilyAdapter<CombatLogArchiveManif
           `This browser's combat log archive migration record disagrees with the server and could not be safely repaired. ${decision.reason}`
         );
 
+      // Fix round 1, item 5: `rawPointer.epoch` (the SECOND, later read
+      // every evidence check above verified against), never
+      // `decision.epoch` (`observed.pointer.epoch` from the FIRST read
+      // inside `this.readAuthority(context)`) — closes the read-skew
+      // window a concurrent cutover could otherwise land in.
       writeCombatLogArchiveAuthorityMarker(localStorage, {
         version: 1,
         campaignCode: context.campaignCode,
         authority: decision.authority,
-        epoch: decision.epoch,
+        epoch: rawPointer.epoch,
         accountId: context.accountId,
         campaignId: context.campaignId,
       });

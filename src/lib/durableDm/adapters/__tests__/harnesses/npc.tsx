@@ -953,6 +953,28 @@ export function createNpcHarness(): NpcConformanceHarness {
       cutoverSink = sink;
     },
 
+    async hardDeleteOneDocument() {
+      const database = await openRollkeeperDatabase();
+      try {
+        const documents = await new IndexedDbNpcRepository(
+          database
+        ).listDocuments(NAMESPACE, CAMPAIGN_ID);
+        const target = documents[0];
+        if (!target) throw new Error('No document to delete');
+        const transaction = database.transaction('documents', 'readwrite');
+        transaction
+          .objectStore('documents')
+          .delete([target.namespace, target.family, target.legacyId]);
+        await transactionComplete(transaction);
+      } finally {
+        database.close();
+      }
+    },
+
+    bumpCloudEpoch() {
+      serverEpoch += 1;
+    },
+
     async deleteAuthorityMarker() {
       localStorage.removeItem(npcAuthorityKey(CAMPAIGN_CODE));
     },

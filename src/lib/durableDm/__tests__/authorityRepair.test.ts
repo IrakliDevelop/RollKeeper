@@ -155,6 +155,32 @@ describe('decideAuthorityRepair', () => {
       expect(verifyIndexedDbGeneration).toHaveBeenCalledTimes(1);
       expect(verifyIndexedDbGeneration).toHaveBeenCalledWith();
     });
+
+    it('repairs when a PRESENT stale rollback marker (legacy_restored) is outrun by a cutover pointer (fix round 1, item 7)', async () => {
+      // Every other "pointer ahead" test uses `marker: null`, which reaches
+      // rank 0 through the `marker ? rankOf(...) : 0` short-circuit and
+      // never actually calls `rankOf` on a real marker. A real marker at
+      // `legacy_restored` (a completed rollback that a LATER cutover then
+      // ran over) exercises `rankOf`'s `localStorage`/`legacy_restored`
+      // fallback branch directly, and must resolve identically to the
+      // absent-marker case.
+      const result = await decideAuthorityRepair({
+        reason: 'marker-pointer-disagreement',
+        observed: {
+          marker: markerView('legacy_restored', 1),
+          pointer: pointerView('indexedDB', 2),
+        },
+        evidence: {
+          verifyIndexedDbGeneration: vi.fn(async () => true),
+          verifyPostgresParity: vi.fn(async () => true),
+        },
+      });
+      expect(result).toEqual({
+        action: 'repair',
+        authority: 'indexedDB',
+        epoch: 2,
+      });
+    });
   });
 
   describe('R5b row 3 — pointer ahead at postgres: verify, then write', () => {

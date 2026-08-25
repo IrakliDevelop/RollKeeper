@@ -114,6 +114,29 @@ export interface ConformanceHarness {
    */
   deleteAuthorityMarker(): Promise<void>;
   /**
+   * Fix round 1, item 2 (coordinator review): hard-deletes ONE seeded
+   * document's row entirely from the `documents` object store, using the
+   * document's OWN persisted `namespace`/`family`/`legacyId` fields to
+   * build the delete key (never a hardcoded literal) — so the deletion is
+   * self-consistent with whatever the repository actually wrote. This is
+   * what makes `repairAuthority`'s row-2 "every manifest document is
+   * present" check exercisable with a genuine failure: after this call the
+   * source manifest still expects the deleted record, but IndexedDB no
+   * longer has it.
+   */
+  hardDeleteOneDocument(): Promise<void>;
+  /**
+   * Fix round 1, item 2 (coordinator review): advances the FAKE SERVER's
+   * own epoch counter directly, without touching the local pointer or
+   * marker — reproducing "another device rolled back and re-activated this
+   * family, moving the cloud epoch ahead of what THIS browser's pointer
+   * still remembers." The only way to make `preview.epoch !== pointer.epoch`
+   * without also changing which authority the cloud reports (which
+   * `divergeCloudGeneration()` does not do either, since it only edits
+   * document rows).
+   */
+  bumpCloudEpoch(): void;
+  /**
    * Fix round 1, item 5: changes the family's legacy source in a way that
    * changes its manifest fingerprint, without re-running `prepareIndexedDb`
    * — proves `commitLocalCutover` re-checks the source manifest rather than
@@ -364,7 +387,15 @@ export function describeAdapterConformance(
       state: 'inconsistent',
     });
     const before = await harness.snapshot();
-    await expect(harness.adapter.repairAuthority(context)).rejects.toThrow();
+    // Fix round 1, item 3: a bare `.rejects.toThrow()` also passes when
+    // `decideAuthorityRepair`'s row-1 rank guard is DELETED — control then
+    // reaches `pointer!.authority` with `pointer === null` and the
+    // resulting `TypeError` satisfies the assertion just as well as a real
+    // refusal. Anchored to the guard's own reason text so only an ACTUAL
+    // row-1 block (not an unrelated crash) can pass.
+    await expect(harness.adapter.repairAuthority(context)).rejects.toThrow(
+      /not ahead of the marker/i
+    );
     // The refusal must not have written anything — a block that silently
     // mutated storage on its way to rejecting would be exactly the "guessed
     // wrong" failure mode this method exists to prevent.
@@ -404,6 +435,59 @@ export function describeAdapterConformance(
     expect(await harness.adapter.readAuthority(context)).toMatchObject({
       state: 'postgres',
       epoch: 1,
+    });
+  });
+
+  // Fix round 1, item 2 (coordinator review): the three tests above prove
+  // repair SUCCEEDS when its evidence is genuine. Nothing proved the other
+  // half — that a family's OWN real evidence check, not a stub, actually
+  // REFUSES when the evidence is bad. `verifyIndexedDbGeneration` and
+  // `verifyPostgresParity` could each be short-circuited to `return true`
+  // and every test up to this point would still pass.
+
+  it(`${name}: repairAuthority refuses when a manifest document is missing from IndexedDB — R5b row 2, real evidence`, async () => {
+    const harness = createHarness();
+    const context = await harness.seedMarkerPointerDisagreement();
+    await harness.hardDeleteOneDocument();
+    const before = await harness.snapshot();
+    await expect(harness.adapter.repairAuthority(context)).rejects.toThrow(
+      /manifest documents could not be verified/i
+    );
+    expect(await harness.snapshot()).toBe(before);
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'inconsistent',
+    });
+  });
+
+  it(`${name}: repairAuthority refuses when the cloud is at a different epoch than the pointer — R5b row 3, real evidence`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    await harness.deleteAuthorityMarker();
+    harness.bumpCloudEpoch();
+    const before = await harness.snapshot();
+    await expect(harness.adapter.repairAuthority(context)).rejects.toThrow(
+      /document parity/i
+    );
+    expect(await harness.snapshot()).toBe(before);
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'inconsistent',
+    });
+  });
+
+  it(`${name}: repairAuthority refuses when the cloud's documents have diverged from the local working copy — R5b row 3, real evidence`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    await harness.deleteAuthorityMarker();
+    await harness.divergeCloudGeneration();
+    const before = await harness.snapshot();
+    await expect(harness.adapter.repairAuthority(context)).rejects.toThrow(
+      /document parity/i
+    );
+    expect(await harness.snapshot()).toBe(before);
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'inconsistent',
     });
   });
 
