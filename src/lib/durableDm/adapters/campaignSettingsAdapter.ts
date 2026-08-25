@@ -56,6 +56,7 @@ import type {
   FamilyVerification,
 } from '../durableFamilyAdapter';
 import {
+  cloudPreviewAtExpectedEpoch,
   deviceIdFor,
   normalizeFlatEnrollmentPreview,
   verifyPostgresGenerationParity,
@@ -578,12 +579,16 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
       let documentsMatch = false;
       let tombstonesMatch = false;
       let recordCount = 0;
+      // Task 16 fix round 1, Important 2: R8's "at the EXPECTED epoch"
+      // condition, previously never checked here.
+      let epochMatches = false;
       if (cloudAuthority === 'postgres' && document) {
         const preview =
           await campaignSettingsApi<CampaignSettingsEnrollmentPreview>({
             action: 'preview-enrollment',
             campaignId: context.campaignId,
           });
+        epochMatches = cloudPreviewAtExpectedEpoch(preview, authority.epoch);
         recordCount = preview.authority === 'postgres' ? 1 : 0;
         documentsMatch =
           preview.authority === 'postgres' &&
@@ -597,6 +602,7 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
       const verified =
         authorityAgrees &&
         cloudAuthority === 'postgres' &&
+        epochMatches &&
         documentsMatch &&
         tombstonesMatch &&
         outboxEmpty &&

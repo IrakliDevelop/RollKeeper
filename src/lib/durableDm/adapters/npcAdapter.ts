@@ -63,6 +63,7 @@ import type {
   FamilyVerification,
 } from '../durableFamilyAdapter';
 import {
+  cloudPreviewAtExpectedEpoch,
   deviceIdFor,
   verifyPostgresGenerationParity,
   verifyPreparedGeneration,
@@ -534,11 +535,15 @@ export const npcAdapter: DurableFamilyAdapter<NpcManifest> = {
     let documentsMatch = false;
     let tombstonesMatch = false;
     let recordCount = 0;
+    // Task 16 fix round 1, Important 2: R8's "at the EXPECTED epoch"
+    // condition, previously never checked here.
+    let epochMatches = false;
     if (cloudAuthority === 'postgres' && documents.length > 0) {
       const preview = await npcApi<NpcEnrollmentPreview>({
         action: 'preview-enrollment',
         campaignId: context.campaignId,
       });
+      epochMatches = cloudPreviewAtExpectedEpoch(preview, authority.epoch);
       const cloudDocuments =
         preview.authority === 'postgres' ? (preview.documents ?? []) : [];
       const cloudByLegacyId = new Map(
@@ -571,6 +576,7 @@ export const npcAdapter: DurableFamilyAdapter<NpcManifest> = {
     const verified =
       authorityAgrees &&
       cloudAuthority === 'postgres' &&
+      epochMatches &&
       documentsMatch &&
       tombstonesMatch &&
       outboxEmpty &&

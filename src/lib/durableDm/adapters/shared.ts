@@ -122,6 +122,35 @@ export async function verifyPreparedGeneration(
  * reimplementing it here would risk the two definitions of "parity"
  * drifting apart silently.
  */
+/**
+ * Task 16 fix round 1, Important 2 (coordinator review): spec R8's second
+ * verification condition -- "cloud authority is `postgres` at the EXPECTED
+ * epoch" -- was never checked by any of the six `verifyCloud`
+ * implementations before this fix: they compared the document multiset but
+ * never `preview.epoch` against the local pointer's own epoch, so a device
+ * whose cloud generation had moved to a NEWER epoch (another browser rolled
+ * back and re-activated the same family) still reported `verified: true`
+ * whenever the document multiset happened to still match.
+ *
+ * Deliberately NOT a call to `verifyPostgresGenerationParity` below: that
+ * function ALSO re-derives full document parity from a differently-shaped
+ * `ActivationManifestRecord[]` (the R5b repair-time working-copy shape),
+ * which every `verifyCloud` already computes independently, in more detail
+ * (`documentsMatch`/`tombstonesMatch` as separate, UI-facing booleans) and
+ * with extensive existing conformance coverage this fix must not disturb.
+ * Reusing it here would mean maintaining the SAME parity rule expressed
+ * twice, over two different input shapes, for the one family of adapters --
+ * exactly the drift risk `verifyPostgresGenerationParity`'s own doc comment
+ * warns against. This is the narrower, independent check R8's second
+ * condition actually needs.
+ */
+export function cloudPreviewAtExpectedEpoch(
+  preview: { authority: 'legacy' | 'postgres'; epoch?: number },
+  expectedEpoch: number
+): boolean {
+  return preview.authority === 'postgres' && preview.epoch === expectedEpoch;
+}
+
 export function verifyPostgresGenerationParity(
   preview: CloudEnrollmentPreview,
   expectedEpoch: number,

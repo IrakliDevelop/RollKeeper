@@ -666,6 +666,17 @@ export function useMigrationWizard(
   const [reportVerifications, setReportVerifications] = useState<
     Partial<Record<DurableFamilyName, FamilyVerification>>
   >({});
+  /**
+   * Task 16 fix round 1, CRITICAL item 1: which currently-enabled family's
+   * `verifyCloud` call REJECTED on the most recent (non-stale) batch, and
+   * why. Rebuilt from scratch on every winning batch, exactly like
+   * `reportVerifications` — never merged with a previous pass's errors,
+   * so a family that fails once and then succeeds on the next Refresh
+   * loses its error the instant the successful batch lands.
+   */
+  const [reportVerificationErrors, setReportVerificationErrors] = useState<
+    Partial<Record<DurableFamilyName, string>>
+  >({});
   const [reportVerifying, setReportVerifying] = useState(false);
   const [reportCrossFamilyDrift, setReportCrossFamilyDrift] = useState<
     string[]
@@ -749,15 +760,37 @@ export function useMigrationWizard(
     // merged -- and never touches `reportVerifying`, which the winning call
     // owns exclusively.
     if (!mountedRef.current || verifyRequestIdRef.current !== requestId) return;
-    setReportVerifications(current => {
-      const next = { ...current };
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          next[adapters[index].family] = result.value;
-        }
-      });
-      return next;
+    // Task 16 fix round 1, CRITICAL item 1 (coordinator review): built
+    // FRESH from THIS batch's own `adapters`/`results`, never merged with
+    // whatever `reportVerifications`/`reportVerificationErrors` already
+    // held. Two distinct bugs shared this one root cause:
+    //   (a) a REJECTED `verifyCloud` call (IndexedDB unavailable, a network
+    //       failure, an API error) left the PREVIOUS pass's "Verified"
+    //       entry standing untouched, so the report kept claiming a family
+    //       was verified on evidence that was no longer current;
+    //   (b) a family that was verified and then DISABLED stayed in the map
+    //       forever, since a disabled family is excluded from
+    //       `enabledAdapters()` and so never appears in a later batch to
+    //       overwrite it.
+    // Replacing wholesale fixes both: only families `enabledAdapters()`
+    // ACTUALLY verified THIS batch can appear as verified afterward.
+    const nextVerifications: Partial<
+      Record<DurableFamilyName, FamilyVerification>
+    > = {};
+    const nextErrors: Partial<Record<DurableFamilyName, string>> = {};
+    results.forEach((result, index) => {
+      const family = adapters[index].family;
+      if (result.status === 'fulfilled') {
+        nextVerifications[family] = result.value;
+      } else {
+        nextErrors[family] =
+          result.reason instanceof Error
+            ? result.reason.message
+            : 'This data category could not be checked.';
+      }
     });
+    setReportVerifications(nextVerifications);
+    setReportVerificationErrors(nextErrors);
     setReportCrossFamilyDrift(drift);
     setReportVerifying(false);
   }, [
@@ -800,6 +833,7 @@ export function useMigrationWizard(
     runFamily,
     repairFamily,
     reportVerifications,
+    reportVerificationErrors,
     reportVerifying,
     reportCrossFamilyDrift,
     verifyReport,

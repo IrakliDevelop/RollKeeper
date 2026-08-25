@@ -1,6 +1,6 @@
 'use client';
 
-import { RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 
 import { Badge } from '@/components/ui/layout/badge';
 import { Button } from '@/components/ui/forms/button';
@@ -40,6 +40,16 @@ interface ReportStepProps {
   familyAuthorities: Partial<Record<DurableFamilyName, NormalizedAuthority>>;
   /** This render's live verification results (spec R14: ephemeral, never persisted). */
   verifications: Partial<Record<DurableFamilyName, FamilyVerification>>;
+  /**
+   * Which currently-enabled family's `verifyCloud` call REJECTED on the
+   * most recent batch, and why (Task 16 fix round 1, CRITICAL item 1) — a
+   * family missing from `verifications` because its check genuinely FAILED
+   * (IndexedDB unavailable, a network error, ...) rather than because it
+   * was never routed or was disabled. Rendered as a `role="alert"` so the
+   * DM is told the check could not run, rather than reading silence as
+   * "still whatever it showed last time".
+   */
+  verificationErrors: Partial<Record<DurableFamilyName, string>>;
   verifying: boolean;
   /**
    * Legacy keys NOT owned by any currently-migrated family whose bytes no
@@ -66,6 +76,7 @@ export function ReportStep({
   totalSteps,
   familyAuthorities,
   verifications,
+  verificationErrors,
   verifying,
   crossFamilyDrift,
   adapterFor,
@@ -74,6 +85,9 @@ export function ReportStep({
   const registeredEntries = DURABLE_FAMILY_REGISTRY.filter(
     (entry): entry is Extract<RegistryEntry, { status: 'registered' }> =>
       entry.status === 'registered'
+  );
+  const erroredEntries = registeredEntries.filter(
+    entry => verificationErrors[entry.family] !== undefined
   );
   const plannedEntries = DURABLE_FAMILY_REGISTRY.filter(
     entry => entry.status === 'planned'
@@ -114,6 +128,14 @@ export function ReportStep({
   const unverifiedEnabledEntries = enabledEntries.filter(
     entry => !isVerified(entry.family)
   );
+  // Rendering only: a family whose check genuinely ERRORED gets its own,
+  // more specific alert below rather than being restated in the generic
+  // "not yet confirmed" list. `unverifiedEnabledEntries` itself (used for
+  // the claim computation above) is untouched -- an errored family still
+  // correctly blocks "All"/"Available".
+  const unverifiedWithoutErrorEntries = unverifiedEnabledEntries.filter(
+    entry => verificationErrors[entry.family] === undefined
+  );
   // R13: "Available campaign data is synced" requires at least one enabled
   // family -- an empty enabled set (everything turned off) is not a
   // completion claim, it is the `partial` default below.
@@ -142,16 +164,26 @@ export function ReportStep({
             Your campaign data in cloud sync
           </h3>
         </div>
-        {/* Deliberately never `loading`/disabled on `verifying` -- `Button`'s
-            `loading` prop also disables the control, which would make a
-            second Refresh unreachable while an earlier verification is
-            still in flight. Spec R14 requires exactly that to be possible
-            (a fresh request must be able to supersede a slow one), so an
-            `aria-busy` hint is used instead of disabling anything. */}
+        {/* Deliberately never passes `loading` -- `Button`'s `loading` prop
+            ALSO disables the control, which would make a second Refresh
+            unreachable while an earlier verification is still in flight.
+            Spec R14 requires exactly that to be possible (a fresh request
+            must be able to supersede a slow one). A visible, non-disabling
+            busy state is given instead: the same spinner `Button` itself
+            uses for `loading` (`Loader2` + `animate-spin`), swapped in for
+            the icon while `verifying` is true, plus `aria-busy` for
+            assistive tech -- so a sighted DM sees the check is running
+            without losing the ability to click Refresh again. */}
         <Button
           variant="outline"
           size="sm"
-          leftIcon={<RefreshCw size={14} />}
+          leftIcon={
+            verifying ? (
+              <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <RefreshCw size={14} />
+            )
+          }
           onClick={onRefresh}
           aria-busy={verifying}
         >
@@ -195,7 +227,30 @@ export function ReportStep({
         </div>
       )}
 
-      {unverifiedEnabledEntries.length > 0 && (
+      {erroredEntries.length > 0 && (
+        <div
+          role="alert"
+          data-testid="verification-error-alert"
+          className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4"
+        >
+          <p className="text-accent-red-text text-sm font-semibold">
+            Could not check cloud sync
+          </p>
+          <ul className="mt-1 list-disc pl-5">
+            {erroredEntries.map(entry => (
+              <li key={entry.family} className="text-accent-red-text text-xs">
+                {entry.label} could not be checked just now
+                {verificationErrors[entry.family]
+                  ? `: ${verificationErrors[entry.family]}`
+                  : '.'}{' '}
+                This is not a claim that it is out of sync — try Refresh again.
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {unverifiedWithoutErrorEntries.length > 0 && (
         <div
           role="alert"
           data-testid="unverified-categories-alert"
@@ -205,7 +260,7 @@ export function ReportStep({
             Not yet confirmed in cloud sync
           </p>
           <ul className="mt-1 list-disc pl-5">
-            {unverifiedEnabledEntries.map(entry => (
+            {unverifiedWithoutErrorEntries.map(entry => (
               <li key={entry.family} className="text-accent-red-text text-xs">
                 {entry.label} has not been confirmed in cloud sync yet. Check
                 this browser again with Refresh, or return to its step to fix

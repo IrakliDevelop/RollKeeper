@@ -138,8 +138,21 @@ export interface MigrationWizardController {
   // never persisted anywhere. Results live in this ephemeral React state and
   // are rebuilt from scratch every time the report is (re-)entered.
   // -----------------------------------------------------------------------
-  /** This session's live verification results, keyed by family. Cleared on nothing -- a fresh `verifyReport()` call replaces every entry it touches. */
+  /**
+   * This session's live verification results, keyed by family. Rebuilt from
+   * scratch on every winning batch (Task 16 fix round 1, CRITICAL item 1) --
+   * never merged with a previous pass's results, so a family that stops
+   * appearing here (a rejected `verifyCloud` call, or the family was
+   * disabled since the last batch) reads as unverified, never as "still
+   * whatever it was last time".
+   */
   reportVerifications: Partial<Record<DurableFamilyName, FamilyVerification>>;
+  /**
+   * Which currently-enabled family's `verifyCloud` call REJECTED on the
+   * most recent batch, and the error message. Also rebuilt from scratch
+   * every batch.
+   */
+  reportVerificationErrors: Partial<Record<DurableFamilyName, string>>;
   /** True while the most recent `verifyReport()` call is still in flight. */
   reportVerifying: boolean;
   /**

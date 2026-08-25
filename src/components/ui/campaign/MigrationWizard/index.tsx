@@ -221,6 +221,7 @@ export function MigrationWizard({
                 totalSteps={DURABLE_FAMILY_REGISTRY.length + 3}
                 familyAuthorities={controller.familyAuthorities}
                 verifications={controller.reportVerifications}
+                verificationErrors={controller.reportVerificationErrors}
                 verifying={controller.reportVerifying}
                 crossFamilyDrift={controller.reportCrossFamilyDrift}
                 adapterFor={controller.adapterFor}

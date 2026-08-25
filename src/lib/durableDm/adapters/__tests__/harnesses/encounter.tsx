@@ -875,6 +875,45 @@ export function createEncounterHarness(): EncounterConformanceHarness {
         database.close();
       }
     },
+    /**
+     * Coordinator review, Important 4: the `superseded` half of
+     * `outboxEmpty`'s definition (spec R8 -- settled means zero
+     * NON-TERMINAL entries; acknowledged AND superseded rows are both
+     * history and stay) was previously unpinned -- dropping
+     * `|| entry.state === 'superseded'` from `verifyCloud` left every
+     * conformance test green. A superseded row (a mutation replaced by a
+     * later one before the server ever acknowledged it) must not make the
+     * family unverifiable either.
+     */
+    async addSupersededOutboxRow() {
+      const database = await openRollkeeperDatabase();
+      try {
+        const transaction = database.transaction('outbox', 'readwrite');
+        transaction.objectStore('outbox').put({
+          namespace: NAMESPACE,
+          campaignId: CAMPAIGN_ID,
+          legacyId: 'enc-1',
+          family: 'encounter_definition',
+          mutationId: `test-superseded-${crypto.randomUUID()}`,
+          cutoverEpoch: 1,
+          operation: 'replace',
+          payload: null,
+          schemaVersion: 1,
+          localRevision: 1,
+          baseServerVersion: 0,
+          contentFingerprint: 'superseded-fingerprint',
+          updatedAt: NOW,
+          state: 'superseded',
+          attemptCount: 1,
+          nextAttemptAt: 0,
+          inflightAt: null,
+          lastError: null,
+        } satisfies EncounterOutboxEntry);
+        await transactionComplete(transaction);
+      } finally {
+        database.close();
+      }
+    },
 
     async drainOutbox() {
       const database = await openRollkeeperDatabase();
@@ -913,6 +952,34 @@ export function createEncounterHarness(): EncounterConformanceHarness {
           legacyId: 'enc-1',
           kind: 'test-conflict',
           resolutionState: 'unresolved',
+          detectedAt: NOW,
+        });
+        await transactionComplete(transaction);
+      } finally {
+        database.close();
+      }
+    },
+    /**
+     * Coordinator review, Important 3: spec R8 counts UNRESOLVED
+     * conflicts only -- a preserved device candidate is recoverable data
+     * this program exists to protect, and counting it here would make a
+     * second device permanently unverifiable after any legitimate
+     * divergence. Previously unpinned: a wrong predicate
+     * (`resolutionState !== 'resolved'`, which WOULD count `'preserved'`)
+     * left every conformance test green.
+     */
+    async addPreservedConflict() {
+      const database = await openRollkeeperDatabase();
+      try {
+        const transaction = database.transaction('conflicts', 'readwrite');
+        transaction.objectStore('conflicts').put({
+          conflictId: `test-preserved-conflict-${crypto.randomUUID()}`,
+          namespace: NAMESPACE,
+          campaignId: CAMPAIGN_ID,
+          family: 'encounter_definition',
+          legacyId: 'enc-1',
+          kind: 'test-conflict',
+          resolutionState: 'preserved',
           detectedAt: NOW,
         });
         await transactionComplete(transaction);

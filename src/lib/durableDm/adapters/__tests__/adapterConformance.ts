@@ -54,8 +54,26 @@ export interface ConformanceHarness {
   deleteWorkingCopy(legacyId: string): Promise<void>;
   addPendingOutboxEntry(): Promise<void>;
   addAcknowledgedOutboxRow(): Promise<void>;
+  /**
+   * Task 16 fix round 1, Important 4: the OTHER non-terminal-excluded state
+   * spec R8 names alongside `acknowledged` — a mutation replaced by a later
+   * one before the server ever acknowledged it. `outboxEmpty`'s
+   * `entry.state === 'acknowledged' || entry.state === 'superseded'` clause
+   * had only its `acknowledged` half pinned; this fixture isolates the
+   * other.
+   */
+  addSupersededOutboxRow(): Promise<void>;
   drainOutbox(): Promise<void>;
   addUnresolvedConflict(): Promise<void>;
+  /**
+   * Task 16 fix round 1, Important 3: a RESOLVED-BUT-KEPT device candidate
+   * (`resolutionState: 'preserved'`) — recoverable data spec R8 explicitly
+   * protects from counting as an unresolved conflict. Without this fixture,
+   * a wrong-but-plausible predicate (`resolutionState !== 'resolved'`, which
+   * WOULD count `'preserved'` as blocking) passes every existing
+   * conformance test.
+   */
+  addPreservedConflict(): Promise<void>;
   /** The run id the fake server issued, for the request-body assertions. */
   serverRunId(): string;
   /** Clears `requestBodies()` so a second attempt can be compared to the first. */
@@ -905,6 +923,54 @@ export function describeAdapterConformance(
     expect(await harness.adapter.verifyCloud(context)).toMatchObject({
       verified: true,
       outboxEmpty: true,
+    });
+  });
+
+  // Task 16 fix round 1, Important 4: the `superseded` half of `outboxEmpty`
+  // was unpinned -- dropping it from `verifyCloud` left every existing test
+  // green.
+  it(`${name}: a superseded outbox row does not make the family unverifiable`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    await harness.addSupersededOutboxRow();
+    expect(await harness.adapter.verifyCloud(context)).toMatchObject({
+      verified: true,
+      outboxEmpty: true,
+    });
+  });
+
+  // Task 16 fix round 1, Important 3: R8 counts UNRESOLVED conflicts only --
+  // a preserved device candidate is recoverable data this program exists to
+  // protect. Previously unpinned: `resolutionState !== 'resolved'` (which
+  // WOULD count `'preserved'`) passed every existing test.
+  it(`${name}: a preserved (resolved-but-kept) conflict does not make the family unverifiable`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    await harness.addPreservedConflict();
+    expect(await harness.adapter.verifyCloud(context)).toMatchObject({
+      verified: true,
+      conflictCount: 0,
+    });
+  });
+
+  // Task 16 fix round 1, Important 2: R8's "cloud authority is postgres AT
+  // THE EXPECTED EPOCH" condition -- `bumpCloudEpoch()` moves the fake
+  // server's epoch ahead of the local pointer's WITHOUT touching any
+  // document, reproducing "another browser rolled back and re-activated
+  // this family" (a scenario the document multiset alone cannot detect,
+  // since nothing about the documents themselves changed).
+  it(`${name}: verifyCloud is unverified when the cloud epoch has moved ahead of the local pointer`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    expect(await harness.adapter.verifyCloud(context)).toMatchObject({
+      verified: true,
+    });
+    harness.bumpCloudEpoch();
+    expect(await harness.adapter.verifyCloud(context)).toMatchObject({
+      verified: false,
     });
   });
 

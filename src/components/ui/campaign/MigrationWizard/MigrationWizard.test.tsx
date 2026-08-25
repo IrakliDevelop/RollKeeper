@@ -513,6 +513,14 @@ const disabledStubFamilies = new Set<DurableFamilyName>();
 const verifyCloudCalls: DurableFamilyName[] = [];
 /** A caller-supplied `FamilyVerification` a family's NEXT (and every subsequent, until cleared) `verifyCloud` call returns instead of the authority-derived default. */
 const verificationOverrides = new Map<DurableFamilyName, FamilyVerification>();
+/** Task 16 fix round 1, CRITICAL item 1: makes a family's NEXT `verifyCloud` call REJECT instead of resolving, for the "a failed check must not leave a stale claim standing" tests. */
+const verificationThrows = new Map<DurableFamilyName, string>();
+function throwVerificationFor(
+  family: DurableFamilyName,
+  message = 'IndexedDB is unavailable.'
+) {
+  verificationThrows.set(family, message);
+}
 /**
  * One-shot deferred `verifyCloud` responses, consumed in FIFO order per
  * family: the NEXT call to that family's `verifyCloud` returns a promise
@@ -548,11 +556,6 @@ function failVerificationFor(family: DurableFamilyName) {
     conflictCount: 0,
     verified: false,
   });
-}
-
-/** Alias — the brief's "schema version drift" scenario is, from the report's point of view, indistinguishable from any other `documentsMatch: false` refusal; the byte-vs-schema-version distinction itself is pinned per-adapter by `adapterConformance.ts`, not re-derived here. */
-function failVerificationForSchemaVersionDrift(family: DurableFamilyName) {
-  failVerificationFor(family);
 }
 
 function deferVerification(family: DurableFamilyName): {
@@ -743,6 +746,13 @@ function stubAdapter(
     // is correctly unverified by default, not vacuously `verified: true`).
     verifyCloud: async () => {
       verifyCloudCalls.push(family);
+      // One-shot, like the deferred queue below: consumed by the NEXT call
+      // only, so a family can succeed, then fail once, then succeed again.
+      const throwMessage = verificationThrows.get(family);
+      if (throwMessage !== undefined) {
+        verificationThrows.delete(family);
+        throw new Error(throwMessage);
+      }
       const queue = deferredVerificationQueue.get(family);
       if (queue && queue.length > 0) {
         const entry = queue.shift()!;
@@ -1299,8 +1309,17 @@ async function openReportWithNothingMigratedYet() {
   await advanceToReport();
 }
 
-async function openReportWithSchemaVersionDrift(family: DurableFamilyName) {
-  failVerificationForSchemaVersionDrift(family);
+/**
+ * Ruling (Minor 6): renamed from the brief's `...SchemaVersionDrift` --
+ * `failVerificationFor` produces a bare `documentsMatch: false` refusal,
+ * indistinguishable at the report level from any other cause. The
+ * byte-vs-schema-version distinction itself is pinned per-adapter by
+ * `adapterConformance.ts`'s `divergeVerifiedSchemaVersion` fixture, not
+ * re-derived here; this only proves the REPORT correctly surfaces and
+ * refuses on whatever `documentsMatch: false` an adapter reports.
+ */
+async function openReportWithDocumentMismatch(family: DurableFamilyName) {
+  failVerificationFor(family);
   await mountAllSixPostgresAndAdvanceToReport();
 }
 
@@ -1520,6 +1539,7 @@ beforeEach(async () => {
   disabledStubFamilies.clear();
   verifyCloudCalls.length = 0;
   verificationOverrides.clear();
+  verificationThrows.clear();
   deferredVerificationQueue.clear();
   lastSeededConflictId = null;
 });
@@ -2709,6 +2729,58 @@ describe('MigrationWizard — report', () => {
     await waitFor(() => expect(verifySpyCallCount()).toBe(12));
   });
 
+  it('discards a stale "Verified" claim when a later verification fails, and surfaces the failure', async () => {
+    // CRITICAL (coordinator review round 1): a REJECTED `verifyCloud` call
+    // must not leave the PREVIOUS pass's "Verified" entry standing. The
+    // reviewer's own probe: enter the report (all six verify and pass),
+    // then make npc's NEXT check throw on Refresh -- the badge must flip to
+    // "Not verified", the report must stop claiming "All campaign data is
+    // synced", and the DM must be told the check failed, not shown silence.
+    await openReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(6));
+    expect(
+      await screen.findByText(/all campaign data is synced/i)
+    ).toBeInTheDocument();
+    expect(await screen.findByTestId('npc-status')).toHaveTextContent(
+      /^verified$/i
+    );
+
+    throwVerificationFor('npc', 'IndexedDB is unavailable.');
+    await refreshReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(12));
+
+    expect(await screen.findByTestId('npc-status')).toHaveTextContent(
+      /^not verified$/i
+    );
+    expect(
+      screen.queryByText(/all campaign data is synced/i)
+    ).not.toBeInTheDocument();
+    const alert = await screen.findByTestId('verification-error-alert');
+    expect(within(alert).getByText(/npc/i)).toBeInTheDocument();
+    expect(
+      within(alert).getByText(/IndexedDB is unavailable/i)
+    ).toBeInTheDocument();
+  });
+
+  it('does not keep counting a family in the progress numerator after it is disabled', async () => {
+    // Same root cause as the stale-claim bug above, different symptom: a
+    // family verified in an earlier batch, then DISABLED, never appears in
+    // a later batch (excluded from `enabledAdapters()`) to overwrite its
+    // old "verified" entry -- so a merge-into-previous-state implementation
+    // keeps counting it forever.
+    await openReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(6));
+    const claimBefore = await screen.findByTestId('report-claim');
+    expect(within(claimBefore).getByText(/6 of 6/)).toBeInTheDocument();
+
+    disableFamily('npc');
+    await refreshReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(11));
+
+    const claim = await screen.findByTestId('report-claim');
+    expect(within(claim).getByText(/5 of 6/)).toBeInTheDocument();
+  });
+
   it('ignores a stale verification response that lands after a newer one', async () => {
     const slow = deferVerification('npc');
     await openReport();
@@ -2731,6 +2803,32 @@ describe('MigrationWizard — report', () => {
     expect(await screen.findByTestId('npc-status')).toHaveTextContent(
       /^verified$/i
     );
+  });
+
+  it('shows a visible, non-disabling busy indicator on Refresh while verification is in flight', async () => {
+    const slow = deferVerification('npc');
+    await openReport();
+    const refreshButton = screen.getByRole('button', { name: /refresh/i });
+    // Non-disabling: still clickable while the check is running (spec R14
+    // requires a fresh Refresh to be able to supersede a slow one).
+    expect(refreshButton).toBeEnabled();
+    expect(refreshButton).toHaveAttribute('aria-busy', 'true');
+    expect(refreshButton.querySelector('.animate-spin')).not.toBeNull();
+    slow.resolve({
+      authorityAgrees: true,
+      cloudAuthority: 'postgres',
+      epoch: 1,
+      recordCount: 1,
+      documentsMatch: true,
+      tombstonesMatch: true,
+      outboxEmpty: true,
+      conflictCount: 0,
+      verified: true,
+    });
+    await waitFor(() =>
+      expect(refreshButton).toHaveAttribute('aria-busy', 'false')
+    );
+    expect(refreshButton.querySelector('.animate-spin')).toBeNull();
   });
 
   it('claims All campaign data is synced only when all six registered families are enabled, postgres and verified', async () => {
@@ -2797,6 +2895,44 @@ describe('MigrationWizard — report', () => {
     expect(await screen.findByTestId('npc-status')).toHaveTextContent(
       /^verified$/i
     );
+  });
+
+  it('excludes a family at indexedDB authority (not yet postgres) from the cross-family check too', async () => {
+    // Guards the OTHER half of `checkCrossFamilyDrift`'s exclusion
+    // condition (`state === 'indexedDB' || state === 'postgres'`): without
+    // the `indexedDB` half, a family that has cut over LOCALLY but not yet
+    // confirmed to the cloud would wrongly trip the cross-family drift
+    // alert on its own legacy key.
+    const adapters = ALL_STUB_FAMILIES.map(family =>
+      family === 'npc'
+        ? stubAdapter('npc', {
+            initialAuthority: {
+              state: 'indexedDB',
+              epoch: 1,
+              campaignId: 'cloud-ALPHA',
+              accountId: 'account-1',
+              rolledBack: false,
+            },
+          })
+        : stubAdapter(family, {
+            initialAuthority: {
+              state: 'postgres',
+              epoch: 1,
+              campaignId: 'cloud-ALPHA',
+              accountId: 'account-1',
+              rolledBack: false,
+            },
+          })
+    );
+    await mountStubWizardResumedWithAdapters(adapters);
+    await advanceToReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(6));
+    mutateCapturedKey('rollkeeper-npc-data');
+    await refreshReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(12));
+    expect(
+      screen.queryByTestId('cross-family-drift-alert')
+    ).not.toBeInTheDocument();
   });
 
   it('resolving a verification after the wizard unmounts throws no unhandled error', async () => {
@@ -2916,8 +3052,8 @@ describe('MigrationWizard — report', () => {
     expect(await preservedCandidateStillReadable()).toBe(true);
   });
 
-  it('refuses verification when only the schema version differs', async () => {
-    await openReportWithSchemaVersionDrift('calendar');
+  it('refuses verification when the adapter reports a document mismatch', async () => {
+    await openReportWithDocumentMismatch('calendar');
     await screen.findByTestId('unverified-categories-alert');
     expect(
       screen.queryByText(/all campaign data is synced/i)
