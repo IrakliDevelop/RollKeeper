@@ -100,6 +100,34 @@ const FAMILY_LOCAL_STORAGE_KEYS: Record<DurableFamilyName, readonly string[]> =
     combat_log_archive: COMBAT_LOG_ARCHIVE_FAMILY_INVENTORY.localStorageKeys,
   };
 
+/**
+ * Task 16 fix round 2, Important 1 (coordinator review): a rejected
+ * `verifyCloud` call's `Error.message` must NEVER reach the DM verbatim --
+ * it is internal error text, not product copy. Two concrete hazards this
+ * closes:
+ *   - all six `*Api` gateways (`npcApi.ts:10` and its five siblings) throw
+ *     `'<Family> changed on another device.'` on HTTP 409, from EVERY RPC
+ *     including `preview-enrollment` -- rendering it verbatim would say
+ *     "device", an R17 breach;
+ *   - any OTHER thrown message (a raw `DOMException`, a fetch failure, an
+ *     unrecognised server error) is equally not vetted product copy and
+ *     must not be shown either.
+ * The raw message is still logged to `console.error` for debugging -- the
+ * technical detail is not lost, only kept out of the rendered alert. Known
+ * failure classes map to their own clean sentence; anything unrecognised
+ * falls back to the same generic copy a non-`Error` rejection already used.
+ */
+function reportFriendlyVerificationError(reason: unknown): string {
+  const raw = reason instanceof Error ? reason.message : String(reason);
+  // Deliberate: the technical detail belongs in the console, never in the
+  // rendered alert (see doc comment above).
+  console.error('[MigrationWizard] verifyCloud failed:', raw);
+  if (/changed on another device/i.test(raw)) {
+    return 'This data category changed somewhere else while this browser was checking it. Try Refresh again.';
+  }
+  return 'This data category could not be checked just now.';
+}
+
 export function useMigrationWizard(
   campaignCode: string
 ): MigrationWizardController {
@@ -783,10 +811,7 @@ export function useMigrationWizard(
       if (result.status === 'fulfilled') {
         nextVerifications[family] = result.value;
       } else {
-        nextErrors[family] =
-          result.reason instanceof Error
-            ? result.reason.message
-            : 'This data category could not be checked.';
+        nextErrors[family] = reportFriendlyVerificationError(result.reason);
       }
     });
     setReportVerifications(nextVerifications);

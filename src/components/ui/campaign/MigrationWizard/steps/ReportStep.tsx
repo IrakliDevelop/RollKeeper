@@ -236,14 +236,21 @@ export function ReportStep({
           <p className="text-accent-red-text text-sm font-semibold">
             Could not check cloud sync
           </p>
+          {/* Static, mapping-independent reassurance -- kept OUT of the
+              per-family list items below so each `<li>` renders ONLY the
+              mapped, R17-clean message `reportFriendlyVerificationError`
+              actually returned. A hardcoded phrase duplicated into every
+              `<li>` regardless of that mapping's outcome would make a test
+              asserting on the fallback text vacuous -- it would pass even
+              if the mapping function were gutted. */}
+          <p className="text-accent-red-text mt-1 text-xs">
+            This is not a claim that any of these are out of sync — try Refresh
+            again.
+          </p>
           <ul className="mt-1 list-disc pl-5">
             {erroredEntries.map(entry => (
               <li key={entry.family} className="text-accent-red-text text-xs">
-                {entry.label} could not be checked just now
-                {verificationErrors[entry.family]
-                  ? `: ${verificationErrors[entry.family]}`
-                  : '.'}{' '}
-                This is not a claim that it is out of sync — try Refresh again.
+                {entry.label}: {verificationErrors[entry.family]}
               </li>
             ))}
           </ul>

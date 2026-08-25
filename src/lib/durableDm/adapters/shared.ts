@@ -108,24 +108,10 @@ export async function verifyPreparedGeneration(
 }
 
 /**
- * Task 13b's evidence for R5b row 3: "Require `preview.epoch ===
- * pointer.epoch` AND exact document parity." `expectedEpoch` must be the
- * PONTER's epoch (the side being verified), never `expectedEpoch + 1` as
- * `runResumableCloudActivation` checks during activation — that check is
- * for a run activating INTO a new epoch; this one is confirming a pointer
- * that already claims to BE at `postgres` at a specific epoch.
- *
- * Document parity reuses `matchesManifest` rather than a second comparison:
- * the exact same legacyId/fingerprint/schemaVersion/tombstone/count rule
- * spec R5b names for this row is the rule `resumableCloudActivation.ts`
- * already enforces for the response-lost reconciliation case, and
- * reimplementing it here would risk the two definitions of "parity"
- * drifting apart silently.
- */
-/**
- * Task 16 fix round 1, Important 2 (coordinator review): spec R8's second
- * verification condition -- "cloud authority is `postgres` at the EXPECTED
- * epoch" -- was never checked by any of the six `verifyCloud`
+ * Task 16 fix round 1, Important 2 (coordinator review); fix round 2,
+ * Minor 4 (comment moved back to sit on the right function): spec R8's
+ * second verification condition -- "cloud authority is `postgres` at the
+ * EXPECTED epoch" -- was never checked by any of the six `verifyCloud`
  * implementations before this fix: they compared the document multiset but
  * never `preview.epoch` against the local pointer's own epoch, so a device
  * whose cloud generation had moved to a NEWER epoch (another browser rolled
@@ -141,8 +127,8 @@ export async function verifyPreparedGeneration(
  * Reusing it here would mean maintaining the SAME parity rule expressed
  * twice, over two different input shapes, for the one family of adapters --
  * exactly the drift risk `verifyPostgresGenerationParity`'s own doc comment
- * warns against. This is the narrower, independent check R8's second
- * condition actually needs.
+ * (below) warns against. This is the narrower, independent check R8's
+ * second condition actually needs.
  */
 export function cloudPreviewAtExpectedEpoch(
   preview: { authority: 'legacy' | 'postgres'; epoch?: number },
@@ -151,6 +137,21 @@ export function cloudPreviewAtExpectedEpoch(
   return preview.authority === 'postgres' && preview.epoch === expectedEpoch;
 }
 
+/**
+ * Task 13b's evidence for R5b row 3: "Require `preview.epoch ===
+ * pointer.epoch` AND exact document parity." `expectedEpoch` must be the
+ * PONTER's epoch (the side being verified), never `expectedEpoch + 1` as
+ * `runResumableCloudActivation` checks during activation — that check is
+ * for a run activating INTO a new epoch; this one is confirming a pointer
+ * that already claims to BE at `postgres` at a specific epoch.
+ *
+ * Document parity reuses `matchesManifest` rather than a second comparison:
+ * the exact same legacyId/fingerprint/schemaVersion/tombstone/count rule
+ * spec R5b names for this row is the rule `resumableCloudActivation.ts`
+ * already enforces for the response-lost reconciliation case, and
+ * reimplementing it here would risk the two definitions of "parity"
+ * drifting apart silently.
+ */
 export function verifyPostgresGenerationParity(
   preview: CloudEnrollmentPreview,
   expectedEpoch: number,

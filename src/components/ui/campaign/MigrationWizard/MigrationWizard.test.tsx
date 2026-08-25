@@ -2756,9 +2756,18 @@ describe('MigrationWizard — report', () => {
       screen.queryByText(/all campaign data is synced/i)
     ).not.toBeInTheDocument();
     const alert = await screen.findByTestId('verification-error-alert');
+    // Important 3: the role, not just the testid -- a failure announced as
+    // `role="status"` would be an accessibility regression no testid-only
+    // query would ever catch.
+    expect(alert).toHaveAttribute('role', 'alert');
     expect(within(alert).getByText(/npc/i)).toBeInTheDocument();
+    // Important 1: the RAW internal error text must never reach the DM --
+    // only the mapped, R17-clean copy.
     expect(
-      within(alert).getByText(/IndexedDB is unavailable/i)
+      within(alert).queryByText(/IndexedDB is unavailable/i)
+    ).not.toBeInTheDocument();
+    expect(
+      within(alert).getByText(/could not be checked/i)
     ).toBeInTheDocument();
   });
 
@@ -2779,6 +2788,47 @@ describe('MigrationWizard — report', () => {
 
     const claim = await screen.findByTestId('report-claim');
     expect(within(claim).getByText(/5 of 6/)).toBeInTheDocument();
+  });
+
+  it('never renders "device" or other raw internal error text in the verification-error alert', async () => {
+    // Important 1 (coordinator review round 2): the reviewer's own R17
+    // hazard -- all six `*Api` gateways throw
+    // `'<Family> changed on another device.'` on HTTP 409, from EVERY RPC
+    // including `preview-enrollment`. Before this fix that string rendered
+    // verbatim, as product copy, saying "device".
+    await openReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(6));
+    throwVerificationFor('npc', 'NPCs changed on another device.');
+    await refreshReport();
+    const alert = await screen.findByTestId('verification-error-alert');
+    expect(alert).toHaveAttribute('role', 'alert');
+    expect(within(alert).queryByText(/device/i)).not.toBeInTheDocument();
+    expect(within(alert).getByText(/npc/i)).toBeInTheDocument();
+    // The known-failure-class mapping actually branched (not just "always
+    // generic") -- this is the SPECIFIC clean sentence for a conflict, not
+    // the bare fallback.
+    expect(
+      within(alert).getByText(
+        /changed somewhere else while this browser was checking/i
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('falls back to the generic clean message for an unrecognised verification failure', async () => {
+    await openReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(6));
+    throwVerificationFor(
+      'calendar',
+      'unexpected token < in JSON at position 0'
+    );
+    await refreshReport();
+    const alert = await screen.findByTestId('verification-error-alert');
+    expect(
+      within(alert).queryByText(/unexpected token/i)
+    ).not.toBeInTheDocument();
+    expect(
+      within(alert).getByText(/could not be checked just now/i)
+    ).toBeInTheDocument();
   });
 
   it('ignores a stale verification response that lands after a newer one', async () => {
@@ -3036,7 +3086,8 @@ describe('MigrationWizard — report', () => {
     );
   });
 
-  it('counts settled outbox state, not an empty table', async () => {
+  // Ruling (Minor 5, fix round 2): renamed -- this mounts a STUB adapter and a REAL acknowledged outbox row; it proves the REPORT trusts `verification.outboxEmpty` rather than independently requiring the raw table to be physically empty. The settled-vs-empty SEMANTIC itself is pinned per-adapter by `adapterConformance.ts`.
+  it('does not independently require the outbox to be physically empty (trusts the adapter\u2019s outboxEmpty)', async () => {
     await openReportWithAcknowledgedOutboxRows();
     // Anchored: distinguishes "Verified" from "Not verified".
     expect(await screen.findByTestId('npc-status')).toHaveTextContent(
@@ -3044,7 +3095,8 @@ describe('MigrationWizard — report', () => {
     );
   });
 
-  it('counts unresolved conflicts only, and keeps preserved candidates recoverable', async () => {
+  // Ruling (Minor 5, fix round 2): renamed -- this mounts a STUB adapter and a REAL preserved conflict row; it proves the REPORT never deletes/mutates that IndexedDB record while verifying, and trusts `verification.conflictCount` rather than re-deriving it. The unresolved-only SEMANTIC itself is pinned per-adapter by `adapterConformance.ts`.
+  it('never mutates a real IndexedDB conflict record while verifying (trusts the adapter\u2019s conflictCount)', async () => {
     await openReportWithPreservedResolvedCandidate();
     expect(await screen.findByTestId('npc-status')).toHaveTextContent(
       /^verified$/i
@@ -3095,6 +3147,12 @@ describe('MigrationWizard — report', () => {
   });
 
   it('renders every report warning at a 390px viewport without truncation', async () => {
+    // Ruling (Important 2, fix round 2): the reviewer's own probe -- a
+    // throwing family co-occurring with the other two alert kinds -- is
+    // reproduced here, and its alert is added to the table below. Before
+    // this fix `alertVariants` enumerated only two kinds and threw
+    // "Unrecognised alert content" the instant a third (the verification-
+    // error alert) rendered alongside them.
     failVerificationFor('calendar');
     localStorage.setItem(
       'rollkeeper-player-data',
@@ -3102,8 +3160,14 @@ describe('MigrationWizard — report', () => {
     );
     await openReportWithAllSixMigrated();
     await screen.findByTestId('unverified-categories-alert');
+    // `throwVerificationFor` is one-shot -- armed for the UPCOMING Refresh
+    // batch (not the initial entry batch), together with the mutated key,
+    // so all three alert kinds render from the SAME batch simultaneously.
+    throwVerificationFor('npc', 'IndexedDB is unavailable.');
     mutateCapturedKey('rollkeeper-player-data');
     await refreshReport();
+    await screen.findByTestId('unverified-categories-alert');
+    await screen.findByTestId('verification-error-alert');
     await screen.findByTestId('cross-family-drift-alert');
     setViewport(MIGRATION_NARROW_VIEWPORT_PX);
 
@@ -3123,10 +3187,20 @@ describe('MigrationWizard — report', () => {
           'does not belong to a data category you have moved yet',
         ],
       },
+      {
+        match: /could not check cloud sync/i,
+        requiredSubstrings: [
+          'Could not check cloud sync',
+          'could not be checked just now',
+          // Ruling (Important 1): the raw thrown message must NEVER appear
+          // here -- only the R17-clean, mapped copy.
+          'This is not a claim that any of these are out of sync',
+        ],
+      },
     ];
 
     const alerts = screen.getAllByRole('alert');
-    expect(alerts.length).toBeGreaterThanOrEqual(2);
+    expect(alerts.length).toBeGreaterThanOrEqual(3);
     for (const warning of alerts) {
       const text = warning.textContent ?? '';
       const variant = alertVariants.find(candidate =>
@@ -3136,6 +3210,8 @@ describe('MigrationWizard — report', () => {
       for (const substring of variant!.requiredSubstrings) {
         expect(text).toContain(substring);
       }
+      // The raw internal message must never leak into the DOM here either.
+      expect(text).not.toContain('IndexedDB is unavailable');
       assertNoTruncationClasses(warning);
     }
   });
