@@ -20,11 +20,26 @@ import type {
 import type { NormalizedAuthority } from '@/lib/durableDm/familyAuthorityNormalizer';
 import type { RegistryEntry } from '@/lib/durableDm/familyRegistry';
 import {
+  readFamilyPreparedState,
+  readFamilySelection,
+} from '@/lib/durableDm/familySelectionReader';
+import {
   deriveFamilyStepState,
   type FamilyStepState,
 } from '@/lib/durableDm/migrationRunState';
+import { openRollkeeperDatabase } from '@/lib/indexeddb/localDatabase';
+import type { StorageNamespace } from '@/lib/indexeddb/shadowJournal';
 
 import type { FamilyRunOutcome } from '../MigrationWizard.types';
+
+/** Ruling R9.2: names the behavioural number instead of a bare literal (matches steps/RecoveryStep.tsx). */
+const FINGERPRINT_DISPLAY_LENGTH = 12;
+
+function shortHash(hash: string): string {
+  return hash.length > FINGERPRINT_DISPLAY_LENGTH
+    ? `${hash.slice(0, FINGERPRINT_DISPLAY_LENGTH)}…`
+    : hash;
+}
 
 const DEFAULT_AUTHORITY: NormalizedAuthority = {
   state: 'legacy',
@@ -94,6 +109,11 @@ export function FamilyStep({
     null
   );
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [selection, setSelection] = useState<{
+    runId: string;
+    manifestHash: string;
+  } | null>(null);
+  const [preparedState, setPreparedState] = useState<string | null>(null);
   const [driftKey, setDriftKey] = useState<string | null>(null);
   const [phrase, setPhrase] = useState('');
   const [running, setRunning] = useState(false);
@@ -111,6 +131,8 @@ export function FamilyStep({
     setManifest(null);
     setConfirmation(null);
     setLoadError(null);
+    setSelection(null);
+    setPreparedState(null);
     setDriftKey(null);
     setPhrase('');
     setRunning(false);
@@ -144,6 +166,43 @@ export function FamilyStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on family identity, not the (re-created every render) context/adapter references
   }, [entry.family, enabled, adapter !== null, context !== null]);
 
+  // Coordinator review, Important 3: `selected`/`prepared` are real,
+  // persisted evidence -- a selection record matching this run's
+  // recovery.runId/manifestHash, and the `migration-state:<scope>` `meta`
+  // checkpoint `prepareIndexedDb` writes -- not states this component may
+  // invent from its own transient click history. Read fresh whenever the
+  // family or its context changes; both reads are read-only.
+  useEffect(() => {
+    if (!enabled || entry.status !== 'registered' || !context) return;
+    let cancelled = false;
+    (async () => {
+      const namespace = `user:${context.accountId}` as StorageNamespace;
+      const nextSelection = readFamilySelection(
+        entry.family,
+        window.localStorage,
+        namespace,
+        context.campaignId
+      );
+      if (!cancelled) setSelection(nextSelection);
+      const database = await openRollkeeperDatabase();
+      try {
+        const nextPreparedState = await readFamilyPreparedState(
+          database,
+          namespace,
+          entry.family,
+          context.campaignId
+        );
+        if (!cancelled) setPreparedState(nextPreparedState);
+      } finally {
+        database.close();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on family identity, not the (re-created every render) context reference
+  }, [entry.family, enabled, entry.status, context !== null]);
+
   // Spec R3: re-checked on entry to this family's step, before any write is
   // even offered. Skipped once a family is already Postgres-authoritative
   // (completed families stay migrated) or already blocked on a marker
@@ -173,13 +232,24 @@ export function FamilyStep({
     entry,
     enabled,
     authority: authority ?? DEFAULT_AUTHORITY,
-    selection: null,
+    selection,
     runRecovery,
-    preparedState: null,
+    preparedState,
     blockers,
     verification: null,
   });
   const badge = STEP_BADGE[stepState];
+  const chosenOrBeyond =
+    stepState === 'selected' ||
+    stepState === 'prepared' ||
+    stepState === 'indexedDb' ||
+    stepState === 'postgresUnverified' ||
+    stepState === 'verified';
+  const preparedOrBeyond =
+    stepState === 'prepared' ||
+    stepState === 'indexedDb' ||
+    stepState === 'postgresUnverified' ||
+    stepState === 'verified';
 
   const phraseMatches = Boolean(
     confirmation &&
@@ -360,9 +430,8 @@ export function FamilyStep({
             </div>
 
             <StageChain
-              attempted={
-                running || runResult !== null || authority?.state !== 'legacy'
-              }
+              chosen={chosenOrBeyond}
+              copiedHere={preparedOrBeyond}
               inThisBrowser={
                 authority?.state === 'indexedDB' ||
                 authority?.state === 'postgres'
@@ -394,6 +463,20 @@ export function FamilyStep({
 
             {manifest.blockers.length === 0 && confirmation && (
               <div className="border-divider bg-surface flex flex-col gap-3 rounded-lg border p-4">
+                {/* R12: the structured confirmation contract's safety
+                    fields, rendered so the DM can see exactly what they are
+                    about to confirm -- not only the typed-phrase gate. The
+                    fingerprint shown here comes from `confirmation`, the
+                    same object `requiredPhrase` below comes from, so it is
+                    the fingerprint under confirmation, not a value read
+                    independently from `manifest`. */}
+                <p className="text-muted text-xs">
+                  Confirming {confirmation.familyLabel} for{' '}
+                  {confirmation.campaignLabel} &middot; manifest{' '}
+                  <span className="font-mono">
+                    {shortHash(confirmation.manifestFingerprint)}
+                  </span>
+                </p>
                 <Input
                   id={inputId}
                   label={`Type "${confirmation.requiredPhrase}" to confirm`}
@@ -448,17 +531,21 @@ function Stat({ label, value }: { label: string; value: number | string }) {
 }
 
 function StageChain({
-  attempted,
+  chosen,
+  copiedHere,
   inThisBrowser,
   inCloudSync,
 }: {
-  attempted: boolean;
+  /** `stepState` at or beyond `selected` -- a real, persisted selection record matches this run (spec R6). */
+  chosen: boolean;
+  /** `stepState` at or beyond `prepared` -- the persisted `CUTOVER_READY` checkpoint (spec R6). */
+  copiedHere: boolean;
   inThisBrowser: boolean;
   inCloudSync: boolean;
 }) {
   const stages: { label: string; done: boolean }[] = [
-    { label: 'Chosen', done: attempted },
-    { label: 'Copied here', done: inThisBrowser },
+    { label: 'Chosen', done: chosen },
+    { label: 'Copied here', done: copiedHere },
     { label: 'This browser', done: inThisBrowser },
     { label: 'Cloud sync', done: inCloudSync },
   ];

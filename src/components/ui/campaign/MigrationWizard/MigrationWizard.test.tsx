@@ -22,6 +22,7 @@ import { decideAuthorityRepair } from '@/lib/durableDm/authorityRepair';
 import type {
   DurableFamilyAdapter,
   DurableFamilyName,
+  FamilyManifestHandle,
   MigrationRunContext,
 } from '@/lib/durableDm/durableFamilyAdapter';
 import type {
@@ -41,6 +42,7 @@ import {
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
+import { selectCampaignSettings } from '@/lib/indexeddb/campaignSettingsSelection';
 import { createBrowserDmWorkspace } from '@/lib/supabase/browserDmWorkspace';
 import { APP_VERSION } from '@/utils/constants';
 
@@ -200,6 +202,34 @@ async function allDownloadReceipts(): Promise<
     >(transaction.objectStore('downloadReceipts').getAll());
     await transactionComplete(transaction);
     return all;
+  } finally {
+    database.close();
+  }
+}
+
+/**
+ * Seeds the persisted `migration-state:<namespace>:<family>:<campaignId>`
+ * checkpoint every `run*IndexedDbMigration` writes on reaching
+ * `CUTOVER_READY` (`adapters/shared.ts`'s `verifyPreparedGeneration` reads
+ * the identical key). Used to prove `deriveFamilyStepState`'s `prepared`
+ * branch renders from this REAL persisted record, not an invented
+ * client-side flag.
+ */
+async function seedPreparedCheckpoint(options: {
+  family: DurableFamilyName;
+  namespace: string;
+  campaignId: string;
+  runId: string;
+}) {
+  const database = await openRollkeeperDatabase();
+  try {
+    const transaction = database.transaction('meta', 'readwrite');
+    transaction.objectStore('meta').put({
+      key: `migration-state:${options.namespace}:${options.family}:${options.campaignId}`,
+      state: 'CUTOVER_READY',
+      runId: options.runId,
+    });
+    await transactionComplete(transaction);
   } finally {
     database.close();
   }
@@ -516,15 +546,37 @@ async function seedMarkerAheadOfPointer(
 
 function stubAdapter(
   family: DurableFamilyName,
-  options: { onCutover?: () => void } = {}
+  options: {
+    onCutover?: () => void;
+    /** Coordinator review, Important 6: non-zero by default so the manifest card, its stats and the `blocked` branch are exercised, not falsified by an always-empty stub. */
+    manifest?: {
+      recordCount?: number;
+      totalBytes?: number;
+      blockers?: FamilyManifestHandle['blockers'];
+      records?: FamilyManifestHandle['records'];
+    };
+    /** Coordinator review, Important 5/6: makes `previewManifest` reject, exercising the `loadError` alert. */
+    previewError?: string;
+    /** Coordinator review, Important 6: pre-seeds the closured authority (e.g. a completed rollback), without needing to drive `rollback()` through a real context first. */
+    initialAuthority?: NormalizedAuthority;
+  } = {}
 ): DurableFamilyAdapter {
-  const manifest = {
+  const manifest: FamilyManifestHandle = {
     family,
-    fingerprint: 'fingerprint',
-    recordCount: 0,
-    totalBytes: 0,
-    blockers: [],
-    records: [],
+    fingerprint: `fingerprint-${family}`,
+    recordCount: options.manifest?.recordCount ?? 3,
+    totalBytes: options.manifest?.totalBytes ?? 4096,
+    blockers: options.manifest?.blockers ?? [],
+    records: options.manifest?.records ?? [
+      {
+        legacyId: `${family}-1`,
+        schemaVersion: 1,
+        byteCount: 128,
+        payloadFingerprint: 'payload-fingerprint',
+        tombstoned: false,
+        references: [{ family: 'campaign_settings', legacyId: 'ref-1' }],
+      },
+    ],
     native: null,
   };
   const cutoverSpy = vi.fn(() => options.onCutover?.());
@@ -535,7 +587,7 @@ function stubAdapter(
   // the default legacy state. Once any operation below sets it, it wins
   // permanently over any seed (mirroring how a real repair/cutover
   // supersedes a stale seeded disagreement).
-  let authority: NormalizedAuthority | null = null;
+  let authority: NormalizedAuthority | null = options.initialAuthority ?? null;
   const currentAuthority = (): NormalizedAuthority =>
     authority ?? inconsistentSeeds.get(family) ?? DEFAULT_STUB_AUTHORITY;
 
@@ -543,7 +595,10 @@ function stubAdapter(
     family,
     label: family,
     isVisible: () => true,
-    previewManifest: async () => manifest,
+    previewManifest: async () => {
+      if (options.previewError) throw new Error(options.previewError);
+      return manifest;
+    },
     confirmation: () => ({
       familyLabel: family,
       campaignLabel: 'Campaign',
@@ -697,6 +752,12 @@ function familyHeadingLabel(
 /** The RTL render currently mounted by a Task 15 helper, if any -- `null` after `cleanup()`/unmount. */
 let currentRender: ReturnType<typeof render> | null = null;
 
+/** Unmounts whatever is currently rendered (if anything) and clears `currentRender`, ready for the next helper to mount fresh. */
+function unmountCurrentRender() {
+  currentRender?.unmount();
+  currentRender = null;
+}
+
 /** Clicks Continue until the named family's heading is on screen, mounting nothing itself. */
 async function clickContinueUntil(label: string) {
   for (
@@ -710,13 +771,15 @@ async function clickContinueUntil(label: string) {
   throw new Error(`Never reached step: ${label}`);
 }
 
-/** Mounts with the six stub families, resumed onto a pre-verified receipt (no download/upload). */
-async function mountStubWizardResumed() {
+/** Mounts with the given adapter set, resumed onto a pre-verified receipt (no download/upload). */
+async function mountStubWizardResumedWithAdapters(
+  adapters: DurableFamilyAdapter[]
+) {
   await seedVerifiedReceipt({
     runId: 'run-1',
     manifestHash: await currentDeviceHash(),
   });
-  mockedRegisteredAdapters.mockReturnValue(stubFamilies());
+  mockedRegisteredAdapters.mockReturnValue(adapters);
   mockedEnabledAdapters.mockImplementation(() => mockedRegisteredAdapters());
   mockedCreateBrowserDmWorkspace.mockResolvedValue({
     ...defaultOwnerContext(),
@@ -728,6 +791,20 @@ async function mountStubWizardResumed() {
   );
   await screen.findByText(/connected to campaign alpha/i);
   await screen.findByText(/safety copy is ready/i);
+}
+
+/** Mounts with the six shared stub families, resumed onto a pre-verified receipt (no download/upload). */
+async function mountStubWizardResumed() {
+  await mountStubWizardResumedWithAdapters(stubFamilies());
+}
+
+/** Renders/resumes at a given family's step against a CUSTOM adapter set (e.g. one adapter with a non-default manifest), instead of the shared six-family cache. */
+async function renderWizardAtFamilyStepWithAdapters(
+  adapters: DurableFamilyAdapter[],
+  family: DurableFamilyName
+) {
+  await mountStubWizardResumedWithAdapters(adapters);
+  await clickContinueUntil(familyHeadingLabel(family));
 }
 
 /** Mounts with the six stub families, driving a REAL download-then-upload so the initiate/verify call counts stay exactly 1. */
@@ -1114,7 +1191,7 @@ describe('MigrationWizard — steps 0 and 1', () => {
     expect(
       await screen.findByText(/that file does not match this browser/i)
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^continue$/i })).toBeDisabled();
   });
 
   it('resumes on a verified receipt for the same browser data, without a second download', async () => {
@@ -1698,29 +1775,388 @@ describe('MigrationWizard — data-category steps', () => {
 
   it('renders a planned family as not yet available and offers no controls', async () => {
     await advanceToFamily('location');
+    // The rail's own "Not yet available" section caption is ALWAYS
+    // rendered (it heads the planned-entries list regardless of which step
+    // is current), so a bare presence check here is satisfied even if
+    // `FamilyStep` never rendered its own not-available copy at all.
+    // `findByText` on the FULL sentence (not the anchored word) is what
+    // actually pins the step-level render.
     expect(
-      (await screen.findAllByText(/not yet available/i)).length
-    ).toBeGreaterThan(0);
+      await screen.findByText(/locations is not yet available in this wizard/i)
+    ).toBeInTheDocument();
     expect(
       screen.queryByLabelText(/type .* to confirm/i)
     ).not.toBeInTheDocument();
   });
 
-  it('renders every family-step warning at a 390px viewport without truncation', async () => {
-    await seedMarkerAheadOfPointer('npc');
-    await advanceToFamily('npc');
+  it('renders every family-step alert at 390px without truncation, covering drift / cloud-failure / blocked / load-error / inconsistent-refusal', async () => {
+    // Coordinator review, Important 5: restores Task 14's `alertVariants` +
+    // `requiredSubstrings` table (copy-presence half of R6.1), and drives
+    // it through every alert THIS task adds -- not only the one the
+    // previous version happened to reach. Only one family step is ever on
+    // screen at a time, so each scenario gets its own render rather than
+    // trying to collect every alert kind into one DOM snapshot.
+    setViewport(MIGRATION_NARROW_VIEWPORT_PX);
+
+    function checkCurrentAlerts(
+      variants: { match: RegExp; requiredSubstrings: string[] }[]
+    ) {
+      const alerts = screen.getAllByRole('alert');
+      expect(alerts.length).toBeGreaterThan(0);
+      for (const warning of alerts) {
+        const text = warning.textContent ?? '';
+        const variant = variants.find(candidate => candidate.match.test(text));
+        expect(variant, `Unrecognised alert content: ${text}`).toBeDefined();
+        for (const substring of variant!.requiredSubstrings) {
+          expect(text).toContain(substring);
+        }
+        assertNoTruncationClasses(warning);
+      }
+    }
+
+    // Scenario 1: drift.
+    await runWizardThroughFamilies(['campaign_settings']);
+    mutateCapturedKey('rollkeeper-calendar-data');
+    await advanceToFamily('calendar');
+    await screen.findByText(/download a fresh/i);
+    checkCurrentAlerts([
+      {
+        match: /this browser.s data changed/i,
+        requiredSubstrings: [
+          "This browser's data changed",
+          'changed since your safety copy was checked. Download a fresh backup of this browser and check it again before this data category can move.',
+        ],
+      },
+    ]);
+    unmountCurrentRender();
+
+    // Scenario 2: cloud failure.
+    failCloudFor('npc');
+    await renderWizardAtFamilyStep('npc');
+    await confirmAndSubmit('npc');
+    checkCurrentAlerts([
+      {
+        match: /saved only in this browser/i,
+        requiredSubstrings: ['Saved only in this browser'],
+      },
+    ]);
+    unmountCurrentRender();
+
+    // Scenario 3: manifest blockers.
+    const blockedAdapter = stubAdapter('magic_item', {
+      manifest: {
+        blockers: [
+          {
+            kind: 'schema-conflict',
+            legacyId: 'mi-1',
+            detail: 'Two records claim the same legacy id.',
+          },
+        ],
+      },
+    });
+    await renderWizardAtFamilyStepWithAdapters([blockedAdapter], 'magic_item');
+    checkCurrentAlerts([
+      {
+        match: /some records need attention/i,
+        requiredSubstrings: [
+          'Some records need attention before this can move',
+          'Two records claim the same legacy id.',
+        ],
+      },
+    ]);
+    unmountCurrentRender();
+
+    // Scenario 4: manifest preview failure.
+    const errorAdapter = stubAdapter('encounter_definition', {
+      previewError: 'The legacy encounter envelope is corrupted.',
+    });
+    await renderWizardAtFamilyStepWithAdapters(
+      [errorAdapter],
+      'encounter_definition'
+    );
+    checkCurrentAlerts([
+      {
+        match: /the legacy encounter envelope is corrupted/i,
+        requiredSubstrings: ['The legacy encounter envelope is corrupted.'],
+      },
+    ]);
+    unmountCurrentRender();
+
+    // Scenario 5: inconsistent, repair refuses (two alerts coexist: the
+    // persistent "needs attention" headline, and the refusal message).
+    await seedMarkerAheadOfPointer('combat_log_archive');
+    await advanceToFamily('combat_log_archive');
     await userEvent.click(
       await screen.findByRole('button', {
         name: /^check this browser and fix it$/i,
       })
     );
     await screen.findByText(/could not be fixed/i);
-    setViewport(MIGRATION_NARROW_VIEWPORT_PX);
+    checkCurrentAlerts([
+      {
+        match: /this browser.s record needs attention/i,
+        requiredSubstrings: ["This browser's record needs attention"],
+      },
+      { match: /could not be fixed/i, requiredSubstrings: [] },
+    ]);
+  });
 
-    const alerts = screen.getAllByRole('alert');
-    expect(alerts.length).toBeGreaterThan(0);
-    for (const warning of alerts) {
-      assertNoTruncationClasses(warning);
-    }
+  it('renders the manifest fingerprint under confirmation, and it is the one about to be cut over', async () => {
+    await renderWizardAtFamilyStep('campaign_settings');
+    await screen.findByLabelText(/type .* to confirm/i);
+    // R12: `familyLabel`/`campaignLabel`/`manifestFingerprint` from the
+    // structured confirmation object, all rendered together -- not only
+    // `requiredPhrase`.
+    const note = screen.getByText(/confirming campaign_settings for/i);
+    expect(note).toHaveTextContent('Campaign');
+    // Truncated per FINGERPRINT_DISPLAY_LENGTH. The ground truth is this
+    // stub's own `previewManifest` fingerprint (`fingerprint-campaign_settings`,
+    // known directly from `stubAdapter`, independent of what `confirmation()`
+    // claims) -- so this fails if the rendered value diverges from the
+    // manifest actually about to be cut over.
+    expect(note).toHaveTextContent('fingerprint-…');
+  });
+
+  it('renders "Chosen" once a persisted selection record matches this run, before any cutover', async () => {
+    const hash = await currentDeviceHash();
+    selectCampaignSettings(localStorage, {
+      namespace: 'user:account-1',
+      campaignId: 'cloud-ALPHA',
+      confirmed: true,
+      recovery: { runId: 'run-1', manifestHash: hash, createdAt: FIXED_TS },
+      now: () => FIXED_TS,
+    });
+    await renderWizardAtFamilyStep('campaign_settings');
+    // Exactly 2, not merely >0: the stage chain's "Chosen" BOX renders its
+    // label unconditionally regardless of `done` (only the icon differs),
+    // so a bare presence check is satisfied even when nothing was ever
+    // selected. The badge (STEP_BADGE.selected) is the second occurrence,
+    // and only renders "Chosen" when `stepState === 'selected'`.
+    await waitFor(async () => {
+      expect((await screen.findAllByText(/^chosen$/i)).length).toBe(2);
+    });
+    // Not yet cut over -- this browser's authority is still legacy. Proves
+    // "Chosen" is read from the persisted selection record, not inferred
+    // from an authority that has already moved.
+    expect(await authorityOf('campaign_settings')).toMatchObject({
+      state: 'legacy',
+    });
+  });
+
+  it('renders "Copied here" once the persisted CUTOVER_READY checkpoint is reached', async () => {
+    const hash = await currentDeviceHash();
+    selectCampaignSettings(localStorage, {
+      namespace: 'user:account-1',
+      campaignId: 'cloud-ALPHA',
+      confirmed: true,
+      recovery: { runId: 'run-1', manifestHash: hash, createdAt: FIXED_TS },
+      now: () => FIXED_TS,
+    });
+    await seedPreparedCheckpoint({
+      family: 'campaign_settings',
+      namespace: 'user:account-1',
+      campaignId: 'cloud-ALPHA',
+      runId: 'generation-x',
+    });
+    await renderWizardAtFamilyStep('campaign_settings');
+    // Exactly 2 (badge + stage-chain box) -- see the "Chosen" test above
+    // for why a bare presence check would be vacuous here too.
+    await waitFor(async () => {
+      expect((await screen.findAllByText(/^copied here$/i)).length).toBe(2);
+    });
+    expect(await authorityOf('campaign_settings')).toMatchObject({
+      state: 'legacy',
+    });
+  });
+
+  it('requires the exact typed phrase, not a prefix', async () => {
+    await renderWizardAtFamilyStep('campaign_settings');
+    const input = await screen.findByLabelText(/type .* to confirm/i);
+    const phrase = confirmationPhraseFor('campaign_settings');
+    await userEvent.type(input, phrase.slice(0, 4));
+    expect(
+      screen.getByRole('button', { name: /move this data to cloud sync/i })
+    ).toBeDisabled();
+  });
+
+  it('matches the typed phrase case-insensitively after trimming', async () => {
+    await renderWizardAtFamilyStep('campaign_settings');
+    const input = await screen.findByLabelText(/type .* to confirm/i);
+    const phrase = confirmationPhraseFor('campaign_settings');
+    await userEvent.type(input, `  ${phrase.toUpperCase()}  `);
+    expect(
+      screen.getByRole('button', { name: /move this data to cloud sync/i })
+    ).toBeEnabled();
+  });
+
+  it('renders the exact manifest -- counts, bytes, blockers and references', async () => {
+    const adapter = stubAdapter('magic_item', {
+      manifest: {
+        recordCount: 7,
+        totalBytes: 2048,
+        records: [
+          {
+            legacyId: 'mi-1',
+            schemaVersion: 1,
+            byteCount: 10,
+            payloadFingerprint: 'p1',
+            tombstoned: false,
+            references: [
+              { family: 'campaign_settings', legacyId: 'r1' },
+              { family: 'npc', legacyId: 'r2' },
+            ],
+          },
+          {
+            legacyId: 'mi-2',
+            schemaVersion: 1,
+            byteCount: 12,
+            payloadFingerprint: 'p2',
+            tombstoned: false,
+            references: [],
+          },
+        ],
+      },
+    });
+    await renderWizardAtFamilyStepWithAdapters([adapter], 'magic_item');
+    await screen.findByLabelText(/type .* to confirm/i);
+    expect(screen.getByText('7')).toBeInTheDocument();
+    expect(screen.getByText('2048 bytes')).toBeInTheDocument();
+    expect(screen.getByText('0')).toBeInTheDocument(); // blockers
+    expect(screen.getByText('2')).toBeInTheDocument(); // references (1 + 0)
+  });
+
+  it('blocks a family with a manifest blocker, renders its alert, and allows a skip -- no confirm input', async () => {
+    const adapter = stubAdapter('magic_item', {
+      manifest: {
+        blockers: [
+          {
+            kind: 'schema-conflict',
+            legacyId: 'mi-1',
+            detail: 'Two records claim the same legacy id.',
+          },
+        ],
+      },
+    });
+    await renderWizardAtFamilyStepWithAdapters([adapter], 'magic_item');
+    const alert = await screen.findByText(/some records need attention/i);
+    expect(alert.closest('[role="alert"]')).not.toBeNull();
+    expect(
+      screen.getByText(/two records claim the same legacy id/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/type .* to confirm/i)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /skip this one/i })
+    ).toBeEnabled();
+  });
+
+  it('renders a rolled-back family honestly, distinct from never-migrated legacy', async () => {
+    const adapter = stubAdapter('magic_item', {
+      initialAuthority: {
+        state: 'legacy',
+        epoch: 2,
+        campaignId: 'cloud-ALPHA',
+        accountId: 'account-1',
+        rolledBack: true,
+      },
+    });
+    await renderWizardAtFamilyStepWithAdapters([adapter], 'magic_item');
+    expect(
+      (await screen.findAllByText(/^rolled back$/i)).length
+    ).toBeGreaterThan(0);
+  });
+
+  it('shows the "Moved to cloud sync" status panel once postgres authority is reached', async () => {
+    const adapter = stubAdapter('magic_item');
+    await renderWizardAtFamilyStepWithAdapters([adapter], 'magic_item');
+    await confirmAndSubmit('magic_item');
+    const heading = await screen.findByText(/^moved to cloud sync$/i);
+    expect(heading.closest('[role="status"]')).not.toBeNull();
+  });
+
+  it('never lists Player inbox in the rendered rail', async () => {
+    await mountStubWizardResumed();
+    expect(screen.queryByText(/player inbox/i)).not.toBeInTheDocument();
+  });
+
+  it('has no orphaned receipt after a reload with a family stuck at indexedDB (post-cutover, cloud not yet activated)', async () => {
+    failCloudFor('npc');
+    await runWizardThroughFamilies(['npc']);
+    expect(await authorityOf('npc')).toMatchObject({ state: 'indexedDB' });
+    expect(await selectionRecordFor('npc')).not.toBeNull();
+    await reloadWizard();
+    await advanceToFamily('npc');
+    const receipts = await allDownloadReceipts();
+    expect(receipts).toHaveLength(1);
+    expect(typeof receipts[0].verifiedAt).toBe('string');
+    expect(await authorityOf('npc')).toMatchObject({ state: 'indexedDB' });
+  });
+
+  it('catches drift injected between selectFamily and prepareIndexedDb (checkpoint 1 already passed)', async () => {
+    await mountStubWizardResumed();
+    const target = stubFamilies().find(a => a.family === 'calendar')!;
+    const originalPrepare = target.prepareIndexedDb.bind(target);
+    target.prepareIndexedDb = async context => {
+      mutateCapturedKey('rollkeeper-calendar-data');
+      return originalPrepare(context);
+    };
+    await clickContinueUntil(familyHeadingLabel('calendar'));
+    const result = await confirmAndSubmit('calendar');
+    expect(result.ok).toBe(false);
+    expect(await screen.findByText(/download a fresh/i)).toBeInTheDocument();
+    expect(await authorityOf('calendar')).toMatchObject({ state: 'legacy' });
+    // selectFamily DID run before the injected drift -- proves checkpoint 1
+    // passed and this is checkpoint 2 (before commitLocalCutover) catching it.
+    expect(await selectionRecordFor('calendar')).not.toBeNull();
+    expect(countApiCalls('begin-staging')).toBe(0);
+  });
+
+  it('catches drift injected at the end of commitLocalCutover, between the two authority transitions', async () => {
+    await mountStubWizardResumed();
+    const target = stubFamilies().find(a => a.family === 'magic_item')!;
+    const originalCommit = target.commitLocalCutover.bind(target);
+    target.commitLocalCutover = async (context, input) => {
+      const result = await originalCommit(context, input);
+      mutateCapturedKey('rollkeeper-calendar-data');
+      return result;
+    };
+    await clickContinueUntil(familyHeadingLabel('magic_item'));
+    const result = await confirmAndSubmit('magic_item');
+    expect(result.ok).toBe(false);
+    expect(await screen.findByText(/download a fresh/i)).toBeInTheDocument();
+    // The first transition (legacy -> indexedDB) already committed once and
+    // is not reversed; the second (indexedDB -> postgres) never started.
+    expect(await authorityOf('magic_item')).toMatchObject({
+      state: 'indexedDB',
+    });
+    expect(countApiCalls('begin-staging')).toBe(0);
+  });
+
+  it('reports an already-routed family as moved on reopen, without the DM revisiting its step', async () => {
+    await runWizardThroughFamilies(['campaign_settings']);
+    await reloadWizard();
+    // Deliberately no `advanceToFamily` call: the assertion below must be
+    // satisfied purely by mount-time discovery, not by navigating into any
+    // family step this session.
+    expect(await screen.findByText(/1 of 6/)).toBeInTheDocument();
+  });
+
+  it('closing between steps writes nothing, and leaves a pre-existing selection record from an abandoned run untouched', async () => {
+    // Spec R11: "deleting it would itself be a write the DM never
+    // confirmed." A close/reload after a prior, abandoned run's selection
+    // record must not touch it -- neither writing over it nor deleting it.
+    const hash = await currentDeviceHash();
+    selectCampaignSettings(localStorage, {
+      namespace: 'user:account-1',
+      campaignId: 'cloud-ALPHA',
+      confirmed: true,
+      recovery: { runId: 'stale-run', manifestHash: hash, createdAt: FIXED_TS },
+      now: () => FIXED_TS,
+    });
+    const before = await snapshotDurableState();
+    await renderWizardAtFamilyStep('npc');
+    await userEvent.click(screen.getByRole('button', { name: /^close$/i }));
+    expect(await snapshotDurableState()).toBe(before);
   });
 });

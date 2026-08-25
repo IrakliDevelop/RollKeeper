@@ -377,11 +377,29 @@ export function useMigrationWizard(
     [contextFor]
   );
 
+  // ---------------------------------------------------------------------
+  // Task 15: per-family step navigation and orchestration.
+  // ---------------------------------------------------------------------
+
+  const [familyAuthorities, setFamilyAuthorities] = useState<
+    Partial<Record<DurableFamilyName, NormalizedAuthority>>
+  >({});
+
   // Derived (never stored): true when any REGISTERED family's normalized
   // authority is indexedDB or postgres. Only attempted once discovery has
   // resolved a real workspace — before that there is no campaignId to ask
   // any adapter about, and a disabled or never-migrated family's own
   // `readAuthority` already reports `legacy` on its own.
+  //
+  // Coordinator review, Critical 2: this is ALSO the run's one bulk
+  // authority scan, so it is the only place that can seed `familyAuthorities`
+  // for a family the DM has never navigated to this session (e.g. right
+  // after reopening the wizard on a campaign with an already-migrated
+  // family). Populating it here, not only from the per-step
+  // `refreshFamilyAuthority` triggered by `index.tsx`'s stepIndex effect, is
+  // what makes the R13 progress line and the rail's `done` dots correct on
+  // open/reopen instead of reporting nothing migrated until every step is
+  // manually visited.
   useEffect(() => {
     if (!ownerContext || !workspace?.cloudId) {
       setAnyCutoverCommitted(false);
@@ -389,8 +407,9 @@ export function useMigrationWizard(
     }
     let cancelled = false;
     async function check() {
+      const adapters = registeredAdapters();
       const results = await Promise.allSettled(
-        registeredAdapters().map(adapter =>
+        adapters.map(adapter =>
           adapter.readAuthority({
             accountId: ownerContext!.accountId,
             campaignId: workspace!.cloudId as string,
@@ -407,16 +426,21 @@ export function useMigrationWizard(
               result.value.state === 'postgres')
         )
       );
+      setFamilyAuthorities(current => {
+        const next = { ...current };
+        results.forEach((result, index) => {
+          if (result.status === 'fulfilled') {
+            next[adapters[index].family] = result.value;
+          }
+        });
+        return next;
+      });
     }
     void check();
     return () => {
       cancelled = true;
     };
   }, [ownerContext, workspace, campaignCode]);
-
-  // ---------------------------------------------------------------------
-  // Task 15: per-family step navigation and orchestration.
-  // ---------------------------------------------------------------------
 
   // -1 = intro (steps 0/1, unchanged). 0..registry.length-1 = one registry
   // entry (registered or planned) in fixed order. Rail rows are not
@@ -442,10 +466,6 @@ export function useMigrationWizard(
   const goBack = useCallback(() => {
     setStepIndex(current => Math.max(current - 1, -1));
   }, []);
-
-  const [familyAuthorities, setFamilyAuthorities] = useState<
-    Partial<Record<DurableFamilyName, NormalizedAuthority>>
-  >({});
 
   const adapterFor = useCallback(
     (family: DurableFamilyName) =>
