@@ -348,7 +348,11 @@ function workspaceFor(
     // for every locally created or forked workspace until the server
     // acknowledges it (dmWorkspaceRepository.ts:84) — a queued-but-not-yet-
     // cloud-linked workspace is a real, reachable state, not a synthetic
-    // one (item 5, coordinator review round 1).
+    // one (item 5, coordinator review round 1). NOTE (round 2, noted-no-action):
+    // a real queued record also carries `displayCode: null` and
+    // `acknowledgedAt: null` — this fixture leaves both non-null, which is
+    // irrelevant to the `cloudId` guard the test targets but is not a fully
+    // faithful queued-record shape.
     cloudId: options.cloudId !== undefined ? options.cloudId : `cloud-${code}`,
     displayCode: 'A1B2C3D4E5F6',
     membershipAuthority: 'legacy',
@@ -623,15 +627,23 @@ describe('MigrationWizard — steps 0 and 1', () => {
   it('discovery changes no authority, no marker and no selection', async () => {
     const before = await snapshotDurableState();
     render(<MigrationWizard campaignCode="ALPHA" />);
-    await userEvent.click(
-      screen.getByRole('button', { name: /find my campaigns/i })
-    );
-    // "Nothing has changed" is static reassurance copy — it renders
-    // unconditionally both before and after discovery, so awaiting it alone
-    // signals nothing about whether discovery actually finished (coordinator
-    // review, item 7). Await the discovery OUTCOME instead: with the default
-    // mock (`list()` resolving `[]`) that is "no cloud workspace found yet".
-    await screen.findByText(/no cloud workspace found yet/i);
+    const discoverButton = screen.getByRole('button', {
+      name: /find my campaigns/i,
+    });
+    await userEvent.click(discoverButton);
+    // Coordinator review round 2, item 7: NEITHER "Nothing has changed" (static,
+    // always on screen) NOR "No cloud workspace found yet" (identical text in
+    // the INITIAL pre-discovery state, since `workspace` starts `null` too) is
+    // a genuine completion signal — both were proven vacuous by a reviewer
+    // probe that showed a write injected at the tail of `discover()`, delayed
+    // by 60ms, went unnoticed. The only signal that is unique to
+    // `discover()` having FULLY returned is its own button leaving the
+    // loading state: `finally { setDiscovering(false) }` is the LAST
+    // statement `discover()` executes (`hooks.ts:144-146`), so `Button`'s
+    // `loading` prop (which also drives `disabled`) only clears after
+    // every write `discover()` could ever make — early, mid-function, or at
+    // the tail, delayed or not — has already happened.
+    await waitFor(() => expect(discoverButton).toBeEnabled());
     expect(await snapshotDurableState()).toBe(before);
   });
 
