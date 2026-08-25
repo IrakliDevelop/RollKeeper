@@ -67,22 +67,20 @@ function baseGatewayMocks() {
     previewEnrollment: vi.fn(
       async () => ({ authority: 'legacy' }) as CloudEnrollmentPreview
     ),
-    beginStaging: vi.fn(
-      async (
-        _input: Parameters<ResumableActivationGateway['beginStaging']>[0]
-      ) => ({
+    // The gateway member type is applied to `vi.fn` itself rather than to a
+    // named-but-unused `_input` parameter: the argument type is what keeps
+    // `.mock.calls[0][0].mutationId` typed below, and this way it carries no
+    // unused binding for `@typescript-eslint/no-unused-vars` to flag.
+    beginStaging: vi.fn<ResumableActivationGateway['beginStaging']>(
+      async () => ({
         runId: 'server-run-1',
       })
     ),
-    stageItems: vi.fn(
-      async (
-        _input: Parameters<ResumableActivationGateway['stageItems']>[0]
-      ) => ({})
+    stageItems: vi.fn<ResumableActivationGateway['stageItems']>(
+      async () => ({})
     ),
-    confirmCutover: vi.fn(
-      async (
-        _input: Parameters<ResumableActivationGateway['confirmCutover']>[0]
-      ) => ({
+    confirmCutover: vi.fn<ResumableActivationGateway['confirmCutover']>(
+      async () => ({
         epoch: 1,
       })
     ),

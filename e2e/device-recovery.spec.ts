@@ -13,7 +13,7 @@ test('stages a full-device bundle inactive and preserves collisions during expli
   await page.reload();
 
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Download device backup' }).click();
+  await page.getByRole('button', { name: 'Download browser backup' }).click();
   const download = await downloadPromise;
   const downloadPath = await download.path();
   expect(downloadPath).not.toBeNull();
