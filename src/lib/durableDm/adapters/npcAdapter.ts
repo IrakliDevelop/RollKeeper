@@ -538,7 +538,17 @@ export const npcAdapter: DurableFamilyAdapter<NpcManifest> = {
     // Task 16 fix round 1, Important 2: R8's "at the EXPECTED epoch"
     // condition, previously never checked here.
     let epochMatches = false;
-    if (cloudAuthority === 'postgres' && documents.length > 0) {
+    // Final fix wave, F2: the parity block used to be gated on
+    // `documents.length > 0` as well. `epochMatches`, `documentsMatch` and
+    // `tombstonesMatch` are assigned NOWHERE else, so a legitimately empty
+    // data category -- a campaign with no records of this kind, migrated
+    // perfectly -- could never be verified, and "All campaign data is
+    // synced" was permanently unreachable for that campaign. R8's
+    // conditions are genuinely satisfied there: the empty multiset matches
+    // the empty multiset. The comparison below already discriminates
+    // correctly at zero -- `documents.length === cloudDocuments.length`
+    // fails if the cloud holds records this browser does not.
+    if (cloudAuthority === 'postgres') {
       const preview = await npcApi<NpcEnrollmentPreview>({
         action: 'preview-enrollment',
         campaignId: context.campaignId,

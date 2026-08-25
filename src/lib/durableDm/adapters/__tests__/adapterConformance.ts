@@ -961,6 +961,57 @@ export function describeAdapterConformance(
   // document, reproducing "another browser rolled back and re-activated
   // this family" (a scenario the document multiset alone cannot detect,
   // since nothing about the documents themselves changed).
+  // Final fix wave, F2: the four multi-record adapters gated their whole
+  // parity/epoch computation on `documents.length > 0`, so a campaign with
+  // zero records of that kind reported "Not verified" forever and the
+  // slice's own completion claim was permanently unreachable for it. The
+  // review's mutation M19 removed that gate and 619/619 still passed --
+  // there was no empty-category verification test anywhere. This is it, and
+  // it runs for all six families (the two single-record ones reach it with
+  // one minimal `{}` record, which is `seedEmpty`'s documented shape for
+  // them, so the test is non-vacuous there too rather than skipped).
+  it(`${name}: verifyCloud verifies a legitimately empty data category`, async () => {
+    const harness = createHarness();
+    const context = await harness.seedEmpty();
+    await harness.runChainThroughCloudActivation(context);
+    expect(await harness.adapter.verifyCloud(context)).toMatchObject({
+      authorityAgrees: true,
+      cloudAuthority: 'postgres',
+      documentsMatch: true,
+      tombstonesMatch: true,
+      outboxEmpty: true,
+      conflictCount: 0,
+      verified: true,
+    });
+  });
+
+  // Final fix wave, F2, the OTHER direction: now that the parity block runs
+  // at zero local documents, "no local documents" must not be mistaken for
+  // "parity satisfied". The plausible wrong fix
+  // (`documents.length === 0 || documents.length === cloudDocuments.length`)
+  // survives every other test in this suite, including
+  // `divergeVerifiedRecordCount`, which removes ONE document and therefore
+  // never reaches an empty local set on a multi-record family. This case
+  // empties it completely, against a cloud generation that still holds the
+  // records.
+  it(`${name}: verifyCloud is unverified when the local working copy is empty but the cloud still holds records`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    const seeded = Object.keys(await harness.documentFingerprints());
+    expect(seeded.length).toBeGreaterThan(0);
+    for (let guard = 0; guard <= seeded.length; guard += 1) {
+      if (Object.keys(await harness.documentFingerprints()).length === 0) break;
+      await harness.hardDeleteOneDocument();
+    }
+    expect(await harness.documentFingerprints()).toEqual({});
+    expect(await harness.adapter.verifyCloud(context)).toMatchObject({
+      cloudAuthority: 'postgres',
+      documentsMatch: false,
+      verified: false,
+    });
+  });
+
   it(`${name}: verifyCloud is unverified when the cloud epoch has moved ahead of the local pointer`, async () => {
     const harness = createHarness();
     const context = await harness.seed();
