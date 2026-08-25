@@ -50,6 +50,7 @@ import {
 import { openRollkeeperDatabase } from '@/lib/indexeddb/localDatabase';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import {
+  associateWorkspaceWithLegacyCampaign,
   createBrowserDmWorkspace,
   type BrowserDmWorkspaceContext,
 } from '@/lib/supabase/browserDmWorkspace';
@@ -786,7 +787,7 @@ export function useCombatLogArchiveSyncController(
   const choose = async (selected: DmWorkspaceDocument) => {
     if (!campaignCode) return;
     if (!context || !selected.cloudId) return;
-    setWorkspace(selected);
+    setWorkspace(associateWorkspaceWithLegacyCampaign(selected, campaignCode));
     setScope({ accountId: context.accountId, campaignId: selected.cloudId });
     setAuthority({ authority: 'localStorage', epoch: 0 });
     setStatus('Campaign picked. Nothing has changed on this browser yet.');

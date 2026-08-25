@@ -60,6 +60,7 @@ import {
 } from '@/lib/indexeddb/calendarSelection';
 import { openRollkeeperDatabase } from '@/lib/indexeddb/localDatabase';
 import {
+  associateWorkspaceWithLegacyCampaign,
   createBrowserDmWorkspace,
   type BrowserDmWorkspaceContext,
 } from '@/lib/supabase/browserDmWorkspace';
@@ -458,7 +459,7 @@ export function CalendarSyncControls({ campaign }: Props) {
 
   const choose = async (selected: DmWorkspaceDocument) => {
     if (!context || !selected.cloudId) return;
-    setWorkspace(selected);
+    setWorkspace(associateWorkspaceWithLegacyCampaign(selected, campaign.code));
     setScope({ accountId: context.accountId, campaignId: selected.cloudId });
     setAuthority({ authority: 'localStorage', epoch: 0 });
     setStatus(

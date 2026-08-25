@@ -21,9 +21,37 @@ vi.mock('./dmWorkspaceGateway', () => ({
 }));
 
 import {
+  associateWorkspaceWithLegacyCampaign,
   createBrowserDmWorkspace,
   fingerprintLegacyCampaignSource,
 } from './browserDmWorkspace';
+
+describe('legacy campaign workspace association', () => {
+  it('rekeys an owner-discovered workspace for wizard resume', () => {
+    const discovered = {
+      namespace: 'user:account-a',
+      localId: 'cloud:cloud-a',
+      legacyId: 'cloud:cloud-a',
+      name: 'Northwatch',
+      creationKind: 'import_fork',
+      sourceFingerprint: 'source-hash',
+      createdAt: '2026-08-25T00:00:00.000Z',
+      family: 'workspace_identity',
+      cloudId: 'cloud-a',
+      displayCode: 'A1B2C3D4E5F6',
+      membershipAuthority: 'legacy',
+      familyAuthorities: 'legacy',
+      liveRuntimeAuthority: 'redis_relay',
+      acknowledgedAt: '2026-08-25T00:00:00.000Z',
+    } as const;
+
+    expect(associateWorkspaceWithLegacyCampaign(discovered, 'MANUAL')).toEqual({
+      ...discovered,
+      localId: 'legacy:MANUAL',
+      legacyId: 'legacy:MANUAL',
+    });
+  });
+});
 
 function enabledEnvironment() {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_AUTH_ENABLED', 'true');
