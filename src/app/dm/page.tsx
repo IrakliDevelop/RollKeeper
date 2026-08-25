@@ -397,17 +397,12 @@ function CampaignCard({
       data-testid={`campaign-card-${campaign.code}`}
       className="border-accent-purple-border bg-surface-raised hover:bg-surface-secondary rounded-lg border-2 shadow-md transition-all hover:shadow-xl"
     >
-      {/* Fix round 1, Minor 4: this is a test hook, not an accessible
-          label -- a bare `<div>` has no role assistive tech exposes an
-          `aria-label` through, so it named itself honestly instead. */}
-      <div data-testid={`campaign-banner-${campaign.code}`}>
-        <BannerUpload
-          bannerUrl={campaign.bannerUrl}
-          campaignCode={campaign.code}
-          onBannerChange={routed ? noOpBannerChange : onBannerChange}
-          variant="card"
-        />
-      </div>
+      <BannerUpload
+        bannerUrl={campaign.bannerUrl}
+        campaignCode={campaign.code}
+        onBannerChange={routed ? noOpBannerChange : onBannerChange}
+        variant="card"
+      />
       <div className="p-6">
         <div className="mb-4">
           <h3 className="text-heading mb-2 text-xl font-semibold">
