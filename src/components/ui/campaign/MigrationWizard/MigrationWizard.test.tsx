@@ -1,0 +1,852 @@
+import 'fake-indexeddb/auto';
+
+import {
+  act,
+  cleanup,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import { configure } from '@testing-library/dom';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { browserRecoveryRepository } from '@/lib/browserRecoveryRepository';
+import {
+  captureDeviceBackup,
+  initiateDeviceBackupDownload,
+  verifyDownloadedDeviceBackup,
+} from '@/lib/deviceRecovery';
+import type {
+  DurableFamilyAdapter,
+  DurableFamilyName,
+  MigrationRunContext,
+} from '@/lib/durableDm/durableFamilyAdapter';
+import {
+  registeredAdapters,
+  enabledAdapters,
+} from '@/lib/durableDm/familyRegistry';
+import {
+  OBJECT_STORE_NAMES,
+  openRollkeeperDatabase,
+  requestResult,
+  transactionComplete,
+} from '@/lib/indexeddb/localDatabase';
+import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
+import { createBrowserDmWorkspace } from '@/lib/supabase/browserDmWorkspace';
+import { APP_VERSION } from '@/utils/constants';
+
+import { MigrationWizard } from './index';
+import { useMigrationWizard } from './MigrationWizard.hooks';
+
+vi.mock('@/lib/supabase/browserDmWorkspace', () => ({
+  createBrowserDmWorkspace: vi.fn(),
+}));
+
+vi.mock('@/lib/durableDm/familyRegistry', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/durableDm/familyRegistry')>();
+  return {
+    ...actual,
+    registeredAdapters: vi.fn(actual.registeredAdapters),
+    enabledAdapters: vi.fn(actual.enabledAdapters),
+  };
+});
+
+vi.mock('@/lib/deviceRecovery', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/deviceRecovery')>();
+  return {
+    ...actual,
+    initiateDeviceBackupDownload: vi.fn(actual.initiateDeviceBackupDownload),
+    verifyDownloadedDeviceBackup: vi.fn(actual.verifyDownloadedDeviceBackup),
+  };
+});
+
+const mockedCreateBrowserDmWorkspace = vi.mocked(createBrowserDmWorkspace);
+const mockedRegisteredAdapters = vi.mocked(registeredAdapters);
+const mockedEnabledAdapters = vi.mocked(enabledAdapters);
+
+// Real, un-stubbed WebCrypto SHA-256 hashing (`captureDeviceBackup`,
+// `verifyDownloadedDeviceBackup`) can occasionally run past
+// testing-library's default 1000ms `findBy*`/`waitFor` timeout under system
+// load — this is patience for genuine async crypto work, not a masked race.
+// `testTimeout` is raised well above `asyncUtilTimeout` so a slow crypto call
+// reddens with THIS timeout's message, not vitest's own bare "Test timed out".
+configure({ asyncUtilTimeout: 5000 });
+vi.setConfig({ testTimeout: 15000, hookTimeout: 15000 });
+
+const FIXED_TS = '2026-08-24T00:00:00.000Z';
+const FIXED_RUN_ID = '99999999-9999-4999-8999-999999999999';
+/** Ruling R9.2: names the behavioural number instead of a bare literal. */
+const MIGRATION_NARROW_VIEWPORT_PX = 390;
+
+// ---------------------------------------------------------------------
+// Test-only infrastructure. `renderRunController` reconciles the brief's four
+// call shapes into one coherent helper — see the task report for the full
+// writeup of that reconciliation and its relation to `useMigrationWizard`.
+// ---------------------------------------------------------------------
+
+/**
+ * A previous test's unmounted component can leave an async IndexedDB read
+ * (e.g. the mount-time recovery capture effect) still in flight for a beat
+ * after `cleanup()` — unmounting sets `cancelled = true` inside the effect,
+ * which blocks further STATE updates, but does not abort the in-flight
+ * promise or close its connection early. If `deleteDatabase` races that
+ * connection, `onblocked` fires. Per the IndexedDB spec the delete request
+ * is NOT abandoned when blocked — it stays pending and still fires
+ * `onsuccess` once every blocking connection closes on its own — so this
+ * must NOT resolve early on `onblocked` (an earlier version did, which
+ * silently abandoned the wait and let a stale database leak into the next
+ * test — the source of an intermittent ~4% flake this fix eliminated).
+ */
+function deleteDatabase(name: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(name);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    // Deliberately no early resolve here — see doc comment above.
+  });
+}
+
+async function snapshotDurableState(): Promise<string> {
+  const storage: [string, string][] = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (key === null) continue;
+    storage.push([key, localStorage.getItem(key) ?? '']);
+  }
+  storage.sort(([left], [right]) => left.localeCompare(right));
+
+  const database = await openRollkeeperDatabase();
+  const stores: Record<string, unknown[]> = {};
+  try {
+    for (const name of OBJECT_STORE_NAMES) {
+      const transaction = database.transaction(name, 'readonly');
+      stores[name] = await requestResult(
+        transaction.objectStore(name).getAll()
+      );
+      await transactionComplete(transaction);
+    }
+  } finally {
+    database.close();
+  }
+  return JSON.stringify({ storage, stores });
+}
+
+async function openRecoveryDatabaseForTests(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('rollkeeper-recovery', 1);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function verifiedReceiptCount(): Promise<number> {
+  const database = await openRecoveryDatabaseForTests();
+  try {
+    const transaction = database.transaction('downloadReceipts', 'readonly');
+    const all = await requestResult<{ verifiedAt?: string }[]>(
+      transaction.objectStore('downloadReceipts').getAll()
+    );
+    await transactionComplete(transaction);
+    return all.filter(entry => typeof entry.verifiedAt === 'string').length;
+  } finally {
+    database.close();
+  }
+}
+
+async function currentDeviceHash(): Promise<string> {
+  const bundle = await captureDeviceBackup(window.localStorage, {
+    appVersion: APP_VERSION,
+    runId: 'hash-probe',
+    timestamp: FIXED_TS,
+  });
+  return bundle.manifestHash;
+}
+
+async function currentEntryCount(): Promise<number> {
+  const bundle = await captureDeviceBackup(window.localStorage, {
+    appVersion: APP_VERSION,
+    runId: 'hash-probe',
+    timestamp: FIXED_TS,
+  });
+  return bundle.entries.length;
+}
+
+async function storedReceiptEntries(runId: string) {
+  const hash = await currentDeviceHash();
+  const receipt =
+    await browserRecoveryRepository.readVerifiedDownloadReceipt(hash);
+  if (!receipt || receipt.runId !== runId) return [];
+  return receipt.entries ?? [];
+}
+
+async function seedVerifiedReceipt({
+  runId,
+  manifestHash,
+}: {
+  runId: string;
+  manifestHash: string;
+}) {
+  const bundle = await captureDeviceBackup(window.localStorage, {
+    appVersion: APP_VERSION,
+    runId,
+    timestamp: FIXED_TS,
+  });
+  await browserRecoveryRepository.recordDownloadReceipt({
+    runId,
+    manifestHash,
+    initiatedAt: FIXED_TS,
+    entries: bundle.entries.map(({ key, byteCount, sha256 }) => ({
+      key,
+      byteCount,
+      sha256,
+    })),
+  });
+  await browserRecoveryRepository.verifyDownloadReceipt({
+    runId,
+    manifestHash,
+    verifiedAt: FIXED_TS,
+  });
+}
+
+async function seedVerifiedReceiptWithoutEntries({
+  runId,
+  manifestHash,
+}: {
+  runId: string;
+  manifestHash: string;
+}) {
+  await browserRecoveryRepository.recordDownloadReceipt({
+    runId,
+    manifestHash,
+    initiatedAt: FIXED_TS,
+  });
+  await browserRecoveryRepository.verifyDownloadReceipt({
+    runId,
+    manifestHash,
+    verifiedAt: FIXED_TS,
+  });
+}
+
+async function seedInitiatedOnlyReceipt({
+  runId,
+  manifestHash,
+}: {
+  runId: string;
+  manifestHash: string;
+}) {
+  await browserRecoveryRepository.recordDownloadReceipt({
+    runId,
+    manifestHash,
+    initiatedAt: FIXED_TS,
+  });
+}
+
+async function bundleFile(): Promise<File> {
+  const bundle = await captureDeviceBackup(window.localStorage, {
+    appVersion: APP_VERSION,
+    runId: FIXED_RUN_ID,
+    timestamp: FIXED_TS,
+  });
+  return new File([JSON.stringify(bundle)], 'backup.json', {
+    type: 'application/json',
+  });
+}
+
+async function staleBundleFile(): Promise<File> {
+  const bundle = await captureDeviceBackup(
+    new Map([
+      [
+        'rollkeeper-dm-data',
+        JSON.stringify({
+          state: { dmId: 'dm-local', campaigns: [] },
+          version: 1,
+        }),
+      ],
+    ]),
+    { appVersion: APP_VERSION, runId: 'stale-run', timestamp: FIXED_TS }
+  );
+  return new File([JSON.stringify(bundle)], 'backup.json', {
+    type: 'application/json',
+  });
+}
+
+async function renderWizardAtRecoveryStep() {
+  render(<MigrationWizard campaignCode="ALPHA" />);
+  // Waits for the button to be ENABLED, not merely present: the button
+  // renders immediately but stays disabled until the async mount-time
+  // recovery capture resolves `recovery.bundle`. A caller that clicks
+  // "Download" or uploads a file before that resolves races a silent no-op
+  // (`selectBundleFile` early-returns on `!recovery.bundle`) — invisible
+  // under light load (the capture usually wins the race) but a genuine,
+  // unbounded hang under heavy load, since the awaited text can then never
+  // appear at all. This was the actual root cause of an intermittent hang
+  // this suite exposed under a full ~460-file parallel run — no timeout
+  // value fixes a race that can only ever resolve one way.
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: /download/i })).toBeEnabled()
+  );
+}
+
+function setViewport(width: number) {
+  Object.defineProperty(window, 'innerWidth', {
+    writable: true,
+    configurable: true,
+    value: width,
+  });
+  window.dispatchEvent(new Event('resize'));
+}
+
+function assertNoTruncationClasses(element: Element) {
+  let node: Element | null = element;
+  while (node) {
+    expect(node.className).not.toMatch(/truncate|line-clamp-|overflow-hidden/);
+    node = node.parentElement;
+  }
+}
+
+function defaultOwnerContext(accountId = 'account-1') {
+  return {
+    accountId,
+    accountLabel: 'Owner',
+    list: vi.fn(async (): Promise<DmWorkspaceDocument[]> => []),
+    discover: vi.fn(async (): Promise<DmWorkspaceDocument[]> => []),
+    remember: vi.fn(async (workspace: DmWorkspaceDocument): Promise<void> => {
+      void workspace;
+    }),
+    create: vi.fn(),
+    forkLegacy: vi.fn(),
+    close: vi.fn(),
+  };
+}
+
+function workspaceFor(
+  code: string,
+  accountId = 'account-1'
+): DmWorkspaceDocument {
+  return {
+    namespace: `user:${accountId}` as const,
+    localId: `legacy:${code}`,
+    legacyId: `legacy:${code}`,
+    name: `Campaign ${code}`,
+    creationKind: 'import_fork',
+    sourceFingerprint: 'source',
+    createdAt: FIXED_TS,
+    family: 'workspace_identity',
+    cloudId: `cloud-${code}`,
+    displayCode: 'A1B2C3D4E5F6',
+    membershipAuthority: 'legacy',
+    familyAuthorities: 'legacy',
+    liveRuntimeAuthority: 'redis_relay',
+    acknowledgedAt: FIXED_TS,
+  };
+}
+
+const cutoverSpies = new Map<DurableFamilyName, ReturnType<typeof vi.fn>>();
+
+function cutoverInvocationOrder(family: DurableFamilyName): number {
+  const spy = cutoverSpies.get(family);
+  if (!spy || spy.mock.invocationCallOrder.length === 0)
+    throw new Error(`No cutover recorded for ${family}`);
+  return spy.mock.invocationCallOrder[0];
+}
+
+function stubAdapter(
+  family: DurableFamilyName,
+  options: { onCutover?: () => void } = {}
+): DurableFamilyAdapter {
+  const manifest = {
+    family,
+    fingerprint: 'fingerprint',
+    recordCount: 0,
+    totalBytes: 0,
+    blockers: [],
+    records: [],
+    native: null,
+  };
+  const cutoverSpy = vi.fn(() => options.onCutover?.());
+  cutoverSpies.set(family, cutoverSpy);
+  return {
+    family,
+    label: family,
+    isVisible: () => true,
+    previewManifest: async () => manifest,
+    confirmation: () => ({
+      familyLabel: family,
+      campaignLabel: 'Campaign',
+      manifestFingerprint: manifest.fingerprint,
+      requiredPhrase: `move ${family}`,
+    }),
+    selectFamily: async () => {},
+    prepareIndexedDb: async () => ({
+      state: 'CUTOVER_READY',
+      generation: 'gen-1',
+      manifest,
+    }),
+    commitLocalCutover: async (context: MigrationRunContext) => {
+      await context.ensureWorkspaceRemembered();
+      cutoverSpy();
+      return { epoch: 1 };
+    },
+    activateCloud: async () => ({ status: 'activated', epoch: 1 }),
+    verifyCloud: async () => ({
+      authorityAgrees: true,
+      cloudAuthority: 'postgres',
+      epoch: 1,
+      recordCount: 0,
+      documentsMatch: true,
+      tombstonesMatch: true,
+      outboxEmpty: true,
+      conflictCount: 0,
+      verified: true,
+    }),
+    readAuthority: async () => ({
+      state: 'legacy',
+      epoch: 0,
+      campaignId: null,
+      accountId: null,
+      rolledBack: false,
+    }),
+    rollback: async () => ({ epoch: 2 }),
+    repairAuthority: async () => ({
+      state: 'legacy',
+      epoch: 0,
+      campaignId: null,
+      accountId: null,
+      rolledBack: false,
+    }),
+  };
+}
+
+/**
+ * Reconciles the brief's four call shapes (a bare controller, one with
+ * `remember`, one with `adapters`, one with `campaignCode`) into one options
+ * object. Relation to `useMigrationWizard`: this is a thin test harness
+ * around the SAME hook the shipped `<MigrationWizard>` renders
+ * (`renderHook(({code}) => useMigrationWizard(code), ...)`) — it adds no
+ * behaviour of its own beyond wiring the mocked `createBrowserDmWorkspace`
+ * and `registeredAdapters` and performing ONE initial `discover()` as setup
+ * (awaited before returning), so R10 tests can call `migrate`/`context`
+ * immediately without each repeating that boilerplate. `context(family)`
+ * falls back to a synthetic context carrying the hook's real
+ * `ensureWorkspaceRemembered` when discovery found no owner (so that guard's
+ * own rejection is still reachable through it).
+ */
+async function renderRunController(
+  options: {
+    remember?: ReturnType<typeof vi.fn>;
+    adapters?: DurableFamilyAdapter[];
+    campaignCode?: string;
+  } = {}
+) {
+  const remember = options.remember ?? vi.fn(async () => {});
+  const closeSpy = vi.fn();
+  const state = { accountId: 'account-1' };
+  const codes = ['ALPHA', 'BETA'];
+
+  mockedCreateBrowserDmWorkspace.mockImplementation(async () => {
+    const context = {
+      accountId: state.accountId,
+      accountLabel: 'Owner',
+      list: vi.fn(
+        async (): Promise<DmWorkspaceDocument[]> =>
+          codes.map(code => workspaceFor(code, state.accountId))
+      ),
+      discover: vi.fn(async (): Promise<DmWorkspaceDocument[]> => []),
+      remember: remember as ReturnType<typeof defaultOwnerContext>['remember'],
+      create: vi.fn(),
+      forkLegacy: vi.fn(),
+      close: closeSpy,
+    };
+    ownerContextMock = context;
+    return context;
+  });
+
+  mockedRegisteredAdapters.mockReturnValue(
+    options.adapters ?? [
+      stubAdapter('campaign_settings'),
+      stubAdapter('calendar'),
+    ]
+  );
+  mockedEnabledAdapters.mockImplementation(() => mockedRegisteredAdapters());
+
+  const view = renderHook(
+    (props: { code: string }) => useMigrationWizard(props.code),
+    { initialProps: { code: options.campaignCode ?? 'ALPHA' } }
+  );
+
+  // One explicit discovery as setup, awaited — see doc comment above.
+  await act(async () => {
+    await view.result.current.discover();
+  });
+
+  return {
+    async discover() {
+      await act(async () => {
+        await view.result.current.discover();
+      });
+    },
+    async migrate(family: DurableFamilyName) {
+      await act(async () => {
+        await view.result.current.migrate(family);
+      });
+    },
+    context(family: DurableFamilyName): MigrationRunContext {
+      return (
+        view.result.current.contextFor(family) ?? {
+          accountId: '',
+          campaignId: '',
+          campaignCode: view.result.current.campaignCode,
+          workspace: workspaceFor(
+            view.result.current.campaignCode,
+            state.accountId
+          ),
+          recovery: {
+            format: 'rollkeeper-device-backup',
+            formatVersion: 1,
+            appVersion: APP_VERSION,
+            runId: '',
+            createdAt: '',
+            entries: [],
+            manifestHash: '',
+            validation: {
+              entryCount: 0,
+              totalBytes: 0,
+              validJsonCount: 0,
+              malformedJsonCount: 0,
+              futureVersionCount: 0,
+              retainedOnlyCount: 0,
+            },
+          },
+          ensureWorkspaceRemembered:
+            view.result.current.ensureWorkspaceRemembered,
+        }
+      );
+    },
+    unmount() {
+      act(() => {
+        view.unmount();
+      });
+    },
+    async switchCampaign(code: string) {
+      view.rerender({ code });
+      await act(async () => {
+        await view.result.current.discover();
+      });
+    },
+    async signInAsDifferentOwner() {
+      state.accountId = 'account-2';
+    },
+  };
+}
+
+let ownerContextMock: ReturnType<typeof defaultOwnerContext>;
+
+beforeEach(async () => {
+  await deleteDatabase('rollkeeper-local');
+  await deleteDatabase('rollkeeper-recovery');
+  localStorage.clear();
+  localStorage.setItem(
+    'rollkeeper-dm-data',
+    JSON.stringify({
+      state: {
+        dmId: 'dm-local',
+        campaigns: [{ code: 'ALPHA', name: 'Canary', createdAt: FIXED_TS }],
+      },
+      version: 1,
+    })
+  );
+  process.env.NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE = 'true';
+
+  vi.spyOn(crypto, 'randomUUID').mockReturnValue(
+    FIXED_RUN_ID as `${string}-${string}-${string}-${string}-${string}`
+  );
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
+    () => undefined
+  );
+
+  mockedCreateBrowserDmWorkspace.mockReset();
+  mockedCreateBrowserDmWorkspace.mockResolvedValue(defaultOwnerContext());
+  mockedRegisteredAdapters.mockReset();
+  mockedRegisteredAdapters.mockReturnValue([]);
+  mockedEnabledAdapters.mockReset();
+  mockedEnabledAdapters.mockReturnValue([]);
+  vi.mocked(initiateDeviceBackupDownload).mockClear();
+  vi.mocked(verifyDownloadedDeviceBackup).mockClear();
+  cutoverSpies.clear();
+});
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  delete process.env.NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE;
+});
+
+describe('MigrationWizard — steps 0 and 1', () => {
+  it('renders nothing while the wizard flag is off', () => {
+    process.env.NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE = 'false';
+    const { container } = render(<MigrationWizard campaignCode="ALPHA" />);
+    // `container` alone is a VACUOUS check: Radix Dialog portals its content
+    // into `document.body`, so `container` is empty regardless of whether
+    // the dialog actually rendered. Assert both: the wrapper AND the fact
+    // that no dialog exists anywhere in the document.
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('discovery changes no authority, no marker and no selection', async () => {
+    const before = await snapshotDurableState();
+    render(<MigrationWizard campaignCode="ALPHA" />);
+    await userEvent.click(
+      screen.getByRole('button', { name: /find my campaigns/i })
+    );
+    await screen.findByText(/nothing has changed/i);
+    expect(await snapshotDurableState()).toBe(before);
+  });
+
+  it('downloads and verifies exactly one bundle for the whole run', async () => {
+    await renderWizardAtRecoveryStep();
+    await userEvent.click(screen.getByRole('button', { name: /download/i }));
+    await userEvent.upload(
+      screen.getByLabelText(/safety copy/i),
+      await bundleFile()
+    );
+    await screen.findByText(/checked.*every entry matches/i);
+    expect(vi.mocked(initiateDeviceBackupDownload)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(verifyDownloadedDeviceBackup)).toHaveBeenCalledTimes(1);
+    expect(await verifiedReceiptCount()).toBe(1);
+  });
+
+  it('refuses a bundle that does not match the current device', async () => {
+    await renderWizardAtRecoveryStep();
+    await userEvent.click(screen.getByRole('button', { name: /download/i }));
+    await userEvent.upload(
+      screen.getByLabelText(/safety copy/i),
+      await staleBundleFile()
+    );
+    expect(
+      await screen.findByText(/that file does not match this browser/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /continue/i })).toBeDisabled();
+  });
+
+  it('resumes on a verified receipt for the same browser data, without a second download', async () => {
+    await seedVerifiedReceipt({
+      runId: 'run-1',
+      manifestHash: await currentDeviceHash(),
+    });
+    render(<MigrationWizard campaignCode="ALPHA" />);
+    expect(
+      await screen.findByText(/safety copy is ready/i)
+    ).toBeInTheDocument();
+    // Pins that the ADOPTED run id is the receipt's own — a fresh runId
+    // would still show the "ready" copy but would desync every family
+    // selection record pinned to `recovery.runId` (spec R4).
+    expect(await screen.findByText(/run-1/)).toBeInTheDocument();
+    expect(vi.mocked(initiateDeviceBackupDownload)).not.toHaveBeenCalled();
+  });
+
+  it('does not resume on a verified receipt that predates the entry vector', async () => {
+    await seedVerifiedReceiptWithoutEntries({
+      runId: 'run-1',
+      manifestHash: await currentDeviceHash(),
+    });
+    render(<MigrationWizard campaignCode="ALPHA" />);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /download/i })).toBeEnabled()
+    );
+  });
+
+  it('enriches a legacy receipt when the aggregate hash still matches, then resumes', async () => {
+    await seedVerifiedReceiptWithoutEntries({
+      runId: 'run-1',
+      manifestHash: await currentDeviceHash(),
+    });
+    render(<MigrationWizard campaignCode="ALPHA" />);
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: /check this browser's backup/i,
+      })
+    );
+    expect(
+      await screen.findByText(/safety copy is ready/i)
+    ).toBeInTheDocument();
+    expect(await storedReceiptEntries('run-1')).toHaveLength(
+      await currentEntryCount()
+    );
+  });
+
+  it('does not resume on a receipt that was downloaded but never verified', async () => {
+    await seedInitiatedOnlyReceipt({
+      runId: 'run-1',
+      manifestHash: await currentDeviceHash(),
+    });
+    render(<MigrationWizard campaignCode="ALPHA" />);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /download/i })).toBeEnabled()
+    );
+    // An initiated-only receipt must not offer enrichment either — that
+    // control is only for a VERIFIED legacy receipt missing its entry
+    // vector, never for "nothing checked yet".
+    expect(
+      screen.queryByRole('button', { name: /check this browser's backup/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('connects to the owner-verified workspace already linked to this campaign', async () => {
+    mockedCreateBrowserDmWorkspace.mockResolvedValue({
+      ...defaultOwnerContext(),
+      list: vi.fn(async () => [workspaceFor('ALPHA')]),
+    });
+    render(<MigrationWizard campaignCode="ALPHA" />);
+    await userEvent.click(
+      screen.getByRole('button', { name: /find my campaigns/i })
+    );
+    expect(
+      await screen.findByText(/connected to campaign alpha/i)
+    ).toBeInTheDocument();
+  });
+
+  it('surfaces a failure without resuming when enrichment cannot complete', async () => {
+    await seedVerifiedReceiptWithoutEntries({
+      runId: 'run-1',
+      manifestHash: await currentDeviceHash(),
+    });
+    const spy = vi
+      .spyOn(browserRecoveryRepository, 'enrichVerifiedDownloadReceiptEntries')
+      .mockRejectedValueOnce(new Error('offline'));
+    render(<MigrationWizard campaignCode="ALPHA" />);
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: /check this browser's backup/i,
+      })
+    );
+    expect(screen.queryByText(/safety copy is ready/i)).not.toBeInTheDocument();
+    // Stays in the retryable pending state rather than hanging or crashing.
+    expect(
+      await screen.findByRole('button', {
+        name: /check this browser's backup/i,
+      })
+    ).toBeInTheDocument();
+    spy.mockRestore();
+  });
+
+  it('renders every warning at a 390px viewport without truncation', async () => {
+    await renderWizardAtRecoveryStep();
+    await userEvent.click(screen.getByRole('button', { name: /download/i }));
+    await userEvent.upload(
+      screen.getByLabelText(/safety copy/i),
+      await staleBundleFile()
+    );
+    await screen.findByRole('alert');
+    setViewport(MIGRATION_NARROW_VIEWPORT_PX);
+
+    const headline = 'That file does not match this browser';
+    const body =
+      'It was saved from different data, so it could not restore this browser. Download a fresh one and pick that up instead.';
+
+    for (const warning of screen.getAllByRole('alert')) {
+      expect(warning.textContent ?? '').toContain(headline);
+      expect(warning.textContent ?? '').toContain(body);
+      assertNoTruncationClasses(warning);
+    }
+  });
+});
+
+describe('MigrationWizard run controller — spec R10', () => {
+  it('remembers the workspace once for the whole run, before the first cutover', async () => {
+    const remember = vi.fn(async () => {});
+    const order: string[] = [];
+    const controller = await renderRunController({
+      remember,
+      adapters: [
+        stubAdapter('campaign_settings', {
+          onCutover: () => order.push('cutover:campaign_settings'),
+        }),
+        stubAdapter('calendar', {
+          onCutover: () => order.push('cutover:calendar'),
+        }),
+      ],
+    });
+    await controller.migrate('campaign_settings');
+    await controller.migrate('calendar');
+    expect(remember).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(['cutover:campaign_settings', 'cutover:calendar']);
+    expect(remember.mock.invocationCallOrder[0]).toBeLessThan(
+      cutoverInvocationOrder('campaign_settings')
+    );
+  });
+
+  it('does not cache a failed remember as done', async () => {
+    const remember = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue(undefined);
+    const controller = await renderRunController({ remember });
+    await expect(controller.migrate('campaign_settings')).rejects.toThrow();
+    await controller.migrate('campaign_settings');
+    expect(remember).toHaveBeenCalledTimes(2);
+  });
+
+  it('makes two families that start together share one remember', async () => {
+    const remember = vi.fn(
+      () => new Promise<void>(resolve => setTimeout(resolve, 5))
+    );
+    const controller = await renderRunController({ remember });
+    await Promise.all([
+      controller.context('campaign_settings').ensureWorkspaceRemembered(),
+      controller.context('calendar').ensureWorkspaceRemembered(),
+    ]);
+    expect(remember).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses the workspace context discovery opened, and never builds a second', async () => {
+    const controller = await renderRunController();
+    expect(mockedCreateBrowserDmWorkspace).toHaveBeenCalledTimes(1);
+    await controller.migrate('campaign_settings');
+    await controller.migrate('calendar');
+    expect(mockedCreateBrowserDmWorkspace).toHaveBeenCalledTimes(1);
+    expect(ownerContextMock.remember).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the workspace context on unmount', async () => {
+    const controller = await renderRunController();
+    expect(ownerContextMock.close).not.toHaveBeenCalled();
+    controller.unmount();
+    expect(ownerContextMock.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses to run when discovery found no owner context', async () => {
+    mockedCreateBrowserDmWorkspace.mockResolvedValueOnce(null);
+    const controller = await renderRunController();
+    await expect(
+      controller.context('campaign_settings').ensureWorkspaceRemembered()
+    ).rejects.toThrow(/sign in/i);
+  });
+
+  it("does not reuse one campaign's remember for another", async () => {
+    const controller = await renderRunController({ campaignCode: 'ALPHA' });
+    await controller.migrate('campaign_settings');
+    expect(ownerContextMock.remember).toHaveBeenCalledTimes(1);
+    await controller.switchCampaign('BETA');
+    await controller.migrate('campaign_settings');
+    expect(ownerContextMock.remember).toHaveBeenCalledTimes(2);
+    expect(ownerContextMock.remember.mock.calls[1][0]).toMatchObject({
+      localId: workspaceFor('BETA').localId,
+    });
+  });
+
+  it('does not reuse a remember across a signed-in account change', async () => {
+    const controller = await renderRunController();
+    await controller.migrate('campaign_settings');
+    expect(ownerContextMock.remember).toHaveBeenCalledTimes(1);
+    await controller.signInAsDifferentOwner();
+    await controller.discover();
+    await controller.migrate('campaign_settings');
+    expect(ownerContextMock.remember).toHaveBeenCalledTimes(2);
+  });
+});
