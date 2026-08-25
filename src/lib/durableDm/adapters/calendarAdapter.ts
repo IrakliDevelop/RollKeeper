@@ -644,8 +644,20 @@ export const calendarAdapter: DurableFamilyAdapter<CalendarManifest> = {
               rawEnvelope: currentRawEnvelope(),
             });
             if (sourceManifest.blockers.length > 0) return false;
-            const expectedRecord = sourceManifest.records[0];
-            if (!expectedRecord) return true;
+            // Fix round 2, item 1: NO `if (!sourceManifest.records[0])
+            // return true` branch here. `buildCalendarManifest`'s only path
+            // to an empty `records` array is `matching.length === 0` (the
+            // campaign's calendar absent from the envelope), which
+            // unconditionally pushes an `id-mismatch` blocker first — so
+            // `blockers.length === 0` above already guarantees
+            // `sourceManifest.records.length === 1`. A "0 records, 0
+            // blockers" state does not exist for this single-record family
+            // (unlike the multi-record families, which legitimately can
+            // have 0 records with 0 blockers — see
+            // `decideAuthorityRepair`'s empty-array `.every()`, fix round 1
+            // item 6). A branch here would be unreachable and untestable
+            // code, exactly the class of finding this slice keeps
+            // surfacing.
             const document = await new IndexedDbCalendarRepository(
               evidenceDatabase
             ).getDocument(namespace, context.campaignCode);
@@ -659,14 +671,17 @@ export const calendarAdapter: DurableFamilyAdapter<CalendarManifest> = {
           }
         },
         async verifyPostgresParity() {
-          // No `rawPointer.authority !== 'postgres'` guard here (fix round
-          // 1, item 4): every transition away from `postgres` also bumps
-          // the epoch (`rollbackCalendarLocalAuthority` writes
-          // `expectedEpoch + 1`; a wiped IndexedDB synthesizes
-          // `{authority: 'localStorage', epoch: 0}`), and
-          // `verifyPostgresGenerationParity` below already requires
-          // `preview.epoch === rawPointer.epoch` — any skew that changed
-          // the authority also changed the epoch, and that check blocks it.
+          // No `rawPointer.authority !== 'postgres'` guard here (fix
+          // round 1, item 4; fix round 2, item 3 tightened this comment
+          // after an inaccurate parenthetical was flagged): it is
+          // unnecessary, not merely untested. The one verified invariant
+          // that makes it safe: every transition AWAY from `postgres`
+          // also bumps the epoch — `rollbackCalendarLocalAuthority` writes
+          // `expectedEpoch + 1`. `verifyPostgresGenerationParity` below
+          // already requires `preview.epoch === rawPointer.epoch`, so any
+          // transition away from `postgres` also changes the epoch, and
+          // the epoch check blocks it — the authority itself never needs a
+          // second look.
           const preview = await calendarApi<CalendarEnrollmentPreview>({
             action: 'preview-enrollment',
             campaignId: context.campaignId,

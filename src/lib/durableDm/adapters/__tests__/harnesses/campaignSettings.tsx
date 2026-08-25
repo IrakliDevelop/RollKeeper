@@ -864,6 +864,26 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
       serverEpoch += 1;
     },
 
+    // Fix round 2, item 1: no `stackableInspiration` (or any other
+    // FAMILY_FIELDS entry) — `buildCampaignSettingsManifest` still produces
+    // exactly ONE record (the campaign itself is present), but with an
+    // empty `{}` payload. This family cannot legitimately reach ZERO
+    // records without a blocker (see the removed-branch comment in
+    // `campaignSettingsAdapter.ts`'s `verifyIndexedDbGeneration`), so
+    // "empty" here means minimal data, not an absent record.
+    seedEmpty: () =>
+      seedWithEnvelope(
+        JSON.stringify({
+          state: {
+            dmId: 'dm-local',
+            campaigns: [
+              { code: CAMPAIGN_CODE, name: 'Canary', createdAt: NOW },
+            ],
+          },
+          version: 1,
+        })
+      ),
+
     async deleteAuthorityMarker() {
       localStorage.removeItem(
         campaignSettingsLegacyProjectionModule.campaignSettingsProjectionAuthorityKey(

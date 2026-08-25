@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { npcAdapter } from '../npcAdapter';
 import { IndexedDbDmWorkspaceRepository } from '@/lib/indexeddb/dmWorkspaceRepository';
+import * as npcAuthorityModule from '@/lib/indexeddb/npcAuthority';
 import { openRollkeeperDatabase } from '@/lib/indexeddb/localDatabase';
 import {
   describeAdapterConformance,
@@ -375,21 +376,60 @@ describe('npcAdapter', () => {
     expect(await harness.readLegacyStorePayload()).toEqual([]);
   });
 
-  // Fix round 1, item 6: a legitimately empty family — migrated with zero
-  // records, which `previewManifest` does not block — must still be
-  // repairable after a lost marker write. `documents.length > 0` (the
-  // pre-fix check) would fail-closed here forever; the manifest-comparison
-  // fix's `sourceManifest.records.every(...)` is vacuously true on an
-  // empty source manifest, so this must succeed.
-  it('repairAuthority resolves an empty family after a lost marker write', async () => {
+  // Fix round 1, item 6's empty-family regression test is promoted into
+  // `describeAdapterConformance` (fix round 2, item 1: "repairAuthority
+  // resolves an empty family after a lost marker write") so all six
+  // families inherit it via `harness.seedEmpty()`, not just this one.
+
+  // Fix round 2, item 2: pins the fix round 1, item 5 epoch choice —
+  // `repairAuthority` must write `rawPointer.epoch` (the SECOND,
+  // freshest read the evidence check actually verified against), not
+  // `decision.epoch` (`observed.pointer.epoch` from the FIRST read inside
+  // `readAuthority`). `npcAuthorityModule.readNpcAuthority` is spied
+  // directly — the harness's own existing spies on
+  // `commitNpcLocalCutover`/`markNpcCloudAuthority`/
+  // `rollbackNpcLocalAuthority` already prove this interception pattern
+  // reaches the adapter's own named import of the same function.
+  it('repairAuthority writes the epoch the evidence actually verified against, closing the verify-vs-write read skew', async () => {
     const harness = createNpcHarness();
-    const context = await harness.seedWithItems(0);
-    await harness.runChainThroughLocalCutover(context);
-    await harness.deleteAuthorityMarker();
-    expect(await harness.adapter.readAuthority(context)).toMatchObject({
-      state: 'inconsistent',
-    });
-    const repaired = await harness.adapter.repairAuthority(context);
-    expect(repaired).toMatchObject({ state: 'indexedDB', epoch: 1 });
+    const context = await harness.seedMarkerPointerDisagreement();
+    const namespace = `user:${context.accountId}` as const;
+
+    const realReadNpcAuthority = npcAuthorityModule.readNpcAuthority;
+    const database = await openRollkeeperDatabase();
+    let real;
+    try {
+      real = await realReadNpcAuthority(
+        database,
+        namespace,
+        context.campaignId
+      );
+    } finally {
+      database.close();
+    }
+    // Sanity: `seedMarkerPointerDisagreement` must have produced a real
+    // routed pointer, or this test proves nothing.
+    expect(real.authority).toBe('indexedDB');
+
+    // Call 1 — INSIDE `this.readAuthority(context)`, the FIRST read —
+    // returns the pointer exactly as it really is. Call 2 onward —
+    // `repairAuthority`'s explicit `rawPointer` fetch, and every
+    // `readAuthority` call after the marker write — returns the SAME
+    // pointer 5 epochs ahead, simulating another cutover landing between
+    // the two reads.
+    const spy = vi.spyOn(npcAuthorityModule, 'readNpcAuthority');
+    spy
+      .mockImplementationOnce(async () => real)
+      .mockImplementation(async () => ({ ...real, epoch: real.epoch + 5 }));
+
+    try {
+      const repaired = await harness.adapter.repairAuthority(context);
+      expect(repaired).toMatchObject({
+        state: 'indexedDB',
+        epoch: real.epoch + 5,
+      });
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

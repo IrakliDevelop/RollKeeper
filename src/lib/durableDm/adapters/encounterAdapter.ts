@@ -718,14 +718,17 @@ export const encounterAdapter: DurableFamilyAdapter<EncounterManifest> = {
           }
         },
         async verifyPostgresParity() {
-          // No `rawPointer.authority !== 'postgres'` guard here (fix round
-          // 1, item 4): every transition away from `postgres` also bumps
-          // the epoch (`rollbackEncounterLocalAuthority` writes
-          // `expectedEpoch + 1`; a wiped IndexedDB synthesizes
-          // `{authority: 'localStorage', epoch: 0}`), and
-          // `verifyPostgresGenerationParity` below already requires
-          // `preview.epoch === rawPointer.epoch` — any skew that changed
-          // the authority also changed the epoch, and that check blocks it.
+          // No `rawPointer.authority !== 'postgres'` guard here (fix
+          // round 1, item 4; fix round 2, item 3 tightened this comment
+          // after an inaccurate parenthetical was flagged): it is
+          // unnecessary, not merely untested. The one verified invariant
+          // that makes it safe: every transition AWAY from `postgres`
+          // also bumps the epoch — `rollbackEncounterLocalAuthority` writes
+          // `expectedEpoch + 1`. `verifyPostgresGenerationParity` below
+          // already requires `preview.epoch === rawPointer.epoch`, so any
+          // transition away from `postgres` also changes the epoch, and
+          // the epoch check blocks it — the authority itself never needs a
+          // second look.
           const preview = await encounterApi<EncounterEnrollmentPreview>({
             action: 'preview-enrollment',
             campaignId: context.campaignId,

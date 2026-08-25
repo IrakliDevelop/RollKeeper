@@ -899,6 +899,13 @@ export function createCalendarHarness(): CalendarConformanceHarness {
       serverEpoch += 1;
     },
 
+    // Fix round 2, item 1: a calendar always carries its own required
+    // fields (`config`/`currentTime`/`startTime`/`weather`), so unlike
+    // `campaign_settings` there is no literal `{}` payload — `events: []`
+    // is calendar's own analog of "zero items", the most minimal state
+    // `buildCalendarManifest` does not block.
+    seedEmpty: () => seedWithEnvelope(envelope({ events: [] })),
+
     async deleteAuthorityMarker() {
       localStorage.removeItem(
         calendarLegacyProjectionModule.calendarProjectionAuthorityKey(

@@ -993,6 +993,8 @@ export function createCombatLogArchiveHarness(): CombatLogArchiveConformanceHarn
       serverEpoch += 1;
     },
 
+    seedEmpty: () => seedWithRawItems({}),
+
     async deleteAuthorityMarker() {
       localStorage.removeItem(combatLogArchiveAuthorityKey(CAMPAIGN_CODE));
     },

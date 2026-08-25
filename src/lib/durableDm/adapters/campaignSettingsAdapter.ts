@@ -716,11 +716,20 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
                 rawEnvelope: currentRawEnvelope(),
               });
               if (sourceManifest.blockers.length > 0) return false;
-              const expectedRecord = sourceManifest.records[0];
-              // Nothing was ever staged for this campaign — vacuously
-              // satisfied, mirroring `decideAuthorityRepair`'s empty-array
-              // `.every()` for multi-record families (fix round 1, item 6).
-              if (!expectedRecord) return true;
+              // Fix round 2, item 1: NO `if (!sourceManifest.records[0])
+              // return true` branch here. `buildCampaignSettingsManifest`'s
+              // only path to an empty `records` array is
+              // `matching.length === 0` (the campaign absent from the
+              // envelope), which unconditionally pushes an `id-mismatch`
+              // blocker first — so `blockers.length === 0` above already
+              // guarantees `sourceManifest.records.length === 1`. A
+              // "0 records, 0 blockers" state does not exist for this
+              // single-record family (unlike the multi-record families,
+              // which legitimately can have 0 records with 0 blockers —
+              // see `decideAuthorityRepair`'s empty-array `.every()`, fix
+              // round 1 item 6). A branch here would be unreachable and
+              // untestable code, exactly the class of finding this slice
+              // keeps surfacing.
               const document = await new IndexedDbCampaignSettingsRepository(
                 evidenceDatabase
               ).getDocument(namespace, context.campaignCode);
@@ -735,17 +744,15 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
           },
           async verifyPostgresParity() {
             // No `rawPointer.authority !== 'postgres'` guard here (fix
-            // round 1, item 4 — the coordinator's correction to task-13b's
-            // original, weaker "no intervening write in tests" reasoning):
-            // it is unnecessary, not merely untested. Every transition that
-            // moves this family's authority AWAY from `postgres` also bumps
-            // its epoch — `rollbackCampaignSettingsLocalAuthority` writes
-            // `expectedEpoch + 1`, and a wiped/reset IndexedDB synthesizes
-            // `{authority: 'localStorage', epoch: 0}` (never a real cloud
-            // epoch). `verifyPostgresGenerationParity` below already
-            // requires `preview.epoch === rawPointer.epoch`, so any skew
-            // that changed the authority also changed the epoch, and the
-            // epoch check blocks it — the authority itself never needs a
+            // round 1, item 4; fix round 2, item 3 tightened this comment
+            // after an inaccurate parenthetical was flagged): it is
+            // unnecessary, not merely untested. The one verified invariant
+            // that makes it safe: every transition AWAY from `postgres`
+            // also bumps the epoch — `rollbackCampaignSettingsLocalAuthority` writes
+            // `expectedEpoch + 1`. `verifyPostgresGenerationParity` below
+            // already requires `preview.epoch === rawPointer.epoch`, so any
+            // transition away from `postgres` also changes the epoch, and
+            // the epoch check blocks it — the authority itself never needs a
             // second look.
             const preview =
               await campaignSettingsApi<CampaignSettingsEnrollmentPreview>({

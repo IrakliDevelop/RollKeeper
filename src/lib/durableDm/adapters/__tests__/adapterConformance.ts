@@ -137,6 +137,20 @@ export interface ConformanceHarness {
    */
   bumpCloudEpoch(): void;
   /**
+   * Fix round 2, item 1: seeds a legitimately EMPTY family — one
+   * `previewManifest`/`build*Manifest` does not block, but that carries no
+   * substantive data. For the four multi-record families this is zero
+   * items. The two single-record families cannot have zero MANIFEST
+   * RECORDS without a blocker (`build<Family>Manifest`'s only path to an
+   * empty `records` array is the campaign being absent from the envelope,
+   * which always pushes an `id-mismatch` blocker) — for them this seeds
+   * the campaign present with none of the family's own fields set, so the
+   * one record it produces carries an empty `{}` payload. Both shapes
+   * exercise the same property: `repairAuthority`'s row-2 evidence check
+   * must not fail-closed on minimal/empty data.
+   */
+  seedEmpty(): Promise<MigrationRunContext>;
+  /**
    * Fix round 1, item 5: changes the family's legacy source in a way that
    * changes its manifest fingerprint, without re-running `prepareIndexedDb`
    * — proves `commitLocalCutover` re-checks the source manifest rather than
@@ -489,6 +503,23 @@ export function describeAdapterConformance(
     expect(await harness.adapter.readAuthority(context)).toMatchObject({
       state: 'inconsistent',
     });
+  });
+
+  it(`${name}: repairAuthority resolves an empty family after a lost marker write — R5b row 2, empty family (fix round 2, item 1)`, async () => {
+    // Promoted from a family-local `npcAdapter.test.ts` test (fix round 1)
+    // to here, so all six families inherit it — this is what proves the
+    // manifest-comparison fix from fix round 1's item 1 does not
+    // regress the item-6 empty-family case for EVERY family, not just the
+    // one it was originally written against.
+    const harness = createHarness();
+    const context = await harness.seedEmpty();
+    await harness.runChainThroughLocalCutover(context);
+    await harness.deleteAuthorityMarker();
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'inconsistent',
+    });
+    const repaired = await harness.adapter.repairAuthority(context);
+    expect(repaired).toMatchObject({ state: 'indexedDB', epoch: 1 });
   });
 
   it(`${name}: selectFamily refuses without a verified receipt for this run`, async () => {

@@ -975,6 +975,8 @@ export function createNpcHarness(): NpcConformanceHarness {
       serverEpoch += 1;
     },
 
+    seedEmpty: () => seedWithRawItems([]),
+
     async deleteAuthorityMarker() {
       localStorage.removeItem(npcAuthorityKey(CAMPAIGN_CODE));
     },

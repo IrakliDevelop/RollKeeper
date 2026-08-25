@@ -922,6 +922,8 @@ export function createMagicItemHarness(): MagicItemConformanceHarness {
       serverEpoch += 1;
     },
 
+    seedEmpty: () => seedWithRawItems([]),
+
     async deleteAuthorityMarker() {
       localStorage.removeItem(magicItemAuthorityKey(CAMPAIGN_CODE));
     },

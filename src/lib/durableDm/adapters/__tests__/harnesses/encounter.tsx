@@ -961,6 +961,8 @@ export function createEncounterHarness(): EncounterConformanceHarness {
       serverEpoch += 1;
     },
 
+    seedEmpty: () => seedWithRawItems([]),
+
     async deleteAuthorityMarker() {
       localStorage.removeItem(encounterAuthorityKey(CAMPAIGN_CODE));
     },
