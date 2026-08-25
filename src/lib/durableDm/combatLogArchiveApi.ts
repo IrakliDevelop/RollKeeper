@@ -9,7 +9,7 @@ export async function combatLogArchiveApi<T>(
   if (!response.ok) {
     const error = new Error(
       response.status === 409
-        ? 'Combat log archives changed on another device.'
+        ? 'Combat log archives changed on another browser.'
         : 'Combat log archive cloud request failed.'
     ) as Error & { status?: number };
     error.status = response.status;

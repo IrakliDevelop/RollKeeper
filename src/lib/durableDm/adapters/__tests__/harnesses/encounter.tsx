@@ -1492,16 +1492,16 @@ export function createEncounterHarness(): EncounterConformanceHarness {
         'Safety copy checked. Your encounters are still stored the usual way for now.'
       );
       fireEvent.click(
-        screen.getByRole('button', { name: 'Get this device ready' })
+        screen.getByRole('button', { name: 'Get this browser ready' })
       );
       await screen.findByText(
-        'This device is ready. One more confirmation and it will be switched over.'
+        'This browser is ready. One more confirmation and it will be switched over.'
       );
       fireEvent.click(
-        await screen.findByRole('button', { name: 'Switch this device over' })
+        await screen.findByRole('button', { name: 'Switch this browser over' })
       );
       await screen.findByText(
-        'Saved on this device. Not backed up to your account yet.'
+        'Saved on this browser. Not backed up to your account yet.'
       );
       fireEvent.click(
         await screen.findByRole('button', {
@@ -1509,13 +1509,13 @@ export function createEncounterHarness(): EncounterConformanceHarness {
         })
       );
       await screen.findByText(
-        'Saved on this device and backed up to your account.'
+        'Saved on this browser and backed up to your account.'
       );
       fireEvent.click(
         await screen.findByRole('button', { name: 'Stop backing up' })
       );
       await screen.findByText(
-        'Backup is off and everything was kept. Reload the page to keep working on this device.'
+        'Backup is off and everything was kept. Reload the page to keep working on this browser.'
       );
       cleanup();
     },

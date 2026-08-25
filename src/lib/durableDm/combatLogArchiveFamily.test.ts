@@ -358,7 +358,7 @@ describe('Slice 11F combat log archive family', () => {
 
     expect(kinds(manifest)).toEqual(['incomplete-envelope']);
     expect(manifest.blockers[0].detail).toBe(
-      'rollkeeper-combat-log has never been persisted on this device'
+      'rollkeeper-combat-log has never been persisted on this browser'
     );
     expect(manifest.blockers[0].legacyId).toBeNull();
   });

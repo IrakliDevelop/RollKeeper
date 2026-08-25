@@ -28,6 +28,7 @@ import {
 import * as supabaseBrowser from '@/lib/supabase/browser';
 import * as browserDmWorkspace from '@/lib/supabase/browserDmWorkspace';
 import { useCalendarStore } from '@/store/calendarStore';
+import { expectCloudProductVocabulary } from '@/test/helpers';
 import type { CalendarConfig, CampaignCalendar } from '@/types/calendar';
 
 import { CalendarSyncControls } from './CalendarSyncControls';
@@ -394,7 +395,7 @@ describe('CalendarSyncControls gates', () => {
         target: { files: [recoveryFile] },
       }
     );
-    await screen.findByText(/family selection was cancelled/);
+    await screen.findByText(/data category selection was cancelled/);
     expect(
       screen.getByRole('button', { name: 'Prepare IndexedDB' })
     ).toBeDisabled();
@@ -439,7 +440,7 @@ describe('CalendarSyncControls gates', () => {
     ).toBeVisible();
     expect(
       screen.queryByText(
-        'The initialized calendar namespace has no matching owner workspace on this device.'
+        'The initialized calendar namespace has no matching owner workspace on this browser.'
       )
     ).toBeNull();
     expect(remembered).toHaveLength(1);
@@ -559,7 +560,7 @@ describe('CalendarSyncControls gates', () => {
     );
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
-    render(<CalendarSyncControls campaign={campaign} />);
+    const { container } = render(<CalendarSyncControls campaign={campaign} />);
     fireEvent.click(
       screen.getByRole('button', { name: 'Find owner workspaces' })
     );
@@ -570,11 +571,15 @@ describe('CalendarSyncControls gates', () => {
       await screen.findByRole('button', { name: 'Preview cloud enrollment' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enroll this device' })
+      await screen.findByRole('button', { name: 'Enroll this browser' })
     );
     await screen.findByText(
-      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
     );
+    // Spec R17: this surface renders the discovery/select/preview/enroll
+    // journey in one flow — check product vocabulary once every one of those
+    // states has been visited.
+    expectCloudProductVocabulary(container);
 
     // The enrollment confirm promises the local candidate "is never uploaded
     // automatically", so autosave must stay disarmed until the DM applies the
@@ -646,10 +651,10 @@ describe('CalendarSyncControls gates', () => {
       await screen.findByRole('button', { name: 'Preview cloud enrollment' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enroll this device' })
+      await screen.findByRole('button', { name: 'Enroll this browser' })
     );
     await screen.findByText(
-      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
     );
 
     // Enrollment writes exactly the previewed version into IndexedDB, so the
@@ -661,7 +666,7 @@ describe('CalendarSyncControls gates', () => {
       screen.getByRole('button', { name: 'Apply exact cloud version' })
     );
     await screen.findByText(
-      'This device already has the exact accepted cloud version.'
+      'This browser already has the exact accepted cloud version.'
     );
 
     // Two edits, because a freshly armed run can only seed the baseline; the
@@ -772,10 +777,10 @@ describe('CalendarSyncControls gates', () => {
       await screen.findByRole('button', { name: 'Preview cloud enrollment' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enroll this device' })
+      await screen.findByRole('button', { name: 'Enroll this browser' })
     );
     await screen.findByText(
-      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
     );
   }
 
@@ -807,12 +812,12 @@ describe('CalendarSyncControls gates', () => {
     // wait for the newer preview to reach state before clicking it — applying
     // the version this device already holds is a no-op that never arms.
     await screen.findByText(
-      'Cloud enrollment preview loaded. This device remains unenrolled.'
+      'Cloud enrollment preview loaded. This browser remains unenrolled.'
     );
     fireEvent.click(
       screen.getByRole('button', { name: 'Apply exact cloud version' })
     );
-    await screen.findByText('Device hydrated from exact cloud version 2.');
+    await screen.findByText('Browser hydrated from exact cloud version 2.');
 
     // Applying rewrote the store from IndexedDB, so it is a hydrating path:
     // the next edit must still reach IndexedDB and the cloud.

@@ -106,9 +106,9 @@ const FAMILY_LOCAL_STORAGE_KEYS: Record<DurableFamilyName, readonly string[]> =
  * it is internal error text, not product copy. Two concrete hazards this
  * closes:
  *   - all six `*Api` gateways (`npcApi.ts:10` and its five siblings) throw
- *     `'<Family> changed on another device.'` on HTTP 409, from EVERY RPC
- *     including `preview-enrollment` -- rendering it verbatim would say
- *     "device", an R17 breach;
+ *     `'<Family> changed on another browser.'` on HTTP 409, from EVERY RPC
+ *     including `preview-enrollment` -- rendering it verbatim would leak
+ *     internal phrasing that has not been vetted as product copy;
  *   - any OTHER thrown message (a raw `DOMException`, a fetch failure, an
  *     unrecognised server error) is equally not vetted product copy and
  *     must not be shown either.
@@ -122,7 +122,7 @@ function reportFriendlyVerificationError(reason: unknown): string {
   // Deliberate: the technical detail belongs in the console, never in the
   // rendered alert (see doc comment above).
   console.error('[MigrationWizard] verifyCloud failed:', raw);
-  if (/changed on another device/i.test(raw)) {
+  if (/changed on another browser/i.test(raw)) {
     return 'This data category changed somewhere else while this browser was checking it. Try Refresh again.';
   }
   return 'This data category could not be checked just now.';

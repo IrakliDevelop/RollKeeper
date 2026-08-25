@@ -9,7 +9,7 @@ export async function campaignSettingsApi<T>(
   if (!response.ok) {
     const error = new Error(
       response.status === 409
-        ? 'Campaign settings changed on another device.'
+        ? 'Campaign settings changed on another browser.'
         : 'Campaign settings cloud request failed.'
     ) as Error & { status?: number };
     error.status = response.status;

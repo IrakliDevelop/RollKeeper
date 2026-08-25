@@ -95,12 +95,12 @@ function blockerMessage(blocker: CombatLogArchiveManifestBlocker) {
       // shape, so the wording reports what the check found rather than
       // asserting the device is empty; the exact detail is on the reference
       // line below.
-      return 'No combat logs were found on this device, so there is nothing to back up yet.';
+      return 'No combat logs were found on this browser, so there is nothing to back up yet.';
     case 'malformed-json':
-      return "The combat logs saved on this device can't be read. Restore a safety copy first.";
+      return "The combat logs saved on this browser can't be read. Restore a safety copy first.";
     case 'legacy-schema':
     case 'future-schema':
-      return 'The combat logs on this device were saved by a different version of RollKeeper. Open them once in this version, then try again.';
+      return 'The combat logs on this browser were saved by a different version of RollKeeper. Open them once in this version, then try again.';
     case 'oversized-record':
       return 'One combat log is too big to back up. Delete it or shorten it and try again.';
     case 'too-many-records':
@@ -233,10 +233,10 @@ export function CombatLogArchiveSyncControls({
           <ScrollText size={20} /> Combat log backup
         </CardTitle>
         <CardDescription>
-          Keep your combat logs on this device and, if you want, back them up to
-          your account so you can open them on another device. Nothing leaves
-          this device until you turn it on. Players never see your combat logs,
-          and running combat is unaffected.
+          Keep your combat logs on this browser and, if you want, back them up
+          to your account so you can open them on another browser. Nothing
+          leaves this browser until you turn it on. Players never see your
+          combat logs, and running combat is unaffected.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -289,12 +289,12 @@ export function CombatLogArchiveSyncControls({
               onClick={sync.previewEnrollment}
               loading={sync.busy}
             >
-              Check this device
+              Check this browser
             </Button>
             {sync.enrollmentPreview?.authority === 'postgres' &&
               sync.authority?.authority === 'localStorage' && (
                 <Button variant="warning" onClick={sync.enrollDevice}>
-                  Add this device to your account
+                  Add this browser to your account
                 </Button>
               )}
             {sync.enrollmentPreview?.authority === 'postgres' &&
@@ -346,7 +346,7 @@ export function CombatLogArchiveSyncControls({
                 loading={sync.busy}
                 disabled={!sync.recoveryVerified || !sync.archivesSelected}
               >
-                Get this device ready
+                Get this browser ready
               </Button>
             )}
             {sync.manifest &&
@@ -358,7 +358,7 @@ export function CombatLogArchiveSyncControls({
                   leftIcon={<ShieldCheck size={16} />}
                   onClick={sync.activateLocal}
                 >
-                  Turn on for this device
+                  Turn on for this browser
                 </Button>
               )}
             {sync.authority?.authority === 'indexedDB' && (
@@ -387,7 +387,7 @@ export function CombatLogArchiveSyncControls({
                   Stop backing up
                 </Button>
                 <Button variant="danger" onClick={sync.removeAccountFromDevice}>
-                  Remove this account&apos;s data from this device
+                  Remove this account&apos;s data from this browser
                 </Button>
               </>
             )}

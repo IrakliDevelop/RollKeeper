@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CharacterStorageMigrationControls } from '@/components/ui/feedback/CharacterStorageMigrationControls';
+import { expectCloudProductVocabulary } from '@/test/helpers';
 
 const capture = vi.fn();
 
@@ -39,7 +40,7 @@ describe('CharacterStorageMigrationControls', () => {
       },
       entries: [],
     });
-    render(<CharacterStorageMigrationControls />);
+    const { container } = render(<CharacterStorageMigrationControls />);
     expect(
       screen.queryByRole('button', { name: /download recovery and select/i })
     ).not.toBeInTheDocument();
@@ -51,5 +52,7 @@ describe('CharacterStorageMigrationControls', () => {
     expect(
       screen.getByRole('button', { name: /download recovery and select/i })
     ).toBeInTheDocument();
+    // Spec R17: this is a recovery screen in scope of the vocabulary sweep.
+    expectCloudProductVocabulary(container);
   });
 });

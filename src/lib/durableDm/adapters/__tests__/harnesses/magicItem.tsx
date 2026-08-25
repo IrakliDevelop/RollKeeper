@@ -1453,7 +1453,7 @@ export function createMagicItemHarness(): MagicItemConformanceHarness {
       );
       await screen.findByText(/IndexedDB authority epoch/);
       fireEvent.click(
-        await screen.findByRole('button', { name: 'Activate cloud family' })
+        await screen.findByRole('button', { name: 'Turn on cloud sync' })
       );
       await screen.findByText(/Cloud: saved/i);
       fireEvent.click(

@@ -133,7 +133,7 @@ export function DmCloudWorkspaceControls({
           </CardTitle>
           <CardDescription>
             Owner-only preview. Creating or forking a workspace changes no
-            player, membership, durable-family, Redis, or relay authority.
+            player, membership, campaign-data, Redis, or relay authority.
           </CardDescription>
         </CardHeader>
         <CardContent className="mt-5 space-y-5">
@@ -227,7 +227,7 @@ export function DmCloudWorkspaceControls({
                 {created.displayCode}
               </p>
               <p className="text-body mt-2 text-sm">
-                Membership remains legacy. Every durable family remains legacy;
+                Membership remains legacy. Every data category remains legacy;
                 Redis and relay remain unchanged.
               </p>
               {legacyCode && (

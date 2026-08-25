@@ -29,6 +29,7 @@ import * as browserDmWorkspace from '@/lib/supabase/browserDmWorkspace';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 import { useDmStore } from '@/store/dmStore';
 import { useNPCStore } from '@/store/npcStore';
+import { expectCloudProductVocabulary } from '@/test/helpers';
 import type { CampaignNPC } from '@/types/encounter';
 
 import {
@@ -468,7 +469,7 @@ describe('NpcSyncControls gates', () => {
     fireEvent.change(screen.getByLabelText('Downloaded NPC recovery file'), {
       target: { files: [recoveryFile] },
     });
-    await screen.findByText(/family selection was cancelled/);
+    await screen.findByText(/data category selection was cancelled/);
     expect(
       screen.getByRole('button', { name: 'Prepare IndexedDB' })
     ).toBeDisabled();
@@ -492,7 +493,7 @@ describe('NpcSyncControls gates', () => {
 
     expect(
       await screen.findByText(
-        /incomplete-envelope: rollkeeper-npc-data has never been persisted on this device/
+        /incomplete-envelope: rollkeeper-npc-data has never been persisted on this browser/
       )
     ).toBeVisible();
     expect(
@@ -578,7 +579,7 @@ describe('NpcSyncControls gates', () => {
     ).toBeVisible();
     expect(
       screen.queryByText(
-        'The initialized NPC namespace has no matching owner workspace on this device.'
+        'The initialized NPC namespace has no matching owner workspace on this browser.'
       )
     ).toBeNull();
     expect(remembered).toHaveLength(1);
@@ -705,7 +706,7 @@ describe('NpcSyncControls gates', () => {
     );
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
-    renderControls();
+    const { container } = renderControls();
     fireEvent.click(
       screen.getByRole('button', { name: 'Find owner workspaces' })
     );
@@ -714,11 +715,14 @@ describe('NpcSyncControls gates', () => {
       await screen.findByRole('button', { name: 'Preview cloud enrollment' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enroll this device' })
+      await screen.findByRole('button', { name: 'Enroll this browser' })
     );
     await screen.findByText(
-      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
     );
+    // Spec R17: check product vocabulary once discovery/select/preview/enroll
+    // have all been visited.
+    expectCloudProductVocabulary(container);
 
     // The enrollment confirm promises the local candidate "is never uploaded
     // automatically", so autosave must stay disarmed until the DM applies the
@@ -817,10 +821,10 @@ describe('NpcSyncControls gates', () => {
       await screen.findByRole('button', { name: 'Preview cloud enrollment' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enroll this device' })
+      await screen.findByRole('button', { name: 'Enroll this browser' })
     );
     await screen.findByText(
-      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
     );
   }
 
@@ -850,7 +854,7 @@ describe('NpcSyncControls gates', () => {
       screen.getByRole('button', { name: 'Apply exact cloud version' })
     );
     await screen.findByText(
-      'Device hydrated from the exact cloud generation of 1 records.'
+      'Browser hydrated from the exact cloud generation of 1 records.'
     );
 
     // Applying rewrote the store from IndexedDB, so it is a hydrating path:

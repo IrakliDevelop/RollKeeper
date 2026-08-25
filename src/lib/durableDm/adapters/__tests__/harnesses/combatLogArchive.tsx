@@ -1562,16 +1562,16 @@ export function createCombatLogArchiveHarness(): CombatLogArchiveConformanceHarn
         'Safety copy checked. Your combat logs are still stored the usual way for now.'
       );
       fireEvent.click(
-        screen.getByRole('button', { name: 'Get this device ready' })
+        screen.getByRole('button', { name: 'Get this browser ready' })
       );
       await screen.findByText(
-        'This device is ready. One more confirmation and it will be switched over.'
+        'This browser is ready. One more confirmation and it will be switched over.'
       );
       fireEvent.click(
-        await screen.findByRole('button', { name: 'Turn on for this device' })
+        await screen.findByRole('button', { name: 'Turn on for this browser' })
       );
       await screen.findByText(
-        'Saved on this device. Not backed up to your account yet.'
+        'Saved on this browser. Not backed up to your account yet.'
       );
       fireEvent.click(
         await screen.findByRole('button', {
@@ -1579,13 +1579,13 @@ export function createCombatLogArchiveHarness(): CombatLogArchiveConformanceHarn
         })
       );
       await screen.findByText(
-        'Saved on this device and backed up to your account.'
+        'Saved on this browser and backed up to your account.'
       );
       fireEvent.click(
         await screen.findByRole('button', { name: 'Stop backing up' })
       );
       await screen.findByText(
-        'Backup is off and everything was kept. Reload the page to keep working on this device.'
+        'Backup is off and everything was kept. Reload the page to keep working on this browser.'
       );
       cleanup();
     },

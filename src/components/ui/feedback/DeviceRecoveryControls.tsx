@@ -47,12 +47,12 @@ export function DeviceRecoveryControls() {
         timestamp: new Date().toISOString(),
       });
       await initiateDeviceBackupDownload(bundle, browserRecoveryRepository);
-      setStatus('Full device backup download initiated.');
+      setStatus('Full browser backup download initiated.');
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : 'Could not create device backup.'
+          : 'Could not create browser backup.'
       );
     } finally {
       setBusy(false);
@@ -148,7 +148,7 @@ export function DeviceRecoveryControls() {
           onClick={handleDownload}
           disabled={busy}
         >
-          Download device backup
+          Download browser backup
         </Button>
         <Button
           variant="outline"

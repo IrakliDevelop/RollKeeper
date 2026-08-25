@@ -334,7 +334,7 @@ export async function buildMagicItemManifest(input: {
     blockers.push({
       kind: 'incomplete-envelope',
       legacyId: null,
-      detail: `${MAGIC_ITEM_STORAGE_KEY} has never been persisted on this device`,
+      detail: `${MAGIC_ITEM_STORAGE_KEY} has never been persisted on this browser`,
     });
     return finalize(input.campaignCode, records, blockers, [rawCandidate]);
   }

@@ -350,7 +350,7 @@ describe('Slice 11D NPC family', () => {
 
     expect(kinds(manifest)).toEqual(['incomplete-envelope']);
     expect(manifest.blockers[0].detail).toBe(
-      'rollkeeper-npc-data has never been persisted on this device'
+      'rollkeeper-npc-data has never been persisted on this browser'
     );
     expect(manifest.blockers[0].legacyId).toBeNull();
   });

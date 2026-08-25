@@ -47,6 +47,7 @@ import * as localDatabaseModule from '@/lib/indexeddb/localDatabase';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 import { selectCampaignSettings } from '@/lib/indexeddb/campaignSettingsSelection';
 import { createBrowserDmWorkspace } from '@/lib/supabase/browserDmWorkspace';
+import { expectCloudProductVocabulary } from '@/test/helpers';
 import { APP_VERSION } from '@/utils/constants';
 
 import { MigrationWizard } from './index';
@@ -2042,6 +2043,7 @@ describe('MigrationWizard — data-category steps', () => {
       confirmationPhraseFor('campaign_settings')
     );
     expect(button).toBeEnabled();
+    expectCloudProductVocabulary(document.body);
   });
 
   it('reuses the one verified receipt across every family', async () => {
@@ -2235,6 +2237,7 @@ describe('MigrationWizard — data-category steps', () => {
     expect(
       screen.queryByLabelText(/type .* to confirm/i)
     ).not.toBeInTheDocument();
+    expectCloudProductVocabulary(document.body);
   });
 
   it('renders every family-step alert at 390px without truncation, covering drift / cloud-failure / blocked / load-error / inconsistent-refusal', async () => {
@@ -2276,6 +2279,10 @@ describe('MigrationWizard — data-category steps', () => {
         ],
       },
     ]);
+    // Ruling R2.2 / Task 15's deferred vocabulary mutation: every rendered
+    // state must stay clean of "device", "family", "whole-device" and
+    // "deliveries" copy, including accessible names (R5.2).
+    expectCloudProductVocabulary(document.body);
     unmountCurrentRender();
 
     // Scenario 2: cloud failure.
@@ -2288,6 +2295,7 @@ describe('MigrationWizard — data-category steps', () => {
         requiredSubstrings: ['Saved only in this browser'],
       },
     ]);
+    expectCloudProductVocabulary(document.body);
     unmountCurrentRender();
 
     // Scenario 3: manifest blockers.
@@ -2312,6 +2320,7 @@ describe('MigrationWizard — data-category steps', () => {
         ],
       },
     ]);
+    expectCloudProductVocabulary(document.body);
     unmountCurrentRender();
 
     // Scenario 4: manifest preview failure.
@@ -2328,6 +2337,7 @@ describe('MigrationWizard — data-category steps', () => {
         requiredSubstrings: ['The legacy encounter envelope is corrupted.'],
       },
     ]);
+    expectCloudProductVocabulary(document.body);
     unmountCurrentRender();
 
     // Scenario 5: inconsistent, repair refuses (two alerts coexist: the
@@ -2353,6 +2363,7 @@ describe('MigrationWizard — data-category steps', () => {
         ],
       },
     ]);
+    expectCloudProductVocabulary(document.body);
   });
 
   it('renders the manifest fingerprint under confirmation, and it is the one about to be cut over', async () => {
@@ -2790,19 +2801,22 @@ describe('MigrationWizard — report', () => {
     expect(within(claim).getByText(/5 of 6/)).toBeInTheDocument();
   });
 
-  it('never renders "device" or other raw internal error text in the verification-error alert', async () => {
+  it('never renders raw internal error text verbatim in the verification-error alert', async () => {
     // Important 1 (coordinator review round 2): the reviewer's own R17
     // hazard -- all six `*Api` gateways throw
-    // `'<Family> changed on another device.'` on HTTP 409, from EVERY RPC
+    // `'<Family> changed on another browser.'` on HTTP 409, from EVERY RPC
     // including `preview-enrollment`. Before this fix that string rendered
-    // verbatim, as product copy, saying "device".
+    // verbatim, as unvetted internal text, instead of the mapped clean
+    // sentence below.
     await openReport();
     await waitFor(() => expect(verifySpyCallCount()).toBe(6));
-    throwVerificationFor('npc', 'NPCs changed on another device.');
+    throwVerificationFor('npc', 'NPCs changed on another browser.');
     await refreshReport();
     const alert = await screen.findByTestId('verification-error-alert');
     expect(alert).toHaveAttribute('role', 'alert');
-    expect(within(alert).queryByText(/device/i)).not.toBeInTheDocument();
+    expect(
+      within(alert).queryByText('NPCs changed on another browser.')
+    ).not.toBeInTheDocument();
     expect(within(alert).getByText(/npc/i)).toBeInTheDocument();
     // The known-failure-class mapping actually branched (not just "always
     // generic") -- this is the SPECIFIC clean sentence for a conflict, not

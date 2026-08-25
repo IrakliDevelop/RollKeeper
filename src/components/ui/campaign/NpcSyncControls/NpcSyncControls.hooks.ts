@@ -383,7 +383,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
         ) {
           restoredContext?.close();
           setError(
-            'The initialized NPC namespace has no matching owner workspace on this device.'
+            'The initialized NPC namespace has no matching owner workspace on this browser.'
           );
           return;
         }
@@ -597,7 +597,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       setContext(next);
       setWorkspaces((await next.discover()).filter(item => item.cloudId));
       setStatus(
-        'Owner workspaces discovered. No family was selected or changed.'
+        'Owner workspaces discovered. No data category was selected or changed.'
       );
     } catch (cause) {
       setError(
@@ -615,7 +615,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
     setScope({ accountId: context.accountId, campaignId: selected.cloudId });
     setAuthority({ authority: 'localStorage', epoch: 0 });
     setStatus(
-      'Workspace chosen. Device enrollment and authority are unchanged.'
+      'Workspace chosen. Browser enrollment and authority are unchanged.'
     );
   };
 
@@ -711,7 +711,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       ) {
         setNpcsSelected(false);
         setStatus(
-          'Recovery file verified; family selection was cancelled and cutover remains blocked.'
+          'Recovery file verified; data category selection was cancelled and cutover remains blocked.'
         );
         return;
       }
@@ -757,7 +757,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
         )
       ) {
         throw new Error(
-          'Verify the downloaded recovery and explicitly select the family first.'
+          'Verify the downloaded recovery and explicitly select the data category first.'
         );
       }
       const selection = readNpcSelection(
@@ -796,7 +796,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       if (result.state !== 'CUTOVER_READY') {
         throw new Error(
           result.manifest.blockers.length > 0
-            ? 'Unresolved candidates block only the NPC family; legacy behavior remains active.'
+            ? 'Unresolved candidates block only NPC data; legacy behavior remains active.'
             : 'Local IndexedDB preparation did not satisfy every safety gate.'
         );
       }
@@ -818,7 +818,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
     if (manifest.blockers.length > 0) return;
     if (
       !window.confirm(
-        `Confirm exact manifest ${manifest.fingerprint.slice(0, 12)} and cut only the NPC family to IndexedDB?`
+        `Confirm exact manifest ${manifest.fingerprint.slice(0, 12)} and cut only NPC data to IndexedDB?`
       )
     )
       return;
@@ -915,7 +915,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       return;
     if (
       !window.confirm(
-        'Stage, revalidate, and atomically activate only the NPC family in Postgres?'
+        'Stage, revalidate, and atomically activate only NPC data in Postgres?'
       )
     )
       return;
@@ -1042,8 +1042,8 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       setEnrollmentPreview(next);
       setStatus(
         next.authority === 'postgres'
-          ? 'Cloud enrollment preview loaded. This device remains unenrolled.'
-          : 'The selected NPC family is not cloud-authoritative.'
+          ? 'Cloud enrollment preview loaded. This browser remains unenrolled.'
+          : 'The selected NPC data is not cloud-authoritative.'
       );
     } catch (cause) {
       setError(
@@ -1074,7 +1074,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       });
       if (
         !window.confirm(
-          `Enroll this device from exact cloud preview ${enrollmentPreview.previewFingerprint.slice(0, 12)}? The local candidate is preserved and is never uploaded automatically.`
+          `Enroll this browser from exact cloud preview ${enrollmentPreview.previewFingerprint.slice(0, 12)}? The local candidate is preserved and is never uploaded automatically.`
         )
       )
         return;
@@ -1142,14 +1142,14 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
           namespace,
         });
         setStatus(
-          'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+          'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
         );
       } finally {
         database.close();
       }
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : 'Device enrollment failed'
+        cause instanceof Error ? cause.message : 'Browser enrollment failed'
       );
     } finally {
       setBusy(false);
@@ -1168,14 +1168,14 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
     )
       return;
     if (enrollmentPreview.epoch !== authority.epoch) {
-      setError('Cloud preview epoch does not match this device authority.');
+      setError('Cloud preview epoch does not match this browser authority.');
       return;
     }
     const documents = enrollmentPreview.documents;
     const cutoverEpoch = enrollmentPreview.epoch;
     if (
       !window.confirm(
-        `Apply the exact cloud generation of ${documents.length} records to this enrolled device? Unresolved local work blocks hydration.`
+        `Apply the exact cloud generation of ${documents.length} records to this enrolled browser? Unresolved local work blocks hydration.`
       )
     )
       return;
@@ -1220,7 +1220,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
           .map(document => [document.legacyId, document.payloadFingerprint])
       );
       setStatus(
-        `Device hydrated from the exact cloud generation of ${documents.length} records.`
+        `Browser hydrated from the exact cloud generation of ${documents.length} records.`
       );
     } catch (cause) {
       setError(
@@ -1470,7 +1470,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       return;
     if (
       !window.confirm(
-        `Remove only ${context.accountLabel}'s local namespace from this device? Cloud and every preserved source remain intact.`
+        `Remove only ${context.accountLabel}'s local namespace from this browser? Cloud and every preserved source remain intact.`
       )
     )
       return;
@@ -1490,7 +1490,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
         const lossConfirmed =
           !unresolved ||
           window.confirm(
-            'Unresolved device-only work will become inaccessible on this device. Confirm the described loss risk?'
+            'Unresolved browser-only work will become inaccessible on this browser. Confirm the described loss risk?'
           );
         if (!lossConfirmed) return;
         if (authority.authority === 'postgres') {
@@ -1499,7 +1499,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
           );
           if (!deviceId)
             throw new Error(
-              'The exact enrolled device identity is unavailable.'
+              'The exact enrolled browser identity is unavailable.'
             );
           await npcApi({
             action: 'remove-device',

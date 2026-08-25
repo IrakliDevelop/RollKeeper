@@ -29,8 +29,8 @@ export default async function AccountPage() {
             <CardTitle>RollKeeper account</CardTitle>
             <CardDescription>
               Signing in changes only your account session. Your local
-              characters, campaigns, maps, and recovery data stay on this device
-              and are never uploaded or claimed here.
+              characters, campaigns, maps, and recovery data stay on this
+              browser and are never uploaded or claimed here.
             </CardDescription>
           </CardHeader>
           <CardContent className="mt-6">

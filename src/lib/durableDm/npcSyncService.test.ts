@@ -261,7 +261,7 @@ describe('NpcHttpGateway', () => {
         .mockResolvedValue({ ok: false, status: 409, json: async () => ({}) })
     );
     await expect(new NpcHttpGateway().put(entry)).rejects.toMatchObject({
-      message: 'NPCs changed on another device.',
+      message: 'NPCs changed on another browser.',
       status: 409,
     });
 

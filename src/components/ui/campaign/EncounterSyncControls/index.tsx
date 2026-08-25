@@ -70,12 +70,12 @@ function blockerMessage(blocker: EncounterManifestBlocker) {
     case 'active-encounter':
       return `"${named ?? 'An encounter'}" is in combat right now. End that combat first.`;
     case 'incomplete-envelope':
-      return 'Nothing has been saved on this device yet. Open an encounter first.';
+      return 'Nothing has been saved on this browser yet. Open an encounter first.';
     case 'malformed-json':
-      return "The encounters saved on this device can't be read. Restore a safety copy first.";
+      return "The encounters saved on this browser can't be read. Restore a safety copy first.";
     case 'legacy-schema':
     case 'future-schema':
-      return 'The encounters on this device were saved by a different version of RollKeeper. Open them once in this version, then try again.';
+      return 'The encounters on this browser were saved by a different version of RollKeeper. Open them once in this version, then try again.';
     case 'oversized-record':
       return `"${named ?? 'One encounter'}" is too big to back up. Remove some creatures from it and try again.`;
     case 'oversized-family':
@@ -107,9 +107,9 @@ export function EncounterSyncControls({
           <Cloud size={20} /> Encounter backup
         </CardTitle>
         <CardDescription>
-          Keep your encounters on this device and, if you want, back them up to
-          your account so you can open them on another device. Nothing leaves
-          this device until you turn it on. Players never see your encounters,
+          Keep your encounters on this browser and, if you want, back them up to
+          your account so you can open them on another browser. Nothing leaves
+          this browser until you turn it on. Players never see your encounters,
           and running combat is unaffected.
         </CardDescription>
       </CardHeader>
@@ -151,12 +151,12 @@ export function EncounterSyncControls({
               onClick={sync.previewEnrollment}
               loading={sync.busy}
             >
-              Check this device
+              Check this browser
             </Button>
             {sync.enrollmentPreview?.authority === 'postgres' &&
               sync.authority?.authority === 'localStorage' && (
                 <Button variant="warning" onClick={sync.enrollDevice}>
-                  Add this device to my account
+                  Add this browser to my account
                 </Button>
               )}
             {sync.enrollmentPreview?.authority === 'postgres' &&
@@ -208,7 +208,7 @@ export function EncounterSyncControls({
                 loading={sync.busy}
                 disabled={!sync.recoveryVerified || !sync.encountersSelected}
               >
-                Get this device ready
+                Get this browser ready
               </Button>
             )}
             {sync.manifest &&
@@ -220,7 +220,7 @@ export function EncounterSyncControls({
                   leftIcon={<ShieldCheck size={16} />}
                   onClick={sync.activateLocal}
                 >
-                  Switch this device over
+                  Switch this browser over
                 </Button>
               )}
             {sync.authority?.authority === 'indexedDB' && (
@@ -249,7 +249,7 @@ export function EncounterSyncControls({
                   Stop backing up
                 </Button>
                 <Button variant="danger" onClick={sync.removeAccountFromDevice}>
-                  Remove this account&apos;s data from this device
+                  Remove this account&apos;s data from this browser
                 </Button>
               </>
             )}

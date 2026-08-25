@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { expect } from 'vitest';
 
 import {
   CampaignData,
@@ -260,4 +261,106 @@ export function createMockCondition(
     source: 'dm',
     ...overrides,
   };
+}
+
+/**
+ * Literal strings that are deliberately allowed to contain the words this
+ * assertion forbids: internal storage-format/identifier names, never product
+ * copy (spec R17). Stripped out before matching so their presence in test
+ * fixtures, hidden inputs, or debug attributes cannot fail the assertion.
+ */
+const ALLOWED_INTERNAL_VOCABULARY_LITERALS = [
+  'rollkeeper-device-backup',
+  'DeviceBackupV1',
+  'deviceId',
+];
+
+/**
+ * Collects every individual text node under `root` as its own array entry
+ * (rather than one flattened `.textContent` string). This matters: DOM
+ * `textContent` concatenates sibling text nodes with NO separator, so two
+ * adjacent elements like `<p>...Data family</p><h3>Campaign settings</h3>`
+ * flatten to `...Data familyCampaign settings` — the word "family" is fused
+ * directly to "Campaign" with no whitespace between them, so a `\bfamily\b`
+ * word-boundary regex silently fails to match (`y` and `C` are both word
+ * characters, so there is no boundary). Keeping nodes separate and joining
+ * them with an explicit separator avoids that false negative.
+ */
+function collectTextNodes(root: Node): string[] {
+  const doc =
+    (root as Node & { ownerDocument?: Document }).ownerDocument ??
+    (root instanceof Document ? root : document);
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const chunks: string[] = [];
+  let node: Node | null = walker.nextNode();
+  while (node) {
+    chunks.push(node.textContent ?? '');
+    node = walker.nextNode();
+  }
+  return chunks;
+}
+
+/**
+ * Render-time guard for spec R17's cloud-sync/recovery product vocabulary:
+ * "this browser"/"another browser" (never device), "campaign data"/"data
+ * category" (never family), no "whole-device" migration language, and (for
+ * the migration wizard specifically) no "deliveries"/"player inbox" — Player
+ * inbox is a Slice 13 concept that must not leak into this slice's surfaces.
+ *
+ * Unlike a plain `container.textContent` scan, this also reads every
+ * accessible-name-bearing attribute (`aria-label`, `aria-labelledby` via its
+ * referenced element's text, `title`, `placeholder`, `alt`) so a violation
+ * that is announced to screen readers but never painted as visible text
+ * (e.g. an icon-only button's `aria-label`) still fails the assertion. It
+ * also keeps each text node distinct (see `collectTextNodes`) instead of
+ * flattening via `.textContent`, so a forbidden word fused to adjacent
+ * markup with no rendered whitespace between them still matches.
+ *
+ * Call this after expanding every conditional state the surface can render
+ * (untouched, local-only, cloud-active, offline, conflict, enrollment
+ * preview, removal warning, rollback, report, ...) — it only inspects
+ * whatever is currently in `container`.
+ */
+export function expectCloudProductVocabulary(container: HTMLElement) {
+  const texts: string[] = collectTextNodes(container);
+
+  const doc = container.ownerDocument ?? document;
+  const candidates = container.querySelectorAll<HTMLElement>(
+    '[aria-label], [aria-labelledby], [title], [placeholder], [alt]'
+  );
+  candidates.forEach(element => {
+    const ariaLabel = element.getAttribute('aria-label');
+    if (ariaLabel) texts.push(ariaLabel);
+
+    const labelledBy = element.getAttribute('aria-labelledby');
+    if (labelledBy) {
+      labelledBy
+        .split(/\s+/)
+        .filter(Boolean)
+        .forEach(id => {
+          const referenced = doc.getElementById(id);
+          if (referenced) texts.push(referenced.textContent ?? '');
+        });
+    }
+
+    const title = element.getAttribute('title');
+    if (title) texts.push(title);
+
+    const placeholder = element.getAttribute('placeholder');
+    if (placeholder) texts.push(placeholder);
+
+    const alt = element.getAttribute('alt');
+    if (alt) texts.push(alt);
+  });
+
+  const scrubbed = ALLOWED_INTERNAL_VOCABULARY_LITERALS.reduce(
+    (text, literal) => text.split(literal).join(' '),
+    texts.join(' \n ')
+  );
+
+  expect(scrubbed).not.toMatch(/\bdevice(?:s|'s|-only)?\b/i);
+  expect(scrubbed).not.toMatch(/\bfamil(?:y|ies)\b/i);
+  expect(scrubbed).not.toMatch(/\bwhole-device\b/i);
+  expect(scrubbed).not.toMatch(/\bdeliveries\b/i);
+  expect(scrubbed).not.toMatch(/player inbox/i);
 }

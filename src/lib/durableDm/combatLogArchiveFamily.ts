@@ -490,7 +490,7 @@ export async function buildCombatLogArchiveManifest(input: {
     blockers.push({
       kind: 'incomplete-envelope',
       legacyId: null,
-      detail: `${COMBAT_LOG_STORAGE_KEY} has never been persisted on this device`,
+      detail: `${COMBAT_LOG_STORAGE_KEY} has never been persisted on this browser`,
     });
     return finalize(input.campaignCode, records, blockers, [rawCandidate]);
   }
@@ -639,7 +639,7 @@ export async function buildCombatLogArchiveManifest(input: {
     blockers.push({
       kind: 'too-many-records',
       legacyId: null,
-      detail: `The combat log archive family exceeds ${COMBAT_LOG_ARCHIVE_MAX_ITEMS} archives`,
+      detail: `The combat log archive exceeds ${COMBAT_LOG_ARCHIVE_MAX_ITEMS} archives`,
     });
   const totalBytes = records.reduce(
     (total, value) => total + value.byteCount,
@@ -649,7 +649,7 @@ export async function buildCombatLogArchiveManifest(input: {
     blockers.push({
       kind: 'oversized-family',
       legacyId: null,
-      detail: `The combat log archive family exceeds ${COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES} UTF-8 bytes`,
+      detail: `The combat log archive exceeds ${COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES} UTF-8 bytes`,
     });
   return finalize(input.campaignCode, records, blockers, [rawCandidate]);
 }

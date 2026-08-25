@@ -9,7 +9,7 @@ export async function calendarApi<T>(
   if (!response.ok) {
     const error = new Error(
       response.status === 409
-        ? 'Calendar changed on another device.'
+        ? 'Calendar changed on another browser.'
         : 'Calendar cloud request failed.'
     ) as Error & { status?: number };
     error.status = response.status;

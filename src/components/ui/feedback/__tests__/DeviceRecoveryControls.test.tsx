@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DeviceRecoveryControls } from '@/components/ui/feedback/DeviceRecoveryControls';
 import { browserRecoveryRepository } from '@/lib/browserRecoveryRepository';
+import { expectCloudProductVocabulary } from '@/test/helpers';
 
 vi.mock('@/lib/browserRecoveryRepository', () => ({
   browserRecoveryRepository: {
@@ -19,7 +20,7 @@ describe('DeviceRecoveryControls', () => {
       'rollkeeper-player-data',
       '{"state":{"characters":[]},"version":1}'
     );
-    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:device-backup');
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:browser-backup');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
@@ -32,9 +33,9 @@ describe('DeviceRecoveryControls', () => {
     const { container } = render(<DeviceRecoveryControls />);
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Download device backup' })
+      screen.getByRole('button', { name: 'Download browser backup' })
     );
-    await screen.findByText('Full device backup download initiated.');
+    await screen.findByText('Full browser backup download initiated.');
     expect(
       browserRecoveryRepository.recordDownloadReceipt
     ).toHaveBeenCalledOnce();
@@ -65,5 +66,8 @@ describe('DeviceRecoveryControls', () => {
         screen.getByRole('button', { name: 'Restore selected entries' })
       ).toBeDisabled()
     );
+    // Spec R17: `document.body`, not `container` — the recovery-preview
+    // Dialog portals its content outside the render's own container.
+    expectCloudProductVocabulary(document.body);
   });
 });

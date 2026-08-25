@@ -262,7 +262,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
         ) {
           restoredContext?.close();
           setError(
-            'The initialized campaign settings namespace has no matching owner workspace on this device.'
+            'The initialized campaign settings namespace has no matching owner workspace on this browser.'
           );
           return;
         }
@@ -451,7 +451,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
       setContext(next);
       setWorkspaces((await next.discover()).filter(item => item.cloudId));
       setStatus(
-        'Owner workspaces discovered. No family was selected or changed.'
+        'Owner workspaces discovered. No data category was selected or changed.'
       );
     } catch (cause) {
       setError(
@@ -468,7 +468,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
     setScope({ accountId: context.accountId, campaignId: selected.cloudId });
     setAuthority({ authority: 'localStorage', epoch: 0 });
     setStatus(
-      'Workspace chosen. Device enrollment and authority are unchanged.'
+      'Workspace chosen. Browser enrollment and authority are unchanged.'
     );
   };
 
@@ -539,7 +539,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
         `Recovery download initiated. Select only campaign_settings for ${campaign.name}? This does not cut over local or cloud authority.`
       )
     ) {
-      setStatus('Recovery downloaded; family selection was cancelled.');
+      setStatus('Recovery downloaded; data category selection was cancelled.');
       return;
     }
     selectCampaignSettings(localStorage, {
@@ -570,7 +570,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
         )
       ) {
         throw new Error(
-          'Download recovery and explicitly select the family first.'
+          'Download recovery and explicitly select the data category first.'
         );
       }
       const runId = `settings-${crypto.randomUUID()}`;
@@ -826,8 +826,8 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
       setEnrollmentPreview(preview);
       setStatus(
         preview.authority === 'postgres'
-          ? 'Cloud enrollment preview loaded. This device remains unenrolled.'
-          : 'The selected campaign_settings family is not cloud-authoritative.'
+          ? 'Cloud enrollment preview loaded. This browser remains unenrolled.'
+          : 'The selected campaign settings data is not cloud-authoritative.'
       );
     } catch (cause) {
       setError(
@@ -856,7 +856,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
     });
     if (
       !window.confirm(
-        `Enroll this device from exact cloud preview ${enrollmentPreview.previewFingerprint.slice(0, 12)}? The local candidate is preserved and is never uploaded automatically.`
+        `Enroll this browser from exact cloud preview ${enrollmentPreview.previewFingerprint.slice(0, 12)}? The local candidate is preserved and is never uploaded automatically.`
       )
     )
       return;
@@ -919,7 +919,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
         namespace: `user:${context.accountId}`,
       });
       setStatus(
-        'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+        'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
       );
     } finally {
       database.close();
@@ -974,12 +974,12 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
     )
       return;
     if (enrollmentPreview.epoch !== authority.epoch) {
-      setError('Cloud preview epoch does not match this device authority.');
+      setError('Cloud preview epoch does not match this browser authority.');
       return;
     }
     if (
       !window.confirm(
-        `Apply exact cloud version ${enrollmentPreview.serverVersion} to this enrolled device? Unresolved local work blocks hydration.`
+        `Apply exact cloud version ${enrollmentPreview.serverVersion} to this enrolled browser? Unresolved local work blocks hydration.`
       )
     )
       return;
@@ -1002,7 +1002,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
           current.payload,
           current.contentFingerprint
         );
-        setStatus('This device already has the exact accepted cloud version.');
+        setStatus('This browser already has the exact accepted cloud version.');
         return;
       }
       await repository.applyAcceptedCloudVersion({
@@ -1023,7 +1023,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
         enrollmentPreview.payloadFingerprint
       );
       setStatus(
-        `Device hydrated from exact cloud version ${enrollmentPreview.serverVersion}.`
+        `Browser hydrated from exact cloud version ${enrollmentPreview.serverVersion}.`
       );
     } catch (cause) {
       setError(
@@ -1270,7 +1270,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
       return;
     if (
       !window.confirm(
-        `Remove only ${context.accountLabel}'s local namespace from this device? Cloud and every preserved source remain intact.`
+        `Remove only ${context.accountLabel}'s local namespace from this browser? Cloud and every preserved source remain intact.`
       )
     )
       return;
@@ -1286,7 +1286,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
       const lossConfirmed =
         !unresolved ||
         window.confirm(
-          'Unresolved device-only work will become inaccessible on this device. Confirm the described loss risk?'
+          'Unresolved browser-only work will become inaccessible on this browser. Confirm the described loss risk?'
         );
       if (!lossConfirmed) return;
       if (authority.authority === 'postgres') {
@@ -1294,7 +1294,9 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
           `rollkeeper:campaign-settings-device:${context.accountId}:${workspace.cloudId}`
         );
         if (!deviceId)
-          throw new Error('The exact enrolled device identity is unavailable.');
+          throw new Error(
+            'The exact enrolled browser identity is unavailable.'
+          );
         await campaignSettingsApi({
           action: 'remove-device',
           mutationId: crypto.randomUUID(),
@@ -1412,7 +1414,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
             {enrollmentPreview?.authority === 'postgres' &&
               authority?.authority === 'localStorage' && (
                 <Button variant="warning" onClick={enrollDevice}>
-                  Enroll this device
+                  Enroll this browser
                 </Button>
               )}
             {enrollmentPreview?.authority === 'postgres' &&
@@ -1450,7 +1452,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
             )}
             {authority?.authority === 'indexedDB' && (
               <Button variant="primary" onClick={activateCloud} loading={busy}>
-                Activate cloud family
+                Turn on cloud sync
               </Button>
             )}
             {authority?.authority === 'postgres' && (
@@ -1473,7 +1475,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
                   Verified rollback
                 </Button>
                 <Button variant="danger" onClick={removeAccountFromDevice}>
-                  Remove this account from this device
+                  Remove this account from this browser
                 </Button>
               </>
             )}

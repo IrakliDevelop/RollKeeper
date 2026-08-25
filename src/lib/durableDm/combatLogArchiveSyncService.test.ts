@@ -271,7 +271,7 @@ describe('CombatLogArchiveHttpGateway', () => {
     await expect(
       new CombatLogArchiveHttpGateway().put(entry)
     ).rejects.toMatchObject({
-      message: 'Combat log archives changed on another device.',
+      message: 'Combat log archives changed on another browser.',
       status: 409,
     });
 

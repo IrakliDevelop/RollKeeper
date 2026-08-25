@@ -263,7 +263,7 @@ describe('EncounterHttpGateway', () => {
         .mockResolvedValue({ ok: false, status: 409, json: async () => ({}) })
     );
     await expect(new EncounterHttpGateway().put(entry)).rejects.toMatchObject({
-      message: 'Encounters changed on another device.',
+      message: 'Encounters changed on another browser.',
       status: 409,
     });
 

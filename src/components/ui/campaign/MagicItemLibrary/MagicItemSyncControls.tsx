@@ -396,7 +396,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
         ) {
           restoredContext?.close();
           setError(
-            'The initialized magic item namespace has no matching owner workspace on this device.'
+            'The initialized magic item namespace has no matching owner workspace on this browser.'
           );
           return;
         }
@@ -616,7 +616,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
       setContext(next);
       setWorkspaces((await next.discover()).filter(item => item.cloudId));
       setStatus(
-        'Owner workspaces discovered. No family was selected or changed.'
+        'Owner workspaces discovered. No data category was selected or changed.'
       );
     } catch (cause) {
       setError(
@@ -633,7 +633,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
     setScope({ accountId: context.accountId, campaignId: selected.cloudId });
     setAuthority({ authority: 'localStorage', epoch: 0 });
     setStatus(
-      'Workspace chosen. Device enrollment and authority are unchanged.'
+      'Workspace chosen. Browser enrollment and authority are unchanged.'
     );
   };
 
@@ -726,7 +726,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
       ) {
         setLibrarySelected(false);
         setStatus(
-          'Recovery file verified; family selection was cancelled and cutover remains blocked.'
+          'Recovery file verified; data category selection was cancelled and cutover remains blocked.'
         );
         return;
       }
@@ -771,7 +771,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
         )
       ) {
         throw new Error(
-          'Verify the downloaded recovery and explicitly select the family first.'
+          'Verify the downloaded recovery and explicitly select the data category first.'
         );
       }
       const selection = readMagicItemSelection(
@@ -1053,7 +1053,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
       setEnrollmentPreview(next);
       setStatus(
         next.authority === 'postgres'
-          ? 'Cloud enrollment preview loaded. This device remains unenrolled.'
+          ? 'Cloud enrollment preview loaded. This browser remains unenrolled.'
           : 'The selected magic item library is not cloud-authoritative.'
       );
     } catch (cause) {
@@ -1084,7 +1084,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
       });
       if (
         !window.confirm(
-          `Enroll this device from exact cloud preview ${enrollmentPreview.previewFingerprint.slice(0, 12)}? The local candidate is preserved and is never uploaded automatically.`
+          `Enroll this browser from exact cloud preview ${enrollmentPreview.previewFingerprint.slice(0, 12)}? The local candidate is preserved and is never uploaded automatically.`
         )
       )
         return;
@@ -1152,14 +1152,14 @@ export function MagicItemSyncControls({ campaign }: Props) {
           namespace,
         });
         setStatus(
-          'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+          'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
         );
       } finally {
         database.close();
       }
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : 'Device enrollment failed'
+        cause instanceof Error ? cause.message : 'Browser enrollment failed'
       );
     } finally {
       setBusy(false);
@@ -1177,14 +1177,14 @@ export function MagicItemSyncControls({ campaign }: Props) {
     )
       return;
     if (enrollmentPreview.epoch !== authority.epoch) {
-      setError('Cloud preview epoch does not match this device authority.');
+      setError('Cloud preview epoch does not match this browser authority.');
       return;
     }
     const documents = enrollmentPreview.documents;
     const cutoverEpoch = enrollmentPreview.epoch;
     if (
       !window.confirm(
-        `Apply the exact cloud generation of ${documents.length} records to this enrolled device? Unresolved local work blocks hydration.`
+        `Apply the exact cloud generation of ${documents.length} records to this enrolled browser? Unresolved local work blocks hydration.`
       )
     )
       return;
@@ -1229,7 +1229,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
           .map(document => [document.legacyId, document.payloadFingerprint])
       );
       setStatus(
-        `Device hydrated from the exact cloud generation of ${documents.length} records.`
+        `Browser hydrated from the exact cloud generation of ${documents.length} records.`
       );
     } catch (cause) {
       setError(
@@ -1482,7 +1482,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
       return;
     if (
       !window.confirm(
-        `Remove only ${context.accountLabel}'s local namespace from this device? Cloud and every preserved source remain intact.`
+        `Remove only ${context.accountLabel}'s local namespace from this browser? Cloud and every preserved source remain intact.`
       )
     )
       return;
@@ -1502,7 +1502,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
         const lossConfirmed =
           !unresolved ||
           window.confirm(
-            'Unresolved device-only work will become inaccessible on this device. Confirm the described loss risk?'
+            'Unresolved browser-only work will become inaccessible on this browser. Confirm the described loss risk?'
           );
         if (!lossConfirmed) return;
         if (authority.authority === 'postgres') {
@@ -1511,7 +1511,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
           );
           if (!deviceId)
             throw new Error(
-              'The exact enrolled device identity is unavailable.'
+              'The exact enrolled browser identity is unavailable.'
             );
           await magicItemApi({
             action: 'remove-device',
@@ -1602,7 +1602,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
             {enrollmentPreview?.authority === 'postgres' &&
               authority?.authority === 'localStorage' && (
                 <Button variant="warning" onClick={enrollDevice}>
-                  Enroll this device
+                  Enroll this browser
                 </Button>
               )}
             {enrollmentPreview?.authority === 'postgres' &&
@@ -1671,7 +1671,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
               )}
             {authority?.authority === 'indexedDB' && (
               <Button variant="primary" onClick={activateCloud} loading={busy}>
-                Activate cloud family
+                Turn on cloud sync
               </Button>
             )}
             {authority?.authority === 'postgres' && (
@@ -1691,7 +1691,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
                   Verified rollback
                 </Button>
                 <Button variant="danger" onClick={removeAccountFromDevice}>
-                  Remove this account from this device
+                  Remove this account from this browser
                 </Button>
               </>
             )}

@@ -265,7 +265,7 @@ describe('MagicItemHttpGateway', () => {
         .mockResolvedValue({ ok: false, status: 409, json: async () => ({}) })
     );
     await expect(new MagicItemHttpGateway().put(entry)).rejects.toMatchObject({
-      message: 'Magic item library changed on another device.',
+      message: 'Magic item library changed on another browser.',
       status: 409,
     });
 

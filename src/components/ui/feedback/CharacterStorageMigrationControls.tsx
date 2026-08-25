@@ -181,7 +181,7 @@ export function CharacterStorageMigrationControls() {
       return;
     if (
       !window.confirm(
-        'Switch this browser profile’s character family to IndexedDB authority now? Current localStorage mirrors and immutable captures will be retained.'
+        'Switch this browser profile’s character data to IndexedDB authority now? Current localStorage mirrors and immutable captures will be retained.'
       )
     )
       return;
