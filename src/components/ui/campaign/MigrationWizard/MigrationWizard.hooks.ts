@@ -219,9 +219,11 @@ export function useMigrationWizard(
       if (mountedRef.current) setWorkspace(found);
     } catch (cause) {
       if (mountedRef.current) {
-        setDiscoveryError(
-          cause instanceof Error ? cause.message : 'Workspace discovery failed.'
-        );
+        // F4 / re-review N1: `list()` is IndexedDB-backed, so a browser with
+        // IndexedDB blocked rejects here with a raw `DOMException` — on the
+        // FIRST step the DM sees. Vetted copy only; the technical detail
+        // goes to `console.error` inside the mapper.
+        setDiscoveryError(friendlyMigrationMessage('discovery', cause));
       }
     } finally {
       // `discoveryAttempted` is NOT set here (fix round 1, Important 1) --
@@ -323,10 +325,10 @@ export function useMigrationWizard(
         setRecovery(current => ({
           ...current,
           status: 'stale',
-          error:
-            cause instanceof Error
-              ? cause.message
-              : 'That file does not match this browser. Download a fresh one and pick that up instead.',
+          // F4 / re-review N1: `file.text()` rejects with a raw
+          // `NotReadableError` `DOMException`, which used to render verbatim
+          // under the "That file does not match this browser" heading.
+          error: friendlyMigrationMessage('backupFile', cause),
         }));
       }
     },
@@ -359,10 +361,9 @@ export function useMigrationWizard(
     } catch (cause) {
       setRecovery(current => ({
         ...current,
-        error:
-          cause instanceof Error
-            ? cause.message
-            : "Could not check this browser's backup.",
+        // F4 / re-review N1: the receipt store is IndexedDB-backed, so this
+        // is the same raw-`DOMException` channel as discovery above.
+        error: friendlyMigrationMessage('backupRecord', cause),
       }));
     }
   }, [recovery.bundle]);

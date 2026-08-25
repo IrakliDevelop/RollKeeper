@@ -226,8 +226,14 @@ export function RecoveryStep({
               It was saved from different data, so it could not restore this
               browser. Download a fresh one and pick that up instead.
             </p>
+            {/*
+              Re-review N1: this used to be a `font-mono ... break-all`
+              slot, styled for the raw `Error.message` it was fed. It now
+              carries vetted product copy from `friendlyMigrationMessage`,
+              so it is styled — and reads — like the sentences around it.
+            */}
             {recovery.error && (
-              <p className="text-accent-red-text mt-2 font-mono text-xs break-all">
+              <p className="text-accent-red-text mt-2 text-sm">
                 {recovery.error}
               </p>
             )}

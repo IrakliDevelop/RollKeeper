@@ -1680,6 +1680,56 @@ describe('MigrationWizard — steps 0 and 1', () => {
     expectCloudProductVocabulary(document.body);
   });
 
+  /**
+   * Scoped re-review N1. F4 was closed on the FAMILY step only, while
+   * workspace discovery still rendered `Error.message` verbatim -- on step
+   * 0, the first thing a DM sees. `BrowserDmWorkspaceContext.list()` is
+   * IndexedDB-backed, so the gate's own D2 scenario (IndexedDB blocked in a
+   * private window) rejects here with a raw `DOMException` before the
+   * family step is ever reached. A `DOMException` on purpose: it is the
+   * real-world trigger, and it inherits `Error`, so the old
+   * `cause instanceof Error ? cause.message : ...` did pass it straight to
+   * the DOM.
+   */
+  it('never renders a raw discovery rejection, not even a DOMException, on the first step', async () => {
+    const raw = 'The user denied permission to access the database.';
+    mockedCreateBrowserDmWorkspace.mockRejectedValue(
+      new DOMException(raw, 'UnknownError')
+    );
+    render(<MigrationWizard campaignCode="ALPHA" />);
+    const discoverButton = screen.getByRole('button', {
+      name: /find my campaigns/i,
+    });
+    await userEvent.click(discoverButton);
+    await waitFor(() => expect(discoverButton).toBeEnabled());
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/could not be looked up just now/i);
+    // The raw platform text never reaches the DOM, and neither does the
+    // pre-fix generic fallback -- so restoring EITHER old branch reddens
+    // the assertion above.
+    expect(document.body.textContent ?? '').not.toContain(raw);
+    expect(document.body.textContent ?? '').not.toContain('DOMException');
+    expectCloudProductVocabulary(document.body);
+
+    // jsdom's `DOMException` does NOT inherit `Error` (a real browser's
+    // does), so the case above proves the mapping is applied but cannot
+    // itself show the verbatim leak. A plain transport rejection -- the one
+    // the manual gate actually saw on screen, one step later -- does.
+    cleanup();
+    mockedCreateBrowserDmWorkspace.mockRejectedValue(
+      new TypeError('Failed to fetch')
+    );
+    render(<MigrationWizard campaignCode="ALPHA" />);
+    const retry = screen.getByRole('button', { name: /find my campaigns/i });
+    await userEvent.click(retry);
+    await waitFor(() => expect(retry).toBeEnabled());
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /could not be looked up just now/i
+    );
+    expect(document.body.textContent ?? '').not.toContain('Failed to fetch');
+  });
+
   it('shows no missing-workspace guidance once a cloud workspace is found', async () => {
     mockedCreateBrowserDmWorkspace.mockResolvedValue({
       ...defaultOwnerContext(),
@@ -1728,6 +1778,37 @@ describe('MigrationWizard — steps 0 and 1', () => {
       await screen.findByText(/that file does not match this browser/i)
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^continue$/i })).toBeDisabled();
+  });
+
+  /**
+   * Scoped re-review N1, second open channel: reading the picked file back.
+   * `File.text()` rejects with a `NotReadableError` `DOMException` on a file
+   * that vanished or is unreadable, and that message used to render verbatim
+   * under the stale-bundle heading.
+   */
+  it('never renders a raw browser-backup file rejection, not even a DOMException', async () => {
+    const raw = 'The requested file could not be read.';
+    vi.mocked(verifyDownloadedDeviceBackup).mockRejectedValueOnce(
+      new DOMException(raw, 'NotReadableError')
+    );
+    await renderWizardAtRecoveryStep();
+    await userEvent.click(screen.getByRole('button', { name: /download/i }));
+    await userEvent.upload(
+      screen.getByLabelText(/safety copy/i),
+      await bundleFile()
+    );
+    // Queried by ROLE, not by the heading text: the pre-fix fallback
+    // repeated that heading inside the same panel, so a text query matched
+    // twice and failed with an ambiguous-element error instead of the
+    // content assertion this test exists for.
+    const alerts = await screen.findAllByRole('alert');
+    const alert = alerts.find(node =>
+      /that file does not match this browser/i.test(node.textContent ?? '')
+    );
+    expect(alert).toBeDefined();
+    expect(alert).toHaveTextContent(/could not read that file/i);
+    expect(document.body.textContent ?? '').not.toContain(raw);
+    expectCloudProductVocabulary(document.body);
   });
 
   it('resumes on a verified receipt for the same browser data, without a second download', async () => {
@@ -1862,9 +1943,14 @@ describe('MigrationWizard — steps 0 and 1', () => {
       runId: 'run-1',
       manifestHash: await currentDeviceHash(),
     });
+    // Scoped re-review N1, third open channel. A `DOMException` on purpose:
+    // the receipt store is IndexedDB-backed, so this is the same
+    // blocked-IndexedDB rejection discovery sees, and it used to render
+    // verbatim.
+    const raw = 'The user denied permission to access the database.';
     const spy = vi
       .spyOn(browserRecoveryRepository, 'enrichVerifiedDownloadReceiptEntries')
-      .mockRejectedValueOnce(new Error('offline'));
+      .mockRejectedValueOnce(new DOMException(raw, 'UnknownError'));
     render(<MigrationWizard campaignCode="ALPHA" />);
     await userEvent.click(
       await screen.findByRole('button', {
@@ -1878,7 +1964,9 @@ describe('MigrationWizard — steps 0 and 1', () => {
     // at all would also satisfy). Weakened to prove it is load-bearing: a
     // render that dropped `recovery.error` entirely fails this exact line.
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('offline');
+    expect(alert).toHaveTextContent(/backup could not be checked just now/i);
+    expect(document.body.textContent ?? '').not.toContain(raw);
+    expectCloudProductVocabulary(document.body);
     // Stays in the retryable pending state rather than hanging or crashing.
     expect(
       await screen.findByRole('button', {
@@ -1919,8 +2007,11 @@ describe('MigrationWizard — steps 0 and 1', () => {
         requiredSubstrings: [
           'That file does not match this browser',
           'It was saved from different data, so it could not restore this browser. Download a fresh one and pick that up instead.',
-          // Item 8: the real verifier message is surfaced too, not dropped.
-          'The selected recovery file does not match the current preview',
+          // Item 8: the failure detail is surfaced too, not dropped. Scoped
+          // re-review N1: it is now the vetted `backupFile` sentence rather
+          // than the verifier's own `Error.message` -- the same channel a
+          // `NotReadableError` `DOMException` arrives on.
+          'This browser could not read that file, or it was saved from different campaign data.',
         ],
       },
     ];

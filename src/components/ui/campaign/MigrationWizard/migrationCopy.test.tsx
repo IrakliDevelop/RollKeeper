@@ -38,6 +38,12 @@ const CHANNELS: MigrationErrorChannel[] = [
   'run',
   'repair',
   'verify',
+  // Re-review N1: the three channels outside the family step. Same reason
+  // as `ACTIVATION_REASONS` above for restating them as literals — a member
+  // deleted from the union must redden this table, not disappear from it.
+  'discovery',
+  'backupFile',
+  'backupRecord',
 ];
 
 /** R17's forbidden vocabulary, applied to every string this module can emit. */

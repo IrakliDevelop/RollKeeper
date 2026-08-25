@@ -20,6 +20,16 @@ import { CHANGED_ON_ANOTHER_BROWSER_PATTERN } from '@/lib/durableDm/familyConfli
  *    `verifyCloud`; the other four channels are closed here, by the same
  *    mechanism, so there is one rule rather than two.
  *
+ * Scope, stated exactly, because the first version of this comment claimed
+ * platform text "cannot reach the DOM now" while three render paths outside
+ * the family step still passed `Error.message` through (scoped re-review
+ * N1): every channel below covers the WHOLE wizard — step 0's workspace
+ * discovery and step 1's browser-backup file and record paths included, not
+ * just the family step. A blocked IndexedDB (a private window) rejects
+ * discovery with a raw `DOMException` before the family step is ever
+ * reached, so that step is the one that would have shown platform text
+ * first.
+ *
  * The raw text is never lost — every mapping below logs it to `console.error`
  * first. It is only kept out of the rendered alert.
  */
@@ -92,7 +102,23 @@ export type MigrationErrorChannel =
   /** `adapter.repairAuthority` refused. */
   | 'repair'
   /** `adapter.verifyCloud` rejected (the channel that was already hardened). */
-  | 'verify';
+  | 'verify'
+  /**
+   * Owner-workspace discovery (`createBrowserDmWorkspace` / `list()`)
+   * rejected. Step 0, the FIRST thing a DM sees — and the step the gate's
+   * own blocked-IndexedDB scenario reaches before any other, because
+   * `list()` is IndexedDB-backed and rejects with a raw `DOMException`
+   * there.
+   */
+  | 'discovery'
+  /**
+   * Reading the picked browser-backup file back (`File.text()` —
+   * `NotReadableError`, another raw `DOMException`) or verifying it
+   * against this browser rejected.
+   */
+  | 'backupFile'
+  /** Re-checking / enriching this browser's stored backup record rejected. */
+  | 'backupRecord';
 
 const CHANNEL_FALLBACK_COPY: Record<MigrationErrorChannel, string> = {
   preview:
@@ -103,6 +129,12 @@ const CHANNEL_FALLBACK_COPY: Record<MigrationErrorChannel, string> = {
   repair:
     "This browser's record could not be fixed automatically. Nothing here was changed. Skip this data category for now — your campaign data is still here in this browser.",
   verify: 'This data category could not be checked just now.',
+  discovery:
+    'Your cloud workspaces could not be looked up just now. Nothing in this browser was changed. Try Find my campaigns again in a moment.',
+  backupFile:
+    'This browser could not read that file, or it was saved from different campaign data.',
+  backupRecord:
+    "This browser's backup could not be checked just now. Nothing here was changed. Try again in a moment.",
 };
 
 const CHANNEL_CHANGED_ELSEWHERE_COPY: Record<MigrationErrorChannel, string> = {
@@ -118,6 +150,12 @@ const CHANNEL_CHANGED_ELSEWHERE_COPY: Record<MigrationErrorChannel, string> = {
   // names, and only this channel has one.
   verify:
     'This data category changed somewhere else while this browser was checking it. Try Refresh again.',
+  discovery:
+    'Your cloud workspaces changed somewhere else while this browser was looking them up. Try Find my campaigns again.',
+  backupFile:
+    'This campaign changed somewhere else while this browser was checking that file. Download a fresh browser backup and pick that one up instead.',
+  backupRecord:
+    'This campaign changed somewhere else while this browser was checking its backup. Try again.',
 };
 
 /**
