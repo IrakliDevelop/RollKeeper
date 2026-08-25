@@ -12,14 +12,22 @@ export function campaignSettingsProjectionAuthorityKey(campaignCode: string) {
   return `rollkeeper:campaign-settings-projection-authority:${campaignCode}`;
 }
 
-export function readCampaignSettingsProjectionAuthority(
-  storage: Pick<Storage, 'getItem'>,
-  campaignCode: string
+/**
+ * Parses and validates a raw `localStorage` value into a
+ * `ProjectionAuthorityMarker`, or `null` if it is missing, malformed, or
+ * fails shape validation (wrong `version`, unrecognized `authority`,
+ * non-numeric `epoch`, non-string `campaignId`).
+ *
+ * Deliberately UNFLAGGED -- unlike `readCampaignSettingsProjectionAuthority`
+ * below, this does NOT gate on `isCampaignSettingsClientVisible()`. It is
+ * the shared parsing/validation core for both that flag-gated reader and
+ * any flag-INDEPENDENT caller (e.g. `/dm`'s dashboard hardening, spec R2b),
+ * so both stay in sync on what counts as a valid marker instead of
+ * maintaining two divergent hand-rolled parsers (fix round 1, Minor 3).
+ */
+export function parseProjectionAuthorityMarker(
+  raw: string | null
 ): ProjectionAuthorityMarker | null {
-  if (!isCampaignSettingsClientVisible()) return null;
-  const raw = storage.getItem(
-    campaignSettingsProjectionAuthorityKey(campaignCode)
-  );
   if (!raw) return null;
   try {
     const marker = JSON.parse(raw) as Partial<ProjectionAuthorityMarker>;
@@ -36,6 +44,17 @@ export function readCampaignSettingsProjectionAuthority(
   } catch {
     return null;
   }
+}
+
+export function readCampaignSettingsProjectionAuthority(
+  storage: Pick<Storage, 'getItem'>,
+  campaignCode: string
+): ProjectionAuthorityMarker | null {
+  if (!isCampaignSettingsClientVisible()) return null;
+  const raw = storage.getItem(
+    campaignSettingsProjectionAuthorityKey(campaignCode)
+  );
+  return parseProjectionAuthorityMarker(raw);
 }
 
 export function writeCampaignSettingsProjectionAuthority(

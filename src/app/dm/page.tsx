@@ -25,7 +25,7 @@ import { useHydration } from '@/hooks/useHydration';
 import {
   campaignSettingsProjectionAuthorityKey,
   campaignSettingsUsesIndexedDbAuthority,
-  type ProjectionAuthorityMarker,
+  parseProjectionAuthorityMarker,
 } from '@/lib/durableDm/campaignSettingsLegacyProjection';
 import { isMigrationWizardVisible } from '@/lib/durableDm/slice11gFlags';
 import { CampaignInfo } from '@/types/campaign';
@@ -55,24 +55,38 @@ import { CampaignInfo } from '@/types/campaign';
  * marker at all is untouched.
  *
  * This reuses `campaignSettingsProjectionAuthorityKey` for the storage key
- * (so the key format has exactly one source of truth) but does NOT call
- * `readCampaignSettingsProjectionAuthority` or
+ * and `parseProjectionAuthorityMarker` for shape validation (fix round 1,
+ * Minor 3 -- one validated parser, not a hand-rolled divergent copy) but
+ * does NOT call `readCampaignSettingsProjectionAuthority` or
  * `campaignSettingsUsesIndexedDbAuthority` -- both are gated on
  * `isCampaignSettingsClientVisible()` and would silently disable this
  * hardening whenever that flag is off.
  */
 function campaignSettingsRouted(campaignCode: string): boolean {
   if (typeof window === 'undefined') return false;
-  try {
-    const raw = window.localStorage.getItem(
+  const marker = parseProjectionAuthorityMarker(
+    window.localStorage.getItem(
       campaignSettingsProjectionAuthorityKey(campaignCode)
-    );
-    if (!raw) return false;
-    const marker = JSON.parse(raw) as Partial<ProjectionAuthorityMarker>;
-    return marker.authority === 'indexedDB' || marker.authority === 'postgres';
-  } catch {
-    return false;
-  }
+    )
+  );
+  return marker?.authority === 'indexedDB' || marker?.authority === 'postgres';
+}
+
+/**
+ * Fix round 1, Important 1 (coordinator review): `/dm` renders
+ * `BannerUpload` with `variant="card"`, which is display-only today and
+ * never invokes `onBannerChange` -- so hiding the whole banner region for a
+ * routed campaign closed no reachable write path and only regressed the
+ * banner image's visibility. The real hazard is defence-in-depth: if the
+ * card variant ever grows edit controls, wiring the live callback would
+ * silently revert through `createCampaignSettingsAwareDmStorage` exactly
+ * as R2b describes. So the banner still renders for every campaign, and
+ * ONLY the callback wiring is swapped for a routed campaign -- this
+ * structurally closes the write path without depending on the card variant
+ * staying display-only.
+ */
+function noOpBannerChange(): void {
+  // Intentionally inert -- see doc comment above.
 }
 
 export default function DmDashboardPage() {
@@ -383,16 +397,17 @@ function CampaignCard({
       data-testid={`campaign-card-${campaign.code}`}
       className="border-accent-purple-border bg-surface-raised hover:bg-surface-secondary rounded-lg border-2 shadow-md transition-all hover:shadow-xl"
     >
-      {!routed && (
-        <div aria-label="Campaign banner">
-          <BannerUpload
-            bannerUrl={campaign.bannerUrl}
-            campaignCode={campaign.code}
-            onBannerChange={onBannerChange}
-            variant="card"
-          />
-        </div>
-      )}
+      {/* Fix round 1, Minor 4: this is a test hook, not an accessible
+          label -- a bare `<div>` has no role assistive tech exposes an
+          `aria-label` through, so it named itself honestly instead. */}
+      <div data-testid={`campaign-banner-${campaign.code}`}>
+        <BannerUpload
+          bannerUrl={campaign.bannerUrl}
+          campaignCode={campaign.code}
+          onBannerChange={routed ? noOpBannerChange : onBannerChange}
+          variant="card"
+        />
+      </div>
       <div className="p-6">
         <div className="mb-4">
           <h3 className="text-heading mb-2 text-xl font-semibold">
