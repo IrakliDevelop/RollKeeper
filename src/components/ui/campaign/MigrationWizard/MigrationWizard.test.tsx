@@ -379,11 +379,33 @@ function setViewport(width: number) {
   window.dispatchEvent(new Event('resize'));
 }
 
+/**
+ * Coordinator review round 3, item 1: walks ANCESTORS (the original
+ * pattern, inherited from Task 14) plus DESCENDANTS. The ancestor-only walk
+ * catches `truncate` on the alert container, but a real truncation
+ * regression is just as likely -- more likely -- on the inner detail `<p>`
+ * that actually carries the long copy a narrow column would clip, and that
+ * element is a DESCENDANT of `element`, never an ancestor. Fixed in this
+ * one shared helper so Task 14's own 390px test (which calls it too) gets
+ * the same fix.
+ */
 function assertNoTruncationClasses(element: Element) {
+  // `getAttribute('class')`, not `.className`: an SVG descendant's
+  // `.className` is an `SVGAnimatedString` object, not a plain string, and
+  // this alert content includes icon `<svg>`s -- `.not.toMatch(...)` on that
+  // object would throw rather than assert. `getAttribute` is a plain string
+  // (or null) for every element, HTML or SVG alike.
   let node: Element | null = element;
   while (node) {
-    expect(node.className).not.toMatch(/truncate|line-clamp-|overflow-hidden/);
+    expect(node.getAttribute('class') ?? '').not.toMatch(
+      /truncate|line-clamp-|overflow-hidden/
+    );
     node = node.parentElement;
+  }
+  for (const descendant of Array.from(element.querySelectorAll('*'))) {
+    expect(descendant.getAttribute('class') ?? '').not.toMatch(
+      /truncate|line-clamp-|overflow-hidden/
+    );
   }
 }
 
@@ -748,11 +770,17 @@ function shortHashForTest(hash: string): string {
     : hash;
 }
 
-/** A minimal, directly-usable `MigrationRunContext` for calling an adapter's own methods (e.g. `previewManifest`) straight from a test, without going through the rendered wizard. Matches what `renderRunController`'s fallback context builds. */
-async function minimalMigrationRunContext(
-  family: DurableFamilyName
-): Promise<MigrationRunContext> {
-  void family;
+/**
+ * A minimal, directly-usable `MigrationRunContext` for calling an adapter's
+ * own methods (e.g. `previewManifest`) straight from a test, without going
+ * through the rendered wizard. Matches what `renderRunController`'s
+ * fallback context builds. Deliberately NOT family-scoped -- every stub
+ * adapter shares this same fixed account/campaign/recovery shape, and
+ * `family` only ever selects WHICH adapter instance to call it against
+ * (the caller's job, not this builder's), so a `family` parameter here
+ * would be decorative.
+ */
+async function minimalMigrationRunContext(): Promise<MigrationRunContext> {
   const hash = await currentDeviceHash();
   return {
     accountId: 'account-1',
@@ -1989,7 +2017,7 @@ describe('MigrationWizard — data-category steps', () => {
     expect(note).toHaveTextContent('Campaign');
 
     const adapter = stubFamilies().find(a => a.family === 'campaign_settings')!;
-    const context = await minimalMigrationRunContext('campaign_settings');
+    const context = await minimalMigrationRunContext();
     const manifest = await adapter.previewManifest(context);
     expect(note).toHaveTextContent(shortHashForTest(manifest.fingerprint));
 
@@ -1998,7 +2026,7 @@ describe('MigrationWizard — data-category steps', () => {
     // confirmation. The rendered value must not be satisfiable by any
     // other registered family's fingerprint either.
     const otherAdapter = stubFamilies().find(a => a.family === 'calendar')!;
-    const otherContext = await minimalMigrationRunContext('calendar');
+    const otherContext = await minimalMigrationRunContext();
     const otherManifest = await otherAdapter.previewManifest(otherContext);
     expect(note).not.toHaveTextContent(
       shortHashForTest(otherManifest.fingerprint)
@@ -2311,9 +2339,16 @@ describe('MigrationWizard — data-category steps', () => {
     const spy = vi
       .spyOn(localDatabaseModule, 'openRollkeeperDatabase')
       .mockRejectedValueOnce(new Error('IndexedDB is unavailable'));
-    await renderWizardAtFamilyStep('campaign_settings');
-    const alert = await screen.findByText(/indexeddb is unavailable/i);
-    expect(alert.closest('[role="alert"]')).not.toBeNull();
-    spy.mockRestore();
+    // Coordinator review round 3, item 2(b): `finally`, not a bare trailing
+    // call -- this project sets no global `restoreMocks`/`afterEach`, so a
+    // failure on the line above would otherwise leak this spy into every
+    // later test in the file.
+    try {
+      await renderWizardAtFamilyStep('campaign_settings');
+      const alert = await screen.findByText(/indexeddb is unavailable/i);
+      expect(alert.closest('[role="alert"]')).not.toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
