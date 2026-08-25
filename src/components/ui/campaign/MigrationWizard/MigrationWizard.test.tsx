@@ -1646,6 +1646,59 @@ describe('MigrationWizard — steps 0 and 1', () => {
     expect(await snapshotDurableState()).toBe(before);
   });
 
+  // Final fix wave, gate defect D3: the manual gate found step 1 dead-ending
+  // for a DM whose account has no cloud workspace for the campaign -- "No
+  // cloud workspace found yet", one control that finds nothing again, and no
+  // explanation or route to the action that creates one.
+  it('explains what to do, and links to the dashboard, when the account has no cloud workspace for this campaign', async () => {
+    // The default owner context is signed in and its `list()` returns no
+    // workspaces -- exactly the state the gate hit.
+    render(<MigrationWizard campaignCode="ALPHA" />);
+    const discoverButton = screen.getByRole('button', {
+      name: /find my campaigns/i,
+    });
+    // Before the lookup runs there is nothing to explain, and the guidance
+    // must not be shown: `workspace` is null in that state too.
+    expect(
+      screen.queryByText(/create a cloud workspace for this campaign first/i)
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(discoverButton);
+    await waitFor(() => expect(discoverButton).toBeEnabled());
+
+    const guidance = await screen.findByText(
+      /^create a cloud workspace for this campaign first$/i
+    );
+    expect(guidance.closest('[role="alert"]')).not.toBeNull();
+    expect(
+      screen.getByText(
+        /this wizard moves campaign data into a cloud workspace/i
+      )
+    ).toHaveTextContent('Fork ALPHA to cloud');
+    const link = screen.getByRole('link', { name: /go to my campaigns/i });
+    expect(link).toHaveAttribute('href', '/dm');
+    expectCloudProductVocabulary(document.body);
+  });
+
+  it('shows no missing-workspace guidance once a cloud workspace is found', async () => {
+    mockedCreateBrowserDmWorkspace.mockResolvedValue({
+      ...defaultOwnerContext(),
+      list: vi.fn(async () => [workspaceFor('ALPHA')]),
+    });
+    render(<MigrationWizard campaignCode="ALPHA" />);
+    const discoverButton = screen.getByRole('button', {
+      name: /find my campaigns/i,
+    });
+    await userEvent.click(discoverButton);
+    await screen.findByText(/connected to campaign alpha/i);
+    expect(
+      screen.queryByText(/create a cloud workspace for this campaign first/i)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /go to my campaigns/i })
+    ).not.toBeInTheDocument();
+  });
+
   it('downloads and verifies exactly one bundle for the whole run', async () => {
     await renderWizardAtRecoveryStep();
     await userEvent.click(screen.getByRole('button', { name: /download/i }));

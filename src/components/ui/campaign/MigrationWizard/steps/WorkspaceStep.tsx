@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import {
   AlertTriangle,
   CheckCircle2,
+  ExternalLink,
   RefreshCw,
   ShieldCheck,
 } from 'lucide-react';
@@ -46,6 +48,15 @@ export function WorkspaceStep({
       : discoveryError
         ? 'Not signed in on this browser'
         : 'Sign-in not checked yet';
+  // Final fix wave, gate defect D3: the wizard dead-ended for a DM whose
+  // account has no cloud workspace for this campaign. Step 1 said "No cloud
+  // workspace found yet" and offered only "Find my campaigns", which finds
+  // nothing again -- with no explanation and no route to the action that
+  // actually creates one. This is what tells the two states apart: a lookup
+  // that has NOT run yet (nothing to explain) versus one that ran, found the
+  // signed-in owner, and genuinely has no workspace for this campaign.
+  const searchedAndFoundNothing =
+    signedIn && !workspace && !discovering && !discoveryError;
   const signInBadge = discovering
     ? { variant: 'neutral' as const, label: 'Checking…' }
     : signedIn
@@ -100,7 +111,9 @@ export function WorkspaceStep({
             <p className="text-muted mt-0.5 text-xs">
               {workspace
                 ? `Campaign data will move into this workspace.`
-                : 'Look up your account to find its cloud workspace for this campaign.'}
+                : searchedAndFoundNothing
+                  ? `Your account has no cloud workspace for ${campaignCode} yet, so there is nowhere for this campaign's data to move.`
+                  : 'Look up your account to find its cloud workspace for this campaign.'}
             </p>
           </div>
           <Button
@@ -119,6 +132,36 @@ export function WorkspaceStep({
         <p role="alert" className="text-accent-red-text text-sm">
           {discoveryError}
         </p>
+      )}
+
+      {searchedAndFoundNothing && (
+        <div
+          role="alert"
+          className="border-accent-amber-border bg-accent-amber-bg flex flex-col gap-3 rounded-lg border p-4"
+        >
+          <div>
+            <p className="text-accent-amber-text text-sm font-semibold">
+              Create a cloud workspace for this campaign first
+            </p>
+            <p className="text-accent-amber-text mt-1 text-sm">
+              This wizard moves campaign data into a cloud workspace your
+              account already owns; it never creates one. Open your campaigns
+              dashboard, find the <strong>DM cloud workspace</strong> section,
+              and use <strong>Fork {campaignCode} to cloud</strong> (or{' '}
+              <strong>Create cloud workspace</strong>). Then come back here and
+              choose Find my campaigns again. Nothing in this browser changes
+              until you do.
+            </p>
+          </div>
+          <div>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/dm" className="flex items-center gap-2">
+                <ExternalLink size={14} aria-hidden="true" />
+                Go to my campaigns
+              </Link>
+            </Button>
+          </div>
+        </div>
       )}
 
       <div
