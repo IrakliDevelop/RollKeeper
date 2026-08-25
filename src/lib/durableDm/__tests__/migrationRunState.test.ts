@@ -208,4 +208,38 @@ describe('deriveFamilyStepState', () => {
       })
     ).toBe('rolledBack');
   });
+
+  it('precedence: blocked beats a matching prepared checkpoint', () => {
+    // Satisfies both "blocked" (a manifest blocker present) and "prepared"
+    // (CUTOVER_READY checkpoint backed by a selection matching this run).
+    // Per the pinned order, blocked (step 3) runs before prepared (step 6),
+    // so blocked wins. Covered by implication through the postgres pair
+    // above (blocked also runs before step 4), but stated explicitly since
+    // the brief names this pair directly.
+    expect(
+      deriveFamilyStepState({
+        ...base,
+        selection: runRecovery,
+        preparedState: 'CUTOVER_READY',
+        blockers: [{ kind: 'active-encounter' }],
+      })
+    ).toBe('blocked');
+  });
+
+  it('precedence: notAvailable beats every later rule, including a verified postgres authority', () => {
+    // Satisfies both "notAvailable" (the family's own client flag is off)
+    // and the routed "verified" rule (postgres authority + a passing live
+    // verification). This is the R13-load-bearing case: a family whose flag
+    // is switched off AFTER it migrated must still read `notAvailable`, not
+    // `verified` — otherwise a disabled family could count toward "All
+    // campaign data is synced".
+    expect(
+      deriveFamilyStepState({
+        ...base,
+        enabled: false,
+        authority: { ...legacy, state: 'postgres', epoch: 1 },
+        verification: { verified: true } as never,
+      })
+    ).toBe('notAvailable');
+  });
 });
