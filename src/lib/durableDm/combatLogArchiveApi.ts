@@ -1,3 +1,5 @@
+import { changedOnAnotherBrowserMessage } from './familyConflictMessage';
+
 export async function combatLogArchiveApi<T>(
   body: Record<string, unknown>
 ): Promise<T> {
@@ -9,7 +11,7 @@ export async function combatLogArchiveApi<T>(
   if (!response.ok) {
     const error = new Error(
       response.status === 409
-        ? 'Combat log archives changed on another browser.'
+        ? changedOnAnotherBrowserMessage('Combat log archives')
         : 'Combat log archive cloud request failed.'
     ) as Error & { status?: number };
     error.status = response.status;

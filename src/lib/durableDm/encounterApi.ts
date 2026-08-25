@@ -1,3 +1,5 @@
+import { changedOnAnotherBrowserMessage } from './familyConflictMessage';
+
 export async function encounterApi<T>(
   body: Record<string, unknown>
 ): Promise<T> {
@@ -9,7 +11,7 @@ export async function encounterApi<T>(
   if (!response.ok) {
     const error = new Error(
       response.status === 409
-        ? 'Encounters changed on another browser.'
+        ? changedOnAnotherBrowserMessage('Encounters')
         : 'Encounter cloud request failed.'
     ) as Error & { status?: number };
     error.status = response.status;

@@ -392,7 +392,7 @@ export async function enrollCombatLogArchiveCloudDevice(
   }
 ) {
   if (!options.confirmed)
-    throw new Error('New device enrollment requires confirmation');
+    throw new Error('New browser enrollment requires confirmation');
   if (
     options.epoch < 1 ||
     options.documents.some(document => document.serverVersion < 1)
@@ -415,7 +415,7 @@ export async function enrollCombatLogArchiveCloudDevice(
   if (current && current.authority !== 'localStorage') {
     transaction.abort();
     await completed.catch(() => undefined);
-    throw new Error('This device already has combat log archive authority');
+    throw new Error('This browser already has combat log archive authority');
   }
   const committedAt = options.now();
   const authority = {

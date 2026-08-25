@@ -377,7 +377,7 @@ describe('IndexedDbMagicItemRepository', () => {
         confirmed: true,
         lossConfirmed: false,
       })
-    ).rejects.toThrow(/device-only work/i);
+    ).rejects.toThrow(/browser-only work/i);
     await expect(
       repo.removeAccountFromDevice('guest', {
         confirmed: true,

@@ -25,6 +25,7 @@ import { MAGIC_ITEM_FAMILY_INVENTORY } from '@/lib/durableDm/magicItemFamily';
 import { NPC_FAMILY_INVENTORY } from '@/lib/durableDm/npcFamily';
 import { ENCOUNTER_FAMILY_INVENTORY } from '@/lib/durableDm/encounterFamily';
 import { COMBAT_LOG_ARCHIVE_FAMILY_INVENTORY } from '@/lib/durableDm/combatLogArchiveFamily';
+import { CHANGED_ON_ANOTHER_BROWSER_PATTERN } from '@/lib/durableDm/familyConflictMessage';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 import {
   createBrowserDmWorkspace,
@@ -105,10 +106,15 @@ const FAMILY_LOCAL_STORAGE_KEYS: Record<DurableFamilyName, readonly string[]> =
  * `verifyCloud` call's `Error.message` must NEVER reach the DM verbatim --
  * it is internal error text, not product copy. Two concrete hazards this
  * closes:
- *   - all six `*Api` gateways (`npcApi.ts:10` and its five siblings) throw
- *     `'<Family> changed on another browser.'` on HTTP 409, from EVERY RPC
- *     including `preview-enrollment` -- rendering it verbatim would leak
- *     internal phrasing that has not been vetted as product copy;
+ *   - all six `*Api` gateways (`npcApi.ts` and its five siblings) build
+ *     `'<Family> changed on another browser.'` via the shared
+ *     `changedOnAnotherBrowserMessage` (`familyConflictMessage.ts`) on HTTP
+ *     409, from EVERY RPC including `preview-enrollment` -- rendering it
+ *     verbatim would leak internal phrasing that has not been vetted as
+ *     product copy. `CHANGED_ON_ANOTHER_BROWSER_PATTERN`, from the same
+ *     module, is what recognizes it below -- keeping producer and consumer
+ *     derived from one source so a rewrite of either cannot silently
+ *     desynchronize from the other (see `familyConflictMessage.test.ts`);
  *   - any OTHER thrown message (a raw `DOMException`, a fetch failure, an
  *     unrecognised server error) is equally not vetted product copy and
  *     must not be shown either.
@@ -122,7 +128,7 @@ function reportFriendlyVerificationError(reason: unknown): string {
   // Deliberate: the technical detail belongs in the console, never in the
   // rendered alert (see doc comment above).
   console.error('[MigrationWizard] verifyCloud failed:', raw);
-  if (/changed on another browser/i.test(raw)) {
+  if (CHANGED_ON_ANOTHER_BROWSER_PATTERN.test(raw)) {
     return 'This data category changed somewhere else while this browser was checking it. Try Refresh again.';
   }
   return 'This data category could not be checked just now.';

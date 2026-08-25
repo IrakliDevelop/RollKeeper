@@ -11,6 +11,7 @@ import {
   type NpcOutboxEntry,
 } from '@/lib/indexeddb/npcRepository';
 
+import { changedOnAnotherBrowserMessage } from './familyConflictMessage';
 import type { NpcPayload } from './npcFamily';
 import { NpcHttpGateway } from './npcHttpGateway';
 import { NpcSyncService } from './npcSyncService';
@@ -261,7 +262,7 @@ describe('NpcHttpGateway', () => {
         .mockResolvedValue({ ok: false, status: 409, json: async () => ({}) })
     );
     await expect(new NpcHttpGateway().put(entry)).rejects.toMatchObject({
-      message: 'NPCs changed on another browser.',
+      message: changedOnAnotherBrowserMessage('NPCs'),
       status: 409,
     });
 

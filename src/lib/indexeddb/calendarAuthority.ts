@@ -356,7 +356,7 @@ export async function enrollCalendarCloudDevice(
   }
 ) {
   if (!options.confirmed)
-    throw new Error('New device enrollment requires confirmation');
+    throw new Error('New browser enrollment requires confirmation');
   if (options.epoch < 1 || options.serverVersion < 1) {
     throw new Error('A durable cloud generation is required');
   }
@@ -376,7 +376,7 @@ export async function enrollCalendarCloudDevice(
   if (current && current.authority !== 'localStorage') {
     transaction.abort();
     await completed.catch(() => undefined);
-    throw new Error('This device already has calendar authority');
+    throw new Error('This browser already has calendar authority');
   }
   const committedAt = options.now();
   const authority = {

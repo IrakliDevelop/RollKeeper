@@ -20,6 +20,7 @@ import {
   verifyDownloadedDeviceBackup,
 } from '@/lib/deviceRecovery';
 import { decideAuthorityRepair } from '@/lib/durableDm/authorityRepair';
+import { changedOnAnotherBrowserMessage } from '@/lib/durableDm/familyConflictMessage';
 import type {
   DurableFamilyAdapter,
   DurableFamilyName,
@@ -2810,13 +2811,12 @@ describe('MigrationWizard — report', () => {
     // sentence below.
     await openReport();
     await waitFor(() => expect(verifySpyCallCount()).toBe(6));
-    throwVerificationFor('npc', 'NPCs changed on another browser.');
+    const rawMessage = changedOnAnotherBrowserMessage('NPCs');
+    throwVerificationFor('npc', rawMessage);
     await refreshReport();
     const alert = await screen.findByTestId('verification-error-alert');
     expect(alert).toHaveAttribute('role', 'alert');
-    expect(
-      within(alert).queryByText('NPCs changed on another browser.')
-    ).not.toBeInTheDocument();
+    expect(within(alert).queryByText(rawMessage)).not.toBeInTheDocument();
     expect(within(alert).getByText(/npc/i)).toBeInTheDocument();
     // The known-failure-class mapping actually branched (not just "always
     // generic") -- this is the SPECIFIC clean sentence for a conflict, not
@@ -2826,6 +2826,10 @@ describe('MigrationWizard — report', () => {
         /changed somewhere else while this browser was checking/i
       )
     ).toBeInTheDocument();
+    // Minor 5 (coordinator review round 1): none of the seven existing
+    // `expectCloudProductVocabulary` call sites reach the verification-error
+    // alert's mapped state -- add one here.
+    expectCloudProductVocabulary(document.body);
   });
 
   it('falls back to the generic clean message for an unrecognised verification failure', async () => {

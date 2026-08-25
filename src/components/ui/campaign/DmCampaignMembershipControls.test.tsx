@@ -9,6 +9,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 
+import { expectCloudProductVocabulary } from '@/test/helpers';
+
 import { DmCampaignMembershipControls } from './DmCampaignMembershipControls';
 
 const workspace: DmWorkspaceDocument = {
@@ -140,7 +142,9 @@ describe('DmCampaignMembershipControls', () => {
         json: async () => ({ authority: 'postgres', epoch: 1 }),
       });
     vi.stubGlobal('fetch', fetchMock);
-    render(<DmCampaignMembershipControls workspaces={[workspace]} />);
+    const { container } = render(
+      <DmCampaignMembershipControls workspaces={[workspace]} />
+    );
     fireEvent.click(
       screen.getByRole('button', { name: 'Refresh exact readiness manifest' })
     );
@@ -175,6 +179,10 @@ describe('DmCampaignMembershipControls', () => {
       fingerprint,
       version: 3,
     });
+    // Coordinator review round 1, Minor 4: this surface's copy changed
+    // (`Membership authority is Postgres at epoch ${e}. Redis live runtime
+    // and every data category are unchanged.`) with no vocabulary guard.
+    expectCloudProductVocabulary(container);
   });
 
   it('uses invitation IDs as readiness row keys when one account has multiple invitations', async () => {

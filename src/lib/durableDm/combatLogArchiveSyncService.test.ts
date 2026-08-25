@@ -11,6 +11,7 @@ import {
   type CombatLogArchiveOutboxEntry,
 } from '@/lib/indexeddb/combatLogArchiveRepository';
 
+import { changedOnAnotherBrowserMessage } from './familyConflictMessage';
 import type { CombatLogArchivePayload } from './combatLogArchiveFamily';
 import { CombatLogArchiveHttpGateway } from './combatLogArchiveHttpGateway';
 import { CombatLogArchiveSyncService } from './combatLogArchiveSyncService';
@@ -271,7 +272,7 @@ describe('CombatLogArchiveHttpGateway', () => {
     await expect(
       new CombatLogArchiveHttpGateway().put(entry)
     ).rejects.toMatchObject({
-      message: 'Combat log archives changed on another browser.',
+      message: changedOnAnotherBrowserMessage('Combat log archives'),
       status: 409,
     });
 

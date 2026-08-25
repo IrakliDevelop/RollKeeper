@@ -11,6 +11,7 @@ import {
   type EncounterOutboxEntry,
 } from '@/lib/indexeddb/encounterRepository';
 
+import { changedOnAnotherBrowserMessage } from './familyConflictMessage';
 import type { EncounterPayload } from './encounterFamily';
 import { EncounterHttpGateway } from './encounterHttpGateway';
 import { EncounterSyncService } from './encounterSyncService';
@@ -263,7 +264,7 @@ describe('EncounterHttpGateway', () => {
         .mockResolvedValue({ ok: false, status: 409, json: async () => ({}) })
     );
     await expect(new EncounterHttpGateway().put(entry)).rejects.toMatchObject({
-      message: 'Encounters changed on another browser.',
+      message: changedOnAnotherBrowserMessage('Encounters'),
       status: 409,
     });
 

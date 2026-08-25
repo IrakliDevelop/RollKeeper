@@ -451,7 +451,7 @@ export class IndexedDbNpcRepository {
   ): Promise<void> {
     if (namespace === 'guest') throw new Error('Account namespace is required');
     if (!options.confirmed)
-      throw new Error('Device removal requires confirmation');
+      throw new Error('Browser removal requires confirmation');
     const transaction = this.database.transaction(
       ['meta', 'outbox'],
       'readwrite'
@@ -470,7 +470,7 @@ export class IndexedDbNpcRepository {
       transaction.abort();
       await transactionComplete(transaction).catch(() => undefined);
       throw new Error(
-        'Unresolved device-only work requires explicit loss confirmation'
+        'Unresolved browser-only work requires explicit loss confirmation'
       );
     }
     transaction.objectStore('meta').put({

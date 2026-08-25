@@ -1,3 +1,5 @@
+import { changedOnAnotherBrowserMessage } from './familyConflictMessage';
+
 export async function campaignSettingsApi<T>(
   body: Record<string, unknown>
 ): Promise<T> {
@@ -9,7 +11,7 @@ export async function campaignSettingsApi<T>(
   if (!response.ok) {
     const error = new Error(
       response.status === 409
-        ? 'Campaign settings changed on another browser.'
+        ? changedOnAnotherBrowserMessage('Campaign settings')
         : 'Campaign settings cloud request failed.'
     ) as Error & { status?: number };
     error.status = response.status;

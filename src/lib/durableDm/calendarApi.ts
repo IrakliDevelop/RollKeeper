@@ -1,3 +1,5 @@
+import { changedOnAnotherBrowserMessage } from './familyConflictMessage';
+
 export async function calendarApi<T>(
   body: Record<string, unknown>
 ): Promise<T> {
@@ -9,7 +11,7 @@ export async function calendarApi<T>(
   if (!response.ok) {
     const error = new Error(
       response.status === 409
-        ? 'Calendar changed on another browser.'
+        ? changedOnAnotherBrowserMessage('Calendar')
         : 'Calendar cloud request failed.'
     ) as Error & { status?: number };
     error.status = response.status;

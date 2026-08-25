@@ -890,7 +890,7 @@ describe('combat log archive local authority', () => {
         preserveDivergentCandidate: true,
         now: () => 'now',
       })
-    ).rejects.toThrow('New device enrollment requires confirmation');
+    ).rejects.toThrow('New browser enrollment requires confirmation');
     const authority = await enrollCombatLogArchiveCloudDevice(database, {
       namespace: NAMESPACE,
       campaignId: CAMPAIGN,
@@ -1114,7 +1114,7 @@ describe('combat log archive local authority', () => {
     ).resolves.toMatchObject({ authority: 'postgres', epoch: 1 });
     await expect(
       enrollCombatLogArchiveCloudDevice(database, base)
-    ).rejects.toThrow('This device already has combat log archive authority');
+    ).rejects.toThrow('This browser already has combat log archive authority');
     database.close();
   });
 
