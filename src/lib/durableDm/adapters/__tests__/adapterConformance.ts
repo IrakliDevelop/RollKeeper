@@ -84,6 +84,36 @@ export interface ConformanceHarness {
   /** Marker/pointer states for Task 13b's repair cases. */
   pointerState(): Promise<'localStorage' | 'indexedDB' | 'postgres'>;
   /**
+   * Ruling R9.9: drives the family through a REAL local cutover (so the
+   * IndexedDB pointer, its generation and its documents are all genuine,
+   * gate-verified production output at epoch 1), then deletes ONLY the
+   * localStorage marker — reproducing the interruption spec R5b exists to
+   * describe: the pointer-advancing transaction committed, and the
+   * SEPARATE marker write after it never happened. This is the only seed
+   * from which `repairAuthority`'s `state: 'indexedDB'` outcome is
+   * reachable, because it is the only one where a REAL prepared generation
+   * with real documents backs the pointer.
+   */
+  seedMarkerPointerDisagreement(): Promise<MigrationRunContext>;
+  /**
+   * Ruling R9.9: writes ONLY the localStorage marker, at epoch 1, through
+   * the family's own write function — WITHOUT ever running select/prepare/
+   * commit, so the real IndexedDB pointer is left at `legacy`. This is
+   * `repairAuthority`'s block case: a marker with nothing behind it in
+   * IndexedDB, exactly spec R5b's "a marker is a cheap write with nothing
+   * behind it; a marker ahead is not evidence".
+   */
+  seedMarkerAheadOfPointer(): Promise<MigrationRunContext>;
+  /**
+   * Deletes ONLY the family's localStorage authority marker, leaving the
+   * IndexedDB pointer (and every document) untouched. The low-level
+   * primitive both named seeds above build on, also reused directly by the
+   * postgres-ahead conformance test below (composed with
+   * `runChainThroughCloudActivation` rather than its own named seed, since
+   * ruling R9.9 names exactly two seeds).
+   */
+  deleteAuthorityMarker(): Promise<void>;
+  /**
    * Fix round 1, item 5: changes the family's legacy source in a way that
    * changes its manifest fingerprint, without re-running `prepareIndexedDb`
    * — proves `commitLocalCutover` re-checks the source manifest rather than
@@ -316,6 +346,65 @@ export function describeAdapterConformance(
     } finally {
       isVisible.mockRestore();
     }
+  });
+
+  it(`${name}: repairAuthority is a no-op that changes nothing when the authority is already resolved`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    const before = await harness.snapshot();
+    const result = await harness.adapter.repairAuthority(context);
+    expect(result).toMatchObject({ state: 'legacy' });
+    expect(await harness.snapshot()).toBe(before);
+  });
+
+  it(`${name}: repairAuthority refuses (never guesses) when the marker is ahead of the pointer — R5b row 1`, async () => {
+    const harness = createHarness();
+    const context = await harness.seedMarkerAheadOfPointer();
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'inconsistent',
+    });
+    const before = await harness.snapshot();
+    await expect(harness.adapter.repairAuthority(context)).rejects.toThrow();
+    // The refusal must not have written anything — a block that silently
+    // mutated storage on its way to rejecting would be exactly the "guessed
+    // wrong" failure mode this method exists to prevent.
+    expect(await harness.snapshot()).toBe(before);
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'inconsistent',
+    });
+  });
+
+  it(`${name}: repairAuthority resolves to indexedDB when the pointer is genuinely ahead of the marker — R5b row 2`, async () => {
+    const harness = createHarness();
+    const context = await harness.seedMarkerPointerDisagreement();
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'inconsistent',
+    });
+    const repaired = await harness.adapter.repairAuthority(context);
+    expect(repaired).toMatchObject({ state: 'indexedDB', epoch: 1 });
+    // The write actually happened — a fresh `readAuthority` call, not the
+    // repair's own return value, is what proves the marker was written
+    // rather than merely computed.
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'indexedDB',
+      epoch: 1,
+    });
+  });
+
+  it(`${name}: repairAuthority resolves to postgres when the pointer is genuinely ahead of the marker at postgres — R5b row 3`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    await harness.deleteAuthorityMarker();
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'inconsistent',
+    });
+    const repaired = await harness.adapter.repairAuthority(context);
+    expect(repaired).toMatchObject({ state: 'postgres', epoch: 1 });
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'postgres',
+      epoch: 1,
+    });
   });
 
   it(`${name}: selectFamily refuses without a verified receipt for this run`, async () => {

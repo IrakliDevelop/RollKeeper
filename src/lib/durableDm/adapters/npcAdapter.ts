@@ -50,6 +50,7 @@ import { IndexedDbDmWorkspaceRepository } from '@/lib/indexeddb/dmWorkspaceRepos
 // library modules, exactly as the other five adapters already do, never
 // through the route-scoped owner or its React context.
 
+import { decideAuthorityRepair } from '../authorityRepair';
 import {
   normalizeFamilyAuthority,
   toAuthorityPointerView,
@@ -61,7 +62,11 @@ import type {
   FamilyManifestHandle,
   FamilyVerification,
 } from '../durableFamilyAdapter';
-import { deviceIdFor } from './shared';
+import {
+  deviceIdFor,
+  verifyPostgresGenerationParity,
+  verifyPreparedGeneration,
+} from './shared';
 
 interface NpcEnrollmentDocument {
   legacyId: string;
@@ -626,6 +631,116 @@ export const npcAdapter: DurableFamilyAdapter<NpcManifest> = {
       accountId: context.accountId,
       campaignId: context.campaignId,
     });
+  },
+
+  async repairAuthority(context) {
+    const authority = await this.readAuthority(context);
+    if (authority.state !== 'inconsistent') return authority;
+
+    const namespace = `user:${context.accountId}` as const;
+    const database = await openRollkeeperDatabase();
+    let rawPointer;
+    try {
+      rawPointer = await readNpcAuthority(
+        database,
+        namespace,
+        context.campaignId
+      );
+    } finally {
+      database.close();
+    }
+
+    const decision = await decideAuthorityRepair({
+      reason: authority.reason,
+      observed: authority.observed,
+      evidence: {
+        async verifyIndexedDbGeneration() {
+          // Not redundant with `decideAuthorityRepair`'s own branch selection:
+          // TypeScript's control-flow narrowing on `rawPointer` (a closured `let`)
+          // is what lets `rawPointer.generation` below type-check at all — remove
+          // this guard and the file fails to compile (verified in task-13b's
+          // mutation pass). It also re-confirms, from a FRESH read, that the
+          // pointer this evidence call is about to trust still says `indexedDB`.
+          if (rawPointer.authority !== 'indexedDB') return false;
+          const evidenceDatabase = await openRollkeeperDatabase();
+          try {
+            const preparedOk = await verifyPreparedGeneration(
+              evidenceDatabase,
+              'npc',
+              namespace,
+              context.campaignId,
+              rawPointer.generation
+            );
+            if (!preparedOk) return false;
+            const documents = await new IndexedDbNpcRepository(
+              evidenceDatabase
+            ).listDocuments(namespace, context.campaignId);
+            return (
+              documents.length > 0 &&
+              documents.every(document => !!document.contentFingerprint)
+            );
+          } finally {
+            evidenceDatabase.close();
+          }
+        },
+        async verifyPostgresParity() {
+          const preview = await npcApi<NpcEnrollmentPreview>({
+            action: 'preview-enrollment',
+            campaignId: context.campaignId,
+          });
+          const normalizedPreview =
+            preview.authority === 'postgres'
+              ? {
+                  authority: 'postgres' as const,
+                  epoch: preview.epoch,
+                  previewFingerprint: preview.previewFingerprint,
+                  recordCount: preview.recordCount,
+                  documents: (preview.documents ?? []).map(document => ({
+                    legacyId: document.legacyId,
+                    serverVersion: document.serverVersion,
+                    schemaVersion: document.schemaVersion,
+                    payloadFingerprint: document.payloadFingerprint,
+                    tombstoned: document.tombstoned,
+                  })),
+                }
+              : { authority: 'legacy' as const };
+          const evidenceDatabase = await openRollkeeperDatabase();
+          try {
+            const documents = await new IndexedDbNpcRepository(
+              evidenceDatabase
+            ).listDocuments(namespace, context.campaignId);
+            const localDocuments = documents.map(document => ({
+              legacyId: document.legacyId,
+              payloadFingerprint: document.contentFingerprint,
+              schemaVersion: document.schemaVersion,
+              tombstoned: document.operation === 'delete',
+            }));
+            return verifyPostgresGenerationParity(
+              normalizedPreview,
+              rawPointer.epoch,
+              localDocuments
+            );
+          } finally {
+            evidenceDatabase.close();
+          }
+        },
+      },
+    });
+
+    if (decision.action === 'block')
+      throw new Error(
+        `This browser's NPC migration record disagrees with the server and could not be safely repaired. ${decision.reason}`
+      );
+
+    writeNpcAuthorityMarker(localStorage, context.campaignCode, {
+      version: 1,
+      authority: decision.authority,
+      epoch: decision.epoch,
+      campaignId: context.campaignId,
+      namespace,
+    });
+
+    return this.readAuthority(context);
   },
 
   async rollback(context) {

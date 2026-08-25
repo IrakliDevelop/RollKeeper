@@ -878,6 +878,41 @@ export function createCalendarHarness(): CalendarConformanceHarness {
       }
     },
 
+    async deleteAuthorityMarker() {
+      localStorage.removeItem(
+        calendarLegacyProjectionModule.calendarProjectionAuthorityKey(
+          CAMPAIGN_CODE
+        )
+      );
+    },
+
+    async seedMarkerPointerDisagreement() {
+      const context = await seedWithEnvelope(envelope());
+      await runChainThroughLocalCutover(context);
+      localStorage.removeItem(
+        calendarLegacyProjectionModule.calendarProjectionAuthorityKey(
+          CAMPAIGN_CODE
+        )
+      );
+      return context;
+    },
+
+    async seedMarkerAheadOfPointer() {
+      const context = await seedWithEnvelope(envelope());
+      calendarLegacyProjectionModule.writeCalendarProjectionAuthority(
+        localStorage,
+        CAMPAIGN_CODE,
+        {
+          version: 1,
+          authority: 'indexedDB',
+          epoch: 1,
+          campaignId: CAMPAIGN_ID,
+          namespace: NAMESPACE,
+        }
+      );
+      return context;
+    },
+
     /**
      * Changes the legacy source in a way that changes its manifest
      * fingerprint without re-running `prepareIndexedDb`.

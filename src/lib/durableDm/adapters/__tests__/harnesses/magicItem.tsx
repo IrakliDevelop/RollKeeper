@@ -900,6 +900,33 @@ export function createMagicItemHarness(): MagicItemConformanceHarness {
       cutoverSink = sink;
     },
 
+    async deleteAuthorityMarker() {
+      localStorage.removeItem(magicItemAuthorityKey(CAMPAIGN_CODE));
+    },
+
+    async seedMarkerPointerDisagreement() {
+      const context = await this.seed();
+      await runChainThroughLocalCutover(context);
+      localStorage.removeItem(magicItemAuthorityKey(CAMPAIGN_CODE));
+      return context;
+    },
+
+    async seedMarkerAheadOfPointer() {
+      const context = await this.seed();
+      magicItemLegacyAuthorityModule.writeMagicItemAuthorityMarker(
+        localStorage,
+        CAMPAIGN_CODE,
+        {
+          version: 1,
+          authority: 'indexedDB',
+          epoch: 1,
+          campaignId: CAMPAIGN_ID,
+          namespace: NAMESPACE,
+        }
+      );
+      return context;
+    },
+
     async pointerState() {
       const database = await openRollkeeperDatabase();
       try {

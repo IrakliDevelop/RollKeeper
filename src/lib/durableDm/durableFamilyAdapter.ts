@@ -4,11 +4,7 @@ import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository'
 
 /**
  * Slice 11G registers exactly these six already-shipped durable data
- * categories. `repairAuthority` (spec R1's final surface member) is
- * deliberately absent from `DurableFamilyAdapter` below: Task 13b adds it,
- * plus all six implementations, in one commit (rulings R7.3, C3). Declaring it
- * earlier would make every Task 7-12 commit fail to satisfy the interface
- * before an implementation exists.
+ * categories.
  */
 export type DurableFamilyName =
   | 'campaign_settings'
@@ -149,4 +145,22 @@ export interface DurableFamilyAdapter<TNative = unknown> {
     >
   ): Promise<NormalizedAuthority>;
   rollback(context: MigrationRunContext): Promise<{ epoch: number }>;
+  /**
+   * Task 13b, ruling R7.3: the interface's final member, added together
+   * with all six implementations in one commit so no intermediate state
+   * ships without it. Resolves a `readAuthority` result of `inconsistent`
+   * per spec R5b's decision table (`src/lib/durableDm/authorityRepair.ts`
+   * makes the decision; this method gathers the family-specific evidence
+   * and performs the write). A no-op that returns the current
+   * `NormalizedAuthority` unchanged when there is nothing to repair.
+   * REFUSES — rejects rather than resolving to a lying "fixed" state — when
+   * R5b's evidence does not support a repair, so a caller must never treat
+   * a rejection as anything other than "still inconsistent, still blocked".
+   */
+  repairAuthority(
+    context: Pick<
+      MigrationRunContext,
+      'accountId' | 'campaignId' | 'campaignCode'
+    >
+  ): Promise<NormalizedAuthority>;
 }

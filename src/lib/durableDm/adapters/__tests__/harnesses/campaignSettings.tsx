@@ -843,6 +843,41 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
       }
     },
 
+    async deleteAuthorityMarker() {
+      localStorage.removeItem(
+        campaignSettingsLegacyProjectionModule.campaignSettingsProjectionAuthorityKey(
+          CAMPAIGN_CODE
+        )
+      );
+    },
+
+    async seedMarkerPointerDisagreement() {
+      const context = await seedWithEnvelope(envelope());
+      await runChainThroughLocalCutover(context);
+      localStorage.removeItem(
+        campaignSettingsLegacyProjectionModule.campaignSettingsProjectionAuthorityKey(
+          CAMPAIGN_CODE
+        )
+      );
+      return context;
+    },
+
+    async seedMarkerAheadOfPointer() {
+      const context = await seedWithEnvelope(envelope());
+      campaignSettingsLegacyProjectionModule.writeCampaignSettingsProjectionAuthority(
+        localStorage,
+        CAMPAIGN_CODE,
+        {
+          version: 1,
+          authority: 'indexedDB',
+          epoch: 1,
+          campaignId: CAMPAIGN_ID,
+          namespace: NAMESPACE,
+        }
+      );
+      return context;
+    },
+
     // ---------------------------------------------------------------------
     // Fix round 1 additions.
     // ---------------------------------------------------------------------

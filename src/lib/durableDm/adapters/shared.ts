@@ -1,4 +1,13 @@
-import type { CloudEnrollmentPreview } from '../resumableCloudActivation';
+import {
+  requestResult,
+  transactionComplete,
+} from '@/lib/indexeddb/localDatabase';
+
+import {
+  matchesManifest,
+  type ActivationManifestRecord,
+  type CloudEnrollmentPreview,
+} from '../resumableCloudActivation';
 
 /**
  * Ruling R8.2: extracted rather than duplicated into every adapter that
@@ -61,4 +70,73 @@ export function deviceIdFor(
     localStorage.setItem(key, deviceId);
   }
   return deviceId;
+}
+
+/**
+ * Task 13b's evidence for R5b row 2 ("verify the prepared generation").
+ * Independently re-reads the SAME `migration-state:<namespace>:<familyKey>:
+ * <campaignId>` `meta` record every `commit*LocalCutover` gates its own
+ * write on (`src/lib/indexeddb/*Authority.ts`, `keys().state`), rather than
+ * trusting that the IndexedDB pointer being at `indexedDB` is sufficient by
+ * itself. A pointer record can only exist if a real cutover transaction
+ * wrote it, but re-checking the state record here — after the fact, from a
+ * fresh transaction — is what makes this a genuine second look rather than
+ * repair simply believing what the pointer says about itself.
+ *
+ * `IDB_PRIMARY` is the state `commit*LocalCutover` checkpoints to
+ * immediately after writing the pointer (see e.g.
+ * `commitCampaignSettingsLocalCutover`), and it always carries the ORIGINAL
+ * `CUTOVER_READY` generation's `runId` forward unchanged — so `runId ===
+ * generation` ties this specific state record to the specific pointer
+ * generation being repaired, not just to "cutover happened at some point".
+ */
+export async function verifyPreparedGeneration(
+  database: IDBDatabase,
+  familyKey: string,
+  namespace: string,
+  campaignId: string,
+  generation: string
+): Promise<boolean> {
+  const transaction = database.transaction('meta', 'readonly');
+  const state = (await requestResult(
+    transaction
+      .objectStore('meta')
+      .get(`migration-state:${namespace}:${familyKey}:${campaignId}`)
+  )) as { state?: string; runId?: string } | undefined;
+  await transactionComplete(transaction);
+  return state?.state === 'IDB_PRIMARY' && state?.runId === generation;
+}
+
+/**
+ * Task 13b's evidence for R5b row 3: "Require `preview.epoch ===
+ * pointer.epoch` AND exact document parity." `expectedEpoch` must be the
+ * PONTER's epoch (the side being verified), never `expectedEpoch + 1` as
+ * `runResumableCloudActivation` checks during activation — that check is
+ * for a run activating INTO a new epoch; this one is confirming a pointer
+ * that already claims to BE at `postgres` at a specific epoch.
+ *
+ * Document parity reuses `matchesManifest` rather than a second comparison:
+ * the exact same legacyId/fingerprint/schemaVersion/tombstone/count rule
+ * spec R5b names for this row is the rule `resumableCloudActivation.ts`
+ * already enforces for the response-lost reconciliation case, and
+ * reimplementing it here would risk the two definitions of "parity"
+ * drifting apart silently.
+ */
+export function verifyPostgresGenerationParity(
+  preview: CloudEnrollmentPreview,
+  expectedEpoch: number,
+  localDocuments: readonly ActivationManifestRecord[]
+): boolean {
+  // No separate `typeof preview.epoch === 'number'` guard: `===` never
+  // coerces, so an absent `preview.epoch` (`undefined`) can only equal a
+  // caller-supplied `expectedEpoch` that is ALSO `undefined` — which the
+  // `number` parameter type rules out for every real caller — and cannot
+  // equal a genuine epoch number. A redundant typeof check here would be
+  // untestable dead weight (task-13b's own standing instruction against
+  // guards that cannot fail).
+  return (
+    preview.authority === 'postgres' &&
+    preview.epoch === expectedEpoch &&
+    matchesManifest(preview, localDocuments)
+  );
 }

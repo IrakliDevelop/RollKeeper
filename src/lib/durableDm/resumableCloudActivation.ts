@@ -132,7 +132,14 @@ export type ResumableActivationResult =
  * did not produce, and reconciling the local pointer to it would silently
  * adopt it.
  */
-function matchesManifest(
+/**
+ * Exported for reuse by `authorityRepair.ts`'s adapter wiring (Task 13b):
+ * R5b's postgres-ahead-of-marker repair row needs the exact same
+ * legacyId/fingerprint/schemaVersion/tombstone/count parity this function
+ * already enforces for a response-lost activation. Reimplementing the
+ * comparison a second time would risk the two drifting apart silently.
+ */
+export function matchesManifest(
   preview: CloudEnrollmentPreview,
   records: readonly ActivationManifestRecord[]
 ): boolean {

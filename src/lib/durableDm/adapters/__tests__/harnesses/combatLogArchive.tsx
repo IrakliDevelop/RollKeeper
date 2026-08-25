@@ -971,6 +971,33 @@ export function createCombatLogArchiveHarness(): CombatLogArchiveConformanceHarn
       cutoverSink = sink;
     },
 
+    async deleteAuthorityMarker() {
+      localStorage.removeItem(combatLogArchiveAuthorityKey(CAMPAIGN_CODE));
+    },
+
+    async seedMarkerPointerDisagreement() {
+      const context = await this.seed();
+      await runChainThroughLocalCutover(context);
+      localStorage.removeItem(combatLogArchiveAuthorityKey(CAMPAIGN_CODE));
+      return context;
+    },
+
+    async seedMarkerAheadOfPointer() {
+      const context = await this.seed();
+      combatLogArchiveLegacyAuthorityModule.writeCombatLogArchiveAuthorityMarker(
+        localStorage,
+        {
+          version: 1,
+          campaignCode: CAMPAIGN_CODE,
+          authority: 'indexedDB',
+          epoch: 1,
+          accountId: ACCOUNT_ID,
+          campaignId: CAMPAIGN_ID,
+        }
+      );
+      return context;
+    },
+
     async pointerState() {
       const database = await openRollkeeperDatabase();
       try {

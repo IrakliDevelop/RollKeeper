@@ -939,6 +939,33 @@ export function createEncounterHarness(): EncounterConformanceHarness {
       cutoverSink = sink;
     },
 
+    async deleteAuthorityMarker() {
+      localStorage.removeItem(encounterAuthorityKey(CAMPAIGN_CODE));
+    },
+
+    async seedMarkerPointerDisagreement() {
+      const context = await this.seed();
+      await runChainThroughLocalCutover(context);
+      localStorage.removeItem(encounterAuthorityKey(CAMPAIGN_CODE));
+      return context;
+    },
+
+    async seedMarkerAheadOfPointer() {
+      const context = await this.seed();
+      encounterLegacyAuthorityModule.writeEncounterAuthorityMarker(
+        localStorage,
+        CAMPAIGN_CODE,
+        {
+          version: 1,
+          authority: 'indexedDB',
+          epoch: 1,
+          campaignId: CAMPAIGN_ID,
+          namespace: NAMESPACE,
+        }
+      );
+      return context;
+    },
+
     async pointerState() {
       const database = await openRollkeeperDatabase();
       try {
