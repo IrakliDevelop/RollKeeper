@@ -41,6 +41,7 @@ import {
   requestResult,
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
+import * as localDatabaseModule from '@/lib/indexeddb/localDatabase';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 import { selectCampaignSettings } from '@/lib/indexeddb/campaignSettingsSelection';
 import { createBrowserDmWorkspace } from '@/lib/supabase/browserDmWorkspace';
@@ -563,7 +564,7 @@ function stubAdapter(
 ): DurableFamilyAdapter {
   const manifest: FamilyManifestHandle = {
     family,
-    fingerprint: `fingerprint-${family}`,
+    fingerprint: `${family}-fingerprint`,
     recordCount: options.manifest?.recordCount ?? 3,
     totalBytes: options.manifest?.totalBytes ?? 4096,
     blockers: options.manifest?.blockers ?? [],
@@ -737,6 +738,46 @@ function disableAllFamiliesExcept(family: DurableFamilyName) {
 
 function confirmationPhraseFor(family: DurableFamilyName): string {
   return `move ${family}`;
+}
+
+/** Mirrors `steps/RecoveryStep.tsx`/`steps/FamilyStep.tsx`'s own `FINGERPRINT_DISPLAY_LENGTH`/`shortHash` truncation, so a test can compute the expected on-screen value instead of asserting a literal. */
+const FINGERPRINT_DISPLAY_LENGTH_FOR_TEST = 12;
+function shortHashForTest(hash: string): string {
+  return hash.length > FINGERPRINT_DISPLAY_LENGTH_FOR_TEST
+    ? `${hash.slice(0, FINGERPRINT_DISPLAY_LENGTH_FOR_TEST)}…`
+    : hash;
+}
+
+/** A minimal, directly-usable `MigrationRunContext` for calling an adapter's own methods (e.g. `previewManifest`) straight from a test, without going through the rendered wizard. Matches what `renderRunController`'s fallback context builds. */
+async function minimalMigrationRunContext(
+  family: DurableFamilyName
+): Promise<MigrationRunContext> {
+  void family;
+  const hash = await currentDeviceHash();
+  return {
+    accountId: 'account-1',
+    campaignId: 'cloud-ALPHA',
+    campaignCode: 'ALPHA',
+    workspace: workspaceFor('ALPHA'),
+    recovery: {
+      format: 'rollkeeper-device-backup',
+      formatVersion: 1,
+      appVersion: APP_VERSION,
+      runId: 'run-1',
+      createdAt: FIXED_TS,
+      entries: [],
+      manifestHash: hash,
+      validation: {
+        entryCount: 0,
+        totalBytes: 0,
+        validJsonCount: 0,
+        malformedJsonCount: 0,
+        futureVersionCount: 0,
+        retainedOnlyCount: 0,
+      },
+    },
+    ensureWorkspaceRemembered: async () => {},
+  };
 }
 
 function familyHeadingLabel(
@@ -1583,8 +1624,20 @@ describe('MigrationWizard — data-category steps', () => {
     }
   });
 
-  it('keeps a disabled registered family in the denominator', async () => {
-    // Production registry: six registered, one enabled.
+  it('keeps a disabled registered family in the denominator (registeredCount, independent of the numerator)', async () => {
+    // Coordinator review round 2, Important 2: this test's NUMERATOR is not
+    // load-bearing here -- the production registry's real adapters never
+    // get their `readAuthority` driven to `postgres` in this test (no
+    // family is ever cut over), so `routedCount` is trivially 0 regardless
+    // of whether the denominator logic is correct. What this test actually
+    // pins is that `registeredCount` reads `registeredAdapters().length`
+    // (which does NOT filter by the client flag) rather than
+    // `enabledAdapters().length` (which would shrink to 1 once five of six
+    // real families' env flags are turned off) -- i.e. the DENOMINATOR
+    // only. The numerator (`routedCount` actually counting a real `postgres`
+    // family) is pinned separately, with real assertions, by
+    // `reports an already-routed family as moved on reopen...` above, which
+    // uses the stub adapters this file fully controls to reach `postgres`.
     disableAllFamiliesExcept('campaign_settings');
     renderWizardWithProductionRegistry();
     expect(await screen.findByText(/0 of 6/)).toBeInTheDocument();
@@ -1613,9 +1666,17 @@ describe('MigrationWizard — data-category steps', () => {
     // verified receipt threaded through every family's context, not a fresh
     // capture per family.
     expect(selectionRecoveryRunIds()).toEqual([FIXED_RUN_ID, FIXED_RUN_ID]);
-    // Read-only re-captures are expected and required: they are how drift is
-    // detected before each authority transition.
-    expect(mockedCaptureDeviceBackup.mock.calls.length).toBeGreaterThan(1);
+    // Coordinator review round 2, Important 4: a bare growth assertion on
+    // `mockedCaptureDeviceBackup.mock.calls.length` here cannot fail --
+    // mount capture plus this file's own helper probes already exceed any
+    // low bound regardless of whether `runFamily` re-captures at all. That
+    // property (read-only re-captures happen at each of R3's three
+    // checkpoints, and are what catch drift) is instead pinned, with a real
+    // negative control, by `catches drift injected between selectFamily and
+    // prepareIndexedDb...` and `catches drift injected at the end of
+    // commitLocalCutover...` below: each removes exactly one checkpoint in
+    // isolation and shows the resulting capture-skipping failing to catch
+    // drift it should have caught.
   });
 
   it('stops before the next authority transition when a captured key changes mid-run, and names it', async () => {
@@ -1897,11 +1958,28 @@ describe('MigrationWizard — data-category steps', () => {
         match: /this browser.s record needs attention/i,
         requiredSubstrings: ["This browser's record needs attention"],
       },
-      { match: /could not be fixed/i, requiredSubstrings: [] },
+      {
+        match: /could not be fixed/i,
+        requiredSubstrings: [
+          "This browser's record could not be fixed:",
+          'the pointer is not ahead of the marker; a marker with nothing behind it in IndexedDB is never evidence of a completed migration',
+        ],
+      },
     ]);
   });
 
   it('renders the manifest fingerprint under confirmation, and it is the one about to be cut over', async () => {
+    // Coordinator review round 2, Critical 1: the previous version asserted
+    // `note` contains `'fingerprint-…'` -- but every stub's fingerprint was
+    // `fingerprint-<family>`, and `'fingerprint-'` is EXACTLY
+    // FINGERPRINT_DISPLAY_LENGTH (12) characters, so that assertion pinned
+    // only the shared 12-char prefix every one of the six stubs happened to
+    // share, not this family's actual manifest. Fixed two ways: (1) the
+    // stub's fingerprint is now `<family>-fingerprint`, which differs
+    // WITHIN the first 12 characters per family; (2) the expected value is
+    // computed here by calling this exact adapter's own `previewManifest`
+    // directly -- the real manifest about to be cut over -- and truncating
+    // it the same way `FamilyStep` does, rather than asserting a literal.
     await renderWizardAtFamilyStep('campaign_settings');
     await screen.findByLabelText(/type .* to confirm/i);
     // R12: `familyLabel`/`campaignLabel`/`manifestFingerprint` from the
@@ -1909,12 +1987,22 @@ describe('MigrationWizard — data-category steps', () => {
     // `requiredPhrase`.
     const note = screen.getByText(/confirming campaign_settings for/i);
     expect(note).toHaveTextContent('Campaign');
-    // Truncated per FINGERPRINT_DISPLAY_LENGTH. The ground truth is this
-    // stub's own `previewManifest` fingerprint (`fingerprint-campaign_settings`,
-    // known directly from `stubAdapter`, independent of what `confirmation()`
-    // claims) -- so this fails if the rendered value diverges from the
-    // manifest actually about to be cut over.
-    expect(note).toHaveTextContent('fingerprint-…');
+
+    const adapter = stubFamilies().find(a => a.family === 'campaign_settings')!;
+    const context = await minimalMigrationRunContext('campaign_settings');
+    const manifest = await adapter.previewManifest(context);
+    expect(note).toHaveTextContent(shortHashForTest(manifest.fingerprint));
+
+    // Cross-family substitution -- the literal R12 hazard: confirming a
+    // DIFFERENT family's manifest fingerprint under this family's typed
+    // confirmation. The rendered value must not be satisfiable by any
+    // other registered family's fingerprint either.
+    const otherAdapter = stubFamilies().find(a => a.family === 'calendar')!;
+    const otherContext = await minimalMigrationRunContext('calendar');
+    const otherManifest = await otherAdapter.previewManifest(otherContext);
+    expect(note).not.toHaveTextContent(
+      shortHashForTest(otherManifest.fingerprint)
+    );
   });
 
   it('renders "Chosen" once a persisted selection record matches this run, before any cutover', async () => {
@@ -2093,6 +2181,60 @@ describe('MigrationWizard — data-category steps', () => {
     expect(await authorityOf('npc')).toMatchObject({ state: 'indexedDB' });
   });
 
+  it('has no orphaned selection after a reload strictly between selectFamily and prepareIndexedDb', async () => {
+    // Coordinator review round 2, Important 5: constructible with the
+    // existing stub seam alone -- no real adapters, no artificial await
+    // gate. Wraps the cached `campaign_settings` stub's `selectFamily` to
+    // ALSO perform the real production write a real adapter's
+    // `selectFamily` makes (`selectCampaignSettings`, the actual function
+    // production code calls), and its `prepareIndexedDb` to throw, so the
+    // interruption lands exactly between the two -- the point MINOR 9
+    // originally called unconstructible.
+    await mountStubWizardResumed();
+    const target = stubFamilies().find(
+      candidate => candidate.family === 'campaign_settings'
+    )!;
+    const originalSelect = target.selectFamily.bind(target);
+    target.selectFamily = async context => {
+      await originalSelect(context);
+      selectCampaignSettings(localStorage, {
+        namespace: 'user:account-1',
+        campaignId: context.campaignId,
+        confirmed: true,
+        recovery: {
+          runId: context.recovery.runId,
+          manifestHash: context.recovery.manifestHash,
+          createdAt: context.recovery.createdAt,
+        },
+        now: () => FIXED_TS,
+      });
+    };
+    target.prepareIndexedDb = async () => {
+      throw new Error('Interrupted before prepare.');
+    };
+
+    await clickContinueUntil(familyHeadingLabel('campaign_settings'));
+    await confirmAndSubmit('campaign_settings');
+    await reloadWizard();
+    await advanceToFamily('campaign_settings');
+
+    // Exactly 2 (badge + stage-chain box), not merely >0 -- see the
+    // "Chosen"/"Copied here" tests above for why a bare presence check
+    // would be vacuous here too. Only reaches 2 if the real selection
+    // record written BEFORE the interruption survives the reload and is
+    // read back as matching this run.
+    await waitFor(async () => {
+      expect((await screen.findAllByText(/^chosen$/i)).length).toBe(2);
+    });
+    expect(await authorityOf('campaign_settings')).toMatchObject({
+      state: 'legacy',
+    });
+
+    const receipts = await allDownloadReceipts();
+    expect(receipts).toHaveLength(1);
+    expect(typeof receipts[0].verifiedAt).toBe('string');
+  });
+
   it('catches drift injected between selectFamily and prepareIndexedDb (checkpoint 1 already passed)', async () => {
     await mountStubWizardResumed();
     const target = stubFamilies().find(a => a.family === 'calendar')!;
@@ -2158,5 +2300,20 @@ describe('MigrationWizard — data-category steps', () => {
     await renderWizardAtFamilyStep('npc');
     await userEvent.click(screen.getByRole('button', { name: /^close$/i }));
     expect(await snapshotDurableState()).toBe(before);
+  });
+
+  it('surfaces a failure instead of an unhandled rejection when the selection/prepared-state read fails', async () => {
+    // Coordinator review round 2, item 6: FamilyStep's selection/prepared
+    // effect had no error handling at all, unlike the manifest effect
+    // right above it. Forces the exact failure mode that effect can hit --
+    // `openRollkeeperDatabase()` rejecting -- and asserts it surfaces as a
+    // real `loadError` alert rather than an unhandled promise rejection.
+    const spy = vi
+      .spyOn(localDatabaseModule, 'openRollkeeperDatabase')
+      .mockRejectedValueOnce(new Error('IndexedDB is unavailable'));
+    await renderWizardAtFamilyStep('campaign_settings');
+    const alert = await screen.findByText(/indexeddb is unavailable/i);
+    expect(alert.closest('[role="alert"]')).not.toBeNull();
+    spy.mockRestore();
   });
 });

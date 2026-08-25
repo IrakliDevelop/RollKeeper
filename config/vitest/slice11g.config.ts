@@ -46,6 +46,7 @@ export default defineConfig({
       'src/lib/durableDm/__tests__/familyRegistry.test.ts',
       'src/lib/durableDm/__tests__/migrationRunState.test.ts',
       'src/lib/durableDm/__tests__/authorityRepair.test.ts',
+      'src/lib/durableDm/__tests__/familySelectionReader.test.ts',
       'src/lib/durableDm/__tests__/awareStorageFixpoint.test.ts',
       'src/lib/durableDm/adapters/__tests__/*.test.ts',
       'src/lib/__tests__/browserRecoveryRepository.test.ts',
@@ -66,6 +67,7 @@ export default defineConfig({
         'src/lib/durableDm/familyRegistry.ts',
         'src/lib/durableDm/migrationRunState.ts',
         'src/lib/durableDm/authorityRepair.ts',
+        'src/lib/durableDm/familySelectionReader.ts',
         'src/lib/durableDm/adapters/*.ts',
       ],
       thresholds: {

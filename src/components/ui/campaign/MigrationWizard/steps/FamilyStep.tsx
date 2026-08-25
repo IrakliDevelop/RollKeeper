@@ -176,25 +176,44 @@ export function FamilyStep({
     if (!enabled || entry.status !== 'registered' || !context) return;
     let cancelled = false;
     (async () => {
-      const namespace = `user:${context.accountId}` as StorageNamespace;
-      const nextSelection = readFamilySelection(
-        entry.family,
-        window.localStorage,
-        namespace,
-        context.campaignId
-      );
-      if (!cancelled) setSelection(nextSelection);
-      const database = await openRollkeeperDatabase();
       try {
-        const nextPreparedState = await readFamilyPreparedState(
-          database,
-          namespace,
+        const namespace = `user:${context.accountId}` as StorageNamespace;
+        const nextSelection = readFamilySelection(
           entry.family,
+          window.localStorage,
+          namespace,
           context.campaignId
         );
-        if (!cancelled) setPreparedState(nextPreparedState);
-      } finally {
-        database.close();
+        if (!cancelled) setSelection(nextSelection);
+        const database = await openRollkeeperDatabase();
+        try {
+          const nextPreparedState = await readFamilyPreparedState(
+            database,
+            namespace,
+            entry.family,
+            context.campaignId
+          );
+          if (!cancelled) setPreparedState(nextPreparedState);
+        } finally {
+          database.close();
+        }
+      } catch (cause) {
+        // Coordinator review round 2, item 6: this effect previously had no
+        // error handling at all -- unlike the manifest effect directly
+        // above, a rejection from `openRollkeeperDatabase()` or a throw
+        // from `readFamilySelection` escaped as an unhandled promise
+        // rejection, surfaced no `loadError`, and (when it came from the
+        // open call before `database` existed) never had a handle to leak
+        // in the first place, but a throw from `readFamilyPreparedState`
+        // AFTER a successful open would have. Matches the manifest effect's
+        // pattern exactly.
+        if (!cancelled) {
+          setLoadError(
+            cause instanceof Error
+              ? cause.message
+              : "This browser's selection record could not be checked."
+          );
+        }
       }
     })();
     return () => {
