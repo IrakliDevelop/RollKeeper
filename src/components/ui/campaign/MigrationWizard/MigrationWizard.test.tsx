@@ -18,12 +18,19 @@ import {
   initiateDeviceBackupDownload,
   verifyDownloadedDeviceBackup,
 } from '@/lib/deviceRecovery';
+import { decideAuthorityRepair } from '@/lib/durableDm/authorityRepair';
 import type {
   DurableFamilyAdapter,
   DurableFamilyName,
   MigrationRunContext,
 } from '@/lib/durableDm/durableFamilyAdapter';
+import type {
+  AuthorityPointerView,
+  NormalizedAuthority,
+  NormalizedAuthorityInconsistent,
+} from '@/lib/durableDm/familyAuthorityNormalizer';
 import {
+  DURABLE_FAMILY_REGISTRY,
   registeredAdapters,
   enabledAdapters,
 } from '@/lib/durableDm/familyRegistry';
@@ -44,9 +51,24 @@ vi.mock('@/lib/supabase/browserDmWorkspace', () => ({
   createBrowserDmWorkspace: vi.fn(),
 }));
 
+// Ruling: Task 15's production-registry tests (`renderWizardWithProductionRegistry`)
+// need the REAL `registeredAdapters`/`enabledAdapters` implementations back
+// after other tests have overridden the mock's return value. `vi.hoisted`
+// is the supported way to hand a value computed inside a hoisted `vi.mock`
+// factory back to the test body.
+const familyRegistryHolder = vi.hoisted(() => ({
+  actual: undefined as
+    | Pick<
+        typeof import('@/lib/durableDm/familyRegistry'),
+        'registeredAdapters' | 'enabledAdapters'
+      >
+    | undefined,
+}));
+
 vi.mock('@/lib/durableDm/familyRegistry', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/lib/durableDm/familyRegistry')>();
+  familyRegistryHolder.actual = actual;
   return {
     ...actual,
     registeredAdapters: vi.fn(actual.registeredAdapters),
@@ -58,6 +80,7 @@ vi.mock('@/lib/deviceRecovery', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/deviceRecovery')>();
   return {
     ...actual,
+    captureDeviceBackup: vi.fn(actual.captureDeviceBackup),
     initiateDeviceBackupDownload: vi.fn(actual.initiateDeviceBackupDownload),
     verifyDownloadedDeviceBackup: vi.fn(actual.verifyDownloadedDeviceBackup),
   };
@@ -66,6 +89,7 @@ vi.mock('@/lib/deviceRecovery', async importOriginal => {
 const mockedCreateBrowserDmWorkspace = vi.mocked(createBrowserDmWorkspace);
 const mockedRegisteredAdapters = vi.mocked(registeredAdapters);
 const mockedEnabledAdapters = vi.mocked(enabledAdapters);
+const mockedCaptureDeviceBackup = vi.mocked(captureDeviceBackup);
 
 // Real, un-stubbed WebCrypto SHA-256 hashing (`captureDeviceBackup`,
 // `verifyDownloadedDeviceBackup`) can occasionally run past
@@ -159,6 +183,23 @@ async function verifiedReceiptCount(): Promise<number> {
     );
     await transactionComplete(transaction);
     return all.filter(entry => typeof entry.verifiedAt === 'string').length;
+  } finally {
+    database.close();
+  }
+}
+
+/** Spec R15's third resume property: every receipt currently on record, verified or not -- used to assert no orphaned initiated-only receipt survives a reload. */
+async function allDownloadReceipts(): Promise<
+  { runId: string; manifestHash: string; verifiedAt?: string }[]
+> {
+  const database = await openRecoveryDatabaseForTests();
+  try {
+    const transaction = database.transaction('downloadReceipts', 'readonly');
+    const all = await requestResult<
+      { runId: string; manifestHash: string; verifiedAt?: string }[]
+    >(transaction.objectStore('downloadReceipts').getAll());
+    await transactionComplete(transaction);
+    return all;
   } finally {
     database.close();
   }
@@ -371,6 +412,108 @@ function cutoverInvocationOrder(family: DurableFamilyName): number {
   return spy.mock.invocationCallOrder[0];
 }
 
+// ---------------------------------------------------------------------
+// Task 15 stub-adapter extensions. `stubAdapter` now carries a small,
+// in-memory NormalizedAuthority per instance (never storage-backed —
+// exactly what a stub should be) so that `readAuthority` reflects what
+// `commitLocalCutover`/`activateCloud`/`repairAuthority` actually did on
+// THIS instance, rather than a fixed literal that could never change. Test
+// helpers below read and mutate this shared, module-level state; every one
+// of them is reset in `beforeEach`.
+// ---------------------------------------------------------------------
+
+const DEFAULT_STUB_AUTHORITY: NormalizedAuthority = {
+  state: 'legacy',
+  epoch: 0,
+  campaignId: null,
+  accountId: null,
+  rolledBack: false,
+};
+
+/** Families for which the NEXT `activateCloud` call reports a conflict. */
+const cloudFailures = new Set<DurableFamilyName>();
+/** One entry per `selectFamily` call, in invocation order, across every family. */
+const selectLog: { family: DurableFamilyName; runId: string }[] = [];
+/**
+ * Seeded `inconsistent` authorities for `seedMarkerPointerDisagreement` /
+ * `seedMarkerAheadOfPointer` (ruling R9.9). Consulted lazily by
+ * `readAuthority`/`repairAuthority` so seeding may happen before OR after
+ * the stub adapter instance is created.
+ */
+const inconsistentSeeds = new Map<
+  DurableFamilyName,
+  NormalizedAuthorityInconsistent
+>();
+/** Counts calls into `activateCloud`, standing in for the real begin-staging RPC (no fake server here — see report). */
+const apiActionCounts = new Map<string, number>();
+
+function failCloudFor(family: DurableFamilyName) {
+  cloudFailures.add(family);
+}
+
+function countApiCalls(action: string): number {
+  return apiActionCounts.get(action) ?? 0;
+}
+
+function selectionRecoveryRunIds(): string[] {
+  return selectLog.map(entry => entry.runId);
+}
+
+async function selectionRecordFor(
+  family: DurableFamilyName
+): Promise<{ runId: string } | null> {
+  const found = [...selectLog].reverse().find(entry => entry.family === family);
+  return found ? { runId: found.runId } : null;
+}
+
+/**
+ * R9.9: the pointer-ahead-at-`indexedDB` case — the only seed from which an
+ * `indexedDB` repair outcome is reachable (spec R5b row 2). The marker is
+ * absent (never written) and the pointer is ahead, exactly the shape an
+ * interruption between `commitLocalCutover`'s two writes leaves behind.
+ */
+async function seedMarkerPointerDisagreement(
+  family: DurableFamilyName
+): Promise<void> {
+  inconsistentSeeds.set(family, {
+    state: 'inconsistent',
+    epoch: 0,
+    campaignId: null,
+    accountId: null,
+    rolledBack: false,
+    reason: 'marker-pointer-disagreement',
+    observed: {
+      marker: null,
+      pointer: {
+        authority: 'indexedDB',
+        epoch: 1,
+      } as unknown as AuthorityPointerView,
+    },
+  });
+}
+
+/**
+ * R9.9: the block case — the marker is ahead of the pointer (which is
+ * absent). Spec R5b row 1: a marker with nothing behind it in IndexedDB is
+ * never evidence of a completed migration, so this can never repair.
+ */
+async function seedMarkerAheadOfPointer(
+  family: DurableFamilyName
+): Promise<void> {
+  inconsistentSeeds.set(family, {
+    state: 'inconsistent',
+    epoch: 0,
+    campaignId: null,
+    accountId: null,
+    rolledBack: false,
+    reason: 'marker-pointer-disagreement',
+    observed: {
+      marker: { authority: 'indexedDB', epoch: 1, campaignId: 'campaign-x' },
+      pointer: null,
+    },
+  });
+}
+
 function stubAdapter(
   family: DurableFamilyName,
   options: { onCutover?: () => void } = {}
@@ -386,6 +529,16 @@ function stubAdapter(
   };
   const cutoverSpy = vi.fn(() => options.onCutover?.());
   cutoverSpies.set(family, cutoverSpy);
+
+  // `null` means "no real operation has happened yet on this instance" —
+  // `currentAuthority()` then falls back to a pending inconsistent seed, or
+  // the default legacy state. Once any operation below sets it, it wins
+  // permanently over any seed (mirroring how a real repair/cutover
+  // supersedes a stale seeded disagreement).
+  let authority: NormalizedAuthority | null = null;
+  const currentAuthority = (): NormalizedAuthority =>
+    authority ?? inconsistentSeeds.get(family) ?? DEFAULT_STUB_AUTHORITY;
+
   return {
     family,
     label: family,
@@ -397,7 +550,9 @@ function stubAdapter(
       manifestFingerprint: manifest.fingerprint,
       requiredPhrase: `move ${family}`,
     }),
-    selectFamily: async () => {},
+    selectFamily: async (context: MigrationRunContext) => {
+      selectLog.push({ family, runId: context.recovery.runId });
+    },
     prepareIndexedDb: async () => ({
       state: 'CUTOVER_READY',
       generation: 'gen-1',
@@ -406,9 +561,35 @@ function stubAdapter(
     commitLocalCutover: async (context: MigrationRunContext) => {
       await context.ensureWorkspaceRemembered();
       cutoverSpy();
+      authority = {
+        state: 'indexedDB',
+        epoch: 1,
+        campaignId: context.campaignId,
+        accountId: context.accountId,
+        rolledBack: false,
+      };
       return { epoch: 1 };
     },
-    activateCloud: async () => ({ status: 'activated', epoch: 1 }),
+    activateCloud: async (context: MigrationRunContext) => {
+      apiActionCounts.set(
+        'begin-staging',
+        (apiActionCounts.get('begin-staging') ?? 0) + 1
+      );
+      if (cloudFailures.has(family)) {
+        return {
+          status: 'conflict' as const,
+          reason: 'Cloud sync is temporarily unavailable. Try again later.',
+        };
+      }
+      authority = {
+        state: 'postgres',
+        epoch: 1,
+        campaignId: context.campaignId,
+        accountId: context.accountId,
+        rolledBack: false,
+      };
+      return { status: 'activated' as const, epoch: 1 };
+    },
     verifyCloud: async () => ({
       authorityAgrees: true,
       cloudAuthority: 'postgres',
@@ -420,22 +601,267 @@ function stubAdapter(
       conflictCount: 0,
       verified: true,
     }),
-    readAuthority: async () => ({
-      state: 'legacy',
-      epoch: 0,
-      campaignId: null,
-      accountId: null,
-      rolledBack: false,
-    }),
-    rollback: async () => ({ epoch: 2 }),
-    repairAuthority: async () => ({
-      state: 'legacy',
-      epoch: 0,
-      campaignId: null,
-      accountId: null,
-      rolledBack: false,
-    }),
+    readAuthority: async () => currentAuthority(),
+    rollback: async (context: MigrationRunContext) => {
+      // Observable, like a real rollback: sets legacy/rolledBack so a
+      // mutation that calls this from `activateCloud`'s failure path is
+      // actually detectable via `readAuthority`, not a silent no-op.
+      authority = {
+        state: 'legacy',
+        epoch: 2,
+        campaignId: context.campaignId,
+        accountId: context.accountId,
+        rolledBack: true,
+      };
+      return { epoch: 2 };
+    },
+    repairAuthority: async () => {
+      const current = currentAuthority();
+      if (current.state !== 'inconsistent') return current;
+      // Reuses the REAL R5b decision engine (`authorityRepair.ts`), not a
+      // re-derived stand-in: only the evidence-gathering (which a real
+      // adapter would do against IndexedDB/the cloud) is faked here.
+      const decision = await decideAuthorityRepair({
+        reason: current.reason,
+        observed: current.observed,
+        evidence: {
+          verifyIndexedDbGeneration: async () => true,
+          verifyPostgresParity: async () => true,
+        },
+      });
+      if (decision.action === 'block') {
+        throw new Error(decision.reason);
+      }
+      authority = {
+        state: decision.authority,
+        epoch: decision.epoch,
+        campaignId: 'campaign-x',
+        accountId: 'account-1',
+        rolledBack: false,
+      };
+      inconsistentSeeds.delete(family);
+      return authority;
+    },
   };
+}
+
+const ALL_STUB_FAMILIES: DurableFamilyName[] = [
+  'campaign_settings',
+  'calendar',
+  'magic_item',
+  'npc',
+  'encounter_definition',
+  'combat_log_archive',
+];
+
+let stubFamiliesCache: DurableFamilyAdapter[] | null = null;
+
+/** Same six stub instances for the whole test, so authority set by one call persists across "reload". */
+function stubFamilies(): DurableFamilyAdapter[] {
+  if (!stubFamiliesCache) {
+    stubFamiliesCache = ALL_STUB_FAMILIES.map(family => stubAdapter(family));
+  }
+  return stubFamiliesCache;
+}
+
+const FAMILY_FLAG_VARS: Record<DurableFamilyName, string> = {
+  campaign_settings: 'NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE',
+  calendar: 'NEXT_PUBLIC_CALENDAR_SYNC_VISIBLE',
+  magic_item: 'NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE',
+  npc: 'NEXT_PUBLIC_NPC_SYNC_VISIBLE',
+  encounter_definition: 'NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE',
+  combat_log_archive: 'NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE',
+};
+
+/** Ruling R9.3-alike: leaves every family's client flag in a known state, restored in `afterEach`. */
+function disableAllFamiliesExcept(family: DurableFamilyName) {
+  for (const [candidate, envVar] of Object.entries(FAMILY_FLAG_VARS)) {
+    process.env[envVar] = candidate === family ? 'true' : 'false';
+  }
+}
+
+function confirmationPhraseFor(family: DurableFamilyName): string {
+  return `move ${family}`;
+}
+
+function familyHeadingLabel(
+  family: DurableFamilyName | 'location' | 'battle_map'
+): string {
+  const entry = DURABLE_FAMILY_REGISTRY.find(
+    candidate => candidate.family === family
+  );
+  if (!entry) throw new Error(`Unknown data category: ${family}`);
+  return entry.label;
+}
+
+/** The RTL render currently mounted by a Task 15 helper, if any -- `null` after `cleanup()`/unmount. */
+let currentRender: ReturnType<typeof render> | null = null;
+
+/** Clicks Continue until the named family's heading is on screen, mounting nothing itself. */
+async function clickContinueUntil(label: string) {
+  for (
+    let attempt = 0;
+    attempt <= DURABLE_FAMILY_REGISTRY.length;
+    attempt += 1
+  ) {
+    if (screen.queryByRole('heading', { name: label })) return;
+    await userEvent.click(screen.getByRole('button', { name: /^continue$/i }));
+  }
+  throw new Error(`Never reached step: ${label}`);
+}
+
+/** Mounts with the six stub families, resumed onto a pre-verified receipt (no download/upload). */
+async function mountStubWizardResumed() {
+  await seedVerifiedReceipt({
+    runId: 'run-1',
+    manifestHash: await currentDeviceHash(),
+  });
+  mockedRegisteredAdapters.mockReturnValue(stubFamilies());
+  mockedEnabledAdapters.mockImplementation(() => mockedRegisteredAdapters());
+  mockedCreateBrowserDmWorkspace.mockResolvedValue({
+    ...defaultOwnerContext(),
+    list: vi.fn(async () => [workspaceFor('ALPHA')]),
+  });
+  currentRender = render(<MigrationWizard campaignCode="ALPHA" />);
+  await userEvent.click(
+    screen.getByRole('button', { name: /find my campaigns/i })
+  );
+  await screen.findByText(/connected to campaign alpha/i);
+  await screen.findByText(/safety copy is ready/i);
+}
+
+/** Mounts with the six stub families, driving a REAL download-then-upload so the initiate/verify call counts stay exactly 1. */
+async function mountStubWizardWithRealBundle() {
+  mockedRegisteredAdapters.mockReturnValue(stubFamilies());
+  mockedEnabledAdapters.mockImplementation(() => mockedRegisteredAdapters());
+  mockedCreateBrowserDmWorkspace.mockResolvedValue({
+    ...defaultOwnerContext(),
+    list: vi.fn(async () => [workspaceFor('ALPHA')]),
+  });
+  currentRender = render(<MigrationWizard campaignCode="ALPHA" />);
+  await userEvent.click(
+    screen.getByRole('button', { name: /find my campaigns/i })
+  );
+  await screen.findByText(/connected to campaign alpha/i);
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: /download/i })).toBeEnabled()
+  );
+  await userEvent.click(screen.getByRole('button', { name: /download/i }));
+  await userEvent.upload(
+    screen.getByLabelText(/safety copy/i),
+    await bundleFile()
+  );
+  await screen.findByText(/checked.*every entry matches/i);
+}
+
+/** Renders/resumes at a given family's step (stub families), mounting if nothing is mounted yet. */
+async function renderWizardAtFamilyStep(family: DurableFamilyName) {
+  await mountStubWizardResumed();
+  await clickContinueUntil(familyHeadingLabel(family));
+}
+
+/** Navigates to a family's step, mounting a resumed stub-backed wizard first if nothing is mounted yet. */
+async function advanceToFamily(
+  family: DurableFamilyName | 'location' | 'battle_map'
+) {
+  if (!currentRender) await mountStubWizardResumed();
+  await clickContinueUntil(familyHeadingLabel(family));
+}
+
+/** Types the confirmation phrase and submits, waiting for the real completion signal (the button leaving its loading-disabled state, or disappearing on success) rather than any static copy. */
+async function confirmAndSubmit(
+  family: DurableFamilyName
+): Promise<{ ok: boolean }> {
+  const input = await screen.findByLabelText(/type .* to confirm/i);
+  await userEvent.clear(input);
+  await userEvent.type(input, confirmationPhraseFor(family));
+  const button = await screen.findByRole('button', {
+    name: /move this data to cloud sync/i,
+  });
+  await waitFor(() => expect(button).toBeEnabled());
+  await userEvent.click(button);
+  await waitFor(() => {
+    const stillPresent = screen.queryByRole('button', {
+      name: /move this data to cloud sync/i,
+    });
+    if (stillPresent) expect(stillPresent).toBeEnabled();
+  });
+  const failed =
+    screen.queryByText(/saved only in this browser/i) !== null ||
+    screen.queryByText(/this browser.s data changed/i) !== null;
+  return { ok: !failed };
+}
+
+/** Runs the wizard through each named family in order: navigate, confirm, submit. Stops at the first failure, leaving later families untouched. */
+async function runWizardThroughFamilies(families: DurableFamilyName[]) {
+  if (!currentRender) await mountStubWizardWithRealBundle();
+  for (const family of families) {
+    await clickContinueUntil(familyHeadingLabel(family));
+    const result = await confirmAndSubmit(family);
+    if (!result.ok) break;
+  }
+}
+
+/** Simulates a close-and-reopen: unmounts the current render and re-mounts, resuming onto the same verified receipt. */
+async function reloadWizard() {
+  currentRender?.unmount();
+  currentRender = null;
+  await mountStubWizardResumed();
+}
+
+/** Reads a legacy localStorage key's raw value directly (async only for a consistent helper shape). */
+async function legacyKeySnapshot(key: string): Promise<string | null> {
+  return localStorage.getItem(key);
+}
+
+/** Changes a captured legacy key's value, simulating a genuine legacy-family mutation mid-run (spec R3). */
+function mutateCapturedKey(key: string) {
+  const previous = localStorage.getItem(key);
+  localStorage.setItem(
+    key,
+    JSON.stringify({
+      state: { mutatedAt: FIXED_TS, previousLength: previous?.length ?? 0 },
+      version: 1,
+    })
+  );
+}
+
+/** Reads a family's current authority from whichever adapter set is currently mocked in (stub or production). */
+async function authorityOf(
+  family: DurableFamilyName
+): Promise<NormalizedAuthority> {
+  const adapter = mockedRegisteredAdapters().find(
+    candidate => candidate.family === family
+  );
+  if (!adapter) throw new Error(`No adapter registered for ${family}`);
+  return adapter.readAuthority({
+    accountId: 'account-1',
+    campaignId: 'cloud-ALPHA',
+    campaignCode: 'ALPHA',
+  });
+}
+
+/** Renders with exactly `count` registered (stub) families -- 0, 1 or 6 -- and nothing else set up (no discovery, no recovery). */
+function renderWizardWithRegisteredAdapters(count: number) {
+  const stubs = ALL_STUB_FAMILIES.slice(0, count).map(family =>
+    stubAdapter(family)
+  );
+  mockedRegisteredAdapters.mockReturnValue(stubs);
+  mockedEnabledAdapters.mockImplementation(() => mockedRegisteredAdapters());
+  return render(<MigrationWizard campaignCode="ALPHA" />);
+}
+
+/** Renders against the REAL six-adapter registry (client-flag state controls `isVisible()`, never the family count). */
+function renderWizardWithProductionRegistry() {
+  if (!familyRegistryHolder.actual)
+    throw new Error('Real family registry module was not captured');
+  mockedRegisteredAdapters.mockImplementation(
+    familyRegistryHolder.actual.registeredAdapters
+  );
+  mockedEnabledAdapters.mockImplementation(
+    familyRegistryHolder.actual.enabledAdapters
+  );
+  return render(<MigrationWizard campaignCode="ALPHA" />);
 }
 
 /**
@@ -603,13 +1029,26 @@ beforeEach(async () => {
   mockedEnabledAdapters.mockReturnValue([]);
   vi.mocked(initiateDeviceBackupDownload).mockClear();
   vi.mocked(verifyDownloadedDeviceBackup).mockClear();
+  mockedCaptureDeviceBackup.mockClear();
   cutoverSpies.clear();
+  cloudFailures.clear();
+  selectLog.length = 0;
+  inconsistentSeeds.clear();
+  apiActionCounts.clear();
+  stubFamiliesCache = null;
+  currentRender = null;
 });
 
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   delete process.env.NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE;
+  // Ruling R9.3-alike: an env var flipped by `disableAllFamiliesExcept` must
+  // not leak into a later test's real-adapter `isVisible()` reads.
+  for (const envVar of Object.values(FAMILY_FLAG_VARS)) {
+    delete process.env[envVar];
+  }
+  currentRender = null;
 });
 
 describe('MigrationWizard — steps 0 and 1', () => {
@@ -1051,5 +1490,237 @@ describe('MigrationWizard run controller — spec R10', () => {
 
     await controller.migrate('calendar');
     expect(remember).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('MigrationWizard — data-category steps', () => {
+  it('runs with zero, one and all families REGISTERED', async () => {
+    // Registered, not enabled. Spec R13: progress is verified / registered,
+    // and a registered family whose flag is off stays in the denominator.
+    for (const count of [0, 1, 6]) {
+      const { unmount } = renderWizardWithRegisteredAdapters(count);
+      expect(
+        await screen.findByText(new RegExp(`0 of ${count}`))
+      ).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it('keeps a disabled registered family in the denominator', async () => {
+    // Production registry: six registered, one enabled.
+    disableAllFamiliesExcept('campaign_settings');
+    renderWizardWithProductionRegistry();
+    expect(await screen.findByText(/0 of 6/)).toBeInTheDocument();
+    expect(screen.queryByText(/0 of 1/)).not.toBeInTheDocument();
+  });
+
+  it('cuts a family over only after the typed confirmation', async () => {
+    await renderWizardAtFamilyStep('campaign_settings');
+    const button = await screen.findByRole('button', {
+      name: /move this data to cloud sync/i,
+    });
+    expect(button).toBeDisabled();
+    await userEvent.type(
+      await screen.findByLabelText(/type .* to confirm/i),
+      confirmationPhraseFor('campaign_settings')
+    );
+    expect(button).toBeEnabled();
+  });
+
+  it('reuses the one verified receipt across every family', async () => {
+    await runWizardThroughFamilies(['campaign_settings', 'calendar']);
+    expect(initiateDeviceBackupDownload).toHaveBeenCalledTimes(1);
+    expect(verifyDownloadedDeviceBackup).toHaveBeenCalledTimes(1);
+    expect(await verifiedReceiptCount()).toBe(1);
+    // Both families received the SAME run's recovery.runId — the run's one
+    // verified receipt threaded through every family's context, not a fresh
+    // capture per family.
+    expect(selectionRecoveryRunIds()).toEqual([FIXED_RUN_ID, FIXED_RUN_ID]);
+    // Read-only re-captures are expected and required: they are how drift is
+    // detected before each authority transition.
+    expect(mockedCaptureDeviceBackup.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('stops before the next authority transition when a captured key changes mid-run, and names it', async () => {
+    await runWizardThroughFamilies(['campaign_settings']);
+    mutateCapturedKey('rollkeeper-calendar-data');
+    await advanceToFamily('calendar');
+    // Scoped to the alert element, not the document: the always-rendered
+    // rail row for "Calendar" would otherwise satisfy a document-wide query
+    // and the "and names it" claim would never actually be pinned.
+    const alert = await screen.findByText(/download a fresh/i);
+    const alertBox = alert.closest('[role="alert"]');
+    expect(alertBox).not.toBeNull();
+    expect(alertBox).toHaveTextContent('rollkeeper-calendar-data');
+    expect(await authorityOf('calendar')).toMatchObject({ state: 'legacy' });
+    expect(await authorityOf('campaign_settings')).toMatchObject({
+      state: 'postgres',
+    });
+  });
+
+  it('stops a mid-session confirm when the browser drifts after the step was already open', async () => {
+    // Distinct from the previous test: there, drift is already present the
+    // MOMENT the family step is entered, so the on-entry drift check alone
+    // explains the stop. Here the step opens clean (on-entry check passes,
+    // the manifest and confirmation UI render normally), and the browser
+    // only drifts AFTER that, while the DM is mid-confirmation -- so only
+    // `runFamily`'s own re-check, immediately before `selectFamily`, can
+    // catch it.
+    await renderWizardAtFamilyStep('calendar');
+    const input = await screen.findByLabelText(/type .* to confirm/i);
+    mutateCapturedKey('rollkeeper-calendar-data');
+    await userEvent.type(input, confirmationPhraseFor('calendar'));
+    await userEvent.click(
+      screen.getByRole('button', { name: /move this data to cloud sync/i })
+    );
+    const alert = await screen.findByText(/download a fresh/i);
+    expect(alert.closest('[role="alert"]')).not.toBeNull();
+    expect(await authorityOf('calendar')).toMatchObject({ state: 'legacy' });
+    // The drift-before-select guard fired before `selectFamily` -- no
+    // selection was ever recorded for this attempt.
+    expect(await selectionRecordFor('calendar')).toBeNull();
+  });
+
+  it('leaves a skipped family byte-identical legacy and writes nothing for it', async () => {
+    const before = await legacyKeySnapshot('rollkeeper-calendar-data');
+    await renderWizardAtFamilyStep('calendar');
+    // Snapshot ALL durable state right before the click, not only the one
+    // legacy key: a skip record persisted under a NEW key (e.g.
+    // `rollkeeper:migration-skip:calendar`) would satisfy a check scoped to
+    // just `rollkeeper-calendar-data` while still being exactly the
+    // forbidden write spec R11 rules out.
+    const beforeSkip = await snapshotDurableState();
+    const skipButton = await screen.findByRole('button', {
+      name: /skip this one/i,
+    });
+    await userEvent.click(skipButton);
+    expect(await snapshotDurableState()).toBe(beforeSkip);
+    expect(await legacyKeySnapshot('rollkeeper-calendar-data')).toBe(before);
+    expect(await selectionRecordFor('calendar')).toBeNull();
+  });
+
+  it('leaves family k on IndexedDB authority and k+1 untouched when the cloud fails', async () => {
+    failCloudFor('magic_item');
+    await runWizardThroughFamilies(['magic_item', 'npc']);
+    expect(await authorityOf('magic_item')).toMatchObject({
+      state: 'indexedDB',
+    });
+    expect(await authorityOf('npc')).toMatchObject({ state: 'legacy' });
+    expect(
+      await screen.findByText(/saved only in this browser/i)
+    ).toBeInTheDocument();
+  });
+
+  it('never rolls local authority back after a failed cloud activation', async () => {
+    failCloudFor('magic_item');
+    await runWizardThroughFamilies(['magic_item']);
+    // Positive discriminator (R6.2): a negative on copy that may never
+    // exist always passes, so this is paired with proof the failure path
+    // actually rendered.
+    expect(
+      await screen.findByText(/saved only in this browser/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/rolled back/i)).not.toBeInTheDocument();
+    expect(await authorityOf('magic_item')).toMatchObject({
+      state: 'indexedDB',
+      epoch: 1,
+    });
+  });
+
+  it('closing between steps writes nothing for any unconfirmed family', async () => {
+    const before = await snapshotDurableState();
+    await renderWizardAtFamilyStep('npc');
+    await userEvent.click(screen.getByRole('button', { name: /^close$/i }));
+    expect(await snapshotDurableState()).toBe(before);
+  });
+
+  it('resumes after a reload without cutting over or staging twice', async () => {
+    await runWizardThroughFamilies(['campaign_settings']);
+    const stagingCalls = countApiCalls('begin-staging');
+    await reloadWizard();
+    await advanceToFamily('campaign_settings');
+    expect(countApiCalls('begin-staging')).toBe(stagingCalls);
+    expect(await authorityOf('campaign_settings')).toMatchObject({
+      state: 'postgres',
+      epoch: 1,
+    });
+    // R15's third resume property (ruling R7.6): exactly one receipt for
+    // the run's manifest hash, verified -- and no initiated-only receipt
+    // left orphaned by the reload.
+    const receipts = await allDownloadReceipts();
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0].manifestHash).toBe(await currentDeviceHash());
+    expect(typeof receipts[0].verifiedAt).toBe('string');
+  });
+
+  it('blocks a family whose marker and pointer disagree, and continues to the next', async () => {
+    await seedMarkerPointerDisagreement('npc');
+    await advanceToFamily('npc');
+    expect(
+      (await screen.findAllByText(/needs attention/i)).length
+    ).toBeGreaterThan(0);
+    expect(
+      await screen.findByRole('button', { name: /^continue$/i })
+    ).toBeEnabled();
+    // It never advances silently: the family stays inconsistent until repaired.
+    expect(await authorityOf('npc')).toMatchObject({ state: 'inconsistent' });
+  });
+
+  it('offers an inconsistent family a repair control, and continues after it succeeds', async () => {
+    await seedMarkerPointerDisagreement('npc');
+    await advanceToFamily('npc');
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: /^check this browser and fix it$/i,
+      })
+    );
+    // Anchored (R6.2): "could not be fixed" also contains "fixed", so the
+    // success assertion must not be satisfiable by the refusal copy.
+    expect(await screen.findByText(/was fixed/i)).toBeInTheDocument();
+    expect(screen.queryByText(/could not be fixed/i)).not.toBeInTheDocument();
+    expect(await authorityOf('npc')).toMatchObject({ state: 'indexedDB' });
+  });
+
+  it('keeps an inconsistent family blocked when the repair refuses, and allows a skip', async () => {
+    await seedMarkerAheadOfPointer('npc');
+    await advanceToFamily('npc');
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: /^check this browser and fix it$/i,
+      })
+    );
+    expect(await screen.findByText(/could not be fixed/i)).toBeInTheDocument();
+    expect(await authorityOf('npc')).toMatchObject({ state: 'inconsistent' });
+    expect(
+      await screen.findByRole('button', { name: /skip this one/i })
+    ).toBeEnabled();
+  });
+
+  it('renders a planned family as not yet available and offers no controls', async () => {
+    await advanceToFamily('location');
+    expect(
+      (await screen.findAllByText(/not yet available/i)).length
+    ).toBeGreaterThan(0);
+    expect(
+      screen.queryByLabelText(/type .* to confirm/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders every family-step warning at a 390px viewport without truncation', async () => {
+    await seedMarkerAheadOfPointer('npc');
+    await advanceToFamily('npc');
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: /^check this browser and fix it$/i,
+      })
+    );
+    await screen.findByText(/could not be fixed/i);
+    setViewport(MIGRATION_NARROW_VIEWPORT_PX);
+
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts.length).toBeGreaterThan(0);
+    for (const warning of alerts) {
+      assertNoTruncationClasses(warning);
+    }
   });
 });

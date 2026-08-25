@@ -7,12 +7,16 @@ import {
   verifyDownloadedDeviceBackup,
   type DeviceBackupV1,
 } from '@/lib/deviceRecovery';
-import { registeredAdapters } from '@/lib/durableDm/familyRegistry';
+import {
+  DURABLE_FAMILY_REGISTRY,
+  registeredAdapters,
+} from '@/lib/durableDm/familyRegistry';
 import { isMigrationWizardVisible } from '@/lib/durableDm/slice11gFlags';
 import type {
   DurableFamilyName,
   MigrationRunContext,
 } from '@/lib/durableDm/durableFamilyAdapter';
+import type { NormalizedAuthority } from '@/lib/durableDm/familyAuthorityNormalizer';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 import {
   createBrowserDmWorkspace,
@@ -21,6 +25,7 @@ import {
 import { APP_VERSION } from '@/utils/constants';
 
 import type {
+  FamilyRunOutcome,
   MigrationRecoveryState,
   MigrationWizardController,
 } from './MigrationWizard.types';
@@ -409,6 +414,195 @@ export function useMigrationWizard(
     };
   }, [ownerContext, workspace, campaignCode]);
 
+  // ---------------------------------------------------------------------
+  // Task 15: per-family step navigation and orchestration.
+  // ---------------------------------------------------------------------
+
+  // -1 = intro (steps 0/1, unchanged). 0..registry.length-1 = one registry
+  // entry (registered or planned) in fixed order. Rail rows are not
+  // clickable (settled decision) — the only way to move `stepIndex` is
+  // Back/Continue/Skip, all of which funnel through `goBack`/`goContinue`
+  // below (Skip is a distinctly-labelled alias for `goContinue`: spec R11
+  // requires it write nothing, and `goContinue` itself never writes
+  // anything either — the DM's typed-confirmation click is the only write
+  // path).
+  const [stepIndex, setStepIndex] = useState(-1);
+  useEffect(() => {
+    setStepIndex(-1);
+  }, [campaignCode]);
+
+  const canContinue =
+    recovery.status === 'verified' || recovery.status === 'resumed';
+
+  const goContinue = useCallback(() => {
+    setStepIndex(current =>
+      Math.min(current + 1, DURABLE_FAMILY_REGISTRY.length - 1)
+    );
+  }, []);
+  const goBack = useCallback(() => {
+    setStepIndex(current => Math.max(current - 1, -1));
+  }, []);
+
+  const [familyAuthorities, setFamilyAuthorities] = useState<
+    Partial<Record<DurableFamilyName, NormalizedAuthority>>
+  >({});
+
+  const adapterFor = useCallback(
+    (family: DurableFamilyName) =>
+      registeredAdapters().find(candidate => candidate.family === family) ??
+      null,
+    []
+  );
+
+  const refreshFamilyAuthority = useCallback(
+    async (family: DurableFamilyName) => {
+      const adapter = adapterFor(family);
+      if (!adapter || !ownerContext || !workspace?.cloudId) return null;
+      const authority = await adapter.readAuthority({
+        accountId: ownerContext.accountId,
+        campaignId: workspace.cloudId,
+        campaignCode,
+      });
+      setFamilyAuthorities(current => ({ ...current, [family]: authority }));
+      return authority;
+    },
+    [adapterFor, ownerContext, workspace, campaignCode]
+  );
+
+  // Spec R3: any captured-key hash change invalidates the run's one
+  // verified receipt. A pure read-and-compare — never writes anything, and
+  // never records an "expected transition" exception (the migration engine
+  // stays the arbiter of acceptable source drift, not the wizard). Called
+  // once when a family step is entered and, again, immediately before each
+  // of `selectFamily`, `commitLocalCutover` and `activateCloud` below.
+  const checkFamilyDrift = useCallback(async (): Promise<string | null> => {
+    if (!recovery.bundle || !recovery.manifestHash) return null;
+    const fresh = await captureDeviceBackup(window.localStorage, {
+      appVersion: APP_VERSION,
+      runId,
+      timestamp: new Date().toISOString(),
+    });
+    if (fresh.manifestHash === recovery.manifestHash) return null;
+    const before = new Map(
+      recovery.bundle.entries.map(entry => [entry.key, entry])
+    );
+    const after = new Map(fresh.entries.map(entry => [entry.key, entry]));
+    const keys = new Set<string>([...before.keys(), ...after.keys()]);
+    for (const key of keys) {
+      const beforeEntry = before.get(key);
+      const afterEntry = after.get(key);
+      if (
+        !beforeEntry ||
+        !afterEntry ||
+        beforeEntry.sha256 !== afterEntry.sha256 ||
+        beforeEntry.byteCount !== afterEntry.byteCount
+      ) {
+        return key;
+      }
+    }
+    // Unreachable in practice: a differing manifestHash is a deterministic
+    // digest over exactly these per-key fields, so the loop above always
+    // finds the changed key first. Kept only so the function has a total,
+    // typed return.
+    return 'this browser’s data';
+  }, [recovery.bundle, recovery.manifestHash, runId]);
+
+  const runFamily = useCallback(
+    async (family: DurableFamilyName): Promise<FamilyRunOutcome> => {
+      const adapter = adapterFor(family);
+      const context = contextFor(family);
+      if (!adapter || !context) {
+        return {
+          outcome: 'error',
+          message: 'Workspace discovery has not completed yet.',
+        };
+      }
+      try {
+        const driftBeforeSelect = await checkFamilyDrift();
+        if (driftBeforeSelect)
+          return { outcome: 'drift', changedKey: driftBeforeSelect };
+
+        await adapter.selectFamily(context);
+        const prepared = await adapter.prepareIndexedDb(context);
+
+        const driftBeforeCommit = await checkFamilyDrift();
+        if (driftBeforeCommit)
+          return { outcome: 'drift', changedKey: driftBeforeCommit };
+
+        await adapter.commitLocalCutover(context, {
+          generation: prepared.generation,
+          manifest: prepared.manifest,
+        });
+        await refreshFamilyAuthority(family);
+
+        const driftBeforeActivate = await checkFamilyDrift();
+        if (driftBeforeActivate)
+          return { outcome: 'drift', changedKey: driftBeforeActivate };
+
+        const activation = await adapter.activateCloud(
+          context,
+          prepared.manifest
+        );
+        if (activation.status === 'conflict') {
+          // Failure never reverses progress (spec, failure semantics
+          // section): the family stays at whatever authority
+          // `commitLocalCutover` already committed it to above. `rollback`
+          // is never called here.
+          return { outcome: 'cloudFailure', reason: activation.reason };
+        }
+        await refreshFamilyAuthority(family);
+        return { outcome: 'success' };
+      } catch (cause) {
+        return {
+          outcome: 'error',
+          message:
+            cause instanceof Error
+              ? cause.message
+              : 'This data category could not be moved.',
+        };
+      }
+    },
+    [adapterFor, contextFor, checkFamilyDrift, refreshFamilyAuthority]
+  );
+
+  const repairFamily = useCallback(
+    async (family: DurableFamilyName) => {
+      const adapter = adapterFor(family);
+      if (!adapter || !ownerContext || !workspace?.cloudId) {
+        return {
+          ok: false,
+          message: "This browser's record could not be fixed.",
+        };
+      }
+      try {
+        // `repairAuthority` REFUSES by rejecting rather than resolving to a
+        // lying "fixed" state (durableFamilyAdapter.ts) — a caller must
+        // never treat a rejection as anything other than "still
+        // inconsistent, still blocked".
+        await adapter.repairAuthority({
+          accountId: ownerContext.accountId,
+          campaignId: workspace.cloudId,
+          campaignCode,
+        });
+        await refreshFamilyAuthority(family);
+        return { ok: true, message: "This browser's record was fixed." };
+      } catch (cause) {
+        return {
+          ok: false,
+          message: `This browser's record could not be fixed: ${
+            cause instanceof Error ? cause.message : 'an unknown error'
+          }`,
+        };
+      }
+    },
+    [adapterFor, ownerContext, workspace, campaignCode, refreshFamilyAuthority]
+  );
+
+  const registeredCount = registeredAdapters().length;
+  const routedCount = Object.values(familyAuthorities).filter(
+    authority => authority?.state === 'postgres'
+  ).length;
+
   return {
     visible,
     campaignCode,
@@ -426,5 +620,17 @@ export function useMigrationWizard(
     contextFor,
     migrate,
     anyCutoverCommitted,
+    stepIndex,
+    canContinue,
+    goContinue,
+    goBack,
+    registeredCount,
+    routedCount,
+    familyAuthorities,
+    adapterFor,
+    refreshFamilyAuthority,
+    checkFamilyDrift,
+    runFamily,
+    repairFamily,
   };
 }

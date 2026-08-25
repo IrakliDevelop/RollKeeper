@@ -1,8 +1,10 @@
 import type { DeviceBackupV1 } from '@/lib/deviceRecovery';
 import type {
+  DurableFamilyAdapter,
   DurableFamilyName,
   MigrationRunContext,
 } from '@/lib/durableDm/durableFamilyAdapter';
+import type { NormalizedAuthority } from '@/lib/durableDm/familyAuthorityNormalizer';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 
 /**
@@ -78,4 +80,60 @@ export interface MigrationWizardController {
   migrate: (family: DurableFamilyName) => Promise<void>;
   /** Derived (never stored): true when any registered family's authority is indexedDB or postgres. */
   anyCutoverCommitted: boolean;
+
+  // -----------------------------------------------------------------------
+  // Task 15: per-family step navigation and orchestration. Rail rows are not
+  // clickable (settled decision) — navigation is exclusively Back / Continue
+  // / Skip, driven by `stepIndex`: -1 is the intro (steps 0/1, unchanged from
+  // Task 14), and 0..DURABLE_FAMILY_REGISTRY.length-1 addresses one registry
+  // entry (registered or planned) in fixed order.
+  // -----------------------------------------------------------------------
+  stepIndex: number;
+  /** True once the run's one browser backup is verified/resumed (spec R3/R4). Gates Continue past the intro. */
+  canContinue: boolean;
+  goContinue: () => void;
+  goBack: () => void;
+  /** `registeredAdapters().length` — the R13 "registered" denominator, live. */
+  registeredCount: number;
+  /** How many registered families this run has observed at `postgres` authority. Never persisted — rebuilt from `familyAuthorities`. */
+  routedCount: number;
+  /**
+   * The last-observed `NormalizedAuthority` per family, populated lazily as
+   * each family's step is visited or acted on. Never a substitute for
+   * `deriveFamilyStepState` — FamilyStep still calls that function fresh
+   * with this value as one of its inputs, rather than storing a step-state
+   * verdict of its own (spec R6).
+   */
+  familyAuthorities: Partial<Record<DurableFamilyName, NormalizedAuthority>>;
+  adapterFor: (family: DurableFamilyName) => DurableFamilyAdapter | null;
+  refreshFamilyAuthority: (
+    family: DurableFamilyName
+  ) => Promise<NormalizedAuthority | null>;
+  /**
+   * Re-captures the browser backup and compares its manifest hash against
+   * the run's one verified receipt (spec R3). Returns the changed key's name
+   * on drift, or `null` when the bundle still matches. Never mutates
+   * anything — a pure read-and-compare, called both on family-step entry
+   * and, again, immediately before each of `selectFamily`,
+   * `commitLocalCutover` and `activateCloud` inside `runFamily`.
+   */
+  checkFamilyDrift: () => Promise<string | null>;
+  /**
+   * Runs one family through the full chain — drift-checked select, prepare,
+   * local cutover, drift-checked cloud activation — from the DM's single
+   * typed-confirmation click. Never reverses progress: a cloud failure
+   * leaves the family at `indexedDB` authority and returns `cloudFailure`
+   * rather than calling `rollback`.
+   */
+  runFamily: (family: DurableFamilyName) => Promise<FamilyRunOutcome>;
+  /** Calls `adapter.repairAuthority`; a REFUSAL (rejection) reads as "still inconsistent, still blocked" (spec R5b). */
+  repairFamily: (
+    family: DurableFamilyName
+  ) => Promise<{ ok: boolean; message: string }>;
 }
+
+export type FamilyRunOutcome =
+  | { outcome: 'success' }
+  | { outcome: 'drift'; changedKey: string }
+  | { outcome: 'cloudFailure'; reason: string }
+  | { outcome: 'error'; message: string };
