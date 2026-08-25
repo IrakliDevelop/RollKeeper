@@ -238,9 +238,12 @@ control origin with the flag off.
   and of `rollkeeper:` markers — **never** on a status code. Do not record a
   403 as proof of anything about the flag.
 - **Reinstall the `window.confirm` override after every navigation**,
-  including a reload — see the §11F note. The wizard and all six cards call
-  it, and a navigation replaces the page's `window`, so a stale override
-  silently stops intercepting and the real dialog blocks the run.
+  including a reload — see the §11F note. The **cards** call it; the wizard,
+  its route and all six adapters deliberately do not (spec R12), so an
+  override that the wizard never trips is working correctly, not broken. It
+  is scenarios 2, 3 and 5 — the ones that drive a card — that need it. A
+  navigation replaces the page's `window`, so a stale override silently stops
+  intercepting and the real dialog blocks the run.
 - **Byte-identity is a per-entry hash comparison, not a glance.** Capture the
   per-entry hash vector before and after each scenario; an entry that looks
   unchanged in the storage viewer can still have been rewritten with
