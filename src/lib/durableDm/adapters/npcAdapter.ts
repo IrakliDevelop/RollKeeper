@@ -227,7 +227,7 @@ export const npcAdapter: DurableFamilyAdapter<NpcManifest> = {
     if (result.state !== 'CUTOVER_READY') {
       throw new Error(
         result.manifest.blockers.length > 0
-          ? 'Unresolved candidates block only the NPC family; legacy behavior remains active.'
+          ? 'Unresolved candidates block only NPCs; legacy behavior remains active.'
           : 'Local IndexedDB preparation did not satisfy every safety gate.'
       );
     }

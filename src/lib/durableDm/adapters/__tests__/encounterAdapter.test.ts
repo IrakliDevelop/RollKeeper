@@ -47,6 +47,25 @@ describe('encounterAdapter', () => {
     await expect(harness.adapter.prepareIndexedDb(context)).rejects.toThrow();
   });
 
+  // Coordinator fix round 1, Minor 4: the brief's test above pins `kind`
+  // only via `.map(...).toContain(...)`, which stays green even if the
+  // adapter rewrote this blocker's `legacyId` or `detail`. Full-verbatim
+  // `toEqual`, mirroring the `unclassified-field` blocker test below, and
+  // matching `encounterFamily.ts:504-508`'s exact detail string.
+  it('reports the active-encounter blocker with the exact legacyId and detail, not merely its kind', async () => {
+    const harness = createEncounterHarness();
+    const context = await harness.seedWithActiveEncounter();
+    const manifest = await harness.adapter.previewManifest(context);
+    expect(manifest.blockers).toEqual([
+      {
+        kind: 'active-encounter',
+        legacyId: 'enc-1',
+        detail:
+          'Encounter "Seed Encounter 1" is in active combat; end combat before cutover',
+      },
+    ]);
+  });
+
   // Brief's mandated extra test, quoted verbatim in the task brief.
   // `combatConfig` and `activeEncounterId` are device-global and are never
   // routed by this adapter, so a full local-cutover-plus-cloud-activation
@@ -429,13 +448,18 @@ describe('encounterAdapter', () => {
   });
 
   // `encounters` is a FLAT, cross-campaign array (unlike `npc`'s
-  // per-campaign-keyed record), so `rollback`'s store restore must filter by
-  // `campaignCode` on both `encounters` and `encounterTombstones` — a guard
-  // this adapter introduces beyond the `npc` template it otherwise mirrors.
-  // Proven by seeding an UNRELATED campaign's encounter directly into the
-  // store (bypassing the harness's seed, which only ever touches
-  // `CAMPAIGN_CODE`) and confirming it survives this campaign's rollback
-  // byte-for-byte.
+  // per-campaign-keyed record). `rollback`'s store restore filters by
+  // `campaignCode` on both `encounters` and `encounterTombstones` —
+  // reproducing the SHIPPED card's own `applyEncounterDocuments`
+  // (`EncounterSyncControls.hooks.ts:264-292`), called unconditionally from
+  // its `rollback()` at `:1579-1581`, expression for expression. This is not
+  // an adapter-only guard; the card performs the identical filter because
+  // `useEncounterStore.encounters` is a flat cross-campaign array where
+  // `npc`'s `npcsByCampaign[code]` is scoped by construction — removing the
+  // filter would clobber other campaigns, not preserve them. Proven by
+  // seeding an UNRELATED campaign's encounter directly into the store
+  // (bypassing the harness's seed, which only ever touches `CAMPAIGN_CODE`)
+  // and confirming it survives this campaign's rollback byte-for-byte.
   it('rollback restores only this campaign, leaving other campaigns untouched in the store', async () => {
     const harness = createEncounterHarness();
     const context = await harness.seed();
@@ -461,5 +485,63 @@ describe('encounterAdapter', () => {
         .getState()
         .encounters.find(encounter => encounter.id === 'other-campaign-enc-1')
     ).toEqual(otherEncounter);
+  });
+
+  // Coordinator fix round 1, Important 1: the `encounterTombstones` half of
+  // the SAME filter (`EncounterSyncControls.hooks.ts:287-291`'s
+  // `isCampaignTombstone` filter, mirrored in `encounterAdapter.ts`'s
+  // `rollback`) had NO discriminating fixture — a total wipe (deleting every
+  // campaign's tombstones) and a total no-op (leaving this campaign's stale
+  // tombstones behind) both shipped green. `encounterTombstones` is
+  // reachable in production: `encounterStore.ts:444-453`'s `deleteEncounter`
+  // populates it on every deletion, with `beforeImage` carrying
+  // `campaignCode` — exactly the field this filter reads. Seeds TWO
+  // tombstones directly into the store (bypassing the harness, which never
+  // populates `encounterTombstones`): one whose `beforeImage.campaignCode`
+  // is THIS campaign, one for another. After rollback, only this campaign's
+  // must be gone; the other campaign's must survive byte-for-byte.
+  it("rollback restores only this campaign's tombstones, leaving other campaigns' tombstones untouched", async () => {
+    const harness = createEncounterHarness();
+    const context = await harness.seed();
+    const thisCampaignDeletedEncounter = {
+      id: 'enc-deleted-here',
+      name: 'Deleted In This Campaign',
+      campaignCode: context.campaignCode,
+      entities: [],
+      currentTurn: 0,
+      round: 1,
+      isActive: false,
+      sortOrder: 'initiative' as const,
+      createdAt: '2026-08-25T00:00:00.000Z',
+      updatedAt: '2026-08-25T00:00:00.000Z',
+    };
+    const otherCampaignDeletedEncounter = {
+      ...thisCampaignDeletedEncounter,
+      id: 'enc-deleted-elsewhere',
+      name: 'Deleted In Another Campaign',
+      campaignCode: 'OTHER-CAMPAIGN',
+    };
+    const thisCampaignTombstone = {
+      id: 'enc-deleted-here',
+      deletedAt: '2026-08-25T00:00:00.000Z',
+      beforeImage: thisCampaignDeletedEncounter,
+    };
+    const otherCampaignTombstone = {
+      id: 'enc-deleted-elsewhere',
+      deletedAt: '2026-08-25T00:00:00.000Z',
+      beforeImage: otherCampaignDeletedEncounter,
+    };
+    useEncounterStore.setState(state => ({
+      encounterTombstones: {
+        ...state.encounterTombstones,
+        'enc-deleted-here': thisCampaignTombstone,
+        'enc-deleted-elsewhere': otherCampaignTombstone,
+      },
+    }));
+    await harness.runChainThroughCloudActivation(context);
+    await harness.adapter.rollback(context);
+    const tombstones = useEncounterStore.getState().encounterTombstones;
+    expect(tombstones['enc-deleted-here']).toBeUndefined();
+    expect(tombstones['enc-deleted-elsewhere']).toEqual(otherCampaignTombstone);
   });
 });

@@ -239,7 +239,7 @@ export const encounterAdapter: DurableFamilyAdapter<EncounterManifest> = {
     if (result.state !== 'CUTOVER_READY') {
       throw new Error(
         result.manifest.blockers.length > 0
-          ? 'Unresolved candidates block only the Encounters family; legacy behavior remains active.'
+          ? 'Unresolved candidates block only Encounters; legacy behavior remains active.'
           : 'Local IndexedDB preparation did not satisfy every safety gate.'
       );
     }
