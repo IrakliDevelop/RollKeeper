@@ -394,6 +394,58 @@ export function describeAdapterConformance(
     expect(await harness.snapshot()).toBe(before);
   });
 
+  /**
+   * Scoped re-review N2. D1's resume branch re-derives the manifest from
+   * `previewManifest` rather than from `prepareIndexedDb`, and its entire
+   * safety argument rests on one property of `previewManifest`: for a
+   * category that has already cut over locally it returns the IndexedDB
+   * WORKING-COPY manifest. Unchanged records must reproduce the first
+   * attempt's fingerprint (so the retry replays the same
+   * `migrationMutationId` receipt instead of opening a second staging run),
+   * and changed records must NOT (so `matchesManifest` refuses rather than
+   * adopting the cloud generation over local edits).
+   *
+   * Nothing pinned it. Disabling the working-copy branch outright
+   * (`if (false && ...)`) survived all 694 slice-11G tests and all 63 npc
+   * contract tests, because with an unchanged working copy the source
+   * manifest is byte-equal — only the second half below discriminates. D1's
+   * own regression tests run against a STUB adapter; this one runs against
+   * the real implementation, and every family inherits it.
+   */
+  it(`${name}: previewManifest after a local cutover reproduces the prepared fingerprint, and follows the working copy when it changes`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.adapter.selectFamily(context);
+    const prepared = await harness.adapter.prepareIndexedDb(context);
+    await harness.adapter.commitLocalCutover(context, {
+      generation: prepared.generation,
+      manifest: prepared.manifest,
+    });
+
+    const resumed = await harness.adapter.previewManifest(context);
+    expect(resumed.fingerprint).toBe(prepared.manifest.fingerprint);
+
+    // ...and the identity above is genuinely READ BACK from IndexedDB, not
+    // re-derived from the legacy envelope, which the cutover leaves in
+    // place. One edit through the family's own delete path must move the
+    // preview off the prepared fingerprint; a source-manifest fallback
+    // would return the prepared fingerprint here too.
+    //
+    // Two legitimate shapes, so the assertion is on what CANNOT happen
+    // rather than on one of them: a multi-record family drops the record
+    // and reports a different fingerprint, while a single-record family
+    // REFUSES outright ("a verified IndexedDB working copy is required for
+    // preview") because its one document is now a tombstone. Both are the
+    // working copy being read; only the fallback reproduces the prepared
+    // fingerprint.
+    await harness.deleteWorkingCopy(resumed.records[0].legacyId);
+    const afterLocalEdit = await harness.adapter.previewManifest(context).then(
+      manifest => manifest.fingerprint,
+      () => null
+    );
+    expect(afterLocalEdit).not.toBe(prepared.manifest.fingerprint);
+  });
+
   it(`${name}: readAuthority changes nothing`, async () => {
     const harness = createHarness();
     const context = await harness.seed();
