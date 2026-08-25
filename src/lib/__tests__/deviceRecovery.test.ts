@@ -192,7 +192,7 @@ describe('device recovery bundle', () => {
     expect(emptyPreview.conflictCount).toBe(0);
   });
 
-  it('downloads through a checksum-labelled Blob URL and records the matching manifest receipt', async () => {
+  it('downloads with browser-facing filename copy while preserving the compatibility format and matching manifest receipt', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-15T10:05:00.000Z'));
     const bundle = await captureDeviceBackup(
@@ -222,7 +222,10 @@ describe('device recovery bundle', () => {
     expect(click).toHaveBeenCalledOnce();
     const link = click.mock.instances[0] as HTMLAnchorElement;
     expect(link.href).toBe('blob:recovery-download');
-    expect(link.download).toContain(bundle.manifestHash);
+    expect(link.download).toBe(
+      `rollkeeper-browser-backup_2026-08-15_${bundle.manifestHash}.json`
+    );
+    expect(bundle.format).toBe('rollkeeper-device-backup');
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:recovery-download');
     expect(receipts.recordDownloadReceipt).toHaveBeenCalledWith({
       runId: bundle.runId,

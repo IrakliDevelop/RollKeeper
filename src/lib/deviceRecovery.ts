@@ -361,7 +361,7 @@ export async function initiateDeviceBackupDownload(
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `rollkeeper-device-backup_${bundle.createdAt.slice(0, 10)}_${bundle.manifestHash}.json`;
+  link.download = `rollkeeper-browser-backup_${bundle.createdAt.slice(0, 10)}_${bundle.manifestHash}.json`;
   link.style.display = 'none';
   document.body.appendChild(link);
   try {
