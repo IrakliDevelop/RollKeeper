@@ -50,6 +50,7 @@ import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository'
 import { selectCampaignSettings } from '@/lib/indexeddb/campaignSettingsSelection';
 import { createBrowserDmWorkspace } from '@/lib/supabase/browserDmWorkspace';
 import { expectCloudProductVocabulary } from '@/test/helpers';
+import { forkCampaignToCloudLabel } from '@/components/ui/campaign/dmCloudWorkspaceLabels';
 import { APP_VERSION } from '@/utils/constants';
 
 import { MigrationWizard } from './index';
@@ -1653,7 +1654,7 @@ describe('MigrationWizard — steps 0 and 1', () => {
   it('explains what to do, and links to the dashboard, when the account has no cloud workspace for this campaign', async () => {
     // The default owner context is signed in and its `list()` returns no
     // workspaces -- exactly the state the gate hit.
-    render(<MigrationWizard campaignCode="ALPHA" />);
+    render(<MigrationWizard campaignCode="ALPHA" campaignName="Canary" />);
     const discoverButton = screen.getByRole('button', {
       name: /find my campaigns/i,
     });
@@ -1670,11 +1671,16 @@ describe('MigrationWizard — steps 0 and 1', () => {
       /^create a cloud workspace for this campaign first$/i
     );
     expect(guidance.closest('[role="alert"]')).not.toBeNull();
+    // Re-review N3: the guidance names the dashboard's fork button after the
+    // CAMPAIGN, never after its code -- that is what the button reads. The
+    // producer/consumer binding to the real control's own label lives in
+    // `workspaceGuidance.test.tsx`; this line only pins the wiring of the
+    // name through the wizard.
     expect(
       screen.getByText(
         /this wizard moves campaign data into a cloud workspace/i
       )
-    ).toHaveTextContent('Fork ALPHA to cloud');
+    ).toHaveTextContent(forkCampaignToCloudLabel('Canary'));
     const link = screen.getByRole('link', { name: /go to my campaigns/i });
     expect(link).toHaveAttribute('href', '/dm');
     expectCloudProductVocabulary(document.body);

@@ -6,6 +6,7 @@ import {
   MigrationWizard,
   type MigrationWizardCloseStatus,
 } from '@/components/ui/campaign/MigrationWizard';
+import { useDmStore } from '@/store/dmStore';
 
 /**
  * Spec R2a's close behaviour, the one piece of routing logic this dedicated
@@ -34,6 +35,18 @@ export function MigrationWizardRoute({
   campaignCode: string;
 }) {
   const router = useRouter();
+  // Re-review N3: step 0's missing-workspace guidance names the dashboard's
+  // fork button, and that button is named after the campaign, not its code.
+  // Read from `dmStore` — the SAME roster `/dm` builds those buttons from —
+  // so the two cannot name different things. `undefined` (no roster entry)
+  // means the dashboard renders no fork button for this campaign either.
+  // Selects the NAME, not the campaign object: a primitive result keeps the
+  // selector referentially stable across renders.
+  const campaignName = useDmStore(
+    state =>
+      state.campaigns.find(campaign => campaign.code === campaignCode)?.name ??
+      null
+  );
 
   const handleClose = ({
     anyCutoverCommitted,
@@ -43,5 +56,11 @@ export function MigrationWizardRoute({
     router.replace(routeToCampaign ? `/dm/campaign/${campaignCode}` : '/dm');
   };
 
-  return <MigrationWizard campaignCode={campaignCode} onClose={handleClose} />;
+  return (
+    <MigrationWizard
+      campaignCode={campaignCode}
+      campaignName={campaignName}
+      onClose={handleClose}
+    />
+  );
 }

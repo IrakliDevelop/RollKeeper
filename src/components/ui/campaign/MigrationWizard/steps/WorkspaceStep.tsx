@@ -13,8 +13,22 @@ import { Badge } from '@/components/ui/layout/badge';
 import { Button } from '@/components/ui/forms/button';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 
+import {
+  CREATE_CLOUD_WORKSPACE_LABEL,
+  DM_CLOUD_WORKSPACE_SECTION_LABEL,
+  forkCampaignToCloudLabel,
+} from '../../dmCloudWorkspaceLabels';
+
 interface WorkspaceStepProps {
   campaignCode: string;
+  /**
+   * The campaign's own name, as the DM dashboard knows it — the dashboard's
+   * fork button is named after it, not after the code (re-review N3).
+   * `null` when this browser's campaign roster has no entry for
+   * `campaignCode`: the dashboard then renders no fork button for it
+   * either, so the guidance names only the create control.
+   */
+  campaignName: string | null;
   discovering: boolean;
   discoveryError: string | null;
   /** Derived from the controller's `accountId !== null` — never fabricated. */
@@ -32,6 +46,7 @@ interface WorkspaceStepProps {
  */
 export function WorkspaceStep({
   campaignCode,
+  campaignName,
   discovering,
   discoveryError,
   signedIn,
@@ -143,14 +158,29 @@ export function WorkspaceStep({
             <p className="text-accent-amber-text text-sm font-semibold">
               Create a cloud workspace for this campaign first
             </p>
+            {/*
+              Re-review N3: every control named here is named by the SAME
+              function the dashboard renders it with
+              (`dmCloudWorkspaceLabels.ts`), never by a hand-copied literal
+              — the dashboard's fork button carries the campaign's NAME, not
+              its code, and the two used to disagree.
+            */}
             <p className="text-accent-amber-text mt-1 text-sm">
               This wizard moves campaign data into a cloud workspace your
               account already owns; it never creates one. Open your campaigns
-              dashboard, find the <strong>DM cloud workspace</strong> section,
-              and use <strong>Fork {campaignCode} to cloud</strong> (or{' '}
-              <strong>Create cloud workspace</strong>). Then come back here and
-              choose Find my campaigns again. Nothing in this browser changes
-              until you do.
+              dashboard, find the{' '}
+              <strong>{DM_CLOUD_WORKSPACE_SECTION_LABEL}</strong> section, and
+              use{' '}
+              {campaignName ? (
+                <>
+                  <strong>{forkCampaignToCloudLabel(campaignName)}</strong> (or{' '}
+                  <strong>{CREATE_CLOUD_WORKSPACE_LABEL}</strong>)
+                </>
+              ) : (
+                <strong>{CREATE_CLOUD_WORKSPACE_LABEL}</strong>
+              )}
+              . Then come back here and choose Find my campaigns again. Nothing
+              in this browser changes until you do.
             </p>
           </div>
           <div>

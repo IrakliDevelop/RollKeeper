@@ -24,6 +24,11 @@ import {
   isDmWorkspaceCloudEnabled,
 } from '@/lib/supabase/dmWorkspaceService';
 import type { CampaignInfo } from '@/types/campaign';
+import {
+  CREATE_CLOUD_WORKSPACE_LABEL,
+  DM_CLOUD_WORKSPACE_SECTION_LABEL,
+  forkCampaignToCloudLabel,
+} from './dmCloudWorkspaceLabels';
 import { DmGuestInvitationControls } from './DmGuestInvitationControls';
 import { DmCampaignMembershipControls } from './DmCampaignMembershipControls';
 
@@ -129,7 +134,7 @@ export function DmCloudWorkspaceControls({
       <Card className="mb-8" padding="lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Cloud size={20} /> DM cloud workspace
+            <Cloud size={20} /> {DM_CLOUD_WORKSPACE_SECTION_LABEL}
           </CardTitle>
           <CardDescription>
             Owner-only preview. Creating or forking a workspace changes no
@@ -153,7 +158,7 @@ export function DmCloudWorkspaceControls({
               loading={busy === 'create'}
               disabled={!name.trim()}
             >
-              Create cloud workspace
+              {CREATE_CLOUD_WORKSPACE_LABEL}
             </Button>
           </div>
 
@@ -211,7 +216,7 @@ export function DmCloudWorkspaceControls({
                     loading={busy === campaign.code}
                     onClick={() => handleFork(campaign)}
                   >
-                    Fork {campaign.name} to cloud
+                    {forkCampaignToCloudLabel(campaign.name)}
                   </Button>
                 ))}
               </div>

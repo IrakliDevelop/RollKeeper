@@ -31,6 +31,14 @@ export interface MigrationWizardCloseStatus {
 export interface MigrationWizardProps {
   campaignCode: string;
   /**
+   * The campaign's name as this browser's DM roster knows it (re-review
+   * N3). Only step 0's missing-workspace guidance uses it, to name the
+   * dashboard's fork button exactly as the dashboard renders it. Optional
+   * so this component stays renderable standalone; the route resolves it
+   * from `dmStore`, the same list the dashboard builds those buttons from.
+   */
+  campaignName?: string | null;
+  /**
    * Task 17 (dedicated route) wires this to `router.replace(...)`: to
    * `/dm/campaign/<code>` once anything was cut over (or discovery never
    * ran, so a stale-`false` `anyCutoverCommitted` is not trusted -- see
@@ -54,6 +62,7 @@ export interface MigrationWizardProps {
  */
 export function MigrationWizard({
   campaignCode,
+  campaignName,
   onClose,
 }: MigrationWizardProps) {
   const controller = useMigrationWizard(campaignCode);
@@ -178,6 +187,7 @@ export function MigrationWizard({
               <>
                 <WorkspaceStep
                   campaignCode={campaignCode}
+                  campaignName={campaignName ?? null}
                   discovering={controller.discovering}
                   discoveryError={controller.discoveryError}
                   signedIn={controller.accountId !== null}
