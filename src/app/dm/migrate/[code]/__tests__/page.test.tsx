@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ReactNode } from 'react';
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -13,6 +13,7 @@ import type {
   FamilyManifestHandle,
   MigrationRunContext,
 } from '@/lib/durableDm/durableFamilyAdapter';
+import type { NormalizedAuthority } from '@/lib/durableDm/familyAuthorityNormalizer';
 import {
   registeredAdapters,
   enabledAdapters,
@@ -452,5 +453,61 @@ describe('/dm/migrate/[code]', () => {
     await renderRoute('ALPHA');
     await findMyCampaigns();
     expect(await screen.findByText(/1 of 6/)).toBeInTheDocument();
+  });
+
+  /**
+   * Fix round 2 (coordinator review, item 1): pins the reset half of
+   * `discoveryAttempted`'s predicate, not just the tail-set half. "Find my
+   * campaigns" (`WorkspaceStep.tsx`) renders unconditionally and is never
+   * disabled after a successful discovery, and each click opens a fresh
+   * workspace identity -- so a SECOND discovery, still in flight when Close
+   * is clicked, must not be masked by the FIRST discovery's already-completed
+   * `discoveryAttempted: true`. Without the reset in the scan effect, this
+   * reaches the R2a hazard verbatim: `/dm` instead of the campaign route.
+   */
+  it('resets discoveryAttempted on a second discovery, so a stale true from the first scan does not mask a still-pending second scan', async () => {
+    let npcCallCount = 0;
+    let resolveSecondScan: (value: NormalizedAuthority) => void = () => {};
+    const legacyAuthority: NormalizedAuthority = {
+      state: 'legacy',
+      epoch: 0,
+      campaignId: null,
+      accountId: null,
+      rolledBack: false,
+    };
+    const npcAdapter: DurableFamilyAdapter = {
+      ...stubAdapter('npc', false),
+      readAuthority: async () => {
+        npcCallCount += 1;
+        if (npcCallCount === 1) return legacyAuthority;
+        // Second (and any later) scan: held pending deliberately -- resolved
+        // only after the assertion below, so nothing leaks as an unhandled
+        // rejection into a later test.
+        return new Promise<NormalizedAuthority>(resolve => {
+          resolveSecondScan = resolve;
+        });
+      },
+    };
+    const adapters = ALL_FAMILIES.map(family =>
+      family === 'npc' ? npcAdapter : stubAdapter(family, false)
+    );
+    wireAdapters(adapters);
+    await renderRoute('ALPHA');
+    await findMyCampaigns(); // first discovery: scan completes, nothing routed
+
+    // Second discovery: re-click "Find my campaigns" -- opens a fresh
+    // workspace identity (`list()` is re-invoked and builds a fresh
+    // `workspaceFor('ALPHA')` object each call) and re-runs the scan effect,
+    // this time with npc's `readAuthority` held pending.
+    await userEvent.click(
+      screen.getByRole('button', { name: /find my campaigns/i })
+    );
+    await waitFor(() => expect(npcCallCount).toBeGreaterThanOrEqual(2));
+
+    await clickClose();
+    expect(mockedReplace).toHaveBeenCalledWith('/dm/campaign/ALPHA');
+    expect(mockedReplace).not.toHaveBeenCalledWith('/dm');
+
+    resolveSecondScan(legacyAuthority);
   });
 });

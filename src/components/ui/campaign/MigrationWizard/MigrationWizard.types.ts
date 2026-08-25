@@ -82,11 +82,17 @@ export interface MigrationWizardController {
   /** Derived (never stored): true when any registered family's authority is indexedDB or postgres. */
   anyCutoverCommitted: boolean;
   /**
-   * True once `discover()` has resolved (success or failure) at least once
-   * this mount. `anyCutoverCommitted` is `false` both when nothing has been
-   * cut over AND before discovery has ever run -- a caller (Task 17's route)
-   * must not treat those as the same, and this is what lets it tell them
-   * apart.
+   * True once the BULK AUTHORITY SCAN that computes `anyCutoverCommitted`
+   * has actually completed for the current owner-workspace pairing this
+   * mount -- never merely whether `discover()` itself returned. It resets
+   * to `false` synchronously whenever that pairing changes (a fresh
+   * "Find my campaigns" click opens a new workspace context, which re-runs
+   * the scan), and it is `false` after a discovery that failed or found no
+   * signed-in owner, since the scan never runs at all in that case.
+   * `anyCutoverCommitted` is `false` both when nothing has been cut over AND
+   * before/while this mount's scan is unresolved -- a caller (Task 17's
+   * route) must not treat those as the same, and this is what lets it tell
+   * them apart.
    */
   discoveryAttempted: boolean;
 
