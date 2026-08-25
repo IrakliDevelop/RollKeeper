@@ -23,9 +23,9 @@ import { defineConfig } from 'vitest/config';
 // (Task 3's receipt-vector write). None of their source files are added to
 // coverage.include — those files are shipped code owned by earlier slices and
 // measuring them here would import their coverage debt into this contract
-// (rulings.md R1.2). The /dm dashboard test file that Task 18's R2b hardening
-// will edit does not exist yet as of this task and is intentionally omitted;
-// Task 18 adds it when it creates that file.
+// (rulings.md R1.2). The /dm dashboard test file is Task 17's own (the
+// flag-gated launcher) — Task 18's R2b hardening edits the SAME file, not a
+// new one.
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(dirname, '../..');
@@ -53,6 +53,7 @@ export default defineConfig({
       'src/lib/__tests__/deviceRecovery.test.ts',
       'src/components/ui/campaign/MigrationWizard/*.test.tsx',
       'src/app/dm/migrate/[code]/__tests__/*.test.tsx',
+      'src/app/dm/__tests__/page.test.tsx',
     ],
     coverage: {
       enabled: true,

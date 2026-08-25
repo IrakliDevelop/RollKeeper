@@ -142,6 +142,17 @@ export function useMigrationWizard(
   const [recovery, setRecovery] =
     useState<MigrationRecoveryState>(INITIAL_RECOVERY);
   const [anyCutoverCommitted, setAnyCutoverCommitted] = useState(false);
+  // Task 17: whether `discover()` has RESOLVED (success or failure) at least
+  // once this mount -- never whether it has merely started, and never reset
+  // once true. `anyCutoverCommitted` short-circuits to `false` before
+  // discovery ever runs (see the effect below), which is indistinguishable
+  // from a genuine "checked, nothing cut over" `false` by that field alone.
+  // The route (spec R2a close behaviour) must not treat those as the same:
+  // routing to `/dm` on a stale `false` after a real cutover would land the
+  // DM on editable campaign UI with no fresh durable-family owner mounted --
+  // exactly what R2a exists to prevent. Exposing this lets a caller require
+  // a completed discovery before trusting `anyCutoverCommitted: false`.
+  const [discoveryAttempted, setDiscoveryAttempted] = useState(false);
 
   // Exactly one open `rollkeeper-local` database handle for the whole run
   // (spec R10 / brief). React's own cleanup-on-dependency-change semantics
@@ -208,7 +219,10 @@ export function useMigrationWizard(
         );
       }
     } finally {
-      if (mountedRef.current) setDiscovering(false);
+      if (mountedRef.current) {
+        setDiscovering(false);
+        setDiscoveryAttempted(true);
+      }
     }
   }, [campaignCode]);
 
@@ -845,6 +859,7 @@ export function useMigrationWizard(
     contextFor,
     migrate,
     anyCutoverCommitted,
+    discoveryAttempted,
     stepIndex,
     canContinue,
     goContinue,

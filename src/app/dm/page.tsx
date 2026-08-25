@@ -11,6 +11,7 @@ import {
   Trash2,
   Clock,
   Download,
+  CloudCog,
 } from 'lucide-react';
 import { useDmStore } from '@/store/dmStore';
 import { Button } from '@/components/ui/forms/button';
@@ -20,6 +21,8 @@ import { CreateCampaignDialog } from '@/components/ui/campaign/CreateCampaignDia
 import { DmCloudWorkspaceControls } from '@/components/ui/campaign/DmCloudWorkspaceControls';
 import { BannerUpload } from '@/components/ui/campaign/BannerUpload';
 import { useHydration } from '@/hooks/useHydration';
+import { campaignSettingsUsesIndexedDbAuthority } from '@/lib/durableDm/campaignSettingsLegacyProjection';
+import { isMigrationWizardVisible } from '@/lib/durableDm/slice11gFlags';
 import { CampaignInfo } from '@/types/campaign';
 
 export default function DmDashboardPage() {
@@ -295,6 +298,18 @@ function CampaignCard({
   onExport: (campaign: CampaignInfo) => void;
   onBannerChange: (url: string | undefined) => void;
 }) {
+  // Spec R2a: the launcher is flag-gated on the client, but the route it
+  // links to (`/dm/migrate/[code]`) independently re-checks the SAME flag,
+  // so direct navigation is covered even if this render is ever bypassed.
+  const migrationWizardVisible = isMigrationWizardVisible();
+  // Once `campaign_settings` is routed off legacy, this campaign has already
+  // been through the wizard at least once -- the launcher's copy reflects
+  // that instead of inviting the DM to start a migration that already ran.
+  const campaignSettingsRouted = campaignSettingsUsesIndexedDbAuthority(
+    window.localStorage,
+    campaign.code
+  );
+
   return (
     <div className="border-accent-purple-border bg-surface-raised hover:bg-surface-secondary rounded-lg border-2 shadow-md transition-all hover:shadow-xl">
       <BannerUpload
@@ -364,6 +379,28 @@ function CampaignCard({
             <Trash2 size={16} />
           </Button>
         </div>
+
+        {migrationWizardVisible && (
+          <div className="border-divider mt-3 border-t pt-3">
+            <Link href={`/dm/migrate/${campaign.code}`}>
+              <Button
+                variant="outline"
+                size="sm"
+                fullWidth
+                leftIcon={<CloudCog size={15} />}
+              >
+                {campaignSettingsRouted
+                  ? 'Review cloud sync'
+                  : 'Move campaign data to cloud sync'}
+              </Button>
+            </Link>
+            <p className="text-faint mt-1.5 text-xs">
+              {campaignSettingsRouted
+                ? 'See what has synced and pick up any category you paused.'
+                : 'Back up this browser first; nothing moves until you confirm each category.'}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

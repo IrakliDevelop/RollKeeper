@@ -21,15 +21,25 @@ import { RecoveryStep } from './steps/RecoveryStep';
 import { ReportStep } from './steps/ReportStep';
 import { WorkspaceStep } from './steps/WorkspaceStep';
 
+export interface MigrationWizardCloseStatus {
+  /** Derived, never stored (spec R6) -- see `MigrationWizardController.anyCutoverCommitted`. */
+  anyCutoverCommitted: boolean;
+  /** See `MigrationWizardController.discoveryAttempted` -- required to trust a `false` `anyCutoverCommitted` above. */
+  discoveryAttempted: boolean;
+}
+
 export interface MigrationWizardProps {
   campaignCode: string;
   /**
-   * Task 17 (dedicated route) wires this to `router.replace('/dm/campaign/<code>')`
-   * so fresh durable-family owners mount before editable campaign UI returns
-   * (spec R2a). Optional and a no-op by default so this component stays
-   * testable standalone.
+   * Task 17 (dedicated route) wires this to `router.replace(...)`: to
+   * `/dm/campaign/<code>` once anything was cut over (or discovery never
+   * ran, so a stale-`false` `anyCutoverCommitted` is not trusted -- see
+   * `MigrationWizardCloseStatus`), so fresh durable-family owners mount
+   * before editable campaign UI returns (spec R2a); to `/dm` otherwise.
+   * Optional and a no-op by default so this component stays testable
+   * standalone.
    */
-  onClose?: () => void;
+  onClose?: (status: MigrationWizardCloseStatus) => void;
 }
 
 /**
@@ -232,7 +242,15 @@ export function MigrationWizard({
         </DialogBody>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onClose?.()}>
+          <Button
+            variant="ghost"
+            onClick={() =>
+              onClose?.({
+                anyCutoverCommitted: controller.anyCutoverCommitted,
+                discoveryAttempted: controller.discoveryAttempted,
+              })
+            }
+          >
             Close
           </Button>
           <Button

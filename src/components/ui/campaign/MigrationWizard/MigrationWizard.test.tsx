@@ -3216,3 +3216,140 @@ describe('MigrationWizard — report', () => {
     }
   });
 });
+
+/**
+ * Task 17: `anyCutoverCommitted` (Task 14, R9.10) and `discoveryAttempted`
+ * (added by Task 17 to close the stale-`false` hazard) have no other
+ * observable surface than the `onClose` callback's argument -- neither is
+ * ever rendered. This is that dedicated test, and it also pins the hazard
+ * itself: a fresh mount (what a page reload produces) resets both to their
+ * initial `false`, even though the underlying adapter authority (this
+ * suite's stand-in for real persisted IndexedDB/localStorage state) still
+ * reports a completed cutover. `anyCutoverCommitted: false` therefore does
+ * NOT mean "nothing was cut over" -- it can also mean "not checked yet this
+ * mount" -- which is exactly why Task 17's route treats `false` as
+ * trustworthy only once `discoveryAttempted` is also `true`.
+ */
+describe('MigrationWizard — close status (spec R2a close-behaviour contract)', () => {
+  function postgresAdapters(routedFamily: DurableFamilyName) {
+    return ALL_STUB_FAMILIES.map(family =>
+      stubAdapter(
+        family,
+        family === routedFamily
+          ? {
+              initialAuthority: {
+                state: 'postgres',
+                epoch: 1,
+                campaignId: 'cloud-ALPHA',
+                accountId: 'account-1',
+                rolledBack: false,
+              },
+            }
+          : {}
+      )
+    );
+  }
+
+  function wireAdapters(adapters: DurableFamilyAdapter[]) {
+    mockedRegisteredAdapters.mockReturnValue(adapters);
+    mockedEnabledAdapters.mockImplementation(() =>
+      mockedRegisteredAdapters().filter(adapter => adapter.isVisible())
+    );
+    mockedCreateBrowserDmWorkspace.mockResolvedValue({
+      ...defaultOwnerContext(),
+      list: vi.fn(async () => [workspaceFor('ALPHA')]),
+    });
+  }
+
+  it('reports both false when Close is clicked before discovery has ever run, even though a family is already routed', async () => {
+    // The adapter data ALREADY shows npc at postgres authority -- exactly
+    // the state a real reload would find -- but nothing in this mount has
+    // asked yet, so both fields must read as "not known", never as a
+    // confident "nothing was cut over".
+    wireAdapters(postgresAdapters('npc'));
+    const onClose = vi.fn();
+    render(<MigrationWizard campaignCode="ALPHA" onClose={onClose} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledWith({
+      anyCutoverCommitted: false,
+      discoveryAttempted: false,
+    });
+  });
+
+  it('reports discoveryAttempted true and anyCutoverCommitted false once discovery completes and finds nothing cut over', async () => {
+    wireAdapters(stubFamilies());
+    const onClose = vi.fn();
+    render(<MigrationWizard campaignCode="ALPHA" onClose={onClose} />);
+    await userEvent.click(
+      screen.getByRole('button', { name: /find my campaigns/i })
+    );
+    await screen.findByText(/connected to campaign alpha/i);
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledWith({
+      anyCutoverCommitted: false,
+      discoveryAttempted: true,
+    });
+  });
+
+  it('derives anyCutoverCommitted true from a registered family already at indexedDB/postgres authority, once discovery completes', async () => {
+    wireAdapters(postgresAdapters('npc'));
+    const onClose = vi.fn();
+    render(<MigrationWizard campaignCode="ALPHA" onClose={onClose} />);
+    await userEvent.click(
+      screen.getByRole('button', { name: /find my campaigns/i })
+    );
+    await screen.findByText(/connected to campaign alpha/i);
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledWith({
+      anyCutoverCommitted: true,
+      discoveryAttempted: true,
+    });
+  });
+
+  /**
+   * THE hazard test: a real cutover is on record (the SAME adapter
+   * instances carry it across both mounts below, standing in for real
+   * persisted state a page reload would still find), discovery ran and
+   * observed it on the FIRST mount -- then the component unmounts and
+   * remounts fresh (a reload). The second mount's Close, clicked before
+   * this mount ever discovers again, must NOT report the confident
+   * `anyCutoverCommitted: false` a naive read would produce. This is also
+   * the derived-not-stored proof for `anyCutoverCommitted` (R6): if it were
+   * cached anywhere outside this component instance's own state, the
+   * second mount would report `true`, not `false`, without ever calling
+   * discover() itself.
+   */
+  it('resets discoveryAttempted (and so cannot be trusted) on a fresh mount, even though the underlying cutover persists', async () => {
+    const adapters = postgresAdapters('npc');
+    wireAdapters(adapters);
+
+    const onCloseFirstMount = vi.fn();
+    const firstMount = render(
+      <MigrationWizard campaignCode="ALPHA" onClose={onCloseFirstMount} />
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: /find my campaigns/i })
+    );
+    await screen.findByText(/connected to campaign alpha/i);
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onCloseFirstMount).toHaveBeenCalledWith({
+      anyCutoverCommitted: true,
+      discoveryAttempted: true,
+    });
+    firstMount.unmount();
+
+    // Re-wire the SAME adapter instances (same closures, same observed
+    // authority) -- nothing about the underlying "browser" data changed.
+    wireAdapters(adapters);
+    const onCloseSecondMount = vi.fn();
+    render(
+      <MigrationWizard campaignCode="ALPHA" onClose={onCloseSecondMount} />
+    );
+    // Deliberately no "Find my campaigns" click on this mount.
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onCloseSecondMount).toHaveBeenCalledWith({
+      anyCutoverCommitted: false,
+      discoveryAttempted: false,
+    });
+  });
+});

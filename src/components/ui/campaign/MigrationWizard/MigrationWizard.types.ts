@@ -81,6 +81,14 @@ export interface MigrationWizardController {
   migrate: (family: DurableFamilyName) => Promise<void>;
   /** Derived (never stored): true when any registered family's authority is indexedDB or postgres. */
   anyCutoverCommitted: boolean;
+  /**
+   * True once `discover()` has resolved (success or failure) at least once
+   * this mount. `anyCutoverCommitted` is `false` both when nothing has been
+   * cut over AND before discovery has ever run -- a caller (Task 17's route)
+   * must not treat those as the same, and this is what lets it tell them
+   * apart.
+   */
+  discoveryAttempted: boolean;
 
   // -----------------------------------------------------------------------
   // Task 15: per-family step navigation and orchestration. Rail rows are not
