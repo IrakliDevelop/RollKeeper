@@ -12,6 +12,7 @@ import {
   Clock,
   Download,
   CloudCog,
+  ShieldCheck,
 } from 'lucide-react';
 import { useDmStore } from '@/store/dmStore';
 import { Button } from '@/components/ui/forms/button';
@@ -21,9 +22,58 @@ import { CreateCampaignDialog } from '@/components/ui/campaign/CreateCampaignDia
 import { DmCloudWorkspaceControls } from '@/components/ui/campaign/DmCloudWorkspaceControls';
 import { BannerUpload } from '@/components/ui/campaign/BannerUpload';
 import { useHydration } from '@/hooks/useHydration';
-import { campaignSettingsUsesIndexedDbAuthority } from '@/lib/durableDm/campaignSettingsLegacyProjection';
+import {
+  campaignSettingsProjectionAuthorityKey,
+  campaignSettingsUsesIndexedDbAuthority,
+  type ProjectionAuthorityMarker,
+} from '@/lib/durableDm/campaignSettingsLegacyProjection';
 import { isMigrationWizardVisible } from '@/lib/durableDm/slice11gFlags';
 import { CampaignInfo } from '@/types/campaign';
+
+/**
+ * Spec R2b / R8.3: whether this campaign's `campaign_settings` family is
+ * CURRENTLY routed off legacy storage (authority `indexedDB` or
+ * `postgres`), regardless of whether the `campaign_settings` client flag
+ * (`NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE`) happens to be on right now.
+ *
+ * Deliberately flag-independent, and note WHY.
+ *
+ * While the family flag is off, `campaignSettingsUsesIndexedDbAuthority`
+ * reads through the flag-gated marker reader
+ * (`readCampaignSettingsProjectionAuthority`), returns `false`, and the
+ * aware storage passes writes through -- so legacy writes are NOT frozen
+ * while the flag is off. That is the hazard, not the protection: those
+ * writes land in the legacy envelope that the family no longer reads from,
+ * and the moment the flag is re-enabled the campaign is authoritative from
+ * IndexedDB again and the edits made in between are invisible. So this
+ * dashboard must hide the unsafe controls for any campaign that is
+ * CURRENTLY ROUTED, whatever the flag says.
+ *
+ * Currently routed means `indexedDB` or `postgres`; a rolled-back campaign
+ * carries `legacy_restored` and is deliberately editable again -- rollback
+ * exists to hand the family back to legacy storage. A campaign with no
+ * marker at all is untouched.
+ *
+ * This reuses `campaignSettingsProjectionAuthorityKey` for the storage key
+ * (so the key format has exactly one source of truth) but does NOT call
+ * `readCampaignSettingsProjectionAuthority` or
+ * `campaignSettingsUsesIndexedDbAuthority` -- both are gated on
+ * `isCampaignSettingsClientVisible()` and would silently disable this
+ * hardening whenever that flag is off.
+ */
+function campaignSettingsRouted(campaignCode: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = window.localStorage.getItem(
+      campaignSettingsProjectionAuthorityKey(campaignCode)
+    );
+    if (!raw) return false;
+    const marker = JSON.parse(raw) as Partial<ProjectionAuthorityMarker>;
+    return marker.authority === 'indexedDB' || marker.authority === 'postgres';
+  } catch {
+    return false;
+  }
+}
 
 export default function DmDashboardPage() {
   const { dmId, campaigns, addCampaign, removeCampaign, updateCampaign } =
@@ -311,27 +361,38 @@ function CampaignCard({
   // flag (`NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE`) is off
   // (`campaignSettingsLegacyProjection.ts`). Harmless here -- this read only
   // picks which LAUNCHER copy to show, and the launcher itself is already
-  // gated on the migration wizard's OWN flag above. Task 18's R2b hardening
-  // (banner/delete removal for a migrated campaign) needs an identically
-  // named `campaignSettingsRouted` read that is INDEPENDENT of that family
-  // flag (R8.3) -- reusing THIS local for that purpose would silently
-  // disable the R2b hardening whenever the family flag happens to be off.
-  // Task 18 must read the marker directly, not call this helper.
-  const campaignSettingsRouted = campaignSettingsUsesIndexedDbAuthority(
-    typeof window === 'undefined'
-      ? { getItem: () => null }
-      : window.localStorage,
-    campaign.code
-  );
+  // gated on the migration wizard's OWN flag above. This is intentionally a
+  // DIFFERENT local than the module-level `campaignSettingsRouted` function
+  // below: R2b's banner/delete hardening must be independent of the family
+  // flag (R8.3), while this launcher-copy read may legitimately fall back
+  // to "not yet migrated" copy while the flag is off.
+  const campaignSettingsRoutedForLauncherCopy =
+    campaignSettingsUsesIndexedDbAuthority(
+      typeof window === 'undefined'
+        ? { getItem: () => null }
+        : window.localStorage,
+      campaign.code
+    );
+  // Spec R2b: flag-independent -- see the `campaignSettingsRouted` doc
+  // comment above for why this must not reuse
+  // `campaignSettingsUsesIndexedDbAuthority`.
+  const routed = campaignSettingsRouted(campaign.code);
 
   return (
-    <div className="border-accent-purple-border bg-surface-raised hover:bg-surface-secondary rounded-lg border-2 shadow-md transition-all hover:shadow-xl">
-      <BannerUpload
-        bannerUrl={campaign.bannerUrl}
-        campaignCode={campaign.code}
-        onBannerChange={onBannerChange}
-        variant="card"
-      />
+    <div
+      data-testid={`campaign-card-${campaign.code}`}
+      className="border-accent-purple-border bg-surface-raised hover:bg-surface-secondary rounded-lg border-2 shadow-md transition-all hover:shadow-xl"
+    >
+      {!routed && (
+        <div aria-label="Campaign banner">
+          <BannerUpload
+            bannerUrl={campaign.bannerUrl}
+            campaignCode={campaign.code}
+            onBannerChange={onBannerChange}
+            variant="card"
+          />
+        </div>
+      )}
       <div className="p-6">
         <div className="mb-4">
           <h3 className="text-heading mb-2 text-xl font-semibold">
@@ -347,6 +408,11 @@ function CampaignCard({
                 {campaign.code}
               </Badge>
             </button>
+            {routed && (
+              <Badge variant="success" leftIcon={<ShieldCheck size={12} />}>
+                Synced
+              </Badge>
+            )}
             {copiedCode === campaign.code && (
               <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
                 <Check size={12} /> Copied
@@ -372,8 +438,12 @@ function CampaignCard({
 
         <div className="flex items-center gap-2">
           <Link href={`/dm/campaign/${campaign.code}`} className="flex-1">
-            <Button variant="secondary" fullWidth>
-              Open Campaign
+            {/* Spec R2b: once routed, this campaign's settings are owned by
+                the campaign-detail page's IndexedDB-aware controls, not by
+                this dashboard -- "Manage" links there instead of offering
+                the legacy "Open Campaign" affordance. */}
+            <Button variant={routed ? 'outline' : 'secondary'} fullWidth>
+              {routed ? 'Manage' : 'Open Campaign'}
             </Button>
           </Link>
           <Button
@@ -384,14 +454,16 @@ function CampaignCard({
           >
             <Download size={16} />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onDelete(campaign)}
-            title="Delete Campaign"
-          >
-            <Trash2 size={16} />
-          </Button>
+          {!routed && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(campaign)}
+              title="Delete Campaign"
+            >
+              <Trash2 size={16} />
+            </Button>
+          )}
         </div>
 
         {migrationWizardVisible && (
@@ -403,13 +475,13 @@ function CampaignCard({
                 fullWidth
                 leftIcon={<CloudCog size={15} />}
               >
-                {campaignSettingsRouted
+                {campaignSettingsRoutedForLauncherCopy
                   ? 'Review cloud sync'
                   : 'Move campaign data to cloud sync'}
               </Button>
             </Link>
             <p className="text-faint mt-1.5 text-xs">
-              {campaignSettingsRouted
+              {campaignSettingsRoutedForLauncherCopy
                 ? 'See what has synced and pick up any category you paused.'
                 : 'Back up this browser first; nothing moves until you confirm each category.'}
             </p>
