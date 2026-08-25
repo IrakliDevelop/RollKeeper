@@ -1,5 +1,6 @@
 import type { DeviceBackupV1 } from '@/lib/deviceRecovery';
 import type {
+  CloudActivationConflictReason,
   DurableFamilyAdapter,
   DurableFamilyName,
   FamilyVerification,
@@ -186,5 +187,13 @@ export interface MigrationWizardController {
 export type FamilyRunOutcome =
   | { outcome: 'success' }
   | { outcome: 'drift'; changedKey: string }
-  | { outcome: 'cloudFailure'; reason: string }
+  /**
+   * Final fix wave, F1: `reason` is the adapter interface's closed
+   * `CloudActivationConflictReason` union — an INTERNAL discriminant, never
+   * product copy. `FamilyStep` maps it through
+   * `cloudActivationFailureMessage` before rendering, and this narrowing is
+   * what stops a test stub from returning polished prose the real adapters
+   * never produce.
+   */
+  | { outcome: 'cloudFailure'; reason: CloudActivationConflictReason }
   | { outcome: 'error'; message: string };

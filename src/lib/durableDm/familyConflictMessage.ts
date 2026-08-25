@@ -3,8 +3,11 @@
  * conflict message every `*Api.ts` gateway throws (`calendarApi.ts`,
  * `campaignSettingsApi.ts`, `magicItemApi.ts`, `npcApi.ts`, `encounterApi.ts`,
  * `combatLogArchiveApi.ts`), and the pattern
- * `MigrationWizard.hooks.ts`'s `reportFriendlyVerificationError` uses to
- * recognize that message and map it to its own specific clean sentence.
+ * `MigrationWizard/migrationCopy.ts`'s `friendlyMigrationMessage` uses to
+ * recognize that message and map it to its own specific clean sentence (the
+ * mapping used to live in `MigrationWizard.hooks.ts` as
+ * `reportFriendlyVerificationError`; the final fix wave moved it so all five
+ * wizard error channels share one rule).
  *
  * Deriving both the message text and the recognizing pattern from this one
  * module closes a real regression this task's own sweep introduced and then

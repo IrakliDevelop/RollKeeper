@@ -30,6 +30,10 @@ import {
 import { openRollkeeperDatabase } from '@/lib/indexeddb/localDatabase';
 import type { StorageNamespace } from '@/lib/indexeddb/shadowJournal';
 
+import {
+  cloudActivationFailureMessage,
+  friendlyMigrationMessage,
+} from '../migrationCopy';
 import type { FamilyRunOutcome } from '../MigrationWizard.types';
 
 /** Ruling R9.2: names the behavioural number instead of a bare literal (matches steps/RecoveryStep.tsx). */
@@ -151,13 +155,13 @@ export function FamilyStep({
         setManifest(nextManifest);
         setConfirmation(adapter.confirmation(context, nextManifest));
       } catch (cause) {
-        if (!cancelled) {
-          setLoadError(
-            cause instanceof Error
-              ? cause.message
-              : 'This data category could not be previewed.'
-          );
-        }
+        // Final fix wave, F4: `cause.message` used to render verbatim, so a
+        // blocked-IndexedDB `DOMException` (or any other platform text)
+        // reached the DM as the only explanation next to a data category
+        // they were about to move. Routed through the same mapping the
+        // report step already used for `verifyCloud`.
+        if (!cancelled)
+          setLoadError(friendlyMigrationMessage('preview', cause));
       }
     })();
     return () => {
@@ -207,13 +211,10 @@ export function FamilyStep({
         // in the first place, but a throw from `readFamilyPreparedState`
         // AFTER a successful open would have. Matches the manifest effect's
         // pattern exactly.
-        if (!cancelled) {
-          setLoadError(
-            cause instanceof Error
-              ? cause.message
-              : "This browser's selection record could not be checked."
-          );
-        }
+        // Final fix wave, F4: same hazard, same mapping — this is the
+        // channel `openRollkeeperDatabase()` rejects on in a private window.
+        if (!cancelled)
+          setLoadError(friendlyMigrationMessage('browserRecord', cause));
       }
     })();
     return () => {
@@ -467,8 +468,13 @@ export function FamilyStep({
                   Saved only in this browser
                 </p>
                 <p className="text-accent-red-text mt-1 text-sm">
+                  {/* Final fix wave, F1: `runResult.reason` is an INTERNAL
+                      `CloudActivationConflictReason` discriminant and used to
+                      render verbatim here (the DM read
+                      "cloud-generation-diverged"). It is mapped to product
+                      copy at this render boundary, never passed through. */}
                   {runResult?.outcome === 'cloudFailure'
-                    ? runResult.reason
+                    ? cloudActivationFailureMessage(runResult.reason)
                     : "This data hasn't moved to cloud sync yet."}
                 </p>
               </div>

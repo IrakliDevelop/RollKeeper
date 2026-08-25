@@ -62,9 +62,28 @@ export interface FamilyConfirmation {
   requiredPhrase: string;
 }
 
+/**
+ * The closed set of reasons a cloud activation can refuse. Every one of them
+ * is produced by `runResumableCloudActivation` and passed straight through by
+ * all six adapters, so this union — NOT a bare `string` — is what the wizard
+ * receives.
+ *
+ * Final fix wave, F1: it was `string`, which let the wizard's own test stub
+ * return polished prose while production returned an internal token, and made
+ * `type-check` unable to tell the two apart. The four members below are
+ * internal discriminants, never product copy: every render site MUST map them
+ * through `cloudActivationFailureMessage`
+ * (`src/components/ui/campaign/MigrationWizard/migrationCopy.ts`).
+ */
+export type CloudActivationConflictReason =
+  | 'cloud-generation-diverged'
+  | 'cloud-epoch-unknown'
+  | 'cloud-epoch-unexpected'
+  | 'cloud-preview-unusable';
+
 export type CloudActivationOutcome =
   | { status: 'activated' | 'reconciled'; epoch: number }
-  | { status: 'conflict'; reason: string };
+  | { status: 'conflict'; reason: CloudActivationConflictReason };
 
 /**
  * Compares legacyId, payloadFingerprint AND schemaVersion. `verifyCloud` is

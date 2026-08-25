@@ -22,6 +22,7 @@ import {
 import { decideAuthorityRepair } from '@/lib/durableDm/authorityRepair';
 import { changedOnAnotherBrowserMessage } from '@/lib/durableDm/familyConflictMessage';
 import type {
+  CloudActivationConflictReason,
   DurableFamilyAdapter,
   DurableFamilyName,
   FamilyManifestHandle,
@@ -487,8 +488,22 @@ const DEFAULT_STUB_AUTHORITY: NormalizedAuthority = {
   rolledBack: false,
 };
 
-/** Families for which the NEXT `activateCloud` call reports a conflict. */
-const cloudFailures = new Set<DurableFamilyName>();
+/**
+ * Families for which the NEXT `activateCloud` call reports a conflict, and
+ * the REAL `CloudActivationConflictReason` it reports.
+ *
+ * Final fix wave, F1: this used to be a bare `Set` and the stub answered with
+ * the polished sentence `'Cloud sync is temporarily unavailable. Try again
+ * later.'` — prose no adapter has ever produced. That made the R17 assertion
+ * below validate the STUB, while production rendered the raw token
+ * `cloud-generation-diverged` to the DM. `CloudActivationOutcome.reason` is
+ * now the closed union, so this map can only hold values the real protocol
+ * produces (and the old prose is a compile error, not a silent divergence).
+ */
+const cloudFailures = new Map<
+  DurableFamilyName,
+  CloudActivationConflictReason
+>();
 /** One entry per `selectFamily` call, in invocation order, across every family. */
 const selectLog: { family: DurableFamilyName; runId: string }[] = [];
 /**
@@ -573,8 +588,11 @@ function deferVerification(family: DurableFamilyName): {
   return { resolve: value => resolveFn(value) };
 }
 
-function failCloudFor(family: DurableFamilyName) {
-  cloudFailures.add(family);
+function failCloudFor(
+  family: DurableFamilyName,
+  reason: CloudActivationConflictReason = 'cloud-generation-diverged'
+) {
+  cloudFailures.set(family, reason);
 }
 
 function countApiCalls(action: string): number {
@@ -726,11 +744,9 @@ function stubAdapter(
         'begin-staging',
         (apiActionCounts.get('begin-staging') ?? 0) + 1
       );
-      if (cloudFailures.has(family)) {
-        return {
-          status: 'conflict' as const,
-          reason: 'Cloud sync is temporarily unavailable. Try again later.',
-        };
+      const failureReason = cloudFailures.get(family);
+      if (failureReason !== undefined) {
+        return { status: 'conflict' as const, reason: failureReason };
       }
       authority = {
         state: 'postgres',
@@ -2155,6 +2171,106 @@ describe('MigrationWizard — data-category steps', () => {
     });
   });
 
+  // ---------------------------------------------------------------------
+  // Final fix wave, F1 and F4: nothing internal reaches the DM.
+  //
+  // The whole-branch review's surviving mutant M14 deleted the cloud-failure
+  // render entirely and 619/619 still passed -- the line was unpinned in BOTH
+  // directions. The expected sentences below are RESTATED here rather than
+  // imported from `migrationCopy.ts`, so the assertions cannot be satisfied
+  // by whatever that module happens to return (the self-fulfilling-oracle
+  // trap ruling R8.4 rejects). Each case therefore reddens on both mutations:
+  // removing the render (no sentence) and removing the mapping (the token).
+  // ---------------------------------------------------------------------
+
+  const EXPECTED_CLOUD_FAILURE_COPY: Record<
+    CloudActivationConflictReason,
+    string
+  > = {
+    'cloud-generation-diverged':
+      'Cloud sync already holds a different copy of this campaign data',
+    'cloud-epoch-unknown':
+      'Cloud sync did not report where this campaign data now lives',
+    'cloud-epoch-unexpected':
+      'Cloud sync moved this campaign data on while this run was in progress',
+    'cloud-preview-unusable':
+      'Cloud sync answered about this campaign data in a way this browser could not read',
+  };
+
+  it.each(
+    Object.keys(EXPECTED_CLOUD_FAILURE_COPY) as CloudActivationConflictReason[]
+  )(
+    'explains the cloud refusal %s in product copy, never as the internal token',
+    async reason => {
+      failCloudFor('npc', reason);
+      await renderWizardAtFamilyStep('npc');
+      await confirmAndSubmit('npc');
+      const heading = await screen.findByText(/^saved only in this browser$/i);
+      const alert = heading.closest('[role="alert"]');
+      expect(alert).not.toBeNull();
+      const text = alert!.textContent ?? '';
+      expect(text).toContain(EXPECTED_CLOUD_FAILURE_COPY[reason]);
+      // The token itself, and every token in the union, must be absent from
+      // the whole rendered tree -- not merely from this one alert.
+      expect(document.body.textContent ?? '').not.toMatch(
+        /cloud-(?:generation-diverged|epoch-unknown|epoch-unexpected|preview-unusable)/
+      );
+      expectCloudProductVocabulary(document.body);
+    }
+  );
+
+  it('never renders raw transport text when the manifest preview rejects', async () => {
+    // The exact rejection the manual browser gate saw on screen (defect D2).
+    const errorAdapter = stubAdapter('encounter_definition', {
+      previewError: 'Failed to fetch',
+    });
+    await renderWizardAtFamilyStepWithAdapters(
+      [errorAdapter],
+      'encounter_definition'
+    );
+    expect(
+      await screen.findByText(/could not be previewed just now/i)
+    ).toBeInTheDocument();
+    expect(document.body.textContent ?? '').not.toContain('Failed to fetch');
+    expectCloudProductVocabulary(document.body);
+  });
+
+  it('never renders raw transport text when the run itself rejects', async () => {
+    const throwingAdapter = stubAdapter('encounter_definition');
+    throwingAdapter.prepareIndexedDb = async () => {
+      throw new TypeError('Failed to fetch');
+    };
+    await renderWizardAtFamilyStepWithAdapters(
+      [throwingAdapter],
+      'encounter_definition'
+    );
+    await confirmAndSubmit('encounter_definition');
+    expect(
+      await screen.findByText(/could not be moved to cloud sync just now/i)
+    ).toBeInTheDocument();
+    expect(document.body.textContent ?? '').not.toContain('Failed to fetch');
+    expectCloudProductVocabulary(document.body);
+  });
+
+  it('never renders the internal repair-refusal reason when a repair is blocked', async () => {
+    await seedMarkerAheadOfPointer('npc');
+    await advanceToFamily('npc');
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: /^check this browser and fix it$/i,
+      })
+    );
+    expect(
+      await screen.findByText(/could not be fixed automatically/i)
+    ).toBeInTheDocument();
+    // `decideAuthorityRepair`'s own prose -- internal reasoning, not copy.
+    expect(document.body.textContent ?? '').not.toMatch(
+      /pointer is not ahead of the marker/i
+    );
+    expect(document.body.textContent ?? '').not.toMatch(/IndexedDB/);
+    expectCloudProductVocabulary(document.body);
+  });
+
   it('closing between steps writes nothing for any unconfirmed family', async () => {
     const before = await snapshotDurableState();
     await renderWizardAtFamilyStep('npc');
@@ -2286,14 +2402,20 @@ describe('MigrationWizard — data-category steps', () => {
     expectCloudProductVocabulary(document.body);
     unmountCurrentRender();
 
-    // Scenario 2: cloud failure.
-    failCloudFor('npc');
+    // Scenario 2: cloud failure. Final fix wave, F10: this used to require
+    // only the alert HEADING, while the drift scenario above required the
+    // full sentence -- and that asymmetry is exactly what let F1's raw token
+    // through the R6.1 rewrite. The explanation sentence is required now.
+    failCloudFor('npc', 'cloud-generation-diverged');
     await renderWizardAtFamilyStep('npc');
     await confirmAndSubmit('npc');
     checkCurrentAlerts([
       {
         match: /saved only in this browser/i,
-        requiredSubstrings: ['Saved only in this browser'],
+        requiredSubstrings: [
+          'Saved only in this browser',
+          'Cloud sync already holds a different copy of this campaign data — most likely it was moved from another browser. Nothing here was changed. Check that other browser before moving this data category again.',
+        ],
       },
     ]);
     expectCloudProductVocabulary(document.body);
@@ -2324,7 +2446,10 @@ describe('MigrationWizard — data-category steps', () => {
     expectCloudProductVocabulary(document.body);
     unmountCurrentRender();
 
-    // Scenario 4: manifest preview failure.
+    // Scenario 4: manifest preview failure. Final fix wave, F4: the thrown
+    // message is no longer rendered -- an internal sentence here stands in
+    // for the `DOMException` a private window produces, and the DM sees the
+    // channel's vetted copy instead.
     const errorAdapter = stubAdapter('encounter_definition', {
       previewError: 'The legacy encounter envelope is corrupted.',
     });
@@ -2334,10 +2459,15 @@ describe('MigrationWizard — data-category steps', () => {
     );
     checkCurrentAlerts([
       {
-        match: /the legacy encounter envelope is corrupted/i,
-        requiredSubstrings: ['The legacy encounter envelope is corrupted.'],
+        match: /could not be previewed just now/i,
+        requiredSubstrings: [
+          'This data category could not be previewed just now. Nothing here was changed. Try again, or skip this one and come back to it.',
+        ],
       },
     ]);
+    expect(document.body.textContent ?? '').not.toContain(
+      'The legacy encounter envelope is corrupted.'
+    );
     expectCloudProductVocabulary(document.body);
     unmountCurrentRender();
 
@@ -2357,10 +2487,11 @@ describe('MigrationWizard — data-category steps', () => {
         requiredSubstrings: ["This browser's record needs attention"],
       },
       {
+        // Final fix wave, F4: `decideAuthorityRepair`'s internal reason
+        // prose is no longer concatenated onto product copy.
         match: /could not be fixed/i,
         requiredSubstrings: [
-          "This browser's record could not be fixed:",
-          'the pointer is not ahead of the marker; a marker with nothing behind it in IndexedDB is never evidence of a completed migration',
+          "This browser's record could not be fixed automatically. Nothing here was changed. Skip this data category for now — your campaign data is still here in this browser.",
         ],
       },
     ]);
@@ -2716,8 +2847,17 @@ describe('MigrationWizard — data-category steps', () => {
     // later test in the file.
     try {
       await renderWizardAtFamilyStep('campaign_settings');
-      const alert = await screen.findByText(/indexeddb is unavailable/i);
+      // Final fix wave, F4: this used to assert the RAW message rendered.
+      // It is now the channel's vetted copy, and the raw text must be
+      // absent -- in production this rejection is a `DOMException` whose
+      // wording is the browser's, not ours.
+      const alert = await screen.findByText(
+        /could not be checked just now\. Nothing here was changed/i
+      );
       expect(alert.closest('[role="alert"]')).not.toBeNull();
+      expect(document.body.textContent ?? '').not.toContain(
+        'IndexedDB is unavailable'
+      );
     } finally {
       spy.mockRestore();
     }

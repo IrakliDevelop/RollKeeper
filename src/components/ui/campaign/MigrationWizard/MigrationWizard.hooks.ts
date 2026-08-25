@@ -25,7 +25,6 @@ import { MAGIC_ITEM_FAMILY_INVENTORY } from '@/lib/durableDm/magicItemFamily';
 import { NPC_FAMILY_INVENTORY } from '@/lib/durableDm/npcFamily';
 import { ENCOUNTER_FAMILY_INVENTORY } from '@/lib/durableDm/encounterFamily';
 import { COMBAT_LOG_ARCHIVE_FAMILY_INVENTORY } from '@/lib/durableDm/combatLogArchiveFamily';
-import { CHANGED_ON_ANOTHER_BROWSER_PATTERN } from '@/lib/durableDm/familyConflictMessage';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 import {
   createBrowserDmWorkspace,
@@ -33,6 +32,7 @@ import {
 } from '@/lib/supabase/browserDmWorkspace';
 import { APP_VERSION } from '@/utils/constants';
 
+import { friendlyMigrationMessage } from './migrationCopy';
 import type {
   FamilyRunOutcome,
   MigrationRecoveryState,
@@ -104,34 +104,22 @@ const FAMILY_LOCAL_STORAGE_KEYS: Record<DurableFamilyName, readonly string[]> =
 /**
  * Task 16 fix round 2, Important 1 (coordinator review): a rejected
  * `verifyCloud` call's `Error.message` must NEVER reach the DM verbatim --
- * it is internal error text, not product copy. Two concrete hazards this
- * closes:
- *   - all six `*Api` gateways (`npcApi.ts` and its five siblings) build
- *     `'<Family> changed on another browser.'` via the shared
- *     `changedOnAnotherBrowserMessage` (`familyConflictMessage.ts`) on HTTP
- *     409, from EVERY RPC including `preview-enrollment` -- rendering it
- *     verbatim would leak internal phrasing that has not been vetted as
- *     product copy. `CHANGED_ON_ANOTHER_BROWSER_PATTERN`, from the same
- *     module, is what recognizes it below -- keeping producer and consumer
- *     derived from one source so a rewrite of either cannot silently
- *     desynchronize from the other (see `familyConflictMessage.test.ts`);
- *   - any OTHER thrown message (a raw `DOMException`, a fetch failure, an
- *     unrecognised server error) is equally not vetted product copy and
- *     must not be shown either.
- * The raw message is still logged to `console.error` for debugging -- the
- * technical detail is not lost, only kept out of the rendered alert. Known
- * failure classes map to their own clean sentence; anything unrecognised
- * falls back to the same generic copy a non-`Error` rejection already used.
+ * it is internal error text, not product copy.
+ *
+ * Final fix wave, F4: the mapping itself moved to `migrationCopy.ts`, so the
+ * three FamilyStep channels the review found still open (`previewManifest`,
+ * the selection-record read, and the typed-confirmation run/repair paths) go
+ * through the SAME function rather than a second, weaker copy of the rule.
+ * The rationale it was written with is unchanged and lives there: all six
+ * `*Api` gateways build `'<Family> changed on another browser.'` on HTTP 409
+ * via `changedOnAnotherBrowserMessage`, recognised through
+ * `CHANGED_ON_ANOTHER_BROWSER_PATTERN` from that same module so producer and
+ * consumer cannot silently desynchronise; anything else is equally unvetted
+ * and gets that channel's own clean sentence, with the raw text logged to
+ * `console.error` and nothing more.
  */
 function reportFriendlyVerificationError(reason: unknown): string {
-  const raw = reason instanceof Error ? reason.message : String(reason);
-  // Deliberate: the technical detail belongs in the console, never in the
-  // rendered alert (see doc comment above).
-  console.error('[MigrationWizard] verifyCloud failed:', raw);
-  if (CHANGED_ON_ANOTHER_BROWSER_PATTERN.test(raw)) {
-    return 'This data category changed somewhere else while this browser was checking it. Try Refresh again.';
-  }
-  return 'This data category could not be checked just now.';
+  return friendlyMigrationMessage('verify', reason);
 }
 
 export function useMigrationWizard(
@@ -681,12 +669,12 @@ export function useMigrationWizard(
         await refreshFamilyAuthority(family);
         return { outcome: 'success' };
       } catch (cause) {
+        // Final fix wave, F4: was `cause.message`, so every adapter throw
+        // AND every platform rejection (the gate saw "Failed to fetch")
+        // rendered verbatim under the run alert.
         return {
           outcome: 'error',
-          message:
-            cause instanceof Error
-              ? cause.message
-              : 'This data category could not be moved.',
+          message: friendlyMigrationMessage('run', cause),
         };
       }
     },
@@ -715,11 +703,13 @@ export function useMigrationWizard(
         await refreshFamilyAuthority(family);
         return { ok: true, message: "This browser's record was fixed." };
       } catch (cause) {
+        // Final fix wave, F4: was raw error text concatenated onto product
+        // copy -- the worst of the three channels, because `repairAuthority`
+        // rejects with `decideAuthorityRepair`'s INTERNAL reason prose
+        // ("the pointer is not ahead of the marker...").
         return {
           ok: false,
-          message: `This browser's record could not be fixed: ${
-            cause instanceof Error ? cause.message : 'an unknown error'
-          }`,
+          message: friendlyMigrationMessage('repair', cause),
         };
       }
     },

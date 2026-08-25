@@ -1,3 +1,4 @@
+import type { CloudActivationConflictReason } from './durableFamilyAdapter';
 import { migrationMutationId } from './migrationMutationIds';
 
 export interface CloudEnrollmentPreview {
@@ -118,11 +119,11 @@ export type ResumableActivationResult =
     }
   | {
       status: 'conflict';
-      reason:
-        | 'cloud-generation-diverged'
-        | 'cloud-epoch-unknown'
-        | 'cloud-epoch-unexpected'
-        | 'cloud-preview-unusable';
+      // Final fix wave, F1: the union now lives on the adapter interface
+      // (`CloudActivationConflictReason`) so `CloudActivationOutcome.reason`
+      // carries it too, instead of widening to `string` the moment an
+      // adapter passes it through.
+      reason: CloudActivationConflictReason;
     };
 
 /**
