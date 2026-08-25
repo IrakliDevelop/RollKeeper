@@ -28,6 +28,7 @@ import {
   fingerprintCalendarTombstone,
   type CalendarManifest,
 } from '@/lib/durableDm/calendarFamily';
+import { blockerKindReferenceLabel } from '@/lib/durableDm/blockerReferenceLabel';
 import { calendarApi } from '@/lib/durableDm/calendarApi';
 import { CalendarHttpGateway } from '@/lib/durableDm/calendarHttpGateway';
 import { CalendarSyncService } from '@/lib/durableDm/calendarSyncService';
@@ -1519,7 +1520,12 @@ export function CalendarSyncControls({ campaign }: Props) {
                 className="text-accent-red-text"
                 key={`${blocker.kind}:${blocker.detail}`}
               >
-                {blocker.kind}: {blocker.detail}
+                {/* Uniform with the four multi-record cards. No kind this
+                    family emits contains a forbidden word today, so there is
+                    no test that reddens without it; the mapping is applied so
+                    that a kind added to calendarFamily.ts later cannot leak
+                    one into rendered text (spec R17). */}
+                {blockerKindReferenceLabel(blocker.kind)}: {blocker.detail}
               </p>
             ))}
           </div>

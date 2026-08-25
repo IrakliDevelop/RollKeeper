@@ -26,6 +26,7 @@ import {
   fingerprintCampaignSettingsPayload,
   type CampaignSettingsManifest,
 } from '@/lib/durableDm/campaignSettingsFamily';
+import { blockerKindReferenceLabel } from '@/lib/durableDm/blockerReferenceLabel';
 import { campaignSettingsApi } from '@/lib/durableDm/campaignSettingsApi';
 import { CampaignSettingsHttpGateway } from '@/lib/durableDm/campaignSettingsHttpGateway';
 import { CampaignSettingsSyncService } from '@/lib/durableDm/campaignSettingsSyncService';
@@ -1501,7 +1502,12 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
                 className="text-accent-red-text"
                 key={`${blocker.kind}:${blocker.detail}`}
               >
-                {blocker.kind}: {blocker.detail}
+                {/* Uniform with the four multi-record cards. No kind this
+                    family emits contains a forbidden word today, so there is
+                    no test that reddens without it; the mapping is applied so
+                    that a kind added to campaignSettingsFamily.ts later cannot leak
+                    one into rendered text (spec R17). */}
+                {blockerKindReferenceLabel(blocker.kind)}: {blocker.detail}
               </p>
             ))}
           </div>
