@@ -634,31 +634,75 @@ export function useMigrationWizard(
         };
       }
       try {
+        // Final fix wave, D1 (manual browser gate): where this family
+        // ACTUALLY stands right now, read fresh from its own authority --
+        // never assumed to be `legacy` because this is the DM's click.
+        //
+        // Without this branch a data category whose cloud call failed was
+        // stranded permanently. The local cutover HAS committed by then
+        // (that is what "Saved only in this browser" means), so a retry ran
+        // `prepareIndexedDb` again, the IndexedDB migration correctly
+        // refused to re-prepare an already-cut-over category, and the DM
+        // read "Local IndexedDB preparation did not satisfy every safety
+        // gate" -- across reloads, forever, for one transient network blip.
+        //
+        // This is NOT the state R5b's authority repair exists for: the
+        // marker and the pointer AGREE here, at the same epoch, so
+        // `normalizeFamilyAuthority` reports `indexedDB` rather than
+        // `inconsistent` and the repair control is correctly never offered.
+        // Nothing was broken -- the run simply had no way to continue from
+        // its own legitimate halfway state.
+        const current = await adapter.readAuthority(context);
+
+        // Already finished (a previous attempt's response was lost, or the
+        // category was completed from its own card). Idempotent: re-running
+        // the chain from here would refuse at `activateCloud`'s
+        // `state !== 'indexedDB'` guard.
+        if (current.state === 'postgres') {
+          await refreshFamilyAuthority(family);
+          return { outcome: 'success' };
+        }
+
+        const resumingFromLocalCutover = current.state === 'indexedDB';
+
         const driftBeforeSelect = await checkFamilyDrift();
         if (driftBeforeSelect)
           return { outcome: 'drift', changedKey: driftBeforeSelect };
 
-        await adapter.selectFamily(context);
-        const prepared = await adapter.prepareIndexedDb(context);
+        // Resume path: the local half is already committed and must not be
+        // repeated. The manifest comes from `previewManifest`, which for a
+        // cut-over category is built from the IndexedDB WORKING COPY -- the
+        // set `activateCloud`'s own `assertWorkingCopyUnchanged` compares
+        // against. When nothing has been edited since, that manifest's
+        // fingerprint is byte-identical to the one the first attempt used
+        // (both are `finalize()` over the same records), so the run's
+        // deterministic mutation ids are unchanged and a half-completed
+        // upload replays its receipt instead of opening a second staging
+        // run (spec R7).
+        let manifest;
+        if (resumingFromLocalCutover) {
+          manifest = await adapter.previewManifest(context);
+        } else {
+          await adapter.selectFamily(context);
+          const prepared = await adapter.prepareIndexedDb(context);
 
-        const driftBeforeCommit = await checkFamilyDrift();
-        if (driftBeforeCommit)
-          return { outcome: 'drift', changedKey: driftBeforeCommit };
+          const driftBeforeCommit = await checkFamilyDrift();
+          if (driftBeforeCommit)
+            return { outcome: 'drift', changedKey: driftBeforeCommit };
 
-        await adapter.commitLocalCutover(context, {
-          generation: prepared.generation,
-          manifest: prepared.manifest,
-        });
-        await refreshFamilyAuthority(family);
+          await adapter.commitLocalCutover(context, {
+            generation: prepared.generation,
+            manifest: prepared.manifest,
+          });
+          await refreshFamilyAuthority(family);
+          manifest = prepared.manifest;
+        }
 
         const driftBeforeActivate = await checkFamilyDrift();
         if (driftBeforeActivate)
           return { outcome: 'drift', changedKey: driftBeforeActivate };
 
-        const activation = await adapter.activateCloud(
-          context,
-          prepared.manifest
-        );
+        const activation = await adapter.activateCloud(context, manifest);
         if (activation.status === 'conflict') {
           // Failure never reverses progress (spec, failure semantics
           // section): the family stays at whatever authority

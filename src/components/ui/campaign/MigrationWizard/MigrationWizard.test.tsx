@@ -54,6 +54,7 @@ import { APP_VERSION } from '@/utils/constants';
 
 import { MigrationWizard } from './index';
 import { useMigrationWizard } from './MigrationWizard.hooks';
+import type { FamilyRunOutcome } from './MigrationWizard.types';
 
 vi.mock('@/lib/supabase/browserDmWorkspace', () => ({
   createBrowserDmWorkspace: vi.fn(),
@@ -588,6 +589,11 @@ function deferVerification(family: DurableFamilyName): {
   return { resolve: value => resolveFn(value) };
 }
 
+/** Restores the transport for a family whose cloud call was made to fail. */
+function restoreCloudFor(family: DurableFamilyName) {
+  cloudFailures.delete(family);
+}
+
 function failCloudFor(
   family: DurableFamilyName,
   reason: CloudActivationConflictReason = 'cloud-generation-diverged'
@@ -722,11 +728,34 @@ function stubAdapter(
     selectFamily: async (context: MigrationRunContext) => {
       selectLog.push({ family, runId: context.recovery.runId });
     },
-    prepareIndexedDb: async () => ({
-      state: 'CUTOVER_READY',
-      generation: 'gen-1',
-      manifest,
-    }),
+    prepareIndexedDb: async (context: MigrationRunContext) => {
+      // Final fix wave, D1: mirrors what `run*IndexedDbMigration` really
+      // does. Once this browser already owns the data category locally,
+      // preparation refuses -- that refusal (surfaced by every adapter as
+      // "Local IndexedDB preparation did not satisfy every safety gate") is
+      // what stranded a category whose cloud call had failed. A stub that
+      // always returns CUTOVER_READY cannot reproduce the gate's defect.
+      //
+      // Scoped to the account/campaign the cutover was committed FOR, like
+      // the real pointer (which is keyed by namespace + campaignId): this
+      // one stub instance is reused across campaign and account switches by
+      // the R10 remember tests, and a real adapter would see legacy
+      // authority in both of those.
+      const committed = currentAuthority();
+      if (
+        (committed.state === 'indexedDB' || committed.state === 'postgres') &&
+        committed.campaignId === context.campaignId &&
+        committed.accountId === context.accountId
+      )
+        throw new Error(
+          'Local IndexedDB preparation did not satisfy every safety gate.'
+        );
+      return {
+        state: 'CUTOVER_READY' as const,
+        generation: 'gen-1',
+        manifest,
+      };
+    },
     commitLocalCutover: async (context: MigrationRunContext) => {
       await context.ensureWorkspaceRemembered();
       cutoverSpy();
@@ -1203,6 +1232,14 @@ async function renderRunController(
       await act(async () => {
         await view.result.current.migrate(family);
       });
+    },
+    /** The full typed-confirmation run (`runFamily`), for the D1 resume cases. */
+    async runFamily(family: DurableFamilyName) {
+      let outcome!: FamilyRunOutcome;
+      await act(async () => {
+        outcome = await view.result.current.runFamily(family);
+      });
+      return outcome;
     },
     async enrich() {
       await act(async () => {
@@ -2269,6 +2306,75 @@ describe('MigrationWizard — data-category steps', () => {
     );
     expect(document.body.textContent ?? '').not.toMatch(/IndexedDB/);
     expectCloudProductVocabulary(document.body);
+  });
+
+  // ---------------------------------------------------------------------
+  // Final fix wave, D1 (manual browser gate): a data category whose cloud
+  // call failed was stranded in BOTH surfaces. In the wizard the retry
+  // re-ran `prepareIndexedDb` on an already-cut-over category and died on
+  // "Local IndexedDB preparation did not satisfy every safety gate" -- and
+  // it survived a full reload, so there was no way back at all.
+  //
+  // The stub's `prepareIndexedDb` now refuses re-preparation exactly as
+  // `run*IndexedDbMigration` does, so these tests fail without the resume
+  // branch rather than passing on a stub that would prepare twice.
+  // ---------------------------------------------------------------------
+
+  it('finishes a data category whose cloud call failed, once the cloud answers again', async () => {
+    failCloudFor('npc', 'cloud-epoch-unknown');
+    await runWizardThroughFamilies(['npc']);
+    expect(await authorityOf('npc')).toMatchObject({ state: 'indexedDB' });
+    expect(
+      await screen.findByText(/^saved only in this browser$/i)
+    ).toBeInTheDocument();
+    const stagingBefore = countApiCalls('begin-staging');
+
+    restoreCloudFor('npc');
+    const retry = await confirmAndSubmit('npc');
+    expect(retry.ok).toBe(true);
+    expect(await authorityOf('npc')).toMatchObject({
+      state: 'postgres',
+      epoch: 1,
+    });
+    // The cloud half ran again; the LOCAL half did not.
+    expect(countApiCalls('begin-staging')).toBe(stagingBefore + 1);
+    expect(cutoverSpies.get('npc')!).toHaveBeenCalledTimes(1);
+  });
+
+  it('finishes a data category whose cloud call failed, after a full reload', async () => {
+    failCloudFor('npc');
+    await runWizardThroughFamilies(['npc']);
+    expect(await authorityOf('npc')).toMatchObject({ state: 'indexedDB' });
+
+    restoreCloudFor('npc');
+    await reloadWizard();
+    await advanceToFamily('npc');
+    const retry = await confirmAndSubmit('npc');
+    expect(retry.ok).toBe(true);
+    expect(await authorityOf('npc')).toMatchObject({ state: 'postgres' });
+    expect(cutoverSpies.get('npc')!).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats an already-completed data category as done instead of failing', async () => {
+    // The state a DM reaches by finishing this category from its own card,
+    // or by confirming twice in one run. Re-running the whole chain would
+    // refuse at `prepareIndexedDb`; the run must recognise "already done".
+    const completed = stubAdapter('campaign_settings', {
+      initialAuthority: {
+        state: 'postgres',
+        epoch: 1,
+        campaignId: 'cloud-ALPHA',
+        accountId: 'account-1',
+        rolledBack: false,
+      },
+    });
+    const controller = await renderRunController({ adapters: [completed] });
+    const stagingBefore = countApiCalls('begin-staging');
+    expect(await controller.runFamily('campaign_settings')).toEqual({
+      outcome: 'success',
+    });
+    expect(countApiCalls('begin-staging')).toBe(stagingBefore);
+    expect(cutoverSpies.get('campaign_settings')!).not.toHaveBeenCalled();
   });
 
   it('closing between steps writes nothing for any unconfirmed family', async () => {
