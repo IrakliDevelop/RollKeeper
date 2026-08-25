@@ -9,14 +9,22 @@ import {
 } from '@/lib/deviceRecovery';
 import {
   DURABLE_FAMILY_REGISTRY,
+  enabledAdapters,
   registeredAdapters,
 } from '@/lib/durableDm/familyRegistry';
 import { isMigrationWizardVisible } from '@/lib/durableDm/slice11gFlags';
 import type {
   DurableFamilyName,
+  FamilyVerification,
   MigrationRunContext,
 } from '@/lib/durableDm/durableFamilyAdapter';
 import type { NormalizedAuthority } from '@/lib/durableDm/familyAuthorityNormalizer';
+import { CAMPAIGN_SETTINGS_FAMILY_INVENTORY } from '@/lib/durableDm/campaignSettingsFamily';
+import { CALENDAR_FAMILY_INVENTORY } from '@/lib/durableDm/calendarFamily';
+import { MAGIC_ITEM_FAMILY_INVENTORY } from '@/lib/durableDm/magicItemFamily';
+import { NPC_FAMILY_INVENTORY } from '@/lib/durableDm/npcFamily';
+import { ENCOUNTER_FAMILY_INVENTORY } from '@/lib/durableDm/encounterFamily';
+import { COMBAT_LOG_ARCHIVE_FAMILY_INVENTORY } from '@/lib/durableDm/combatLogArchiveFamily';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 import {
   createBrowserDmWorkspace,
@@ -66,6 +74,31 @@ const EMPTY_BACKUP: DeviceBackupV1 = {
     retainedOnlyCount: 0,
   },
 };
+
+/**
+ * Task 16 (spec R8's sixth verification condition): which legacy
+ * `rollkeeper-*` key(s) each registered family owns, read straight from each
+ * family's own `*_FAMILY_INVENTORY.localStorageKeys` -- the same single
+ * source of truth `captureDeviceBackup`'s classification and every
+ * adapter's own manifest builder already read, never a second hardcoded
+ * list. A key belonging to a family that has been cut over locally
+ * (`indexedDB`/`postgres` authority) is EXCLUDED from the cross-family
+ * check below -- that family's own aware storage is allowed to keep
+ * touching its legacy key after cutover (spec R2b), so drift there is
+ * expected, not evidence of a broken run. Every OTHER captured key --
+ * including families that never left legacy, and keys that belong to no
+ * family the wizard knows about at all (player data, the character family)
+ * -- must still match the run's one verified bundle.
+ */
+const FAMILY_LOCAL_STORAGE_KEYS: Record<DurableFamilyName, readonly string[]> =
+  {
+    campaign_settings: CAMPAIGN_SETTINGS_FAMILY_INVENTORY.localStorageKeys,
+    calendar: CALENDAR_FAMILY_INVENTORY.localStorageKeys,
+    magic_item: MAGIC_ITEM_FAMILY_INVENTORY.localStorageKeys,
+    npc: NPC_FAMILY_INVENTORY.localStorageKeys,
+    encounter_definition: ENCOUNTER_FAMILY_INVENTORY.localStorageKeys,
+    combat_log_archive: COMBAT_LOG_ARCHIVE_FAMILY_INVENTORY.localStorageKeys,
+  };
 
 export function useMigrationWizard(
   campaignCode: string
@@ -458,9 +491,12 @@ export function useMigrationWizard(
   const canContinue =
     recovery.status === 'verified' || recovery.status === 'resumed';
 
+  // Caps at `DURABLE_FAMILY_REGISTRY.length` -- one past the last registry
+  // entry -- which is the report (Task 16). The report is the terminal
+  // step: Continue is a no-op once there.
   const goContinue = useCallback(() => {
     setStepIndex(current =>
-      Math.min(current + 1, DURABLE_FAMILY_REGISTRY.length - 1)
+      Math.min(current + 1, DURABLE_FAMILY_REGISTRY.length)
     );
   }, []);
   const goBack = useCallback(() => {
@@ -623,6 +659,117 @@ export function useMigrationWizard(
     authority => authority?.state === 'postgres'
   ).length;
 
+  // ---------------------------------------------------------------------
+  // Task 16: the final report (spec R8, R13, R14).
+  // ---------------------------------------------------------------------
+
+  const [reportVerifications, setReportVerifications] = useState<
+    Partial<Record<DurableFamilyName, FamilyVerification>>
+  >({});
+  const [reportVerifying, setReportVerifying] = useState(false);
+  const [reportCrossFamilyDrift, setReportCrossFamilyDrift] = useState<
+    string[]
+  >([]);
+  // Incremented on every `verifyReport()` call. A call's own results are
+  // only ever applied if this ref STILL holds the id it captured when it
+  // started -- the cancellation/stale-response guard spec R14 requires. A
+  // batch-level token (one check per call, after every family's
+  // `verifyCloud` has settled) rather than a per-family one: the observable
+  // behaviour is identical, because a call whose token has already been
+  // superseded is discarded in full, never partially applied.
+  const verifyRequestIdRef = useRef(0);
+
+  // Spec R8's sixth condition, cross-family: every recovery entry NOT owned
+  // by a currently-migrated family must still hash to the value in the
+  // run's one verified bundle. A pure read-and-compare, exactly like
+  // `checkFamilyDrift` above, except it EXCLUDES keys owned by a family
+  // whose authority has already routed off legacy (spec R2b: that family's
+  // own aware storage is allowed to keep touching its legacy key after
+  // cutover).
+  const checkCrossFamilyDrift = useCallback(async (): Promise<string[]> => {
+    if (!recovery.bundle) return [];
+    const fresh = await captureDeviceBackup(window.localStorage, {
+      appVersion: APP_VERSION,
+      runId,
+      timestamp: new Date().toISOString(),
+    });
+    const excludedKeys = new Set<string>();
+    for (const family of Object.keys(
+      familyAuthorities
+    ) as DurableFamilyName[]) {
+      const authority = familyAuthorities[family];
+      if (authority?.state !== 'indexedDB' && authority?.state !== 'postgres')
+        continue;
+      for (const key of FAMILY_LOCAL_STORAGE_KEYS[family] ?? []) {
+        excludedKeys.add(key);
+      }
+    }
+    const before = new Map(
+      recovery.bundle.entries.map(entry => [entry.key, entry])
+    );
+    const after = new Map(fresh.entries.map(entry => [entry.key, entry]));
+    const keys = new Set<string>([...before.keys(), ...after.keys()]);
+    const changed: string[] = [];
+    for (const key of keys) {
+      if (excludedKeys.has(key)) continue;
+      const beforeEntry = before.get(key);
+      const afterEntry = after.get(key);
+      if (
+        !beforeEntry ||
+        !afterEntry ||
+        beforeEntry.sha256 !== afterEntry.sha256 ||
+        beforeEntry.byteCount !== afterEntry.byteCount
+      ) {
+        changed.push(key);
+      }
+    }
+    return changed;
+  }, [recovery.bundle, familyAuthorities, runId]);
+
+  const verifyReport = useCallback(async () => {
+    if (!ownerContext || !workspace?.cloudId) return;
+    const requestId = (verifyRequestIdRef.current += 1);
+    setReportVerifying(true);
+    const adapters = enabledAdapters();
+    const context: MigrationRunContext = {
+      accountId: ownerContext.accountId,
+      campaignId: workspace.cloudId,
+      campaignCode,
+      workspace,
+      recovery: recovery.bundle
+        ? { ...recovery.bundle, runId }
+        : { ...EMPTY_BACKUP, runId },
+      ensureWorkspaceRemembered,
+    };
+    const [results, drift] = await Promise.all([
+      Promise.allSettled(adapters.map(adapter => adapter.verifyCloud(context))),
+      checkCrossFamilyDrift(),
+    ]);
+    // A superseded call's results are discarded IN FULL -- never partially
+    // merged -- and never touches `reportVerifying`, which the winning call
+    // owns exclusively.
+    if (!mountedRef.current || verifyRequestIdRef.current !== requestId) return;
+    setReportVerifications(current => {
+      const next = { ...current };
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          next[adapters[index].family] = result.value;
+        }
+      });
+      return next;
+    });
+    setReportCrossFamilyDrift(drift);
+    setReportVerifying(false);
+  }, [
+    ownerContext,
+    workspace,
+    campaignCode,
+    recovery.bundle,
+    runId,
+    ensureWorkspaceRemembered,
+    checkCrossFamilyDrift,
+  ]);
+
   return {
     visible,
     campaignCode,
@@ -652,5 +799,9 @@ export function useMigrationWizard(
     checkFamilyDrift,
     runFamily,
     repairFamily,
+    reportVerifications,
+    reportVerifying,
+    reportCrossFamilyDrift,
+    verifyReport,
   };
 }

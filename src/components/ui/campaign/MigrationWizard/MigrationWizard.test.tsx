@@ -7,6 +7,7 @@ import {
   renderHook,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import { configure } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
@@ -23,6 +24,7 @@ import type {
   DurableFamilyAdapter,
   DurableFamilyName,
   FamilyManifestHandle,
+  FamilyVerification,
   MigrationRunContext,
 } from '@/lib/durableDm/durableFamilyAdapter';
 import type {
@@ -500,6 +502,72 @@ const inconsistentSeeds = new Map<
 /** Counts calls into `activateCloud`, standing in for the real begin-staging RPC (no fake server here — see report). */
 const apiActionCounts = new Map<string, number>();
 
+// ---------------------------------------------------------------------
+// Task 16 stub-adapter extensions (report / verification). All reset in
+// `beforeEach`.
+// ---------------------------------------------------------------------
+
+/** Registered families whose stub `isVisible()` currently reports `false` (spec R13's "disabled registered family"). */
+const disabledStubFamilies = new Set<DurableFamilyName>();
+/** Every `verifyCloud` call, in order, across every family — the `verifySpy` the brief's pseudocode calls a bare spy. */
+const verifyCloudCalls: DurableFamilyName[] = [];
+/** A caller-supplied `FamilyVerification` a family's NEXT (and every subsequent, until cleared) `verifyCloud` call returns instead of the authority-derived default. */
+const verificationOverrides = new Map<DurableFamilyName, FamilyVerification>();
+/**
+ * One-shot deferred `verifyCloud` responses, consumed in FIFO order per
+ * family: the NEXT call to that family's `verifyCloud` returns a promise
+ * only `resolve()` settles, and every call after that one falls back to the
+ * override/default as normal. Models `deferVerification` from the brief's
+ * pseudocode.
+ */
+const deferredVerificationQueue = new Map<
+  DurableFamilyName,
+  {
+    promise: Promise<FamilyVerification>;
+    resolve: (value: FamilyVerification) => void;
+  }[]
+>();
+
+function disableFamily(family: DurableFamilyName) {
+  disabledStubFamilies.add(family);
+}
+
+function verifySpyCallCount(): number {
+  return verifyCloudCalls.length;
+}
+
+function failVerificationFor(family: DurableFamilyName) {
+  verificationOverrides.set(family, {
+    authorityAgrees: true,
+    cloudAuthority: 'postgres',
+    epoch: 1,
+    recordCount: 1,
+    documentsMatch: false,
+    tombstonesMatch: true,
+    outboxEmpty: true,
+    conflictCount: 0,
+    verified: false,
+  });
+}
+
+/** Alias — the brief's "schema version drift" scenario is, from the report's point of view, indistinguishable from any other `documentsMatch: false` refusal; the byte-vs-schema-version distinction itself is pinned per-adapter by `adapterConformance.ts`, not re-derived here. */
+function failVerificationForSchemaVersionDrift(family: DurableFamilyName) {
+  failVerificationFor(family);
+}
+
+function deferVerification(family: DurableFamilyName): {
+  resolve: (value: FamilyVerification) => void;
+} {
+  let resolveFn!: (value: FamilyVerification) => void;
+  const promise = new Promise<FamilyVerification>(resolve => {
+    resolveFn = resolve;
+  });
+  const queue = deferredVerificationQueue.get(family) ?? [];
+  queue.push({ promise, resolve: value => resolveFn(value) });
+  deferredVerificationQueue.set(family, queue);
+  return { resolve: value => resolveFn(value) };
+}
+
 function failCloudFor(family: DurableFamilyName) {
   cloudFailures.add(family);
 }
@@ -617,7 +685,7 @@ function stubAdapter(
   return {
     family,
     label: family,
-    isVisible: () => true,
+    isVisible: () => !disabledStubFamilies.has(family),
     previewManifest: async () => {
       if (options.previewError) throw new Error(options.previewError);
       return manifest;
@@ -668,17 +736,34 @@ function stubAdapter(
       };
       return { status: 'activated' as const, epoch: 1 };
     },
-    verifyCloud: async () => ({
-      authorityAgrees: true,
-      cloudAuthority: 'postgres',
-      epoch: 1,
-      recordCount: 0,
-      documentsMatch: true,
-      tombstonesMatch: true,
-      outboxEmpty: true,
-      conflictCount: 0,
-      verified: true,
-    }),
+    // Task 16: records the call (`verifySpyCallCount`), serves one queued
+    // `deferVerification` response FIFO if one is pending, else a per-test
+    // `verificationOverrides` value, else a default DERIVED from this
+    // instance's own current authority (so a family that never left legacy
+    // is correctly unverified by default, not vacuously `verified: true`).
+    verifyCloud: async () => {
+      verifyCloudCalls.push(family);
+      const queue = deferredVerificationQueue.get(family);
+      if (queue && queue.length > 0) {
+        const entry = queue.shift()!;
+        return entry.promise;
+      }
+      const override = verificationOverrides.get(family);
+      if (override) return override;
+      const current = currentAuthority();
+      const routed = current.state === 'postgres';
+      return {
+        authorityAgrees: current.state !== 'inconsistent',
+        cloudAuthority: routed ? 'postgres' : 'legacy',
+        epoch: current.epoch,
+        recordCount: manifest.recordCount,
+        documentsMatch: routed,
+        tombstonesMatch: routed,
+        outboxEmpty: true,
+        conflictCount: 0,
+        verified: routed,
+      };
+    },
     readAuthority: async () => currentAuthority(),
     rollback: async (context: MigrationRunContext) => {
       // Observable, like a real rollback: sets legacy/rolledBack so a
@@ -849,7 +934,9 @@ async function mountStubWizardResumedWithAdapters(
     manifestHash: await currentDeviceHash(),
   });
   mockedRegisteredAdapters.mockReturnValue(adapters);
-  mockedEnabledAdapters.mockImplementation(() => mockedRegisteredAdapters());
+  mockedEnabledAdapters.mockImplementation(() =>
+    mockedRegisteredAdapters().filter(adapter => adapter.isVisible())
+  );
   mockedCreateBrowserDmWorkspace.mockResolvedValue({
     ...defaultOwnerContext(),
     list: vi.fn(async () => [workspaceFor('ALPHA')]),
@@ -879,7 +966,9 @@ async function renderWizardAtFamilyStepWithAdapters(
 /** Mounts with the six stub families, driving a REAL download-then-upload so the initiate/verify call counts stay exactly 1. */
 async function mountStubWizardWithRealBundle() {
   mockedRegisteredAdapters.mockReturnValue(stubFamilies());
-  mockedEnabledAdapters.mockImplementation(() => mockedRegisteredAdapters());
+  mockedEnabledAdapters.mockImplementation(() =>
+    mockedRegisteredAdapters().filter(adapter => adapter.isVisible())
+  );
   mockedCreateBrowserDmWorkspace.mockResolvedValue({
     ...defaultOwnerContext(),
     list: vi.fn(async () => [workspaceFor('ALPHA')]),
@@ -993,7 +1082,9 @@ function renderWizardWithRegisteredAdapters(count: number) {
     stubAdapter(family)
   );
   mockedRegisteredAdapters.mockReturnValue(stubs);
-  mockedEnabledAdapters.mockImplementation(() => mockedRegisteredAdapters());
+  mockedEnabledAdapters.mockImplementation(() =>
+    mockedRegisteredAdapters().filter(adapter => adapter.isVisible())
+  );
   return render(<MigrationWizard campaignCode="ALPHA" />);
 }
 
@@ -1060,7 +1151,9 @@ async function renderRunController(
       stubAdapter('calendar'),
     ]
   );
-  mockedEnabledAdapters.mockImplementation(() => mockedRegisteredAdapters());
+  mockedEnabledAdapters.mockImplementation(() =>
+    mockedRegisteredAdapters().filter(adapter => adapter.isVisible())
+  );
 
   const view = renderHook(
     (props: { code: string }) => useMigrationWizard(props.code),
@@ -1142,6 +1235,247 @@ async function renderRunController(
 
 let ownerContextMock: ReturnType<typeof defaultOwnerContext>;
 
+// ---------------------------------------------------------------------
+// Task 16: report-suite helpers.
+// ---------------------------------------------------------------------
+
+/** Six fresh stub adapters, each ALREADY postgres-authoritative (as if every family's cutover already ran this session) -- so the report suite can jump straight to verification without re-running Task 15's whole per-family confirmation flow. */
+function stubFamiliesAllPostgres(): DurableFamilyAdapter[] {
+  return ALL_STUB_FAMILIES.map(family =>
+    stubAdapter(family, {
+      initialAuthority: {
+        state: 'postgres',
+        epoch: 1,
+        campaignId: 'cloud-ALPHA',
+        accountId: 'account-1',
+        rolledBack: false,
+      },
+    })
+  );
+}
+
+/** Clicks Continue until the report renders, mounting nothing itself. */
+async function advanceToReport() {
+  for (
+    let attempt = 0;
+    attempt <= DURABLE_FAMILY_REGISTRY.length + 1;
+    attempt += 1
+  ) {
+    if (screen.queryByTestId('migration-report')) return;
+    await userEvent.click(screen.getByRole('button', { name: /^continue$/i }));
+  }
+  throw new Error('Never reached the report');
+}
+
+async function mountAllSixPostgresAndAdvanceToReport() {
+  await mountStubWizardResumedWithAdapters(stubFamiliesAllPostgres());
+  await advanceToReport();
+}
+
+/** Default report entry point: mounts (if nothing is mounted yet) with all six families already postgres-authoritative, then navigates to the report -- verifying every enabled family exactly once on the way in (spec R14). */
+async function openReport() {
+  if (!currentRender) await mountAllSixPostgresAndAdvanceToReport();
+  else await advanceToReport();
+}
+
+/** All six registered families enabled, postgres and (by the stub's own default) verified. */
+async function openReportWithAllSixMigratedAndVerified() {
+  await mountAllSixPostgresAndAdvanceToReport();
+}
+
+/** All six postgres-authoritative, but NOT necessarily verified -- callers set `failVerificationFor`/`disableFamily` first. */
+async function openReportWithAllSixMigrated() {
+  await mountAllSixPostgresAndAdvanceToReport();
+}
+
+/** Same mount as the "all six" helpers; named separately because the brief's "Available" scenario expects the caller to have already `disableFamily`'d one first. */
+async function openReportWithEveryEnabledFamilyVerified() {
+  await mountAllSixPostgresAndAdvanceToReport();
+}
+
+/** Nothing has been migrated at all -- the shared six stub families at their `DEFAULT_STUB_AUTHORITY` (legacy, epoch 0). */
+async function openReportWithNothingMigratedYet() {
+  await mountStubWizardResumedWithAdapters(stubFamilies());
+  await advanceToReport();
+}
+
+async function openReportWithSchemaVersionDrift(family: DurableFamilyName) {
+  failVerificationForSchemaVersionDrift(family);
+  await mountAllSixPostgresAndAdvanceToReport();
+}
+
+async function refreshReport() {
+  await userEvent.click(screen.getByRole('button', { name: /refresh/i }));
+}
+
+async function closeReport() {
+  await userEvent.click(screen.getByRole('button', { name: /^back$/i }));
+}
+
+/** Directly seeds a real, minimal ACKNOWLEDGED `outbox` row for `npc` -- proves the report trusts `verification.outboxEmpty` rather than independently requiring the raw table to be physically empty (spec R8). */
+async function seedAcknowledgedOutboxRow() {
+  const database = await openRollkeeperDatabase();
+  try {
+    const transaction = database.transaction('outbox', 'readwrite');
+    transaction.objectStore('outbox').put({
+      mutationId: 'npc-outbox-acknowledged-1',
+      namespace: 'user:account-1',
+      campaignId: 'cloud-ALPHA',
+      family: 'npc',
+      legacyId: 'npc-1',
+      cutoverEpoch: 1,
+      operation: 'create',
+      payload: null,
+      schemaVersion: 1,
+      localRevision: 1,
+      baseServerVersion: 1,
+      contentFingerprint: 'fingerprint',
+      updatedAt: FIXED_TS,
+      state: 'acknowledged',
+      attemptCount: 1,
+      nextAttemptAt: 0,
+      inflightAt: null,
+      lastError: null,
+    });
+    await transactionComplete(transaction);
+  } finally {
+    database.close();
+  }
+}
+
+async function openReportWithAcknowledgedOutboxRows() {
+  await seedAcknowledgedOutboxRow();
+  await mountAllSixPostgresAndAdvanceToReport();
+}
+
+let lastSeededConflictId: string | null = null;
+
+/** Directly seeds a real `conflicts` row for `npc` with `resolutionState: 'preserved'` -- a resolved-but-kept device candidate (spec R8: preserved candidates are recoverable data and must never be treated as an unresolved conflict). */
+async function seedPreservedConflictCandidate() {
+  lastSeededConflictId =
+    'npc:user:account-1:cloud-ALPHA:preserved-npc-1:mutation-1';
+  const database = await openRollkeeperDatabase();
+  try {
+    const transaction = database.transaction('conflicts', 'readwrite');
+    transaction.objectStore('conflicts').put({
+      conflictId: lastSeededConflictId,
+      namespace: 'user:account-1',
+      campaignId: 'cloud-ALPHA',
+      family: 'npc',
+      legacyId: 'preserved-npc-1',
+      mutationId: 'mutation-1',
+      localCandidate: { note: 'preserved local candidate' },
+      cloudCandidate: { note: 'cloud candidate' },
+      resolutionState: 'preserved',
+      detectedAt: FIXED_TS,
+    });
+    await transactionComplete(transaction);
+  } finally {
+    database.close();
+  }
+}
+
+async function openReportWithPreservedResolvedCandidate() {
+  await seedPreservedConflictCandidate();
+  await mountAllSixPostgresAndAdvanceToReport();
+}
+
+/** Whether the seeded preserved conflict candidate is STILL present -- proves report verification never deletes or mutates recoverable device-candidate evidence. */
+async function preservedCandidateStillReadable(): Promise<boolean> {
+  if (!lastSeededConflictId)
+    throw new Error('No conflict candidate was seeded');
+  const database = await openRollkeeperDatabase();
+  try {
+    const transaction = database.transaction('conflicts', 'readonly');
+    const record = await requestResult(
+      transaction.objectStore('conflicts').get(lastSeededConflictId)
+    );
+    await transactionComplete(transaction);
+    return record !== undefined;
+  } finally {
+    database.close();
+  }
+}
+
+/** Ruling R6.8 (D10): the `toEqual([])` contract this defines. Recurses into every localStorage value and every `rollkeeper-local`/`rollkeeper-recovery` record looking for a `FamilyVerification`-shaped object (`documentsMatch`/`tombstonesMatch`/`outboxEmpty`/`conflictCount`/`verified` together) -- the shape `verifyReport` would have to persist to violate spec R14. A recovery download receipt's own legitimate `verifiedAt` (spec R4, "the bundle was checked") is NOT this shape and is deliberately not flagged. */
+function looksLikeFamilyVerification(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    'documentsMatch' in record &&
+    'tombstonesMatch' in record &&
+    'outboxEmpty' in record &&
+    'conflictCount' in record &&
+    'verified' in record
+  );
+}
+
+function containsFamilyVerificationShape(value: unknown, depth = 0): boolean {
+  if (depth > 6 || value === null || typeof value !== 'object') return false;
+  if (looksLikeFamilyVerification(value)) return true;
+  if (Array.isArray(value)) {
+    return value.some(item => containsFamilyVerificationShape(item, depth + 1));
+  }
+  return Object.values(value as Record<string, unknown>).some(item =>
+    containsFamilyVerificationShape(item, depth + 1)
+  );
+}
+
+async function storedVerificationClaims(): Promise<unknown[]> {
+  const claims: unknown[] = [];
+
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (key === null) continue;
+    const raw = localStorage.getItem(key);
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      if (containsFamilyVerificationShape(parsed)) {
+        claims.push({ store: 'localStorage', key });
+      }
+    } catch {
+      // Not JSON -- never a persisted claim shape.
+    }
+  }
+
+  const local = await openRollkeeperDatabase();
+  try {
+    for (const name of OBJECT_STORE_NAMES) {
+      const transaction = local.transaction(name, 'readonly');
+      const rows = await requestResult<unknown[]>(
+        transaction.objectStore(name).getAll()
+      );
+      await transactionComplete(transaction);
+      for (const row of rows) {
+        if (containsFamilyVerificationShape(row)) {
+          claims.push({ store: name });
+        }
+      }
+    }
+  } finally {
+    local.close();
+  }
+
+  const recovery = await openRecoveryDatabaseForTests();
+  try {
+    const transaction = recovery.transaction('downloadReceipts', 'readonly');
+    const rows = await requestResult<unknown[]>(
+      transaction.objectStore('downloadReceipts').getAll()
+    );
+    await transactionComplete(transaction);
+    for (const row of rows) {
+      if (containsFamilyVerificationShape(row)) {
+        claims.push({ store: 'downloadReceipts' });
+      }
+    }
+  } finally {
+    recovery.close();
+  }
+
+  return claims;
+}
+
 beforeEach(async () => {
   await deleteDatabase('rollkeeper-local');
   await deleteDatabase('rollkeeper-recovery');
@@ -1183,6 +1517,11 @@ beforeEach(async () => {
   apiActionCounts.clear();
   stubFamiliesCache = null;
   currentRender = null;
+  disabledStubFamilies.clear();
+  verifyCloudCalls.length = 0;
+  verificationOverrides.clear();
+  deferredVerificationQueue.clear();
+  lastSeededConflictId = null;
 });
 
 afterEach(() => {
@@ -2349,6 +2688,319 @@ describe('MigrationWizard — data-category steps', () => {
       expect(alert.closest('[role="alert"]')).not.toBeNull();
     } finally {
       spy.mockRestore();
+    }
+  });
+});
+
+describe('MigrationWizard — report', () => {
+  it('verifies on entry and again on Refresh, and never persists the result', async () => {
+    await openReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(6));
+    await refreshReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(12));
+    expect(await storedVerificationClaims()).toEqual([]);
+  });
+
+  it('re-verifies when the report is reopened', async () => {
+    await openReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(6));
+    await closeReport();
+    await openReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(12));
+  });
+
+  it('ignores a stale verification response that lands after a newer one', async () => {
+    const slow = deferVerification('npc');
+    await openReport();
+    await refreshReport();
+    // The FIRST (deferred, now-superseded) npc call is resolved only after
+    // the second request has already fired -- this is what the request
+    // token must discard.
+    slow.resolve({
+      authorityAgrees: true,
+      cloudAuthority: 'postgres',
+      epoch: 1,
+      recordCount: 1,
+      documentsMatch: false,
+      tombstonesMatch: false,
+      outboxEmpty: false,
+      conflictCount: 1,
+      verified: false,
+    });
+    // Anchored (ruling: `/verified/i` alone is satisfied by "Not verified").
+    expect(await screen.findByTestId('npc-status')).toHaveTextContent(
+      /^verified$/i
+    );
+  });
+
+  it('claims All campaign data is synced only when all six registered families are enabled, postgres and verified', async () => {
+    await openReportWithAllSixMigratedAndVerified();
+    expect(
+      await screen.findByText(/all campaign data is synced/i)
+    ).toBeInTheDocument();
+  });
+
+  it('claims only Available campaign data is synced when a registered family is disabled', async () => {
+    disableFamily('combat_log_archive');
+    await openReportWithEveryEnabledFamilyVerified();
+    expect(
+      await screen.findByText(/available campaign data is synced/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/all campaign data is synced/i)
+    ).not.toBeInTheDocument();
+    // Ruling (known plan defect 2): scoped to the dedicated callout, not the
+    // document -- the family's own always-rendered row also says "Combat
+    // log", which would satisfy an unscoped query regardless of this task's
+    // own behaviour.
+    const disabledStatus = await screen.findByTestId(
+      'disabled-categories-status'
+    );
+    expect(within(disabledStatus).getByText(/combat log/i)).toBeInTheDocument();
+    expect(
+      await screen.findByTestId('combat_log_archive-status')
+    ).toHaveTextContent(/^turned off$/i);
+    // A disabled family's own `verifyCloud` must never be called -- pins
+    // `verifyReport`'s use of `enabledAdapters()` rather than
+    // `registeredAdapters()` to pick which families to verify.
+    expect(verifyCloudCalls).not.toContain('combat_log_archive');
+  });
+
+  it('claims Not finished yet, not Available, when every registered family is disabled', async () => {
+    // Guards the `enabledEntries.length > 0` term: `.every()` over an EMPTY
+    // enabled set is vacuously true, which would wrongly satisfy "Available
+    // campaign data is synced" with nothing actually enabled.
+    for (const family of ALL_STUB_FAMILIES) disableFamily(family);
+    await openReportWithAllSixMigrated();
+    expect(await screen.findByText(/not finished yet/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/available campaign data is synced/i)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/all campaign data is synced/i)
+    ).not.toBeInTheDocument();
+    expect(verifyCloudCalls).toHaveLength(0);
+  });
+
+  it('excludes a migrated family’s own legacy key from the cross-family check', async () => {
+    // Guards the exclusion set in `checkCrossFamilyDrift`: without it, EVERY
+    // family's own legacy key -- which spec R2b allows to keep changing
+    // after cutover -- would wrongly trip the cross-family drift alert.
+    await openReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(6));
+    mutateCapturedKey('rollkeeper-npc-data');
+    await refreshReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(12));
+    expect(
+      screen.queryByTestId('cross-family-drift-alert')
+    ).not.toBeInTheDocument();
+    expect(await screen.findByTestId('npc-status')).toHaveTextContent(
+      /^verified$/i
+    );
+  });
+
+  it('resolving a verification after the wizard unmounts throws no unhandled error', async () => {
+    // NOT a mutation-discriminating test for `!mountedRef.current`: React 18
+    // silently no-ops a `setState` call on an unmounted component (the
+    // "Can't perform a state update on an unmounted component" warning was
+    // removed in React 18), so removing this guard and re-running this exact
+    // test still passes -- confirmed by hand during mutation-verify and
+    // recorded in the task report. `mountedRef` is kept for consistency with
+    // this file's already-established idiom (`discover()` uses the same
+    // pattern) and as defense against a future React downgrade, not because
+    // this test can prove it is load-bearing today.
+    const slow = deferVerification('npc');
+    await openReport();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      currentRender?.unmount();
+      currentRender = null;
+      slow.resolve({
+        authorityAgrees: true,
+        cloudAuthority: 'postgres',
+        epoch: 1,
+        recordCount: 1,
+        documentsMatch: true,
+        tombstonesMatch: true,
+        outboxEmpty: true,
+        conflictCount: 0,
+        verified: true,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      const unmountedWarning = errorSpy.mock.calls.some(
+        args =>
+          typeof args[0] === 'string' &&
+          /unmounted component|update.*state.*unmounted/i.test(args[0])
+      );
+      expect(unmountedWarning).toBe(false);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('claims Not finished yet when nothing has been verified yet', async () => {
+    await openReportWithNothingMigratedYet();
+    expect(await screen.findByText(/not finished yet/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/all campaign data is synced/i)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/available campaign data is synced/i)
+    ).not.toBeInTheDocument();
+    // Scoped to the report's own claim card: the rail sidebar ALSO renders
+    // an "X of Y ... moved to cloud sync" line built from different counts,
+    // which an unscoped `/0 of 6/` query can collide with.
+    const claim = await screen.findByTestId('report-claim');
+    expect(within(claim).getByText(/0 of 6/)).toBeInTheDocument();
+    // Distinguishes "never left legacy" from "moved but not verified" --
+    // both are `verified: false`, but only the first is `notStarted`.
+    expect(await screen.findByTestId('npc-status')).toHaveTextContent(
+      /^not moved yet$/i
+    );
+  });
+
+  it('refuses All campaign data is synced when one category is unverified, and names it', async () => {
+    failVerificationFor('calendar');
+    await openReportWithAllSixMigrated();
+    await screen.findByTestId('unverified-categories-alert');
+    expect(
+      screen.queryByText(/all campaign data is synced/i)
+    ).not.toBeInTheDocument();
+    // Ruling (known plan defect 2): scoped to the alert, not the document.
+    const alert = screen.getByTestId('unverified-categories-alert');
+    expect(within(alert).getByText(/calendar/i)).toBeInTheDocument();
+  });
+
+  it('lists the planned families as not yet available and excludes them from the denominator', async () => {
+    await openReportWithAllSixMigratedAndVerified();
+    const claim = await screen.findByTestId('report-claim');
+    expect(within(claim).getByText(/6 of 6/)).toBeInTheDocument();
+    // Settled decision: Locations AND Battle maps, never Player inbox.
+    expect(
+      await screen.findByText(/battle maps.*not yet available/i)
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(/locations.*not yet available/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/player inbox/i)).not.toBeInTheDocument();
+  });
+
+  it('counts verified families in the progress line, not merely postgres authority (Task 15 carry-forward)', async () => {
+    // npc is postgres-authoritative (via `stubFamiliesAllPostgres`) but its
+    // OWN live verification fails -- the progress numerator must track
+    // `verified`, not `authority.state === 'postgres'`.
+    failVerificationFor('npc');
+    await openReportWithAllSixMigrated();
+    await screen.findByTestId('unverified-categories-alert');
+    const claim = await screen.findByTestId('report-claim');
+    expect(within(claim).getByText(/5 of 6/)).toBeInTheDocument();
+    expect(await screen.findByTestId('npc-status')).toHaveTextContent(
+      /^not verified$/i
+    );
+  });
+
+  it('counts settled outbox state, not an empty table', async () => {
+    await openReportWithAcknowledgedOutboxRows();
+    // Anchored: distinguishes "Verified" from "Not verified".
+    expect(await screen.findByTestId('npc-status')).toHaveTextContent(
+      /^verified$/i
+    );
+  });
+
+  it('counts unresolved conflicts only, and keeps preserved candidates recoverable', async () => {
+    await openReportWithPreservedResolvedCandidate();
+    expect(await screen.findByTestId('npc-status')).toHaveTextContent(
+      /^verified$/i
+    );
+    expect(await preservedCandidateStillReadable()).toBe(true);
+  });
+
+  it('refuses verification when only the schema version differs', async () => {
+    await openReportWithSchemaVersionDrift('calendar');
+    await screen.findByTestId('unverified-categories-alert');
+    expect(
+      screen.queryByText(/all campaign data is synced/i)
+    ).not.toBeInTheDocument();
+    expect(await screen.findByTestId('calendar-status')).toHaveTextContent(
+      /^not verified$/i
+    );
+  });
+
+  it('reports an unrelated recovery entry whose bytes changed since the run’s bundle was captured', async () => {
+    localStorage.setItem(
+      'rollkeeper-player-data',
+      JSON.stringify({
+        state: { dmId: 'dm-local', characters: [] },
+        version: 1,
+      })
+    );
+    await openReport();
+    await waitFor(() => expect(verifySpyCallCount()).toBe(6));
+    mutateCapturedKey('rollkeeper-player-data');
+    await refreshReport();
+    const alert = await screen.findByTestId('cross-family-drift-alert');
+    expect(
+      within(alert).getByText(/rollkeeper-player-data/)
+    ).toBeInTheDocument();
+    // Cross-family drift is a global condition (spec R8): it blocks EVERY
+    // family's verified claim, not only the one that happens to own the
+    // changed key.
+    expect(await screen.findByTestId('npc-status')).toHaveTextContent(
+      /^not verified$/i
+    );
+  });
+
+  it('never renders Player inbox in the report, even when a registered family is disabled', async () => {
+    disableFamily('magic_item');
+    await openReportWithEveryEnabledFamilyVerified();
+    await screen.findByTestId('disabled-categories-status');
+    expect(screen.queryByText(/player inbox/i)).not.toBeInTheDocument();
+  });
+
+  it('renders every report warning at a 390px viewport without truncation', async () => {
+    failVerificationFor('calendar');
+    localStorage.setItem(
+      'rollkeeper-player-data',
+      JSON.stringify({ state: { dmId: 'dm-local' }, version: 1 })
+    );
+    await openReportWithAllSixMigrated();
+    await screen.findByTestId('unverified-categories-alert');
+    mutateCapturedKey('rollkeeper-player-data');
+    await refreshReport();
+    await screen.findByTestId('cross-family-drift-alert');
+    setViewport(MIGRATION_NARROW_VIEWPORT_PX);
+
+    const alertVariants: { match: RegExp; requiredSubstrings: string[] }[] = [
+      {
+        match: /not yet confirmed in cloud sync/i,
+        requiredSubstrings: [
+          'Not yet confirmed in cloud sync',
+          'has not been confirmed in cloud sync yet',
+        ],
+      },
+      {
+        match: /this browser.s data changed outside this run/i,
+        requiredSubstrings: [
+          "This browser's data changed outside this run",
+          'rollkeeper-player-data',
+          'does not belong to a data category you have moved yet',
+        ],
+      },
+    ];
+
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts.length).toBeGreaterThanOrEqual(2);
+    for (const warning of alerts) {
+      const text = warning.textContent ?? '';
+      const variant = alertVariants.find(candidate =>
+        candidate.match.test(text)
+      );
+      expect(variant, `Unrecognised alert content: ${text}`).toBeDefined();
+      for (const substring of variant!.requiredSubstrings) {
+        expect(text).toContain(substring);
+      }
+      assertNoTruncationClasses(warning);
     }
   });
 });

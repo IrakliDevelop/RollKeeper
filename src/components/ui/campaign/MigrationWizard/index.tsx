@@ -18,6 +18,7 @@ import { DURABLE_FAMILY_REGISTRY } from '@/lib/durableDm/familyRegistry';
 import { useMigrationWizard } from './MigrationWizard.hooks';
 import { FamilyStep } from './steps/FamilyStep';
 import { RecoveryStep } from './steps/RecoveryStep';
+import { ReportStep } from './steps/ReportStep';
 import { WorkspaceStep } from './steps/WorkspaceStep';
 
 export interface MigrationWizardProps {
@@ -47,8 +48,14 @@ export function MigrationWizard({
 }: MigrationWizardProps) {
   const controller = useMigrationWizard(campaignCode);
 
+  // Task 16: `stepIndex === DURABLE_FAMILY_REGISTRY.length` is one past the
+  // last registry entry (registered or planned) -- the final report (spec
+  // R6 does not name a step for it; it is reached the same way every other
+  // step is, via Continue, and it is the terminal step: `goContinue` caps
+  // at this index).
+  const isReportStep = controller.stepIndex === DURABLE_FAMILY_REGISTRY.length;
   const currentEntry =
-    controller.stepIndex >= 0
+    controller.stepIndex >= 0 && !isReportStep
       ? DURABLE_FAMILY_REGISTRY[controller.stepIndex]
       : null;
   const currentAdapter =
@@ -77,6 +84,19 @@ export function MigrationWizard({
     void controller.refreshFamilyAuthority(currentEntry.family);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on step identity; refreshFamilyAuthority is stable per its own deps
   }, [controller.stepIndex]);
+
+  // Spec R14: verification runs when the DM ENTERS the report -- keyed on
+  // `isReportStep` flipping false -> true, never on every render while
+  // already there, and never merely because some OTHER piece of state
+  // changed. Leaving the report and coming back (Back, then Continue again)
+  // flips this same boolean false then true again, which is what makes
+  // re-entering the report re-verify (spec: "reopening the report verifies
+  // again").
+  useEffect(() => {
+    if (!isReportStep) return;
+    void controller.verifyReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on entering the report step, not on verifyReport's own identity
+  }, [isReportStep]);
 
   if (!controller.visible) return null;
 
@@ -166,7 +186,7 @@ export function MigrationWizard({
               <FamilyStep
                 entry={currentEntry}
                 stepNumber={controller.stepIndex + 3}
-                totalSteps={DURABLE_FAMILY_REGISTRY.length + 2}
+                totalSteps={DURABLE_FAMILY_REGISTRY.length + 3}
                 enabled={currentEnabled}
                 adapter={currentAdapter}
                 context={currentContext}
@@ -195,6 +215,18 @@ export function MigrationWizard({
                 onSkip={controller.goContinue}
               />
             )}
+            {isReportStep && (
+              <ReportStep
+                stepNumber={DURABLE_FAMILY_REGISTRY.length + 3}
+                totalSteps={DURABLE_FAMILY_REGISTRY.length + 3}
+                familyAuthorities={controller.familyAuthorities}
+                verifications={controller.reportVerifications}
+                verifying={controller.reportVerifying}
+                crossFamilyDrift={controller.reportCrossFamilyDrift}
+                adapterFor={controller.adapterFor}
+                onRefresh={() => void controller.verifyReport()}
+              />
+            )}
           </div>
         </DialogBody>
 
@@ -212,7 +244,7 @@ export function MigrationWizard({
           <Button
             variant="primary"
             onClick={controller.goContinue}
-            disabled={!controller.canContinue}
+            disabled={!controller.canContinue || isReportStep}
           >
             Continue
           </Button>

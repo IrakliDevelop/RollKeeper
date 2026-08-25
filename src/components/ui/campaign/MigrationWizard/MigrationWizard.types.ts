@@ -2,6 +2,7 @@ import type { DeviceBackupV1 } from '@/lib/deviceRecovery';
 import type {
   DurableFamilyAdapter,
   DurableFamilyName,
+  FamilyVerification,
   MigrationRunContext,
 } from '@/lib/durableDm/durableFamilyAdapter';
 import type { NormalizedAuthority } from '@/lib/durableDm/familyAuthorityNormalizer';
@@ -130,6 +131,29 @@ export interface MigrationWizardController {
   repairFamily: (
     family: DurableFamilyName
   ) => Promise<{ ok: boolean; message: string }>;
+
+  // -----------------------------------------------------------------------
+  // Task 16: the final report (spec R8, R13, R14). Verification runs ONLY
+  // on entry to the report and on an explicit Refresh -- never on render,
+  // never persisted anywhere. Results live in this ephemeral React state and
+  // are rebuilt from scratch every time the report is (re-)entered.
+  // -----------------------------------------------------------------------
+  /** This session's live verification results, keyed by family. Cleared on nothing -- a fresh `verifyReport()` call replaces every entry it touches. */
+  reportVerifications: Partial<Record<DurableFamilyName, FamilyVerification>>;
+  /** True while the most recent `verifyReport()` call is still in flight. */
+  reportVerifying: boolean;
+  /**
+   * Legacy keys NOT owned by any currently-migrated family whose bytes no
+   * longer match the run's one verified bundle (spec R8's sixth condition).
+   */
+  reportCrossFamilyDrift: string[];
+  /**
+   * Runs every ENABLED registered family's `verifyCloud` plus the
+   * cross-family drift check, guarded by an incrementing request token so a
+   * response from a superseded call is discarded rather than applied (spec
+   * R14's cancellation and stale-response protection).
+   */
+  verifyReport: () => Promise<void>;
 }
 
 export type FamilyRunOutcome =
