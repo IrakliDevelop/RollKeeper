@@ -2,12 +2,62 @@ import {
   requestResult,
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
+import type { StorageNamespace } from '@/lib/indexeddb/shadowJournal';
 
+import type {
+  DurableFamilyName,
+  MigrationRunContext,
+} from '../durableFamilyAdapter';
+import { readFamilySelection } from '../familySelectionReader';
 import {
   matchesManifest,
   type ActivationManifestRecord,
   type CloudEnrollmentPreview,
 } from '../resumableCloudActivation';
+
+/**
+ * Final fix wave, F5: every card's own `prepare()` reads its family's
+ * selection record and refuses unless `selection.recovery.runId` AND
+ * `selection.recovery.manifestHash` both match the bundle currently under
+ * confirmation (`NpcSyncControls.hooks.ts:753-775` and its five siblings). No
+ * adapter did, and `migrationEngine.ts` checks only
+ * `recoveryGate.hasDownloadReceipt` -- so the adapters were safe ONLY because
+ * `MigrationWizard.hooks.ts` happened to call `selectFamily` in the same tick
+ * immediately before.
+ *
+ * R6's own resume derivation is what makes that reachable: a resumed run
+ * reads `deriveFamilyStepState` -> `'selected'` from a PERSISTED selection
+ * record and therefore skips `selectFamily`. If that record is from an older
+ * run (different `runId`, different `manifestHash` -- exactly what
+ * `familySelectionReader` exists to detect), `prepareIndexedDb` would migrate
+ * and write `CUTOVER_READY` against a bundle the DM never verified for this
+ * run, and `commitLocalCutover` -- which re-checks only the source manifest
+ * fingerprint -- would cut over on it. The card is structurally incapable of
+ * reaching that state.
+ *
+ * Uses `readFamilySelection` rather than six per-family readers: all six
+ * selection records carry the identical `recovery: {runId, manifestHash,
+ * createdAt}` shape, and one implementation cannot drift from itself.
+ */
+export function assertFamilySelectionMatchesRun(
+  family: DurableFamilyName,
+  context: MigrationRunContext
+): void {
+  const selection = readFamilySelection(
+    family,
+    localStorage,
+    `user:${context.accountId}` as StorageNamespace,
+    context.campaignId
+  );
+  if (
+    !selection ||
+    selection.runId !== context.recovery.runId ||
+    selection.manifestHash !== context.recovery.manifestHash
+  )
+    throw new Error(
+      'This data category was chosen during a different browser-backup check, so this browser is not ready to prepare it.'
+    );
+}
 
 /**
  * Ruling R8.2: extracted rather than duplicated into every adapter that

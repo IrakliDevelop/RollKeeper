@@ -6,6 +6,7 @@ import { calendarAdapter } from '../calendarAdapter';
 import {
   describeAdapterConformance,
   describeCardParity,
+  seedFamilySelectionForRun,
 } from './adapterConformance';
 import { createCalendarHarness } from './harnesses/calendar';
 
@@ -159,13 +160,19 @@ describe('calendarAdapter', () => {
   it('prepareIndexedDb reports the generic gate message when preparation is not ready for a reason other than blockers', async () => {
     const harness = createCalendarHarness();
     const context = await harness.seed();
-    await harness.adapter.selectFamily(context);
-    await expect(
-      harness.adapter.prepareIndexedDb({
-        ...context,
-        recovery: { ...context.recovery, manifestHash: 'e'.repeat(64) },
-      })
-    ).rejects.toThrow(/safety gate/i);
+    // Final fix wave, F5: `prepareIndexedDb` now refuses a selection record
+    // that is not this run's, and that gate fires BEFORE the receipt gate
+    // inside `run*IndexedDbMigration`. The selection is therefore seeded for
+    // the SAME recovery this call passes, so the only guard that can refuse
+    // here is still the one this test is named for.
+    const runContext = {
+      ...context,
+      recovery: { ...context.recovery, manifestHash: 'e'.repeat(64) },
+    };
+    await seedFamilySelectionForRun(harness.adapter, runContext);
+    await expect(harness.adapter.prepareIndexedDb(runContext)).rejects.toThrow(
+      /safety gate/i
+    );
   });
 
   // Two sequential guards in `previewManifest`'s post-cutover branch, pinned
@@ -288,11 +295,18 @@ describe('calendarAdapter', () => {
     // `selectFamily`), so several OTHER failures are reachable here too — a
     // bare `.rejects.toThrow()` would also pass on any of them and stop
     // discriminating the recoveryGate fix specifically.
-    await expect(
-      harness.adapter.prepareIndexedDb({
-        ...context,
-        recovery: { ...context.recovery, manifestHash: unverifiedHash },
-      })
-    ).rejects.toThrow(/safety gate/i);
+    // Final fix wave, F5: the selection gate refuses a record that is not
+    // this run's, before the receipt gate is reached. Seeded for this exact
+    // recovery so the receipt gate stays the only guard under test -- the
+    // production state this reproduces is "selected while the receipt was
+    // verified, and it stopped being verified afterwards".
+    const runContext = {
+      ...context,
+      recovery: { ...context.recovery, manifestHash: unverifiedHash },
+    };
+    await seedFamilySelectionForRun(harness.adapter, runContext);
+    await expect(harness.adapter.prepareIndexedDb(runContext)).rejects.toThrow(
+      /safety gate/i
+    );
   });
 });

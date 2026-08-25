@@ -50,6 +50,7 @@ import type {
   FamilyVerification,
 } from '../durableFamilyAdapter';
 import {
+  assertFamilySelectionMatchesRun,
   cloudPreviewAtExpectedEpoch,
   deviceIdFor,
   normalizeFlatEnrollmentPreview,
@@ -178,6 +179,8 @@ export const calendarAdapter: DurableFamilyAdapter<CalendarManifest> = {
   },
 
   async prepareIndexedDb(context) {
+    // F5: the card's own selection gate, which no adapter had.
+    assertFamilySelectionMatchesRun('calendar', context);
     const runId = `calendar-${crypto.randomUUID()}`;
     const result = await runCalendarIndexedDbMigration({
       factory: indexedDB,
@@ -235,6 +238,19 @@ export const calendarAdapter: DurableFamilyAdapter<CalendarManifest> = {
       // there): this names WHEN the drift was detected, before/at cutover.
       throw new Error(
         'Your campaign calendar changed since you prepared this browser. Preview the migration again.'
+      );
+    // Final fix wave, F5, second half: the cards ALSO bail on
+    // `if (manifest.blockers.length > 0) return;` before cutting over
+    // (e.g. `EncounterSyncControls.hooks.ts:930`). No adapter did -- they
+    // relied entirely on the fingerprint comparison above. A caller that
+    // fed a `previewManifest` handle carrying blockers (an
+    // `active-encounter`, an unresolved candidate) plus a matching
+    // generation would cut a campaign over where the card refuses. Placed
+    // after the fingerprint re-check, which has already proved this handle
+    // describes the CURRENT legacy envelope.
+    if (input.manifest.blockers.length > 0)
+      throw new Error(
+        'Some records in this data category need attention before it can move; nothing was changed.'
       );
     // Spec R10. Ordered before the cutover so a failure here leaves legacy
     // authority untouched, and asserted afterwards so a caller that passes a

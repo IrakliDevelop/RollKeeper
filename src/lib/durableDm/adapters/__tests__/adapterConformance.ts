@@ -1,9 +1,43 @@
 import { expect, it, vi } from 'vitest';
 
+import { browserRecoveryRepository } from '@/lib/browserRecoveryRepository';
+
 import type {
   DurableFamilyAdapter,
   MigrationRunContext,
 } from '../../durableFamilyAdapter';
+
+/**
+ * Final fix wave, F5: writes the family's REAL selection record for `context`
+ * through the adapter's own `selectFamily`, with only the verified-receipt
+ * precondition lifted for the duration of the call.
+ *
+ * `prepareIndexedDb` now refuses unless a selection record matches this run's
+ * `recovery.runId` AND `recovery.manifestHash` (the gate every card has and
+ * no adapter had). That correctly refuses BEFORE the recovery-receipt gate
+ * inside `run*IndexedDbMigration`, which would otherwise leave the receipt
+ * gate unpinned in the tests that drive prepare with a deliberately wrong
+ * hash. Those tests use this to reach the receipt gate the way production
+ * does: the DM genuinely selected this data category for this run, and the
+ * receipt stopped being verified afterwards (another tab, storage eviction).
+ *
+ * Deliberately the production writer rather than a hand-built record: a
+ * hand-built one could disagree with what `selectFamily` actually persists
+ * and the test would stop describing production.
+ */
+export async function seedFamilySelectionForRun(
+  adapter: DurableFamilyAdapter,
+  context: MigrationRunContext
+): Promise<void> {
+  const spy = vi
+    .spyOn(browserRecoveryRepository, 'hasVerifiedDownloadReceipt')
+    .mockResolvedValue(true);
+  try {
+    await adapter.selectFamily(context);
+  } finally {
+    spy.mockRestore();
+  }
+}
 
 /**
  * Base conformance contract (ruling R3.1: Task 7 declares this; Tasks 8-12
@@ -563,6 +597,97 @@ export function describeAdapterConformance(
         recovery: { ...context.recovery, manifestHash: 'e'.repeat(64) },
       })
     ).rejects.toThrow();
+  });
+
+  // Final fix wave, F5: every card's `prepare()` refuses unless its selection
+  // record matches the bundle currently under confirmation. No adapter did,
+  // and R6's own resume derivation makes the gap reachable: a resumed run
+  // reads `'selected'` from a PERSISTED selection record and therefore skips
+  // `selectFamily`, so a leftover record from an older run would have carried
+  // the whole IndexedDB migration through to `CUTOVER_READY` against a bundle
+  // this run never verified.
+  it(`${name}: prepareIndexedDb refuses a selection record left over from a different run`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.adapter.selectFamily(context);
+    const before = await harness.snapshot();
+    // ONLY the run id differs: the manifest hash is this run's, and its
+    // receipt is verified, so the recovery gate inside
+    // `run*IndexedDbMigration` is satisfied and the selection binding is the
+    // only guard that can refuse.
+    await expect(
+      harness.adapter.prepareIndexedDb({
+        ...context,
+        recovery: { ...context.recovery, runId: 'a-different-run' },
+      })
+    ).rejects.toThrow();
+    expect(await harness.snapshot()).toBe(before);
+  });
+
+  // The OTHER half of the binding. Matching on `runId` alone survives the
+  // test above (the run id is what differs there), and a mid-run re-capture
+  // after drift produces exactly this state: same run, a NEW verified bundle,
+  // and a selection record still pointing at the old one. The receipt gate is
+  // stubbed satisfied for the duration so it cannot be what refuses.
+  it(`${name}: prepareIndexedDb refuses a selection record bound to a different browser backup`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.adapter.selectFamily(context);
+    const before = await harness.snapshot();
+    const spy = vi
+      .spyOn(browserRecoveryRepository, 'hasVerifiedDownloadReceipt')
+      .mockResolvedValue(true);
+    try {
+      await expect(
+        harness.adapter.prepareIndexedDb({
+          ...context,
+          recovery: { ...context.recovery, manifestHash: 'a'.repeat(64) },
+        })
+      ).rejects.toThrow();
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await harness.snapshot()).toBe(before);
+  });
+
+  it(`${name}: prepareIndexedDb refuses when this data category was never selected for the run`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    const before = await harness.snapshot();
+    await expect(harness.adapter.prepareIndexedDb(context)).rejects.toThrow();
+    expect(await harness.snapshot()).toBe(before);
+  });
+
+  // Final fix wave, F5, second half: the cards bail on
+  // `if (manifest.blockers.length > 0) return;` before cutting over; the
+  // adapters relied entirely on the fingerprint re-check. The handle below
+  // keeps the prepared fingerprint (so the re-check passes) and carries a
+  // blocker, which is exactly the caller shape the review named.
+  it(`${name}: commitLocalCutover refuses a manifest handle that still carries blockers`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.adapter.selectFamily(context);
+    const prepared = await harness.adapter.prepareIndexedDb(context);
+    const before = await harness.snapshot();
+    await expect(
+      harness.adapter.commitLocalCutover(context, {
+        generation: prepared.generation,
+        manifest: {
+          ...prepared.manifest,
+          blockers: [
+            {
+              kind: 'unresolved-candidate',
+              legacyId: 'blocked-1',
+              detail: 'Something in this data category needs attention.',
+            },
+          ],
+        },
+      })
+    ).rejects.toThrow();
+    expect(await harness.snapshot()).toBe(before);
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'legacy',
+    });
   });
 
   it(`${name}: commitLocalCutover refuses when the workspace is not remembered`, async () => {

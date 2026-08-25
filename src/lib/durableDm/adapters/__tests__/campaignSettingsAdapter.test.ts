@@ -6,6 +6,7 @@ import { campaignSettingsAdapter } from '../campaignSettingsAdapter';
 import {
   describeAdapterConformance,
   describeCardParity,
+  seedFamilySelectionForRun,
 } from './adapterConformance';
 import { createCampaignSettingsHarness } from './harnesses/campaignSettings';
 
@@ -145,13 +146,19 @@ describe('campaignSettingsAdapter', () => {
   it('prepareIndexedDb reports the generic gate message when preparation is not ready for a reason other than blockers', async () => {
     const harness = createCampaignSettingsHarness();
     const context = await harness.seed();
-    await harness.adapter.selectFamily(context);
-    await expect(
-      harness.adapter.prepareIndexedDb({
-        ...context,
-        recovery: { ...context.recovery, manifestHash: 'e'.repeat(64) },
-      })
-    ).rejects.toThrow(/safety gate/i);
+    // Final fix wave, F5: `prepareIndexedDb` now refuses a selection record
+    // that is not this run's, and that gate fires BEFORE the receipt gate
+    // inside `run*IndexedDbMigration`. The selection is therefore seeded for
+    // the SAME recovery this call passes, so the only guard that can refuse
+    // here is still the one this test is named for.
+    const runContext = {
+      ...context,
+      recovery: { ...context.recovery, manifestHash: 'e'.repeat(64) },
+    };
+    await seedFamilySelectionForRun(harness.adapter, runContext);
+    await expect(harness.adapter.prepareIndexedDb(runContext)).rejects.toThrow(
+      /safety gate/i
+    );
   });
 
   // Task 8 review, Important 3: the two clauses of
