@@ -19,6 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/layout/card';
+import { blockerKindReferenceLabel } from '@/lib/durableDm/blockerReferenceLabel';
 import { isNpcClientVisible } from '@/lib/durableDm/slice11dFlags';
 
 import { useNpcSyncContext } from './NpcSyncProvider';
@@ -228,7 +229,7 @@ export function NpcSyncControls() {
                 className="text-accent-red-text"
                 key={`${blocker.kind}:${blocker.legacyId ?? ''}:${blocker.detail}`}
               >
-                {blocker.kind}: {blocker.detail}
+                {blockerKindReferenceLabel(blocker.kind)}: {blocker.detail}
               </p>
             ))}
           </div>

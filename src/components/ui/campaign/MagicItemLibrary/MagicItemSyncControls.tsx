@@ -33,6 +33,7 @@ import {
   type MagicItemManifest,
   type MagicItemPayload,
 } from '@/lib/durableDm/magicItemFamily';
+import { blockerKindReferenceLabel } from '@/lib/durableDm/blockerReferenceLabel';
 import { magicItemApi } from '@/lib/durableDm/magicItemApi';
 import { MagicItemHttpGateway } from '@/lib/durableDm/magicItemHttpGateway';
 import { MagicItemSyncService } from '@/lib/durableDm/magicItemSyncService';
@@ -1725,7 +1726,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
                 className="text-accent-red-text"
                 key={`${blocker.kind}:${blocker.legacyId ?? ''}:${blocker.detail}`}
               >
-                {blocker.kind}: {blocker.detail}
+                {blockerKindReferenceLabel(blocker.kind)}: {blocker.detail}
               </p>
             ))}
           </div>

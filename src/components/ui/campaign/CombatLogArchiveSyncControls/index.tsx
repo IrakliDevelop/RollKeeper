@@ -20,6 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/layout/card';
+import { blockerKindReferenceLabel } from '@/lib/durableDm/blockerReferenceLabel';
 import {
   canonicalJson,
   combatLogArchivePayloadFrom,
@@ -446,7 +447,7 @@ export function CombatLogArchiveSyncControls({
                 <p
                   key={`detail:${blocker.kind}:${blocker.legacyId ?? ''}:${blocker.detail}`}
                 >
-                  {blocker.kind}: {blocker.detail}
+                  {blockerKindReferenceLabel(blocker.kind)}: {blocker.detail}
                 </p>
               ))}
             </div>

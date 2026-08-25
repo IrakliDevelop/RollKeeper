@@ -19,6 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/layout/card';
+import { blockerKindReferenceLabel } from '@/lib/durableDm/blockerReferenceLabel';
 import type { EncounterManifestBlocker } from '@/lib/durableDm/encounterFamily';
 import { isEncounterClientVisible } from '@/lib/durableDm/slice11eFlags';
 import type { CampaignInfo } from '@/types/campaign';
@@ -308,7 +309,7 @@ export function EncounterSyncControls({
                 <p
                   key={`detail:${blocker.kind}:${blocker.legacyId ?? ''}:${blocker.detail}`}
                 >
-                  {blocker.kind}: {blocker.detail}
+                  {blockerKindReferenceLabel(blocker.kind)}: {blocker.detail}
                 </p>
               ))}
             </div>

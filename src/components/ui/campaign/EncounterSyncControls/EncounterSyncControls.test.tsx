@@ -15,6 +15,7 @@ import {
   fingerprintEncounterTombstone,
   type EncounterPayload,
 } from '@/lib/durableDm/encounterFamily';
+import * as encounterFamily from '@/lib/durableDm/encounterFamily';
 import { writeEncounterAuthorityMarker } from '@/lib/durableDm/encounterLegacyAuthority';
 import {
   commitEncounterLocalCutover,
@@ -397,6 +398,58 @@ describe('EncounterSyncControls gates', () => {
     expect(
       screen.queryByRole('button', { name: 'Switch this browser over' })
     ).toBeNull();
+  });
+
+  it('renders an oversized-family blocker with R17-clean reference text, never the raw internal kind', async () => {
+    // Coordinator review round 2, Important 1: the manifest's raw `kind`
+    // discriminant is rendered verbatim on the muted reference line next to
+    // `blocker.detail`. `'oversized-family'` is the one kind that contains
+    // the forbidden word; `blockerKindReferenceLabel` maps it to
+    // `'oversized-batch'` at the render site only. Mocking
+    // `buildEncounterManifest` directly (rather than seeding
+    // `ENCOUNTER_MAX_ITEMS + 1` real encounters) reaches this state without
+    // a 2000-record fixture.
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspace();
+    vi.spyOn(encounterFamily, 'buildEncounterManifest').mockResolvedValue({
+      format: 'rollkeeper-encounter-manifest',
+      version: 1,
+      family: 'encounter_definition',
+      campaignCode: campaign.code,
+      recordCount: 2001,
+      totalBytes: 12345,
+      records: [],
+      blockers: [
+        {
+          kind: 'oversized-family',
+          legacyId: null,
+          detail: 'The encounter roster exceeds 2000 encounters',
+        },
+      ],
+      rawCandidates: [],
+      fingerprint: 'f'.repeat(64),
+    });
+    const { container } = renderControls();
+    fireEvent.click(screen.getByRole('button', { name: 'Find my campaigns' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Use Encounters/ })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'See what will be backed up' })
+      ).toBeVisible()
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'See what will be backed up' })
+    );
+
+    expect(
+      await screen.findByText(
+        /oversized-batch: The encounter roster exceeds 2000 encounters/
+      )
+    ).toBeVisible();
+    expect(screen.queryByText(/oversized-family/i)).not.toBeInTheDocument();
+    expectCloudProductVocabulary(container);
   });
 
   it('blocks cutover when the persisted envelope predates version 2', async () => {

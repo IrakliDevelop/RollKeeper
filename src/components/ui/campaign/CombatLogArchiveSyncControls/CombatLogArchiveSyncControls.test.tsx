@@ -18,6 +18,7 @@ import {
   fingerprintCombatLogArchiveTombstone,
   type CombatLogArchivePayload,
 } from '@/lib/durableDm/combatLogArchiveFamily';
+import * as combatLogArchiveFamily from '@/lib/durableDm/combatLogArchiveFamily';
 import { writeCombatLogArchiveAuthorityMarker } from '@/lib/durableDm/combatLogArchiveLegacyAuthority';
 import {
   commitCombatLogArchiveLocalCutover,
@@ -1471,6 +1472,50 @@ describe('CombatLogArchiveSyncControls card', () => {
     cleanup();
     renderControls();
     expect(screen.getByText('Combat log backup')).toBeInTheDocument();
+  });
+
+  it('renders an oversized-family blocker with R17-clean reference text, never the raw internal kind', async () => {
+    // Coordinator review round 2, Important 1: the manifest's raw `kind`
+    // discriminant is rendered verbatim on the muted reference line next to
+    // `blocker.detail`. `'oversized-family'` is the one kind that contains
+    // the forbidden word; `blockerKindReferenceLabel` maps it to
+    // `'oversized-batch'` at the render site only. Mocking
+    // `buildCombatLogArchiveManifest` directly (rather than seeding
+    // `COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES` worth of real archives) reaches
+    // this state without a multi-megabyte fixture.
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspace();
+    vi.spyOn(
+      combatLogArchiveFamily,
+      'buildCombatLogArchiveManifest'
+    ).mockResolvedValue({
+      format: 'rollkeeper-combat-log-archive-manifest',
+      version: 1,
+      family: 'combat_log_archive',
+      campaignCode: campaign.code,
+      recordCount: 10,
+      totalBytes: 6_000_000,
+      records: [],
+      blockers: [
+        {
+          kind: 'oversized-family',
+          legacyId: null,
+          detail: 'The combat log archive exceeds 5242880 UTF-8 bytes',
+        },
+      ],
+      rawCandidates: [],
+      fingerprint: 'f'.repeat(64),
+    });
+    const { container } = renderControls();
+    await selectWorkspaceAndPreview();
+
+    expect(
+      await screen.findByText(
+        /oversized-batch: The combat log archive exceeds 5242880 UTF-8 bytes/
+      )
+    ).toBeVisible();
+    expect(screen.queryByText(/oversized-family/i)).not.toBeInTheDocument();
+    expectCloudProductVocabulary(container);
   });
 
   it('describes each combat log by name, start time, event count and size', () => {

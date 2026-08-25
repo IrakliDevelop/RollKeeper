@@ -502,6 +502,62 @@ describe('MagicItemSyncControls gates', () => {
     ).toBeNull();
   });
 
+  it('renders an oversized-family blocker with R17-clean reference text, never the raw internal kind', async () => {
+    // Coordinator review round 2, Important 1: the manifest's raw `kind`
+    // discriminant is rendered verbatim on the muted reference line next to
+    // `blocker.detail`. `'oversized-family'` is the one kind that contains
+    // the forbidden word; `blockerKindReferenceLabel` maps it to
+    // `'oversized-batch'` at the render site only -- the underlying
+    // `blocker.kind` value, the React `key`, and every comparison elsewhere
+    // stay exactly what `magicItemFamily.ts` produces. Mocking
+    // `buildMagicItemManifest` directly (rather than seeding
+    // `MAGIC_ITEM_MAX_ITEMS + 1` real items) reaches this state without a
+    // 2000-item fixture.
+    vi.stubEnv('NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspace();
+    vi.spyOn(magicItemFamily, 'buildMagicItemManifest').mockResolvedValue({
+      format: 'rollkeeper-magic-item-manifest',
+      version: 1,
+      family: 'magic_item',
+      campaignCode: campaign.code,
+      recordCount: 2001,
+      totalBytes: 12345,
+      records: [],
+      blockers: [
+        {
+          kind: 'oversized-family',
+          legacyId: null,
+          detail: 'The magic item library exceeds 2000 items',
+        },
+      ],
+      rawCandidates: [],
+      fingerprint: 'f'.repeat(64),
+    });
+    const { container } = render(<MagicItemSyncControls campaign={campaign} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Find owner workspaces' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Select Magic items/ })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Preview exact manifest' })
+      ).toBeVisible()
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Preview exact manifest' })
+    );
+
+    expect(
+      await screen.findByText(
+        /oversized-batch: The magic item library exceeds 2000 items/
+      )
+    ).toBeVisible();
+    expect(screen.queryByText(/oversized-family/i)).not.toBeInTheDocument();
+    expectCloudProductVocabulary(container);
+  });
+
   it('hydrates after a reload when the workspace was only discovered, never enrolled', async () => {
     vi.stubEnv('NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE', 'true');
     const remembered = mockOwnerWorkspaceWithMemory();

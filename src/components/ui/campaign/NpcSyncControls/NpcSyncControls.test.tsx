@@ -501,6 +501,57 @@ describe('NpcSyncControls gates', () => {
     ).toBeNull();
   });
 
+  it('renders an oversized-family blocker with R17-clean reference text, never the raw internal kind', async () => {
+    // Coordinator review round 2, Important 1: the manifest's raw `kind`
+    // discriminant is rendered verbatim on the muted reference line next to
+    // `blocker.detail`. `'oversized-family'` is the one kind that contains
+    // the forbidden word; `blockerKindReferenceLabel` maps it to
+    // `'oversized-batch'` at the render site only. Mocking `buildNpcManifest`
+    // directly (rather than seeding `NPC_MAX_ITEMS + 1` real NPCs) reaches
+    // this state without a 2000-record fixture.
+    vi.stubEnv('NEXT_PUBLIC_NPC_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspace();
+    vi.spyOn(npcFamily, 'buildNpcManifest').mockResolvedValue({
+      format: 'rollkeeper-npc-manifest',
+      version: 1,
+      family: 'npc',
+      campaignCode: campaign.code,
+      recordCount: 2001,
+      totalBytes: 12345,
+      records: [],
+      blockers: [
+        {
+          kind: 'oversized-family',
+          legacyId: null,
+          detail: 'The NPC roster exceeds 2000 NPCs',
+        },
+      ],
+      rawCandidates: [],
+      fingerprint: 'f'.repeat(64),
+    });
+    const { container } = renderControls();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Find owner workspaces' })
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /Select NPCs/ }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Preview exact manifest' })
+      ).toBeVisible()
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Preview exact manifest' })
+    );
+
+    expect(
+      await screen.findByText(
+        /oversized-batch: The NPC roster exceeds 2000 NPCs/
+      )
+    ).toBeVisible();
+    expect(screen.queryByText(/oversized-family/i)).not.toBeInTheDocument();
+    expectCloudProductVocabulary(container);
+  });
+
   it('blocks cutover when the persisted envelope predates version 4', async () => {
     vi.stubEnv('NEXT_PUBLIC_NPC_SYNC_VISIBLE', 'true');
     mockOwnerWorkspace();
