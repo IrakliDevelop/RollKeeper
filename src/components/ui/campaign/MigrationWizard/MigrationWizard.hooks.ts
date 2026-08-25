@@ -89,6 +89,22 @@ export function useMigrationWizard(
     [ownerContext]
   );
 
+  // Tracks whether THIS component instance is still mounted, for the one
+  // window the effect above cannot cover: `discover()`'s own in-flight
+  // `createBrowserDmWorkspace()` call. If the component unmounts while that
+  // call is pending, `setOwnerContext(next)` becomes a no-op on an unmounted
+  // tree — the cleanup effect above never sees `next` (it never entered
+  // state), so its `rollkeeper-local` handle would otherwise leak for the
+  // life of the tab (the exact hazard R10 warns about for
+  // `versionchange`). Guarded below by closing it directly instead.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   // Step 0: fresh, read-only owner-workspace discovery. Writes nothing —
   // `list()` and `discover()` on `BrowserDmWorkspaceContext` are both
   // read-only (spec R2a). Every explicit click of "Find my campaigns" opens
@@ -98,6 +114,12 @@ export function useMigrationWizard(
     setDiscoveryError(null);
     try {
       const next = await createBrowserDmWorkspace();
+      if (!mountedRef.current) {
+        // Never stored in state, so the close-on-change effect above will
+        // never see it — close it directly rather than leak the handle.
+        next?.close();
+        return;
+      }
       setOwnerContext(next);
       if (!next) {
         setWorkspace(null);
@@ -112,13 +134,15 @@ export function useMigrationWizard(
         remembered.find(
           item => item.legacyId === targetLegacyId && item.cloudId
         ) ?? null;
-      setWorkspace(found);
+      if (mountedRef.current) setWorkspace(found);
     } catch (cause) {
-      setDiscoveryError(
-        cause instanceof Error ? cause.message : 'Workspace discovery failed.'
-      );
+      if (mountedRef.current) {
+        setDiscoveryError(
+          cause instanceof Error ? cause.message : 'Workspace discovery failed.'
+        );
+      }
     } finally {
-      setDiscovering(false);
+      if (mountedRef.current) setDiscovering(false);
     }
   }, [campaignCode]);
 

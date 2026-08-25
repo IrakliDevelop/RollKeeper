@@ -1,6 +1,11 @@
 'use client';
 
-import { CheckCircle2, RefreshCw, ShieldCheck } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  RefreshCw,
+  ShieldCheck,
+} from 'lucide-react';
 
 import { Badge } from '@/components/ui/layout/badge';
 import { Button } from '@/components/ui/forms/button';
@@ -10,6 +15,8 @@ interface WorkspaceStepProps {
   campaignCode: string;
   discovering: boolean;
   discoveryError: string | null;
+  /** Derived from the controller's `accountId !== null` — never fabricated. */
+  signedIn: boolean;
   workspace: DmWorkspaceDocument | null;
   onDiscover: () => void;
 }
@@ -25,9 +32,28 @@ export function WorkspaceStep({
   campaignCode,
   discovering,
   discoveryError,
+  signedIn,
   workspace,
   onDiscover,
 }: WorkspaceStepProps) {
+  // Derived, not fabricated: before any discovery attempt neither `signedIn`
+  // nor `discoveryError` is set, and the row says so honestly rather than
+  // claiming readiness that was never checked.
+  const signInLabel = discovering
+    ? 'Checking sign-in on this browser…'
+    : signedIn
+      ? 'Signed in on this browser'
+      : discoveryError
+        ? 'Not signed in on this browser'
+        : 'Sign-in not checked yet';
+  const signInBadge = discovering
+    ? { variant: 'neutral' as const, label: 'Checking…' }
+    : signedIn
+      ? { variant: 'success' as const, label: 'Ready' }
+      : discoveryError
+        ? { variant: 'danger' as const, label: 'Not signed in' }
+        : { variant: 'neutral' as const, label: 'Not checked' };
+
   return (
     <section className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
@@ -45,16 +71,24 @@ export function WorkspaceStep({
       <div className="border-divider bg-surface flex flex-col gap-3 rounded-lg border p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <CheckCircle2
-              size={18}
-              className="text-accent-emerald-text shrink-0"
-              aria-hidden="true"
-            />
+            {signedIn ? (
+              <CheckCircle2
+                size={18}
+                className="text-accent-emerald-text shrink-0"
+                aria-hidden="true"
+              />
+            ) : (
+              <AlertTriangle
+                size={18}
+                className="text-muted shrink-0"
+                aria-hidden="true"
+              />
+            )}
             <span className="text-heading text-sm font-medium">
-              Signed in on this browser
+              {signInLabel}
             </span>
           </div>
-          <Badge variant="success">Ready</Badge>
+          <Badge variant={signInBadge.variant}>{signInBadge.label}</Badge>
         </div>
         <div className="border-divider flex items-center justify-between gap-3 border-t pt-3">
           <div className="min-w-0">
@@ -66,8 +100,7 @@ export function WorkspaceStep({
             <p className="text-muted mt-0.5 text-xs">
               {workspace
                 ? `Campaign data will move into this workspace.`
-                : (discoveryError ??
-                  'Look up your account to find its cloud workspace for this campaign.')}
+                : 'Look up your account to find its cloud workspace for this campaign.'}
             </p>
           </div>
           <Button
@@ -81,6 +114,12 @@ export function WorkspaceStep({
           </Button>
         </div>
       </div>
+
+      {discoveryError && (
+        <p role="alert" className="text-accent-red-text text-sm">
+          {discoveryError}
+        </p>
+      )}
 
       <div
         role="status"

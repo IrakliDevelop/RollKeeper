@@ -109,6 +109,14 @@ function deleteDatabase(name: string): Promise<void> {
   });
 }
 
+/**
+ * Covers localStorage plus every `rollkeeper-local` object store — correct
+ * and sufficient for R2a's claim (step 0 never touches authority, marker,
+ * pointer or selection state, all of which live there). Deliberately does
+ * NOT cover `rollkeeper-recovery` (download receipts) — a later task must
+ * not assume this snapshot is total; it is scoped to exactly what R2a makes
+ * a claim about.
+ */
 async function snapshotDurableState(): Promise<string> {
   const storage: [string, string][] = [];
   for (let index = 0; index < localStorage.length; index += 1) {
@@ -324,8 +332,9 @@ function defaultOwnerContext(accountId = 'account-1') {
 
 function workspaceFor(
   code: string,
-  accountId = 'account-1'
+  options: { accountId?: string; cloudId?: string | null } = {}
 ): DmWorkspaceDocument {
+  const accountId = options.accountId ?? 'account-1';
   return {
     namespace: `user:${accountId}` as const,
     localId: `legacy:${code}`,
@@ -335,7 +344,12 @@ function workspaceFor(
     sourceFingerprint: 'source',
     createdAt: FIXED_TS,
     family: 'workspace_identity',
-    cloudId: `cloud-${code}`,
+    // `IndexedDbDmWorkspaceRepository.commitCreate` writes `cloudId: null`
+    // for every locally created or forked workspace until the server
+    // acknowledges it (dmWorkspaceRepository.ts:84) — a queued-but-not-yet-
+    // cloud-linked workspace is a real, reachable state, not a synthetic
+    // one (item 5, coordinator review round 1).
+    cloudId: options.cloudId !== undefined ? options.cloudId : `cloud-${code}`,
     displayCode: 'A1B2C3D4E5F6',
     membershipAuthority: 'legacy',
     familyAuthorities: 'legacy',
@@ -452,7 +466,7 @@ async function renderRunController(
       accountLabel: 'Owner',
       list: vi.fn(
         async (): Promise<DmWorkspaceDocument[]> =>
-          codes.map(code => workspaceFor(code, state.accountId))
+          codes.map(code => workspaceFor(code, { accountId: state.accountId }))
       ),
       discover: vi.fn(async (): Promise<DmWorkspaceDocument[]> => []),
       remember: remember as ReturnType<typeof defaultOwnerContext>['remember'],
@@ -493,16 +507,24 @@ async function renderRunController(
         await view.result.current.migrate(family);
       });
     },
+    async enrich() {
+      await act(async () => {
+        await view.result.current.enrichLegacyReceipt();
+      });
+    },
+    /** The recovery bundle's manifest hash, or `null` while still capturing. */
+    recoveryManifestHash(): string | null {
+      return view.result.current.recovery.bundle?.manifestHash ?? null;
+    },
     context(family: DurableFamilyName): MigrationRunContext {
       return (
         view.result.current.contextFor(family) ?? {
           accountId: '',
           campaignId: '',
           campaignCode: view.result.current.campaignCode,
-          workspace: workspaceFor(
-            view.result.current.campaignCode,
-            state.accountId
-          ),
+          workspace: workspaceFor(view.result.current.campaignCode, {
+            accountId: state.accountId,
+          }),
           recovery: {
             format: 'rollkeeper-device-backup',
             formatVersion: 1,
@@ -604,7 +626,12 @@ describe('MigrationWizard — steps 0 and 1', () => {
     await userEvent.click(
       screen.getByRole('button', { name: /find my campaigns/i })
     );
-    await screen.findByText(/nothing has changed/i);
+    // "Nothing has changed" is static reassurance copy — it renders
+    // unconditionally both before and after discovery, so awaiting it alone
+    // signals nothing about whether discovery actually finished (coordinator
+    // review, item 7). Await the discovery OUTCOME instead: with the default
+    // mock (`list()` resolving `[]`) that is "no cloud workspace found yet".
+    await screen.findByText(/no cloud workspace found yet/i);
     expect(await snapshotDurableState()).toBe(before);
   });
 
@@ -615,7 +642,12 @@ describe('MigrationWizard — steps 0 and 1', () => {
       screen.getByLabelText(/safety copy/i),
       await bundleFile()
     );
-    await screen.findByText(/checked.*every entry matches/i);
+    const verifiedText = await screen.findByText(
+      /checked.*every entry matches/i
+    );
+    // Coordinator review, item 3: the success block must be an accessible
+    // `role="status"` announcement, not a plain, silent paragraph.
+    expect(verifiedText.closest('[role="status"]')).not.toBeNull();
     expect(vi.mocked(initiateDeviceBackupDownload)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(verifyDownloadedDeviceBackup)).toHaveBeenCalledTimes(1);
     expect(await verifiedReceiptCount()).toBe(1);
@@ -669,7 +701,7 @@ describe('MigrationWizard — steps 0 and 1', () => {
     render(<MigrationWizard campaignCode="ALPHA" />);
     await userEvent.click(
       await screen.findByRole('button', {
-        name: /check this browser's backup/i,
+        name: /^check this browser's backup$/i,
       })
     );
     expect(
@@ -693,7 +725,7 @@ describe('MigrationWizard — steps 0 and 1', () => {
     // control is only for a VERIFIED legacy receipt missing its entry
     // vector, never for "nothing checked yet".
     expect(
-      screen.queryByRole('button', { name: /check this browser's backup/i })
+      screen.queryByRole('button', { name: /^check this browser's backup$/i })
     ).not.toBeInTheDocument();
   });
 
@@ -711,6 +743,56 @@ describe('MigrationWizard — steps 0 and 1', () => {
     ).toBeInTheDocument();
   });
 
+  it('does not claim to be signed in before discovery has ever run', () => {
+    // Coordinator review, item 2: the sign-in row must be DERIVED from a
+    // real discovery result, never rendered as a fixed claim. Weakened check
+    // (fails open): a component that always renders "Signed in" regardless
+    // of state fails this immediately, on initial render, with no click.
+    render(<MigrationWizard campaignCode="ALPHA" />);
+    expect(
+      screen.queryByText(/^signed in on this browser$/i)
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/^ready$/i)).not.toBeInTheDocument();
+  });
+
+  it('renders a failure, not a false success, when no owner account is found', async () => {
+    mockedCreateBrowserDmWorkspace.mockResolvedValue(null);
+    render(<MigrationWizard campaignCode="ALPHA" />);
+    await userEvent.click(
+      screen.getByRole('button', { name: /find my campaigns/i })
+    );
+    // The negative case, pinned two ways: the false-success claim must be
+    // absent, AND a real, accessible failure signal must be present.
+    expect(
+      screen.queryByText(/^signed in on this browser$/i)
+    ).not.toBeInTheDocument();
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/sign in/i);
+  });
+
+  it('does not treat a queued, not-yet-cloud-linked workspace as owner-verified', async () => {
+    // Coordinator review, item 5: `IndexedDbDmWorkspaceRepository.commitCreate`
+    // writes `cloudId: null` for every locally created or forked workspace
+    // until the server acknowledges it — a real, reachable state for a
+    // migrating DM, not a synthetic one. `discover()` reads only `list()`
+    // (local records), so this workspace is visible to it but must not be
+    // treated as "found".
+    mockedCreateBrowserDmWorkspace.mockResolvedValue({
+      ...defaultOwnerContext(),
+      list: vi.fn(async () => [workspaceFor('ALPHA', { cloudId: null })]),
+    });
+    render(<MigrationWizard campaignCode="ALPHA" />);
+    await userEvent.click(
+      screen.getByRole('button', { name: /find my campaigns/i })
+    );
+    expect(
+      await screen.findByText(/no cloud workspace found yet/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/connected to campaign alpha/i)
+    ).not.toBeInTheDocument();
+  });
+
   it('surfaces a failure without resuming when enrichment cannot complete', async () => {
     await seedVerifiedReceiptWithoutEntries({
       runId: 'run-1',
@@ -722,36 +804,76 @@ describe('MigrationWizard — steps 0 and 1', () => {
     render(<MigrationWizard campaignCode="ALPHA" />);
     await userEvent.click(
       await screen.findByRole('button', {
-        name: /check this browser's backup/i,
+        name: /^check this browser's backup$/i,
       })
     );
     expect(screen.queryByText(/safety copy is ready/i)).not.toBeInTheDocument();
+    // The failure must actually be SURFACED to the DM, not merely silent
+    // (coordinator review, item 1 — the previous version of this test only
+    // proved the absence of success, which a component that renders nothing
+    // at all would also satisfy). Weakened to prove it is load-bearing: a
+    // render that dropped `recovery.error` entirely fails this exact line.
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('offline');
     // Stays in the retryable pending state rather than hanging or crashing.
     expect(
       await screen.findByRole('button', {
-        name: /check this browser's backup/i,
+        name: /^check this browser's backup$/i,
       })
     ).toBeInTheDocument();
     spy.mockRestore();
   });
 
   it('renders every warning at a 390px viewport without truncation', async () => {
+    // Coordinator review, item 3: the previous version of this test only
+    // ever produced the stale-bundle alert, so the OTHER failure this task
+    // renders (the not-signed-in alert, WorkspaceStep) sat outside the check
+    // entirely. Drive both into existence in one render.
+    mockedCreateBrowserDmWorkspace.mockResolvedValue(null);
     await renderWizardAtRecoveryStep();
+    await userEvent.click(
+      screen.getByRole('button', { name: /find my campaigns/i })
+    );
+    await screen.findByText(/not signed in on this browser/i);
     await userEvent.click(screen.getByRole('button', { name: /download/i }));
     await userEvent.upload(
       screen.getByLabelText(/safety copy/i),
       await staleBundleFile()
     );
-    await screen.findByRole('alert');
+    await screen.findByText(/that file does not match this browser/i);
     setViewport(MIGRATION_NARROW_VIEWPORT_PX);
 
-    const headline = 'That file does not match this browser';
-    const body =
-      'It was saved from different data, so it could not restore this browser. Download a fresh one and pick that up instead.';
+    const alertVariants: { match: RegExp; requiredSubstrings: string[] }[] = [
+      {
+        match: /sign in to the owner account/i,
+        requiredSubstrings: [
+          'Sign in to the owner account before migrating this campaign.',
+        ],
+      },
+      {
+        match: /that file does not match this browser/i,
+        requiredSubstrings: [
+          'That file does not match this browser',
+          'It was saved from different data, so it could not restore this browser. Download a fresh one and pick that up instead.',
+          // Item 8: the real verifier message is surfaced too, not dropped.
+          'The selected recovery file does not match the current preview',
+        ],
+      },
+    ];
 
-    for (const warning of screen.getAllByRole('alert')) {
-      expect(warning.textContent ?? '').toContain(headline);
-      expect(warning.textContent ?? '').toContain(body);
+    const alerts = screen.getAllByRole('alert');
+    // Proves BOTH kinds of warning this task renders are actually present,
+    // not merely one repeated — closing the exact gap the coordinator named.
+    expect(alerts.length).toBeGreaterThanOrEqual(2);
+    for (const warning of alerts) {
+      const text = warning.textContent ?? '';
+      const variant = alertVariants.find(candidate =>
+        candidate.match.test(text)
+      );
+      expect(variant, `Unrecognised alert content: ${text}`).toBeDefined();
+      for (const substring of variant!.requiredSubstrings) {
+        expect(text).toContain(substring);
+      }
       assertNoTruncationClasses(warning);
     }
   });
@@ -776,6 +898,13 @@ describe('MigrationWizard run controller — spec R10', () => {
     await controller.migrate('calendar');
     expect(remember).toHaveBeenCalledTimes(1);
     expect(order).toEqual(['cutover:campaign_settings', 'cutover:calendar']);
+    // This ordering is fully determined by THIS test's own `stubAdapter` —
+    // it proves the WIZARD calls `ensureWorkspaceRemembered` before
+    // `migrate`'s chain reaches `commitLocalCutover`, not that any real
+    // adapter's `commitLocalCutover` itself awaits it before doing real work.
+    // That second guarantee is proven per-family, at real entry time, in
+    // `src/lib/durableDm/adapters/__tests__/adapterConformance.ts:621-647`
+    // (`harness.recordCutoverInto(order)`, `expect(order).toEqual(['remember','cutover'])`).
     expect(remember.mock.invocationCallOrder[0]).toBeLessThan(
       cutoverInvocationOrder('campaign_settings')
     );
@@ -820,6 +949,39 @@ describe('MigrationWizard run controller — spec R10', () => {
     expect(ownerContextMock.close).toHaveBeenCalledTimes(1);
   });
 
+  it('closes a discovered context that arrives after unmount, instead of leaking its handle', async () => {
+    // Coordinator review, item 6: unmounting while `createBrowserDmWorkspace()`
+    // is in flight makes `setOwnerContext(next)` a no-op on an unmounted
+    // tree — the close-on-change effect never sees `next` (it never entered
+    // state), so without the guard its `rollkeeper-local` handle leaks for
+    // the life of the tab (R10's own `versionchange` hazard).
+    let resolveDiscovery!: (
+      value: ReturnType<typeof defaultOwnerContext> | null
+    ) => void;
+    mockedCreateBrowserDmWorkspace.mockReturnValue(
+      new Promise(resolve => {
+        resolveDiscovery = resolve;
+      })
+    );
+    const view = renderHook(
+      (props: { code: string }) => useMigrationWizard(props.code),
+      { initialProps: { code: 'ALPHA' } }
+    );
+    let discoverPromise!: Promise<void>;
+    act(() => {
+      discoverPromise = view.result.current.discover();
+    });
+    view.unmount();
+
+    const arrivedLate = defaultOwnerContext();
+    resolveDiscovery(arrivedLate);
+    await act(async () => {
+      await discoverPromise;
+    });
+
+    expect(arrivedLate.close).toHaveBeenCalledTimes(1);
+  });
+
   it('refuses to run when discovery found no owner context', async () => {
     mockedCreateBrowserDmWorkspace.mockResolvedValueOnce(null);
     const controller = await renderRunController();
@@ -848,5 +1010,34 @@ describe('MigrationWizard run controller — spec R10', () => {
     await controller.discover();
     await controller.migrate('campaign_settings');
     expect(ownerContextMock.remember).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not reuse a remember across a resumed run id change, account and workspace unchanged', async () => {
+    // Coordinator review, item 4: the brief's mutation #9 drops the WHOLE
+    // key at once, so a memo keyed on `accountId|workspace.localId` alone
+    // (dropping only `runId`) was never isolated — `crypto.randomUUID` is
+    // globally stubbed to one fixed value in `beforeEach`, so `runId` never
+    // actually varied in any other test. This test varies ONLY `runId`,
+    // holding account and workspace fixed, via the real production path
+    // that changes it mid-run: resuming a legacy receipt through
+    // `enrichLegacyReceipt` (`hooks.ts`'s `setRunId(receipt.runId)`).
+    const remember = vi.fn(async () => {});
+    const controller = await renderRunController({ remember });
+    await waitFor(() =>
+      expect(controller.recoveryManifestHash()).not.toBeNull()
+    );
+    await controller.migrate('campaign_settings');
+    expect(remember).toHaveBeenCalledTimes(1);
+
+    const hash = controller.recoveryManifestHash();
+    if (!hash) throw new Error('Recovery bundle was not captured');
+    await seedVerifiedReceiptWithoutEntries({
+      runId: 'resumed-run-id',
+      manifestHash: hash,
+    });
+    await controller.enrich();
+
+    await controller.migrate('calendar');
+    expect(remember).toHaveBeenCalledTimes(2);
   });
 });

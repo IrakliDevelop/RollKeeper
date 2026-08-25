@@ -119,6 +119,11 @@ export function RecoveryStep({
                   Check this browser&apos;s backup
                 </Button>
               </div>
+              {recovery.error && (
+                <p role="alert" className="text-accent-red-text text-sm">
+                  {recovery.error}
+                </p>
+              )}
             </div>
           )}
           <div className="flex items-center justify-between gap-3">
@@ -167,7 +172,10 @@ export function RecoveryStep({
       )}
 
       {recovery.status === 'verified' && (
-        <div className="border-accent-emerald-border bg-accent-emerald-bg rounded-lg border p-4">
+        <div
+          role="status"
+          className="border-accent-emerald-border bg-accent-emerald-bg rounded-lg border p-4"
+        >
           <p className="text-accent-emerald-text text-sm font-semibold">
             Checked &mdash; every entry matches
           </p>
@@ -218,6 +226,11 @@ export function RecoveryStep({
               It was saved from different data, so it could not restore this
               browser. Download a fresh one and pick that up instead.
             </p>
+            {recovery.error && (
+              <p className="text-accent-red-text mt-2 font-mono text-xs break-all">
+                {recovery.error}
+              </p>
+            )}
           </div>
         </div>
       )}

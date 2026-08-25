@@ -91,6 +91,7 @@ export function MigrationWizard({ campaignCode }: MigrationWizardProps) {
               campaignCode={campaignCode}
               discovering={controller.discovering}
               discoveryError={controller.discoveryError}
+              signedIn={controller.accountId !== null}
               workspace={controller.workspace}
               onDiscover={() => void controller.discover()}
             />
