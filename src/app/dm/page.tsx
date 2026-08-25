@@ -305,8 +305,22 @@ function CampaignCard({
   // Once `campaign_settings` is routed off legacy, this campaign has already
   // been through the wizard at least once -- the launcher's copy reflects
   // that instead of inviting the DM to start a migration that already ran.
+  //
+  // Fix round 1, Minor 5 (coordinator review): `campaignSettingsUsesIndexedDbAuthority`
+  // early-returns `false` when the `campaign_settings` family's OWN client
+  // flag (`NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE`) is off
+  // (`campaignSettingsLegacyProjection.ts`). Harmless here -- this read only
+  // picks which LAUNCHER copy to show, and the launcher itself is already
+  // gated on the migration wizard's OWN flag above. Task 18's R2b hardening
+  // (banner/delete removal for a migrated campaign) needs an identically
+  // named `campaignSettingsRouted` read that is INDEPENDENT of that family
+  // flag (R8.3) -- reusing THIS local for that purpose would silently
+  // disable the R2b hardening whenever the family flag happens to be off.
+  // Task 18 must read the marker directly, not call this helper.
   const campaignSettingsRouted = campaignSettingsUsesIndexedDbAuthority(
-    window.localStorage,
+    typeof window === 'undefined'
+      ? { getItem: () => null }
+      : window.localStorage,
     campaign.code
   );
 

@@ -3231,14 +3231,27 @@ describe('MigrationWizard — report', () => {
  * trustworthy only once `discoveryAttempted` is also `true`.
  */
 describe('MigrationWizard — close status (spec R2a close-behaviour contract)', () => {
-  function postgresAdapters(routedFamily: DurableFamilyName) {
+  /**
+   * `routedState` defaults to `'postgres'` for every EXISTING call site
+   * below. Fix round 1, Important 3 (coordinator review): `anyCutoverCommitted`'s
+   * derivation (`hooks.ts`) is `state === 'indexedDB' || state === 'postgres'`
+   * -- a family stuck at `indexedDB` (committed locally, not yet cloud-
+   * activated) is precisely the post-cutover, pre-activation state R2a
+   * protects, and reducing the guard to `postgres` alone left the whole
+   * coverage suite green because no fixture anywhere exercised `indexedDB`.
+   * `routedState` lets ONE test below pin that arm directly.
+   */
+  function postgresAdapters(
+    routedFamily: DurableFamilyName,
+    routedState: 'postgres' | 'indexedDB' = 'postgres'
+  ) {
     return ALL_STUB_FAMILIES.map(family =>
       stubAdapter(
         family,
         family === routedFamily
           ? {
               initialAuthority: {
-                state: 'postgres',
+                state: routedState,
                 epoch: 1,
                 campaignId: 'cloud-ALPHA',
                 accountId: 'account-1',
@@ -3276,6 +3289,77 @@ describe('MigrationWizard — close status (spec R2a close-behaviour contract)',
     });
   });
 
+  /**
+   * Fix round 1, Important 1, probe A (coordinator review): a REJECTED or
+   * signed-out `discover()` never reaches the bulk authority scan at all
+   * (`ownerContext` stays null), so a real prior cutover (npc at postgres,
+   * standing for THIS "browser"'s persisted state) is never observed this
+   * mount. An earlier version set `discoveryAttempted` from `discover()`'s
+   * own settling regardless of outcome, which made this reachable state
+   * report a TRUSTED `false` -- routing to `/dm`, the hazard verbatim.
+   */
+  it('does not trust a stale false anyCutoverCommitted when discovery itself fails (signed-out / rejected)', async () => {
+    wireAdapters(postgresAdapters('npc'));
+    mockedCreateBrowserDmWorkspace.mockRejectedValue(
+      new Error('Workspace discovery failed for this probe.')
+    );
+    const onClose = vi.fn();
+    render(<MigrationWizard campaignCode="ALPHA" onClose={onClose} />);
+    await userEvent.click(
+      screen.getByRole('button', { name: /find my campaigns/i })
+    );
+    // A real, accessible failure signal -- the scan never runs.
+    await screen.findByRole('alert');
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledWith({
+      anyCutoverCommitted: false,
+      discoveryAttempted: false,
+    });
+  });
+
+  /**
+   * Fix round 1, Important 1, probe B (coordinator review): `discover()`
+   * resolving a workspace does not mean the bulk authority scan it triggers
+   * has finished -- `readAuthority` is still an in-flight network/IndexedDB
+   * call. Closing in that exact window must not report a confident `false`
+   * either. `npc`'s `readAuthority` is held pending deliberately; the test
+   * resolves it only after the assertion, so nothing leaks into a later
+   * test as an unhandled rejection or dangling timer.
+   */
+  it('does not trust a stale false anyCutoverCommitted while the bulk authority scan is still in flight', async () => {
+    let resolvePending: (value: NormalizedAuthority) => void = () => {};
+    const pending = new Promise<NormalizedAuthority>(resolve => {
+      resolvePending = resolve;
+    });
+    const adapters = postgresAdapters('npc').map(adapter =>
+      adapter.family === 'npc'
+        ? { ...adapter, readAuthority: async () => pending }
+        : adapter
+    );
+    wireAdapters(adapters);
+    const onClose = vi.fn();
+    render(<MigrationWizard campaignCode="ALPHA" onClose={onClose} />);
+    await userEvent.click(
+      screen.getByRole('button', { name: /find my campaigns/i })
+    );
+    // Workspace discovery itself has completed (the connected-campaign text
+    // renders once `workspace` resolves) -- but the bulk scan's own
+    // `readAuthority` call for `npc` is still pending at this point.
+    await screen.findByText(/connected to campaign alpha/i);
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledWith({
+      anyCutoverCommitted: false,
+      discoveryAttempted: false,
+    });
+    resolvePending({
+      state: 'postgres',
+      epoch: 1,
+      campaignId: 'cloud-ALPHA',
+      accountId: 'account-1',
+      rolledBack: false,
+    });
+  });
+
   it('reports discoveryAttempted true and anyCutoverCommitted false once discovery completes and finds nothing cut over', async () => {
     wireAdapters(stubFamilies());
     const onClose = vi.fn();
@@ -3293,6 +3377,29 @@ describe('MigrationWizard — close status (spec R2a close-behaviour contract)',
 
   it('derives anyCutoverCommitted true from a registered family already at indexedDB/postgres authority, once discovery completes', async () => {
     wireAdapters(postgresAdapters('npc'));
+    const onClose = vi.fn();
+    render(<MigrationWizard campaignCode="ALPHA" onClose={onClose} />);
+    await userEvent.click(
+      screen.getByRole('button', { name: /find my campaigns/i })
+    );
+    await screen.findByText(/connected to campaign alpha/i);
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledWith({
+      anyCutoverCommitted: true,
+      discoveryAttempted: true,
+    });
+  });
+
+  /**
+   * Fix round 1, Important 3 (coordinator review): pins the `indexedDB` arm
+   * of `anyCutoverCommitted`'s derivation specifically -- a family committed
+   * locally but not yet cloud-activated. Reducing the guard to
+   * `state === 'postgres'` alone left 605/605 green in the coverage suite
+   * before this test existed, because no fixture anywhere in the slice used
+   * `indexedDB`.
+   */
+  it('derives anyCutoverCommitted true from a family at indexedDB authority specifically, not only postgres', async () => {
+    wireAdapters(postgresAdapters('npc', 'indexedDB'));
     const onClose = vi.fn();
     render(<MigrationWizard campaignCode="ALPHA" onClose={onClose} />);
     await userEvent.click(

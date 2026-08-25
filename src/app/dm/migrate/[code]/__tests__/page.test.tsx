@@ -70,29 +70,47 @@ vi.mock('@/lib/durableDm/familyRegistry', async importOriginal => {
 // assertion: every provider the campaign route group mounts is wrapped so a
 // call is recorded, and the route's full render (through to a family step)
 // must never trigger one.
+//
+// Fix round 1, Important 2 (coordinator review): mocking only the BARREL
+// module (`@/components/ui/campaign/NpcSyncControls`, etc.) is bypassable --
+// mounting the SAME `NpcSyncProvider` via its deep module path
+// (`.../NpcSyncControls/NpcSyncProvider`) left this suite green, because the
+// deep module was never intercepted. Each REAL provider component is
+// declared in exactly one deep module and the barrel only re-exports it, so
+// mocking the deep module directly wraps the ONE shared implementation --
+// the barrel's own (unmocked, real) re-export resolves through this same
+// mock too, since ordinary imports inside a module fetched via
+// `importOriginal` still go through the mocked module graph. This covers
+// both the barrel and the deep import path with a single spy.
 const npcProviderSpy = vi.fn();
 const encounterProviderSpy = vi.fn();
 const combatLogArchiveProviderSpy = vi.fn();
 
-vi.mock('@/components/ui/campaign/NpcSyncControls', async importOriginal => {
-  const actual =
-    await importOriginal<
-      typeof import('@/components/ui/campaign/NpcSyncControls')
-    >();
-  return {
-    ...actual,
-    NpcSyncProvider: (props: { campaignCode: string; children: ReactNode }) => {
-      npcProviderSpy();
-      return actual.NpcSyncProvider(props);
-    },
-  };
-});
 vi.mock(
-  '@/components/ui/campaign/EncounterSyncControls',
+  '@/components/ui/campaign/NpcSyncControls/NpcSyncProvider',
   async importOriginal => {
     const actual =
       await importOriginal<
-        typeof import('@/components/ui/campaign/EncounterSyncControls')
+        typeof import('@/components/ui/campaign/NpcSyncControls/NpcSyncProvider')
+      >();
+    return {
+      ...actual,
+      NpcSyncProvider: (props: {
+        campaignCode: string;
+        children: ReactNode;
+      }) => {
+        npcProviderSpy();
+        return actual.NpcSyncProvider(props);
+      },
+    };
+  }
+);
+vi.mock(
+  '@/components/ui/campaign/EncounterSyncControls/EncounterSyncProvider',
+  async importOriginal => {
+    const actual =
+      await importOriginal<
+        typeof import('@/components/ui/campaign/EncounterSyncControls/EncounterSyncProvider')
       >();
     return {
       ...actual,
@@ -107,11 +125,11 @@ vi.mock(
   }
 );
 vi.mock(
-  '@/components/ui/campaign/CombatLogArchiveSyncControls',
+  '@/components/ui/campaign/CombatLogArchiveSyncControls/CombatLogArchiveSyncProvider',
   async importOriginal => {
     const actual =
       await importOriginal<
-        typeof import('@/components/ui/campaign/CombatLogArchiveSyncControls')
+        typeof import('@/components/ui/campaign/CombatLogArchiveSyncControls/CombatLogArchiveSyncProvider')
       >();
     return {
       ...actual,
@@ -376,39 +394,51 @@ describe('/dm/migrate/[code]', () => {
     expect(mockedReplace).toHaveBeenCalledWith('/dm');
   });
 
-  it('does NOT route to the dashboard on close before discovery has ever run this mount', async () => {
-    // No `findMyCampaigns()` call -- Close is the very first interaction.
-    // A closed dialog on this route is a blank page either way, but which
-    // target is picked matters: routing to `/dm` here would be the R2a
-    // hazard (a stale `false` mistaken for "definitely nothing cut over").
-    wireAdapters(adaptersWithOneRouted());
+  /**
+   * THE pinned hazard (Task 14 carry-forward), covering BOTH reachable
+   * "never confirmed this mount" shapes in one test:
+   *
+   * - Close clicked as the very first interaction (no `findMyCampaigns()`
+   *   call at all -- a closed dialog on this route is a blank page either
+   *   way, but which target is picked matters).
+   * - A reload: a cutover happened in an EARLIER mount (a previous tab
+   *   session, simulated by `cleanup()` + a fresh `renderRoute` re-wired to
+   *   the SAME adapter instances -- same underlying "browser" state), and
+   *   THIS mount's Close is clicked before it re-runs discovery itself.
+   *
+   * Fix round 1, Minor 4 (coordinator review): these were originally two
+   * separate tests, but they are NOT independently discriminating -- a
+   * fresh, never-discovered mount is the identical state either way (the
+   * first mount + `cleanup()` cannot influence the second mount's own
+   * state, which is what a real reload also does to React). Kept as ONE
+   * test, documenting both scenarios, rather than two that always fail and
+   * pass together. The genuinely discriminating twin -- asserting the
+   * `{true,true}` -> `{false,false}` TRANSITION across the reload, which
+   * this route-level test cannot see (it only observes the final
+   * `router.replace` call) -- is
+   * `MigrationWizard.test.tsx`'s `resets discoveryAttempted (and so cannot
+   * be trusted) on a fresh mount, even though the underlying cutover
+   * persists`.
+   */
+  it('replaces into the campaign route on close whenever discovery has not confirmed anything this mount, never routing to the dashboard on a stale false', async () => {
+    const adapters = adaptersWithOneRouted();
+
+    // Shape 1: Close as the very first interaction, no discovery attempted.
+    wireAdapters(adapters);
     await renderRoute('ALPHA');
     await clickClose();
     expect(mockedReplace).toHaveBeenCalledWith('/dm/campaign/ALPHA');
     expect(mockedReplace).not.toHaveBeenCalledWith('/dm');
-  });
+    mockedReplace.mockClear();
+    cleanup();
 
-  /**
-   * THE pinned hazard (Task 14 carry-forward): a cutover happened in an
-   * earlier mount (a previous tab session), so it is on record in this
-   * "browser"'s adapter authority -- but a reload resets ALL React state,
-   * and this fresh mount's Close is clicked before it re-runs discovery
-   * itself. `anyCutoverCommitted` alone reads `false` here (nothing
-   * observed THIS mount) -- indistinguishable, by that field alone, from a
-   * campaign that was genuinely never touched. Routing to `/dm` on that
-   * stale `false` would land the DM on editable campaign UI with no fresh
-   * durable-family owner mounted, which is exactly what R2a exists to
-   * prevent. The route must route conservatively to the campaign page
-   * instead.
-   */
-  it('replaces into the campaign route on close after a real cutover even when discovery has not re-run this mount', async () => {
-    const adapters = adaptersWithOneRouted();
-    wireAdapters(adapters);
+    // Shape 2: a reload after an earlier mount DID observe the cutover.
+    wireAdapters(adapters); // same underlying "browser" state persists
     await renderRoute('ALPHA');
     await findMyCampaigns();
-    cleanup(); // simulate a reload: full unmount, all component state gone
+    cleanup(); // simulate the reload: full unmount, all component state gone
 
-    wireAdapters(adapters); // same underlying "browser" state persists
+    wireAdapters(adapters);
     await renderRoute('ALPHA'); // fresh mount -- no rediscovery click
     await clickClose();
     expect(mockedReplace).toHaveBeenCalledWith('/dm/campaign/ALPHA');

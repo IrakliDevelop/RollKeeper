@@ -142,16 +142,27 @@ export function useMigrationWizard(
   const [recovery, setRecovery] =
     useState<MigrationRecoveryState>(INITIAL_RECOVERY);
   const [anyCutoverCommitted, setAnyCutoverCommitted] = useState(false);
-  // Task 17: whether `discover()` has RESOLVED (success or failure) at least
-  // once this mount -- never whether it has merely started, and never reset
-  // once true. `anyCutoverCommitted` short-circuits to `false` before
-  // discovery ever runs (see the effect below), which is indistinguishable
-  // from a genuine "checked, nothing cut over" `false` by that field alone.
-  // The route (spec R2a close behaviour) must not treat those as the same:
-  // routing to `/dm` on a stale `false` after a real cutover would land the
-  // DM on editable campaign UI with no fresh durable-family owner mounted --
-  // exactly what R2a exists to prevent. Exposing this lets a caller require
-  // a completed discovery before trusting `anyCutoverCommitted: false`.
+  // Task 17, fix round 1 (coordinator review, Important 1): whether the
+  // BULK AUTHORITY SCAN below (the one that computes `anyCutoverCommitted`)
+  // has actually completed for the CURRENT `ownerContext`/`workspace`
+  // pairing -- never merely whether `discover()` itself returned.
+  // `anyCutoverCommitted` short-circuits to `false` whenever
+  // `ownerContext`/`workspace?.cloudId` is missing, which is indistinguishable
+  // from a genuine "checked every family, nothing cut over" `false` by that
+  // field alone. An earlier version set this from `discover()`'s own
+  // `finally` block, which is satisfied by two states that must NOT be
+  // trusted: discovery failing or finding no signed-in owner (the scan below
+  // never runs at all -- `ownerContext` stays null), and the window between
+  // `discover()` resolving and the scan's own `readAuthority` calls settling
+  // (a real race: `discoveryAttempted` would read `true` while
+  // `anyCutoverCommitted` was still whatever the PREVIOUS pairing left it
+  // at). Both are the R2a hazard reachable in production. Set `false`
+  // synchronously whenever this effect re-runs (dependencies changed, no
+  // scan has completed for the new pairing yet) and `true` only at the tail
+  // of `check()`, after `anyCutoverCommitted`/`familyAuthorities` are
+  // already up to date -- so a caller that requires `discoveryAttempted`
+  // before trusting `anyCutoverCommitted: false` is trusting a `false` that
+  // the CURRENT scan actually produced, never a stale or never-run one.
   const [discoveryAttempted, setDiscoveryAttempted] = useState(false);
 
   // Exactly one open `rollkeeper-local` database handle for the whole run
@@ -219,10 +230,11 @@ export function useMigrationWizard(
         );
       }
     } finally {
-      if (mountedRef.current) {
-        setDiscovering(false);
-        setDiscoveryAttempted(true);
-      }
+      // `discoveryAttempted` is NOT set here (fix round 1, Important 1) --
+      // see its declaration above. It is driven exclusively by the bulk
+      // authority scan effect below, which is what actually determines
+      // whether `anyCutoverCommitted: false` is trustworthy.
+      if (mountedRef.current) setDiscovering(false);
     }
   }, [campaignCode]);
 
@@ -476,6 +488,13 @@ export function useMigrationWizard(
   // open/reopen instead of reporting nothing migrated until every step is
   // manually visited.
   useEffect(() => {
+    // Fix round 1, Important 1: cleared on EVERY run of this effect, before
+    // either branch below -- the dependencies changed, so no scan has
+    // completed for this (possibly new) `ownerContext`/`workspace` pairing
+    // yet. This is what makes the pending window between a dependency
+    // change and `check()`'s own tail (or this early return) read as
+    // "not yet known" rather than carrying over a previous pairing's `true`.
+    setDiscoveryAttempted(false);
     if (!ownerContext || !workspace?.cloudId) {
       setAnyCutoverCommitted(false);
       return;
@@ -510,6 +529,11 @@ export function useMigrationWizard(
         });
         return next;
       });
+      // Set LAST, after `anyCutoverCommitted`/`familyAuthorities` are
+      // already current -- a caller reading `discoveryAttempted: true`
+      // never observes a stale `anyCutoverCommitted` from a in-between
+      // render (fix round 1, Important 1's race probe).
+      setDiscoveryAttempted(true);
     }
     void check();
     return () => {
