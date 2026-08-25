@@ -81,7 +81,7 @@ test.describe('explicitly selected profile', () => {
       .click();
     const download = await downloadPromise;
     await selectionReload;
-    expect(download.suggestedFilename()).toMatch(/^rollkeeper-device-backup_/);
+    expect(download.suggestedFilename()).toMatch(/^rollkeeper-browser-backup_/);
 
     await expect(
       page.getByRole('heading', { name: /your characters/i }).first()
