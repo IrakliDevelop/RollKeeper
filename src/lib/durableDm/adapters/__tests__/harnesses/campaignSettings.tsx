@@ -1035,6 +1035,58 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
       }
     },
 
+    // -----------------------------------------------------------------
+    // Coordinator review of Task 12, Important 1 (slice-level fix):
+    // `verifyCloud`'s R8 comparisons, added to the shared base interface.
+    // -----------------------------------------------------------------
+
+    async divergeVerifiedFingerprint() {
+      await this.corruptWorkingCopyFingerprint();
+    },
+
+    async divergeVerifiedSchemaVersion() {
+      await this.corruptWorkingCopySchemaVersion();
+    },
+
+    async divergeVerifiedTombstoneFlag() {
+      const database = await openRollkeeperDatabase();
+      try {
+        const transaction = database.transaction('documents', 'readwrite');
+        const store = transaction.objectStore('documents');
+        const key = [NAMESPACE, 'campaign_settings', CAMPAIGN_CODE];
+        const current = (await requestResult(store.get(key))) as
+          | { operation: string; deletedAt: string | null }
+          | undefined;
+        if (!current) throw new Error('No working copy to corrupt');
+        store.put({ ...current, operation: 'delete', deletedAt: NOW });
+        await transactionComplete(transaction);
+      } finally {
+        database.close();
+      }
+    },
+
+    // A single-record family has no EXTRA document to add — this is the
+    // one-document store's only way for a local count to differ from the
+    // cloud's: hard-delete the local row entirely (bypassing `commit()`,
+    // which would keep a soft-deleted row and only trip the fingerprint
+    // and tombstone clauses, not a count clause). `verifyCloud`'s
+    // `documentsMatch` never literally counts documents for this family —
+    // it is gated behind `if (cloudAuthority === 'postgres' && document)`,
+    // so a genuinely ABSENT document folds into that same guard, which is
+    // what a local count of 0 (vs the cloud's 1) actually means here.
+    async divergeVerifiedRecordCount() {
+      const database = await openRollkeeperDatabase();
+      try {
+        const transaction = database.transaction('documents', 'readwrite');
+        transaction
+          .objectStore('documents')
+          .delete([NAMESPACE, 'campaign_settings', CAMPAIGN_CODE]);
+        await transactionComplete(transaction);
+      } finally {
+        database.close();
+      }
+    },
+
     async hideNamespace() {
       const database = await openRollkeeperDatabase();
       try {

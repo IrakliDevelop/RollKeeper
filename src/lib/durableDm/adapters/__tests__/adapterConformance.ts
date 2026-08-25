@@ -209,6 +209,54 @@ export interface ConformanceHarness {
    * `combat_log_archive`'s specific signal.
    */
   recordRollbackOrderInto(sink: string[]): void;
+
+  /**
+   * Fix round (coordinator review of Task 12, Important 1): spec R8 defines
+   * "verified" as an exact document-multiset match — same `legacyId` set,
+   * same `payloadFingerprint`, same `schemaVersion` and same tombstone flag
+   * per document, same record count. Before this fix round no fixture
+   * anywhere made the LOCAL IndexedDB working copy disagree with the fake
+   * server's OWN confirmed generation after a successful activation, so
+   * `verifyCloud`'s `documentsMatch`/`tombstonesMatch` comparisons were
+   * tautologically satisfied in all six families. These four members let
+   * `describeAdapterConformance` diverge one already-uploaded, already-
+   * confirmed document's LOCAL copy from what the cloud confirmed, in each
+   * of R8's four independent ways, so each of the four checks below can be
+   * pinned and mutation-isolated.
+   *
+   * After `runChainThroughCloudActivation`, corrupts the LOCAL working copy
+   * of one already-uploaded document's `contentFingerprint` ALONE —
+   * `schemaVersion` and tombstone state unchanged — so it disagrees with
+   * what the cloud confirmed. Isolates `verifyCloud`'s `documentsMatch`
+   * fingerprint clause. For a single-record family this is its one
+   * document.
+   */
+  divergeVerifiedFingerprint(): Promise<void>;
+  /** Same target document; `schemaVersion` diverges instead. */
+  divergeVerifiedSchemaVersion(): Promise<void>;
+  /**
+   * Flips ONE already-uploaded document's LOCAL tombstone state
+   * (`operation`) by writing the `documents` row directly — bypassing the
+   * family's own delete path, which also changes `contentFingerprint` —
+   * so `contentFingerprint`/`schemaVersion` stay exactly as confirmed and
+   * ONLY `tombstonesMatch` disagrees. TEST-ONLY: production code never
+   * writes this store directly.
+   */
+  divergeVerifiedTombstoneFlag(): Promise<void>;
+  /**
+   * Changes the LOCAL working copy's document count so it disagrees with
+   * the cloud's confirmed record count, isolating `documentsMatch`'s count
+   * clause. A multi-record family adds an extra LOCAL-only document (the
+   * same mechanism `addExtraWorkingCopy` already uses). A single-record
+   * family has no "extra document" to add — its own implementation's doc
+   * comment states that it instead hard-deletes its one local row, the
+   * only way a one-document store's local count can differ from the
+   * cloud's; the resulting `documentsMatch: false` comes from the SAME
+   * `if (... && document)` guard a genuine count check would also need,
+   * not a distinct comparison that family's `verifyCloud` ever contains —
+   * disclosed rather than left to look like a literal count comparison.
+   */
+  divergeVerifiedRecordCount(): Promise<void>;
 }
 
 export function describeAdapterConformance(
@@ -649,6 +697,56 @@ export function describeAdapterConformance(
     expect(await harness.adapter.verifyCloud(context)).toMatchObject({
       verified: true,
       outboxEmpty: true,
+    });
+  });
+
+  // Coordinator review of Task 12, Important 1 (slice-level): spec R8's
+  // exact-multiset claim was untested in all six families before this fix
+  // round — no fixture made the LOCAL working copy disagree with the fake
+  // server's OWN confirmed generation after a successful activation, so
+  // `documentsMatch`/`tombstonesMatch` were tautologically satisfied. Four
+  // tests below, each isolating one of R8's four independent comparisons.
+  it(`${name}: verifyCloud is unverified when an uploaded document's fingerprint drifted locally`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    await harness.divergeVerifiedFingerprint();
+    expect(await harness.adapter.verifyCloud(context)).toMatchObject({
+      verified: false,
+      documentsMatch: false,
+    });
+  });
+
+  it(`${name}: verifyCloud is unverified when an uploaded document's schemaVersion drifted locally`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    await harness.divergeVerifiedSchemaVersion();
+    expect(await harness.adapter.verifyCloud(context)).toMatchObject({
+      verified: false,
+      documentsMatch: false,
+    });
+  });
+
+  it(`${name}: verifyCloud is unverified when an uploaded document's tombstone flag disagrees locally`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    await harness.divergeVerifiedTombstoneFlag();
+    expect(await harness.adapter.verifyCloud(context)).toMatchObject({
+      verified: false,
+      tombstonesMatch: false,
+    });
+  });
+
+  it(`${name}: verifyCloud is unverified when the local document count disagrees with the cloud's`, async () => {
+    const harness = createHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    await harness.divergeVerifiedRecordCount();
+    expect(await harness.adapter.verifyCloud(context)).toMatchObject({
+      verified: false,
+      documentsMatch: false,
     });
   });
 

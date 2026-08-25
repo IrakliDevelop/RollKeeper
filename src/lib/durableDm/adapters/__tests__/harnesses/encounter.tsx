@@ -1199,6 +1199,59 @@ export function createEncounterHarness(): EncounterConformanceHarness {
     },
 
     // -----------------------------------------------------------------
+    // Coordinator review of Task 12, Important 1 (slice-level fix):
+    // `verifyCloud`'s R8 comparisons, added to the shared base interface.
+    // -----------------------------------------------------------------
+
+    async divergeVerifiedFingerprint() {
+      await this.corruptWorkingCopyFingerprint('enc-1');
+    },
+
+    async divergeVerifiedSchemaVersion() {
+      await this.corruptWorkingCopySchemaVersion('enc-1');
+    },
+
+    async divergeVerifiedTombstoneFlag() {
+      const database = await openRollkeeperDatabase();
+      try {
+        const transaction = database.transaction('documents', 'readwrite');
+        const store = transaction.objectStore('documents');
+        const key = [NAMESPACE, 'encounter_definition', 'enc-1'];
+        const current = (await requestResult(store.get(key))) as
+          | { operation: string; deletedAt: string | null }
+          | undefined;
+        if (!current) throw new Error('No working copy to corrupt');
+        store.put({ ...current, operation: 'delete', deletedAt: NOW });
+        await transactionComplete(transaction);
+      } finally {
+        database.close();
+      }
+    },
+
+    // An EXTRA local document (what `addExtraWorkingCopy` would add) is
+    // already caught by the per-document `cloud !== undefined` check inside
+    // `.every()` even with the length clause deleted (verified directly:
+    // mutating the length clause away left an add-based fixture's test
+    // green) — only a document that exists in the cloud but is ABSENT
+    // locally is unreachable by `.every()`, which iterates the LOCAL
+    // documents only, so removing one is what actually isolates this
+    // clause. Hard-deletes the row (bypassing `commit()`, which would keep
+    // it as a soft-tombstoned row the cloud comparison would still see and
+    // catch via the fingerprint/tombstone clauses instead) — TEST-ONLY.
+    async divergeVerifiedRecordCount() {
+      const database = await openRollkeeperDatabase();
+      try {
+        const transaction = database.transaction('documents', 'readwrite');
+        transaction
+          .objectStore('documents')
+          .delete([NAMESPACE, 'encounter_definition', 'enc-2']);
+        await transactionComplete(transaction);
+      } finally {
+        database.close();
+      }
+    },
+
+    // -----------------------------------------------------------------
     // Card/adapter step-parity test support.
     // -----------------------------------------------------------------
 
