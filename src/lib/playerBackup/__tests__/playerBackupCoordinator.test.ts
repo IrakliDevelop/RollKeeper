@@ -37,11 +37,35 @@ import {
   continuePlayerBackupLocalPreparation,
 } from '../playerBackupCoordinator';
 import { classifyDegradedEligibility } from '../playerBackupEligibility';
+import type { PlayerBackupExecutionResult } from '../playerBackupOnlineExecution';
 import type { PlayerBackupExclusiveLockProvider } from '../playerBackupRunFence';
 import { PlayerBackupLockUnavailableError } from '../playerBackupRunFence';
 import { playerBackupExecutionPath } from '../playerBackupRunRepository';
 
 const RAW = '{"state":{"characters":[{"id":"hero-a"}]},"version":1}';
+
+function fakeResult(
+  accountId: string,
+  overrides: Partial<PlayerBackupExecutionResult> = {}
+): PlayerBackupExecutionResult {
+  return {
+    runId: 'run-a',
+    accountId,
+    mode: 'one-time',
+    executionPath: 'integrated',
+    protected: ['hero-a'],
+    queued: [],
+    offline: [],
+    authRequired: [],
+    needsAttention: [],
+    heldAside: [],
+    failed: [],
+    pending: [],
+    outcomes: { 'hero-a': { outcome: 'protected', reason: null } },
+    complete: true,
+    ...overrides,
+  };
+}
 
 const HERO_A = {
   id: 'hero-a',
@@ -881,6 +905,70 @@ describe('player backup local preparation coordinator', () => {
       await expect(
         openExistingRollkeeperDatabase({ factory: indexedDB })
       ).resolves.toBeNull();
+    });
+  });
+
+  describe('account-token result state', () => {
+    it('applies a current-account result', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+      const result = fakeResult('account-a');
+
+      await expect(
+        coordinator.loadResult('account-a', async () => result)
+      ).resolves.toBe(true);
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-a',
+        result,
+        resultLoading: false,
+      });
+    });
+
+    it('discards a result resolving after changeAccount switches away', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+      let releaseLoader: (() => void) | undefined;
+      const pending = new Promise<PlayerBackupExecutionResult>(resolve => {
+        releaseLoader = () => resolve(fakeResult('account-a'));
+      });
+
+      const loading = coordinator.loadResult('account-a', () => pending);
+      coordinator.changeAccount('account-b');
+      releaseLoader!();
+
+      await expect(loading).resolves.toBe(false);
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-b',
+        result: null,
+      });
+    });
+
+    it('discards a result whose accountId differs from the requested account', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+
+      await expect(
+        coordinator.loadResult('account-a', async () => fakeResult('account-b'))
+      ).resolves.toBe(false);
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-a',
+        result: null,
+      });
+    });
+
+    it('switches the coordinator account first when loadResult targets a different account', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+      const result = fakeResult('account-b');
+
+      await expect(
+        coordinator.loadResult('account-b', async () => result)
+      ).resolves.toBe(true);
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-b',
+        result,
+        resultLoading: false,
+      });
     });
   });
 });

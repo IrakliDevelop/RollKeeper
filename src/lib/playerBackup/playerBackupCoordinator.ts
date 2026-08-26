@@ -37,6 +37,7 @@ import {
   PlayerBackupCloudPreviewController,
   PlayerBackupCloudPreviewError,
 } from './playerBackupCloudPreview';
+import type { PlayerBackupExecutionResult } from './playerBackupOnlineExecution';
 import { rebindPlayerBackupActiveSelection } from './playerBackupActiveSelection';
 import { classifyDegradedEligibility } from './playerBackupEligibility';
 import {
@@ -63,10 +64,16 @@ export class PlayerBackupReadOnlyCoordinator {
   readonly cloud = new PlayerBackupCloudPreviewController();
   private accountId: string | null = null;
   private run: PlayerBackupRunV1 | null = null;
+  private resultToken = 0;
+  private result: PlayerBackupExecutionResult | null = null;
+  private resultLoading = false;
 
   changeAccount(accountId: string | null): void {
     this.accountId = accountId;
     this.run = null;
+    this.resultToken += 1;
+    this.result = null;
+    this.resultLoading = false;
     this.cloud.changeAccount(accountId);
   }
 
@@ -75,6 +82,8 @@ export class PlayerBackupReadOnlyCoordinator {
       accountId: this.accountId,
       run: this.run,
       cloud: this.cloud.snapshot(),
+      result: this.result,
+      resultLoading: this.resultLoading,
     };
   }
 
@@ -94,6 +103,40 @@ export class PlayerBackupReadOnlyCoordinator {
   ): Promise<boolean> {
     if (this.accountId !== accountId) this.changeAccount(accountId);
     return this.cloud.load(accountId, loader);
+  }
+
+  /**
+   * Mirrors `cloud.load`'s token/account guard: a result is applied only when
+   * this call's token and account are still current and the loaded result's
+   * own `accountId` matches. `changeAccount` bumps the token synchronously, so
+   * a result that resolves after the account switched is discarded.
+   */
+  async loadResult(
+    accountId: string,
+    loader: () => Promise<PlayerBackupExecutionResult>
+  ): Promise<boolean> {
+    if (this.accountId !== accountId) this.changeAccount(accountId);
+    const requestToken = ++this.resultToken;
+    this.resultLoading = true;
+    try {
+      const result = await loader();
+      if (
+        requestToken !== this.resultToken ||
+        this.accountId !== accountId ||
+        result.accountId !== accountId
+      ) {
+        return false;
+      }
+      this.result = result;
+      this.resultLoading = false;
+      return true;
+    } catch (cause) {
+      if (requestToken !== this.resultToken || this.accountId !== accountId) {
+        return false;
+      }
+      this.resultLoading = false;
+      throw cause;
+    }
   }
 }
 
