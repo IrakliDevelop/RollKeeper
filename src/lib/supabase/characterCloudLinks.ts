@@ -4,6 +4,7 @@ export const CHARACTER_CLOUD_LINKS_STORAGE_KEY =
 export interface PendingCharacterMutation {
   mutationId: string;
   contentFingerprint: string;
+  originPlayerBackupRunId?: string;
 }
 
 export interface CharacterCloudLink {
@@ -18,6 +19,7 @@ export interface CharacterCloudLink {
 export interface CharacterCloudLinkRepository {
   get(accountId: string, legacyId: string): CharacterCloudLink | null;
   save(link: CharacterCloudLink): void;
+  remove(accountId: string, legacyId: string): void;
 }
 
 function identity(accountId: string, legacyId: string): string {
@@ -53,6 +55,13 @@ export function createCharacterCloudLinkRepository(
       links[identity(link.accountId, link.legacyId)] = structuredClone(link);
       storage.setItem(CHARACTER_CLOUD_LINKS_STORAGE_KEY, JSON.stringify(links));
     },
+    remove(accountId, legacyId) {
+      const links = parseLinks(
+        storage.getItem(CHARACTER_CLOUD_LINKS_STORAGE_KEY)
+      );
+      delete links[identity(accountId, legacyId)];
+      storage.setItem(CHARACTER_CLOUD_LINKS_STORAGE_KEY, JSON.stringify(links));
+    },
   };
 }
 
@@ -65,6 +74,9 @@ export function createMemoryCharacterCloudLinkRepository(): CharacterCloudLinkRe
     },
     save(link) {
       links.set(identity(link.accountId, link.legacyId), structuredClone(link));
+    },
+    remove(accountId, legacyId) {
+      links.delete(identity(accountId, legacyId));
     },
   };
 }

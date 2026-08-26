@@ -21,6 +21,37 @@ export interface PlayerBackupRunV1 {
   stage: PlayerBackupRunStage;
   characterCheckpoints: Record<string, PlayerBackupCharacterCheckpoint>;
   localReadyEvidence?: PlayerBackupLocalReadyEvidence;
+  executionPath?: PlayerBackupExecutionPath;
+}
+
+export type PlayerBackupExecutionPath = 'integrated' | 'degraded-manual';
+
+export type PlayerBackupOnlineCheckpointState =
+  | 'pending'
+  | 'protected'
+  | 'queued'
+  | 'offline'
+  | 'auth-required'
+  | 'needs-attention'
+  | 'held-aside'
+  | 'failed';
+
+export interface PlayerBackupOnlineCheckpoint {
+  version: 1;
+  kind: 'manual' | 'automatic';
+  cloudId: string;
+  /** null only for identical-row link attachment. */
+  mutationId: string | null;
+  state: PlayerBackupOnlineCheckpointState;
+  recordedAt: string;
+  /** Required when state === 'protected'. */
+  serverVersion?: number;
+  /** Required when state === 'protected'. */
+  contentFingerprint?: string;
+  /** Required when state === 'protected'. */
+  verifiedAt?: string;
+  /** needs-attention / held-aside / failed / offline / auth-required. */
+  reason?: string;
 }
 
 export type PlayerBackupRunStage = 'confirmed' | 'local-ready';
@@ -57,6 +88,7 @@ export type PlayerBackupAuthoritySnapshot =
 
 export interface PlayerBackupCharacterCheckpoint {
   localPreparation: 'pending' | 'ready';
+  online?: PlayerBackupOnlineCheckpoint;
 }
 
 export interface PlayerBackupLocalReadyEvidence {
@@ -161,6 +193,59 @@ function isAuthority(value: unknown): value is PlayerBackupAuthoritySnapshot {
   );
 }
 
+const ONLINE_CHECKPOINT_STATES = new Set<PlayerBackupOnlineCheckpointState>([
+  'pending',
+  'protected',
+  'queued',
+  'offline',
+  'auth-required',
+  'needs-attention',
+  'held-aside',
+  'failed',
+]);
+
+function isOnlineCheckpoint(
+  value: unknown
+): value is PlayerBackupOnlineCheckpoint {
+  if (typeof value !== 'object' || value === null) return false;
+  const checkpoint = value as Partial<PlayerBackupOnlineCheckpoint>;
+  if (
+    checkpoint.version !== 1 ||
+    (checkpoint.kind !== 'manual' && checkpoint.kind !== 'automatic') ||
+    !isNonEmptyString(checkpoint.cloudId) ||
+    !(
+      typeof checkpoint.mutationId === 'string' ||
+      checkpoint.mutationId === null
+    ) ||
+    typeof checkpoint.state !== 'string' ||
+    !ONLINE_CHECKPOINT_STATES.has(
+      checkpoint.state as PlayerBackupOnlineCheckpointState
+    ) ||
+    !isNonEmptyString(checkpoint.recordedAt)
+  ) {
+    return false;
+  }
+  if (checkpoint.state === 'protected') {
+    return (
+      Number.isSafeInteger(checkpoint.serverVersion) &&
+      checkpoint.serverVersion! > 0 &&
+      isNonEmptyString(checkpoint.contentFingerprint) &&
+      isNonEmptyString(checkpoint.verifiedAt)
+    );
+  }
+  return true;
+}
+
+function isExecutionPathValid(run: Partial<PlayerBackupRunV1>): boolean {
+  if (run.executionPath === undefined || run.executionPath === 'integrated') {
+    return true;
+  }
+  if (run.executionPath === 'degraded-manual') {
+    return run.mode === 'one-time' && run.stage === 'confirmed';
+  }
+  return false;
+}
+
 export function isPlayerBackupRun(
   value: unknown,
   accountId?: string
@@ -184,6 +269,7 @@ export function isPlayerBackupRun(
     isAuthority(run.authority) &&
     isNonEmptyString(run.confirmedAt) &&
     (run.stage === 'confirmed' || run.stage === 'local-ready') &&
+    isExecutionPathValid(run) &&
     typeof run.characterCheckpoints === 'object' &&
     run.characterCheckpoints !== null
   ) {
@@ -198,7 +284,9 @@ export function isPlayerBackupRun(
           checkpoint !== null &&
           typeof checkpoint === 'object' &&
           (checkpoint.localPreparation === 'pending' ||
-            checkpoint.localPreparation === 'ready')
+            checkpoint.localPreparation === 'ready') &&
+          (checkpoint.online === undefined ||
+            isOnlineCheckpoint(checkpoint.online))
         );
       }) &&
       (complete.mode === 'ongoing'
@@ -219,6 +307,83 @@ export function isPlayerBackupRun(
     );
   }
   return false;
+}
+
+export function playerBackupExecutionPath(
+  run: Pick<PlayerBackupRunV1, 'executionPath'>
+): PlayerBackupExecutionPath {
+  return run.executionPath ?? 'integrated';
+}
+
+/**
+ * Reads the run inside a transaction the caller owns, re-verifying the
+ * account-scoped active pointer still points at `expectedActiveRunId`. Valid
+ * at any stage (unlike `assertPlayerBackupRunLocalReady`, which requires
+ * local-ready).
+ */
+export async function readPlayerBackupRunInTransaction(
+  meta: IDBObjectStore,
+  accountId: string,
+  expectedActiveRunId: string
+): Promise<PlayerBackupRunV1> {
+  const pointer = (await requestResult(
+    meta.get(playerBackupActiveRunKey(accountId))
+  )) as ActiveRunPointer | undefined;
+  if (
+    pointer?.accountId !== accountId ||
+    pointer.runId !== expectedActiveRunId
+  ) {
+    throw new PlayerBackupRunReplacedError();
+  }
+  const stored = await requestResult(
+    meta.get(playerBackupRunKey(expectedActiveRunId))
+  );
+  assertValidPlayerBackupRun(stored, accountId);
+  const record = structuredClone(stored) as PlayerBackupRunV1 & {
+    key?: string;
+  };
+  delete record.key;
+  return record;
+}
+
+/**
+ * Updates a single selected character's online checkpoint inside a
+ * caller-owned, fenced transaction. Rejects characters that are not selected
+ * in the current run.
+ */
+export async function updatePlayerBackupCharacterCheckpoint(
+  meta: IDBObjectStore,
+  options: {
+    accountId: string;
+    expectedActiveRunId: string;
+    legacyId: string;
+    online: PlayerBackupOnlineCheckpoint;
+  }
+): Promise<PlayerBackupRunV1> {
+  const current = await readPlayerBackupRunInTransaction(
+    meta,
+    options.accountId,
+    options.expectedActiveRunId
+  );
+  if (!current.selectedCharacterIds.includes(options.legacyId)) {
+    throw new Error('Character is not selected in this player backup run');
+  }
+  const next: PlayerBackupRunV1 = {
+    ...current,
+    characterCheckpoints: {
+      ...current.characterCheckpoints,
+      [options.legacyId]: {
+        ...current.characterCheckpoints[options.legacyId],
+        online: structuredClone(options.online),
+      },
+    },
+  };
+  assertValidPlayerBackupRun(next, options.accountId);
+  meta.put({
+    ...structuredClone(next),
+    key: playerBackupRunKey(next.runId),
+  });
+  return next;
 }
 
 export async function assertPlayerBackupRunLocalReady(
@@ -280,10 +445,16 @@ export async function advancePlayerBackupRunToLocalReady(
       key?: string;
     };
     delete current.key;
+    if (playerBackupExecutionPath(current) === 'degraded-manual') {
+      throw new Error('Degraded manual runs never reach local-ready');
+    }
     const characterCheckpoints = Object.fromEntries(
       current.selectedCharacterIds.map(id => [
         id,
-        { localPreparation: 'ready' as const },
+        {
+          ...current.characterCheckpoints[id],
+          localPreparation: 'ready' as const,
+        },
       ])
     );
     const next: PlayerBackupRunV1 = {

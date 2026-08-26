@@ -11,11 +11,16 @@ import {
 import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
 
 import {
+  type PlayerBackupOnlineCheckpoint,
   type PlayerBackupRunV1,
   PlayerBackupRunReplacedError,
   advancePlayerBackupRunToLocalReady,
   assertPlayerBackupRunLocalReady,
+  isPlayerBackupRun,
+  playerBackupExecutionPath,
   readActivePlayerBackupRun,
+  readPlayerBackupRunInTransaction,
+  updatePlayerBackupCharacterCheckpoint,
 } from '../playerBackupRunRepository';
 import { runPlayerBackupTransaction } from '../playerBackupRunFence';
 
@@ -279,5 +284,258 @@ describe('player backup durable consent', () => {
     const rows = await requestResult(read.objectStore('documents').getAll());
     await transactionComplete(read);
     expect(rows).toEqual([]);
+  });
+
+  it('accepts degraded-manual one-time confirmed runs and rejects them at local-ready', async () => {
+    expect(
+      isPlayerBackupRun(
+        run({
+          mode: 'one-time',
+          futureDefault: 'off',
+          executionPath: 'degraded-manual',
+        })
+      )
+    ).toBe(true);
+    expect(isPlayerBackupRun(run({ executionPath: 'degraded-manual' }))).toBe(
+      false
+    );
+    expect(playerBackupExecutionPath(run())).toBe('integrated');
+
+    const preferences = new AutomaticCharacterSyncPreferences(database);
+    const degradedRun = run({
+      mode: 'one-time',
+      futureDefault: 'off',
+      executionPath: 'degraded-manual',
+    });
+    await preferences.applyConfirmedSelection({
+      expectedActiveRunId: null,
+      run: degradedRun,
+      confirmed: true,
+    });
+
+    await expect(
+      advancePlayerBackupRunToLocalReady(database, {
+        accountId: ACCOUNT,
+        expectedActiveRunId: 'run-a',
+        authority: {
+          kind: 'indexedDB',
+          namespace: 'guest',
+          family: 'character',
+          generation: 'generation-a',
+          epoch: 1,
+        },
+        selectionAuthorizedAt: '2026-08-26T10:00:00.000Z',
+        verifiedAt: '2026-08-26T10:05:00.000Z',
+      })
+    ).rejects.toThrow('Degraded manual runs never reach local-ready');
+  });
+
+  it('validates online checkpoints and requires protected evidence', () => {
+    const pending: PlayerBackupOnlineCheckpoint = {
+      version: 1,
+      kind: 'manual',
+      cloudId: 'cloud-a',
+      mutationId: 'mutation-a',
+      state: 'pending',
+      recordedAt: '2026-08-26T10:01:00.000Z',
+    };
+    expect(
+      isPlayerBackupRun(
+        run({
+          characterCheckpoints: {
+            'hero-a': { localPreparation: 'pending', online: pending },
+          },
+        })
+      )
+    ).toBe(true);
+    expect(
+      isPlayerBackupRun(
+        run({
+          characterCheckpoints: {
+            'hero-a': {
+              localPreparation: 'pending',
+              online: { ...pending, state: 'protected' },
+            },
+          },
+        })
+      )
+    ).toBe(false);
+    expect(
+      isPlayerBackupRun(
+        run({
+          characterCheckpoints: {
+            'hero-a': {
+              localPreparation: 'pending',
+              online: {
+                ...pending,
+                state: 'protected',
+                serverVersion: 1,
+                contentFingerprint: 'fp',
+                verifiedAt: 't',
+              },
+            },
+          },
+        })
+      )
+    ).toBe(true);
+  });
+
+  it('updates a selected character checkpoint only inside a fenced transaction and aborts atomically', async () => {
+    const preferences = new AutomaticCharacterSyncPreferences(database);
+    await preferences.applyConfirmedSelection({
+      expectedActiveRunId: null,
+      run: run(),
+      confirmed: true,
+    });
+
+    const pending: PlayerBackupOnlineCheckpoint = {
+      version: 1,
+      kind: 'manual',
+      cloudId: 'cloud-a',
+      mutationId: 'mutation-a',
+      state: 'pending',
+      recordedAt: '2026-08-26T10:01:00.000Z',
+    };
+
+    await expect(
+      runPlayerBackupTransaction({
+        database,
+        accountId: ACCOUNT,
+        expectedActiveRunId: 'run-a',
+        stores: [],
+        task: async transaction => {
+          await updatePlayerBackupCharacterCheckpoint(
+            transaction.objectStore('meta'),
+            {
+              accountId: ACCOUNT,
+              expectedActiveRunId: 'run-a',
+              legacyId: 'hero-a',
+              online: pending,
+            }
+          );
+          throw new Error('boom');
+        },
+      })
+    ).rejects.toThrow('boom');
+
+    await expect(
+      readActivePlayerBackupRun({ accountId: ACCOUNT, factory: indexedDB })
+    ).resolves.toMatchObject({
+      characterCheckpoints: { 'hero-a': { localPreparation: 'pending' } },
+    });
+    await expect(
+      readActivePlayerBackupRun({ accountId: ACCOUNT, factory: indexedDB })
+    ).resolves.not.toMatchObject({
+      characterCheckpoints: { 'hero-a': { online: expect.anything() } },
+    });
+
+    const updated = await runPlayerBackupTransaction({
+      database,
+      accountId: ACCOUNT,
+      expectedActiveRunId: 'run-a',
+      stores: [],
+      task: transaction =>
+        updatePlayerBackupCharacterCheckpoint(transaction.objectStore('meta'), {
+          accountId: ACCOUNT,
+          expectedActiveRunId: 'run-a',
+          legacyId: 'hero-a',
+          online: pending,
+        }),
+    });
+    expect(updated.characterCheckpoints['hero-a'].online).toEqual(pending);
+
+    await expect(
+      readActivePlayerBackupRun({ accountId: ACCOUNT, factory: indexedDB })
+    ).resolves.toMatchObject({
+      characterCheckpoints: { 'hero-a': { online: pending } },
+    });
+
+    await expect(
+      runPlayerBackupTransaction({
+        database,
+        accountId: ACCOUNT,
+        expectedActiveRunId: 'run-a',
+        stores: [],
+        task: transaction =>
+          updatePlayerBackupCharacterCheckpoint(
+            transaction.objectStore('meta'),
+            {
+              accountId: ACCOUNT,
+              expectedActiveRunId: 'run-a',
+              legacyId: 'hero-b',
+              online: pending,
+            }
+          ),
+      })
+    ).rejects.toThrow('Character is not selected in this player backup run');
+
+    await expect(
+      readActivePlayerBackupRun({ accountId: ACCOUNT, factory: indexedDB })
+    ).resolves.toMatchObject({
+      characterCheckpoints: { 'hero-a': { online: pending } },
+    });
+
+    const staleTransaction = database.transaction('meta', 'readonly');
+    await expect(
+      readPlayerBackupRunInTransaction(
+        staleTransaction.objectStore('meta'),
+        ACCOUNT,
+        'run-stale'
+      )
+    ).rejects.toBeInstanceOf(PlayerBackupRunReplacedError);
+  });
+
+  it('advancing to local-ready preserves online checkpoints', async () => {
+    const preferences = new AutomaticCharacterSyncPreferences(database);
+    await preferences.applyConfirmedSelection({
+      expectedActiveRunId: null,
+      run: run(),
+      confirmed: true,
+    });
+
+    const pending: PlayerBackupOnlineCheckpoint = {
+      version: 1,
+      kind: 'automatic',
+      cloudId: 'cloud-a',
+      mutationId: 'mutation-a',
+      state: 'queued',
+      recordedAt: '2026-08-26T10:01:00.000Z',
+    };
+    await runPlayerBackupTransaction({
+      database,
+      accountId: ACCOUNT,
+      expectedActiveRunId: 'run-a',
+      stores: [],
+      task: transaction =>
+        updatePlayerBackupCharacterCheckpoint(transaction.objectStore('meta'), {
+          accountId: ACCOUNT,
+          expectedActiveRunId: 'run-a',
+          legacyId: 'hero-a',
+          online: pending,
+        }),
+    });
+
+    await advancePlayerBackupRunToLocalReady(database, {
+      accountId: ACCOUNT,
+      expectedActiveRunId: 'run-a',
+      authority: {
+        kind: 'indexedDB',
+        namespace: 'guest',
+        family: 'character',
+        generation: 'generation-a',
+        epoch: 1,
+      },
+      selectionAuthorizedAt: '2026-08-26T10:00:00.000Z',
+      verifiedAt: '2026-08-26T10:05:00.000Z',
+    });
+
+    await expect(
+      readActivePlayerBackupRun({ accountId: ACCOUNT, factory: indexedDB })
+    ).resolves.toMatchObject({
+      stage: 'local-ready',
+      characterCheckpoints: {
+        'hero-a': { localPreparation: 'ready', online: pending },
+      },
+    });
   });
 });
