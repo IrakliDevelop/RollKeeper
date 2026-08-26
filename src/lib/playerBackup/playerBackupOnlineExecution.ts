@@ -113,6 +113,29 @@ async function withExistingDatabase<T>(
   }
 }
 
+interface RetainedCharacterIdentity {
+  cloudId: string | null;
+  mutationId: string | null;
+}
+
+/**
+ * The identity a resumed run must reuse. Checkpoints written on a path that
+ * never minted an identity (roster miss, failed listing, contested row without
+ * a cloud copy) carry the `NO_CLOUD_IDENTITY` sentinel, which must never become
+ * a put target; a real identity from an earlier attempt is carried forward.
+ */
+function retainCharacterIdentity(
+  online: PlayerBackupOnlineCheckpoint | undefined,
+  link: CharacterCloudLink | null
+): RetainedCharacterIdentity {
+  const recorded =
+    online && online.cloudId !== NO_CLOUD_IDENTITY ? online.cloudId : null;
+  return {
+    cloudId: recorded ?? link?.cloudId ?? null,
+    mutationId: online?.mutationId ?? link?.pendingMutation?.mutationId ?? null,
+  };
+}
+
 function onlineCheckpoint(options: {
   kind?: 'manual' | 'automatic';
   state: PlayerBackupOnlineCheckpointState;
@@ -300,6 +323,8 @@ async function processManualCharacter(
     });
     const existing = run.characterCheckpoints[legacyId]?.online;
     if (existing?.state === 'protected') return;
+    const existingLink = context.links.get(context.accountId, legacyId);
+    const retained = retainCharacterIdentity(existing, existingLink);
 
     const writeCheckpoint = (online: PlayerBackupOnlineCheckpoint) =>
       withFencedCheckpoint({
@@ -315,8 +340,8 @@ async function processManualCharacter(
       await writeCheckpoint(
         onlineCheckpoint({
           state: 'failed',
-          cloudId: existing?.cloudId ?? NO_CLOUD_IDENTITY,
-          mutationId: existing?.mutationId ?? null,
+          cloudId: retained.cloudId ?? NO_CLOUD_IDENTITY,
+          mutationId: retained.mutationId,
           recordedAt: context.now(),
           reason: 'local-character-missing',
         })
@@ -338,8 +363,8 @@ async function processManualCharacter(
       await writeCheckpoint(
         onlineCheckpoint({
           state: mapped.state,
-          cloudId: existing?.cloudId ?? NO_CLOUD_IDENTITY,
-          mutationId: existing?.mutationId ?? null,
+          cloudId: retained.cloudId ?? NO_CLOUD_IDENTITY,
+          mutationId: retained.mutationId,
           recordedAt: context.now(),
           reason: mapped.reason,
         })
@@ -368,13 +393,13 @@ async function processManualCharacter(
         legacyId,
         character,
         compared,
-        existing,
+        existingLink,
+        retained,
         writeCheckpoint,
       });
       return;
     }
 
-    const existingLink = context.links.get(context.accountId, legacyId);
     await uploadCharacter({
       context,
       run,
@@ -382,6 +407,7 @@ async function processManualCharacter(
       character,
       existing,
       existingLink,
+      retained,
       writeCheckpoint,
     });
   });
@@ -397,30 +423,37 @@ async function attachIdenticalRow(options: {
   legacyId: string;
   character: unknown;
   compared: PlayerBackupPreviewCharacter;
-  existing: PlayerBackupOnlineCheckpoint | undefined;
+  existingLink: CharacterCloudLink | null;
+  retained: RetainedCharacterIdentity;
   writeCheckpoint: (online: PlayerBackupOnlineCheckpoint) => Promise<void>;
 }): Promise<void> {
-  const { context, compared } = options;
+  const { context, compared, retained } = options;
   const row = compared.row;
   const decoded = compared.decoded;
   if (!row || !decoded) throw new Error('Cloud comparison is missing its row');
+  const attached = {
+    accountId: context.accountId,
+    legacyId: options.legacyId,
+    cloudId: row.id,
+    serverVersion: row.server_version,
+    contentFingerprint: decoded.contentFingerprint,
+  };
   try {
+    // A pending identity from a lost response is retained until the refetch
+    // confirms the row, so a failed verification cannot strand it.
     context.links.save({
-      accountId: context.accountId,
-      legacyId: options.legacyId,
-      cloudId: row.id,
-      serverVersion: row.server_version,
-      contentFingerprint: decoded.contentFingerprint,
-      pendingMutation: null,
+      ...attached,
+      pendingMutation: options.existingLink?.pendingMutation ?? null,
     });
     const verified = await context.service.verify(options.character, {
       id: context.accountId,
     });
+    context.links.save({ ...attached, pendingMutation: null });
     await options.writeCheckpoint(
       onlineCheckpoint({
         state: 'protected',
         cloudId: verified.row.id,
-        mutationId: options.existing?.mutationId ?? null,
+        mutationId: retained.mutationId,
         recordedAt: context.now(),
         verified: {
           serverVersion: verified.row.server_version,
@@ -430,13 +463,18 @@ async function attachIdenticalRow(options: {
       })
     );
   } catch (cause) {
-    if (cause instanceof PlayerBackupRunReplacedError) throw cause;
+    if (
+      cause instanceof PlayerBackupRunReplacedError ||
+      cause instanceof PlayerBackupLockUnavailableError
+    ) {
+      throw cause;
+    }
     const mapped = mapExecutionError(cause);
     await options.writeCheckpoint(
       onlineCheckpoint({
         state: mapped.state,
         cloudId: row.id,
-        mutationId: options.existing?.mutationId ?? null,
+        mutationId: retained.mutationId,
         recordedAt: context.now(),
         reason: mapped.reason,
       })
@@ -456,15 +494,12 @@ async function uploadCharacter(options: {
   character: unknown;
   existing: PlayerBackupOnlineCheckpoint | undefined;
   existingLink: CharacterCloudLink | null;
+  retained: RetainedCharacterIdentity;
   writeCheckpoint: (online: PlayerBackupOnlineCheckpoint) => Promise<void>;
 }): Promise<void> {
-  const { context, existing, existingLink } = options;
-  const cloudId =
-    existing?.cloudId ?? existingLink?.cloudId ?? context.generateCloudId();
-  const mutationId =
-    existing?.mutationId ??
-    existingLink?.pendingMutation?.mutationId ??
-    context.generateMutationId();
+  const { context, existing, existingLink, retained } = options;
+  const cloudId = retained.cloudId ?? context.generateCloudId();
+  const mutationId = retained.mutationId ?? context.generateMutationId();
   const contentFingerprint = await fingerprintCharacterPayload(
     encodeCharacterCloudPayload(options.character)
   );
@@ -526,7 +561,12 @@ async function uploadCharacter(options: {
       })
     );
   } catch (cause) {
-    if (cause instanceof PlayerBackupRunReplacedError) throw cause;
+    if (
+      cause instanceof PlayerBackupRunReplacedError ||
+      cause instanceof PlayerBackupLockUnavailableError
+    ) {
+      throw cause;
+    }
     const mapped = mapExecutionError(cause);
     await options.writeCheckpoint(
       onlineCheckpoint({

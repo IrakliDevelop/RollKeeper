@@ -165,6 +165,9 @@ interface GatewayDouble extends CharacterCloudGateway {
   putRequests: PutCharacterRequest[];
   failNextPut: FailMode | null;
   failNextList: 'offline' | 'auth' | null;
+  /** How many consecutive `list` calls `failNextList` covers. */
+  failListCount: number;
+  failNextFetch: 'offline' | 'auth' | null;
 }
 
 function gatewayError(mode: 'offline' | 'auth'): CharacterCloudGatewayError {
@@ -203,6 +206,8 @@ function createGatewayDouble(
     putRequests: [],
     failNextPut: null,
     failNextList: null,
+    failListCount: 1,
+    failNextFetch: null,
     put: vi.fn(async (request: PutCharacterRequest) => {
       record('put');
       gateway.putRequests.push(structuredClone(request));
@@ -236,14 +241,23 @@ function createGatewayDouble(
     }),
     fetch: vi.fn(async (cloudId: string) => {
       record('fetch');
+      const mode = gateway.failNextFetch;
+      gateway.failNextFetch = null;
+      if (mode) throw gatewayError(mode);
       const row = rows.get(cloudId);
       return row ? structuredClone(row) : null;
     }),
     list: vi.fn(async () => {
       record('list');
       const mode = gateway.failNextList;
-      gateway.failNextList = null;
-      if (mode) throw gatewayError(mode);
+      if (mode) {
+        gateway.failListCount -= 1;
+        if (gateway.failListCount <= 0) {
+          gateway.failNextList = null;
+          gateway.failListCount = 1;
+        }
+        throw gatewayError(mode);
+      }
       return [...rows.values()].map(row => structuredClone(row));
     }),
     archive: vi.fn(),
@@ -975,5 +989,170 @@ describe('one-time player backup online execution', () => {
     expect(harness.gateway.rows.size).toBe(1);
     // A protected checkpoint short-circuits before any cloud read.
     expect(harness.gateway.list).toHaveBeenCalledTimes(1);
+  });
+
+  it('mints a real cloud id on resume instead of reusing the no-identity sentinel', async () => {
+    await seedRun();
+    const harness = createHarness();
+    harness.gateway.failNextList = 'offline';
+
+    const first = await harness.execute();
+
+    expect(first.offline).toEqual(['hero-a']);
+    const stalled = await readCheckpoints();
+    expect(stalled['hero-a'].online).toMatchObject({
+      state: 'offline',
+      cloudId: 'none',
+      mutationId: null,
+    });
+    expect(harness.links.get(ACCOUNT, 'hero-a')).toBeNull();
+
+    const second = await harness.execute();
+
+    expect(second.protected).toEqual(['hero-a']);
+    expect(harness.gateway.putRequests[0]).toMatchObject({
+      legacyId: 'hero-a',
+      cloudId: 'cloud-1',
+    });
+    expect(harness.gateway.rows.has('none')).toBe(false);
+    expect(harness.links.get(ACCOUNT, 'hero-a')).toMatchObject({
+      cloudId: 'cloud-1',
+      pendingMutation: null,
+    });
+  });
+
+  it('gives two sentinel-path characters distinct cloud ids when the run resumes', async () => {
+    await seedRun({ selected: ['hero-a', 'hero-b'] });
+    const harness = createHarness();
+    harness.gateway.failNextList = 'offline';
+    harness.gateway.failListCount = 2;
+
+    const first = await harness.execute();
+
+    expect(first.offline).toEqual(['hero-a', 'hero-b']);
+    expect(harness.gateway.put).not.toHaveBeenCalled();
+
+    const second = await harness.execute();
+
+    expect(second.protected).toEqual(['hero-a', 'hero-b']);
+    expect(second.complete).toBe(true);
+    expect(harness.gateway.putRequests.map(request => request.cloudId)).toEqual(
+      ['cloud-1', 'cloud-2']
+    );
+    expect(harness.gateway.rows.has('none')).toBe(false);
+    expect([...harness.gateway.rows.keys()]).toEqual(['cloud-1', 'cloud-2']);
+  });
+
+  it('keeps a real pending identity across a failed listing and reuses it on resume', async () => {
+    await seedRun();
+    const harness = createHarness();
+    harness.gateway.failNextPut = 'offline';
+
+    await harness.execute();
+
+    harness.gateway.failNextList = 'offline';
+    const stalled = await harness.execute();
+
+    expect(stalled.offline).toEqual(['hero-a']);
+    const checkpoints = await readCheckpoints();
+    expect(checkpoints['hero-a'].online).toMatchObject({
+      state: 'offline',
+      cloudId: 'cloud-1',
+      mutationId: 'mutation-1',
+      reason: 'offline',
+    });
+
+    const resumed = await harness.execute();
+
+    expect(resumed.protected).toEqual(['hero-a']);
+    expect(harness.gateway.putRequests[1]).toMatchObject({
+      cloudId: 'cloud-1',
+      mutationId: 'mutation-1',
+    });
+    expect(harness.identities.generateCloudId).toHaveBeenCalledTimes(1);
+    expect(harness.identities.generateMutationId).toHaveBeenCalledTimes(1);
+    expect(harness.gateway.rows.size).toBe(1);
+  });
+
+  it('records a missing roster character as failed without any cloud call', async () => {
+    await seedRun({ selected: ['hero-a', 'hero-b'] });
+    const harness = createHarness({ roster: { 'hero-b': HERO_B } });
+
+    const first = await harness.execute();
+
+    expect(first.failed).toEqual(['hero-a']);
+    expect(first.protected).toEqual(['hero-b']);
+    expect(first.outcomes['hero-a']).toEqual({
+      outcome: 'failed',
+      reason: 'local-character-missing',
+    });
+    expect(harness.links.get(ACCOUNT, 'hero-a')).toBeNull();
+    // hero-b is the only character that reached the cloud.
+    expect(harness.gateway.list).toHaveBeenCalledTimes(1);
+    expect(harness.gateway.put).toHaveBeenCalledTimes(1);
+    const checkpoints = await readCheckpoints();
+    expect(checkpoints['hero-a'].online).toMatchObject({
+      state: 'failed',
+      cloudId: 'none',
+      mutationId: null,
+      reason: 'local-character-missing',
+    });
+
+    harness.roster['hero-a'] = HERO_A;
+    const resumed = await harness.execute();
+
+    expect(resumed.protected).toEqual(['hero-a', 'hero-b']);
+    expect(harness.gateway.putRequests[1]).toMatchObject({
+      legacyId: 'hero-a',
+      cloudId: 'cloud-2',
+    });
+    expect(harness.gateway.rows.has('none')).toBe(false);
+  });
+
+  it('retains the pending mutation when verifying an identical row fails', async () => {
+    await seedRun();
+    const harness = createHarness();
+    harness.gateway.failNextPut = 'lost';
+
+    await harness.execute();
+
+    expect(harness.links.get(ACCOUNT, 'hero-a')).toMatchObject({
+      pendingMutation: { mutationId: 'mutation-1' },
+    });
+
+    harness.gateway.failNextFetch = 'offline';
+    const stalled = await harness.execute();
+
+    expect(stalled.offline).toEqual(['hero-a']);
+    expect(harness.links.get(ACCOUNT, 'hero-a')).toMatchObject({
+      cloudId: 'cloud-1',
+      serverVersion: 1,
+      pendingMutation: {
+        mutationId: 'mutation-1',
+        originPlayerBackupRunId: 'run-a',
+      },
+    });
+    const checkpoints = await readCheckpoints();
+    expect(checkpoints['hero-a'].online).toMatchObject({
+      state: 'offline',
+      cloudId: 'cloud-1',
+      mutationId: 'mutation-1',
+    });
+
+    const resumed = await harness.execute();
+
+    expect(resumed.protected).toEqual(['hero-a']);
+    expect(harness.gateway.put).toHaveBeenCalledTimes(1);
+    expect(harness.links.get(ACCOUNT, 'hero-a')).toMatchObject({
+      cloudId: 'cloud-1',
+      serverVersion: 1,
+      pendingMutation: null,
+    });
+    const verified = await readCheckpoints();
+    expect(verified['hero-a'].online).toMatchObject({
+      state: 'protected',
+      cloudId: 'cloud-1',
+      mutationId: 'mutation-1',
+    });
   });
 });
