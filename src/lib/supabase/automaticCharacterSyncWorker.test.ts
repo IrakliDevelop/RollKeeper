@@ -432,7 +432,7 @@ describe('AutomaticCharacterSyncWorker', () => {
     await repository.commit(mutation('refused'));
     const guard: AutomaticSyncDispatchGuard = {
       around: (_entry, task) => task(),
-      authorize: async () => 'hold',
+      authorize: async () => ({ hold: 'preference-off' }),
     };
 
     await expect(worker(cloud, true, guard).runOnce()).resolves.toBe('held');
@@ -454,7 +454,7 @@ describe('AutomaticCharacterSyncWorker', () => {
     await repository.markInflight('mutation-1');
     const guard: AutomaticSyncDispatchGuard = {
       around: (_entry, task) => task(),
-      authorize: async () => 'hold',
+      authorize: async () => ({ hold: 'preference-off' }),
     };
     const sync = worker(cloud, true, guard);
 
@@ -471,6 +471,46 @@ describe('AutomaticCharacterSyncWorker', () => {
     await expect(sync.runOnce()).resolves.toBe('idle');
     expect(cloud.put).not.toHaveBeenCalled();
     expect(cloud.fetch).not.toHaveBeenCalled();
+  });
+
+  it('pauses only stale-origin work and keeps current work of the same character runnable', async () => {
+    const cloud = gateway();
+    await repository.commit(
+      mutation('resumed', { originPlayerBackupRunId: 'run-old' })
+    );
+    await repository.updateWork('mutation-1', {
+      state: 'retry',
+      nextAttemptAt: 0,
+      lastError: 'stale attempt',
+    });
+    await repository.commit(
+      mutation('resumed', { originPlayerBackupRunId: 'run-new' })
+    );
+    const guard: AutomaticSyncDispatchGuard = {
+      around: (_entry, task) => task(),
+      authorize: async entry =>
+        entry.originPlayerBackupRunId === 'run-new'
+          ? 'dispatch'
+          : { hold: 'stale-origin' },
+    };
+    const sync = worker(cloud, true, guard);
+
+    await expect(sync.runOnce()).resolves.toBe('held');
+
+    await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+      expect.objectContaining({ mutationId: 'mutation-1', state: 'paused' }),
+      expect.objectContaining({ mutationId: 'mutation-2', state: 'queued' }),
+    ]);
+    expect(cloud.put).not.toHaveBeenCalled();
+
+    await expect(sync.runOnce()).resolves.toBe('synced');
+
+    expect(cloud.put).toHaveBeenCalledWith(
+      expect.objectContaining({ mutationId: 'mutation-2' })
+    );
+    await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+      expect.objectContaining({ mutationId: 'mutation-1', state: 'paused' }),
+    ]);
   });
 
   it('runs put, refetch and acknowledgement inside the guard boundary', async () => {

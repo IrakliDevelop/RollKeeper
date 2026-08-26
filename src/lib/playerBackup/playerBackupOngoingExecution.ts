@@ -1,6 +1,7 @@
 import {
   IndexedDbAutomaticCharacterSyncRepository,
   type AutomaticCharacterDocument,
+  type AutomaticCharacterOutboxEntry,
 } from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import {
   openExistingRollkeeperDatabase,
@@ -8,7 +9,10 @@ import {
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
 import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
-import type { AutomaticSyncDispatchGuard } from '@/lib/supabase/automaticCharacterSyncWorker';
+import type {
+  AutomaticSyncDispatchDecision,
+  AutomaticSyncDispatchGuard,
+} from '@/lib/supabase/automaticCharacterSyncWorker';
 import {
   encodeCharacterCloudPayload,
   fingerprintCharacterPayload,
@@ -139,6 +143,36 @@ function ongoingFailureReason(cause: unknown): string {
 }
 
 /**
+ * Drops this character's work left behind by a superseded run, inside the
+ * caller's transaction. Such work can never be dispatched again, and leaving it
+ * queued makes the dispatch guard refuse the character on every drain. Inflight
+ * work (a lease another attempt may still acknowledge) and contested work (the
+ * conflict record is the durable evidence) are never touched.
+ */
+async function supersedeStaleRunWork(
+  transaction: IDBTransaction,
+  scope: { namespace: `user:${string}`; runId: string; legacyId: string }
+): Promise<void> {
+  const outbox = transaction.objectStore('outbox');
+  const entries = (await requestResult(
+    outbox.getAll()
+  )) as AutomaticCharacterOutboxEntry[];
+  for (const entry of entries) {
+    if (
+      entry.namespace === scope.namespace &&
+      entry.family === 'character' &&
+      entry.legacyId === scope.legacyId &&
+      entry.originPlayerBackupRunId !== undefined &&
+      entry.originPlayerBackupRunId !== scope.runId &&
+      entry.state !== 'inflight' &&
+      entry.state !== 'conflict'
+    ) {
+      outbox.delete(entry.mutationId);
+    }
+  }
+}
+
+/**
  * Creates the initial document, outbox entry and `queued` checkpoint for one
  * selected character in a single fenced transaction. The payload and its
  * fingerprint are computed first: an IndexedDB transaction auto-commits on any
@@ -194,6 +228,11 @@ async function createOngoingCharacterWork(
       const cloudId = existing?.cloudId ?? context.generateCloudId();
       const mutationId = context.generateMutationId();
       const recordedAt = context.now();
+      await supersedeStaleRunWork(transaction, {
+        namespace: run.namespace,
+        runId: run.runId,
+        legacyId: context.legacyId,
+      });
       const written = await context.repository.writeMutationInTransaction(
         transaction,
         {
@@ -320,7 +359,7 @@ export function createPlayerBackupDispatchGuard(options: {
       const database = await openExistingRollkeeperDatabase({
         factory: options.factory,
       });
-      if (!database) return 'hold';
+      if (!database) return { hold: 'unavailable' };
       try {
         const transaction = database.transaction('meta', 'readonly');
         const meta = transaction.objectStore('meta');
@@ -330,7 +369,9 @@ export function createPlayerBackupDispatchGuard(options: {
         const stale =
           entry.originPlayerBackupRunId !== undefined &&
           pointer?.runId !== entry.originPlayerBackupRunId;
-        let decision: 'dispatch' | 'hold' = 'hold';
+        let decision: AutomaticSyncDispatchDecision = stale
+          ? { hold: 'stale-origin' }
+          : { hold: 'unavailable' };
         if (!stale && entry.namespace === namespace) {
           const policy =
             await AutomaticCharacterSyncPreferences.readCharacterPolicyInTransaction(
@@ -338,7 +379,7 @@ export function createPlayerBackupDispatchGuard(options: {
               namespace,
               entry.legacyId
             );
-          decision = policy === 'off' ? 'hold' : 'dispatch';
+          decision = policy === 'off' ? { hold: 'preference-off' } : 'dispatch';
         }
         await transactionComplete(transaction);
         return decision;

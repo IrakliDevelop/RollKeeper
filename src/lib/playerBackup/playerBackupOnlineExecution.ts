@@ -49,6 +49,7 @@ import {
 export const CONSENT_NOT_ACKNOWLEDGED =
   'Durable player backup consent could not be acknowledged';
 const RUN_MISSING = 'Committed player backup run is missing';
+const LINKS_REQUIRED = 'Link evidence is required for one-time runs';
 /**
  * Checkpoints require a non-empty cloud id even when none was ever minted.
  * @internal Shared with `playerBackupOngoingExecution`.
@@ -267,9 +268,33 @@ export async function acknowledgeConfirmedSelection(
   });
 }
 
+/**
+ * A pending mutation this run stamped itself is its own retained retry, not
+ * evidence of a competing writer. Execution classifies against a link view that
+ * masks it, so a transient failure cannot make an otherwise exact link contest
+ * itself forever. The pure classifier stays unchanged for preflight, where an
+ * unfinished mutation is still a reason to refuse.
+ */
+function linksWithoutOwnPendingMutation(
+  links: CharacterCloudLinkRepository,
+  runId: string
+): CharacterCloudLinkRepository {
+  return {
+    get: (accountId, legacyId) => {
+      const link = links.get(accountId, legacyId);
+      return link?.pendingMutation?.originPlayerBackupRunId === runId
+        ? { ...link, pendingMutation: null }
+        : link;
+    },
+    save: link => links.save(link),
+    remove: (accountId, legacyId) => links.remove(accountId, legacyId),
+  };
+}
+
 /** Lists and classifies a single character with the preview's own rules. */
 async function classifyUnderLock(options: {
   accountId: string;
+  runId: string;
   gateway: Pick<CharacterCloudGateway, 'list'>;
   links: CharacterCloudLinkRepository;
   character: unknown;
@@ -285,7 +310,7 @@ async function classifyUnderLock(options: {
       characters,
       onlineOnly: [],
     },
-    links: options.links,
+    links: linksWithoutOwnPendingMutation(options.links, options.runId),
   }).characters[0];
   return { compared: characters[0], eligibility };
 }
@@ -372,6 +397,7 @@ async function processManualCharacter(
     try {
       classified = await classifyUnderLock({
         accountId: context.accountId,
+        runId: run.runId,
         gateway: context.gateway,
         links: context.links,
         character,
@@ -586,6 +612,12 @@ async function uploadCharacter(options: {
     ) {
       throw cause;
     }
+    if (cause instanceof ManualCharacterCloudRejectedError && !existingLink) {
+      // The pending link only ever existed for this attempt. A rejection leaves
+      // both copies untouched, so the character must be left unlinked instead
+      // of keeping a link to a cloud copy this run never wrote.
+      context.links.remove(context.accountId, options.legacyId);
+    }
     const mapped = mapExecutionError(cause);
     await options.writeCheckpoint(
       onlineCheckpoint({
@@ -673,7 +705,7 @@ export async function derivePlayerBackupRunResult(options: {
   factory: IDBFactory;
   accountId: string;
   expectedActiveRunId: string;
-  /** Manual one-time evidence; ongoing runs never attach a link. */
+  /** Required for one-time runs; ongoing runs never attach a link. */
   links?: CharacterCloudLinkRepository;
   repository?: IndexedDbAutomaticCharacterSyncRepository;
 }): Promise<PlayerBackupExecutionResult> {
@@ -683,6 +715,11 @@ export async function derivePlayerBackupRunResult(options: {
   });
   if (!run || run.runId !== options.expectedActiveRunId) {
     throw new Error(RUN_MISSING);
+  }
+  if (run.mode === 'one-time' && !options.links) {
+    // Without the link repository every protected character would be derived
+    // as a link-evidence mismatch, which is a false failure, not evidence.
+    throw new Error(LINKS_REQUIRED);
   }
   const buckets: Record<PlayerBackupCharacterOutcome, string[]> = {
     protected: [],
@@ -804,7 +841,11 @@ function deriveAutomaticOutcome(
     document.baseServerVersion > 0 &&
     document.cloudId === online.cloudId
   ) {
-    return { outcome: 'protected', reason: null };
+    // An archived document is an acknowledged tombstone: the cloud copy this
+    // run protected no longer exists, so completion cannot be claimed for it.
+    return document.deletedAt === null
+      ? { outcome: 'protected', reason: null }
+      : { outcome: 'failed', reason: 'cloud-copy-removed' };
   }
   if (
     online.state !== 'pending' &&

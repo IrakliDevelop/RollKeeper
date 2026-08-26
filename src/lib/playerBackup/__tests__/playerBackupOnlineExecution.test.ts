@@ -1217,6 +1217,107 @@ describe('one-time player backup online execution', () => {
     expect(harness.gateway.rows.has('none')).toBe(false);
   });
 
+  it('refuses to derive a one-time run without link evidence', async () => {
+    await seedRun();
+    const harness = createHarness();
+    const executed = await harness.execute();
+
+    expect(executed.protected).toEqual(['hero-a']);
+    await expect(
+      derivePlayerBackupRunResult({
+        factory: indexedDB,
+        accountId: ACCOUNT,
+        expectedActiveRunId: 'run-a',
+      })
+    ).rejects.toThrow('Link evidence is required for one-time runs');
+  });
+
+  it('removes the link when a fresh upload is rejected by a row created elsewhere', async () => {
+    await seedRun();
+    const harness = createHarness({
+      // Another device creates the row between the listing and the put.
+      onPut: request => {
+        void seedRow(harness.gateway, {
+          cloudId: request.cloudId,
+          legacyId: 'hero-a',
+          character: HERO_A_OLD,
+          serverVersion: 1,
+          clientRevision: 4,
+        });
+      },
+    });
+
+    const result = await harness.execute();
+
+    expect(result.needsAttention).toEqual(['hero-a']);
+    expect(result.outcomes['hero-a']).toEqual({
+      outcome: 'needs-attention',
+      reason: 'rejected:conflict',
+    });
+    expect(harness.links.get(ACCOUNT, 'hero-a')).toBeNull();
+    const checkpoints = await readCheckpoints();
+    expect(checkpoints['hero-a'].online).toMatchObject({
+      state: 'needs-attention',
+      cloudId: 'cloud-1',
+      reason: 'rejected:conflict',
+    });
+  });
+
+  it('retries a linked-exact character after a transient failure instead of contesting it', async () => {
+    await seedRun();
+    const harness = createHarness();
+    await seedRow(harness.gateway, {
+      cloudId: 'cloud-a',
+      legacyId: 'hero-a',
+      character: HERO_A_OLD,
+      serverVersion: 1,
+      clientRevision: 4,
+    });
+    harness.links.save({
+      accountId: ACCOUNT,
+      legacyId: 'hero-a',
+      cloudId: 'cloud-a',
+      serverVersion: 1,
+      contentFingerprint: await fingerprint(HERO_A_OLD),
+      pendingMutation: null,
+    });
+    harness.gateway.failNextPut = 'offline';
+
+    const stalled = await harness.execute();
+
+    expect(stalled.offline).toEqual(['hero-a']);
+    const checkpoints = await readCheckpoints();
+    expect(checkpoints['hero-a'].online).toMatchObject({
+      state: 'offline',
+      cloudId: 'cloud-a',
+      mutationId: 'mutation-1',
+      reason: 'offline',
+    });
+    expect(harness.links.get(ACCOUNT, 'hero-a')).toMatchObject({
+      serverVersion: 1,
+      pendingMutation: {
+        mutationId: 'mutation-1',
+        originPlayerBackupRunId: 'run-a',
+      },
+    });
+
+    const resumed = await harness.execute();
+
+    expect(resumed.protected).toEqual(['hero-a']);
+    expect(resumed.needsAttention).toEqual([]);
+    expect(harness.gateway.put).toHaveBeenCalledTimes(2);
+    expect(harness.gateway.putRequests[1]).toMatchObject({
+      cloudId: 'cloud-a',
+      mutationId: 'mutation-1',
+      expectedServerVersion: 1,
+    });
+    expect(harness.links.get(ACCOUNT, 'hero-a')).toMatchObject({
+      cloudId: 'cloud-a',
+      serverVersion: 2,
+      pendingMutation: null,
+    });
+  });
+
   it('retains the pending mutation when verifying an identical row fails', async () => {
     await seedRun();
     const harness = createHarness();
@@ -1646,6 +1747,140 @@ describe('ongoing player backup work creation', () => {
     }
   });
 
+  it('supersedes stale-origin work when a new run mints initial work', async () => {
+    await seedRun({ mode: 'ongoing', selected: ['hero-a', 'hero-c'] });
+    const staleMutation = (legacyId: string, origin?: string) => ({
+      namespace: NAMESPACE,
+      legacyId,
+      cloudId: `cloud-stale-${legacyId}`,
+      operation: 'create' as const,
+      payload: encodeCharacterCloudPayload(ONGOING_ROSTER[legacyId]),
+      schemaVersion: 1,
+      localRevision: 1,
+      baseServerVersion: 0,
+      contentFingerprint: `stale-${legacyId}`,
+      syncPolicy: 'on' as const,
+      updatedAt: CONFIRMED_AT,
+      ...(origin ? { originPlayerBackupRunId: origin } : {}),
+    });
+    const database = await openRollkeeperDatabase({ factory: indexedDB });
+    try {
+      const staleRepository = new IndexedDbAutomaticCharacterSyncRepository(
+        database,
+        { randomId: () => 'stale-a' }
+      );
+      await staleRepository.commit(staleMutation('hero-a', 'run-old'));
+      await staleRepository.updateWork('stale-a', {
+        state: 'retry',
+        nextAttemptAt: 0,
+        lastError: 'stale attempt',
+      });
+      // An ordinary edit carries no run origin and is never superseded.
+      const editRepository = new IndexedDbAutomaticCharacterSyncRepository(
+        database,
+        { randomId: () => 'ordinary-edit' }
+      );
+      await editRepository.commit({
+        ...staleMutation('hero-a'),
+        localRevision: 2,
+      });
+      await editRepository.updateWork('ordinary-edit', {
+        state: 'retry',
+        nextAttemptAt: 0,
+      });
+      const inflightRepository = new IndexedDbAutomaticCharacterSyncRepository(
+        database,
+        { randomId: () => 'stale-c' }
+      );
+      await inflightRepository.commit(staleMutation('hero-c', 'run-old'));
+      await inflightRepository.markInflight('stale-c');
+    } finally {
+      database.close();
+    }
+
+    await createOngoingHarness().start();
+
+    await expect(readStore('outbox')).resolves.toEqual([
+      expect.objectContaining({
+        mutationId: 'mutation-1',
+        legacyId: 'hero-a',
+        state: 'queued',
+        originPlayerBackupRunId: 'run-a',
+      }),
+      expect.objectContaining({
+        mutationId: 'mutation-2',
+        legacyId: 'hero-c',
+        state: 'queued',
+        originPlayerBackupRunId: 'run-a',
+      }),
+      expect.objectContaining({
+        mutationId: 'ordinary-edit',
+        legacyId: 'hero-a',
+        state: 'retry',
+      }),
+      // Stale work that is already in flight is left exactly as it is.
+      expect.objectContaining({
+        mutationId: 'stale-c',
+        legacyId: 'hero-c',
+        state: 'inflight',
+        originPlayerBackupRunId: 'run-old',
+      }),
+    ]);
+  });
+
+  it('reports an acknowledged cloud copy that was later removed as failed', async () => {
+    await seedRun({ mode: 'ongoing' });
+    await createOngoingHarness().start();
+
+    const database = await openExistingRollkeeperDatabase({
+      factory: indexedDB,
+    });
+    if (!database) throw new Error('database is missing');
+    try {
+      const repository = new IndexedDbAutomaticCharacterSyncRepository(
+        database,
+        { randomId: () => 'archive-hero-a' }
+      );
+      const worker = new AutomaticCharacterSyncWorker({
+        namespace: NAMESPACE,
+        featureEnabled: true,
+        repository,
+        gateway: createGatewayDouble(),
+      });
+      await expect(worker.runOnce()).resolves.toBe('synced');
+      await expect(deriveOngoing(repository)).resolves.toMatchObject({
+        protected: ['hero-a'],
+      });
+
+      const document = await repository.getDocument(NAMESPACE, 'hero-a');
+      await repository.commit({
+        namespace: NAMESPACE,
+        legacyId: 'hero-a',
+        cloudId: document!.cloudId!,
+        operation: 'delete',
+        payload: null,
+        schemaVersion: 1,
+        localRevision: 6,
+        baseServerVersion: document!.baseServerVersion,
+        contentFingerprint: document!.contentFingerprint,
+        syncPolicy: 'on',
+        updatedAt: NOW,
+      });
+      const [archive] = await repository.listOutbox(NAMESPACE);
+      await repository.acknowledge(archive!, document!.cloudId!, 2);
+
+      const removed = await deriveOngoing(repository);
+      expect(removed.protected).toEqual([]);
+      expect(removed.failed).toEqual(['hero-a']);
+      expect(removed.outcomes['hero-a']).toEqual({
+        outcome: 'failed',
+        reason: 'cloud-copy-removed',
+      });
+    } finally {
+      database.close();
+    }
+  });
+
   it('dispatch guard holds stale-origin and paused work but dispatches current on work', async () => {
     await seedRun({ mode: 'ongoing' });
     await createOngoingHarness().start();
@@ -1661,10 +1896,10 @@ describe('ongoing player backup work creation', () => {
 
     await expect(
       guard.authorize({ ...entry!, originPlayerBackupRunId: 'run-old' })
-    ).resolves.toBe('hold');
+    ).resolves.toEqual({ hold: 'stale-origin' });
     await expect(
       guard.authorize({ ...entry!, namespace: 'user:account-b' })
-    ).resolves.toBe('hold');
+    ).resolves.toEqual({ hold: 'unavailable' });
     await expect(guard.authorize(entry!)).resolves.toBe('dispatch');
 
     await expect(guard.around(entry!, async () => 'dispatched')).resolves.toBe(
@@ -1676,7 +1911,9 @@ describe('ongoing player backup work creation', () => {
     ]);
 
     await setCharacterPolicy('hero-a', false);
-    await expect(guard.authorize(entry!)).resolves.toBe('hold');
+    await expect(guard.authorize(entry!)).resolves.toEqual({
+      hold: 'preference-off',
+    });
 
     const lockless = createPlayerBackupDispatchGuard({
       factory: indexedDB,

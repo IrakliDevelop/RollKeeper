@@ -31,12 +31,23 @@ export interface AutomaticCharacterSyncGateway {
  * acknowledgement; `authorize` runs inside it, before any state change or
  * gateway call, and refuses work whose origin run or preference is stale.
  */
+export type AutomaticSyncDispatchDecision =
+  | 'dispatch'
+  /**
+   * `stale-origin` refuses this one entry only: work from a superseded run must
+   * stop without stopping the character's current work. `preference-off` and
+   * `unavailable` refuse the whole character until it is authorised again.
+   */
+  | { hold: 'stale-origin' | 'preference-off' | 'unavailable' };
+
 export interface AutomaticSyncDispatchGuard {
   around<T>(
     entry: AutomaticCharacterOutboxEntry,
     task: () => Promise<T>
   ): Promise<T>;
-  authorize(entry: AutomaticCharacterOutboxEntry): Promise<'dispatch' | 'hold'>;
+  authorize(
+    entry: AutomaticCharacterOutboxEntry
+  ): Promise<AutomaticSyncDispatchDecision>;
 }
 
 interface WorkerOptions {
@@ -109,23 +120,31 @@ export class AutomaticCharacterSyncWorker {
     if (!guard) return this.dispatch(entry);
     try {
       return await guard.around(entry, async () => {
-        if ((await guard.authorize(entry)) === 'hold') {
-          await this.options.repository.pauseAggregate(
-            this.options.namespace,
-            entry.legacyId
-          );
-          if (entry.state === 'inflight') {
-            // pauseAggregate deliberately leaves inflight work alone, so a
-            // refused reclaimed lease has to be stopped explicitly; without it
-            // nextRunnable keeps returning it and the drain never advances.
-            await this.options.repository.updateWork(entry.mutationId, {
-              state: 'paused',
-              inflightAt: null,
-            });
-          }
+        const decision = await guard.authorize(entry);
+        if (decision === 'dispatch') return this.dispatch(entry);
+        if (decision.hold === 'stale-origin') {
+          // Only this entry is stale. Pausing the aggregate would also stop
+          // the character's current work, whose preference is still on.
+          await this.options.repository.updateWork(entry.mutationId, {
+            state: 'paused',
+            inflightAt: null,
+          });
           return 'held' as const;
         }
-        return this.dispatch(entry);
+        await this.options.repository.pauseAggregate(
+          this.options.namespace,
+          entry.legacyId
+        );
+        if (entry.state === 'inflight') {
+          // pauseAggregate deliberately leaves inflight work alone, so a
+          // refused reclaimed lease has to be stopped explicitly; without it
+          // nextRunnable keeps returning it and the drain never advances.
+          await this.options.repository.updateWork(entry.mutationId, {
+            state: 'paused',
+            inflightAt: null,
+          });
+        }
+        return 'held' as const;
       });
     } catch (cause) {
       // A guard that cannot take its boundary retains the work for retry.
