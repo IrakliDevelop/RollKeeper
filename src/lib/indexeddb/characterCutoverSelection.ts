@@ -13,7 +13,7 @@ interface WritableSelectionStorage extends SelectionStorage {
   setItem(key: string, value: string): void;
 }
 
-interface CharacterCutoverSelection {
+export interface CharacterCutoverSelection {
   version: 1;
   namespace: StorageNamespace;
   family: typeof CHARACTER_FAMILY;
@@ -23,6 +23,9 @@ interface CharacterCutoverSelection {
   recoveryCreatedAt?: string;
   activatedEpoch?: number;
   activatedGeneration?: string;
+  playerBackupRunId?: string;
+  playerBackupAccountId?: string;
+  playerBackupAuthorizedAt?: string;
 }
 
 export function characterCutoverSelectionKey(
@@ -63,6 +66,11 @@ export function selectCharacterCutover(
     manifestHash: string;
     runId: string;
     createdAt: string;
+  },
+  playerBackup?: {
+    runId: string;
+    accountId: string;
+    authorizedAt: string;
   }
 ): void {
   if (!confirmed) {
@@ -78,6 +86,13 @@ export function selectCharacterCutover(
           recoveryManifestHash: recovery.manifestHash,
           recoveryRunId: recovery.runId,
           recoveryCreatedAt: recovery.createdAt,
+        }
+      : {}),
+    ...(playerBackup
+      ? {
+          playerBackupRunId: playerBackup.runId,
+          playerBackupAccountId: playerBackup.accountId,
+          playerBackupAuthorizedAt: playerBackup.authorizedAt,
         }
       : {}),
   };

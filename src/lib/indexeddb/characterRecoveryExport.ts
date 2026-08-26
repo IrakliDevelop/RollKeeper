@@ -1,5 +1,11 @@
+import { captureDeviceBackup, type DeviceBackupV1 } from '../deviceRecovery';
 import { sha256Bytes } from './migrationCapture';
-import { readCharacterAuthority } from './characterAuthority';
+import {
+  type ActiveCharacterSafetyRow,
+  type IndexedDbCharacterAuthority,
+  inspectCurrentCharacterSafetyCoverage,
+  readCharacterAuthority,
+} from './characterAuthority';
 import { isCharacterFamilyKey } from './characterFamily';
 import { requestResult, transactionComplete } from './localDatabase';
 import type { StorageNamespace } from './shadowJournal';
@@ -8,6 +14,71 @@ interface ExportStorage {
   readonly length: number;
   key(index: number): string | null;
   getItem(key: string): string | null;
+}
+
+export interface ActiveCharacterRecoveryBundle {
+  bundle: DeviceBackupV1;
+  authority: IndexedDbCharacterAuthority;
+}
+
+export async function captureActiveCharacterRecoveryBundleFromRows(options: {
+  authority: IndexedDbCharacterAuthority;
+  rows: readonly ActiveCharacterSafetyRow[];
+  appVersion: string;
+  runId: string;
+  timestamp: string;
+}): Promise<ActiveCharacterRecoveryBundle> {
+  const values = new Map<string, string>();
+  const seen = new Set<string>();
+  for (const row of options.rows) {
+    if (
+      row.namespace !== options.authority.namespace ||
+      row.generation !== options.authority.generation ||
+      !isCharacterFamilyKey(row.key) ||
+      seen.has(row.key) ||
+      typeof row.presence !== 'boolean' ||
+      (row.presence && typeof row.rawValue !== 'string') ||
+      (!row.presence && row.rawValue !== null)
+    ) {
+      throw new Error('Character recovery source rows are malformed or mixed');
+    }
+    seen.add(row.key);
+    if (row.presence) values.set(row.key, row.rawValue as string);
+  }
+  if (values.size === 0) {
+    throw new Error('Character recovery source is empty');
+  }
+  return {
+    authority: options.authority,
+    bundle: await captureDeviceBackup(values, {
+      appVersion: options.appVersion,
+      runId: options.runId,
+      timestamp: options.timestamp,
+    }),
+  };
+}
+
+export async function captureActiveCharacterRecoveryBundle(options: {
+  factory: IDBFactory;
+  namespace: StorageNamespace;
+  appVersion: string;
+  runId: string;
+  timestamp: string;
+  expectedAuthority?: { generation: string; epoch: number };
+}): Promise<ActiveCharacterRecoveryBundle> {
+  const coverage = await inspectCurrentCharacterSafetyCoverage({
+    factory: options.factory,
+    storage: { length: 0, key: () => null, getItem: () => null },
+    namespace: options.namespace,
+    expectedAuthority: options.expectedAuthority,
+  });
+  return captureActiveCharacterRecoveryBundleFromRows({
+    authority: coverage.authority,
+    rows: coverage.rows,
+    appVersion: options.appVersion,
+    runId: options.runId,
+    timestamp: options.timestamp,
+  });
 }
 
 function scopedArtifact(

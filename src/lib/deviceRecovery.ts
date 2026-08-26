@@ -60,6 +60,32 @@ export interface DeviceBackupV1 {
   validation: DeviceBackupValidationSummary;
 }
 
+export type DeviceBackupEntryVectorItem = Pick<
+  DeviceBackupEntry,
+  'key' | 'byteCount' | 'sha256'
+>;
+
+export function deviceBackupEntryVector(
+  source: DeviceBackupV1 | readonly DeviceBackupEntry[]
+): DeviceBackupEntryVectorItem[] {
+  const entries: readonly DeviceBackupEntry[] = Array.isArray(source)
+    ? (source as readonly DeviceBackupEntry[])
+    : (source as DeviceBackupV1).entries;
+  return entries
+    .map(({ key, byteCount, sha256 }) => ({ key, byteCount, sha256 }))
+    .sort((left, right) => left.key.localeCompare(right.key));
+}
+
+export function deviceBackupEntryVectorsEqual(
+  left: DeviceBackupV1 | readonly DeviceBackupEntry[],
+  right: DeviceBackupV1 | readonly DeviceBackupEntry[]
+): boolean {
+  return (
+    JSON.stringify(deviceBackupEntryVector(left)) ===
+    JSON.stringify(deviceBackupEntryVector(right))
+  );
+}
+
 export interface CaptureDeviceBackupOptions {
   appVersion: string;
   runId: string;

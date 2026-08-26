@@ -14,7 +14,18 @@ import {
 import { isAuthEnabled } from '@/lib/supabase/authConfig';
 import { getServerAuthClaims } from '@/lib/supabase/server';
 
-export default async function AccountPage() {
+const PLAYER_BACKUP_RETURN_PATH = '/player/backup';
+
+export function safeAccountReturnTo(value: unknown): string | null {
+  return value === PLAYER_BACKUP_RETURN_PATH ? PLAYER_BACKUP_RETURN_PATH : null;
+}
+
+export default async function AccountPage({
+  searchParams = Promise.resolve({}),
+}: {
+  searchParams?: Promise<{ returnTo?: string | string[] }>;
+} = {}) {
+  const returnTo = safeAccountReturnTo((await searchParams).returnTo);
   const claims = isAuthEnabled() ? await getServerAuthClaims() : null;
   const email = typeof claims?.email === 'string' ? claims.email : null;
 
@@ -22,7 +33,9 @@ export default async function AccountPage() {
     <main className="bg-surface min-h-screen px-4 py-12">
       <div className="mx-auto max-w-lg space-y-5">
         <Button variant="ghost" asChild>
-          <Link href="/">Back to RollKeeper</Link>
+          <Link href={returnTo ?? '/'}>
+            {returnTo ? 'Back to character backup' : 'Back to RollKeeper'}
+          </Link>
         </Button>
         <Card padding="lg">
           <CardHeader>
@@ -34,7 +47,11 @@ export default async function AccountPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="mt-6">
-            {email ? <AccountControls email={email} /> : <AuthPageClient />}
+            {email ? (
+              <AccountControls email={email} />
+            ) : (
+              <AuthPageClient returnTo={returnTo} />
+            )}
           </CardContent>
         </Card>
       </div>
