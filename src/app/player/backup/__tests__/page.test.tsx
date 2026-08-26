@@ -20,10 +20,13 @@ describe('/player/backup', () => {
     process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE = 'true';
     const { container } = render(await PlayerBackupPage());
     expect(
-      screen.getByRole('heading', { name: 'Protect your characters' })
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Protect your characters',
+      })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Save a safety file' })
+      screen.getByRole('heading', { level: 2, name: 'Save a safety file' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /back to characters/i })

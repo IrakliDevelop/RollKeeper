@@ -7,7 +7,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from '@/components/ui/layout/card';
 
 import { isPlayerBackupWizardVisible } from '@/lib/playerBackup/playerBackupFlags';
@@ -23,7 +22,9 @@ export default async function PlayerBackupPage() {
         </Button>
         <Card padding="lg">
           <CardHeader>
-            <CardTitle>Protect your characters</CardTitle>
+            <h1 className="text-heading text-lg leading-none font-semibold tracking-tight">
+              Protect your characters
+            </h1>
             <CardDescription>
               Save a safety file, choose your characters, and protect them with
               your account.
