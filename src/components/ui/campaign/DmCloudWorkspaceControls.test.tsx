@@ -10,6 +10,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { BrowserDmWorkspaceContext } from '@/lib/supabase/browserDmWorkspace';
 
+import { expectCloudProductVocabulary } from '@/test/helpers';
+
 import { DmCloudWorkspaceControls } from './DmCloudWorkspaceControls';
 
 function enableWorkspaceCloud() {
@@ -87,7 +89,7 @@ describe('DmCloudWorkspaceControls', () => {
   it('creates an authenticated owner workspace and displays its new code without enabling other authorities', async () => {
     enableWorkspaceCloud();
     const cloud = context();
-    render(
+    const { container } = render(
       <DmCloudWorkspaceControls campaigns={[]} dmId="legacy-dm" cloud={cloud} />
     );
 
@@ -104,6 +106,10 @@ describe('DmCloudWorkspaceControls', () => {
     expect(screen.getByText('A1B2C3D4E5F6')).toBeVisible();
     expect(screen.getByText(/membership remains legacy/i)).toBeVisible();
     expect(screen.getByText(/redis and relay remain unchanged/i)).toBeVisible();
+    // Coordinator review round 1, Minor 4: both this state's status text and
+    // the card's always-rendered description had copy changed with no
+    // vocabulary guard.
+    expectCloudProductVocabulary(container);
   });
 
   it('loads acknowledged codes from account-isolated local durability only after an explicit action', async () => {

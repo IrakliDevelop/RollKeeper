@@ -208,7 +208,7 @@ describe('Slice 11C magic item family', () => {
 
     expect(kinds(manifest)).toEqual(['incomplete-envelope']);
     expect(manifest.blockers[0].detail).toBe(
-      'rollkeeper-dm-magic-item-library has never been persisted on this device'
+      'rollkeeper-dm-magic-item-library has never been persisted on this browser'
     );
     expect(manifest.blockers[0].legacyId).toBeNull();
   });

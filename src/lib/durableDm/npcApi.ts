@@ -1,3 +1,5 @@
+import { changedOnAnotherBrowserMessage } from './familyConflictMessage';
+
 export async function npcApi<T>(body: Record<string, unknown>): Promise<T> {
   const response = await fetch('/api/npc-sync', {
     method: 'POST',
@@ -7,7 +9,7 @@ export async function npcApi<T>(body: Record<string, unknown>): Promise<T> {
   if (!response.ok) {
     const error = new Error(
       response.status === 409
-        ? 'NPCs changed on another device.'
+        ? changedOnAnotherBrowserMessage('NPCs')
         : 'NPC cloud request failed.'
     ) as Error & { status?: number };
     error.status = response.status;

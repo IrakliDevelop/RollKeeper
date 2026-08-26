@@ -97,6 +97,13 @@ export interface RecoveryDownloadReceipt {
   manifestHash: string;
   initiatedAt: string;
   verifiedAt?: string;
+  /**
+   * The verified bundle's per-entry hashes. Recovery evidence, not wizard
+   * state: it is what lets a migration run resumed after a reload name the
+   * exact key whose bytes changed, instead of only reporting that the device
+   * manifest no longer matches.
+   */
+  entries?: { key: string; byteCount: number; sha256: string }[];
 }
 
 export interface RecoveryReceiptStore {
@@ -314,6 +321,18 @@ function manifestPayload(entries: DeviceBackupEntry[]): string {
   );
 }
 
+/**
+ * Computes the same aggregate hash `captureDeviceBackup` stamps onto
+ * `manifestHash`, from an already-captured entry list. Recovery-receipt
+ * enrichment reuses this — never a re-derivation — so that its equality
+ * check is the same manifest computation the original capture used.
+ */
+export async function computeManifestHash(
+  entries: DeviceBackupEntry[]
+): Promise<string> {
+  return sha256(manifestPayload(entries));
+}
+
 export async function validateDeviceBackupJson(
   serialized: string
 ): Promise<DeviceBackupV1> {
@@ -342,7 +361,7 @@ export async function initiateDeviceBackupDownload(
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `rollkeeper-device-backup_${bundle.createdAt.slice(0, 10)}_${bundle.manifestHash}.json`;
+  link.download = `rollkeeper-browser-backup_${bundle.createdAt.slice(0, 10)}_${bundle.manifestHash}.json`;
   link.style.display = 'none';
   document.body.appendChild(link);
   try {
@@ -351,6 +370,11 @@ export async function initiateDeviceBackupDownload(
       runId: bundle.runId,
       manifestHash: bundle.manifestHash,
       initiatedAt: new Date().toISOString(),
+      entries: bundle.entries.map(({ key, byteCount, sha256 }) => ({
+        key,
+        byteCount,
+        sha256,
+      })),
     });
   } finally {
     document.body.removeChild(link);

@@ -19,7 +19,9 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/layout/card';
+import { blockerKindReferenceLabel } from '@/lib/durableDm/blockerReferenceLabel';
 import { isNpcClientVisible } from '@/lib/durableDm/slice11dFlags';
+import { areStandaloneMigrationControlsVisible } from '@/lib/durableDm/slice11gFlags';
 
 import { useNpcSyncContext } from './NpcSyncProvider';
 
@@ -42,6 +44,7 @@ export { NpcSyncProvider, useNpcSyncContext } from './NpcSyncProvider';
 export function NpcSyncControls() {
   const sync = useNpcSyncContext();
   if (!sync || !isNpcClientVisible()) return null;
+  if (!areStandaloneMigrationControlsVisible()) return null;
 
   return (
     <Card padding="lg" className="mt-6">
@@ -99,7 +102,7 @@ export function NpcSyncControls() {
             {sync.enrollmentPreview?.authority === 'postgres' &&
               sync.authority?.authority === 'localStorage' && (
                 <Button variant="warning" onClick={sync.enrollDevice}>
-                  Enroll this device
+                  Enroll this browser
                 </Button>
               )}
             {sync.enrollmentPreview?.authority === 'postgres' &&
@@ -172,7 +175,7 @@ export function NpcSyncControls() {
                 onClick={sync.activateCloud}
                 loading={sync.busy}
               >
-                Activate cloud family
+                Turn on cloud sync
               </Button>
             )}
             {sync.authority?.authority === 'postgres' && (
@@ -192,7 +195,7 @@ export function NpcSyncControls() {
                   Verified rollback
                 </Button>
                 <Button variant="danger" onClick={sync.removeAccountFromDevice}>
-                  Remove this account from this device
+                  Remove this account from this browser
                 </Button>
               </>
             )}
@@ -228,7 +231,7 @@ export function NpcSyncControls() {
                 className="text-accent-red-text"
                 key={`${blocker.kind}:${blocker.legacyId ?? ''}:${blocker.detail}`}
               >
-                {blocker.kind}: {blocker.detail}
+                {blockerKindReferenceLabel(blocker.kind)}: {blocker.detail}
               </p>
             ))}
           </div>

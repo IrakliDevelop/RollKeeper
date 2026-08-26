@@ -152,7 +152,7 @@ describe('IndexedDbCampaignSettingsRepository', () => {
         confirmed: true,
         lossConfirmed: false,
       })
-    ).rejects.toThrow(/device-only work/i);
+    ).rejects.toThrow(/browser-only work/i);
     await repo.removeAccountFromDevice(NAMESPACE, {
       confirmed: true,
       lossConfirmed: true,

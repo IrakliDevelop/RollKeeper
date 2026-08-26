@@ -18,6 +18,7 @@ import {
   fingerprintCombatLogArchiveTombstone,
   type CombatLogArchivePayload,
 } from '@/lib/durableDm/combatLogArchiveFamily';
+import * as combatLogArchiveFamily from '@/lib/durableDm/combatLogArchiveFamily';
 import { writeCombatLogArchiveAuthorityMarker } from '@/lib/durableDm/combatLogArchiveLegacyAuthority';
 import {
   commitCombatLogArchiveLocalCutover,
@@ -40,6 +41,7 @@ import * as browserDmWorkspace from '@/lib/supabase/browserDmWorkspace';
 import { useCombatLogStore } from '@/store/combatLogStore';
 import { useDmStore } from '@/store/dmStore';
 import { useEncounterStore } from '@/store/encounterStore';
+import { expectCloudProductVocabulary } from '@/test/helpers';
 import type { CombatLogState, TurnEvent } from '@/types/combatLog';
 
 import {
@@ -415,16 +417,20 @@ async function enrollAgainstCloudGeneration(
     await screen.findByRole('button', { name: /Use Combat logs/ })
   );
   fireEvent.click(
-    await screen.findByRole('button', { name: 'Check this device' })
+    await screen.findByRole('button', { name: 'Check this browser' })
   );
   fireEvent.click(
     await screen.findByRole('button', {
-      name: 'Add this device to your account',
+      name: 'Add this browser to your account',
     })
   );
   await screen.findByText(
-    'This device was added to your account. Choose "Use the copy from your account" when you are ready.'
+    'This browser was added to your account. Choose "Use the copy from your account" when you are ready.'
   );
+  // Spec R17: check product vocabulary once discovery/select/check/add have
+  // all been visited. `document.body`, not the render's own `container`: no
+  // portal is used here, but this stays correct even if one is added later.
+  expectCloudProductVocabulary(document.body);
   return { cloudFingerprint, cloudPayload };
 }
 
@@ -498,13 +504,13 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     await selectWorkspaceAndPreview();
     await downloadAndOpenSafetyCopy(createObjectURL);
     fireEvent.click(
-      screen.getByRole('button', { name: 'Get this device ready' })
+      screen.getByRole('button', { name: 'Get this browser ready' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: /turn on for this device/i })
+      await screen.findByRole('button', { name: /turn on for this browser/i })
     );
     await screen.findByText(
-      'Saved on this device. Not backed up to your account yet.'
+      'Saved on this browser. Not backed up to your account yet.'
     );
     await waitFor(() => expect(remembered).toHaveLength(1));
 
@@ -516,11 +522,11 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     renderControls();
 
     await waitFor(() =>
-      expect(screen.getByText(/loaded from this device/i)).toBeInTheDocument()
+      expect(screen.getByText(/loaded from this browser/i)).toBeInTheDocument()
     );
     expect(
       screen.queryByText(
-        "This device isn't set up for that account yet. Choose your campaign again."
+        "This browser isn't set up for that account yet. Choose your campaign again."
       )
     ).toBeNull();
 
@@ -579,7 +585,7 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     // Hydration reached this device's IndexedDB authority and then stopped, so
     // `authority` and `scope` are known while the store is still un-hydrated.
     await screen.findByText(
-      'The combat logs saved on this device look damaged. Use Earlier versions to restore one.'
+      'The combat logs saved on this browser look damaged. Use Earlier versions to restore one.'
     );
 
     const commit = vi.spyOn(
@@ -605,7 +611,7 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     mockOwnerSession();
 
     renderControls();
-    await screen.findByText('Your combat logs are loaded from this device.');
+    await screen.findByText('Your combat logs are loaded from this browser.');
     expect(authListener).toBeDefined();
 
     // Another tab moved this device onto a newer local generation, and what it
@@ -622,7 +628,7 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
       await new Promise(resolve => setTimeout(resolve, 25));
     });
     await screen.findByText(
-      'The combat logs saved on this device look damaged. Use Earlier versions to restore one.'
+      'The combat logs saved on this browser look damaged. Use Earlier versions to restore one.'
     );
 
     // A re-hydration publishes the new authority before it replaces the store,
@@ -941,7 +947,7 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     await waitFor(() =>
       expect(
         screen.getByText(
-          "This device hasn't finished loading your combat logs, so nothing was deleted. Finish setting this device up, then try again."
+          "This browser hasn't finished loading your combat logs, so nothing was deleted. Finish setting this browser up, then try again."
         )
       ).toBeVisible()
     );
@@ -979,7 +985,7 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
 
     expect(
       await screen.findByText(
-        "This device hasn't finished loading your combat logs, so nothing was deleted. Finish setting this device up, then try again."
+        "This browser hasn't finished loading your combat logs, so nothing was deleted. Finish setting this browser up, then try again."
       )
     ).toBeVisible();
     expect(confirmSpy).not.toHaveBeenCalled();
@@ -1028,15 +1034,15 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     await selectWorkspaceAndPreview();
     await downloadAndOpenSafetyCopy(createObjectURL);
     fireEvent.click(
-      screen.getByRole('button', { name: 'Get this device ready' })
+      screen.getByRole('button', { name: 'Get this browser ready' })
     );
-    await screen.findByRole('button', { name: /turn on for this device/i });
+    await screen.findByRole('button', { name: /turn on for this browser/i });
     vi.spyOn(localDatabase, 'openRollkeeperDatabase').mockRejectedValueOnce(
       new Error('database unavailable')
     );
 
     fireEvent.click(
-      screen.getByRole('button', { name: /turn on for this device/i })
+      screen.getByRole('button', { name: /turn on for this browser/i })
     );
 
     await waitFor(() =>
@@ -1150,7 +1156,7 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: 'Stop backing up' }));
     await screen.findByText(
-      'Backup is off and everything was kept. Reload the page to keep working on this device.'
+      'Backup is off and everything was kept. Reload the page to keep working on this browser.'
     );
     expect(requests.map(request => request.action)).toContain('rollback');
   });
@@ -1247,15 +1253,15 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     renderControls();
-    await screen.findByText('Your combat logs are loaded from this device.');
+    await screen.findByText('Your combat logs are loaded from this browser.');
 
     fireEvent.click(
       screen.getByRole('button', {
-        name: "Remove this account's data from this device",
+        name: "Remove this account's data from this browser",
       })
     );
     await screen.findByText(
-      'Removed from this device. Your account keeps everything.'
+      'Removed from this browser. Your account keeps everything.'
     );
 
     // The campaign's archives were hidden, so a commit now would delete every
@@ -1306,7 +1312,7 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
 
     renderControls();
     // Hydration already restored the workspace, so the picker is behind us.
-    await screen.findByText('Your combat logs are loaded from this device.');
+    await screen.findByText('Your combat logs are loaded from this browser.');
     fireEvent.click(
       await screen.findByRole('button', { name: 'See what will be backed up' })
     );
@@ -1318,7 +1324,7 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     );
 
     await screen.findByText(
-      'Saved on this device and backed up to your account.'
+      'Saved on this browser and backed up to your account.'
     );
     expect(requests.map(request => request.action)).toEqual([
       'begin-staging',
@@ -1468,6 +1474,50 @@ describe('CombatLogArchiveSyncControls card', () => {
     expect(screen.getByText('Combat log backup')).toBeInTheDocument();
   });
 
+  it('renders an oversized-family blocker with R17-clean reference text, never the raw internal kind', async () => {
+    // Coordinator review round 2, Important 1: the manifest's raw `kind`
+    // discriminant is rendered verbatim on the muted reference line next to
+    // `blocker.detail`. `'oversized-family'` is the one kind that contains
+    // the forbidden word; `blockerKindReferenceLabel` maps it to
+    // `'oversized-batch'` at the render site only. Mocking
+    // `buildCombatLogArchiveManifest` directly (rather than seeding
+    // `COMBAT_LOG_ARCHIVE_MAX_TOTAL_BYTES` worth of real archives) reaches
+    // this state without a multi-megabyte fixture.
+    vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspace();
+    vi.spyOn(
+      combatLogArchiveFamily,
+      'buildCombatLogArchiveManifest'
+    ).mockResolvedValue({
+      format: 'rollkeeper-combat-log-archive-manifest',
+      version: 1,
+      family: 'combat_log_archive',
+      campaignCode: campaign.code,
+      recordCount: 10,
+      totalBytes: 6_000_000,
+      records: [],
+      blockers: [
+        {
+          kind: 'oversized-family',
+          legacyId: null,
+          detail: 'The combat log archive exceeds 5242880 UTF-8 bytes',
+        },
+      ],
+      rawCandidates: [],
+      fingerprint: 'f'.repeat(64),
+    });
+    const { container } = renderControls();
+    await selectWorkspaceAndPreview();
+
+    expect(
+      await screen.findByText(
+        /oversized-batch: The combat log archive exceeds 5242880 UTF-8 bytes/
+      )
+    ).toBeVisible();
+    expect(screen.queryByText(/oversized-family/i)).not.toBeInTheDocument();
+    expectCloudProductVocabulary(container);
+  });
+
   it('describes each combat log by name, start time, event count and size', () => {
     vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
     useEncounterStore.setState({
@@ -1586,7 +1636,7 @@ describe('CombatLogArchiveSyncControls card', () => {
 
     renderControls();
     await waitFor(() =>
-      expect(screen.getByText(/loaded from this device/i)).toBeInTheDocument()
+      expect(screen.getByText(/loaded from this browser/i)).toBeInTheDocument()
     );
 
     fireEvent.click(

@@ -30,6 +30,19 @@ export interface BrowserDmWorkspaceContext {
   close(): void;
 }
 
+/**
+ * Associates an owner-discovered cloud workspace with the legacy campaign the
+ * DM explicitly selected it for. Remote discovery cannot know that browser-
+ * local relationship, but the migration wizard resumes by this stable id.
+ */
+export function associateWorkspaceWithLegacyCampaign(
+  workspace: DmWorkspaceDocument,
+  campaignCode: string
+): DmWorkspaceDocument {
+  const legacyId = `legacy:${campaignCode}`;
+  return { ...workspace, localId: legacyId, legacyId };
+}
+
 export function fingerprintLegacyCampaignSource(source: {
   code: string;
   dmId: string;

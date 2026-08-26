@@ -380,7 +380,7 @@ export async function enrollNpcCloudDevice(
   }
 ) {
   if (!options.confirmed)
-    throw new Error('New device enrollment requires confirmation');
+    throw new Error('New browser enrollment requires confirmation');
   if (
     options.epoch < 1 ||
     options.documents.some(document => document.serverVersion < 1)
@@ -403,7 +403,7 @@ export async function enrollNpcCloudDevice(
   if (current && current.authority !== 'localStorage') {
     transaction.abort();
     await completed.catch(() => undefined);
-    throw new Error('This device already has NPC authority');
+    throw new Error('This browser already has NPC authority');
   }
   const committedAt = options.now();
   const authority = {

@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { toAuthorityPointerView } from '@/lib/durableDm/familyAuthorityNormalizer';
 import type { NpcPayload } from '@/lib/durableDm/npcFamily';
 
 import {
@@ -140,6 +141,22 @@ describe('npc local authority', () => {
       authority: 'localStorage',
       epoch: 0,
     });
+    // Runtime net for the `namespace` contract familyAuthorityNormalizer's
+    // toAuthorityPointerView relies on (rulings.md fix round 3, finding 1):
+    // the type bridge cannot catch a future write path silently dropping
+    // `namespace`, since TS treats an optional field and an absent one as
+    // equivalent. This drives the real writer and real reader and asserts
+    // the mapping is still correct on an actual IndexedDB record.
+    expect(
+      toAuthorityPointerView(
+        await readNpcAuthority(database, NAMESPACE, CAMPAIGN)
+      )
+    ).toMatchObject({ authority: 'indexedDB', epoch: 1 });
+    expect(
+      toAuthorityPointerView(
+        await readNpcAuthority(database, NAMESPACE, 'other')
+      )
+    ).toBeNull();
     const meta = database.transaction('meta', 'readonly');
     expect(
       await requestResult(
@@ -230,6 +247,14 @@ describe('npc local authority', () => {
       rollbackGeneration: GENERATION,
       committedAt: 'rollback',
     });
+    // Same runtime net, for the path where a misclassification matters most:
+    // a real rolled-back record must still map to a non-null pointer, or a
+    // half-written rollback would go undetected (rulings.md fix round 3).
+    expect(
+      toAuthorityPointerView(
+        await readNpcAuthority(database, NAMESPACE, CAMPAIGN)
+      )
+    ).toMatchObject({ authority: 'localStorage', epoch: 2 });
     await expect(
       rollbackNpcLocalAuthority(database, {
         namespace: NAMESPACE,

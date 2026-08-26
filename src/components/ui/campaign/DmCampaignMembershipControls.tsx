@@ -242,7 +242,7 @@ export function DmCampaignMembershipControls({ workspaces }: Props) {
       });
       setEpoch(Number(data.epoch));
       setMessage(
-        `Membership authority is Postgres at epoch ${String(data.epoch)}. Redis live runtime and every DM family are unchanged.`
+        `Membership authority is Postgres at epoch ${String(data.epoch)}. Redis live runtime and every data category are unchanged.`
       );
     } catch {
       setMessage(

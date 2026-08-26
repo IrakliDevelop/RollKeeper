@@ -28,6 +28,7 @@ import { IndexedDbMagicItemRepository } from '@/lib/indexeddb/magicItemRepositor
 import * as supabaseBrowser from '@/lib/supabase/browser';
 import * as browserDmWorkspace from '@/lib/supabase/browserDmWorkspace';
 import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
+import { expectCloudProductVocabulary } from '@/test/helpers';
 import type { CustomMagicItem } from '@/types/magicItemLibrary';
 
 import {
@@ -468,7 +469,7 @@ describe('MagicItemSyncControls gates', () => {
       screen.getByLabelText('Downloaded magic item recovery file'),
       { target: { files: [recoveryFile] } }
     );
-    await screen.findByText(/family selection was cancelled/);
+    await screen.findByText(/data category selection was cancelled/);
     expect(
       screen.getByRole('button', { name: 'Prepare IndexedDB' })
     ).toBeDisabled();
@@ -493,12 +494,68 @@ describe('MagicItemSyncControls gates', () => {
 
     expect(
       await screen.findByText(
-        /incomplete-envelope: rollkeeper-dm-magic-item-library has never been persisted on this device/
+        /incomplete-envelope: rollkeeper-dm-magic-item-library has never been persisted on this browser/
       )
     ).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Confirm local cutover' })
     ).toBeNull();
+  });
+
+  it('renders an oversized-family blocker with R17-clean reference text, never the raw internal kind', async () => {
+    // Coordinator review round 2, Important 1: the manifest's raw `kind`
+    // discriminant is rendered verbatim on the muted reference line next to
+    // `blocker.detail`. `'oversized-family'` is the one kind that contains
+    // the forbidden word; `blockerKindReferenceLabel` maps it to
+    // `'oversized-batch'` at the render site only -- the underlying
+    // `blocker.kind` value, the React `key`, and every comparison elsewhere
+    // stay exactly what `magicItemFamily.ts` produces. Mocking
+    // `buildMagicItemManifest` directly (rather than seeding
+    // `MAGIC_ITEM_MAX_ITEMS + 1` real items) reaches this state without a
+    // 2000-item fixture.
+    vi.stubEnv('NEXT_PUBLIC_MAGIC_ITEM_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspace();
+    vi.spyOn(magicItemFamily, 'buildMagicItemManifest').mockResolvedValue({
+      format: 'rollkeeper-magic-item-manifest',
+      version: 1,
+      family: 'magic_item',
+      campaignCode: campaign.code,
+      recordCount: 2001,
+      totalBytes: 12345,
+      records: [],
+      blockers: [
+        {
+          kind: 'oversized-family',
+          legacyId: null,
+          detail: 'The magic item library exceeds 2000 items',
+        },
+      ],
+      rawCandidates: [],
+      fingerprint: 'f'.repeat(64),
+    });
+    const { container } = render(<MagicItemSyncControls campaign={campaign} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Find owner workspaces' })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Select Magic items/ })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Preview exact manifest' })
+      ).toBeVisible()
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Preview exact manifest' })
+    );
+
+    expect(
+      await screen.findByText(
+        /oversized-batch: The magic item library exceeds 2000 items/
+      )
+    ).toBeVisible();
+    expect(screen.queryByText(/oversized-family/i)).not.toBeInTheDocument();
+    expectCloudProductVocabulary(container);
   });
 
   it('hydrates after a reload when the workspace was only discovered, never enrolled', async () => {
@@ -568,7 +625,7 @@ describe('MagicItemSyncControls gates', () => {
     ).toBeVisible();
     expect(
       screen.queryByText(
-        'The initialized magic item namespace has no matching owner workspace on this device.'
+        'The initialized magic item namespace has no matching owner workspace on this browser.'
       )
     ).toBeNull();
     expect(remembered).toHaveLength(1);
@@ -696,7 +753,7 @@ describe('MagicItemSyncControls gates', () => {
     );
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
-    render(<MagicItemSyncControls campaign={campaign} />);
+    const { container } = render(<MagicItemSyncControls campaign={campaign} />);
     fireEvent.click(
       screen.getByRole('button', { name: 'Find owner workspaces' })
     );
@@ -707,11 +764,14 @@ describe('MagicItemSyncControls gates', () => {
       await screen.findByRole('button', { name: 'Preview cloud enrollment' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enroll this device' })
+      await screen.findByRole('button', { name: 'Enroll this browser' })
     );
     await screen.findByText(
-      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
     );
+    // Spec R17: check product vocabulary once discovery/select/preview/enroll
+    // have all been visited.
+    expectCloudProductVocabulary(container);
 
     // The enrollment confirm promises the local candidate "is never uploaded
     // automatically", so autosave must stay disarmed until the DM applies the
@@ -815,10 +875,10 @@ describe('MagicItemSyncControls gates', () => {
       await screen.findByRole('button', { name: 'Preview cloud enrollment' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enroll this device' })
+      await screen.findByRole('button', { name: 'Enroll this browser' })
     );
     await screen.findByText(
-      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
     );
   }
 
@@ -848,7 +908,7 @@ describe('MagicItemSyncControls gates', () => {
       screen.getByRole('button', { name: 'Apply exact cloud version' })
     );
     await screen.findByText(
-      'Device hydrated from the exact cloud generation of 1 records.'
+      'Browser hydrated from the exact cloud generation of 1 records.'
     );
 
     // Applying rewrote the store from IndexedDB, so it is a hydrating path:

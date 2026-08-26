@@ -178,7 +178,10 @@ describe('combat log archive authority-aware Zustand storage', () => {
       }),
       'arc-a': frozen,
     });
-    expect(Object.keys(persisted.state.encounters)).toEqual(['arc-d', 'arc-a']);
+    // Key order follows the previous envelope's own order (`arc-a`, `arc-d`),
+    // not an unrouted-then-routed rebuild — otherwise re-persisting an
+    // unchanged envelope would still change its byte order (Slice 11G task 1).
+    expect(Object.keys(persisted.state.encounters)).toEqual(['arc-a', 'arc-d']);
     expect(persisted.state.combatLogTombstones).toEqual({
       'arc-other': tombstone('arc-other', 'DEF456'),
       'arc-other-2': tombstone('arc-other-2', 'DEF456'),
@@ -286,7 +289,6 @@ describe('combat log archive authority-aware Zustand storage', () => {
       KEY,
       envelope(
         {
-          // Routed first, so the first routed write must reorder the record.
           'arc-a': archive('enc-1', 'ABC123'),
           'arc-d': archive('enc-9', 'DEF456'),
           'arc-b': archive('enc-3', 'ABC123'),
@@ -317,10 +319,11 @@ describe('combat log archive authority-aware Zustand storage', () => {
       )
     );
     const routedRaw = localStorage.getItem(KEY)!;
-    // The reconstruction really did move the routed keys to the tail.
+    // The reconstruction preserves the previous envelope's own key order —
+    // it must not move routed keys to the tail (Slice 11G task 1).
     expect(Object.keys(JSON.parse(routedRaw).state.encounters)).toEqual([
-      'arc-d',
       'arc-a',
+      'arc-d',
       'arc-b',
     ]);
 

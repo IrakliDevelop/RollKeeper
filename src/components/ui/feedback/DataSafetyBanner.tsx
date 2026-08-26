@@ -45,7 +45,7 @@ export function DataSafetyBanner({ onExport }: DataSafetyBannerProps) {
           Your characters are saved only in this browser
         </p>
         <p className="text-muted text-sm">
-          Clearing browser data or switching devices will lose them. Export a
+          Clearing browser data or switching browsers will lose them. Export a
           backup to stay safe.
         </p>
       </div>

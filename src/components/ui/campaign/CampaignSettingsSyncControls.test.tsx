@@ -29,6 +29,7 @@ import {
 import * as browserDmWorkspace from '@/lib/supabase/browserDmWorkspace';
 import * as supabaseBrowser from '@/lib/supabase/browser';
 import { useDmStore } from '@/store/dmStore';
+import { expectCloudProductVocabulary } from '@/test/helpers';
 import type { CampaignInfo } from '@/types/campaign';
 import { CampaignSettingsSyncControls } from './CampaignSettingsSyncControls';
 
@@ -329,6 +330,26 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
     expect(open).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(document.cookie).toBe(cookieBefore);
+  });
+
+  it('leaves setup to the wizard when both interfaces are enabled', () => {
+    vi.stubEnv('NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE', 'true');
+    vi.stubEnv('NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE', 'true');
+
+    const { container } = render(
+      <CampaignSettingsSyncControls
+        campaign={{
+          code: 'SYNTH1',
+          name: 'Synthetic campaign',
+          createdAt: 'now',
+        }}
+      />
+    );
+
+    expect(container).toBeEmptyDOMElement();
+    expect(
+      screen.queryByText(/campaign settings cloud canary/i)
+    ).not.toBeInTheDocument();
   });
 
   it('keeps an unselected discovered family out of IndexedDB', async () => {
@@ -652,7 +673,7 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
     ).toBeVisible();
     expect(
       screen.queryByText(
-        'The initialized campaign settings namespace has no matching owner workspace on this device.'
+        'The initialized campaign settings namespace has no matching owner workspace on this browser.'
       )
     ).toBeNull();
     expect(remembered).toHaveLength(1);
@@ -767,7 +788,7 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
     );
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
-    render(<CampaignSettingsHarness />);
+    const { container } = render(<CampaignSettingsHarness />);
     fireEvent.click(
       screen.getByRole('button', { name: 'Find owner workspaces' })
     );
@@ -778,11 +799,14 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
       await screen.findByRole('button', { name: 'Preview cloud enrollment' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enroll this device' })
+      await screen.findByRole('button', { name: 'Enroll this browser' })
     );
     await screen.findByText(
-      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
     );
+    // Spec R17: check product vocabulary once discovery/select/preview/enroll
+    // have all been visited.
+    expectCloudProductVocabulary(container);
 
     // The enrollment confirm promises the local candidate "is never uploaded
     // automatically", so autosave must stay disarmed until the DM applies the
@@ -861,10 +885,10 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
       await screen.findByRole('button', { name: 'Preview cloud enrollment' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enroll this device' })
+      await screen.findByRole('button', { name: 'Enroll this browser' })
     );
     await screen.findByText(
-      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
     );
 
     // Enrollment writes exactly the previewed version into IndexedDB, so the
@@ -876,7 +900,7 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
       screen.getByRole('button', { name: 'Apply exact cloud version' })
     );
     await screen.findByText(
-      'This device already has the exact accepted cloud version.'
+      'This browser already has the exact accepted cloud version.'
     );
 
     // Two edits, because a freshly armed run can only seed the baseline; the
@@ -997,10 +1021,10 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
       await screen.findByRole('button', { name: 'Preview cloud enrollment' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enroll this device' })
+      await screen.findByRole('button', { name: 'Enroll this browser' })
     );
     await screen.findByText(
-      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
     );
   }
 
@@ -1039,12 +1063,12 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
     // wait for the newer preview to reach state before clicking it — applying
     // the version this device already holds is a no-op that never arms.
     await screen.findByText(
-      'Cloud enrollment preview loaded. This device remains unenrolled.'
+      'Cloud enrollment preview loaded. This browser remains unenrolled.'
     );
     fireEvent.click(
       screen.getByRole('button', { name: 'Apply exact cloud version' })
     );
-    await screen.findByText('Device hydrated from exact cloud version 2.');
+    await screen.findByText('Browser hydrated from exact cloud version 2.');
 
     // Applying rewrote the DM store from IndexedDB, so it is a hydrating path:
     // the next edit must still reach IndexedDB and the cloud.

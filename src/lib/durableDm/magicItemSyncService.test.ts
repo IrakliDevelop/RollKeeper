@@ -11,6 +11,7 @@ import {
   type MagicItemOutboxEntry,
 } from '@/lib/indexeddb/magicItemRepository';
 
+import { changedOnAnotherBrowserMessage } from './familyConflictMessage';
 import type { MagicItemPayload } from './magicItemFamily';
 import { MagicItemHttpGateway } from './magicItemHttpGateway';
 import { MagicItemSyncService } from './magicItemSyncService';
@@ -265,7 +266,7 @@ describe('MagicItemHttpGateway', () => {
         .mockResolvedValue({ ok: false, status: 409, json: async () => ({}) })
     );
     await expect(new MagicItemHttpGateway().put(entry)).rejects.toMatchObject({
-      message: 'Magic item library changed on another device.',
+      message: changedOnAnotherBrowserMessage('Magic item library'),
       status: 409,
     });
 

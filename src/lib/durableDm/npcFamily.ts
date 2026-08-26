@@ -429,7 +429,7 @@ export async function buildNpcManifest(input: {
     blockers.push({
       kind: 'incomplete-envelope',
       legacyId: null,
-      detail: `${NPC_STORAGE_KEY} has never been persisted on this device`,
+      detail: `${NPC_STORAGE_KEY} has never been persisted on this browser`,
     });
     return finalize(input.campaignCode, records, blockers, [rawCandidate]);
   }

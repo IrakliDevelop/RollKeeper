@@ -11,6 +11,7 @@ import {
   stageRecoveryBundle,
   validateDeviceBackupJson,
   verifyDownloadedDeviceBackup,
+  type RecoveryDownloadReceipt,
 } from '@/lib/deviceRecovery';
 
 describe('device recovery bundle', () => {
@@ -191,7 +192,7 @@ describe('device recovery bundle', () => {
     expect(emptyPreview.conflictCount).toBe(0);
   });
 
-  it('downloads through a checksum-labelled Blob URL and records the matching manifest receipt', async () => {
+  it('downloads with browser-facing filename copy while preserving the compatibility format and matching manifest receipt', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-15T10:05:00.000Z'));
     const bundle = await captureDeviceBackup(
@@ -221,13 +222,53 @@ describe('device recovery bundle', () => {
     expect(click).toHaveBeenCalledOnce();
     const link = click.mock.instances[0] as HTMLAnchorElement;
     expect(link.href).toBe('blob:recovery-download');
-    expect(link.download).toContain(bundle.manifestHash);
+    expect(link.download).toBe(
+      `rollkeeper-browser-backup_2026-08-15_${bundle.manifestHash}.json`
+    );
+    expect(bundle.format).toBe('rollkeeper-device-backup');
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:recovery-download');
     expect(receipts.recordDownloadReceipt).toHaveBeenCalledWith({
       runId: bundle.runId,
       manifestHash: bundle.manifestHash,
       initiatedAt: '2026-08-15T10:05:00.000Z',
+      entries: bundle.entries.map(({ key, byteCount, sha256 }) => ({
+        key,
+        byteCount,
+        sha256,
+      })),
     });
+  });
+
+  it('records the bundle entry vector on the download receipt', async () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue(
+      'blob:recovery-download-entries'
+    );
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
+      () => undefined
+    );
+    const recorded: RecoveryDownloadReceipt[] = [];
+    const storage = new Map<string, string>([
+      ['rollkeeper-dm-data', '{"state":{},"version":1}'],
+      ['rollkeeper-player-data', '{"state":{"characters":[]},"version":1}'],
+    ]);
+    const bundle = await captureDeviceBackup(storage, {
+      appVersion: 'test',
+      runId: 'run-1',
+      timestamp: '2026-08-24T00:00:00.000Z',
+    });
+
+    await initiateDeviceBackupDownload(bundle, {
+      recordDownloadReceipt: async receipt => void recorded.push(receipt),
+    });
+
+    expect(recorded[0].entries).toEqual(
+      bundle.entries.map(({ key, byteCount, sha256 }) => ({
+        key,
+        byteCount,
+        sha256,
+      }))
+    );
   });
 
   it('verifies a reselected download only when its checksums and exact identity match', async () => {

@@ -490,7 +490,7 @@ export default function PlayerDashboardPage() {
 
         <section className="border-divider bg-surface-secondary mb-6 rounded-lg border p-4">
           <h2 className="text-heading text-sm font-semibold">
-            Full device recovery
+            Full browser recovery
           </h2>
           <p className="text-muted mb-3 text-sm">
             Back up all RollKeeper browser data or stage a recovery file for

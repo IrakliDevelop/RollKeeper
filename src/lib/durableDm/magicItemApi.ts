@@ -1,3 +1,5 @@
+import { changedOnAnotherBrowserMessage } from './familyConflictMessage';
+
 export async function magicItemApi<T>(
   body: Record<string, unknown>
 ): Promise<T> {
@@ -9,7 +11,7 @@ export async function magicItemApi<T>(
   if (!response.ok) {
     const error = new Error(
       response.status === 409
-        ? 'Magic item library changed on another device.'
+        ? changedOnAnotherBrowserMessage('Magic item library')
         : 'Magic item cloud request failed.'
     ) as Error & { status?: number };
     error.status = response.status;

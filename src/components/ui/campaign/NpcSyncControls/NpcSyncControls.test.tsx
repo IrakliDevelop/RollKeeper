@@ -29,6 +29,7 @@ import * as browserDmWorkspace from '@/lib/supabase/browserDmWorkspace';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
 import { useDmStore } from '@/store/dmStore';
 import { useNPCStore } from '@/store/npcStore';
+import { expectCloudProductVocabulary } from '@/test/helpers';
 import type { CampaignNPC } from '@/types/encounter';
 
 import {
@@ -468,7 +469,7 @@ describe('NpcSyncControls gates', () => {
     fireEvent.change(screen.getByLabelText('Downloaded NPC recovery file'), {
       target: { files: [recoveryFile] },
     });
-    await screen.findByText(/family selection was cancelled/);
+    await screen.findByText(/data category selection was cancelled/);
     expect(
       screen.getByRole('button', { name: 'Prepare IndexedDB' })
     ).toBeDisabled();
@@ -492,12 +493,63 @@ describe('NpcSyncControls gates', () => {
 
     expect(
       await screen.findByText(
-        /incomplete-envelope: rollkeeper-npc-data has never been persisted on this device/
+        /incomplete-envelope: rollkeeper-npc-data has never been persisted on this browser/
       )
     ).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Confirm local cutover' })
     ).toBeNull();
+  });
+
+  it('renders an oversized-family blocker with R17-clean reference text, never the raw internal kind', async () => {
+    // Coordinator review round 2, Important 1: the manifest's raw `kind`
+    // discriminant is rendered verbatim on the muted reference line next to
+    // `blocker.detail`. `'oversized-family'` is the one kind that contains
+    // the forbidden word; `blockerKindReferenceLabel` maps it to
+    // `'oversized-batch'` at the render site only. Mocking `buildNpcManifest`
+    // directly (rather than seeding `NPC_MAX_ITEMS + 1` real NPCs) reaches
+    // this state without a 2000-record fixture.
+    vi.stubEnv('NEXT_PUBLIC_NPC_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspace();
+    vi.spyOn(npcFamily, 'buildNpcManifest').mockResolvedValue({
+      format: 'rollkeeper-npc-manifest',
+      version: 1,
+      family: 'npc',
+      campaignCode: campaign.code,
+      recordCount: 2001,
+      totalBytes: 12345,
+      records: [],
+      blockers: [
+        {
+          kind: 'oversized-family',
+          legacyId: null,
+          detail: 'The NPC roster exceeds 2000 NPCs',
+        },
+      ],
+      rawCandidates: [],
+      fingerprint: 'f'.repeat(64),
+    });
+    const { container } = renderControls();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Find owner workspaces' })
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /Select NPCs/ }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Preview exact manifest' })
+      ).toBeVisible()
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Preview exact manifest' })
+    );
+
+    expect(
+      await screen.findByText(
+        /oversized-batch: The NPC roster exceeds 2000 NPCs/
+      )
+    ).toBeVisible();
+    expect(screen.queryByText(/oversized-family/i)).not.toBeInTheDocument();
+    expectCloudProductVocabulary(container);
   });
 
   it('blocks cutover when the persisted envelope predates version 4', async () => {
@@ -578,7 +630,7 @@ describe('NpcSyncControls gates', () => {
     ).toBeVisible();
     expect(
       screen.queryByText(
-        'The initialized NPC namespace has no matching owner workspace on this device.'
+        'The initialized NPC namespace has no matching owner workspace on this browser.'
       )
     ).toBeNull();
     expect(remembered).toHaveLength(1);
@@ -705,7 +757,7 @@ describe('NpcSyncControls gates', () => {
     );
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
-    renderControls();
+    const { container } = renderControls();
     fireEvent.click(
       screen.getByRole('button', { name: 'Find owner workspaces' })
     );
@@ -714,11 +766,14 @@ describe('NpcSyncControls gates', () => {
       await screen.findByRole('button', { name: 'Preview cloud enrollment' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enroll this device' })
+      await screen.findByRole('button', { name: 'Enroll this browser' })
     );
     await screen.findByText(
-      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
     );
+    // Spec R17: check product vocabulary once discovery/select/preview/enroll
+    // have all been visited.
+    expectCloudProductVocabulary(container);
 
     // The enrollment confirm promises the local candidate "is never uploaded
     // automatically", so autosave must stay disarmed until the DM applies the
@@ -817,10 +872,10 @@ describe('NpcSyncControls gates', () => {
       await screen.findByRole('button', { name: 'Preview cloud enrollment' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Enroll this device' })
+      await screen.findByRole('button', { name: 'Enroll this browser' })
     );
     await screen.findByText(
-      'Device explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
+      'Browser explicitly enrolled and hydrated into its isolated IndexedDB namespace.'
     );
   }
 
@@ -850,7 +905,7 @@ describe('NpcSyncControls gates', () => {
       screen.getByRole('button', { name: 'Apply exact cloud version' })
     );
     await screen.findByText(
-      'Device hydrated from the exact cloud generation of 1 records.'
+      'Browser hydrated from the exact cloud generation of 1 records.'
     );
 
     // Applying rewrote the store from IndexedDB, so it is a hydrating path:

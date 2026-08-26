@@ -50,6 +50,7 @@ import {
 import { openRollkeeperDatabase } from '@/lib/indexeddb/localDatabase';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import {
+  associateWorkspaceWithLegacyCampaign,
   createBrowserDmWorkspace,
   type BrowserDmWorkspaceContext,
 } from '@/lib/supabase/browserDmWorkspace';
@@ -204,7 +205,7 @@ export async function runCombatLogArchiveMutationPlan(input: {
 function commitFailureMessage(reason: 'guest' | 'failed' | 'tombstoned') {
   return reason === 'tombstoned'
     ? 'This combat log was deleted from your account. Use Earlier versions to bring it back.'
-    : "This device couldn't save that change. Try again.";
+    : "This browser couldn't save that change. Try again.";
 }
 
 /**
@@ -529,7 +530,7 @@ export function useCombatLogArchiveSyncController(
         ) {
           restoredContext?.close();
           setError(
-            "This device isn't set up for that account yet. Choose your campaign again."
+            "This browser isn't set up for that account yet. Choose your campaign again."
           );
           return;
         }
@@ -542,7 +543,7 @@ export function useCombatLogArchiveSyncController(
             : null;
           if (fingerprint !== document.contentFingerprint) {
             setError(
-              'The combat logs saved on this device look damaged. Use Earlier versions to restore one.'
+              'The combat logs saved on this browser look damaged. Use Earlier versions to restore one.'
             );
             return;
           }
@@ -563,7 +564,7 @@ export function useCombatLogArchiveSyncController(
           localAuthority
         );
         setHydrated(true);
-        setStatus('Your combat logs are loaded from this device.');
+        setStatus('Your combat logs are loaded from this browser.');
       } finally {
         database.close();
       }
@@ -590,7 +591,7 @@ export function useCombatLogArchiveSyncController(
         setError(
           cause instanceof Error
             ? cause.message
-            : "Couldn't load your combat logs from this device."
+            : "Couldn't load your combat logs from this browser."
         )
       );
     });
@@ -740,12 +741,12 @@ export function useCombatLogArchiveSyncController(
         if (result.committed > 0)
           setStatus(
             !service
-              ? 'Saved on this device. Not backed up to your account yet.'
+              ? 'Saved on this browser. Not backed up to your account yet.'
               : result.outcome === 'cloud-saved'
-                ? 'Saved on this device and backed up to your account.'
+                ? 'Saved on this browser and backed up to your account.'
                 : result.outcome === 'conflict'
-                  ? 'Saved on this device. Another device changed this combat log, so it was not backed up.'
-                  : 'Saved on this device. It will be backed up when you are back online.'
+                  ? 'Saved on this browser. Another browser changed this combat log, so it was not backed up.'
+                  : 'Saved on this browser. It will be backed up when you are back online.'
           );
         if (result.error) setError(result.error);
       } catch (cause) {
@@ -786,10 +787,10 @@ export function useCombatLogArchiveSyncController(
   const choose = async (selected: DmWorkspaceDocument) => {
     if (!campaignCode) return;
     if (!context || !selected.cloudId) return;
-    setWorkspace(selected);
+    setWorkspace(associateWorkspaceWithLegacyCampaign(selected, campaignCode));
     setScope({ accountId: context.accountId, campaignId: selected.cloudId });
     setAuthority({ authority: 'localStorage', epoch: 0 });
-    setStatus('Campaign picked. Nothing has changed on this device yet.');
+    setStatus('Campaign picked. Nothing has changed on this browser yet.');
   };
 
   const preview = async () => {
@@ -970,18 +971,18 @@ export function useCombatLogArchiveSyncController(
             ? ACTIVE_COMBAT_LOG_GUIDANCE
             : result.manifest.blockers.length > 0
               ? 'Some combat logs need attention first. Nothing has changed.'
-              : 'This device is not ready yet. Try again.'
+              : 'This browser is not ready yet. Try again.'
         );
       }
       setPreparedGeneration(result.generation);
       setStatus(
-        'This device is ready. One more confirmation and it will be switched over.'
+        'This browser is ready. One more confirmation and it will be switched over.'
       );
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "Couldn't get this device ready."
+          : "Couldn't get this browser ready."
       );
     } finally {
       setBusy(false);
@@ -995,7 +996,7 @@ export function useCombatLogArchiveSyncController(
     if (manifest.blockers.length > 0) return;
     if (
       !window.confirm(
-        `Switch this device over to the new way of storing combat logs? Your safety copy is already saved. Reference: ${manifest.fingerprint.slice(0, 12)}`
+        `Switch this browser over to the new way of storing combat logs? Your safety copy is already saved. Reference: ${manifest.fingerprint.slice(0, 12)}`
       )
     )
       return;
@@ -1078,12 +1079,12 @@ export function useCombatLogArchiveSyncController(
           .filter(record => !record.tombstoned)
           .map(record => [record.legacyId, record.payloadFingerprint])
       );
-      setStatus('Saved on this device. Not backed up to your account yet.');
+      setStatus('Saved on this browser. Not backed up to your account yet.');
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "Couldn't switch this device over."
+          : "Couldn't switch this browser over."
       );
     } finally {
       database?.close();
@@ -1209,13 +1210,13 @@ export function useCombatLogArchiveSyncController(
       } finally {
         database.close();
       }
-      setStatus('Saved on this device and backed up to your account.');
+      setStatus('Saved on this browser and backed up to your account.');
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Couldn't turn on backup."
       );
       setStatus(
-        'Saved on this device. Backup was not turned on, so nothing changed in your account.'
+        'Saved on this browser. Backup was not turned on, so nothing changed in your account.'
       );
     } finally {
       setBusy(false);
@@ -1235,7 +1236,7 @@ export function useCombatLogArchiveSyncController(
       setEnrollmentPreview(next);
       setStatus(
         next.authority === 'postgres'
-          ? 'Found a backup in your account. This device has not been added yet.'
+          ? 'Found a backup in your account. This browser has not been added yet.'
           : 'Nothing is backed up in your account for this campaign yet.'
       );
     } catch (cause) {
@@ -1267,7 +1268,7 @@ export function useCombatLogArchiveSyncController(
       });
       if (
         !window.confirm(
-          `Add this device to your account's backup? What is on this device is kept and is never uploaded on its own. Reference: ${enrollmentPreview.previewFingerprint.slice(0, 12)}`
+          `Add this browser to your account's backup? What is on this browser is kept and is never uploaded on its own. Reference: ${enrollmentPreview.previewFingerprint.slice(0, 12)}`
         )
       )
         return;
@@ -1335,14 +1336,14 @@ export function useCombatLogArchiveSyncController(
           campaignId,
         });
         setStatus(
-          'This device was added to your account. Choose "Use the copy from your account" when you are ready.'
+          'This browser was added to your account. Choose "Use the copy from your account" when you are ready.'
         );
       } finally {
         database.close();
       }
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "Couldn't add this device."
+        cause instanceof Error ? cause.message : "Couldn't add this browser."
       );
     } finally {
       setBusy(false);
@@ -1381,7 +1382,7 @@ export function useCombatLogArchiveSyncController(
       return;
     if (enrollmentPreview.epoch !== authority.epoch) {
       setError(
-        'Your account has a newer copy. Choose "Check this device" again.'
+        'Your account has a newer copy. Choose "Check this browser" again.'
       );
       return;
     }
@@ -1392,7 +1393,7 @@ export function useCombatLogArchiveSyncController(
     const cutoverEpoch = enrollmentPreview.epoch;
     if (
       !window.confirm(
-        `Load ${combatLogCount(liveDocumentCount)} from your account onto this device? Work on this device that has not been backed up will stop this.`
+        `Load ${combatLogCount(liveDocumentCount)} from your account onto this browser? Work on this browser that has not been backed up will stop this.`
       )
     )
       return;
@@ -1723,7 +1724,7 @@ export function useCombatLogArchiveSyncController(
       hydrationSignature.current = null;
       rollbackMutationId.current = null;
       setStatus(
-        'Backup is off and everything was kept. Reload the page to keep working on this device.'
+        'Backup is off and everything was kept. Reload the page to keep working on this browser.'
       );
     } catch (cause) {
       setError(
@@ -1745,7 +1746,7 @@ export function useCombatLogArchiveSyncController(
       return;
     if (
       !window.confirm(
-        `Remove ${context.accountLabel}'s combat logs from this device? Your account keeps everything.`
+        `Remove ${context.accountLabel}'s combat logs from this browser? Your account keeps everything.`
       )
     )
       return;
@@ -1765,7 +1766,7 @@ export function useCombatLogArchiveSyncController(
         const lossConfirmed =
           !unresolved ||
           window.confirm(
-            'Some changes on this device have not been backed up yet and will be lost. Continue?'
+            'Some changes on this browser have not been backed up yet and will be lost. Continue?'
           );
         if (!lossConfirmed) return;
         if (authority.authority === 'postgres') {
@@ -1774,7 +1775,7 @@ export function useCombatLogArchiveSyncController(
           );
           if (!deviceId)
             throw new Error(
-              'The exact enrolled device identity is unavailable.'
+              'The exact enrolled browser identity is unavailable.'
             );
           await combatLogArchiveApi({
             action: 'remove-device',
@@ -1798,7 +1799,7 @@ export function useCombatLogArchiveSyncController(
         // every document the account still holds. `setScope(null)` alone would
         // disarm the gate, so the three lines are one disarm rather than three.
         setHydrated(false);
-        setStatus('Removed from this device. Your account keeps everything.');
+        setStatus('Removed from this browser. Your account keeps everything.');
       } finally {
         database.close();
       }
@@ -1831,7 +1832,7 @@ export function useCombatLogArchiveSyncController(
         ?.authority;
     if (routedAuthority && routedAuthority !== 'localStorage' && !hydrated) {
       setError(
-        "This device hasn't finished loading your combat logs, so nothing was deleted. Finish setting this device up, then try again."
+        "This browser hasn't finished loading your combat logs, so nothing was deleted. Finish setting this browser up, then try again."
       );
       return;
     }

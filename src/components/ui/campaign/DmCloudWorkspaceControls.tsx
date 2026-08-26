@@ -23,7 +23,13 @@ import {
   type DmWorkspaceCreateResult,
   isDmWorkspaceCloudEnabled,
 } from '@/lib/supabase/dmWorkspaceService';
+import { isMigrationWizardVisible } from '@/lib/durableDm/slice11gFlags';
 import type { CampaignInfo } from '@/types/campaign';
+import {
+  CREATE_CLOUD_WORKSPACE_LABEL,
+  DM_CLOUD_WORKSPACE_SECTION_LABEL,
+  forkCampaignToCloudLabel,
+} from './dmCloudWorkspaceLabels';
 import { DmGuestInvitationControls } from './DmGuestInvitationControls';
 import { DmCampaignMembershipControls } from './DmCampaignMembershipControls';
 
@@ -56,7 +62,7 @@ export function DmCloudWorkspaceControls({
     []
   );
 
-  if (!isDmWorkspaceCloudEnabled()) return null;
+  if (!isDmWorkspaceCloudEnabled() || isMigrationWizardVisible()) return null;
 
   const resolveContext = async () => {
     if (cloud) return cloud;
@@ -129,11 +135,11 @@ export function DmCloudWorkspaceControls({
       <Card className="mb-8" padding="lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Cloud size={20} /> DM cloud workspace
+            <Cloud size={20} /> {DM_CLOUD_WORKSPACE_SECTION_LABEL}
           </CardTitle>
           <CardDescription>
             Owner-only preview. Creating or forking a workspace changes no
-            player, membership, durable-family, Redis, or relay authority.
+            player, membership, campaign-data, Redis, or relay authority.
           </CardDescription>
         </CardHeader>
         <CardContent className="mt-5 space-y-5">
@@ -153,7 +159,7 @@ export function DmCloudWorkspaceControls({
               loading={busy === 'create'}
               disabled={!name.trim()}
             >
-              Create cloud workspace
+              {CREATE_CLOUD_WORKSPACE_LABEL}
             </Button>
           </div>
 
@@ -211,7 +217,7 @@ export function DmCloudWorkspaceControls({
                     loading={busy === campaign.code}
                     onClick={() => handleFork(campaign)}
                   >
-                    Fork {campaign.name} to cloud
+                    {forkCampaignToCloudLabel(campaign.name)}
                   </Button>
                 ))}
               </div>
@@ -227,7 +233,7 @@ export function DmCloudWorkspaceControls({
                 {created.displayCode}
               </p>
               <p className="text-body mt-2 text-sm">
-                Membership remains legacy. Every durable family remains legacy;
+                Membership remains legacy. Every data category remains legacy;
                 Redis and relay remain unchanged.
               </p>
               {legacyCode && (

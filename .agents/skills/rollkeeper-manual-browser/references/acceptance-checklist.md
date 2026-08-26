@@ -97,10 +97,13 @@ failure path.
 
 Applies to changes touching the `combat_log_archive` durable DM family (the
 "Combat log backup" card on `/dm/campaign/[code]`). Use the seed script's
-`rollkeeper-combat-log` entry — four fixed archives for the seeded campaign,
-two of them sharing one `encounterId` (combat-log-archive-seed-001 and -002),
-plus one unscoped archive with no `campaignCode` — so the card has content
-before driving these scenarios. Each agent drives its own browser per the
+`rollkeeper-combat-log` entry — six fixed archives: three for campaign
+`MANUAL` (two of them sharing one `encounterId`, combat-log-archive-seed-001
+and -002), two for campaign `SECOND` interleaved between them, and one
+unscoped archive with no `campaignCode` — so the card has content before
+driving these scenarios. `MANUAL`'s card lists three; `SECOND`'s lists two;
+the unscoped one belongs to neither. Every archive names a seeded encounter,
+so no row may read "Untitled combat". Each agent drives its own browser per the
 "Establish Claude's browser gate" / Codex equivalent section; the steps below
 are otherwise identical for both.
 
@@ -113,7 +116,7 @@ are otherwise identical for both.
    Then delete one archive from the card and confirm the tombstone reaches
    IndexedDB and survives a **second** reload (not just the first).
 2. **Enrollment → apply exact cloud version → delete → reload (the path that
-   caught the PR #267 Critical).** Preview enrollment, enroll this device,
+   caught the PR #267 Critical).** Preview enrollment, enroll this browser,
    then apply the exact cloud version. Delete one archive from the card and
    confirm the mutation reaches IndexedDB and survives a reload — this is the
    exact sequence where a prior implementation left the store hydrated but
@@ -139,6 +142,112 @@ are otherwise identical for both.
   call `window.confirm`, and a navigation replaces the page's `window` object
   — a stale override left over from before the reload silently stops
   intercepting, and the real browser dialog blocks the run instead.
+
+## Slice 11G — Campaign data migration wizard
+
+Applies to changes touching the migration wizard (the launcher on `/dm` and
+the `/dm/migrate/[code]` route it opens) or any of the six registered
+campaign data categories: campaign settings, calendar, magic items, NPCs,
+encounters, combat logs.
+
+### Seed
+
+One profile carries legacy data for all six categories at once. Generate it
+once and apply the same `localStorageEntries` to every origin below, so all
+three start from the same raw pairs.
+
+```bash
+node .agents/skills/rollkeeper-manual-browser/scripts/generate-fake-seed.mjs --manifest
+```
+
+Quote that output verbatim in the Baseline section — seed version, entry
+count, total UTF-8 bytes, manifest hash prefix, and the per-entry
+byte/hash/role vector — then recompute the same numbers in-page after
+injection and confirm they match. The script is pure data with no clock, no
+randomness and no environment input, so two runs on any machine print
+identical output; if they differ, stop and treat the seed as broken.
+
+The seed carries **two** campaigns, `MANUAL` and `SECOND`, whose records
+**interleave** inside the shared storage envelopes rather than sitting in
+separate blocks (encounters run MANUAL, SECOND, MANUAL, SECOND; the combat
+log archives do the same). That is what makes the following checkable by
+hand:
+
+- Migrating `MANUAL` must leave every `SECOND` record byte-identical **and in
+  the same position**, and vice versa. Record both directions, not just one.
+- `rollkeeper-location-data`, `rollkeeper-battlemap-data` and
+  `rollkeeper-manual-acceptance-sentinel` belong to no registered category.
+  Their per-entry hashes must stay **byte-identical** across every
+  migration, rollback and reload in this section.
+  `rollkeeper-manual-acceptance-sentinel` is owned by no store at all, so a
+  change to it can only be a stray broad write.
+- Every seeded combat log archive names a seeded encounter, so **no archive
+  row may read "Untitled combat"**. A previous run recorded that fallback on
+  every row because the seed carried archives with no encounters to name
+  them. If it reappears, the seed was injected wrong — check that before
+  filing it as a product bug.
+
+Three origins: participating profiles **A** and **B**, plus a separate
+control origin with the flag off.
+
+### Scenarios
+
+1. **Full run end to end on A.** Open the wizard from the dashboard and take
+   every enabled data category through to the end in one sitting: one browser
+   backup, one download, one verification. Record, per category, what the
+   verification report claims and what storage actually holds.
+2. **On B, set each category up from its own card first.** Apply every data
+   category through its existing card on the campaign page **before** opening
+   the wizard — turning on cloud sync is deliberately not part of the wizard's
+   per-category work. Then open the wizard and check that the verification
+   report agrees with what the cards already did, and that it does not offer
+   to redo work that is already finished.
+3. **Skip one, migrate it later.** Skip exactly one data category in the
+   wizard, finish the rest, then migrate the skipped one from its own card.
+   Confirm the wizard and the card end in the same state and that the skipped
+   category was untouched while it was skipped.
+4. **Forced cloud failure at category *k*.** Break the cloud call for one data
+   category *k* only. Assert all three of these, separately:
+   - category *k* reports **Saved only in this browser**;
+   - category *k+1* stays **untouched** — not started, not attempted, no
+     partial write;
+   - **nothing rolls back** — no already-finished category reverts, and *k*'s
+     own local data is intact.
+   Restore the cloud call and confirm *k* can be finished afterwards.
+5. **Rollback after completion.** Complete the run, then roll one data
+   category back from that category's own card. Confirm the rollback targets
+   current compatible data rather than a stale snapshot, and that no other
+   category moves.
+6. **Default-off control origin.** With the flag off: no wizard launcher on
+   the dashboard, `/dm/migrate/[code]` is absent, no `rollkeeper-local`
+   IndexedDB database exists, and no `rollkeeper:` markers exist in
+   `localStorage`.
+7. **Re-drive the two paths a previous run left blocked**, and record them
+   here under 11G rather than treating them as implied by the wizard:
+   - enroll → apply exact cloud version → delete → reload (§11F scenario 2);
+   - the backport's second-browser path: make the same change from a second
+     browser and confirm the first browser reconciles rather than clobbers.
+
+### Traps — check all three
+
+- **A 403 never proves the flag is on.** An unauthenticated `POST` to a
+  category's route returns **403 whether the flag is on or off**, because
+  membership validation runs before the flag check. This has now been proven
+  twice. Default-off evidence therefore rests on the card and the route being
+  **absent**, and on the absence of the `rollkeeper-local` IndexedDB database
+  and of `rollkeeper:` markers — **never** on a status code. Do not record a
+  403 as proof of anything about the flag.
+- **Reinstall the `window.confirm` override after every navigation**,
+  including a reload — see the §11F note. The **cards** call it; the wizard,
+  its route and all six adapters deliberately do not (spec R12), so an
+  override that the wizard never trips is working correctly, not broken. It
+  is scenarios 2, 3 and 5 — the ones that drive a card — that need it. A
+  navigation replaces the page's `window`, so a stale override silently stops
+  intercepting and the real dialog blocks the run.
+- **Byte-identity is a per-entry hash comparison, not a glance.** Capture the
+  per-entry hash vector before and after each scenario; an entry that looks
+  unchanged in the storage viewer can still have been rewritten with
+  reordered keys.
 
 ## Evidence template
 

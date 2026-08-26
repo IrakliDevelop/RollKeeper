@@ -15,6 +15,7 @@ import {
   fingerprintEncounterTombstone,
   type EncounterPayload,
 } from '@/lib/durableDm/encounterFamily';
+import * as encounterFamily from '@/lib/durableDm/encounterFamily';
 import { writeEncounterAuthorityMarker } from '@/lib/durableDm/encounterLegacyAuthority';
 import {
   commitEncounterLocalCutover,
@@ -32,6 +33,7 @@ import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository'
 import * as browserDmWorkspace from '@/lib/supabase/browserDmWorkspace';
 import { useDmStore } from '@/store/dmStore';
 import { useEncounterStore } from '@/store/encounterStore';
+import { expectCloudProductVocabulary } from '@/test/helpers';
 import type { Encounter } from '@/types/encounter';
 
 import {
@@ -333,7 +335,7 @@ describe('EncounterSyncControls gates', () => {
     ).toBeVisible();
     expect(screen.getByText(/1 encounter · /)).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Get this device ready' })
+      screen.getByRole('button', { name: 'Get this browser ready' })
     ).toBeDisabled();
     expect(open).not.toHaveBeenCalled();
 
@@ -362,7 +364,7 @@ describe('EncounterSyncControls gates', () => {
     });
     await screen.findByText('Safety copy checked. Nothing was changed.');
     expect(
-      screen.getByRole('button', { name: 'Get this device ready' })
+      screen.getByRole('button', { name: 'Get this browser ready' })
     ).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Safety copy you downloaded'), {
       target: { files: [recoveryFile] },
@@ -371,7 +373,7 @@ describe('EncounterSyncControls gates', () => {
       'Safety copy checked. Your encounters are still stored the usual way for now.'
     );
     expect(
-      screen.getByRole('button', { name: 'Get this device ready' })
+      screen.getByRole('button', { name: 'Get this browser ready' })
     ).toBeEnabled();
     expect(open).not.toHaveBeenCalled();
   });
@@ -384,18 +386,70 @@ describe('EncounterSyncControls gates', () => {
 
     expect(
       await screen.findByText(
-        'Nothing has been saved on this device yet. Open an encounter first.'
+        'Nothing has been saved on this browser yet. Open an encounter first.'
       )
     ).toBeVisible();
     // The exact reason stays available as muted reference detail.
     expect(
       screen.getByText(
-        /incomplete-envelope: rollkeeper-encounter-data has never been persisted on this device/
+        /incomplete-envelope: rollkeeper-encounter-data has never been persisted on this browser/
       )
     ).toBeVisible();
     expect(
-      screen.queryByRole('button', { name: 'Switch this device over' })
+      screen.queryByRole('button', { name: 'Switch this browser over' })
     ).toBeNull();
+  });
+
+  it('renders an oversized-family blocker with R17-clean reference text, never the raw internal kind', async () => {
+    // Coordinator review round 2, Important 1: the manifest's raw `kind`
+    // discriminant is rendered verbatim on the muted reference line next to
+    // `blocker.detail`. `'oversized-family'` is the one kind that contains
+    // the forbidden word; `blockerKindReferenceLabel` maps it to
+    // `'oversized-batch'` at the render site only. Mocking
+    // `buildEncounterManifest` directly (rather than seeding
+    // `ENCOUNTER_MAX_ITEMS + 1` real encounters) reaches this state without
+    // a 2000-record fixture.
+    vi.stubEnv('NEXT_PUBLIC_ENCOUNTER_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspace();
+    vi.spyOn(encounterFamily, 'buildEncounterManifest').mockResolvedValue({
+      format: 'rollkeeper-encounter-manifest',
+      version: 1,
+      family: 'encounter_definition',
+      campaignCode: campaign.code,
+      recordCount: 2001,
+      totalBytes: 12345,
+      records: [],
+      blockers: [
+        {
+          kind: 'oversized-family',
+          legacyId: null,
+          detail: 'The encounter roster exceeds 2000 encounters',
+        },
+      ],
+      rawCandidates: [],
+      fingerprint: 'f'.repeat(64),
+    });
+    const { container } = renderControls();
+    fireEvent.click(screen.getByRole('button', { name: 'Find my campaigns' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Use Encounters/ })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'See what will be backed up' })
+      ).toBeVisible()
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'See what will be backed up' })
+    );
+
+    expect(
+      await screen.findByText(
+        /oversized-batch: The encounter roster exceeds 2000 encounters/
+      )
+    ).toBeVisible();
+    expect(screen.queryByText(/oversized-family/i)).not.toBeInTheDocument();
+    expectCloudProductVocabulary(container);
   });
 
   it('blocks cutover when the persisted envelope predates version 2', async () => {
@@ -406,7 +460,7 @@ describe('EncounterSyncControls gates', () => {
 
     expect(
       await screen.findByText(
-        'The encounters on this device were saved by a different version of RollKeeper. Open them once in this version, then try again.'
+        'The encounters on this browser were saved by a different version of RollKeeper. Open them once in this version, then try again.'
       )
     ).toBeVisible();
     expect(
@@ -415,7 +469,7 @@ describe('EncounterSyncControls gates', () => {
       )
     ).toBeVisible();
     expect(
-      screen.queryByRole('button', { name: 'Switch this device over' })
+      screen.queryByRole('button', { name: 'Switch this browser over' })
     ).toBeNull();
   });
 
@@ -441,7 +495,7 @@ describe('EncounterSyncControls gates', () => {
       )
     ).toBeVisible();
     expect(
-      screen.queryByRole('button', { name: 'Switch this device over' })
+      screen.queryByRole('button', { name: 'Switch this browser over' })
     ).toBeNull();
   });
 
@@ -570,7 +624,7 @@ describe('EncounterSyncControls gates', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: 'Stop backing up' }));
     await screen.findByText(
-      'Backup is off and everything was kept. Reload the page to keep working on this device.'
+      'Backup is off and everything was kept. Reload the page to keep working on this browser.'
     );
     expect(requests.map(request => request.action)).toContain('rollback');
   });
@@ -614,22 +668,25 @@ describe('EncounterSyncControls gates', () => {
     );
     vi.spyOn(window, 'confirm').mockReturnValue(true);
 
-    renderControls();
+    const { container } = renderControls();
     fireEvent.click(screen.getByRole('button', { name: 'Find my campaigns' }));
     fireEvent.click(
       await screen.findByRole('button', { name: /Use Encounters/ })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Check this device' })
+      await screen.findByRole('button', { name: 'Check this browser' })
     );
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Add this device to my account',
+        name: 'Add this browser to my account',
       })
     );
     await screen.findByText(
-      'This device was added to your account. Choose "Load the copy from my account" when you are ready.'
+      'This browser was added to your account. Choose "Load the copy from my account" when you are ready.'
     );
+    // Spec R17: check product vocabulary once discovery/select/check/add
+    // have all been visited.
+    expectCloudProductVocabulary(container);
 
     // The enrollment confirm promises the local candidate "is never uploaded
     // automatically", so autosave must stay disarmed until the DM applies the
@@ -727,15 +784,15 @@ describe('EncounterSyncControls gates', () => {
       await screen.findByRole('button', { name: /Use Encounters/ })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Check this device' })
+      await screen.findByRole('button', { name: 'Check this browser' })
     );
     fireEvent.click(
       await screen.findByRole('button', {
-        name: 'Add this device to my account',
+        name: 'Add this browser to my account',
       })
     );
     await screen.findByText(
-      'This device was added to your account. Choose "Load the copy from my account" when you are ready.'
+      'This browser was added to your account. Choose "Load the copy from my account" when you are ready.'
     );
 
     // Enrolled but not yet applied: autosave is deliberately disarmed here.
@@ -804,13 +861,13 @@ describe('EncounterSyncControls gates', () => {
       'Safety copy checked. Your encounters are still stored the usual way for now.'
     );
     fireEvent.click(
-      screen.getByRole('button', { name: 'Get this device ready' })
+      screen.getByRole('button', { name: 'Get this browser ready' })
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Switch this device over' })
+      await screen.findByRole('button', { name: 'Switch this browser over' })
     );
     await screen.findByText(
-      'Saved on this device. Not backed up to your account yet.'
+      'Saved on this browser. Not backed up to your account yet.'
     );
 
     // Simulate the reload: the mount is fresh, localStorage keeps the frozen
@@ -826,11 +883,11 @@ describe('EncounterSyncControls gates', () => {
     // A locally cut-over device must hydrate on reload without ever touching
     // the cloud; the workspace has to have been persisted for that to work.
     expect(
-      await screen.findByText('Your encounters are loaded from this device.')
+      await screen.findByText('Your encounters are loaded from this browser.')
     ).toBeVisible();
     expect(
       screen.queryByText(
-        "This device isn't set up for that account yet. Choose your campaign again."
+        "This browser isn't set up for that account yet. Choose your campaign again."
       )
     ).toBeNull();
     expect(

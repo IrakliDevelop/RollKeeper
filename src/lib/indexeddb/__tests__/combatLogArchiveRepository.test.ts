@@ -507,14 +507,14 @@ describe('IndexedDbCombatLogArchiveRepository', () => {
         confirmed: false,
         lossConfirmed: false,
       })
-    ).rejects.toThrow('Device removal requires confirmation');
+    ).rejects.toThrow('Browser removal requires confirmation');
     await expect(
       repo.removeAccountFromDevice(NAMESPACE, {
         confirmed: true,
         lossConfirmed: false,
       })
     ).rejects.toThrow(
-      'Unresolved device-only work requires explicit loss confirmation'
+      'Unresolved browser-only work requires explicit loss confirmation'
     );
     await expect(
       repo.removeAccountFromDevice('guest', {

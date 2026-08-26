@@ -2,13 +2,18 @@ import 'fake-indexeddb/auto';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { IndexedDbCalendarRepository } from '@/lib/indexeddb/calendarRepository';
+import {
+  IndexedDbCalendarRepository,
+  type CalendarOutboxEntry,
+} from '@/lib/indexeddb/calendarRepository';
 import {
   deleteRollkeeperDatabaseForTests,
   openRollkeeperDatabase,
 } from '@/lib/indexeddb/localDatabase';
 
+import { CalendarHttpGateway } from './calendarHttpGateway';
 import { CalendarSyncService } from './calendarSyncService';
+import { changedOnAnotherBrowserMessage } from './familyConflictMessage';
 
 const mutation = {
   namespace: 'user:account-a' as const,
@@ -182,5 +187,84 @@ describe('CalendarSyncService', () => {
       }),
     ]);
     database.close();
+  });
+});
+
+describe('CalendarHttpGateway', () => {
+  const entry: CalendarOutboxEntry = {
+    ...mutation,
+    family: 'calendar',
+    mutationId: 'mutation-1',
+    state: 'inflight',
+    attemptCount: 1,
+    nextAttemptAt: 0,
+    inflightAt: null,
+    lastError: null,
+  };
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('posts the outbox entry to the calendar sync route', async () => {
+    const acknowledgement = {
+      serverVersion: 3,
+      cutoverEpoch: 1,
+      payloadFingerprint: 'a'.repeat(64),
+      cloudSaved: true,
+      playerView: 'pending',
+    };
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => acknowledgement,
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await expect(new CalendarHttpGateway().put(entry)).resolves.toEqual(
+      acknowledgement
+    );
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe('/api/calendar-sync');
+    expect(init.method).toBe('POST');
+    expect(init.headers).toEqual({
+      'Content-Type': 'application/json',
+      'x-rollkeeper-csrf': '1',
+    });
+    expect(JSON.parse(init.body)).toEqual({
+      action: 'put',
+      mutationId: 'mutation-1',
+      campaignId: 'campaign-a',
+      expectedEpoch: 1,
+      legacyId: 'AAA111',
+      operation: 'replace',
+      expectedServerVersion: 1,
+      schemaVersion: 1,
+      payload: mutation.payload,
+      payloadFingerprint: 'a'.repeat(64),
+    });
+  });
+
+  it('surfaces conflict and failure statuses on the thrown error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue({ ok: false, status: 409, json: async () => ({}) })
+    );
+    await expect(new CalendarHttpGateway().put(entry)).rejects.toMatchObject({
+      message: changedOnAnotherBrowserMessage('Calendar'),
+      status: 409,
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue({ ok: false, status: 503, json: async () => ({}) })
+    );
+    await expect(new CalendarHttpGateway().put(entry)).rejects.toMatchObject({
+      message: 'Calendar cloud request failed.',
+      status: 503,
+    });
   });
 });
