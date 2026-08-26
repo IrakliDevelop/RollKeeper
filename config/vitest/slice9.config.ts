@@ -20,6 +20,8 @@ export default defineConfig({
       'src/lib/supabase/browserAutomaticCharacterSync.test.ts',
       'src/lib/playerBackup/__tests__/playerBackupCoordinator.test.ts',
       'src/lib/playerBackup/__tests__/playerBackupRunRepository.test.ts',
+      'src/lib/playerBackup/__tests__/playerBackupEligibility.test.ts',
+      'src/lib/playerBackup/__tests__/playerBackupOnlineExecution.test.ts',
     ],
     coverage: {
       enabled: true,

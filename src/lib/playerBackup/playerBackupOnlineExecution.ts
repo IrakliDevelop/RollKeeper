@@ -1,0 +1,665 @@
+import type { IndexedDbAutomaticCharacterSyncRepository } from '@/lib/indexeddb/automaticCharacterSyncRepository';
+import { openExistingRollkeeperDatabase } from '@/lib/indexeddb/localDatabase';
+import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
+import {
+  encodeCharacterCloudPayload,
+  fingerprintCharacterPayload,
+} from '@/lib/supabase/characterCloudCodec';
+import { CharacterCloudGatewayError } from '@/lib/supabase/characterCloudGateway';
+import type {
+  CharacterCloudLink,
+  CharacterCloudLinkRepository,
+} from '@/lib/supabase/characterCloudLinks';
+import type {
+  CharacterCloudGateway,
+  ManualCharacterCloudService,
+} from '@/lib/supabase/manualCharacterCloudService';
+import { ManualCharacterCloudRejectedError } from '@/lib/supabase/manualCharacterCloudService';
+
+import type { PlayerBackupPreviewCharacter } from './playerBackupCloudPreview';
+import { compareCloudRows } from './playerBackupCloudPreview';
+import type { DegradedCharacterEligibility } from './playerBackupEligibility';
+import { classifyDegradedEligibility } from './playerBackupEligibility';
+import type { PlayerBackupExclusiveLockProvider } from './playerBackupRunFence';
+import {
+  PlayerBackupLockUnavailableError,
+  hasPlayerBackupExclusiveLockCapability,
+  runPlayerBackupTransaction,
+  withPlayerBackupAccountLock,
+} from './playerBackupRunFence';
+import type {
+  PlayerBackupExecutionPath,
+  PlayerBackupOnlineCheckpoint,
+  PlayerBackupOnlineCheckpointState,
+  PlayerBackupRunV1,
+} from './playerBackupRunRepository';
+import {
+  PlayerBackupRunReplacedError,
+  playerBackupExecutionPath,
+  readActivePlayerBackupRun,
+  readPlayerBackupRunInTransaction,
+  updatePlayerBackupCharacterCheckpoint,
+} from './playerBackupRunRepository';
+
+const CONSENT_NOT_ACKNOWLEDGED =
+  'Durable player backup consent could not be acknowledged';
+const RUN_MISSING = 'Committed player backup run is missing';
+/** Checkpoints require a non-empty cloud id even when none was ever minted. */
+const NO_CLOUD_IDENTITY = 'none';
+
+/** Roster reader shaped like the input `ManualCharacterCloudService` takes. */
+export interface PlayerBackupLocalCharacterSource {
+  get(legacyId: string): unknown | null;
+}
+
+export type PlayerBackupCharacterOutcome =
+  | 'protected'
+  | 'queued'
+  | 'offline'
+  | 'auth-required'
+  | 'needs-attention'
+  | 'held-aside'
+  | 'failed'
+  | 'pending';
+
+export interface PlayerBackupExecutionResult {
+  runId: string;
+  accountId: string;
+  mode: 'one-time' | 'ongoing';
+  executionPath: PlayerBackupExecutionPath;
+  protected: string[];
+  queued: string[];
+  offline: string[];
+  authRequired: string[];
+  needsAttention: string[];
+  heldAside: string[];
+  failed: string[];
+  pending: string[];
+  outcomes: Record<
+    string,
+    { outcome: PlayerBackupCharacterOutcome; reason: string | null }
+  >;
+  complete: boolean;
+}
+
+export interface PlayerBackupManualExecutionOptions {
+  factory: IDBFactory;
+  locks: PlayerBackupExclusiveLockProvider | null | undefined;
+  accountId: string;
+  expectedActiveRunId: string;
+  service: ManualCharacterCloudService;
+  links: CharacterCloudLinkRepository;
+  gateway: Pick<CharacterCloudGateway, 'list'>;
+  characters: PlayerBackupLocalCharacterSource;
+  generateCloudId: () => string;
+  generateMutationId: () => string;
+  now: () => string;
+}
+
+// ---------------------------------------------------------------------------
+// Shared helpers (Task 5 adds automatic-work functions alongside these).
+// ---------------------------------------------------------------------------
+
+async function withExistingDatabase<T>(
+  factory: IDBFactory,
+  task: (database: IDBDatabase) => Promise<T>
+): Promise<T> {
+  const database = await openExistingRollkeeperDatabase({ factory });
+  if (!database) throw new Error(RUN_MISSING);
+  try {
+    return await task(database);
+  } finally {
+    database.close();
+  }
+}
+
+function onlineCheckpoint(options: {
+  kind?: 'manual' | 'automatic';
+  state: PlayerBackupOnlineCheckpointState;
+  cloudId: string;
+  mutationId: string | null;
+  recordedAt: string;
+  reason?: string | null;
+  verified?: {
+    serverVersion: number;
+    contentFingerprint: string;
+    verifiedAt: string;
+  };
+}): PlayerBackupOnlineCheckpoint {
+  return {
+    version: 1,
+    kind: options.kind ?? 'manual',
+    cloudId: options.cloudId,
+    mutationId: options.mutationId,
+    state: options.state,
+    recordedAt: options.recordedAt,
+    ...(options.verified ?? {}),
+    ...(options.reason ? { reason: options.reason } : {}),
+  };
+}
+
+/**
+ * Writes one character checkpoint inside a transaction that re-verifies the
+ * account-scoped active run pointer. A replaced run aborts without writing.
+ */
+async function withFencedCheckpoint(options: {
+  database: IDBDatabase;
+  accountId: string;
+  expectedActiveRunId: string;
+  legacyId: string;
+  online: PlayerBackupOnlineCheckpoint;
+}): Promise<void> {
+  await runPlayerBackupTransaction({
+    database: options.database,
+    accountId: options.accountId,
+    expectedActiveRunId: options.expectedActiveRunId,
+    stores: [],
+    task: transaction =>
+      updatePlayerBackupCharacterCheckpoint(transaction.objectStore('meta'), {
+        accountId: options.accountId,
+        expectedActiveRunId: options.expectedActiveRunId,
+        legacyId: options.legacyId,
+        online: options.online,
+      }),
+  });
+}
+
+/**
+ * Re-reads the run and the exact preference partition for one character in a
+ * single fenced transaction, immediately before any online work.
+ */
+async function readAcknowledgedRun(options: {
+  database: IDBDatabase;
+  accountId: string;
+  expectedActiveRunId: string;
+  legacyId: string;
+}): Promise<PlayerBackupRunV1> {
+  return runPlayerBackupTransaction({
+    database: options.database,
+    accountId: options.accountId,
+    expectedActiveRunId: options.expectedActiveRunId,
+    stores: [],
+    task: async transaction => {
+      const meta = transaction.objectStore('meta');
+      const run = await readPlayerBackupRunInTransaction(
+        meta,
+        options.accountId,
+        options.expectedActiveRunId
+      );
+      const policy =
+        await AutomaticCharacterSyncPreferences.readCharacterPolicyInTransaction(
+          meta,
+          run.namespace,
+          options.legacyId
+        );
+      const account =
+        await AutomaticCharacterSyncPreferences.readAccountDefaultInTransaction(
+          meta,
+          run.namespace
+        );
+      if (policy !== 'off' || account?.confirmedAt !== run.confirmedAt) {
+        throw new Error(CONSENT_NOT_ACKNOWLEDGED);
+      }
+      return run;
+    },
+  });
+}
+
+async function acknowledgeConfirmedSelection(
+  factory: IDBFactory,
+  run: PlayerBackupRunV1
+): Promise<void> {
+  await withExistingDatabase(factory, async database => {
+    const acknowledged = await new AutomaticCharacterSyncPreferences(
+      database
+    ).readConfirmedSelection(run.namespace, run.eligibleCharacterIds);
+    if (
+      acknowledged.futureDefault !== 'off' ||
+      acknowledged.confirmedAt !== run.confirmedAt ||
+      run.eligibleCharacterIds.some(
+        legacyId => acknowledged.characterPolicies[legacyId] !== 'off'
+      )
+    ) {
+      throw new Error(CONSENT_NOT_ACKNOWLEDGED);
+    }
+  });
+}
+
+/** Lists and classifies a single character with the preview's own rules. */
+async function classifyUnderLock(options: {
+  accountId: string;
+  gateway: Pick<CharacterCloudGateway, 'list'>;
+  links: CharacterCloudLinkRepository;
+  character: unknown;
+}): Promise<{
+  compared: PlayerBackupPreviewCharacter;
+  eligibility: DegradedCharacterEligibility;
+}> {
+  const rows = await options.gateway.list();
+  const { characters } = await compareCloudRows(rows, [options.character]);
+  const eligibility = classifyDegradedEligibility({
+    preview: {
+      account: { id: options.accountId },
+      characters,
+      onlineOnly: [],
+    },
+    links: options.links,
+  }).characters[0];
+  return { compared: characters[0], eligibility };
+}
+
+function mapGatewayCategory(error: CharacterCloudGatewayError): {
+  state: PlayerBackupOnlineCheckpointState;
+  reason: string;
+} {
+  return { state: error.category, reason: error.category };
+}
+
+function mapExecutionError(error: unknown): {
+  state: PlayerBackupOnlineCheckpointState;
+  reason: string;
+} {
+  if (error instanceof ManualCharacterCloudRejectedError) {
+    return { state: 'needs-attention', reason: `rejected:${error.status}` };
+  }
+  if (error instanceof CharacterCloudGatewayError) {
+    return error.category === 'failed'
+      ? { state: 'failed', reason: error.message }
+      : mapGatewayCategory(error);
+  }
+  return {
+    state: 'failed',
+    reason: error instanceof Error ? error.message : String(error),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Manual one-time execution
+// ---------------------------------------------------------------------------
+
+interface ManualExecutionContext extends PlayerBackupManualExecutionOptions {
+  locks: PlayerBackupExclusiveLockProvider;
+}
+
+/**
+ * Runs one selected character end to end while the caller holds the account
+ * lock: fenced consent re-read, classification, identity, gateway mutation and
+ * the durable checkpoint. Only a replaced run, a missing lock or a broken
+ * consent partition escapes; every online failure becomes a checkpoint.
+ */
+async function processManualCharacter(
+  context: ManualExecutionContext,
+  legacyId: string
+): Promise<void> {
+  await withExistingDatabase(context.factory, async database => {
+    const run = await readAcknowledgedRun({
+      database,
+      accountId: context.accountId,
+      expectedActiveRunId: context.expectedActiveRunId,
+      legacyId,
+    });
+    const existing = run.characterCheckpoints[legacyId]?.online;
+    if (existing?.state === 'protected') return;
+
+    const writeCheckpoint = (online: PlayerBackupOnlineCheckpoint) =>
+      withFencedCheckpoint({
+        database,
+        accountId: context.accountId,
+        expectedActiveRunId: context.expectedActiveRunId,
+        legacyId,
+        online,
+      });
+
+    const character = context.characters.get(legacyId);
+    if (character === null || character === undefined) {
+      await writeCheckpoint(
+        onlineCheckpoint({
+          state: 'failed',
+          cloudId: existing?.cloudId ?? NO_CLOUD_IDENTITY,
+          mutationId: existing?.mutationId ?? null,
+          recordedAt: context.now(),
+          reason: 'local-character-missing',
+        })
+      );
+      return;
+    }
+
+    let classified: Awaited<ReturnType<typeof classifyUnderLock>>;
+    try {
+      classified = await classifyUnderLock({
+        accountId: context.accountId,
+        gateway: context.gateway,
+        links: context.links,
+        character,
+      });
+    } catch (cause) {
+      if (!(cause instanceof CharacterCloudGatewayError)) throw cause;
+      const mapped = mapGatewayCategory(cause);
+      await writeCheckpoint(
+        onlineCheckpoint({
+          state: mapped.state,
+          cloudId: existing?.cloudId ?? NO_CLOUD_IDENTITY,
+          mutationId: existing?.mutationId ?? null,
+          recordedAt: context.now(),
+          reason: mapped.reason,
+        })
+      );
+      return;
+    }
+
+    const { compared, eligibility } = classified;
+    if (!eligibility.eligible) {
+      await writeCheckpoint(
+        onlineCheckpoint({
+          state:
+            eligibility.reason === 'future' ? 'held-aside' : 'needs-attention',
+          cloudId: eligibility.row?.id ?? NO_CLOUD_IDENTITY,
+          mutationId: null,
+          recordedAt: context.now(),
+          reason: eligibility.reason,
+        })
+      );
+      return;
+    }
+
+    if (eligibility.reason === 'identical') {
+      await attachIdenticalRow({
+        context,
+        legacyId,
+        character,
+        compared,
+        existing,
+        writeCheckpoint,
+      });
+      return;
+    }
+
+    const existingLink = context.links.get(context.accountId, legacyId);
+    await uploadCharacter({
+      context,
+      run,
+      legacyId,
+      character,
+      existing,
+      existingLink,
+      writeCheckpoint,
+    });
+  });
+}
+
+/**
+ * The cloud already holds this exact content: attach the link and confirm it
+ * with a refetch. A retained mutation identity survives so a resumed run stays
+ * idempotent after a lost response.
+ */
+async function attachIdenticalRow(options: {
+  context: ManualExecutionContext;
+  legacyId: string;
+  character: unknown;
+  compared: PlayerBackupPreviewCharacter;
+  existing: PlayerBackupOnlineCheckpoint | undefined;
+  writeCheckpoint: (online: PlayerBackupOnlineCheckpoint) => Promise<void>;
+}): Promise<void> {
+  const { context, compared } = options;
+  const row = compared.row;
+  const decoded = compared.decoded;
+  if (!row || !decoded) throw new Error('Cloud comparison is missing its row');
+  try {
+    context.links.save({
+      accountId: context.accountId,
+      legacyId: options.legacyId,
+      cloudId: row.id,
+      serverVersion: row.server_version,
+      contentFingerprint: decoded.contentFingerprint,
+      pendingMutation: null,
+    });
+    const verified = await context.service.verify(options.character, {
+      id: context.accountId,
+    });
+    await options.writeCheckpoint(
+      onlineCheckpoint({
+        state: 'protected',
+        cloudId: verified.row.id,
+        mutationId: options.existing?.mutationId ?? null,
+        recordedAt: context.now(),
+        verified: {
+          serverVersion: verified.row.server_version,
+          contentFingerprint: verified.fingerprint,
+          verifiedAt: context.now(),
+        },
+      })
+    );
+  } catch (cause) {
+    if (cause instanceof PlayerBackupRunReplacedError) throw cause;
+    const mapped = mapExecutionError(cause);
+    await options.writeCheckpoint(
+      onlineCheckpoint({
+        state: mapped.state,
+        cloudId: row.id,
+        mutationId: options.existing?.mutationId ?? null,
+        recordedAt: context.now(),
+        reason: mapped.reason,
+      })
+    );
+  }
+}
+
+/**
+ * Records the mutation identity durably — checkpoint first, then the pending
+ * link — before the request, so a lost response is retried with the same
+ * identity instead of creating a second cloud copy.
+ */
+async function uploadCharacter(options: {
+  context: ManualExecutionContext;
+  run: PlayerBackupRunV1;
+  legacyId: string;
+  character: unknown;
+  existing: PlayerBackupOnlineCheckpoint | undefined;
+  existingLink: CharacterCloudLink | null;
+  writeCheckpoint: (online: PlayerBackupOnlineCheckpoint) => Promise<void>;
+}): Promise<void> {
+  const { context, existing, existingLink } = options;
+  const cloudId =
+    existing?.cloudId ?? existingLink?.cloudId ?? context.generateCloudId();
+  const mutationId =
+    existing?.mutationId ??
+    existingLink?.pendingMutation?.mutationId ??
+    context.generateMutationId();
+  const contentFingerprint = await fingerprintCharacterPayload(
+    encodeCharacterCloudPayload(options.character)
+  );
+
+  if (
+    existing?.state !== 'pending' ||
+    existing.cloudId !== cloudId ||
+    existing.mutationId !== mutationId
+  ) {
+    await options.writeCheckpoint(
+      onlineCheckpoint({
+        state: 'pending',
+        cloudId,
+        mutationId,
+        recordedAt: context.now(),
+      })
+    );
+  }
+
+  const pending = existingLink?.pendingMutation;
+  if (
+    !existingLink ||
+    pending?.mutationId !== mutationId ||
+    pending.contentFingerprint !== contentFingerprint ||
+    pending.originPlayerBackupRunId !== options.run.runId
+  ) {
+    context.links.save({
+      accountId: context.accountId,
+      legacyId: options.legacyId,
+      cloudId,
+      serverVersion: existingLink?.serverVersion ?? 0,
+      contentFingerprint: existingLink?.contentFingerprint ?? null,
+      pendingMutation: {
+        mutationId,
+        contentFingerprint,
+        originPlayerBackupRunId: options.run.runId,
+      },
+    });
+  }
+
+  try {
+    const verified = await context.service.backup(
+      options.character,
+      { id: context.accountId },
+      { guestSelected: true, confirmedTargetAccountId: context.accountId },
+      { originPlayerBackupRunId: options.run.runId }
+    );
+    await options.writeCheckpoint(
+      onlineCheckpoint({
+        state: 'protected',
+        cloudId: verified.row.id,
+        mutationId,
+        recordedAt: context.now(),
+        verified: {
+          serverVersion: verified.row.server_version,
+          contentFingerprint: verified.fingerprint,
+          verifiedAt: context.now(),
+        },
+      })
+    );
+  } catch (cause) {
+    if (cause instanceof PlayerBackupRunReplacedError) throw cause;
+    const mapped = mapExecutionError(cause);
+    await options.writeCheckpoint(
+      onlineCheckpoint({
+        state: mapped.state,
+        cloudId,
+        mutationId,
+        recordedAt: context.now(),
+        reason: mapped.reason,
+      })
+    );
+  }
+}
+
+/**
+ * Executes a confirmed one-time run. Every selected character runs
+ * independently under the account lock; results come from durable evidence, not
+ * from the loop.
+ */
+export async function executePlayerBackupManualRun(
+  options: PlayerBackupManualExecutionOptions
+): Promise<PlayerBackupExecutionResult> {
+  const locks = options.locks;
+  if (!hasPlayerBackupExclusiveLockCapability(locks)) {
+    throw new PlayerBackupLockUnavailableError();
+  }
+  const run = await readActivePlayerBackupRun({
+    accountId: options.accountId,
+    factory: options.factory,
+  });
+  if (!run || run.runId !== options.expectedActiveRunId) {
+    throw new PlayerBackupRunReplacedError();
+  }
+  if (run.mode !== 'one-time') {
+    throw new Error('Manual execution requires a one-time run');
+  }
+  if (
+    playerBackupExecutionPath(run) === 'integrated' &&
+    run.stage !== 'local-ready'
+  ) {
+    throw new Error('Player backup run has not reached local-ready');
+  }
+  await acknowledgeConfirmedSelection(options.factory, run);
+
+  const context: ManualExecutionContext = { ...options, locks };
+  for (const legacyId of run.selectedCharacterIds) {
+    await withPlayerBackupAccountLock(
+      { accountId: options.accountId, locks },
+      () => processManualCharacter(context, legacyId)
+    );
+  }
+
+  return derivePlayerBackupRunResult({
+    factory: options.factory,
+    accountId: options.accountId,
+    expectedActiveRunId: options.expectedActiveRunId,
+    links: options.links,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Durable result derivation
+// ---------------------------------------------------------------------------
+
+function deriveManualOutcome(
+  online: PlayerBackupOnlineCheckpoint | undefined,
+  link: CharacterCloudLink | null
+): { outcome: PlayerBackupCharacterOutcome; reason: string | null } {
+  if (!online || online.kind === 'automatic') {
+    // Automatic work is completed in Task 5.
+    return { outcome: 'pending', reason: null };
+  }
+  if (online.state === 'protected') {
+    const verified =
+      link !== null &&
+      !link.pendingMutation &&
+      link.cloudId === online.cloudId &&
+      link.serverVersion === online.serverVersion &&
+      link.contentFingerprint === online.contentFingerprint;
+    return verified
+      ? { outcome: 'protected', reason: null }
+      : { outcome: 'failed', reason: 'link-evidence-mismatch' };
+  }
+  return { outcome: online.state, reason: online.reason ?? null };
+}
+
+/** Read-only. Reports exactly what durable local evidence supports. */
+export async function derivePlayerBackupRunResult(options: {
+  factory: IDBFactory;
+  accountId: string;
+  expectedActiveRunId: string;
+  links: CharacterCloudLinkRepository;
+  repository?: IndexedDbAutomaticCharacterSyncRepository;
+}): Promise<PlayerBackupExecutionResult> {
+  const run = await readActivePlayerBackupRun({
+    accountId: options.accountId,
+    factory: options.factory,
+  });
+  if (!run || run.runId !== options.expectedActiveRunId) {
+    throw new Error(RUN_MISSING);
+  }
+  const buckets: Record<PlayerBackupCharacterOutcome, string[]> = {
+    protected: [],
+    queued: [],
+    offline: [],
+    'auth-required': [],
+    'needs-attention': [],
+    'held-aside': [],
+    failed: [],
+    pending: [],
+  };
+  const outcomes: PlayerBackupExecutionResult['outcomes'] = {};
+  for (const legacyId of run.selectedCharacterIds) {
+    const derived = deriveManualOutcome(
+      run.characterCheckpoints[legacyId]?.online,
+      options.links.get(options.accountId, legacyId)
+    );
+    buckets[derived.outcome].push(legacyId);
+    outcomes[legacyId] = derived;
+  }
+  return {
+    runId: run.runId,
+    accountId: run.accountId,
+    mode: run.mode,
+    executionPath: playerBackupExecutionPath(run),
+    protected: buckets.protected,
+    queued: buckets.queued,
+    offline: buckets.offline,
+    authRequired: buckets['auth-required'],
+    needsAttention: buckets['needs-attention'],
+    heldAside: buckets['held-aside'],
+    failed: buckets.failed,
+    pending: buckets.pending,
+    outcomes,
+    complete: buckets.protected.length === run.selectedCharacterIds.length,
+  };
+}

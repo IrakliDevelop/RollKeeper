@@ -103,32 +103,18 @@ async function readAccount(
   };
 }
 
-export async function previewPlayerBackupCloud(options: {
-  auth: PlayerBackupPreviewAuth;
-  gateway: PlayerBackupPreviewGateway;
-  expectedAccountId?: string;
-  localCharacters: readonly unknown[];
-}): Promise<PlayerBackupCloudPreview> {
-  const account = await readAccount(options.auth);
-  if (
-    options.expectedAccountId !== undefined &&
-    account.id !== options.expectedAccountId
-  ) {
-    throw new PlayerBackupCloudPreviewError('account-changed');
-  }
-
-  let rows: CharacterCloudRow[];
-  try {
-    rows = await options.gateway.list();
-  } catch {
-    throw new PlayerBackupCloudPreviewError('offline');
-  }
-
-  const accountAfterRead = await readAccount(options.auth);
-  if (accountAfterRead.id !== account.id) {
-    throw new PlayerBackupCloudPreviewError('account-changed');
-  }
-
+/**
+ * Decodes cloud rows, drops duplicated legacy identities, and compares each
+ * local character against its cloud copy. Shared by the read-only preview and
+ * by locked online execution so both classify identically.
+ */
+export async function compareCloudRows(
+  rows: readonly CharacterCloudRow[],
+  localCharacters: readonly unknown[]
+): Promise<{
+  characters: PlayerBackupPreviewCharacter[];
+  onlineOnly: DecodedCloudCharacter[];
+}> {
   const decoded = await Promise.all(
     rows.map(async row => {
       try {
@@ -148,7 +134,7 @@ export async function previewPlayerBackupCloud(options: {
   });
 
   const characters = await Promise.all(
-    options.localCharacters.map(async character => {
+    localCharacters.map(async character => {
       const legacyId = localId(character);
       const candidate = byLegacyId.get(legacyId);
       if (candidate === undefined) {
@@ -190,13 +176,42 @@ export async function previewPlayerBackupCloud(options: {
   );
   const localIds = new Set(characters.map(character => character.legacyId));
   return {
-    account,
     characters,
     onlineOnly: decoded.filter(
       (candidate): candidate is DecodedCloudCharacter =>
         candidate !== null && !localIds.has(candidate.row.legacy_client_id)
     ),
   };
+}
+
+export async function previewPlayerBackupCloud(options: {
+  auth: PlayerBackupPreviewAuth;
+  gateway: PlayerBackupPreviewGateway;
+  expectedAccountId?: string;
+  localCharacters: readonly unknown[];
+}): Promise<PlayerBackupCloudPreview> {
+  const account = await readAccount(options.auth);
+  if (
+    options.expectedAccountId !== undefined &&
+    account.id !== options.expectedAccountId
+  ) {
+    throw new PlayerBackupCloudPreviewError('account-changed');
+  }
+
+  let rows: CharacterCloudRow[];
+  try {
+    rows = await options.gateway.list();
+  } catch {
+    throw new PlayerBackupCloudPreviewError('offline');
+  }
+
+  const accountAfterRead = await readAccount(options.auth);
+  if (accountAfterRead.id !== account.id) {
+    throw new PlayerBackupCloudPreviewError('account-changed');
+  }
+
+  const compared = await compareCloudRows(rows, options.localCharacters);
+  return { account, ...compared };
 }
 
 export interface PlayerBackupCloudPreviewSnapshot {
