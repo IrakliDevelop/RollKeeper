@@ -1,12 +1,7 @@
 'use client';
 
 import { useEffect, useId, useState } from 'react';
-import {
-  AlertTriangle,
-  CheckCircle2,
-  CircleDashed,
-  Wrench,
-} from 'lucide-react';
+import { AlertTriangle, Wrench } from 'lucide-react';
 
 import { Badge } from '@/components/ui/layout/badge';
 import { Button } from '@/components/ui/forms/button';
@@ -35,15 +30,6 @@ import {
   friendlyMigrationMessage,
 } from '../migrationCopy';
 import type { FamilyRunOutcome } from '../MigrationWizard.types';
-
-/** Ruling R9.2: names the behavioural number instead of a bare literal (matches steps/RecoveryStep.tsx). */
-const FINGERPRINT_DISPLAY_LENGTH = 12;
-
-function shortHash(hash: string): string {
-  return hash.length > FINGERPRINT_DISPLAY_LENGTH
-    ? `${hash.slice(0, FINGERPRINT_DISPLAY_LENGTH)}…`
-    : hash;
-}
 
 const DEFAULT_AUTHORITY: NormalizedAuthority = {
   state: 'legacy',
@@ -259,18 +245,6 @@ export function FamilyStep({
     verification: null,
   });
   const badge = STEP_BADGE[stepState];
-  const chosenOrBeyond =
-    stepState === 'selected' ||
-    stepState === 'prepared' ||
-    stepState === 'indexedDb' ||
-    stepState === 'postgresUnverified' ||
-    stepState === 'verified';
-  const preparedOrBeyond =
-    stepState === 'prepared' ||
-    stepState === 'indexedDb' ||
-    stepState === 'postgresUnverified' ||
-    stepState === 'verified';
-
   const phraseMatches = Boolean(
     confirmation &&
       phrase.trim().toLowerCase() ===
@@ -296,14 +270,16 @@ export function FamilyStep({
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-muted mb-0.5 text-[11px] font-bold tracking-wide uppercase">
-            Step {stepNumber} of {totalSteps} &middot; Data category
+            Step {stepNumber} of {totalSteps}: Campaign section
           </p>
           <h3 className="text-heading text-lg font-semibold">{entry.label}</h3>
         </div>
-        <Badge variant={badge.variant}>{badge.label}</Badge>
+        <Badge variant={badge.variant} className="self-start">
+          {badge.label}
+        </Badge>
       </div>
 
       {/* Rendered independent of `stepState`: a successful repair moves
@@ -327,7 +303,7 @@ export function FamilyStep({
       {!enabled && (
         <div className="border-divider bg-surface-secondary rounded-lg border p-4">
           <p className="text-body text-sm">
-            {entry.label} is not yet available in this wizard.
+            {entry.label} cannot be backed up yet.
           </p>
         </div>
       )}
@@ -342,9 +318,9 @@ export function FamilyStep({
               This browser&apos;s record needs attention
             </p>
             <p className="text-accent-red-text mt-1 text-sm">
-              This browser and your account disagree about where{' '}
-              {entry.label.toLowerCase()} currently lives. Check this browser to
-              see if it can be fixed automatically, or skip this one for now.
+              RollKeeper found two different saved copies of{' '}
+              {entry.label.toLowerCase()}. Check whether it can be fixed
+              automatically, or skip it for now.
             </p>
           </div>
           <div>
@@ -355,7 +331,7 @@ export function FamilyStep({
               onClick={() => void handleRepair()}
               loading={repairing}
             >
-              Check this browser and fix it
+              Check and fix
             </Button>
           </div>
         </div>
@@ -376,9 +352,8 @@ export function FamilyStep({
               This browser&apos;s data changed
             </p>
             <p className="text-accent-red-text mt-1 text-sm">
-              {driftKey} changed since your safety copy was checked. Download a
-              fresh backup of this browser and check it again before this data
-              category can move.
+              Something changed after you saved the safety copy. Download a
+              fresh backup, then start this setup again.
             </p>
           </div>
         </div>
@@ -399,10 +374,11 @@ export function FamilyStep({
             className="border-accent-emerald-border bg-accent-emerald-bg rounded-lg border p-4"
           >
             <p className="text-accent-emerald-text text-sm font-semibold">
-              Moved to cloud sync
+              Online backup is on
             </p>
             <p className="text-accent-emerald-text mt-1 text-sm">
-              {entry.label} now lives in your account&apos;s cloud workspace.
+              {entry.label} is backed up to your account and available on your
+              other signed-in browsers.
             </p>
           </div>
         )}
@@ -415,16 +391,11 @@ export function FamilyStep({
         manifest && (
           <>
             <div className="border-divider bg-surface rounded-lg border p-4">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Stat label="Records" value={manifest.recordCount} />
-                <Stat label="Size" value={`${manifest.totalBytes} bytes`} />
-                <Stat label="Blockers" value={manifest.blockers.length} />
+              <div className="grid grid-cols-2 gap-3">
+                <Stat label="Items found" value={manifest.recordCount} />
                 <Stat
-                  label="References"
-                  value={manifest.records.reduce(
-                    (total, record) => total + record.references.length,
-                    0
-                  )}
+                  label="Needs attention"
+                  value={manifest.blockers.length}
                 />
               </div>
               {manifest.blockers.length > 0 && (
@@ -449,16 +420,6 @@ export function FamilyStep({
               )}
             </div>
 
-            <StageChain
-              chosen={chosenOrBeyond}
-              copiedHere={preparedOrBeyond}
-              inThisBrowser={
-                authority?.state === 'indexedDB' ||
-                authority?.state === 'postgres'
-              }
-              inCloudSync={authority?.state === 'postgres'}
-            />
-
             {authority?.state === 'indexedDB' && (
               <div
                 role="alert"
@@ -475,7 +436,7 @@ export function FamilyStep({
                       copy at this render boundary, never passed through. */}
                   {runResult?.outcome === 'cloudFailure'
                     ? cloudActivationFailureMessage(runResult.reason)
-                    : "This data hasn't moved to cloud sync yet."}
+                    : 'Online backup is not finished yet. Try again.'}
                 </p>
               </div>
             )}
@@ -488,19 +449,9 @@ export function FamilyStep({
 
             {manifest.blockers.length === 0 && confirmation && (
               <div className="border-divider bg-surface flex flex-col gap-3 rounded-lg border p-4">
-                {/* R12: the structured confirmation contract's safety
-                    fields, rendered so the DM can see exactly what they are
-                    about to confirm -- not only the typed-phrase gate. The
-                    fingerprint shown here comes from `confirmation`, the
-                    same object `requiredPhrase` below comes from, so it is
-                    the fingerprint under confirmation, not a value read
-                    independently from `manifest`. */}
                 <p className="text-muted text-xs">
-                  Confirming {confirmation.familyLabel} for{' '}
-                  {confirmation.campaignLabel} &middot; manifest{' '}
-                  <span className="font-mono">
-                    {shortHash(confirmation.manifestFingerprint)}
-                  </span>
+                  This turns on online backup for {confirmation.familyLabel} in{' '}
+                  {confirmation.campaignLabel}.
                 </p>
                 <Input
                   id={inputId}
@@ -517,7 +468,7 @@ export function FamilyStep({
                     disabled={!phraseMatches}
                     loading={running}
                   >
-                    Move this data to cloud sync
+                    Turn on online backup
                   </Button>
                   <Button variant="ghost" size="sm" onClick={onSkip}>
                     Skip this one
@@ -551,47 +502,6 @@ function Stat({ label, value }: { label: string; value: number | string }) {
     <div>
       <p className="text-muted text-[11px] uppercase">{label}</p>
       <p className="text-heading text-sm font-bold">{value}</p>
-    </div>
-  );
-}
-
-function StageChain({
-  chosen,
-  copiedHere,
-  inThisBrowser,
-  inCloudSync,
-}: {
-  /** `stepState` at or beyond `selected` -- a real, persisted selection record matches this run (spec R6). */
-  chosen: boolean;
-  /** `stepState` at or beyond `prepared` -- the persisted `CUTOVER_READY` checkpoint (spec R6). */
-  copiedHere: boolean;
-  inThisBrowser: boolean;
-  inCloudSync: boolean;
-}) {
-  const stages: { label: string; done: boolean }[] = [
-    { label: 'Chosen', done: chosen },
-    { label: 'Copied here', done: copiedHere },
-    { label: 'This browser', done: inThisBrowser },
-    { label: 'Cloud sync', done: inCloudSync },
-  ];
-  return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      {stages.map(stage => {
-        const Icon = stage.done ? CheckCircle2 : CircleDashed;
-        return (
-          <div
-            key={stage.label}
-            className="border-divider bg-surface flex items-center gap-2 rounded-lg border px-3 py-2"
-          >
-            <Icon
-              size={14}
-              className={stage.done ? 'text-accent-emerald-text' : 'text-faint'}
-              aria-hidden="true"
-            />
-            <span className="text-body text-xs">{stage.label}</span>
-          </div>
-        );
-      })}
     </div>
   );
 }

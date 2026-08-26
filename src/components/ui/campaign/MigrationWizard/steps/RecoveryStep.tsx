@@ -12,16 +12,6 @@ import { Badge } from '@/components/ui/layout/badge';
 import { Button } from '@/components/ui/forms/button';
 import type { MigrationRecoveryState } from '../MigrationWizard.types';
 
-/** Ruling R9.2: names the behavioural number instead of a bare literal. */
-const FINGERPRINT_DISPLAY_LENGTH = 12;
-
-function shortHash(hash: string | null): string {
-  if (!hash) return '';
-  return hash.length > FINGERPRINT_DISPLAY_LENGTH
-    ? `${hash.slice(0, FINGERPRINT_DISPLAY_LENGTH)}…`
-    : hash;
-}
-
 interface RecoveryStepProps {
   recovery: MigrationRecoveryState;
   onDownload: () => void;
@@ -56,21 +46,23 @@ export function RecoveryStep({
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-muted mb-0.5 text-[11px] font-bold tracking-wide uppercase">
-            Step 2 of 3 &middot; Backup
+            Step 2 of 3: Safety copy
           </p>
           <h3 className="text-heading text-lg font-semibold">
             Back up this browser
           </h3>
         </div>
-        <Badge variant={badge.variant}>{badge.label}</Badge>
+        <Badge variant={badge.variant} className="self-start">
+          {badge.label}
+        </Badge>
       </div>
 
       <p className="text-body text-sm">
-        One file covers the whole run &mdash; every data category below reuses
-        it. Download it, then pick it back up so we can check it arrived intact.
+        Save one file before RollKeeper makes any changes. It covers every
+        campaign section in this setup.
       </p>
 
       {recovery.status === 'resumed' && (
@@ -91,11 +83,6 @@ export function RecoveryStep({
               This browser&apos;s data still matches the safety copy you checked
               earlier, so we picked that run back up instead of asking for
               another download.
-            </p>
-            <p className="text-accent-emerald-text mt-2 font-mono text-xs break-all">
-              {recovery.runId} &middot; verified{' '}
-              {recovery.verifiedAt ?? 'earlier'} &middot; manifest{' '}
-              {shortHash(recovery.manifestHash)}
             </p>
           </div>
         </div>
@@ -126,15 +113,15 @@ export function RecoveryStep({
               )}
             </div>
           )}
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-heading text-sm font-medium">
-                1 &mdash; Download the file
+                1. Save your safety copy
               </p>
               <p className="text-muted mt-0.5 text-xs">
                 {recovery.bundle
-                  ? `${recovery.bundle.entries.length} entries · ${recovery.bundle.validation.totalBytes} bytes`
-                  : 'Preparing your safety copy…'}
+                  ? `${recovery.bundle.entries.length} saved items are ready`
+                  : 'Preparing your safety copy...'}
               </p>
             </div>
             <Button
@@ -142,8 +129,10 @@ export function RecoveryStep({
               leftIcon={<Download size={16} />}
               onClick={onDownload}
               disabled={!recovery.bundle}
+              aria-label="Save backup file"
+              className="w-full sm:w-auto"
             >
-              Download backup
+              Save backup file
             </Button>
           </div>
           <div className="border-divider flex items-end justify-between gap-3 border-t pt-3.5">
@@ -152,11 +141,12 @@ export function RecoveryStep({
                 htmlFor={inputId}
                 className="text-heading mb-1.5 block text-sm font-medium"
               >
-                2 &mdash; Pick your safety copy file back up
+                2. Choose the file you just saved
               </label>
               <input
                 ref={inputRef}
                 id={inputId}
+                aria-label="Choose safety copy file"
                 type="file"
                 accept="application/json,.json"
                 className="text-muted border-divider bg-surface-secondary block w-full rounded-lg border-2 border-dashed px-3 py-2 text-sm"
@@ -177,34 +167,12 @@ export function RecoveryStep({
           className="border-accent-emerald-border bg-accent-emerald-bg rounded-lg border p-4"
         >
           <p className="text-accent-emerald-text text-sm font-semibold">
-            Checked &mdash; every entry matches
+            Checked. Every saved item matches
           </p>
-          <div className="mt-2.5 grid grid-cols-3 gap-2.5">
-            <div>
-              <p className="text-accent-emerald-text text-[11px] uppercase">
-                Entries
-              </p>
-              <p className="text-accent-emerald-text text-sm font-bold">
-                {recovery.entryCount}
-              </p>
-            </div>
-            <div>
-              <p className="text-accent-emerald-text text-[11px] uppercase">
-                Size
-              </p>
-              <p className="text-accent-emerald-text text-sm font-bold">
-                {recovery.totalBytes} bytes
-              </p>
-            </div>
-            <div>
-              <p className="text-accent-emerald-text text-[11px] uppercase">
-                Receipt
-              </p>
-              <p className="text-accent-emerald-text text-sm font-bold">
-                {recovery.runId}
-              </p>
-            </div>
-          </div>
+          <p className="text-accent-emerald-text mt-1 text-sm">
+            RollKeeper checked all {recovery.entryCount} saved items. You can
+            continue safely.
+          </p>
         </div>
       )}
 

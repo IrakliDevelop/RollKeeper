@@ -53,6 +53,8 @@ const FORBIDDEN = [
   /\bwhole-device\b/i,
   /\bdeliveries\b/i,
   /player inbox/i,
+  /\b(?:workspace|manifest|indexeddb|authority|epoch|canary|workflow)\b/i,
+  /—/,
 ];
 
 describe('migrationCopy', () => {

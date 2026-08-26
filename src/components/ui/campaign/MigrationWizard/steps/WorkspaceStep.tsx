@@ -1,10 +1,7 @@
 'use client';
-
-import Link from 'next/link';
 import {
   AlertTriangle,
   CheckCircle2,
-  ExternalLink,
   RefreshCw,
   ShieldCheck,
 } from 'lucide-react';
@@ -12,12 +9,6 @@ import {
 import { Badge } from '@/components/ui/layout/badge';
 import { Button } from '@/components/ui/forms/button';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
-
-import {
-  CREATE_CLOUD_WORKSPACE_LABEL,
-  DM_CLOUD_WORKSPACE_SECTION_LABEL,
-  forkCampaignToCloudLabel,
-} from '../../dmCloudWorkspaceLabels';
 
 interface WorkspaceStepProps {
   campaignCode: string;
@@ -35,6 +26,9 @@ interface WorkspaceStepProps {
   signedIn: boolean;
   workspace: DmWorkspaceDocument | null;
   onDiscover: () => void;
+  creatingWorkspace?: boolean;
+  workspaceCreationError?: string | null;
+  onCreateWorkspace?: () => void;
 }
 
 /**
@@ -52,16 +46,19 @@ export function WorkspaceStep({
   signedIn,
   workspace,
   onDiscover,
+  creatingWorkspace = false,
+  workspaceCreationError = null,
+  onCreateWorkspace = () => {},
 }: WorkspaceStepProps) {
   // Derived, not fabricated: before any discovery attempt neither `signedIn`
   // nor `discoveryError` is set, and the row says so honestly rather than
   // claiming readiness that was never checked.
   const signInLabel = discovering
-    ? 'Checking sign-in on this browser…'
+    ? 'Checking your account...'
     : signedIn
-      ? 'Signed in on this browser'
+      ? 'Signed in'
       : discoveryError
-        ? 'Not signed in on this browser'
+        ? 'Not signed in'
         : 'Sign-in not checked yet';
   // Final fix wave, gate defect D3: the wizard dead-ended for a DM whose
   // account has no cloud workspace for this campaign. Step 1 said "No cloud
@@ -73,7 +70,7 @@ export function WorkspaceStep({
   const searchedAndFoundNothing =
     signedIn && !workspace && !discovering && !discoveryError;
   const signInBadge = discovering
-    ? { variant: 'neutral' as const, label: 'Checking…' }
+    ? { variant: 'neutral' as const, label: 'Checking...' }
     : signedIn
       ? { variant: 'success' as const, label: 'Ready' }
       : discoveryError
@@ -82,16 +79,18 @@ export function WorkspaceStep({
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-muted mb-0.5 text-[11px] font-bold tracking-wide uppercase">
-            Step 1 of 3 &middot; Account
+            Step 1 of 3: Account
           </p>
           <h3 className="text-heading text-lg font-semibold">
-            Find where this campaign will live
+            Connect your campaign
           </h3>
         </div>
-        <Badge variant="neutral">Reads only</Badge>
+        <Badge variant="neutral" className="self-start">
+          No changes yet
+        </Badge>
       </div>
 
       <div className="border-divider bg-surface flex flex-col gap-3 rounded-lg border p-4">
@@ -116,19 +115,19 @@ export function WorkspaceStep({
           </div>
           <Badge variant={signInBadge.variant}>{signInBadge.label}</Badge>
         </div>
-        <div className="border-divider flex items-center justify-between gap-3 border-t pt-3">
+        <div className="border-divider flex flex-col items-stretch gap-3 border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-heading text-sm font-medium">
               {workspace
                 ? `Connected to ${workspace.name}`
-                : `No cloud workspace found yet for ${campaignCode}`}
+                : `Online backup is not set up for ${campaignCode}`}
             </p>
             <p className="text-muted mt-0.5 text-xs">
               {workspace
-                ? `Campaign data will move into this workspace.`
+                ? 'This campaign is ready for online backup.'
                 : searchedAndFoundNothing
-                  ? `Your account has no cloud workspace for ${campaignCode} yet, so there is nowhere for this campaign's data to move.`
-                  : 'Look up your account to find its cloud workspace for this campaign.'}
+                  ? 'Set it up here, then continue with one backup for the whole campaign.'
+                  : 'Check your account for an existing online copy of this campaign.'}
             </p>
           </div>
           <Button
@@ -137,8 +136,9 @@ export function WorkspaceStep({
             leftIcon={<RefreshCw size={14} />}
             onClick={onDiscover}
             loading={discovering}
+            className="w-full sm:w-auto"
           >
-            Find my campaigns
+            Check my account
           </Button>
         </div>
       </div>
@@ -156,41 +156,28 @@ export function WorkspaceStep({
         >
           <div>
             <p className="text-accent-amber-text text-sm font-semibold">
-              Create a cloud workspace for this campaign first
+              Set up online backup
             </p>
-            {/*
-              Re-review N3: every control named here is named by the SAME
-              function the dashboard renders it with
-              (`dmCloudWorkspaceLabels.ts`), never by a hand-copied literal
-              — the dashboard's fork button carries the campaign's NAME, not
-              its code, and the two used to disagree.
-            */}
             <p className="text-accent-amber-text mt-1 text-sm">
-              This wizard moves campaign data into a cloud workspace your
-              account already owns; it never creates one. Open your campaigns
-              dashboard, find the{' '}
-              <strong>{DM_CLOUD_WORKSPACE_SECTION_LABEL}</strong> section, and
-              use{' '}
-              {campaignName ? (
-                <>
-                  <strong>{forkCampaignToCloudLabel(campaignName)}</strong> (or{' '}
-                  <strong>{CREATE_CLOUD_WORKSPACE_LABEL}</strong>)
-                </>
-              ) : (
-                <strong>{CREATE_CLOUD_WORKSPACE_LABEL}</strong>
-              )}
-              . Then come back here and choose Find my campaigns again. Nothing
-              in this browser changes until you do.
+              Create a private online copy for{' '}
+              {campaignName ? <strong>{campaignName}</strong> : 'this campaign'}
+              . Your current campaign stays available while RollKeeper copies
+              each section, and players are not affected.
             </p>
           </div>
-          <div>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/dm" className="flex items-center gap-2">
-                <ExternalLink size={14} aria-hidden="true" />
-                Go to my campaigns
-              </Link>
-            </Button>
-          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onCreateWorkspace}
+            loading={creatingWorkspace}
+          >
+            Set up online backup
+          </Button>
+          {workspaceCreationError && (
+            <p role="alert" className="text-accent-red-text text-sm">
+              {workspaceCreationError}
+            </p>
+          )}
         </div>
       )}
 
@@ -204,8 +191,8 @@ export function WorkspaceStep({
           aria-hidden="true"
         />
         <p className="text-accent-emerald-text text-sm">
-          Nothing has changed. Looking up your account does not move data,
-          change what this browser reads from, or touch your campaign.
+          Nothing changes until you confirm a campaign section. Your browser
+          copy stays available throughout setup.
         </p>
       </div>
     </section>

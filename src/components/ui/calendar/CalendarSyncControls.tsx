@@ -33,6 +33,7 @@ import { calendarApi } from '@/lib/durableDm/calendarApi';
 import { CalendarHttpGateway } from '@/lib/durableDm/calendarHttpGateway';
 import { CalendarSyncService } from '@/lib/durableDm/calendarSyncService';
 import { isCalendarClientVisible } from '@/lib/durableDm/slice11bFlags';
+import { areStandaloneMigrationControlsVisible } from '@/lib/durableDm/slice11gFlags';
 import {
   readCalendarProjectionAuthority,
   writeCalendarProjectionAuthority,
@@ -1350,6 +1351,8 @@ export function CalendarSyncControls({ campaign }: Props) {
     setStatus('Cloud: saved · Player view: replay queued');
     await loadProjectionStatus();
   };
+
+  if (!areStandaloneMigrationControlsVisible()) return null;
 
   return (
     <Card padding="lg">

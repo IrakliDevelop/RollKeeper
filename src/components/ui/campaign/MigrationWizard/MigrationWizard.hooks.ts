@@ -26,6 +26,7 @@ import { NPC_FAMILY_INVENTORY } from '@/lib/durableDm/npcFamily';
 import { ENCOUNTER_FAMILY_INVENTORY } from '@/lib/durableDm/encounterFamily';
 import { COMBAT_LOG_ARCHIVE_FAMILY_INVENTORY } from '@/lib/durableDm/combatLogArchiveFamily';
 import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository';
+import type { CampaignInfo } from '@/types/campaign';
 import {
   createBrowserDmWorkspace,
   type BrowserDmWorkspaceContext,
@@ -123,7 +124,9 @@ function reportFriendlyVerificationError(reason: unknown): string {
 }
 
 export function useMigrationWizard(
-  campaignCode: string
+  campaignCode: string,
+  campaign: CampaignInfo | null = null,
+  dmId: string | null = null
 ): MigrationWizardController {
   const visible = isMigrationWizardVisible();
 
@@ -133,6 +136,10 @@ export function useMigrationWizard(
   const [workspace, setWorkspace] = useState<DmWorkspaceDocument | null>(null);
   const [discovering, setDiscovering] = useState(false);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
+  const [workspaceCreationError, setWorkspaceCreationError] = useState<
+    string | null
+  >(null);
   const [recovery, setRecovery] =
     useState<MigrationRecoveryState>(INITIAL_RECOVERY);
   const [anyCutoverCommitted, setAnyCutoverCommitted] = useState(false);
@@ -205,9 +212,7 @@ export function useMigrationWizard(
       setOwnerContext(next);
       if (!next) {
         setWorkspace(null);
-        setDiscoveryError(
-          'Sign in to the owner account before migrating this campaign.'
-        );
+        setDiscoveryError('Sign in before backing up this campaign.');
         return;
       }
       const remembered = await next.list();
@@ -233,6 +238,42 @@ export function useMigrationWizard(
       if (mountedRef.current) setDiscovering(false);
     }
   }, [campaignCode]);
+
+  const createWorkspace = useCallback(async () => {
+    if (!ownerContext || !campaign || !dmId) {
+      setWorkspaceCreationError(
+        'This campaign could not be prepared for online backup. Return to My Campaigns and try again.'
+      );
+      return;
+    }
+    setCreatingWorkspace(true);
+    setWorkspaceCreationError(null);
+    try {
+      const result = await ownerContext.forkLegacy(campaign, dmId);
+      if (result.status === 'created') {
+        const remembered = await ownerContext.list();
+        const created =
+          remembered.find(
+            item => item.legacyId === `legacy:${campaignCode}` && item.cloudId
+          ) ?? null;
+        if (created) {
+          setWorkspace(created);
+          return;
+        }
+      }
+      setWorkspaceCreationError(
+        result.status === 'queued'
+          ? 'Online backup could not be finished yet. Check your connection and try again.'
+          : 'Online backup is unavailable right now. Try again in a moment.'
+      );
+    } catch {
+      setWorkspaceCreationError(
+        'Online backup could not be set up. Nothing in this browser was changed. Try again.'
+      );
+    } finally {
+      setCreatingWorkspace(false);
+    }
+  }, [ownerContext, campaign, dmId, campaignCode]);
 
   // Step 1 resume detection (spec R4), on mount and whenever the campaign
   // changes: re-capture the browser backup with a throwaway run id, hash it,
@@ -916,6 +957,9 @@ export function useMigrationWizard(
     workspace,
     accountId: ownerContext?.accountId ?? null,
     discover,
+    creatingWorkspace,
+    workspaceCreationError,
+    createWorkspace,
     recovery,
     downloadBundle,
     selectBundleFile,

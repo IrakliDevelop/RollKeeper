@@ -47,13 +47,13 @@ const CLOUD_ACTIVATION_FAILURE_COPY: Record<
   string
 > = {
   'cloud-generation-diverged':
-    'Cloud sync already holds a different copy of this campaign data — most likely it was moved from another browser. Nothing here was changed. Check that other browser before moving this data category again.',
+    'Your account already has a different copy of this campaign section, probably from another browser. Nothing here was changed. Check the other browser, then try again.',
   'cloud-epoch-unknown':
-    'Cloud sync did not report where this campaign data now lives, so this browser stopped instead of guessing. Nothing here was changed. Try this data category again in a moment.',
+    'RollKeeper could not confirm the online copy, so it stopped safely. Nothing here was changed. Try again in a moment.',
   'cloud-epoch-unexpected':
-    'Cloud sync moved this campaign data on while this run was in progress, so this browser stopped rather than overwrite it. Nothing here was changed. Close the wizard, reopen it and try this data category again.',
+    'This campaign section changed online during setup. Nothing here was overwritten. Close this setup, open it again, and retry this section.',
   'cloud-preview-unusable':
-    'Cloud sync answered about this campaign data in a way this browser could not read, so nothing was changed. Try this data category again in a moment.',
+    'RollKeeper could not read the online copy, so nothing was changed. Try this campaign section again in a moment.',
 };
 
 /**
@@ -63,7 +63,7 @@ const CLOUD_ACTIVATION_FAILURE_COPY: Record<
  * never fall through to being rendered verbatim.
  */
 const UNKNOWN_CLOUD_ACTIVATION_FAILURE_COPY =
-  'This campaign data could not be moved to cloud sync just now. Nothing here was changed. Try this data category again in a moment.';
+  'This campaign section could not be backed up just now. Nothing here was changed. Try again in a moment.';
 
 /**
  * Maps an internal cloud-activation refusal to the DM-facing sentence.
@@ -122,15 +122,15 @@ export type MigrationErrorChannel =
 
 const CHANNEL_FALLBACK_COPY: Record<MigrationErrorChannel, string> = {
   preview:
-    'This data category could not be previewed just now. Nothing here was changed. Try again, or skip this one and come back to it.',
+    'This campaign section could not be checked just now. Nothing here was changed. Try again, or skip it for now.',
   browserRecord:
-    "This browser's record for this data category could not be checked just now. Nothing here was changed. Try again, or skip this one and come back to it.",
-  run: 'This data category could not be moved to cloud sync just now. Your campaign data is still here in this browser. Try again, or skip this one and come back to it.',
+    "This browser's saved copy could not be checked just now. Nothing here was changed. Try again, or skip it for now.",
+  run: 'This campaign section could not be backed up just now. Your campaign is still safe in this browser. Try again, or skip it for now.',
   repair:
-    "This browser's record could not be fixed automatically. Nothing here was changed. Skip this data category for now — your campaign data is still here in this browser.",
-  verify: 'This data category could not be checked just now.',
+    "This browser's saved copy could not be fixed automatically. Nothing here was changed. Skip it for now. Your campaign is still safe in this browser.",
+  verify: 'This campaign section could not be checked just now.',
   discovery:
-    'Your cloud workspaces could not be looked up just now. Nothing in this browser was changed. Try Find my campaigns again in a moment.',
+    'Your online campaigns could not be looked up just now. Nothing in this browser was changed. Try Check my account again in a moment.',
   backupFile:
     'This browser could not read that file, or it was saved from different campaign data.',
   backupRecord:
@@ -139,19 +139,19 @@ const CHANNEL_FALLBACK_COPY: Record<MigrationErrorChannel, string> = {
 
 const CHANNEL_CHANGED_ELSEWHERE_COPY: Record<MigrationErrorChannel, string> = {
   preview:
-    'This data category changed somewhere else while this browser was reading it. Try again.',
+    'This campaign section changed somewhere else while RollKeeper was checking it. Try again.',
   browserRecord:
-    'This data category changed somewhere else while this browser was checking it. Try again.',
-  run: 'This data category changed somewhere else while this browser was moving it. Nothing here was changed. Try again.',
+    'This campaign section changed somewhere else while RollKeeper was checking it. Try again.',
+  run: 'This campaign section changed somewhere else during setup. Nothing here was overwritten. Try again.',
   repair:
-    'This data category changed somewhere else while this browser was checking it. Try again.',
+    'This campaign section changed somewhere else while RollKeeper was checking it. Try again.',
   // Unchanged from the sentence `reportFriendlyVerificationError` shipped
   // with — the report step's Refresh control is what "Try Refresh again"
   // names, and only this channel has one.
   verify:
-    'This data category changed somewhere else while this browser was checking it. Try Refresh again.',
+    'This campaign section changed somewhere else while RollKeeper was checking it. Try Refresh again.',
   discovery:
-    'Your cloud workspaces changed somewhere else while this browser was looking them up. Try Find my campaigns again.',
+    'Your online campaigns changed somewhere else while RollKeeper was checking them. Try Check my account again.',
   backupFile:
     'This campaign changed somewhere else while this browser was checking that file. Download a fresh browser backup and pick that one up instead.',
   backupRecord:

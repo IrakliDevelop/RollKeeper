@@ -27,6 +27,7 @@ import {
   type CombatLogArchiveManifestBlocker,
 } from '@/lib/durableDm/combatLogArchiveFamily';
 import { isCombatLogArchiveClientVisible } from '@/lib/durableDm/slice11fFlags';
+import { areStandaloneMigrationControlsVisible } from '@/lib/durableDm/slice11gFlags';
 import { useCombatLogStore } from '@/store/combatLogStore';
 import { useEncounterStore } from '@/store/encounterStore';
 import type { CampaignInfo } from '@/types/campaign';
@@ -218,6 +219,7 @@ export function CombatLogArchiveSyncControls({
     [measured, encounterNames]
   );
   if (!sync || !isCombatLogArchiveClientVisible()) return null;
+  if (!areStandaloneMigrationControlsVisible()) return null;
   if (sync.campaignCode !== campaign.code) return null;
 
   const downloadArchive = (archiveId: string, format: 'json' | 'text') =>

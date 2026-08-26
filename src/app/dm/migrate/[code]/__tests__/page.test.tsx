@@ -288,7 +288,7 @@ async function renderRoute(code: string) {
 
 async function findMyCampaigns() {
   await userEvent.click(
-    screen.getByRole('button', { name: /find my campaigns/i })
+    screen.getByRole('button', { name: /check my account/i })
   );
   await screen.findByText(/connected to campaign alpha/i);
 }
@@ -339,7 +339,7 @@ describe('/dm/migrate/[code]', () => {
   it('renders the wizard while the flag is on, independently of the dashboard launcher', async () => {
     await renderRoute('ALPHA');
     expect(
-      screen.getByText('Move campaign data to cloud sync')
+      screen.getByText('Back up your campaign online')
     ).toBeInTheDocument();
   });
 
@@ -500,7 +500,7 @@ describe('/dm/migrate/[code]', () => {
     // `workspaceFor('ALPHA')` object each call) and re-runs the scan effect,
     // this time with npc's `readAuthority` held pending.
     await userEvent.click(
-      screen.getByRole('button', { name: /find my campaigns/i })
+      screen.getByRole('button', { name: /check my account/i })
     );
     await waitFor(() => expect(npcCallCount).toBeGreaterThanOrEqual(2));
 

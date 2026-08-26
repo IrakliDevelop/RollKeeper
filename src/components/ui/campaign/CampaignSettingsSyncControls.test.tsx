@@ -332,6 +332,26 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
     expect(document.cookie).toBe(cookieBefore);
   });
 
+  it('leaves setup to the wizard when both interfaces are enabled', () => {
+    vi.stubEnv('NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE', 'true');
+    vi.stubEnv('NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE', 'true');
+
+    const { container } = render(
+      <CampaignSettingsSyncControls
+        campaign={{
+          code: 'SYNTH1',
+          name: 'Synthetic campaign',
+          createdAt: 'now',
+        }}
+      />
+    );
+
+    expect(container).toBeEmptyDOMElement();
+    expect(
+      screen.queryByText(/campaign settings cloud canary/i)
+    ).not.toBeInTheDocument();
+  });
+
   it('keeps an unselected discovered family out of IndexedDB', async () => {
     vi.stubEnv('NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE', 'true');
     const workspace = {

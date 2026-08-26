@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { isMigrationWizardVisible } from '../slice11gFlags';
+import {
+  areStandaloneMigrationControlsVisible,
+  isMigrationWizardVisible,
+} from '../slice11gFlags';
 
 const original = process.env.NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE;
 
@@ -24,5 +27,11 @@ describe('isMigrationWizardVisible', () => {
   it('is on for the exact string "true"', () => {
     process.env.NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE = 'true';
     expect(isMigrationWizardVisible()).toBe(true);
+    expect(areStandaloneMigrationControlsVisible()).toBe(false);
+  });
+
+  it('keeps the older setup controls available when the wizard is off', () => {
+    delete process.env.NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE;
+    expect(areStandaloneMigrationControlsVisible()).toBe(true);
   });
 });

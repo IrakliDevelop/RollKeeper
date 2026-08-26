@@ -55,6 +55,9 @@ export interface MigrationWizardController {
   workspace: DmWorkspaceDocument | null;
   accountId: string | null;
   discover: () => Promise<void>;
+  creatingWorkspace: boolean;
+  workspaceCreationError: string | null;
+  createWorkspace: () => Promise<void>;
   recovery: MigrationRecoveryState;
   downloadBundle: () => Promise<void>;
   selectBundleFile: (file: File) => Promise<void>;

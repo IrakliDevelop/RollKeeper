@@ -180,7 +180,7 @@ export default function DmDashboardPage() {
       URL.revokeObjectURL(url);
     } catch {
       alert(
-        'Could not export campaign data. The campaign may have expired in Redis — players need to re-sync.'
+        'Could not export campaign data. Ask your players to reconnect, then try again.'
       );
     }
   };
@@ -286,7 +286,7 @@ export default function DmDashboardPage() {
                     ? new Date(
                         campaigns[campaigns.length - 1].createdAt
                       ).toLocaleDateString()
-                    : '—'}
+                    : 'Not yet'}
                 </h3>
                 <p className="text-body">Latest Campaign</p>
               </div>
@@ -486,14 +486,14 @@ function CampaignCard({
                 leftIcon={<CloudCog size={15} />}
               >
                 {campaignSettingsRoutedForLauncherCopy
-                  ? 'Review cloud sync'
-                  : 'Move campaign data to cloud sync'}
+                  ? 'Review online backup'
+                  : 'Back up campaign online'}
               </Button>
             </Link>
             <p className="text-faint mt-1.5 text-xs">
               {campaignSettingsRoutedForLauncherCopy
-                ? 'See what has synced and pick up any category you paused.'
-                : 'Back up this browser first; nothing moves until you confirm each category.'}
+                ? 'See what is backed up and finish anything you paused.'
+                : 'Save one safety copy, then back up the whole campaign in one guided setup.'}
             </p>
           </div>
         )}

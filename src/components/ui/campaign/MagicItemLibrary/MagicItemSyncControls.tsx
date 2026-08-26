@@ -38,6 +38,7 @@ import { magicItemApi } from '@/lib/durableDm/magicItemApi';
 import { MagicItemHttpGateway } from '@/lib/durableDm/magicItemHttpGateway';
 import { MagicItemSyncService } from '@/lib/durableDm/magicItemSyncService';
 import { isMagicItemClientVisible } from '@/lib/durableDm/slice11cFlags';
+import { areStandaloneMigrationControlsVisible } from '@/lib/durableDm/slice11gFlags';
 import {
   readMagicItemAuthorityMarker,
   writeMagicItemAuthorityMarker,
@@ -1547,6 +1548,8 @@ export function MagicItemSyncControls({ campaign }: Props) {
       setBusy(false);
     }
   };
+
+  if (!areStandaloneMigrationControlsVisible()) return null;
 
   return (
     <Card padding="lg">

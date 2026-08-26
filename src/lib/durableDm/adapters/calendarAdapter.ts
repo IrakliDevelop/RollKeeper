@@ -72,7 +72,6 @@ interface CalendarEnrollmentPreview {
 }
 
 // Ruling R9.2: name the behavioural number instead of a bare `.slice(0, 12)`.
-const FINGERPRINT_DISPLAY_LENGTH = 12;
 
 function currentRawEnvelope() {
   return localStorage.getItem('rollkeeper-calendar-data') ?? '';
@@ -153,7 +152,7 @@ export const calendarAdapter: DurableFamilyAdapter<CalendarManifest> = {
       familyLabel,
       campaignLabel: `${context.campaignCode}`,
       manifestFingerprint: manifest.fingerprint,
-      requiredPhrase: `migrate ${familyLabel.toLowerCase()} ${context.campaignCode} ${manifest.fingerprint.slice(0, FINGERPRINT_DISPLAY_LENGTH)}`,
+      requiredPhrase: `back up ${familyLabel.toLowerCase()} ${context.campaignCode}`,
     };
   },
 

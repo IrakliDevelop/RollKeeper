@@ -42,11 +42,11 @@ export function MigrationWizardRoute({
   // means the dashboard renders no fork button for this campaign either.
   // Selects the NAME, not the campaign object: a primitive result keeps the
   // selector referentially stable across renders.
-  const campaignName = useDmStore(
+  const campaign = useDmStore(
     state =>
-      state.campaigns.find(campaign => campaign.code === campaignCode)?.name ??
-      null
+      state.campaigns.find(campaign => campaign.code === campaignCode) ?? null
   );
+  const dmId = useDmStore(state => state.dmId);
 
   const handleClose = ({
     anyCutoverCommitted,
@@ -59,7 +59,9 @@ export function MigrationWizardRoute({
   return (
     <MigrationWizard
       campaignCode={campaignCode}
-      campaignName={campaignName}
+      campaign={campaign}
+      campaignName={campaign?.name ?? null}
+      dmId={dmId}
       onClose={handleClose}
     />
   );

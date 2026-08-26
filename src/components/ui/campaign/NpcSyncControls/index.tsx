@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/layout/card';
 import { blockerKindReferenceLabel } from '@/lib/durableDm/blockerReferenceLabel';
 import { isNpcClientVisible } from '@/lib/durableDm/slice11dFlags';
+import { areStandaloneMigrationControlsVisible } from '@/lib/durableDm/slice11gFlags';
 
 import { useNpcSyncContext } from './NpcSyncProvider';
 
@@ -43,6 +44,7 @@ export { NpcSyncProvider, useNpcSyncContext } from './NpcSyncProvider';
 export function NpcSyncControls() {
   const sync = useNpcSyncContext();
   if (!sync || !isNpcClientVisible()) return null;
+  if (!areStandaloneMigrationControlsVisible()) return null;
 
   return (
     <Card padding="lg" className="mt-6">

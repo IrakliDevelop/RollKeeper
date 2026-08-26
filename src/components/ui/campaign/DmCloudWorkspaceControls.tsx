@@ -23,6 +23,7 @@ import {
   type DmWorkspaceCreateResult,
   isDmWorkspaceCloudEnabled,
 } from '@/lib/supabase/dmWorkspaceService';
+import { isMigrationWizardVisible } from '@/lib/durableDm/slice11gFlags';
 import type { CampaignInfo } from '@/types/campaign';
 import {
   CREATE_CLOUD_WORKSPACE_LABEL,
@@ -61,7 +62,7 @@ export function DmCloudWorkspaceControls({
     []
   );
 
-  if (!isDmWorkspaceCloudEnabled()) return null;
+  if (!isDmWorkspaceCloudEnabled() || isMigrationWizardVisible()) return null;
 
   const resolveContext = async () => {
     if (cloud) return cloud;

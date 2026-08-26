@@ -22,6 +22,7 @@ import {
 import { blockerKindReferenceLabel } from '@/lib/durableDm/blockerReferenceLabel';
 import type { EncounterManifestBlocker } from '@/lib/durableDm/encounterFamily';
 import { isEncounterClientVisible } from '@/lib/durableDm/slice11eFlags';
+import { areStandaloneMigrationControlsVisible } from '@/lib/durableDm/slice11gFlags';
 import type { CampaignInfo } from '@/types/campaign';
 
 import { ACTIVE_ENCOUNTER_GUIDANCE } from './EncounterSyncControls.hooks';
@@ -99,6 +100,7 @@ export function EncounterSyncControls({
 }) {
   const sync = useEncounterSyncContext();
   if (!sync || !isEncounterClientVisible()) return null;
+  if (!areStandaloneMigrationControlsVisible()) return null;
   if (sync.campaignCode !== campaign.code) return null;
 
   return (

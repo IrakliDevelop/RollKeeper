@@ -155,13 +155,13 @@ export function ReportStep({
       data-testid="migration-report"
       aria-label="Result"
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-muted mb-0.5 text-[11px] font-bold tracking-wide uppercase">
-            Step {stepNumber} of {totalSteps} &middot; Result
+            Step {stepNumber} of {totalSteps}: Result
           </p>
           <h3 className="text-heading text-lg font-semibold">
-            Your campaign data in cloud sync
+            Online backup summary
           </h3>
         </div>
         {/* Deliberately never passes `loading` -- `Button`'s `loading` prop
@@ -197,11 +197,13 @@ export function ReportStep({
         className="border-divider bg-surface rounded-lg border p-4"
       >
         <p className="text-heading text-sm font-semibold">
-          {verifiedCount} of {registeredEntries.length} data categories verified
+          {verifiedCount} of {registeredEntries.length} campaign sections backed
+          up
         </p>
         <p className="text-body mt-1 text-sm">
-          {claim === 'all' && 'All campaign data is synced.'}
-          {claim === 'available' && 'Available campaign data is synced.'}
+          {claim === 'all' && 'Your campaign backup is complete.'}
+          {claim === 'available' &&
+            'Everything currently available is backed up.'}
           {claim === 'partial' && 'Not finished yet.'}
         </p>
       </div>
@@ -218,9 +220,8 @@ export function ReportStep({
           <ul className="mt-1 list-disc pl-5">
             {disabledEntries.map(entry => (
               <li key={entry.family} className="text-accent-amber-text text-xs">
-                {entry.label} is turned off in this browser, so the full
-                everything-is-synced claim above is not reachable until it is
-                turned on.
+                {entry.label} is not available for online backup in this browser
+                yet.
               </li>
             ))}
           </ul>
@@ -234,7 +235,7 @@ export function ReportStep({
           className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4"
         >
           <p className="text-accent-red-text text-sm font-semibold">
-            Could not check cloud sync
+            Could not check online backup
           </p>
           {/* Static, mapping-independent reassurance -- kept OUT of the
               per-family list items below so each `<li>` renders ONLY the
@@ -244,8 +245,7 @@ export function ReportStep({
               asserting on the fallback text vacuous -- it would pass even
               if the mapping function were gutted. */}
           <p className="text-accent-red-text mt-1 text-xs">
-            This is not a claim that any of these are out of sync — try Refresh
-            again.
+            Nothing was changed. Try Refresh again.
           </p>
           <ul className="mt-1 list-disc pl-5">
             {erroredEntries.map(entry => (
@@ -264,14 +264,13 @@ export function ReportStep({
           className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4"
         >
           <p className="text-accent-red-text text-sm font-semibold">
-            Not yet confirmed in cloud sync
+            Online backup is not finished
           </p>
           <ul className="mt-1 list-disc pl-5">
             {unverifiedWithoutErrorEntries.map(entry => (
               <li key={entry.family} className="text-accent-red-text text-xs">
-                {entry.label} has not been confirmed in cloud sync yet. Check
-                this browser again with Refresh, or return to its step to fix
-                it.
+                {entry.label} still needs attention. Try Refresh, or return to
+                that step and try again.
               </li>
             ))}
           </ul>
@@ -285,17 +284,12 @@ export function ReportStep({
           className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4"
         >
           <p className="text-accent-red-text text-sm font-semibold">
-            This browser&apos;s data changed outside this run
+            Your campaign changed during setup
           </p>
-          <ul className="mt-1 list-disc pl-5">
-            {crossFamilyDrift.map(key => (
-              <li key={key} className="text-accent-red-text text-xs">
-                {key} changed since your safety copy was checked, and it does
-                not belong to a data category you have moved yet, so cloud sync
-                cannot confirm it still matches.
-              </li>
-            ))}
-          </ul>
+          <p className="text-accent-red-text mt-1 text-xs">
+            Close this setup and start again so the safety copy includes your
+            latest changes.
+          </p>
         </div>
       )}
 
@@ -324,7 +318,7 @@ export function ReportStep({
             data-testid={`${entry.family}-status`}
           >
             <p className="text-faint text-sm">
-              {entry.label} &mdash; not yet available
+              {entry.label}: not yet available
             </p>
           </div>
         ))}

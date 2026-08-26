@@ -50,7 +50,6 @@ import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository'
 import { selectCampaignSettings } from '@/lib/indexeddb/campaignSettingsSelection';
 import { createBrowserDmWorkspace } from '@/lib/supabase/browserDmWorkspace';
 import { expectCloudProductVocabulary } from '@/test/helpers';
-import { forkCampaignToCloudLabel } from '@/components/ui/campaign/dmCloudWorkspaceLabels';
 import { APP_VERSION } from '@/utils/constants';
 
 import { MigrationWizard } from './index';
@@ -373,7 +372,9 @@ async function renderWizardAtRecoveryStep() {
   // this suite exposed under a full ~460-file parallel run — no timeout
   // value fixes a race that can only ever resolve one way.
   await waitFor(() =>
-    expect(screen.getByRole('button', { name: /download/i })).toBeEnabled()
+    expect(
+      screen.getByRole('button', { name: /save backup file/i })
+    ).toBeEnabled()
   );
 }
 
@@ -905,52 +906,6 @@ function confirmationPhraseFor(family: DurableFamilyName): string {
   return `move ${family}`;
 }
 
-/** Mirrors `steps/RecoveryStep.tsx`/`steps/FamilyStep.tsx`'s own `FINGERPRINT_DISPLAY_LENGTH`/`shortHash` truncation, so a test can compute the expected on-screen value instead of asserting a literal. */
-const FINGERPRINT_DISPLAY_LENGTH_FOR_TEST = 12;
-function shortHashForTest(hash: string): string {
-  return hash.length > FINGERPRINT_DISPLAY_LENGTH_FOR_TEST
-    ? `${hash.slice(0, FINGERPRINT_DISPLAY_LENGTH_FOR_TEST)}…`
-    : hash;
-}
-
-/**
- * A minimal, directly-usable `MigrationRunContext` for calling an adapter's
- * own methods (e.g. `previewManifest`) straight from a test, without going
- * through the rendered wizard. Matches what `renderRunController`'s
- * fallback context builds. Deliberately NOT family-scoped -- every stub
- * adapter shares this same fixed account/campaign/recovery shape, and
- * `family` only ever selects WHICH adapter instance to call it against
- * (the caller's job, not this builder's), so a `family` parameter here
- * would be decorative.
- */
-async function minimalMigrationRunContext(): Promise<MigrationRunContext> {
-  const hash = await currentDeviceHash();
-  return {
-    accountId: 'account-1',
-    campaignId: 'cloud-ALPHA',
-    campaignCode: 'ALPHA',
-    workspace: workspaceFor('ALPHA'),
-    recovery: {
-      format: 'rollkeeper-device-backup',
-      formatVersion: 1,
-      appVersion: APP_VERSION,
-      runId: 'run-1',
-      createdAt: FIXED_TS,
-      entries: [],
-      manifestHash: hash,
-      validation: {
-        entryCount: 0,
-        totalBytes: 0,
-        validJsonCount: 0,
-        malformedJsonCount: 0,
-        futureVersionCount: 0,
-        retainedOnlyCount: 0,
-      },
-    },
-    ensureWorkspaceRemembered: async () => {},
-  };
-}
-
 function familyHeadingLabel(
   family: DurableFamilyName | 'location' | 'battle_map'
 ): string {
@@ -1001,7 +956,7 @@ async function mountStubWizardResumedWithAdapters(
   });
   currentRender = render(<MigrationWizard campaignCode="ALPHA" />);
   await userEvent.click(
-    screen.getByRole('button', { name: /find my campaigns/i })
+    screen.getByRole('button', { name: /check my account/i })
   );
   await screen.findByText(/connected to campaign alpha/i);
   await screen.findByText(/safety copy is ready/i);
@@ -1033,18 +988,22 @@ async function mountStubWizardWithRealBundle() {
   });
   currentRender = render(<MigrationWizard campaignCode="ALPHA" />);
   await userEvent.click(
-    screen.getByRole('button', { name: /find my campaigns/i })
+    screen.getByRole('button', { name: /check my account/i })
   );
   await screen.findByText(/connected to campaign alpha/i);
   await waitFor(() =>
-    expect(screen.getByRole('button', { name: /download/i })).toBeEnabled()
+    expect(
+      screen.getByRole('button', { name: /save backup file/i })
+    ).toBeEnabled()
   );
-  await userEvent.click(screen.getByRole('button', { name: /download/i }));
+  await userEvent.click(
+    screen.getByRole('button', { name: /save backup file/i })
+  );
   await userEvent.upload(
     screen.getByLabelText(/safety copy/i),
     await bundleFile()
   );
-  await screen.findByText(/checked.*every entry matches/i);
+  await screen.findByText(/checked.*every saved item matches/i);
 }
 
 /** Renders/resumes at a given family's step (stub families), mounting if nothing is mounted yet. */
@@ -1069,13 +1028,13 @@ async function confirmAndSubmit(
   await userEvent.clear(input);
   await userEvent.type(input, confirmationPhraseFor(family));
   const button = await screen.findByRole('button', {
-    name: /move this data to cloud sync/i,
+    name: /turn on online backup/i,
   });
   await waitFor(() => expect(button).toBeEnabled());
   await userEvent.click(button);
   await waitFor(() => {
     const stillPresent = screen.queryByRole('button', {
-      name: /move this data to cloud sync/i,
+      name: /turn on online backup/i,
     });
     if (stillPresent) expect(stillPresent).toBeEnabled();
   });
@@ -1628,11 +1587,11 @@ describe('MigrationWizard — steps 0 and 1', () => {
     const before = await snapshotDurableState();
     render(<MigrationWizard campaignCode="ALPHA" />);
     const discoverButton = screen.getByRole('button', {
-      name: /find my campaigns/i,
+      name: /check my account/i,
     });
     await userEvent.click(discoverButton);
     // Coordinator review round 2, item 7: NEITHER "Nothing has changed" (static,
-    // always on screen) NOR "No cloud workspace found yet" (identical text in
+    // always on screen) NOR "online backup is not set up" (identical text in
     // the INITIAL pre-discovery state, since `workspace` starts `null` too) is
     // a genuine completion signal — both were proven vacuous by a reviewer
     // probe that showed a write injected at the tail of `discover()`, delayed
@@ -1651,38 +1610,49 @@ describe('MigrationWizard — steps 0 and 1', () => {
   // for a DM whose account has no cloud workspace for the campaign -- "No
   // cloud workspace found yet", one control that finds nothing again, and no
   // explanation or route to the action that creates one.
-  it('explains what to do, and links to the dashboard, when the account has no cloud workspace for this campaign', async () => {
+  it('sets up online backup inside the wizard when no online campaign exists yet', async () => {
     // The default owner context is signed in and its `list()` returns no
     // workspaces -- exactly the state the gate hit.
-    render(<MigrationWizard campaignCode="ALPHA" campaignName="Canary" />);
+    const owner = defaultOwnerContext();
+    const created = workspaceFor('ALPHA');
+    owner.list.mockResolvedValueOnce([]).mockResolvedValueOnce([created]);
+    owner.forkLegacy.mockResolvedValue({
+      status: 'created',
+      workspace: created,
+    });
+    mockedCreateBrowserDmWorkspace.mockResolvedValue(owner);
+    const campaign = {
+      code: 'ALPHA',
+      name: 'Canary',
+      createdAt: FIXED_TS,
+    };
+    render(
+      <MigrationWizard
+        campaignCode="ALPHA"
+        campaign={campaign}
+        campaignName={campaign.name}
+        dmId="legacy-dm"
+      />
+    );
     const discoverButton = screen.getByRole('button', {
-      name: /find my campaigns/i,
+      name: /check my account/i,
     });
     // Before the lookup runs there is nothing to explain, and the guidance
     // must not be shown: `workspace` is null in that state too.
-    expect(
-      screen.queryByText(/create a cloud workspace for this campaign first/i)
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/set up online backup/i)).not.toBeInTheDocument();
 
     await userEvent.click(discoverButton);
     await waitFor(() => expect(discoverButton).toBeEnabled());
 
-    const guidance = await screen.findByText(
-      /^create a cloud workspace for this campaign first$/i
-    );
-    expect(guidance.closest('[role="alert"]')).not.toBeNull();
-    // Re-review N3: the guidance names the dashboard's fork button after the
-    // CAMPAIGN, never after its code -- that is what the button reads. The
-    // producer/consumer binding to the real control's own label lives in
-    // `workspaceGuidance.test.tsx`; this line only pins the wiring of the
-    // name through the wizard.
+    const setupButton = screen.getByRole('button', {
+      name: /^set up online backup$/i,
+    });
+    expect(setupButton.closest('[role="alert"]')).not.toBeNull();
+    await userEvent.click(setupButton);
     expect(
-      screen.getByText(
-        /this wizard moves campaign data into a cloud workspace/i
-      )
-    ).toHaveTextContent(forkCampaignToCloudLabel('Canary'));
-    const link = screen.getByRole('link', { name: /go to my campaigns/i });
-    expect(link).toHaveAttribute('href', '/dm');
+      await screen.findByText(/connected to campaign alpha/i)
+    ).toBeInTheDocument();
+    expect(owner.forkLegacy).toHaveBeenCalledWith(campaign, 'legacy-dm');
     expectCloudProductVocabulary(document.body);
   });
 
@@ -1704,7 +1674,7 @@ describe('MigrationWizard — steps 0 and 1', () => {
     );
     render(<MigrationWizard campaignCode="ALPHA" />);
     const discoverButton = screen.getByRole('button', {
-      name: /find my campaigns/i,
+      name: /check my account/i,
     });
     await userEvent.click(discoverButton);
     await waitFor(() => expect(discoverButton).toBeEnabled());
@@ -1727,7 +1697,7 @@ describe('MigrationWizard — steps 0 and 1', () => {
       new TypeError('Failed to fetch')
     );
     render(<MigrationWizard campaignCode="ALPHA" />);
-    const retry = screen.getByRole('button', { name: /find my campaigns/i });
+    const retry = screen.getByRole('button', { name: /check my account/i });
     await userEvent.click(retry);
     await waitFor(() => expect(retry).toBeEnabled());
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -1743,13 +1713,11 @@ describe('MigrationWizard — steps 0 and 1', () => {
     });
     render(<MigrationWizard campaignCode="ALPHA" />);
     const discoverButton = screen.getByRole('button', {
-      name: /find my campaigns/i,
+      name: /check my account/i,
     });
     await userEvent.click(discoverButton);
     await screen.findByText(/connected to campaign alpha/i);
-    expect(
-      screen.queryByText(/create a cloud workspace for this campaign first/i)
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/set up online backup/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: /go to my campaigns/i })
     ).not.toBeInTheDocument();
@@ -1757,13 +1725,15 @@ describe('MigrationWizard — steps 0 and 1', () => {
 
   it('downloads and verifies exactly one bundle for the whole run', async () => {
     await renderWizardAtRecoveryStep();
-    await userEvent.click(screen.getByRole('button', { name: /download/i }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /save backup file/i })
+    );
     await userEvent.upload(
       screen.getByLabelText(/safety copy/i),
       await bundleFile()
     );
     const verifiedText = await screen.findByText(
-      /checked.*every entry matches/i
+      /checked.*every saved item matches/i
     );
     // Coordinator review, item 3: the success block must be an accessible
     // `role="status"` announcement, not a plain, silent paragraph.
@@ -1775,7 +1745,9 @@ describe('MigrationWizard — steps 0 and 1', () => {
 
   it('refuses a bundle that does not match the current device', async () => {
     await renderWizardAtRecoveryStep();
-    await userEvent.click(screen.getByRole('button', { name: /download/i }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /save backup file/i })
+    );
     await userEvent.upload(
       screen.getByLabelText(/safety copy/i),
       await staleBundleFile()
@@ -1798,7 +1770,9 @@ describe('MigrationWizard — steps 0 and 1', () => {
       new DOMException(raw, 'NotReadableError')
     );
     await renderWizardAtRecoveryStep();
-    await userEvent.click(screen.getByRole('button', { name: /download/i }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /save backup file/i })
+    );
     await userEvent.upload(
       screen.getByLabelText(/safety copy/i),
       await bundleFile()
@@ -1829,7 +1803,7 @@ describe('MigrationWizard — steps 0 and 1', () => {
     // Pins that the ADOPTED run id is the receipt's own — a fresh runId
     // would still show the "ready" copy but would desync every family
     // selection record pinned to `recovery.runId` (spec R4).
-    expect(await screen.findByText(/run-1/)).toBeInTheDocument();
+    expect(screen.queryByText(/run-1/)).not.toBeInTheDocument();
     expect(vi.mocked(initiateDeviceBackupDownload)).not.toHaveBeenCalled();
   });
 
@@ -1840,7 +1814,9 @@ describe('MigrationWizard — steps 0 and 1', () => {
     });
     render(<MigrationWizard campaignCode="ALPHA" />);
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /download/i })).toBeEnabled()
+      expect(
+        screen.getByRole('button', { name: /save backup file/i })
+      ).toBeEnabled()
     );
   });
 
@@ -1870,7 +1846,9 @@ describe('MigrationWizard — steps 0 and 1', () => {
     });
     render(<MigrationWizard campaignCode="ALPHA" />);
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /download/i })).toBeEnabled()
+      expect(
+        screen.getByRole('button', { name: /save backup file/i })
+      ).toBeEnabled()
     );
     // An initiated-only receipt must not offer enrichment either — that
     // control is only for a VERIFIED legacy receipt missing its entry
@@ -1887,7 +1865,7 @@ describe('MigrationWizard — steps 0 and 1', () => {
     });
     render(<MigrationWizard campaignCode="ALPHA" />);
     await userEvent.click(
-      screen.getByRole('button', { name: /find my campaigns/i })
+      screen.getByRole('button', { name: /check my account/i })
     );
     expect(
       await screen.findByText(/connected to campaign alpha/i)
@@ -1910,7 +1888,7 @@ describe('MigrationWizard — steps 0 and 1', () => {
     mockedCreateBrowserDmWorkspace.mockResolvedValue(null);
     render(<MigrationWizard campaignCode="ALPHA" />);
     await userEvent.click(
-      screen.getByRole('button', { name: /find my campaigns/i })
+      screen.getByRole('button', { name: /check my account/i })
     );
     // The negative case, pinned two ways: the false-success claim must be
     // absent, AND a real, accessible failure signal must be present.
@@ -1934,10 +1912,10 @@ describe('MigrationWizard — steps 0 and 1', () => {
     });
     render(<MigrationWizard campaignCode="ALPHA" />);
     await userEvent.click(
-      screen.getByRole('button', { name: /find my campaigns/i })
+      screen.getByRole('button', { name: /check my account/i })
     );
     expect(
-      await screen.findByText(/no cloud workspace found yet/i)
+      await screen.findByText(/online backup is not set up/i)
     ).toBeInTheDocument();
     expect(
       screen.queryByText(/connected to campaign alpha/i)
@@ -1990,10 +1968,12 @@ describe('MigrationWizard — steps 0 and 1', () => {
     mockedCreateBrowserDmWorkspace.mockResolvedValue(null);
     await renderWizardAtRecoveryStep();
     await userEvent.click(
-      screen.getByRole('button', { name: /find my campaigns/i })
+      screen.getByRole('button', { name: /check my account/i })
     );
-    await screen.findByText(/not signed in on this browser/i);
-    await userEvent.click(screen.getByRole('button', { name: /download/i }));
+    await screen.findByText(/sign in before backing up this campaign/i);
+    await userEvent.click(
+      screen.getByRole('button', { name: /save backup file/i })
+    );
     await userEvent.upload(
       screen.getByLabelText(/safety copy/i),
       await staleBundleFile()
@@ -2003,10 +1983,8 @@ describe('MigrationWizard — steps 0 and 1', () => {
 
     const alertVariants: { match: RegExp; requiredSubstrings: string[] }[] = [
       {
-        match: /sign in to the owner account/i,
-        requiredSubstrings: [
-          'Sign in to the owner account before migrating this campaign.',
-        ],
+        match: /sign in before backing up/i,
+        requiredSubstrings: ['Sign in before backing up this campaign.'],
       },
       {
         match: /that file does not match this browser/i,
@@ -2239,7 +2217,7 @@ describe('MigrationWizard — data-category steps', () => {
   it('cuts a family over only after the typed confirmation', async () => {
     await renderWizardAtFamilyStep('campaign_settings');
     const button = await screen.findByRole('button', {
-      name: /move this data to cloud sync/i,
+      name: /turn on online backup/i,
     });
     expect(button).toBeDisabled();
     await userEvent.type(
@@ -2282,7 +2260,8 @@ describe('MigrationWizard — data-category steps', () => {
     const alert = await screen.findByText(/download a fresh/i);
     const alertBox = alert.closest('[role="alert"]');
     expect(alertBox).not.toBeNull();
-    expect(alertBox).toHaveTextContent('rollkeeper-calendar-data');
+    expect(alertBox).toHaveTextContent(/something changed after you saved/i);
+    expect(alertBox).not.toHaveTextContent('rollkeeper-calendar-data');
     expect(await authorityOf('calendar')).toMatchObject({ state: 'legacy' });
     expect(await authorityOf('campaign_settings')).toMatchObject({
       state: 'postgres',
@@ -2302,7 +2281,7 @@ describe('MigrationWizard — data-category steps', () => {
     mutateCapturedKey('rollkeeper-calendar-data');
     await userEvent.type(input, confirmationPhraseFor('calendar'));
     await userEvent.click(
-      screen.getByRole('button', { name: /move this data to cloud sync/i })
+      screen.getByRole('button', { name: /turn on online backup/i })
     );
     const alert = await screen.findByText(/download a fresh/i);
     expect(alert.closest('[role="alert"]')).not.toBeNull();
@@ -2375,13 +2354,11 @@ describe('MigrationWizard — data-category steps', () => {
     string
   > = {
     'cloud-generation-diverged':
-      'Cloud sync already holds a different copy of this campaign data',
-    'cloud-epoch-unknown':
-      'Cloud sync did not report where this campaign data now lives',
+      'Your account already has a different copy of this campaign section',
+    'cloud-epoch-unknown': 'RollKeeper could not confirm the online copy',
     'cloud-epoch-unexpected':
-      'Cloud sync moved this campaign data on while this run was in progress',
-    'cloud-preview-unusable':
-      'Cloud sync answered about this campaign data in a way this browser could not read',
+      'This campaign section changed online during setup',
+    'cloud-preview-unusable': 'RollKeeper could not read the online copy',
   };
 
   it.each(
@@ -2416,7 +2393,7 @@ describe('MigrationWizard — data-category steps', () => {
       'encounter_definition'
     );
     expect(
-      await screen.findByText(/could not be previewed just now/i)
+      await screen.findByText(/could not be checked just now/i)
     ).toBeInTheDocument();
     expect(document.body.textContent ?? '').not.toContain('Failed to fetch');
     expectCloudProductVocabulary(document.body);
@@ -2433,7 +2410,7 @@ describe('MigrationWizard — data-category steps', () => {
     );
     await confirmAndSubmit('encounter_definition');
     expect(
-      await screen.findByText(/could not be moved to cloud sync just now/i)
+      await screen.findByText(/could not be backed up just now/i)
     ).toBeInTheDocument();
     expect(document.body.textContent ?? '').not.toContain('Failed to fetch');
     expectCloudProductVocabulary(document.body);
@@ -2444,7 +2421,7 @@ describe('MigrationWizard — data-category steps', () => {
     await advanceToFamily('npc');
     await userEvent.click(
       await screen.findByRole('button', {
-        name: /^check this browser and fix it$/i,
+        name: /^check and fix$/i,
       })
     );
     expect(
@@ -2571,7 +2548,7 @@ describe('MigrationWizard — data-category steps', () => {
     await advanceToFamily('npc');
     await userEvent.click(
       await screen.findByRole('button', {
-        name: /^check this browser and fix it$/i,
+        name: /^check and fix$/i,
       })
     );
     // Anchored (R6.2): "could not be fixed" also contains "fixed", so the
@@ -2586,7 +2563,7 @@ describe('MigrationWizard — data-category steps', () => {
     await advanceToFamily('npc');
     await userEvent.click(
       await screen.findByRole('button', {
-        name: /^check this browser and fix it$/i,
+        name: /^check and fix$/i,
       })
     );
     expect(await screen.findByText(/could not be fixed/i)).toBeInTheDocument();
@@ -2605,7 +2582,7 @@ describe('MigrationWizard — data-category steps', () => {
     // `findByText` on the FULL sentence (not the anchored word) is what
     // actually pins the step-level render.
     expect(
-      await screen.findByText(/locations is not yet available in this wizard/i)
+      await screen.findByText(/locations cannot be backed up yet/i)
     ).toBeInTheDocument();
     expect(
       screen.queryByLabelText(/type .* to confirm/i)
@@ -2648,7 +2625,7 @@ describe('MigrationWizard — data-category steps', () => {
         match: /this browser.s data changed/i,
         requiredSubstrings: [
           "This browser's data changed",
-          'changed since your safety copy was checked. Download a fresh backup of this browser and check it again before this data category can move.',
+          'Download a fresh backup, then start this setup again.',
         ],
       },
     ]);
@@ -2670,7 +2647,7 @@ describe('MigrationWizard — data-category steps', () => {
         match: /saved only in this browser/i,
         requiredSubstrings: [
           'Saved only in this browser',
-          'Cloud sync already holds a different copy of this campaign data — most likely it was moved from another browser. Nothing here was changed. Check that other browser before moving this data category again.',
+          'Your account already has a different copy of this campaign section, probably from another browser. Nothing here was changed. Check the other browser, then try again.',
         ],
       },
     ]);
@@ -2715,9 +2692,9 @@ describe('MigrationWizard — data-category steps', () => {
     );
     checkCurrentAlerts([
       {
-        match: /could not be previewed just now/i,
+        match: /could not be checked just now/i,
         requiredSubstrings: [
-          'This data category could not be previewed just now. Nothing here was changed. Try again, or skip this one and come back to it.',
+          'This campaign section could not be checked just now. Nothing here was changed. Try again, or skip it for now.',
         ],
       },
     ]);
@@ -2733,7 +2710,7 @@ describe('MigrationWizard — data-category steps', () => {
     await advanceToFamily('combat_log_archive');
     await userEvent.click(
       await screen.findByRole('button', {
-        name: /^check this browser and fix it$/i,
+        name: /^check and fix$/i,
       })
     );
     await screen.findByText(/could not be fixed/i);
@@ -2747,14 +2724,14 @@ describe('MigrationWizard — data-category steps', () => {
         // prose is no longer concatenated onto product copy.
         match: /could not be fixed/i,
         requiredSubstrings: [
-          "This browser's record could not be fixed automatically. Nothing here was changed. Skip this data category for now — your campaign data is still here in this browser.",
+          "This browser's saved copy could not be fixed automatically. Nothing here was changed. Skip it for now. Your campaign is still safe in this browser.",
         ],
       },
     ]);
     expectCloudProductVocabulary(document.body);
   });
 
-  it('renders the manifest fingerprint under confirmation, and it is the one about to be cut over', async () => {
+  it('explains the confirmation without exposing storage details', async () => {
     // Coordinator review round 2, Critical 1: the previous version asserted
     // `note` contains `'fingerprint-…'` -- but every stub's fingerprint was
     // `fingerprint-<family>`, and `'fingerprint-'` is EXACTLY
@@ -2771,24 +2748,9 @@ describe('MigrationWizard — data-category steps', () => {
     // R12: `familyLabel`/`campaignLabel`/`manifestFingerprint` from the
     // structured confirmation object, all rendered together -- not only
     // `requiredPhrase`.
-    const note = screen.getByText(/confirming campaign_settings for/i);
+    const note = screen.getByText(/this turns on online backup for/i);
     expect(note).toHaveTextContent('Campaign');
-
-    const adapter = stubFamilies().find(a => a.family === 'campaign_settings')!;
-    const context = await minimalMigrationRunContext();
-    const manifest = await adapter.previewManifest(context);
-    expect(note).toHaveTextContent(shortHashForTest(manifest.fingerprint));
-
-    // Cross-family substitution -- the literal R12 hazard: confirming a
-    // DIFFERENT family's manifest fingerprint under this family's typed
-    // confirmation. The rendered value must not be satisfiable by any
-    // other registered family's fingerprint either.
-    const otherAdapter = stubFamilies().find(a => a.family === 'calendar')!;
-    const otherContext = await minimalMigrationRunContext();
-    const otherManifest = await otherAdapter.previewManifest(otherContext);
-    expect(note).not.toHaveTextContent(
-      shortHashForTest(otherManifest.fingerprint)
-    );
+    expect(note).not.toHaveTextContent(/manifest|fingerprint|indexeddb/i);
   });
 
   it('renders "Chosen" once a persisted selection record matches this run, before any cutover', async () => {
@@ -2807,7 +2769,7 @@ describe('MigrationWizard — data-category steps', () => {
     // selected. The badge (STEP_BADGE.selected) is the second occurrence,
     // and only renders "Chosen" when `stepState === 'selected'`.
     await waitFor(async () => {
-      expect((await screen.findAllByText(/^chosen$/i)).length).toBe(2);
+      expect((await screen.findAllByText(/^chosen$/i)).length).toBe(1);
     });
     // Not yet cut over -- this browser's authority is still legacy. Proves
     // "Chosen" is read from the persisted selection record, not inferred
@@ -2836,7 +2798,7 @@ describe('MigrationWizard — data-category steps', () => {
     // Exactly 2 (badge + stage-chain box) -- see the "Chosen" test above
     // for why a bare presence check would be vacuous here too.
     await waitFor(async () => {
-      expect((await screen.findAllByText(/^copied here$/i)).length).toBe(2);
+      expect((await screen.findAllByText(/^copied here$/i)).length).toBe(1);
     });
     expect(await authorityOf('campaign_settings')).toMatchObject({
       state: 'legacy',
@@ -2849,7 +2811,7 @@ describe('MigrationWizard — data-category steps', () => {
     const phrase = confirmationPhraseFor('campaign_settings');
     await userEvent.type(input, phrase.slice(0, 4));
     expect(
-      screen.getByRole('button', { name: /move this data to cloud sync/i })
+      screen.getByRole('button', { name: /turn on online backup/i })
     ).toBeDisabled();
   });
 
@@ -2859,11 +2821,11 @@ describe('MigrationWizard — data-category steps', () => {
     const phrase = confirmationPhraseFor('campaign_settings');
     await userEvent.type(input, `  ${phrase.toUpperCase()}  `);
     expect(
-      screen.getByRole('button', { name: /move this data to cloud sync/i })
+      screen.getByRole('button', { name: /turn on online backup/i })
     ).toBeEnabled();
   });
 
-  it('renders the exact manifest -- counts, bytes, blockers and references', async () => {
+  it('shows item and issue counts without technical storage details', async () => {
     const adapter = stubAdapter('magic_item', {
       manifest: {
         recordCount: 7,
@@ -2894,9 +2856,8 @@ describe('MigrationWizard — data-category steps', () => {
     await renderWizardAtFamilyStepWithAdapters([adapter], 'magic_item');
     await screen.findByLabelText(/type .* to confirm/i);
     expect(screen.getByText('7')).toBeInTheDocument();
-    expect(screen.getByText('2048 bytes')).toBeInTheDocument();
-    expect(screen.getByText('0')).toBeInTheDocument(); // blockers
-    expect(screen.getByText('2')).toBeInTheDocument(); // references (1 + 0)
+    expect(screen.getByText('0')).toBeInTheDocument();
+    expect(document.body.textContent ?? '').not.toMatch(/bytes|references/i);
   });
 
   it('blocks a family with a manifest blocker, renders its alert, and allows a skip -- no confirm input', async () => {
@@ -2941,11 +2902,11 @@ describe('MigrationWizard — data-category steps', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('shows the "Moved to cloud sync" status panel once postgres authority is reached', async () => {
+  it('shows the "online backup is on" status panel once postgres authority is reached', async () => {
     const adapter = stubAdapter('magic_item');
     await renderWizardAtFamilyStepWithAdapters([adapter], 'magic_item');
     await confirmAndSubmit('magic_item');
-    const heading = await screen.findByText(/^moved to cloud sync$/i);
+    const heading = await screen.findByText(/^online backup is on$/i);
     expect(heading.closest('[role="status"]')).not.toBeNull();
   });
 
@@ -3010,7 +2971,7 @@ describe('MigrationWizard — data-category steps', () => {
     // record written BEFORE the interruption survives the reload and is
     // read back as matching this run.
     await waitFor(async () => {
-      expect((await screen.findAllByText(/^chosen$/i)).length).toBe(2);
+      expect((await screen.findAllByText(/^chosen$/i)).length).toBe(1);
     });
     expect(await authorityOf('campaign_settings')).toMatchObject({
       state: 'legacy',
@@ -3147,7 +3108,7 @@ describe('MigrationWizard — report', () => {
     await openReport();
     await waitFor(() => expect(verifySpyCallCount()).toBe(6));
     expect(
-      await screen.findByText(/all campaign data is synced/i)
+      await screen.findByText(/your campaign backup is complete/i)
     ).toBeInTheDocument();
     expect(await screen.findByTestId('npc-status')).toHaveTextContent(
       /^verified$/i
@@ -3161,7 +3122,7 @@ describe('MigrationWizard — report', () => {
       /^not verified$/i
     );
     expect(
-      screen.queryByText(/all campaign data is synced/i)
+      screen.queryByText(/your campaign backup is complete/i)
     ).not.toBeInTheDocument();
     const alert = await screen.findByTestId('verification-error-alert');
     // Important 3: the role, not just the testid -- a failure announced as
@@ -3219,7 +3180,7 @@ describe('MigrationWizard — report', () => {
     // the bare fallback.
     expect(
       within(alert).getByText(
-        /changed somewhere else while this browser was checking/i
+        /changed somewhere else while rollkeeper was checking/i
       )
     ).toBeInTheDocument();
     // Minor 5 (coordinator review round 1): none of the seven existing
@@ -3295,21 +3256,21 @@ describe('MigrationWizard — report', () => {
     expect(refreshButton.querySelector('.animate-spin')).toBeNull();
   });
 
-  it('claims All campaign data is synced only when all six registered families are enabled, postgres and verified', async () => {
+  it('claims your campaign backup is complete only when all six registered families are enabled, postgres and verified', async () => {
     await openReportWithAllSixMigratedAndVerified();
     expect(
-      await screen.findByText(/all campaign data is synced/i)
+      await screen.findByText(/your campaign backup is complete/i)
     ).toBeInTheDocument();
   });
 
-  it('claims only Available campaign data is synced when a registered family is disabled', async () => {
+  it('claims only everything currently available is backed up when a registered family is disabled', async () => {
     disableFamily('combat_log_archive');
     await openReportWithEveryEnabledFamilyVerified();
     expect(
-      await screen.findByText(/available campaign data is synced/i)
+      await screen.findByText(/everything currently available is backed up/i)
     ).toBeInTheDocument();
     expect(
-      screen.queryByText(/all campaign data is synced/i)
+      screen.queryByText(/your campaign backup is complete/i)
     ).not.toBeInTheDocument();
     // Ruling (known plan defect 2): scoped to the dedicated callout, not the
     // document -- the family's own always-rendered row also says "Combat
@@ -3336,10 +3297,10 @@ describe('MigrationWizard — report', () => {
     await openReportWithAllSixMigrated();
     expect(await screen.findByText(/not finished yet/i)).toBeInTheDocument();
     expect(
-      screen.queryByText(/available campaign data is synced/i)
+      screen.queryByText(/everything currently available is backed up/i)
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByText(/all campaign data is synced/i)
+      screen.queryByText(/your campaign backup is complete/i)
     ).not.toBeInTheDocument();
     expect(verifyCloudCalls).toHaveLength(0);
   });
@@ -3443,13 +3404,13 @@ describe('MigrationWizard — report', () => {
     await openReportWithNothingMigratedYet();
     expect(await screen.findByText(/not finished yet/i)).toBeInTheDocument();
     expect(
-      screen.queryByText(/all campaign data is synced/i)
+      screen.queryByText(/your campaign backup is complete/i)
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByText(/available campaign data is synced/i)
+      screen.queryByText(/everything currently available is backed up/i)
     ).not.toBeInTheDocument();
     // Scoped to the report's own claim card: the rail sidebar ALSO renders
-    // an "X of Y ... moved to cloud sync" line built from different counts,
+    // an "X of Y ... online backup is on" line built from different counts,
     // which an unscoped `/0 of 6/` query can collide with.
     const claim = await screen.findByTestId('report-claim');
     expect(within(claim).getByText(/0 of 6/)).toBeInTheDocument();
@@ -3460,12 +3421,12 @@ describe('MigrationWizard — report', () => {
     );
   });
 
-  it('refuses All campaign data is synced when one category is unverified, and names it', async () => {
+  it('refuses your campaign backup is complete when one category is unverified, and names it', async () => {
     failVerificationFor('calendar');
     await openReportWithAllSixMigrated();
     await screen.findByTestId('unverified-categories-alert');
     expect(
-      screen.queryByText(/all campaign data is synced/i)
+      screen.queryByText(/your campaign backup is complete/i)
     ).not.toBeInTheDocument();
     // Ruling (known plan defect 2): scoped to the alert, not the document.
     const alert = screen.getByTestId('unverified-categories-alert');
@@ -3522,7 +3483,7 @@ describe('MigrationWizard — report', () => {
     await openReportWithDocumentMismatch('calendar');
     await screen.findByTestId('unverified-categories-alert');
     expect(
-      screen.queryByText(/all campaign data is synced/i)
+      screen.queryByText(/your campaign backup is complete/i)
     ).not.toBeInTheDocument();
     expect(await screen.findByTestId('calendar-status')).toHaveTextContent(
       /^not verified$/i
@@ -3542,9 +3503,8 @@ describe('MigrationWizard — report', () => {
     mutateCapturedKey('rollkeeper-player-data');
     await refreshReport();
     const alert = await screen.findByTestId('cross-family-drift-alert');
-    expect(
-      within(alert).getByText(/rollkeeper-player-data/)
-    ).toBeInTheDocument();
+    expect(alert).toHaveTextContent(/campaign changed during setup/i);
+    expect(alert).not.toHaveTextContent(/rollkeeper-player-data/i);
     // Cross-family drift is a global condition (spec R8): it blocks EVERY
     // family's verified claim, not only the one that happens to own the
     // changed key.
@@ -3587,28 +3547,27 @@ describe('MigrationWizard — report', () => {
 
     const alertVariants: { match: RegExp; requiredSubstrings: string[] }[] = [
       {
-        match: /not yet confirmed in cloud sync/i,
+        match: /online backup is not finished/i,
         requiredSubstrings: [
-          'Not yet confirmed in cloud sync',
-          'has not been confirmed in cloud sync yet',
+          'Online backup is not finished',
+          'still needs attention',
         ],
       },
       {
-        match: /this browser.s data changed outside this run/i,
+        match: /your campaign changed during setup/i,
         requiredSubstrings: [
-          "This browser's data changed outside this run",
-          'rollkeeper-player-data',
-          'does not belong to a data category you have moved yet',
+          'Your campaign changed during setup',
+          'Close this setup and start again',
         ],
       },
       {
-        match: /could not check cloud sync/i,
+        match: /could not check online backup/i,
         requiredSubstrings: [
-          'Could not check cloud sync',
+          'Could not check online backup',
           'could not be checked just now',
           // Ruling (Important 1): the raw thrown message must NEVER appear
           // here -- only the R17-clean, mapped copy.
-          'This is not a claim that any of these are out of sync',
+          'Nothing was changed. Try Refresh again.',
         ],
       },
     ];
@@ -3720,7 +3679,7 @@ describe('MigrationWizard — close status (spec R2a close-behaviour contract)',
     const onClose = vi.fn();
     render(<MigrationWizard campaignCode="ALPHA" onClose={onClose} />);
     await userEvent.click(
-      screen.getByRole('button', { name: /find my campaigns/i })
+      screen.getByRole('button', { name: /check my account/i })
     );
     // A real, accessible failure signal -- the scan never runs.
     await screen.findByRole('alert');
@@ -3754,7 +3713,7 @@ describe('MigrationWizard — close status (spec R2a close-behaviour contract)',
     const onClose = vi.fn();
     render(<MigrationWizard campaignCode="ALPHA" onClose={onClose} />);
     await userEvent.click(
-      screen.getByRole('button', { name: /find my campaigns/i })
+      screen.getByRole('button', { name: /check my account/i })
     );
     // Workspace discovery itself has completed (the connected-campaign text
     // renders once `workspace` resolves) -- but the bulk scan's own
@@ -3779,7 +3738,7 @@ describe('MigrationWizard — close status (spec R2a close-behaviour contract)',
     const onClose = vi.fn();
     render(<MigrationWizard campaignCode="ALPHA" onClose={onClose} />);
     await userEvent.click(
-      screen.getByRole('button', { name: /find my campaigns/i })
+      screen.getByRole('button', { name: /check my account/i })
     );
     await screen.findByText(/connected to campaign alpha/i);
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
@@ -3794,7 +3753,7 @@ describe('MigrationWizard — close status (spec R2a close-behaviour contract)',
     const onClose = vi.fn();
     render(<MigrationWizard campaignCode="ALPHA" onClose={onClose} />);
     await userEvent.click(
-      screen.getByRole('button', { name: /find my campaigns/i })
+      screen.getByRole('button', { name: /check my account/i })
     );
     await screen.findByText(/connected to campaign alpha/i);
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
@@ -3817,7 +3776,7 @@ describe('MigrationWizard — close status (spec R2a close-behaviour contract)',
     const onClose = vi.fn();
     render(<MigrationWizard campaignCode="ALPHA" onClose={onClose} />);
     await userEvent.click(
-      screen.getByRole('button', { name: /find my campaigns/i })
+      screen.getByRole('button', { name: /check my account/i })
     );
     await screen.findByText(/connected to campaign alpha/i);
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
@@ -3849,7 +3808,7 @@ describe('MigrationWizard — close status (spec R2a close-behaviour contract)',
       <MigrationWizard campaignCode="ALPHA" onClose={onCloseFirstMount} />
     );
     await userEvent.click(
-      screen.getByRole('button', { name: /find my campaigns/i })
+      screen.getByRole('button', { name: /check my account/i })
     );
     await screen.findByText(/connected to campaign alpha/i);
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
@@ -3866,7 +3825,7 @@ describe('MigrationWizard — close status (spec R2a close-behaviour contract)',
     render(
       <MigrationWizard campaignCode="ALPHA" onClose={onCloseSecondMount} />
     );
-    // Deliberately no "Find my campaigns" click on this mount.
+    // Deliberately no "check my account" click on this mount.
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onCloseSecondMount).toHaveBeenCalledWith({
       anyCutoverCommitted: false,

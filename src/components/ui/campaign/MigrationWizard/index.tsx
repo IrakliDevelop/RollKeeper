@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/feedback/dialog';
 import { DURABLE_FAMILY_REGISTRY } from '@/lib/durableDm/familyRegistry';
+import type { CampaignInfo } from '@/types/campaign';
 
 import { useMigrationWizard } from './MigrationWizard.hooks';
 import { FamilyStep } from './steps/FamilyStep';
@@ -30,6 +31,8 @@ export interface MigrationWizardCloseStatus {
 
 export interface MigrationWizardProps {
   campaignCode: string;
+  campaign?: CampaignInfo | null;
+  dmId?: string | null;
   /**
    * The campaign's name as this browser's DM roster knows it (re-review
    * N3). Only step 0's missing-workspace guidance uses it, to name the
@@ -62,10 +65,12 @@ export interface MigrationWizardProps {
  */
 export function MigrationWizard({
   campaignCode,
+  campaign = null,
+  dmId = null,
   campaignName,
   onClose,
 }: MigrationWizardProps) {
-  const controller = useMigrationWizard(campaignCode);
+  const controller = useMigrationWizard(campaignCode, campaign, dmId);
 
   // Task 16: `stepIndex === DURABLE_FAMILY_REGISTRY.length` is one past the
   // last registry entry (registered or planned) -- the final report (spec
@@ -123,25 +128,24 @@ export function MigrationWizard({
     <Dialog open onOpenChange={() => {}}>
       <DialogContent size="lg" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>Move campaign data to cloud sync</DialogTitle>
+          <DialogTitle>Back up your campaign online</DialogTitle>
           <DialogDescription>
-            One data category at a time, with a backup of this browser first.
-            Nothing moves until you confirm it, and you can stop after any
-            category.
+            RollKeeper saves one safety copy first, then backs up each part of
+            your campaign. Nothing changes until you confirm it.
           </DialogDescription>
         </DialogHeader>
 
         <DialogBody className="flex gap-5">
           <aside className="border-divider bg-surface-secondary hidden w-[252px] shrink-0 flex-col gap-1 rounded-lg border p-3 sm:flex">
             <p className="text-muted mb-1.5 px-1.5 text-[11px] font-bold tracking-wide uppercase">
-              This run
+              Progress
             </p>
             <p className="text-muted mb-1.5 px-1.5 text-xs">
-              {controller.routedCount} of {controller.registeredCount} data
-              categories moved to cloud sync
+              {controller.routedCount} of {controller.registeredCount} campaign
+              sections backed up
             </p>
             <RailRow
-              label="Your account"
+              label="Online campaign"
               done={controller.workspace !== null}
             />
             <RailRow
@@ -193,6 +197,9 @@ export function MigrationWizard({
                   signedIn={controller.accountId !== null}
                   workspace={controller.workspace}
                   onDiscover={() => void controller.discover()}
+                  creatingWorkspace={controller.creatingWorkspace}
+                  workspaceCreationError={controller.workspaceCreationError}
+                  onCreateWorkspace={() => void controller.createWorkspace()}
                 />
                 <RecoveryStep
                   recovery={controller.recovery}

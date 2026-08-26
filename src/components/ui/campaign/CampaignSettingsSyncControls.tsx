@@ -31,6 +31,7 @@ import { campaignSettingsApi } from '@/lib/durableDm/campaignSettingsApi';
 import { CampaignSettingsHttpGateway } from '@/lib/durableDm/campaignSettingsHttpGateway';
 import { CampaignSettingsSyncService } from '@/lib/durableDm/campaignSettingsSyncService';
 import { isCampaignSettingsClientVisible } from '@/lib/durableDm/slice11aFlags';
+import { areStandaloneMigrationControlsVisible } from '@/lib/durableDm/slice11gFlags';
 import {
   readCampaignSettingsProjectionAuthority,
   writeCampaignSettingsProjectionAuthority,
@@ -1360,6 +1361,8 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
     setStatus('Cloud: saved · Player view: replay queued');
     await loadProjectionStatus();
   };
+
+  if (!areStandaloneMigrationControlsVisible()) return null;
 
   return (
     <Card padding="lg">

@@ -110,21 +110,21 @@ describe('DmDashboardPage — migration wizard launcher (spec R2a)', () => {
     localStorage.clear();
   });
 
-  it('shows Move campaign data to cloud sync only while the wizard flag is on', () => {
+  it('shows Back up campaign online only while the wizard flag is on', () => {
     process.env.NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE = 'false';
     const { rerender } = render(<DmDashboardPage />);
     expect(
-      screen.queryByRole('link', { name: /move campaign data to cloud sync/i })
+      screen.queryByRole('link', { name: /back up campaign online/i })
     ).not.toBeInTheDocument();
 
     process.env.NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE = 'true';
     rerender(<DmDashboardPage />);
     expect(
-      screen.getByRole('link', { name: /move campaign data to cloud sync/i })
+      screen.getByRole('link', { name: /back up campaign online/i })
     ).toHaveAttribute('href', '/dm/migrate/ALPHA');
   });
 
-  it('shows Review cloud sync, not Move campaign data to cloud sync, once campaign_settings is already routed', () => {
+  it('shows Review online backup, not Back up campaign online, once campaign_settings is already routed', () => {
     process.env.NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE = 'true';
     process.env.NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE = 'true';
     const marker: ProjectionAuthorityMarker = {
@@ -141,10 +141,10 @@ describe('DmDashboardPage — migration wizard launcher (spec R2a)', () => {
     render(<DmDashboardPage />);
 
     expect(
-      screen.getByRole('link', { name: /review cloud sync/i })
+      screen.getByRole('link', { name: /review online backup/i })
     ).toHaveAttribute('href', '/dm/migrate/ALPHA');
     expect(
-      screen.queryByRole('link', { name: /move campaign data to cloud sync/i })
+      screen.queryByRole('link', { name: /back up campaign online/i })
     ).not.toBeInTheDocument();
   });
 
@@ -163,7 +163,7 @@ describe('DmDashboardPage — migration wizard launcher (spec R2a)', () => {
     });
     render(<DmDashboardPage />);
     const links = screen.getAllByRole('link', {
-      name: /move campaign data to cloud sync/i,
+      name: /back up campaign online/i,
     });
     expect(links).toHaveLength(2);
     const hrefs = links.map(link => link.getAttribute('href')).sort();
@@ -181,7 +181,7 @@ describe('DmDashboardPage — migration wizard launcher (spec R2a)', () => {
    * test in this file, because the other launcher tests only exercise the
    * flag-on case where the two locals coincide.
    */
-  it('shows Move campaign data to cloud sync copy for an already-routed campaign while the campaign_settings client flag is off', () => {
+  it('shows Back up campaign online copy for an already-routed campaign while the campaign_settings client flag is off', () => {
     process.env.NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE = 'true';
     // NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE deliberately left unset.
     const marker: ProjectionAuthorityMarker = {
@@ -198,10 +198,10 @@ describe('DmDashboardPage — migration wizard launcher (spec R2a)', () => {
     render(<DmDashboardPage />);
 
     expect(
-      screen.getByRole('link', { name: /move campaign data to cloud sync/i })
+      screen.getByRole('link', { name: /back up campaign online/i })
     ).toHaveAttribute('href', '/dm/migrate/ALPHA');
     expect(
-      screen.queryByRole('link', { name: /review cloud sync/i })
+      screen.queryByRole('link', { name: /review online backup/i })
     ).not.toBeInTheDocument();
   });
 });
