@@ -402,3 +402,25 @@ export function expectCloudProductVocabulary(container: HTMLElement) {
   expect(scrubbed).not.toMatch(/\bdeliveries\b/i);
   expect(scrubbed).not.toMatch(/player inbox/i);
 }
+
+const PLAYER_BACKUP_FORBIDDEN_VOCABULARY =
+  /\b(?:indexeddb|localstorage|manifest|schema|authority|epoch|cutover|migration|namespace|mutation|outbox|tombstone|quarantine|cas|device|workflow|canary|workspace|sync|synchronization|synchronized)\b/i;
+
+/** Strict rendered-copy guard for the player backup subtree. */
+export function expectPlayerBackupVocabulary(container: HTMLElement) {
+  const texts = collectTextNodes(container);
+  const doc = container.ownerDocument ?? document;
+  if (container.matches(ACCESSIBLE_NAME_ATTRIBUTE_SELECTOR)) {
+    collectAccessibleNameAttributes(container, doc, texts);
+  }
+  container
+    .querySelectorAll<HTMLElement>(ACCESSIBLE_NAME_ATTRIBUTE_SELECTOR)
+    .forEach(element => collectAccessibleNameAttributes(element, doc, texts));
+
+  const joined = texts.join(' ').replace(/\s+/g, ' ');
+  expect(joined).not.toMatch(PLAYER_BACKUP_FORBIDDEN_VOCABULARY);
+  expect(joined).not.toContain('\u2014');
+  // Catch the only camel-cased forbidden term when markup splits its two
+  // halves across descendants.
+  expect(joined.replace(/\s+/g, '')).not.toMatch(/localstorage/i);
+}

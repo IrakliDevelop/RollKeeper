@@ -7,6 +7,7 @@ import {
   DATABASE_VERSION,
   OBJECT_STORE_NAMES,
   deleteRollkeeperDatabaseForTests,
+  openExistingRollkeeperDatabase,
   openRollkeeperDatabase,
   requestResult,
   transactionComplete,
@@ -23,6 +24,51 @@ describe('rollkeeper-local schema', () => {
     expect(database.version).toBe(DATABASE_VERSION);
     expect([...database.objectStoreNames]).toEqual([...OBJECT_STORE_NAMES]);
     database.close();
+  });
+
+  it('probes an absent database without creating it', async () => {
+    await expect(
+      openExistingRollkeeperDatabase({ factory: indexedDB })
+    ).resolves.toBeNull();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await expect(indexedDB.databases()).resolves.not.toContainEqual(
+      expect.objectContaining({ name: DATABASE_NAME })
+    );
+  });
+
+  it('opens an existing compatible database without upgrading it', async () => {
+    const created = await openRollkeeperDatabase({ factory: indexedDB });
+    created.close();
+    const existing = await openExistingRollkeeperDatabase({
+      factory: indexedDB,
+    });
+    expect(existing?.version).toBe(DATABASE_VERSION);
+    expect([...(existing?.objectStoreNames ?? [])]).toEqual([
+      ...OBJECT_STORE_NAMES,
+    ]);
+    existing?.close();
+  });
+
+  it('closes and rejects a present incompatible database without changing it', async () => {
+    const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION + 1);
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      request.onupgradeneeded = () =>
+        request.result.createObjectStore('future-only');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+    await expect(
+      openExistingRollkeeperDatabase({ factory: indexedDB })
+    ).rejects.toThrow(/incompatible/i);
+    const unchanged = await new Promise<IDBDatabase>((resolve, reject) => {
+      const reopen = indexedDB.open(DATABASE_NAME);
+      reopen.onsuccess = () => resolve(reopen.result);
+      reopen.onerror = () => reject(reopen.error);
+    });
+    expect(unchanged.version).toBe(DATABASE_VERSION + 1);
+    expect([...unchanged.objectStoreNames]).toEqual(['future-only']);
+    unchanged.close();
   });
 
   it('closes on versionchange so a later schema can reopen safely', async () => {

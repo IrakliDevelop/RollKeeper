@@ -92,6 +92,76 @@ export function openRollkeeperDatabase(
   });
 }
 
+export function openExistingRollkeeperDatabase(
+  options: OpenDatabaseOptions = {}
+): Promise<IDBDatabase | null> {
+  const factory =
+    options.factory === null ? null : (options.factory ?? globalThis.indexedDB);
+  if (!factory) return Promise.reject(new Error('IndexedDB is unavailable'));
+
+  return new Promise((resolve, reject) => {
+    const request = factory.open(DATABASE_NAME);
+    let abortedCreation = false;
+    let settled = false;
+    const resolveOnce = (value: IDBDatabase | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const rejectOnce = (cause: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(cause);
+    };
+
+    request.onupgradeneeded = () => {
+      abortedCreation = true;
+      request.transaction?.abort();
+    };
+    request.onsuccess = () => {
+      const database = request.result;
+      if (settled) {
+        database.close();
+        return;
+      }
+      if (abortedCreation) {
+        database.close();
+        resolveOnce(null);
+        return;
+      }
+      const compatible =
+        database.version === DATABASE_VERSION &&
+        OBJECT_STORE_NAMES.every(name =>
+          database.objectStoreNames.contains(name)
+        ) &&
+        database.objectStoreNames.length === OBJECT_STORE_NAMES.length;
+      if (!compatible) {
+        database.close();
+        rejectOnce(
+          new Error('Existing rollkeeper-local database is incompatible')
+        );
+        return;
+      }
+      database.onversionchange = () => {
+        options.onVersionChange?.(database);
+        database.close();
+      };
+      resolveOnce(database);
+    };
+    request.onerror = () => {
+      if (abortedCreation && request.error?.name === 'AbortError') {
+        resolveOnce(null);
+        return;
+      }
+      rejectOnce(request.error ?? new Error('IndexedDB open failed'));
+    };
+    request.onblocked = () => {
+      options.onBlocked?.();
+      rejectOnce(new Error('rollkeeper-local database open is blocked'));
+    };
+  });
+}
+
 export function deleteRollkeeperDatabaseForTests(
   factory: IDBFactory
 ): Promise<void> {

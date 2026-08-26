@@ -9,7 +9,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { AuthForm } from './AuthForm';
 import { TurnstileWidget } from './TurnstileWidget';
 
-export function AuthPageClient() {
+export function AuthPageClient({ returnTo }: { returnTo?: string | null }) {
   const router = useRouter();
   const [turnstileToken, setTurnstileToken] = useState<string>();
   const [turnstileAttempt, setTurnstileAttempt] = useState(0);
@@ -52,7 +52,7 @@ export function AuthPageClient() {
           setTurnstileAttempt(value => value + 1);
         }}
         onSignedIn={() => {
-          router.push('/account');
+          router.push(returnTo ?? '/account');
           router.refresh();
         }}
       />

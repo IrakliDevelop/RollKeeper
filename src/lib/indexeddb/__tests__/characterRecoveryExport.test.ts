@@ -2,7 +2,10 @@ import 'fake-indexeddb/auto';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { exportCurrentCharacterData } from '@/lib/indexeddb/characterRecoveryExport';
+import {
+  captureActiveCharacterRecoveryBundleFromRows,
+  exportCurrentCharacterData,
+} from '@/lib/indexeddb/characterRecoveryExport';
 import {
   deleteRollkeeperDatabaseForTests,
   openRollkeeperDatabase,
@@ -21,7 +24,14 @@ describe('blocked-state character exports', () => {
     localStorage.setItem('rollkeeper-dm-data', 'dm');
     const database = await openRollkeeperDatabase({ factory: indexedDB });
     const setup = database.transaction(
-      ['meta', 'kvGenerations', 'journal', 'conflicts', 'quarantine'],
+      [
+        'meta',
+        'kvGenerations',
+        'journal',
+        'conflicts',
+        'quarantine',
+        'tombstones',
+      ],
       'readwrite'
     );
     setup.objectStore('meta').put({
@@ -64,6 +74,12 @@ describe('blocked-state character exports', () => {
       namespace: 'user:other',
       key: 'rollkeeper-player-data',
     });
+    setup.objectStore('tombstones').put({
+      namespace: 'guest',
+      family: 'character',
+      legacyId: 'hero',
+      key: 'rollkeeper-character:hero',
+    });
     await transactionComplete(setup);
 
     const serialized = await exportCurrentCharacterData(
@@ -85,6 +101,7 @@ describe('blocked-state character exports', () => {
       journal: [{ journalId: 'j' }],
       conflicts: [{ conflictId: 'c' }],
       quarantine: [],
+      tombstones: [expect.objectContaining({ legacyId: 'hero' })],
       bundleHash: expect.any(String),
     });
     expect(bundle.generations).toEqual([
@@ -111,5 +128,50 @@ describe('blocked-state character exports', () => {
     expect(bundle.authority).toEqual({ authority: 'localStorage', epoch: 0 });
     expect(bundle.compatibilityMirrors).toEqual([]);
     database.close();
+  });
+
+  it('rejects empty, duplicate, malformed, and mixed active-row sources before serialization', async () => {
+    const authority = {
+      authority: 'indexedDB' as const,
+      namespace: 'guest' as const,
+      family: 'character' as const,
+      generation: 'active',
+      epoch: 1,
+      committedAt: 'now',
+    };
+    const base = {
+      authority,
+      appVersion: 'test',
+      runId: 'recovery',
+      timestamp: 'created',
+    };
+    await expect(
+      captureActiveCharacterRecoveryBundleFromRows({ ...base, rows: [] })
+    ).rejects.toThrow(/empty/i);
+    const valid = {
+      namespace: 'guest' as const,
+      generation: 'active',
+      key: 'rollkeeper-player-data',
+      presence: true,
+      rawValue: '{"version":1}',
+    };
+    await expect(
+      captureActiveCharacterRecoveryBundleFromRows({
+        ...base,
+        rows: [valid, valid],
+      })
+    ).rejects.toThrow(/malformed|mixed/i);
+    await expect(
+      captureActiveCharacterRecoveryBundleFromRows({
+        ...base,
+        rows: [{ ...valid, presence: false, rawValue: 'not-null' }],
+      })
+    ).rejects.toThrow(/malformed|mixed/i);
+    await expect(
+      captureActiveCharacterRecoveryBundleFromRows({
+        ...base,
+        rows: [{ ...valid, generation: 'other' }],
+      })
+    ).rejects.toThrow(/malformed|mixed/i);
   });
 });

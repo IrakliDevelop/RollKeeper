@@ -1,5 +1,6 @@
 import { CHARACTER_FAMILY, isCharacterFamilyKey } from './characterFamily';
 import {
+  openExistingRollkeeperDatabase,
   openRollkeeperDatabase,
   requestResult,
   transactionComplete,
@@ -37,6 +38,22 @@ export type CharacterAuthority =
 
 interface ActivePointerRecord extends IndexedDbCharacterAuthority {
   key: string;
+}
+
+export interface ActiveCharacterSafetyRow {
+  namespace: StorageNamespace;
+  generation: string;
+  key: string;
+  presence: boolean;
+  rawValue: string | null;
+}
+
+export interface CurrentCharacterSafetyCoverage {
+  authority: IndexedDbCharacterAuthority;
+  rows: ActiveCharacterSafetyRow[];
+  parity: boolean;
+  matchingJournalCount: number;
+  broadFileCoversCurrentCharacters: boolean;
 }
 
 interface RolledBackPointerRecord {
@@ -116,6 +133,114 @@ export async function verifyCharacterRollbackGenerationAfterReopen(
     return false;
   } finally {
     database?.close();
+  }
+}
+
+export async function inspectCurrentCharacterSafetyCoverage(options: {
+  factory: IDBFactory;
+  storage: Pick<Storage, 'length' | 'key' | 'getItem'>;
+  namespace: StorageNamespace;
+  expectedAuthority?: { generation: string; epoch: number };
+}): Promise<CurrentCharacterSafetyCoverage> {
+  const database = await openExistingRollkeeperDatabase({
+    factory: options.factory,
+  });
+  if (!database) throw new Error('Active character saving is not available');
+  try {
+    const keys = scopedCharacterAuthorityKeys(options.namespace);
+    const transaction = database.transaction(
+      ['meta', 'kvGenerations', 'journal'],
+      'readonly'
+    );
+    const pointer = (await requestResult(
+      transaction.objectStore('meta').get(keys.pointer)
+    )) as ActivePointerRecord | RolledBackPointerRecord | undefined;
+    const epoch = (await requestResult(
+      transaction.objectStore('meta').get(keys.epoch)
+    )) as EpochRecord | undefined;
+    const allRows = (await requestResult(
+      transaction.objectStore('kvGenerations').getAll()
+    )) as unknown[];
+    const journals = (await requestResult(
+      transaction.objectStore('journal').getAll()
+    )) as Array<Record<string, unknown>>;
+    await transactionComplete(transaction);
+
+    if (
+      pointer?.authority !== 'indexedDB' ||
+      pointer.namespace !== options.namespace ||
+      pointer.family !== CHARACTER_FAMILY ||
+      epoch?.value !== pointer.epoch
+    ) {
+      throw new Error('Active character saving is not available');
+    }
+    if (
+      options.expectedAuthority &&
+      (pointer.generation !== options.expectedAuthority.generation ||
+        pointer.epoch !== options.expectedAuthority.epoch)
+    ) {
+      throw new Error('Active character saving changed during the check');
+    }
+
+    const activeRows: ActiveCharacterSafetyRow[] = [];
+    const seen = new Set<string>();
+    for (const value of allRows) {
+      if (typeof value !== 'object' || value === null) continue;
+      const row = value as Partial<ActiveCharacterSafetyRow>;
+      if (
+        row.namespace !== options.namespace ||
+        row.generation !== pointer.generation ||
+        typeof row.key !== 'string' ||
+        !isCharacterFamilyKey(row.key)
+      ) {
+        continue;
+      }
+      if (
+        seen.has(row.key) ||
+        typeof row.presence !== 'boolean' ||
+        (row.presence && typeof row.rawValue !== 'string') ||
+        (!row.presence && row.rawValue !== null)
+      ) {
+        throw new Error('Active character row is malformed or duplicated');
+      }
+      seen.add(row.key);
+      activeRows.push(row as ActiveCharacterSafetyRow);
+    }
+    activeRows.sort((left, right) => left.key.localeCompare(right.key));
+    if (activeRows.length === 0) {
+      throw new Error('Active character generation is empty');
+    }
+
+    const compatibilityKeys = new Set<string>();
+    for (let index = 0; index < options.storage.length; index += 1) {
+      const key = options.storage.key(index);
+      if (key && isCharacterFamilyKey(key)) compatibilityKeys.add(key);
+    }
+    const parity =
+      [...compatibilityKeys].every(key => seen.has(key)) &&
+      activeRows.every(row =>
+        row.presence
+          ? options.storage.getItem(row.key) === row.rawValue
+          : options.storage.getItem(row.key) === null
+      );
+    const matchingJournalCount = journals.filter(
+      row =>
+        row.kind === 'character-compatibility-mirror' &&
+        row.namespace === options.namespace &&
+        row.family === CHARACTER_FAMILY &&
+        row.generation === pointer.generation &&
+        row.cutoverEpoch === pointer.epoch
+    ).length;
+    const authority = withoutKey(pointer);
+    return {
+      authority,
+      rows: activeRows,
+      parity,
+      matchingJournalCount,
+      broadFileCoversCurrentCharacters: parity && matchingJournalCount === 0,
+    };
+  } finally {
+    database.close();
   }
 }
 
