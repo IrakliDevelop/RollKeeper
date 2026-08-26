@@ -1,4 +1,8 @@
-import type { IndexedDbAutomaticCharacterSyncRepository } from '@/lib/indexeddb/automaticCharacterSyncRepository';
+import type {
+  AutomaticCharacterDocument,
+  AutomaticCharacterOutboxEntry,
+  IndexedDbAutomaticCharacterSyncRepository,
+} from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import { openExistingRollkeeperDatabase } from '@/lib/indexeddb/localDatabase';
 import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
 import {
@@ -41,11 +45,15 @@ import {
   updatePlayerBackupCharacterCheckpoint,
 } from './playerBackupRunRepository';
 
-const CONSENT_NOT_ACKNOWLEDGED =
+/** @internal Shared with `playerBackupOngoingExecution`. */
+export const CONSENT_NOT_ACKNOWLEDGED =
   'Durable player backup consent could not be acknowledged';
 const RUN_MISSING = 'Committed player backup run is missing';
-/** Checkpoints require a non-empty cloud id even when none was ever minted. */
-const NO_CLOUD_IDENTITY = 'none';
+/**
+ * Checkpoints require a non-empty cloud id even when none was ever minted.
+ * @internal Shared with `playerBackupOngoingExecution`.
+ */
+export const NO_CLOUD_IDENTITY = 'none';
 
 /** Roster reader shaped like the input `ManualCharacterCloudService` takes. */
 export interface PlayerBackupLocalCharacterSource {
@@ -97,10 +105,11 @@ export interface PlayerBackupManualExecutionOptions {
 }
 
 // ---------------------------------------------------------------------------
-// Shared helpers (Task 5 adds automatic-work functions alongside these).
+// Shared helpers (`playerBackupOngoingExecution` reuses the exported ones).
 // ---------------------------------------------------------------------------
 
-async function withExistingDatabase<T>(
+/** @internal Shared with `playerBackupOngoingExecution`. */
+export async function withExistingDatabase<T>(
   factory: IDBFactory,
   task: (database: IDBDatabase) => Promise<T>
 ): Promise<T> {
@@ -136,7 +145,8 @@ function retainCharacterIdentity(
   };
 }
 
-function onlineCheckpoint(options: {
+/** @internal Shared with `playerBackupOngoingExecution`. */
+export function onlineCheckpoint(options: {
   kind?: 'manual' | 'automatic';
   state: PlayerBackupOnlineCheckpointState;
   cloudId: string;
@@ -164,8 +174,9 @@ function onlineCheckpoint(options: {
 /**
  * Writes one character checkpoint inside a transaction that re-verifies the
  * account-scoped active run pointer. A replaced run aborts without writing.
+ * @internal Shared with `playerBackupOngoingExecution`.
  */
-async function withFencedCheckpoint(options: {
+export async function withFencedCheckpoint(options: {
   database: IDBDatabase;
   accountId: string;
   expectedActiveRunId: string;
@@ -228,18 +239,27 @@ async function readAcknowledgedRun(options: {
   });
 }
 
-async function acknowledgeConfirmedSelection(
+/**
+ * A one-time run leaves every eligible character off; an ongoing run turns the
+ * selected ones on. Both partitions must match the run exactly.
+ * @internal Shared with `playerBackupOngoingExecution`.
+ */
+export async function acknowledgeConfirmedSelection(
   factory: IDBFactory,
   run: PlayerBackupRunV1
 ): Promise<void> {
+  const selectedPolicy = run.mode === 'ongoing' ? 'on' : 'off';
   await withExistingDatabase(factory, async database => {
     const acknowledged = await new AutomaticCharacterSyncPreferences(
       database
     ).readConfirmedSelection(run.namespace, run.eligibleCharacterIds);
     if (
-      acknowledged.futureDefault !== 'off' ||
+      acknowledged.futureDefault !== run.futureDefault ||
       acknowledged.confirmedAt !== run.confirmedAt ||
-      run.eligibleCharacterIds.some(
+      run.selectedCharacterIds.some(
+        legacyId => acknowledged.characterPolicies[legacyId] !== selectedPolicy
+      ) ||
+      run.clearedCharacterIds.some(
         legacyId => acknowledged.characterPolicies[legacyId] !== 'off'
       )
     ) {
@@ -634,10 +654,7 @@ function deriveManualOutcome(
   online: PlayerBackupOnlineCheckpoint | undefined,
   link: CharacterCloudLink | null
 ): { outcome: PlayerBackupCharacterOutcome; reason: string | null } {
-  if (!online || online.kind === 'automatic') {
-    // Automatic work is completed in Task 5.
-    return { outcome: 'pending', reason: null };
-  }
+  if (!online) return { outcome: 'pending', reason: null };
   if (online.state === 'protected') {
     const verified =
       link !== null &&
@@ -657,7 +674,8 @@ export async function derivePlayerBackupRunResult(options: {
   factory: IDBFactory;
   accountId: string;
   expectedActiveRunId: string;
-  links: CharacterCloudLinkRepository;
+  /** Manual one-time evidence; ongoing runs never attach a link. */
+  links?: CharacterCloudLinkRepository;
   repository?: IndexedDbAutomaticCharacterSyncRepository;
 }): Promise<PlayerBackupExecutionResult> {
   const run = await readActivePlayerBackupRun({
@@ -678,11 +696,22 @@ export async function derivePlayerBackupRunResult(options: {
     pending: [],
   };
   const outcomes: PlayerBackupExecutionResult['outcomes'] = {};
+  const automatic = run.selectedCharacterIds.some(
+    legacyId => run.characterCheckpoints[legacyId]?.online?.kind === 'automatic'
+  );
+  const evidence =
+    automatic && options.repository
+      ? await readAutomaticEvidence(options.repository, run.namespace)
+      : null;
   for (const legacyId of run.selectedCharacterIds) {
-    const derived = deriveManualOutcome(
-      run.characterCheckpoints[legacyId]?.online,
-      options.links.get(options.accountId, legacyId)
-    );
+    const online = run.characterCheckpoints[legacyId]?.online;
+    const derived =
+      online?.kind === 'automatic'
+        ? deriveAutomaticOutcome(online, legacyId, evidence)
+        : deriveManualOutcome(
+            online,
+            options.links?.get(options.accountId, legacyId) ?? null
+          );
     buckets[derived.outcome].push(legacyId);
     outcomes[legacyId] = derived;
   }
@@ -702,4 +731,89 @@ export async function derivePlayerBackupRunResult(options: {
     outcomes,
     complete: buckets.protected.length === run.selectedCharacterIds.length,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Automatic (ongoing) result derivation
+// ---------------------------------------------------------------------------
+
+interface AutomaticWorkEvidence {
+  documents: Map<string, AutomaticCharacterDocument>;
+  work: Map<string, AutomaticCharacterOutboxEntry>;
+  conflicts: Set<string>;
+  quarantine: Set<string>;
+}
+
+async function readAutomaticEvidence(
+  repository: IndexedDbAutomaticCharacterSyncRepository,
+  namespace: `user:${string}`
+): Promise<AutomaticWorkEvidence> {
+  const [documents, outbox, conflicts, quarantine] = await Promise.all([
+    repository.listDocuments(namespace),
+    repository.listOutbox(namespace),
+    repository.listConflicts(namespace),
+    repository.listQuarantine(namespace),
+  ]);
+  const work = new Map<string, AutomaticCharacterOutboxEntry>();
+  for (const entry of outbox) {
+    if (!work.has(entry.legacyId)) work.set(entry.legacyId, entry);
+  }
+  return {
+    documents: new Map(
+      documents.map(document => [document.legacyId, document])
+    ),
+    work,
+    conflicts: new Set(
+      conflicts
+        .filter(conflict => conflict.resolutionState === 'unresolved')
+        .map(conflict => conflict.legacyId)
+    ),
+    quarantine: new Set(quarantine.map(record => record.legacyId)),
+  };
+}
+
+/** Reports exactly what the durable automatic stores support. */
+function deriveAutomaticOutcome(
+  online: PlayerBackupOnlineCheckpoint,
+  legacyId: string,
+  evidence: AutomaticWorkEvidence | null
+): { outcome: PlayerBackupCharacterOutcome; reason: string | null } {
+  if (!evidence) return { outcome: 'pending', reason: null };
+  if (evidence.quarantine.has(legacyId)) {
+    return { outcome: 'held-aside', reason: 'quarantined' };
+  }
+  const work = evidence.work.get(legacyId);
+  if (evidence.conflicts.has(legacyId) || work?.state === 'conflict') {
+    return {
+      outcome: 'needs-attention',
+      reason: work?.lastError ?? 'conflict',
+    };
+  }
+  if (work?.state === 'auth-required') {
+    return { outcome: 'auth-required', reason: work.lastError };
+  }
+  if (work?.state === 'offline') {
+    return { outcome: 'offline', reason: work.lastError };
+  }
+  if (work && (work.state === 'retry' || work.state === 'failed')) {
+    return { outcome: 'failed', reason: work.lastError };
+  }
+  if (work) return { outcome: 'queued', reason: null };
+  const document = evidence.documents.get(legacyId);
+  if (
+    document &&
+    document.baseServerVersion > 0 &&
+    document.cloudId === online.cloudId
+  ) {
+    return { outcome: 'protected', reason: null };
+  }
+  if (
+    online.state !== 'pending' &&
+    online.state !== 'queued' &&
+    online.state !== 'protected'
+  ) {
+    // A refused or unusable character keeps its own recorded outcome.
+    return { outcome: online.state, reason: online.reason ?? null };
+  }
+  return { outcome: 'pending', reason: null };
 }

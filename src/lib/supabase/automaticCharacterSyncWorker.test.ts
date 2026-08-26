@@ -10,12 +10,14 @@ import {
   deleteRollkeeperDatabaseForTests,
   openRollkeeperDatabase,
 } from '@/lib/indexeddb/localDatabase';
+import { PlayerBackupLockUnavailableError } from '@/lib/playerBackup/playerBackupRunFence';
 
 import { CharacterCloudGatewayError } from './characterCloudGateway';
 import { fingerprintCharacterPayload } from './characterCloudCodec';
 import {
   AutomaticCharacterSyncWorker,
   type AutomaticCharacterSyncGateway,
+  type AutomaticSyncDispatchGuard,
 } from './automaticCharacterSyncWorker';
 
 const NAMESPACE = 'user:account-a' as const;
@@ -88,13 +90,15 @@ describe('AutomaticCharacterSyncWorker', () => {
 
   const worker = (
     cloud: AutomaticCharacterSyncGateway,
-    featureEnabled = true
+    featureEnabled = true,
+    dispatchGuard?: AutomaticSyncDispatchGuard
   ) =>
     new AutomaticCharacterSyncWorker({
       namespace: NAMESPACE,
       featureEnabled,
       repository,
       gateway: cloud,
+      ...(dispatchGuard ? { dispatchGuard } : {}),
       now: () => 10_000,
       random: () => 0,
       fingerprint: async payload =>
@@ -421,6 +425,107 @@ describe('AutomaticCharacterSyncWorker', () => {
       })
     );
     await expect(worker(cloud).runOnce()).resolves.toBe('failed');
+  });
+
+  it('holds and pauses work when the dispatch guard refuses, without any gateway call', async () => {
+    const cloud = gateway();
+    await repository.commit(mutation('refused'));
+    const guard: AutomaticSyncDispatchGuard = {
+      around: (_entry, task) => task(),
+      authorize: async () => 'hold',
+    };
+
+    await expect(worker(cloud, true, guard).runOnce()).resolves.toBe('held');
+
+    await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+      expect.objectContaining({
+        legacyId: 'refused',
+        state: 'paused',
+        pausedFromState: 'queued',
+      }),
+    ]);
+    expect(cloud.put).not.toHaveBeenCalled();
+    expect(cloud.fetch).not.toHaveBeenCalled();
+  });
+
+  it('runs put, refetch and acknowledgement inside the guard boundary', async () => {
+    const events: string[] = [];
+    const cloud = gateway();
+    vi.mocked(cloud.put).mockImplementation(async request => {
+      events.push('put');
+      return {
+        status: 'success' as const,
+        characterId: request.cloudId,
+        serverVersion: 1,
+      };
+    });
+    vi.mocked(cloud.fetch).mockImplementation(async cloudId => {
+      events.push('fetch');
+      return row(cloudId.replace('cloud-', ''));
+    });
+    await repository.commit(mutation('guarded'));
+    const guard: AutomaticSyncDispatchGuard = {
+      around: async (_entry, task) => {
+        events.push('enter');
+        try {
+          return await task();
+        } finally {
+          const retained = await repository.listOutbox(NAMESPACE);
+          events.push(retained.length === 0 ? 'acknowledged' : 'retained');
+          events.push('exit');
+        }
+      },
+      authorize: async () => {
+        events.push('authorize');
+        return 'dispatch';
+      },
+    };
+
+    await expect(worker(cloud, true, guard).runOnce()).resolves.toBe('synced');
+
+    expect(events).toEqual([
+      'enter',
+      'authorize',
+      'put',
+      'fetch',
+      'acknowledged',
+      'exit',
+    ]);
+  });
+
+  it('turns a guard failure into retained retry work', async () => {
+    const cloud = gateway();
+    await repository.commit(mutation('lock-lost'));
+    const guard: AutomaticSyncDispatchGuard = {
+      around: async () => {
+        throw new PlayerBackupLockUnavailableError();
+      },
+      authorize: async () => 'dispatch',
+    };
+
+    await expect(worker(cloud, true, guard).runOnce()).resolves.toBe('failed');
+
+    await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+      expect.objectContaining({
+        legacyId: 'lock-lost',
+        state: 'retry',
+        attemptCount: 1,
+        lastError: 'The exclusive player backup lock is unavailable',
+      }),
+    ]);
+    expect(cloud.put).not.toHaveBeenCalled();
+  });
+
+  it('never holds work without a dispatch guard', async () => {
+    const cloud = gateway();
+    await repository.commit(mutation('unguarded'));
+    const sync = worker(cloud);
+
+    const results = [await sync.runOnce(), await sync.runOnce()];
+
+    expect(results).toEqual(['synced', 'idle']);
+    expect(results).not.toContain('held');
+    await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([]);
   });
 
   it('uses safe default clocks, jitter, fingerprinting, and payload-name fallback', async () => {

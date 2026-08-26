@@ -3,6 +3,10 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { captureDeviceBackup } from '@/lib/deviceRecovery';
+import {
+  IndexedDbAutomaticCharacterSyncRepository,
+  type AutomaticCharacterOutboxEntry,
+} from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import { readCharacterAuthority } from '@/lib/indexeddb/characterAuthority';
 import { characterCutoverSelectionKey } from '@/lib/indexeddb/characterCutoverSelection';
 import {
@@ -13,6 +17,8 @@ import {
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
 import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
+import { AutomaticCharacterSyncService } from '@/lib/supabase/automaticCharacterSyncService';
+import { AutomaticCharacterSyncWorker } from '@/lib/supabase/automaticCharacterSyncWorker';
 import type { CharacterCloudRow } from '@/lib/supabase/characterCloudCodec';
 import {
   encodeCharacterCloudPayload,
@@ -28,6 +34,10 @@ import type {
 import { ManualCharacterCloudService } from '@/lib/supabase/manualCharacterCloudService';
 
 import { confirmPlayerBackupConsent } from '../playerBackupCoordinator';
+import {
+  createPlayerBackupDispatchGuard,
+  startPlayerBackupOngoingWork,
+} from '../playerBackupOngoingExecution';
 import {
   derivePlayerBackupRunResult,
   executePlayerBackupManualRun,
@@ -73,6 +83,20 @@ const HERO_B_OLD = {
   id: 'hero-b',
   name: 'Hero B',
   characterData: { id: 'hero-b', revision: 1 },
+};
+/** Ongoing work reads the roster the automatic sync service reads. */
+const CREATED_AT = '2026-08-01T00:00:00.000Z';
+const ONGOING_HERO_A = { ...HERO_A, createdAt: CREATED_AT };
+const HERO_C = {
+  id: 'hero-c',
+  name: 'Hero C',
+  createdAt: CREATED_AT,
+  characterData: { id: 'hero-c', revision: 3 },
+};
+const ONGOING_ROSTER: Record<string, unknown> = {
+  'hero-a': ONGOING_HERO_A,
+  'hero-b': { ...HERO_B, createdAt: CREATED_AT },
+  'hero-c': HERO_C,
 };
 
 function fingerprint(character: unknown): Promise<string> {
@@ -411,6 +435,90 @@ async function readStore(name: 'documents' | 'outbox'): Promise<unknown[]> {
   } finally {
     database.close();
   }
+}
+
+class ImmediateLocks implements PlayerBackupExclusiveLockProvider {
+  async request<T>(
+    _name: string,
+    _options: { mode: 'exclusive' },
+    callback: () => Promise<T> | T
+  ): Promise<T> {
+    return callback();
+  }
+}
+
+/** Runs `beforeLock` once, immediately before the first fenced section. */
+function hookedLocks(
+  beforeLock: () => Promise<void>
+): PlayerBackupExclusiveLockProvider {
+  let fired = false;
+  return {
+    async request<T>(
+      _name: string,
+      _options: { mode: 'exclusive' },
+      callback: () => Promise<T> | T
+    ): Promise<T> {
+      if (!fired) {
+        fired = true;
+        await beforeLock();
+      }
+      return callback();
+    },
+  };
+}
+
+async function setCharacterPolicy(
+  legacyId: string,
+  enabled: boolean
+): Promise<void> {
+  const database = await openRollkeeperDatabase({ factory: indexedDB });
+  try {
+    await new AutomaticCharacterSyncPreferences(database).setCharacter(
+      NAMESPACE,
+      legacyId,
+      enabled
+    );
+  } finally {
+    database.close();
+  }
+}
+
+function createOngoingHarness(
+  options: {
+    roster?: Record<string, unknown>;
+    locks?: PlayerBackupExclusiveLockProvider | null;
+    beforeLock?: () => Promise<void>;
+  } = {}
+) {
+  const roster = options.roster ?? ONGOING_ROSTER;
+  const identities = createIdentities();
+  const locks =
+    options.locks !== undefined
+      ? options.locks
+      : options.beforeLock
+        ? hookedLocks(options.beforeLock)
+        : new ImmediateLocks();
+  const start = (runId = 'run-a') =>
+    startPlayerBackupOngoingWork({
+      factory: indexedDB,
+      locks,
+      accountId: ACCOUNT,
+      expectedActiveRunId: runId,
+      characters: { get: (legacyId: string) => roster[legacyId] ?? null },
+      generateCloudId: identities.generateCloudId,
+      generateMutationId: identities.generateMutationId,
+      now: () => NOW,
+    });
+  return { identities, locks, roster, start };
+}
+
+function deriveOngoing(repository: IndexedDbAutomaticCharacterSyncRepository) {
+  return derivePlayerBackupRunResult({
+    factory: indexedDB,
+    accountId: ACCOUNT,
+    expectedActiveRunId: 'run-a',
+    repository,
+  });
 }
 
 describe('one-time player backup online execution', () => {
@@ -1154,5 +1262,388 @@ describe('one-time player backup online execution', () => {
       cloudId: 'cloud-1',
       mutationId: 'mutation-1',
     });
+  });
+});
+
+describe('ongoing player backup work creation', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(async () => {
+    localStorage.clear();
+    await deleteRollkeeperDatabaseForTests(indexedDB);
+  });
+
+  it('creates origin-stamped initial documents and work only for selected ids of a local-ready ongoing run', async () => {
+    await seedRun({
+      mode: 'ongoing',
+      selected: ['hero-a'],
+      cleared: ['hero-b'],
+    });
+    const harness = createOngoingHarness();
+
+    const result = await harness.start();
+
+    const expected = await fingerprint(ONGOING_HERO_A);
+    await expect(readStore('documents')).resolves.toEqual([
+      expect.objectContaining({
+        namespace: NAMESPACE,
+        family: 'character',
+        legacyId: 'hero-a',
+        cloudId: 'cloud-1',
+        operation: 'create',
+        payload: encodeCharacterCloudPayload(ONGOING_HERO_A),
+        schemaVersion: 1,
+        localRevision: 5,
+        baseServerVersion: 0,
+        contentFingerprint: expected,
+        syncPolicy: 'on',
+        updatedAt: NOW,
+        originPlayerBackupRunId: 'run-a',
+        deletedAt: null,
+      }),
+    ]);
+    await expect(readStore('outbox')).resolves.toEqual([
+      expect.objectContaining({
+        mutationId: 'mutation-1',
+        namespace: NAMESPACE,
+        legacyId: 'hero-a',
+        cloudId: 'cloud-1',
+        operation: 'create',
+        state: 'queued',
+        syncPolicy: 'on',
+        contentFingerprint: expected,
+        originPlayerBackupRunId: 'run-a',
+      }),
+    ]);
+    const checkpoints = await readCheckpoints();
+    expect(checkpoints['hero-a'].online).toEqual({
+      version: 1,
+      kind: 'automatic',
+      cloudId: 'cloud-1',
+      mutationId: 'mutation-1',
+      state: 'queued',
+      recordedAt: NOW,
+    });
+    expect(checkpoints['hero-b']).toBeUndefined();
+    expect(result).toMatchObject({
+      runId: 'run-a',
+      mode: 'ongoing',
+      executionPath: 'integrated',
+      queued: ['hero-a'],
+      protected: [],
+      failed: [],
+      pending: [],
+      complete: false,
+    });
+  });
+
+  it('rejects a confirmed run and a degraded run', async () => {
+    await seedRun({ mode: 'ongoing', stage: 'confirmed' });
+
+    await expect(createOngoingHarness().start()).rejects.toThrow(
+      'Player backup run has not reached local-ready'
+    );
+    await expect(readStore('documents')).resolves.toEqual([]);
+    await expect(readStore('outbox')).resolves.toEqual([]);
+
+    await deleteRollkeeperDatabaseForTests(indexedDB);
+    await seedRun({
+      mode: 'one-time',
+      stage: 'confirmed',
+      executionPath: 'degraded-manual',
+    });
+
+    await expect(createOngoingHarness().start()).rejects.toThrow(
+      'Ongoing work requires an integrated run'
+    );
+    await expect(readStore('documents')).resolves.toEqual([]);
+    await expect(readStore('outbox')).resolves.toEqual([]);
+  });
+
+  it('is idempotent across reload and never duplicates work', async () => {
+    await seedRun({ mode: 'ongoing' });
+    const harness = createOngoingHarness();
+
+    const first = await harness.start();
+    const second = await harness.start();
+
+    expect(second).toEqual(first);
+    await expect(readStore('outbox')).resolves.toEqual([
+      expect.objectContaining({ mutationId: 'mutation-1' }),
+    ]);
+    await expect(readStore('documents')).resolves.toHaveLength(1);
+    expect(harness.identities.generateMutationId).toHaveBeenCalledTimes(1);
+    expect(harness.identities.generateCloudId).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes nothing when the active run was replaced mid-transaction', async () => {
+    await seedRun({ mode: 'ongoing' });
+    const harness = createOngoingHarness({
+      // The replacement lands after the pre-flight read, so only the fenced
+      // transaction can still refuse the work.
+      beforeLock: async () => {
+        await seedRun({
+          mode: 'ongoing',
+          runId: 'run-b',
+          stage: 'confirmed',
+          expectedActiveRunId: 'run-a',
+        });
+      },
+    });
+
+    await expect(harness.start('run-a')).rejects.toBeInstanceOf(
+      PlayerBackupRunReplacedError
+    );
+    await expect(readStore('documents')).resolves.toEqual([]);
+    await expect(readStore('outbox')).resolves.toEqual([]);
+  });
+
+  it('re-reads preference under the fence and refuses a paused character', async () => {
+    await seedRun({ mode: 'ongoing', selected: ['hero-a', 'hero-c'] });
+    await setCharacterPolicy('hero-a', false);
+
+    // A selection that is already broken before the run starts writes nothing.
+    await expect(createOngoingHarness().start()).rejects.toThrow(
+      'Durable player backup consent could not be acknowledged'
+    );
+    await expect(readStore('outbox')).resolves.toEqual([]);
+
+    await setCharacterPolicy('hero-a', true);
+    const harness = createOngoingHarness({
+      beforeLock: async () => {
+        await setCharacterPolicy('hero-a', false);
+      },
+    });
+
+    const result = await harness.start();
+
+    expect(result.failed).toEqual(['hero-a']);
+    expect(result.outcomes['hero-a']).toEqual({
+      outcome: 'failed',
+      reason: 'preference-not-acknowledged',
+    });
+    expect(result.queued).toEqual(['hero-c']);
+    await expect(readStore('outbox')).resolves.toEqual([
+      expect.objectContaining({ legacyId: 'hero-c' }),
+    ]);
+    await expect(readStore('documents')).resolves.toEqual([
+      expect.objectContaining({ legacyId: 'hero-c' }),
+    ]);
+    const checkpoints = await readCheckpoints();
+    expect(checkpoints['hero-a'].online).toMatchObject({
+      kind: 'automatic',
+      state: 'failed',
+      reason: 'preference-not-acknowledged',
+      mutationId: null,
+    });
+  });
+
+  it('records a missing local character as failed without creating work', async () => {
+    await seedRun({ mode: 'ongoing', selected: ['hero-a', 'hero-c'] });
+    const harness = createOngoingHarness({
+      roster: { 'hero-c': HERO_C },
+    });
+
+    const result = await harness.start();
+
+    expect(result.failed).toEqual(['hero-a']);
+    expect(result.outcomes['hero-a']).toEqual({
+      outcome: 'failed',
+      reason: 'local-character-missing',
+    });
+    expect(result.queued).toEqual(['hero-c']);
+    await expect(readStore('outbox')).resolves.toEqual([
+      expect.objectContaining({ legacyId: 'hero-c' }),
+    ]);
+  });
+
+  it('derives protected only from an acknowledged document with no pending work', async () => {
+    await seedRun({ mode: 'ongoing' });
+    const harness = createOngoingHarness();
+    const queued = await harness.start();
+
+    expect(queued.queued).toEqual(['hero-a']);
+    expect(queued.protected).toEqual([]);
+
+    const database = await openExistingRollkeeperDatabase({
+      factory: indexedDB,
+    });
+    if (!database) throw new Error('database is missing');
+    try {
+      const repository = new IndexedDbAutomaticCharacterSyncRepository(
+        database,
+        { randomId: () => 'later-edit' }
+      );
+      const gateway = createGatewayDouble();
+      const worker = new AutomaticCharacterSyncWorker({
+        namespace: NAMESPACE,
+        featureEnabled: true,
+        repository,
+        gateway,
+      });
+
+      await expect(worker.runOnce()).resolves.toBe('synced');
+
+      const acknowledged = await deriveOngoing(repository);
+      expect(acknowledged.protected).toEqual(['hero-a']);
+      expect(acknowledged.complete).toBe(true);
+
+      const document = await repository.getDocument(NAMESPACE, 'hero-a');
+      expect(document).toMatchObject({ cloudId: 'cloud-1' });
+      await repository.commit({
+        namespace: NAMESPACE,
+        legacyId: 'hero-a',
+        cloudId: 'cloud-1',
+        operation: 'replace',
+        payload: document!.payload,
+        schemaVersion: 1,
+        localRevision: 6,
+        baseServerVersion: document!.baseServerVersion,
+        contentFingerprint: document!.contentFingerprint,
+        syncPolicy: 'on',
+        updatedAt: NOW,
+      });
+      const [pending] = await repository.listOutbox(NAMESPACE);
+      expect((await deriveOngoing(repository)).queued).toEqual(['hero-a']);
+
+      await repository.preserveConflict(
+        pending!,
+        { id: 'cloud-1', server_version: 9 },
+        NOW
+      );
+      const contested = await deriveOngoing(repository);
+      expect(contested.needsAttention).toEqual(['hero-a']);
+      expect(contested.protected).toEqual([]);
+
+      await repository.quarantineCloudCandidate(
+        NAMESPACE,
+        'hero-a',
+        { id: 'cloud-1' },
+        'undecodable',
+        NOW
+      );
+      const quarantined = await deriveOngoing(repository);
+      expect(quarantined.heldAside).toEqual(['hero-a']);
+      expect(quarantined.needsAttention).toEqual([]);
+    } finally {
+      database.close();
+    }
+  });
+
+  it('dispatch guard holds stale-origin and paused work but dispatches current on work', async () => {
+    await seedRun({ mode: 'ongoing' });
+    await createOngoingHarness().start();
+    const [entry] = (await readStore(
+      'outbox'
+    )) as AutomaticCharacterOutboxEntry[];
+    const locks = new RecordingLocks();
+    const guard = createPlayerBackupDispatchGuard({
+      factory: indexedDB,
+      locks,
+      accountId: ACCOUNT,
+    });
+
+    await expect(
+      guard.authorize({ ...entry!, originPlayerBackupRunId: 'run-old' })
+    ).resolves.toBe('hold');
+    await expect(
+      guard.authorize({ ...entry!, namespace: 'user:account-b' })
+    ).resolves.toBe('hold');
+    await expect(guard.authorize(entry!)).resolves.toBe('dispatch');
+
+    await expect(guard.around(entry!, async () => 'dispatched')).resolves.toBe(
+      'dispatched'
+    );
+    expect(locks.events).toEqual([
+      `acquire:${LOCK_NAME}`,
+      `release:${LOCK_NAME}`,
+    ]);
+
+    await setCharacterPolicy('hero-a', false);
+    await expect(guard.authorize(entry!)).resolves.toBe('hold');
+
+    const lockless = createPlayerBackupDispatchGuard({
+      factory: indexedDB,
+      locks: null,
+      accountId: ACCOUNT,
+    });
+    await expect(
+      lockless.around(entry!, async () => 'dispatched')
+    ).rejects.toBeInstanceOf(PlayerBackupLockUnavailableError);
+  });
+
+  it('later ongoing edits stop after an explicit pause and resume without losing acknowledged data', async () => {
+    await seedRun({ mode: 'ongoing' });
+    const harness = createOngoingHarness();
+    await harness.start();
+
+    const database = await openExistingRollkeeperDatabase({
+      factory: indexedDB,
+    });
+    if (!database) throw new Error('database is missing');
+    try {
+      const repository = new IndexedDbAutomaticCharacterSyncRepository(
+        database
+      );
+      const preferences = new AutomaticCharacterSyncPreferences(database);
+      const gateway = createGatewayDouble();
+      const worker = new AutomaticCharacterSyncWorker({
+        namespace: NAMESPACE,
+        featureEnabled: true,
+        repository,
+        gateway,
+        dispatchGuard: createPlayerBackupDispatchGuard({
+          factory: indexedDB,
+          locks: new ImmediateLocks(),
+          accountId: ACCOUNT,
+        }),
+      });
+      await expect(worker.runOnce()).resolves.toBe('synced');
+
+      const service = new AutomaticCharacterSyncService({
+        featureEnabled: true,
+        account: { id: ACCOUNT },
+        repository,
+        preferences,
+        indexedDbPrimary: true,
+        generateCloudId: harness.identities.generateCloudId,
+        now: () => NOW,
+      });
+      const edited = {
+        ...ONGOING_HERO_A,
+        characterData: { id: 'hero-a', revision: 6 },
+      };
+      await expect(service.recordEdit(edited)).resolves.toBe('queued');
+      await service.disableCharacter('hero-a');
+
+      await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+        expect.objectContaining({ state: 'paused', pausedFromState: 'queued' }),
+      ]);
+      await expect(
+        repository.getDocument(NAMESPACE, 'hero-a')
+      ).resolves.toMatchObject({ cloudId: 'cloud-1', baseServerVersion: 1 });
+      await expect(worker.runOnce()).resolves.toBe('idle');
+      expect(gateway.put).toHaveBeenCalledTimes(1);
+
+      await service.enableCharacter(edited, {
+        confirmed: true,
+        targetAccountId: ACCOUNT,
+      });
+
+      await expect(worker.runOnce()).resolves.toBe('synced');
+      expect(gateway.put).toHaveBeenCalledTimes(2);
+      await expect(
+        repository.getDocument(NAMESPACE, 'hero-a')
+      ).resolves.toMatchObject({
+        cloudId: 'cloud-1',
+        baseServerVersion: 2,
+        localRevision: 6,
+      });
+      await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([]);
+    } finally {
+      database.close();
+    }
   });
 });

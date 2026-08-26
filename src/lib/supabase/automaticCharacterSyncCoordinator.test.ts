@@ -181,6 +181,30 @@ describe('AutomaticCharacterSyncCoordinator', () => {
     expect(runOnce).toHaveBeenCalledTimes(2);
   });
 
+  it('drains past held work and stops only on a non-runnable outcome', async () => {
+    const runOnce = vi
+      .fn()
+      .mockResolvedValueOnce('held')
+      .mockResolvedValueOnce('synced')
+      .mockResolvedValueOnce('idle');
+    const pull = vi.fn().mockResolvedValue(undefined);
+    const coordinator = new AutomaticCharacterSyncCoordinator({
+      featureEnabled: true,
+      hasParticipants: async () => true,
+      runOnce,
+      pull,
+      events: new EventTarget(),
+    });
+
+    await coordinator.start();
+
+    expect(runOnce).toHaveBeenCalledTimes(3);
+    expect(pull.mock.calls.map(call => call[0])).toEqual([
+      'startup',
+      'successful-push',
+    ]);
+  });
+
   it('rechecks participation before event-driven pulls and manual refresh', async () => {
     const events = new EventTarget();
     const pull = vi.fn();
